@@ -16,7 +16,7 @@ export interface Product {
   /**
    * 每匹米数（匹↔米换算元数据，可空）；仅换算视图入参，不参与库存计量（models/product.rs:70）。
    * 后端 rust_decimal 序列化为字符串（如 "100.00"）、NULL→null；本接口亦用于创建/更新入参（表单数值），
-   * 故取并集。消费点：ProductFormDialogTab 编辑回显需 Number() 归一后绑定 el-input-number。
+   * 故取并集。消费点：ProductFormDialogTab 编辑回显需 Number() 归一后绑定手写录入控件。
    */
   meters_per_piece?: number | string | null;
   /**
