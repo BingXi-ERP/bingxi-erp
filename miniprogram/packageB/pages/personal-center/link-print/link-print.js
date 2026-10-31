@@ -220,7 +220,7 @@ Page({
   confirmR: function () {
     var t = this;
     wx.setClipboardData({
-      // 厂商侧服务号占位：真实号码不再入公开仓库面，如需可达此入口应由接口下发
+      // 把打印机无线热点名复制到剪贴板，供用户去系统 WLAN 列表粘贴连接，热点名由后端配置下发
       data: "gc13800000000",
       success: function (e) {
         (t.cancelR(),

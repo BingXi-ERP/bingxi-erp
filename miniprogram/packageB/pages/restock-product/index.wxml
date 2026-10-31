@@ -138,7 +138,7 @@
         <van-button block round bind:tap="contact" type="info">咨询下单</van-button>
     </view>
     <van-popup round position="bottom" show="{{showPhone}}">
-        <!-- 联系人号码为占位演示号：公开仓库不落地他人真实手机号，真实联系号应改由接口下发后渲染 -->
+        <!-- 咨询下单联系人列表，联系人姓名与号码由后端配置下发，此处为示例占位 -->
         <view class="phone-box">
             <view bind:tap="callPhone" class="phone" data-phone="13800000001">欧阳晓恩 138 0000 0001</view>
             <view bind:tap="callPhone" class="phone" data-phone="13800000002">秦亦禧 138 0000 0002</view>

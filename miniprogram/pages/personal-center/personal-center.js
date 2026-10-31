@@ -204,7 +204,7 @@ Page({
       return !a.perm || e.data.userAuthList[a.perm];
     });
     var util = wx.getStorageSync("mobile");
-    // 演示账号特判占位号：真实演示号不入公开仓库面，命中占位号即无特判生效
+    // 演示账号特判，本地缓存手机号等于演示号时隐藏登录入口，演示号由后端配置下发
     (("13800000000" != util && util) || login.splice(0, 1),
       this.setData({
         panel: o,
