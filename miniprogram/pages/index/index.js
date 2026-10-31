@@ -7,6 +7,9 @@ var t,
   mta_analysis = a(require("../../utils/mta_analysis")),
   formatRichText = require("../../utils/formatRichText.js"),
   global = require("../../libs/services/global"),
+  request = require("../../libs/services/request.js").request,
+  apiGateway = require("../../libs/utils/apiGateway.js"),
+  uploadGateway = require("../../libs/utils/uploadGateway.js"),
   isVisitor = a(require("../../libs/utils/isVisitor")),
   getWxInfo = a(require("../../libs/utils/getWxInfo")),
   ServicesUserLog = require("../../libs/services/ServicesUserLog"),
@@ -79,6 +82,21 @@ Page(
         path: "/pages/index/index",
       };
     },
+    /**
+     * 首页以图搜索的图片上传
+     * 调用方：本页 wxml 的拍照搜布入口
+     * 入参：wx.chooseMedia 选中的临时文件清单
+     * 传给谁：libs/utils/uploadGateway.js 的 upload（内部由 libs/utils/apiGateway.js 的
+     *   requestContract 发出并归一化），不再直发 wx.uploadFile 也不自拼 Authorization 头——
+     *   后端凭据是 httpOnly Cookie（backend/src/middleware/auth.rs 的优先级
+     *   access_token Cookie 到 jwt Cookie 到 Authorization 头），JS 侧 storage 里从来没有 token，
+     *   那条头永远为空并被 auth.rs 判"无效的认证头格式"，属凭据冒充登录态
+     * 存什么/存哪里：只把返回的相对地址并入本页 remoteImageFiles，不落任何凭据键
+     * 待拍板一条：旧路径 /app-api/oss/upload 在本仓权威面
+     *   frontend/scripts/route-snapshot.txt（1821 条）内没有等价的对象存储上传端点
+     *   （multipart 腿只有 user/avatar 与 supplier 资质附件 与 system-update/upload 与 data-import），
+     *   原样保留并登记，禁止改成会 404 的假接入
+     */
     upload: function () {
       var t = this;
       wx.chooseMedia({
@@ -89,60 +107,61 @@ Page(
             isLoadingPhoto: 1,
           }),
             e.tempFiles.map(function (n) {
-              wx.uploadFile({
-                header: {
-                  "Content-Type": "multipart/form-data",
-                  Authorization: wx.getStorageSync("token"),
-                  terminalSource: 6,
-                  terminalType: 81,
-                },
-                formData: {
-                  type: 1,
-                },
-                url: "".concat(app.config.bingxiHost, "/app-api/oss/upload"),
-                filePath: n.tempFilePath,
-                name: "file",
-                success: function (n) {
-                  try {
-                    var o = JSON.parse(n.data);
-                    if (0 === o.code) {
-                      var s = o.data;
-                      (t.data.remoteImageFiles.push({
-                        text: util.replImage(s, 300),
-                        name: s.substr(s.lastIndexOf("/") + 1),
-                        storagePath: util.replImage(s, 300),
-                      }),
-                        t.data.remoteImageFiles.length > uploadPiece &&
-                          (t.data.remoteImageFiles.length = uploadPiece),
-                        t.setData({
-                          remoteImageFiles: t.data.remoteImageFiles,
-                          isLoadingPhoto: 0,
-                        }));
-                    } else
-                      401 === o.code
-                        ? wx.showToast({
-                            icon: "none",
-                            title: "token失效,请重新上传",
-                          })
-                        : wx.showToast({
-                            icon: "none",
-                            title: t.data.msg.result,
-                          });
-                  } catch (t) {
-                    wx.showToast({
-                      icon: "none",
-                      title: "上传图片失败",
-                    });
-                  }
+              uploadGateway
+                .upload({
+                  header: {
+                    terminalSource: 6,
+                    terminalType: 81,
+                  },
+                  formData: {
+                    type: 1,
+                  },
+                  url: "".concat(app.config.bingxiHost, "/app-api/oss/upload"),
+                  filePath: n.tempFilePath,
+                  name: "file",
+                })
+                .then(function (o) {
+                  if (o && 0 === o.code) {
+                    var s = o.data;
+                    (t.data.remoteImageFiles.push({
+                      text: util.replImage(s, 300),
+                      name: s.substr(s.lastIndexOf("/") + 1),
+                      storagePath: util.replImage(s, 300),
+                    }),
+                      t.data.remoteImageFiles.length > uploadPiece &&
+                        (t.data.remoteImageFiles.length = uploadPiece),
+                      t.setData({
+                        remoteImageFiles: t.data.remoteImageFiles,
+                        isLoadingPhoto: 0,
+                      }));
+                  } else
+                    401 === (o && o.code)
+                      ? wx.showToast({
+                          icon: "none",
+                          title: "会话失效,请重新登录",
+                        })
+                      : wx.showToast({
+                          icon: "none",
+                          title: (o && o.msg) || "上传图片失败",
+                        });
                   (t.getWidth(),
                     (a += 1) &&
                       a === e.tempFiles.length &&
                       setTimeout(function () {
                         wx.hideLoading();
                       }, 500));
-                },
-                fail: function (t) {},
-              });
+                }, function () {
+                  wx.showToast({
+                    icon: "none",
+                    title: "上传图片失败",
+                  });
+                  (t.getWidth(),
+                    (a += 1) &&
+                      a === e.tempFiles.length &&
+                      setTimeout(function () {
+                        wx.hideLoading();
+                      }, 500));
+                });
             }));
         },
       });
@@ -222,6 +241,21 @@ Page(
         app.globalData.wxCode;
       });
     },
+    /**
+     * 记录渠道落地访问
+     * 调用方：本页 onShow 在统计次数为零时
+     * 入参：t 页面启动参数，取 c 与 sc 两枚渠道码
+     * 传给谁：ServicesUser.getChannel 即 POST /api/v1/erp/page-view（快照:1351 track_page_view）
+     * 存什么/存哪里：不落盘
+     * 凭据一条：原载荷里带 token: wx.getStorageSync("token")，
+     *   而 PageViewRequest（backend/src/handlers/tracking_handler.rs:34 到 46）的入参只有
+     *   path 与 timestamp 与 session_id 与 referrer 与 user_agent 与 ip_address，没有 token，
+     *   且后端凭据是 httpOnly Cookie，JS 侧从来没有 token，所以这条参数既非契约所需又永远为空，
+     *   按"不需要就删掉该参数而不是传空串"退场。
+     * 待拍板一条：PageViewRequest 必填 path 与 timestamp，本处传的 channel 与 subChannel 与
+     *   wxCode 三枚都不在其入参内，等于这腿必 400；渠道归因能力在本仓没有承载面，
+     *   不改成像（不拿 path 拼一条假访问），登记待拍板清单
+     */
     getUserCode: function (t) {
       var e = util.getParam(t, "c", "0"),
         a = util.getParam(t, "sc", "0");
@@ -232,7 +266,6 @@ Page(
           channel: e,
           subChannel: a,
           wxCode: n,
-          token: wx.getStorageSync("token"),
         };
         ServicesUser.getChannel(o);
       }
@@ -242,8 +275,17 @@ Page(
         url: "/pages/register/login/login",
       });
     },
+    /**
+     * 首页加载：只有会话成立才拉档案与消息与广告
+     * 判据由 wx.getStorageSync("token") 换成 apiGateway.isLoggedIn()：
+     *   后端登录出参没有 token 字段（backend/src/handlers/auth_handler.rs 的 LoginResponse
+     *   只有 csrf_token 与 user 与 permissions 与 password_expired），storage 的 token 永远为空，
+     *   拿它当门等于恒判未登录，首页整块内容永不加载，属凭据冒充登录态；
+     *   isLoggedIn() 读的是 users/me 回读确认后写入的会话快照 bingxiSession，是真判据。
+     *   会话过期由传输层在收到 401 时经 checkToken.checkLogin() 回读复核并跳登录页。
+     */
     onLoad: async function (e) {
-      if (wx.getStorageSync("token")) {
+      if (apiGateway.isLoggedIn()) {
         await this.getUserInfo();
         await this.getMessage();
         await this.getAdvertisingData(3);
@@ -255,10 +297,11 @@ Page(
           saveOptions: e,
         }));
     },
+    /** 同 onLoad：登录门改为会话快照判据，不再读永为空的 storage token */
     onShow: function () {
       var t = this,
         e = this;
-      (wx.getStorageSync("token") &&
+      (apiGateway.isLoggedIn() &&
         getWxInfo.default
           .getWxCode()
           .then(function () {
@@ -403,7 +446,7 @@ Page(
       isVisitor.default.isVisitor().then(function (e) {
         var a = "release";
         ((a = "production" == app.environment ? "release" : "trial"),
-          wx.getStorageSync("token") && ServicesUserLog.servicesUserLog.setUserHandleLog(600),
+          apiGateway.isLoggedIn() && ServicesUserLog.servicesUserLog.setUserHandleLog(600),
           t.data.storeInfo.companyId &&
           "null" !== t.data.storeInfo.companyId &&
           "undefined" !== t.data.storeInfo.companyId
@@ -508,27 +551,33 @@ Page(
         });
       });
     },
+    /**
+     * 上报订阅消息 formId
+     * 调用方：本页表单 submit 后取到 formId 时
+     * 入参：无（读本页 data.formId 与 wx.login 的 code）
+     * 传给谁：libs/services/request.js 的传输层，再由 libs/utils/apiGateway.js 的 requestContract
+     *   发出；地址仍由 libs/services/global.js 的 saveFormId 给出
+     * 存什么/存哪里：不落盘
+     * 三处退场：一 不再把 storage 的 token 放进请求体（后端凭据是 httpOnly Cookie，
+     *   JS 侧从来没有 token，传过去必为空）；二 不再自拼 Authorization 头；
+     *   三 不再写空的 success 回调把失败静默吞掉，失败一律经传输层外显
+     * 待拍板一条：旧路径 /app-api/pubMsg/saveFormId 仓内无等价端点，原样保留并登记
+     */
     getformId: function () {
       var t = this,
         e = (0, global.saveFormId)();
       wx.login({
         success: function (a) {
           var n = {
-            token: wx.getStorageSync("token"),
             formId: t.data.formId,
             code: a.code,
           };
-          wx.request({
-            url: e,
-            method: "POST",
-            data: n,
-            header: {
+          request.POST(e, n, {
+            headers: {
               "content-type": "application/x-www-form-urlencoded",
-              Authorization: wx.getStorageSync("token"),
               terminalSource: 6,
               terminalType: 81,
             },
-            success: function (t) {},
           });
         },
       });

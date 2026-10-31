@@ -2,6 +2,7 @@ var e = require("../../../../../../@babel/runtime/helpers/interopRequireDefault"
   objectSpread2 = require("../../../../../../@babel/runtime/helpers/objectSpread2");
 require("../../../../../../@babel/runtime/helpers/Arrayincludes");
 var ServicesQRCode = require("../../../../../libs/services/ServicesQRCode.js"),
+  uploadGateway = require("../../../../../libs/utils/uploadGateway.js"),
   dialog = e(require("../../../../../../miniprogram_npm/@vant/weapp/dialog/dialog")),
   app = getApp();
 Page({
@@ -127,25 +128,23 @@ Page({
               console.log("上传中"));
           }, 500),
             console.log(ServicesQRCode),
-            wx.uploadFile({
+            uploadGateway.upload({
               url: "".concat(app.config.bingxiHost, "/app-api/file/upload"),
               filePath: ServicesQRCode,
               name: "file",
               header: {
-                "Content-Type": "multipart/form-data",
-                Authorization: wx.getStorageSync("token"),
                 terminalSource: 6,
                 terminalType: 81,
               },
               formData: {
                 filePath: "/bdd/pay",
               },
-              success: function (e) {
-                var ServicesQRCode = JSON.parse(e.data);
-                0 === ServicesQRCode.code
-                  ? (console.log(e),
+            }).then(
+              function (t) {
+                0 === (t && t.code)
+                  ? (console.log(t),
                     wx.hideLoading(),
-                    objectSpread2.updateMoneyCode(ServicesQRCode.data),
+                    objectSpread2.updateMoneyCode(t.data),
                     setTimeout(function () {
                       wx.hideLoading();
                     }, 1500))
@@ -153,11 +152,11 @@ Page({
                       wx.hideLoading();
                     }, 500),
                     wx.showToast({
-                      title: ServicesQRCode.msg.result,
+                      title: (t && t.msg) || "上传失败",
                       icon: "none",
                     }));
               },
-              fail: function () {
+              function () {
                 (objectSpread2.setData({
                   curUploadType: "",
                 }),
@@ -169,7 +168,7 @@ Page({
                       }));
                   }, 500));
               },
-            }));
+            ));
         },
         fail: function () {
           (wx.hideLoading(),

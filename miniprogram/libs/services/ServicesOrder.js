@@ -29,15 +29,23 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
         );
       }),
       (this.draftCount = function (t) {
-        return request.GET(
-          "".concat(app.config.bingxiHost, "/app-api/order/sale/billing/draftCount"),
-          t,
-          {
-            headers: {
-              "content-type": "application/json",
-            },
+        // 功能 统计当前草稿态销售订单的张数
+        // 调用方 pages/order/pin/index.js 的 onLoad（把返回值直接当张数显示）
+        // 入参 t 旧侧的空查询对象，本仓按状态过滤取一页一条只为读 total
+        // 传给谁 本仓 sales orders 列表 GET 口（route-snapshot.txt 第 892 行），
+        //   状态键按 SalesOrderFilter 的 status 字段（backend/src/handlers/sales_order_handler.rs 第 69 行）
+        // 存什么 只带 status 与 page 与 page_size 三枚查询参数
+        // 存哪里 不写本地缓存；出参由旧侧的裸数值变成分页信封，张数在 data.total，
+        //   消费页仍读 data 整包，该形态差异已登记进映射报告
+        return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/sales/orders"), {
+          status: "draft",
+          page: 1,
+          page_size: 1,
+        }, {
+          headers: {
+            "content-type": "application/json",
           },
-        );
+        });
       }),
       (this.closeOrder = function (t) {
         return request.POST("".concat(app.config.bingxiHost, "/api/v1/erp/sales/orders/", t.billingId || t.id || t.orderId || "", "/cancel"), t,
@@ -110,11 +118,18 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
         );
       }),
       (this.paymentDetail = function (t) {
+        // 功能 读取单张销售订单的金额构成（收款页表头）
+        // 调用方 pages/order/receipt/index.js 的 paymentDetail
+        // 入参 t.billingId 订单标识
+        // 传给谁 本仓 sales orders 详情 GET 口（route-snapshot.txt 第 893 行），
+        //   标识内联进 URL 路径段（快照用星号表示该段）
+        // 存什么 URL 上只带订单标识，请求体不再传旧侧的整包查询对象；
+        //   旧侧返回独立的金额聚合体，本仓由订单头的 total_amount 与 paid_amount 等列承载，
+        //   DECIMAL 列序列化为字符串，字段名与类型差异已登记进映射报告
+        // 存哪里 不写本地缓存
         return request.GET(
-          ""
-            .concat(app.config.bingxiHost, "/app-api/order/sale/billing/billingAmount/")
-            .concat(t.billingId),
-          t,
+          "".concat(app.config.bingxiHost, "/api/v1/erp/sales/orders/", t.billingId),
+          {},
           {
             headers: {
               "content-type": "application/json",

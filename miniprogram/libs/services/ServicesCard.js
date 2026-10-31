@@ -1,8 +1,30 @@
 var createClass = require("../../@babel/runtime/helpers/createClass"),
   classCallCheck = require("../../@babel/runtime/helpers/classCallCheck"),
   app = getApp(),
-  request = require("./request.js").request,
-  c = createClass(function o() {
+  request = require("./request.js").request;
+
+/**
+ * 功能 批量切换色卡商品的上架与下架状态
+ * 调用方 本文件的 batchSetOnSale 与 batchSetOffSale，上游为 pages/color-card-management/batch-management/batch-management.js 的 onOrOffShelves 与 pages/color-card-management/color-card-management.js 的 onOrOff
+ * 入参 o.productIds 商品标识数组，o.onSale 上架标志（数值 1 上架，其余按下架处理）
+ * 传给谁 本仓 products 批量更新口 POST（route-snapshot.txt 第 1492 行），载荷键按 BatchUpdateProductsPayload 的 products 数组与逐行 status 字段（backend/src/handlers/bulk_product_handler.rs 第 27 行）
+ * 存什么 只把商品标识与状态两键组进载荷，状态词表取 active 与 inactive（frontend/src/api/product.ts 第 202 行）
+ * 存哪里 不写本地缓存，结果只回给调用页
+ */
+function batchSwitchProductStatus(o) {
+  var ids = o.productIds;
+  var status = Number(o.onSale) === 1 ? "active" : "inactive";
+  var products = [];
+  for (var i = 0; i < ids.length; i++) {
+    products.push({ id: Number(ids[i]), status: status });
+  }
+  return request.POST("".concat(app.config.bingxiHost, "/api/v1/erp/products/batch/update"), {
+    products: products,
+  });
+}
+
+var c =
+  createClass(function o() {
     (classCallCheck(this, o),
       (this.colorCardList = function (o) {
         return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/products"), o);
@@ -45,16 +67,10 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
         return request.POST("".concat(app.config.bingxiHost, "/app-api/colorCardSetting/save"), o);
       }),
       (this.batchSetOnSale = function (o) {
-        return request.PUT(
-          "".concat(app.config.bingxiHost, "/app-api/product/batch/switchStatus"),
-          o,
-        );
+        return batchSwitchProductStatus(o);
       }),
       (this.batchSetOffSale = function (o) {
-        return request.PUT(
-          "".concat(app.config.bingxiHost, "/app-api/product/batch/switchStatus"),
-          o,
-        );
+        return batchSwitchProductStatus(o);
       }),
       (this.queryColorCardCount = function (o) {
         return request.GET("".concat(app.config.bingxiHost, "/app-api/goods/goodsSaleCount"), o);

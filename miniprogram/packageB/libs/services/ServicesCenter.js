@@ -92,15 +92,14 @@ var createClass = require("../../../@babel/runtime/helpers/createClass"),
         return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/users/me"), t);
       }),
       (this.shopDetail2 = function (t) {
-        return request.POST(
-          "".concat(app.config.bingxiHost, "/app-api/setting/company/detail?id=").concat(t.id),
-          t,
-          {
-            headers: {
-              "content-type": "application/x-www-form-urlencoded",
-            },
-          },
-        );
+        // 功能 读取本公司档案详情用于店铺资料页回显
+        // 调用方 packageB/pages/personal-center/edit-shop/edit-shop.js 的 shopDetail2
+        // 入参 t 旧侧带 id 查询串的表单对象，本仓该口按会话取当前公司，无查询参数
+        // 传给谁 本仓 company-profile 全量读口 GET（route-snapshot.txt 第 349 行），与 libs 份同一形态
+        // 存什么 出参列名按 company_profile 实体（backend/src/models/company_profile.rs 第 21 行起），
+        //   与旧侧店铺字段名不同，差异点已登记进映射报告
+        // 存哪里 不写本地缓存
+        return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/company-profile/full"), {});
       }),
       (this.updateShop = function (t) {
         return request.POST("".concat(app.config.bingxiHost, "/app-api/setting/company/modify"), t);

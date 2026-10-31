@@ -102,7 +102,38 @@ function upload(spec) {
   });
 }
 
+/**
+ * wx.uploadFile 的回调式替身（调用点迁移用）
+ * 功能：保持 wx.uploadFile({url, filePath, name, header, formData, success, fail}) 的入参形态，
+ *   但实际发送交给 upload，即经 apiGateway.requestContract 走契约层
+ * 调用方：pages/color-card 与 pages/color-card-management 的上传站点、pages/print 与
+ *   pages/search-img/search 与 pages/register 的申请资料页等沿用回调式写法的调用点
+ * 入参：spec 同 wx.uploadFile，另 success(res) 收到的 res 是归一化后的响应体对象
+ *   （不是 wx 的原始回调对象，因此调用点原先的 JSON.parse(x.data) 一律改为直接用 res）
+ * 传给谁：upload 的 Promise，再落回 success 与 fail
+ * 存什么/存哪里：不落盘
+ * 一条硬约束：本替身不接收也不发送 Authorization，凭据由 httpOnly Cookie 承载；
+ *   同时不再让调用点写死无 boundary 的 Content-Type，multipart 的分隔符必须留给
+ *   wx.uploadFile 自己生成，否则后端解析不到文件字段
+ */
+function uploadFile(spec) {
+  var s = spec || {};
+  var settle = function (fn, arg) {
+    if (typeof fn === "function") fn(arg);
+  };
+  return upload(s).then(
+    function (res) {
+      settle(s.success, res);
+    },
+    function (err) {
+      settle(s.fail, err);
+    },
+  );
+}
+
 module.exports = {
   upload: upload,
+  uploadFile: uploadFile,
   parseUploadBody: parseUploadBody,
 };
+
