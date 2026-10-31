@@ -42,6 +42,7 @@ SELF_TEST=0
 MP_SUBPACKAGE_LIMIT_KB="${MP_SUBPACKAGE_LIMIT_KB:-2048}"
 MP_TOTAL_LIMIT_KB="${MP_TOTAL_LIMIT_KB:-20480}"
 MP_JS_FLOOR="${MP_JS_FLOOR:-100}"
+MP_EXPOSURE_FLOOR="${MP_EXPOSURE_FLOOR:-100}"
 
 FAIL=0
 TOOL_FAIL=0
@@ -206,6 +207,9 @@ JSON
   # 假接入：指向仓内不存在的端点
   printf 'wx.request({ url: bingxiBase() + "/api/v1/erp/__no_such_endpoint__/x", method: "GET" });\n' \
     > "$tmp/miniprogram/libs/probe.js"
+  # 暴露面：公网 IP 字面量与服务端凭据字面量（203.0.113.0/24 是文档保留段，只用于夹具）
+  printf 'module.exports = { bingxiHost: "https://203.0.113.10", appSecret: "abcdef0123456789" };\n' \
+    > "$tmp/miniprogram/envConfig.js"
 
   MP_JS_FLOOR=1 bash -c 'true' >/dev/null 2>&1
   node --check "$tmp/miniprogram/pages/a/a.js" >/dev/null 2>&1; rc_s=$?
@@ -218,27 +222,25 @@ JSON
     return 1
   fi
   node "$checker" --root "$tmp/miniprogram" --snapshot "$SNAPSHOT" >/dev/null 2>&1; rc_e=$?
+  # 暴露面用夹具自己的地板：小夹具只有几个文件，沿用生产地板会被"扫面过窄"抢先判 9，
+  # 那样抓到的是地板而不是泄露点，自证就成了假证
+  MP_EXPOSURE_FLOOR=2 mp_exposure "$tmp/miniprogram" >/dev/null 2>&1; rc_x=$?
   rm -rf "$tmp"
 
-  # 语法探针靠 node --check 的非零退出码；页面对账与端点对账靠判定器自己的非零退出码
+  # 语法探针靠 node --check 的非零退出码；页面对账与端点对账靠判定器自己的非零退出码；
+  # 暴露面必须恰好退 1（判红），退 9 说明是地板误伤，不算抓到泄露
   [ "$rc_s" -ne 0 ] && caught=$((caught + 1)) || missed="$missed syntax"
   [ "$rc_p" -ne 0 ] && caught=$((caught + 1)) || missed="$missed pages"
   [ "$rc_e" -ne 0 ] && caught=$((caught + 1)) || missed="$missed endpoints"
-  say "SELFTEST caught=$caught/3${missed:+ missed:$missed}"
-  if [ "$caught" -eq 3 ]; then
-    say "MP_DETECTOR_OK 三道反向探针全部被抓到"
+  [ "$rc_x" -eq 1 ] && caught=$((caught + 1)) || missed="$missed exposure(rc=$rc_x)"
+  say "SELFTEST caught=$caught/4${missed:+ missed:$missed}"
+  if [ "$caught" -eq 4 ]; then
+    say "MP_DETECTOR_OK 四道反向探针全部被抓到"
     return 0
   fi
   tool_bug "反向探针有没被抓到的道，判定器无检测力，其绿不可信"
   return 1
 }
-
-if [ "$SELF_TEST" = 1 ]; then
-  mp_selftest
-  rc=$?
-  [ "$rc" -eq 0 ] && say "MP_SELFTEST_OK" || say "MP_SELFTEST_RED"
-  exit $rc
-fi
 
 # 依赖与产物声明校验：miniprogram_npm 下每个厂商包都必须在 miniprogram/package.json 里声明，
 # 且构建产物目录不得进版本库（产物由 npm 构建再生，入库会让依赖面与审计面双双失真）
@@ -286,6 +288,79 @@ NODE
   return $?
 }
 
+# 暴露面点名校验：小程序面不得把真实服务器地址与后端凭据写进源码。
+# 判红两类：一是公网 IPv4 字面量（微信"request 合法域名"本就只收备案域名，
+#   写 IP 既是最常见的攻击面泄露，也让真机联调只能靠开发者工具"不校验合法域名"
+#   才能通，等于把生产 IP 永久钉死在客户端里）；二是 appsecret / private key
+#   这类服务端凭据字面量（小程序包可被任意解出，写进去等于公开）。
+# 手机号只点名不判红：客服号是给客户看的界面文案，属正常内容，判红会逼人删掉
+#   真实可用的联系入口；此处如实报告，交人判。
+mp_exposure() {
+  local root="$1"
+  node - "$root" "$MP_EXPOSURE_FLOOR" <<'NODE'
+const fs = require('fs');
+const path = require('path');
+const root = process.argv[2];
+const floor = Number(process.argv[3]);
+const skip = new Set(['miniprogram_npm', 'node_modules', '.git']);
+const exts = new Set(['.js', '.wxs', '.json', '.wxml', '.wxss', '.md', '.html']);
+// 私网与保留段不算泄露：10/127/0/169.254/192.0.0/192.168/172.16-31 与全 0
+const PRIV = /^(?:10\.|127\.|0\.|169\.254\.|192\.0\.0\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/;
+const IPV4 = /(?<![\w.])(\d{1,3}\.){3}\d{1,3}(?![\w.])/g;
+const SECRET_KEY = /(?:app_?secret|appsecret|private_?key|access_?key_?secret|secret_?key)\s*[:=]\s*['"]([^'"]{8,})['"]/i;
+const PHONE = /(?<!\d)1[3-9]\d{9}(?!\d)/g;
+const files = [];
+(function walk(dir) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (skip.has(e.name)) continue;
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) walk(full);
+    else if (exts.has(path.extname(e.name))) files.push(full);
+  }
+})(root);
+const ipHits = [];
+const secretHits = [];
+const phoneHits = [];
+for (const f of files) {
+  const text = fs.readFileSync(f, 'utf8');
+  const rel = path.relative(root, f).replace(/\\/g, '/');
+  const lines = text.split(/\r?\n/);
+  lines.forEach((line, i) => {
+    for (const m of line.match(IPV4) || []) {
+      const parts = m.split('.');
+      const octetsOk = parts.every((p) => Number(p) <= 255);
+      if (octetsOk && !PRIV.test(m) && /^(\d{1,3}\.){3}\d{1,3}$/.test(m)) {
+        ipHits.push(rel + ':' + (i + 1) + ' ' + m);
+      }
+    }
+    const sm = line.match(SECRET_KEY);
+    if (sm) secretHits.push(rel + ':' + (i + 1) + ' 键值形如 ' + sm[0].slice(0, 24) + '…');
+    for (const p of line.match(PHONE) || []) phoneHits.push(rel + ':' + (i + 1) + ' ' + p);
+  });
+}
+console.log('MP_EXPOSURE scanned=' + files.length + ' publicIp=' + ipHits.length + ' secretLiteral=' + secretHits.length + ' phoneLiteral=' + phoneHits.length);
+if (files.length < floor) {
+  console.log('TOOL_BUG 暴露面扫描只看到 ' + files.length + ' 个文件，低于地板 ' + floor + '，其"零命中"不可信');
+  process.exit(9);
+}
+for (const h of ipHits) console.log('  EXPOSURE_PUBLIC_IP ' + h);
+for (const h of secretHits) console.log('  EXPOSURE_SECRET ' + h);
+for (const h of phoneHits) console.log('  EXPOSURE_NOTE_PHONE ' + h + '（界面文案可接受，仅点名）');
+let fail = 0;
+if (ipHits.length > 0) { console.log('MP_EXPOSURE_RED 有 ' + ipHits.length + ' 处公网 IP 字面量，须改为微信备案域名并由单点配置提供'); fail = 1; }
+if (secretHits.length > 0) { console.log('MP_EXPOSURE_RED 有 ' + secretHits.length + ' 处服务端凭据字面量，小程序包内不得携带'); fail = 1; }
+process.exit(fail);
+NODE
+  return $?
+}
+
+if [ "$SELF_TEST" = 1 ]; then
+  mp_selftest
+  rc=$?
+  [ "$rc" -eq 0 ] && say "MP_SELFTEST_OK" || say "MP_SELFTEST_RED"
+  exit $rc
+fi
+
 say "MP_CHECK_BEGIN root=$MP_ROOT snapshot=$SNAPSHOT"
 # 每道的退出码必须先存进变量再打印哨兵：say 自身会改写 $?，先打印后取值会把红报成 0
 run_step() {
@@ -306,6 +381,7 @@ run_step size mp_size "$MP_ROOT"
 run_step pages mp_pages "$MP_ROOT"
 run_step endpoints mp_endpoints "$MP_ROOT"
 run_step deps mp_deps "$MP_ROOT"
+run_step exposure mp_exposure "$MP_ROOT"
 
 if [ "$TOOL_FAIL" = 1 ]; then
   say "MP_CHECK_TOOLBUG 判定器或工具链不可用，本道结论按不通过处理"
@@ -315,5 +391,5 @@ if [ "$FAIL" = 1 ]; then
   say "MP_CHECK_RED miniprogram 静态门未过"
   exit 1
 fi
-say "MP_CHECK_GREEN miniprogram 四道全过"
+say "MP_CHECK_GREEN miniprogram 六道全过"
 exit 0
