@@ -12,6 +12,13 @@
  * 登录成功判据：后端登录返回码 0 且 GET /api/v1/erp/users/me 回读通过（valid 或 denied）
  * 本文件不再写 storage 的 token / loginToken：backend/src/handlers/auth_handler.rs 的 LoginResponse
  * 只有 csrf_token、user、permissions、password_expired，凭据在 httpOnly Cookie 里，JS 侧取不到也没有
+ *
+ * 已退场的 loginByLoginToken 入口：原写法把注册接口返回的 loginToken 塞进 POST /api/v1/erp/auth/login
+ * 请求体做"注册后免密登录"。后端 LoginRequest 只有 username（必填 3 到 50）与 password（必填 6 到 128）
+ * 与可选 totp_token 与 recovery_code（backend/src/handlers/auth_handler.rs 的 LoginRequest），
+ * 没有 loginToken 字段，也没有任何签发它的端点，所以那条腿必 400，属假接入；
+ * 调用方 pages/register/submission/submission.js 与 packageB/pages/register/professer-category/
+ * professer-category.js 改为走应用已有的"请重新登录"回登录页分支，免密登录能力记入待拍板清单。
  */
 var e = require("../../@babel/runtime/helpers/interopRequireDefault").default,
   createClass = require("../../@babel/runtime/helpers/createClass"),
@@ -124,9 +131,6 @@ var s = createClass(function e() {
         wxLoginType: 2,
       };
       return ServicesUser.login2(g).then(finishLogin);
-    }),
-    (this.loginByLoginToken = function (payload) {
-      return ServicesUser.login2(payload).then(finishLogin);
     }),
     (this.getUserInfo = function (profileOnly) {
       return new Promise(function (t, a) {

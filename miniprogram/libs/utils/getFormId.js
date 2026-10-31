@@ -1,6 +1,23 @@
+/**
+ * 订阅消息 formId 上报
+ * ---------------------------------------------------------------
+ * 调用方：pages/demand-square/demand-square.js、pages/index/index.js 与 packageA/packageB 各页
+ *   在表单 submit 事件里取 e.detail.formId 后调 saveFormId.getformId(formId)
+ * 入参：e 微信表单插件下发的 formId（空值直接不发请求）
+ * 传给谁：libs/services/request.js 的传输层，再由 libs/utils/apiGateway.js 的 requestContract
+ *   做响应归一化、CSRF 一次性令牌取用与轮换、403 重放；凭据是后端 httpOnly Cookie，由 wx.request
+ *   自动携带，本文件不再自拼 Authorization 头，也不再读 storage 的 token
+ * 存什么：不落盘
+ * 存哪里：无
+ *
+ * 说明：上报通道 /app-api/pubMsg/saveFormId 是本仓 route-snapshot.txt 里没有的旧路径，
+ *   仓内无等价端点，路径按原样保留并登记在待拍板清单；请求仍走网关，
+ *   apiGateway.consumesCsrf 只认 /api/v1/erp 前缀，所以这条旧路径不会消费会话里的一次性令牌。
+ */
 var createClass = require("../../@babel/runtime/helpers/createClass"),
   classCallCheck = require("../../@babel/runtime/helpers/classCallCheck"),
   app = getApp(),
+  request = require("../services/request.js").request,
   r = createClass(function e(r) {
     (classCallCheck(this, e),
       (this.getformId = function (e) {
@@ -9,22 +26,13 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
           wx.login({
             success: function (t) {
               var r = {
-                  formId: e,
-                  code: t.code,
-                },
-                c = {
-                  Authorization: wx.getStorageSync("token"),
-                  terminalSource: 6,
+                formId: e,
+                code: t.code,
+              };
+              request.POST(classCallCheck, r, {
+                headers: {
                   "content-type": "application/x-www-form-urlencoded",
-                };
-              wx.request({
-                url: classCallCheck,
-                method: "POST",
-                data: r,
-                header: c,
-                complete: function (e) {},
-                success: function (e) {
-                  console.log(e);
+                  terminalSource: 6,
                 },
               });
             },

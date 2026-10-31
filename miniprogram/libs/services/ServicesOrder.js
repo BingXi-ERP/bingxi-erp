@@ -69,9 +69,23 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
         );
       }),
       (this.saveRemark = function (t) {
-        return request.POST(
-          "".concat(app.config.bingxiHost, "/app-api/order/sale/billing/updateBillingRemark"),
-          t,
+        // 功能 改写指定销售订单的备注正文
+        // 调用方 pages/order/remark/index.js 的 saveFun（非退货分支）
+        // 入参 t.billingId 订单标识 t.billingRemark 备注正文
+        // 传给谁 本仓 sales orders 编辑保存口 PUT（route-snapshot.txt 第 1795 行），
+        //   正文键名按后端 UpdateSalesOrderRequest 的 notes 字段改名（backend/src/services/so/mod.rs:288）
+        // 存什么 只提交 notes 一键，其余订单头字段与状态不进载荷（状态改由权威操作口产生）
+        // 存哪里 不落本地缓存
+        return request.PUT(
+          "".concat(app.config.bingxiHost, "/api/v1/erp/sales/orders/", t.billingId),
+          {
+            notes: t.billingRemark,
+          },
+          {
+            headers: {
+              "content-type": "application/json",
+            },
+          },
         );
       }),
       (this.saveImage = function (t) {

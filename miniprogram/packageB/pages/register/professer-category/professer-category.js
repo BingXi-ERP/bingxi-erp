@@ -59,25 +59,20 @@ Page({
           }),
             wx.removeStorageSync("inviteUserId"),
             (app.globalData.wxId = ""));
-          var t = e.data;
-          t
-            ? login.login
-                .loginByLoginToken({
-                  loginToken: t,
-                })
-                .then(function (e) {
-                  0 === e.code &&
-                    wx.reLaunch({
-                      url: "/pages/index/index",
-                    });
-                })
-            : (wx.showToast({
-                title: "请重新登录",
-                icon: "none",
-              }),
-              wx.reLaunch({
-                url: "/pages/register/login/login",
-              }));
+          // 申请提交成功后一律回到登录页重新登录。
+          // 原先这里把后端返回体当 loginToken 塞进 POST /api/v1/erp/auth/login 做"注册后免密登录"，
+          // 但后端 LoginRequest 只认 username 与 password 与可选 totp_token 与 recovery_code
+          // （backend/src/handlers/auth_handler.rs 的 LoginRequest），没有 loginToken 字段，
+          // 全仓也没有签发该字段的端点（frontend/scripts/route-snapshot.txt 1821 条内 grep loginToken
+          // 零命中），那条腿必 400，属凭据冒充登录态的假接入，已按本文件原有的"请重新登录"分支退场；
+          // "供货商申请通过后免密进入"这一功能面记入待拍板清单。
+          (wx.showToast({
+            title: "请重新登录",
+            icon: "none",
+          }),
+            wx.reLaunch({
+              url: "/pages/register/login/login",
+            }));
         } else
           wx.showToast({
             title: e.data.msg,

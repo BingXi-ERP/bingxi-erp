@@ -11,6 +11,13 @@
  *
  * 不再写 storage 的 token / loginToken：后端登录出参（backend/src/handlers/auth_handler.rs 的
  * LoginResponse）只有 csrf_token、user、permissions、password_expired，凭据在 httpOnly Cookie 里
+ *
+ * 已退场的 loginByLoginToken 入口：原写法把注册接口返回的 loginToken 塞进 POST /api/v1/erp/auth/login
+ * 请求体做"注册后免密登录"。后端 LoginRequest 只有 username（必填 3 到 50）与 password（必填 6 到 128）
+ * 与可选 totp_token 与 recovery_code（backend/src/handlers/auth_handler.rs 的 LoginRequest），
+ * 没有 loginToken 字段，也没有任何签发它的端点，所以那条腿必 400，属假接入；
+ * 调用方 packageB/pages/register/professer-category/professer-category.js 改为走应用已有的
+ * "请重新登录"回登录页分支，免密登录能力记入待拍板清单。
  */
 var e = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   createClass = require("../../../@babel/runtime/helpers/createClass"),
@@ -22,16 +29,15 @@ var e = require("../../../@babel/runtime/helpers/interopRequireDefault").default
 
 /**
  * 归一登录出参并在后端会话回读通过后才落登录态
- * 入参 raw ServicesUser.login2 的原始响应体
+ * 入参 raw ServicesUser.login2 的返回值（该方法内部已经过 apiGateway.adaptLogin，此处不再二次归一）
  * 传给谁：登录入口的 Promise（页面按 code === 0 判定）
- * 存什么：会话有效时落用户档案与会话快照；无效时清会话与一次性令牌
+ * 存什么：会话有效时由 login2 落的用户档案与会话快照保持不变；无效时清会话与一次性令牌
  * 存哪里：wx.storage
  */
-function finishLogin(raw) {
-  var res = apiGateway.adaptLogin(raw, !0);
-  if (res.code !== 0) {
+function finishLogin(res) {
+  if (!res || res.code !== 0) {
     wx.showToast({
-      title: res.msg || "登录失败",
+      title: (res && res.msg) || "登录失败",
       icon: "none",
       duration: 4e3,
     });
@@ -82,9 +88,6 @@ var r = createClass(function e() {
         wxId: o.globalData.wxId,
       };
       return ServicesUser.login2(d).then(finishLogin);
-    }),
-    (this.loginByLoginToken = function (payload) {
-      return ServicesUser.login2(payload).then(finishLogin);
     }),
     (this.getUserInfo = function (profileOnly) {
       return ServicesUser.getUserInfo({}).then(function (res) {

@@ -341,17 +341,21 @@ Page({
                                   url: "/pages/register/registered/registered",
                                 });
                               else if (e.data) {
-                                var a = e.data;
-                                login.login
-                                  .loginByLoginToken({
-                                    loginToken: a,
-                                  })
-                                  .then(function (e) {
-                                    0 === e.code &&
-                                      wx.reLaunch({
-                                        url: "/pages/index/index",
-                                      });
-                                  });
+                                // 开店申请通过后回到登录页重新登录。
+                                // 原先这里把后端返回体当 loginToken 塞进 POST /api/v1/erp/auth/login
+                                // 做"申请后免密登录"，但后端 LoginRequest 只认 username 与 password
+                                // 与可选 totp_token 与 recovery_code（backend/src/handlers/auth_handler.rs
+                                // 的 LoginRequest），没有 loginToken 字段，全仓在册的 1821 条端点里也没有
+                                // 任何签发该字段的入口（frontend/scripts/route-snapshot.txt），
+                                // 那条腿必 400，属凭据冒充登录态的假接入，已退场；
+                                // "开店申请通过后免密进入"这一功能面记入待拍板清单。
+                                (wx.showToast({
+                                  title: "提交成功，请重新登录",
+                                  icon: "none",
+                                }),
+                                  wx.reLaunch({
+                                    url: "/pages/register/login/login",
+                                  }));
                               } else
                                 (wx.showToast({
                                   icon: "none",
