@@ -2,16 +2,17 @@
 # .github/workflows/miniprogram-checks.yml
 #
 # 功能：微信小程序面的静态门禁——语法、代码包体积、页面声明对账、后端端点对账、
-#       依赖声明对账五道，判据全部住在 scripts/ci/miniprogram-checks.sh 一处，
+#       依赖声明对账、入库面凭据与主机暴露、跳转路由字面量对账七道，判据全部住在
+#       scripts/ci/miniprogram-checks.sh 一处，
 #       本地与云端跑同一份脚本，杜绝"本地能过、CI 红"与"CI 过、本地红"的口径分叉。
 # 调用方：改动 miniprogram/ 下任何页面的 js/wxml/wxss/json、改动 app.json 的页面与
 #       分包声明、改动任何 /api/v1/erp 调用点、改动门禁脚本自身的工作流定义时触发；
 #       也可 workflow_dispatch 手动跑一次（用于体积整改中途看数）。
 # 入参：无（工作流把仓库检出后直接调脚本；阈值见脚本 env 段，
 #       MP_SUBPACKAGE_LIMIT_KB=2048 与 MP_TOTAL_LIMIT_KB=20480 取微信官方上限）
-# 传给谁：scripts/ci/miniprogram-checks.sh → 其内部三份判定器
-#       （node --check 逐文件、体积计量、scripts/ci/mp-check-pages.cjs 页面对账、
-#        scripts/ci/mp-endpoint-check.cjs 端点对账）
+# 传给谁：scripts/ci/miniprogram-checks.sh 内部跑七道，页面对账调 scripts/ci/mp-check-pages.cjs，
+#       端点对账调 scripts/ci/mp-endpoint-check.cjs，其余五道（语法逐文件 node --check、体积计量、
+#       依赖声明、暴露面、跳转路由）内联在本脚本里，路由对账的声明集取自 app.json
 # 存什么：不写仓、不写凭据；只把门禁的逐行结论写进 $GITHUB_STEP_SUMMARY 供人读，
 #       以及把体积明细落工作流日志供分片比对
 # 存哪里：仅 Actions 运行摘要与日志
@@ -76,6 +77,6 @@ jobs:
         shell: bash
         run: bash scripts/ci/miniprogram-checks.sh --self-test
 
-      - name: 五道静态门（语法/体积/页面对账/端点对账/依赖对账）
+      - name: 七道静态门（语法/体积/页面对账/端点对账/依赖对账/暴露面/路由对账）
         shell: bash
         run: bash scripts/ci/miniprogram-checks.sh | tee -a "$GITHUB_STEP_SUMMARY"
