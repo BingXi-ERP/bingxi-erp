@@ -146,3 +146,6 @@ frontend/stats.html
 # 本地跑一次就会把 backend.log / playwright-output.txt / seed-failures-*.json
 # 之类带进版本库，故按目录名整体忽略）
 reports/
+
+# 小程序主机面本地真值配置，模板 mpHost.local.example.js 入库，真值 mpHost.local.js 由开发者本地维护不入库
+/miniprogram/mpHost.local.js

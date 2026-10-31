@@ -1,11 +1,30 @@
+// bingxiHost 是本仓后端主机的单点配置，四环境共用同一值，真值不进仓库。
+// 调用方：本文件。读取面：同目录的 mpHost.local.js（本地真值文件）。传给谁：app.js 的 initEnv 写入 app.config.bingxiHost。
+// 缺文件时直接抛错点名，不静默回退。补法：复制 mpHost.local.example.js 为 mpHost.local.js 并填入真实主机。
+var mpHost;
+try {
+  mpHost = require("./mpHost.local.js");
+} catch (err) {
+  throw new Error(
+    "缺少本地主机配置，miniprogram 目录下没有可读取的 mpHost.local.js，请复制 mpHost.local.example.js 为 mpHost.local.js 并填入真实主机地址",
+  );
+}
+if (
+  !mpHost ||
+  typeof mpHost.bingxiHost !== "string" ||
+  mpHost.bingxiHost.length === 0
+) {
+  throw new Error(
+    "本地主机配置无效，mpHost.local.js 的 bingxiHost 必须是非空的 https 主机地址",
+  );
+}
 module.exports = {
   envPage: "production",
   appVersion: "1.0.0",
   envList: {
       dev: {
         rootHost: "https://dshop.duibu.cn",
-        // bingxi-erp 后端 (Rust/Axum) —— 统一指向 8.166.117.33
-        bingxiHost: "https://8.166.117.33",
+        bingxiHost: mpHost.bingxiHost,
         imgHost: "https://oss.duibu.cn/duibu/shop",
         imgHostFile: "https://tfile.duibu.cn/luoxuan",
         imgOssHost: "https://oss.duibu.cn/",
@@ -13,7 +32,7 @@ module.exports = {
       },
       test: {
         rootHost: "https://tshop.duibu.cn",
-        bingxiHost: "https://8.166.117.33",
+        bingxiHost: mpHost.bingxiHost,
         imgHost: "https://oss.duibu.cn/duibu/shop",
         imgHostFile: "https://tfile.duibu.cn/luoxuan",
         imgOssHost: "https://oss.duibu.cn/",
@@ -21,7 +40,7 @@ module.exports = {
       },
       uat: {
         rootHost: "https://ushop.duibu.cn",
-        bingxiHost: "https://8.166.117.33",
+        bingxiHost: mpHost.bingxiHost,
         imgHost: "https://img.duibu.cn/duibu/shop",
         imgHostFile: "https://ufile.duibu.cn/ushop",
         imgOssHost: "https://img.duibu.cn/",
@@ -29,7 +48,7 @@ module.exports = {
       },
       production: {
         rootHost: "https://shop.duibu.cn",
-        bingxiHost: "https://8.166.117.33",
+        bingxiHost: mpHost.bingxiHost,
         imgHostFile: "https://img.duibu.cn/shop",
         imgHost: "https://img.duibu.cn/duibu/shop",
         imgOssHost: "https://img.duibu.cn/",
