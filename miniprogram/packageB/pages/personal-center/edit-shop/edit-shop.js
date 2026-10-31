@@ -6,6 +6,7 @@ var e = require("../../../../@babel/runtime/helpers/interopRequireDefault").defa
   getLocation = require("../../../libs/utils/getLocation"),
   ServicesCenter = require("../../../libs/services/ServicesCenter.js").servicesCenter,
   ServicesShop = require("../../../libs/services/ServicesShop.js").servicesShop,
+  uploadGateway = require("../../../libs/utils/uploadGateway.js"),
   app = getApp();
 Page({
   data: {
@@ -68,6 +69,20 @@ Page({
     multiIndex: [0, 0, 0],
     type: 0,
   },
+  /**
+   * 选图并上传店铺 logo
+   * 调用方：本页 wxml 的 logo 区
+   * 入参：wx.chooseMedia 回调里的首个临时文件
+   * 传给谁：libs/utils/uploadGateway.js 的 upload（内部由 apiGateway.requestContract 发出），
+   *   不再直发 wx.uploadFile 也不自拼 Authorization 头——凭据是后端 httpOnly Cookie
+   *   （backend/src/middleware/auth.rs），JS 侧 storage 里从来没有 token，
+   *   空值与裸值都会被 auth.rs 判"无效的认证头格式"，这条头永远为假
+   * 存什么/存哪里：只把返回的相对地址放进本页 data，不落任何凭据键
+   * 待拍板一条：旧路径 /app-api/file/upload 在本仓权威面
+   *   frontend/scripts/route-snapshot.txt（1821 条）内没有等价的通用图片上传端点
+   *   （multipart 腿只有 user/avatar 与 supplier 资质附件 与 system-update/upload 与 data-import），
+   *   故原样保留并登记，禁止改成会 404 的假接入；去向见交付报告待拍板清单
+   */
   changeAvatar: function () {
     var e = this;
     wx.chooseMedia({
@@ -76,40 +91,60 @@ Page({
       sourceType: ["album", "camera"],
       mediaType: ["image"],
       success: function (a) {
-        (wx.showLoading({
+        wx.showLoading({
           title: "头像上传中",
-        }),
-          wx.uploadFile({
+        });
+        uploadGateway
+          .upload({
             url: "".concat(app.config.bingxiHost, "/app-api/file/upload"),
             filePath: a.tempFiles[0].tempFilePath,
             name: "file",
             header: {
-              Authorization: wx.getStorageSync("token"),
               terminalSource: 6,
             },
             formData: {
               filePath: "/bdd/head",
             },
-            success: function (a) {
-              var t = JSON.parse(a.data);
-              (console.log(t),
-                0 === t.code
-                  ? (e.setData({
-                      "formParams.logo": t.data,
-                    }),
-                    wx.hideLoading(),
-                    wx.showToast({
-                      title: "头像上传成功",
-                    }))
-                  : (wx.hideLoading(),
-                    wx.showToast({
-                      title: a.msg.result,
-                    })));
+          })
+          .then(
+            function (t) {
+              wx.hideLoading();
+              if (t && 0 === t.code) {
+                e.setData({
+                  "formParams.logo": t.data,
+                });
+                wx.showToast({
+                  title: "头像上传成功",
+                });
+                return;
+              }
+              // 失败原因一律外显；原写法取 a.msg.result（把 msg 当对象再取 result）必抛 TypeError
+              wx.showToast({
+                title: (t && t.msg) || "头像上传失败",
+                icon: "none",
+              });
             },
-          }));
+            function (err) {
+              wx.hideLoading();
+              wx.showToast({
+                title: (err && err.errMsg) || "头像上传失败",
+                icon: "none",
+              });
+            },
+          );
       },
     });
   },
+  /**
+   * 选图并上传店铺背景图
+   * 调用方：本页 wxml 的背景图区
+   * 入参：wx.chooseMedia 回调里的首个临时文件
+   * 传给谁：libs/utils/uploadGateway.js 的 upload（经 apiGateway.requestContract），
+   *   去掉自拼 Authorization 头与手工 Content-Type（multipart 的 boundary 由 wx.uploadFile 生成，
+   *   写死无 boundary 的 multipart/form-data 会让后端解析不到文件字段）
+   * 存什么/存哪里：只把返回的相对地址放进本页 data，不落任何凭据键
+   * 待拍板一条：同 changeAvatar，旧路径 /app-api/file/upload 仓内无等价端点，原样保留并登记
+   */
   changeBanner: function () {
     var e = this;
     wx.chooseMedia({
@@ -118,37 +153,46 @@ Page({
       sourceType: ["album", "camera"],
       mediaType: ["image"],
       success: function (a) {
-        (wx.showLoading({
+        wx.showLoading({
           title: "图片上传中",
-        }),
-          wx.uploadFile({
+        });
+        uploadGateway
+          .upload({
             url: "".concat(app.config.bingxiHost, "/app-api/file/upload"),
             filePath: a.tempFiles[0].tempFilePath,
             name: "file",
             header: {
-              "Content-Type": "multipart/form-data",
-              Authorization: wx.getStorageSync("token"),
               terminalSource: 6,
             },
             formData: {
               filePath: "/bdd/head",
             },
-            success: function (a) {
-              var t = JSON.parse(a.data);
-              0 === t.code
-                ? (e.setData({
-                    "formParams.background": t.data,
-                  }),
-                  wx.hideLoading(),
-                  wx.showToast({
-                    title: "上传成功",
-                  }))
-                : (wx.hideLoading(),
-                  wx.showToast({
-                    title: a.msg,
-                  }));
+          })
+          .then(
+            function (t) {
+              wx.hideLoading();
+              if (t && 0 === t.code) {
+                e.setData({
+                  "formParams.background": t.data,
+                });
+                wx.showToast({
+                  title: "上传成功",
+                });
+                return;
+              }
+              wx.showToast({
+                title: (t && t.msg) || "上传失败",
+                icon: "none",
+              });
             },
-          }));
+            function (err) {
+              wx.hideLoading();
+              wx.showToast({
+                title: (err && err.errMsg) || "上传失败",
+                icon: "none",
+              });
+            },
+          );
       },
     });
   },
