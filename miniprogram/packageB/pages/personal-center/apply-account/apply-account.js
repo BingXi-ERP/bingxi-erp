@@ -7,7 +7,7 @@ Page({
   },
   toMine: function () {
     wx.reLaunch({
-      url: "/pages/index/personalCenter/personalCenter",
+      url: "/pages/personal-center/personal-center",
     });
   },
 });
