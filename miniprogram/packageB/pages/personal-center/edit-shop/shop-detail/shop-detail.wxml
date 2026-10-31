@@ -1,0 +1,12 @@
+<view class="wrapper">
+    <view class="input-list">
+        <view class="input-list-li">
+            <text>手机</text>
+            <input disabled="true" value="月入百万的店"></input>
+        </view>
+        <view class="input-list-li">
+            <text>档口所在地区</text>
+            <input disabled="true" value="月入百万的店"></input>
+        </view>
+    </view>
+</view>

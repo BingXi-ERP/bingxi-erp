@@ -1,0 +1,296 @@
+.login-page {
+  margin: auto;
+  padding-bottom: 100rpx;
+  text-align: center;
+  width: 88%;
+}
+.login-logo {
+  height: 225rpx;
+  width: 664rpx;
+}
+.other_type {
+  color: #999bb4;
+  font-size: 14px;
+  text-align: center;
+}
+.other_login image {
+  border-radius: 100rpx;
+  height: 54px;
+  width: 54px;
+}
+.login-info {
+  margin: 0 0 10%;
+}
+.login-info .text {
+  height: 120rpx;
+  line-height: 120rpx;
+  margin-right: 30rpx;
+}
+.input_code,
+.input_phone {
+  border-bottom: 1rpx solid #eaeaea;
+  font-size: 32rpx;
+  height: 120rpx;
+  text-align: left;
+  vertical-align: middle;
+  width: 100%;
+}
+.input_phone input {
+  height: 120rpx;
+  line-height: 120rpx;
+  width: 50%;
+}
+.input_code image,
+.input_phone image {
+  height: 48rpx;
+  margin-top: 35rpx;
+  vertical-align: middle;
+  width: 48rpx;
+}
+.input_code image {
+  position: absolute;
+  right: 35%;
+  z-index: 99;
+}
+.input_code,
+.input_phone {
+  display: -webkit-flex;
+  display: flex;
+  padding-top: 25rpx;
+}
+.input_code input {
+  height: 120rpx;
+  line-height: 120rpx;
+  width: 200rpx;
+}
+.input_code button {
+  color: #2f7bfd;
+  font-size: 24rpx;
+  height: 110rpx;
+  line-height: 120rpx;
+  margin-top: 0;
+  padding-left: 0;
+  padding-right: 0;
+  text-align: right;
+  width: 38%;
+}
+.input_code button,
+.input_code button[disabled] {
+  background-color: #fff;
+}
+.open-shop-btn {
+  margin: 0 auto 50rpx;
+}
+.login-btn {
+  margin: 90rpx auto 50rpx;
+}
+.other_login {
+  margin: 5%0 0;
+}
+.other_type span {
+  border-top: 1rpx solid #eaeaea;
+  display: inline-block;
+  margin-top: 20rpx;
+  width: 30%;
+}
+.other_type {
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: wrap;
+  height: 40rpx;
+  justify-content: space-between;
+  line-height: 40rpx;
+  margin: auto;
+  width: 88%;
+}
+.cancel {
+  color: #2f7bfd;
+  font-size: 36rpx;
+}
+.actionsheetItem {
+  color: #000;
+  font-size: 32rpx;
+}
+.tipsModal {
+  background: rgba(0, 0, 0, 0.6);
+  height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+  z-index: 999;
+}
+.tipsModalContent {
+  background: #fff;
+  border-radius: 20rpx;
+  height: 600rpx;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 234rpx;
+  width: 600rpx;
+}
+.tipsBg {
+  background-color: #2f7bfd;
+  background-size: contain;
+  border-radius: 20rpx;
+  height: 172rpx;
+}
+.InfoTop {
+  color: #333;
+  font-size: 30rpx;
+  font-weight: 500;
+  margin-bottom: 24rpx;
+}
+.InfoContent {
+  margin-bottom: 24rpx;
+}
+.InfoContent,
+.InfoUpdate {
+  color: #567;
+  font-size: 26rpx;
+}
+.InfoUpdate {
+  margin-bottom: 12rpx;
+}
+.JumpAddress {
+  color: #567;
+  font-size: 26rpx;
+  margin-top: 24rpx;
+}
+.closeTips {
+  height: 64rpx;
+  margin-top: 50rpx;
+  width: 64rpx;
+}
+.toUserTeac {
+  color: #3780ff;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+.tipsContent {
+  color: #567;
+  font-size: 28rpx;
+  line-height: 52rpx;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  padding-top: 48rpx;
+}
+.closeModal {
+  background: #2f7bfd;
+  border-radius: 44rpx;
+  color: #fff;
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 138rpx;
+  text-align: center;
+  width: 520rpx;
+}
+.newBtn {
+  background: #d8d9e3;
+  background: linear-gradient(90deg, #7ab5ff, #336af8);
+  border-radius: 48rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  width: 622rpx;
+}
+.login-page .newBtn[disabled] {
+  background: #d8d9e3;
+  color: #fff;
+}
+.login-other {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-top: 120rpx;
+  width: 100%;
+}
+.loginText {
+  color: #70728c;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+}
+.agreePage {
+  color: #4077f9;
+  font-size: 12px;
+}
+.register-check {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+  font-size: 12px;
+  justify-content: center;
+  margin: auto;
+}
+.check {
+  height: 32rpx;
+  margin-right: 10rpx;
+}
+.noCheck {
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.noCheck,
+.register-check image {
+  height: 32rpx;
+  width: 32rpx;
+}
+.tip-dialog {
+  height: 100%;
+  width: 80%;
+}
+.tip-dialog .van-popup {
+  border-radius: 16rpx;
+  color: #64689e;
+  font-size: 28rpx;
+  width: 640rpx;
+}
+.popTitle {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  display: inline-block;
+  font-size: 36rpx;
+  font-weight: 500;
+  height: 176rpx;
+  width: 100%;
+}
+.popContent,
+.popTitle {
+  color: #373c55;
+  text-align: center;
+}
+.popContent {
+  margin: 32rpx 0;
+  padding: 48rpx;
+}
+.popBtn {
+  align-items: center;
+  border-top: 1rpx solid #edeff6;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-around;
+}
+.popBtn button {
+  background-color: #fff;
+  border: none;
+  color: #336af8;
+  font-size: 32rpx;
+  font-weight: 500;
+  height: 100rpx;
+  line-height: 100rpx;
+  position: relative;
+  width: 50%;
+}
+.popBtn .cancelBtn {
+  border-right: 1rpx solid #edeff6;
+  box-sizing: border-box;
+}

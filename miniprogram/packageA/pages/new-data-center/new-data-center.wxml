@@ -1,0 +1,16 @@
+<view class="contain">
+  <view>
+    <image src="{{backImg}}" style="width: 100%; height: 180rpx"></image>
+  </view>
+  <view class="topContent">
+    <panel-img
+      bind:toCustomDetail="toCustomDetail"
+      fontRed="{{item.fontRed}}"
+      list="{{item}}"
+      showBorder="{{item.showBorder}}"
+      wx:if="{{item.auth}}"
+      wx:for="{{panel}}"
+      wx:key="index"
+    ></panel-img>
+  </view>
+</view>

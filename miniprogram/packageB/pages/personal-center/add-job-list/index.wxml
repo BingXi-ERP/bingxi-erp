@@ -1,0 +1,72 @@
+<view class="addJobList">
+  <van-notice-bar
+    backgroundColor="#FFF9F3"
+    color="#FF7C00"
+    leftIcon="info-o"
+    text="岗位权限修改后，请提示员工重新登录使用。"
+  ></van-notice-bar>
+  <view class="treeSelect">
+    <view class="stall-categories">
+      <view class="categories-left">
+        <view
+          bindtap="changeChild"
+          class="categories-left-item  {{item.checked==1?'active':''}}"
+          data-index="{{index}}"
+          id="{{item.id}}"
+          wx:for="{{list}}"
+          wx:key="index"
+          >{{item.name}}</view
+        >
+      </view>
+      <view class="categories-right">
+        <scroll-view scrollY style="height: 100%">
+          <block wx:for="{{childList}}" wx:key="index">
+            <view
+              catchtap="onClickItem"
+              class="categories-right-item fl-between categories-child-tag"
+              data-parent-Id="{{item.parentId}}"
+              id="{{item.id}}"
+              wx:if="{{!item.disable}}"
+              >{{item.name}}<view>
+                <van-icon
+                  color="#FF7C00"
+                  data-parent-Id="{{item.parentId}}"
+                  id="{{item.id}}"
+                  name="checked"
+                  size="18"
+                  wx:if="{{item.isChecked==1}}"
+                ></van-icon>
+                <van-icon
+                  color="#DCDCDF"
+                  data-parent-Id="{{item.parentId}}"
+                  id="{{item.id}}"
+                  name="checked"
+                  size="18"
+                  wx:else
+                ></van-icon>
+              </view>
+            </view>
+            <view
+              class="disbale categories-right-item fl-between categories-child-tag"
+              data-parent-Id="{{item.parentId}}"
+              id="{{item.id}}"
+              wx:if="{{item.disable}}"
+              >{{item.name}}<view>
+                <van-icon
+                  color="#DCDCDF"
+                  data-parent-Id="{{item.parentId}}"
+                  id="{{item.id}}"
+                  name="circle"
+                  size="18"
+                ></van-icon>
+              </view>
+            </view>
+          </block>
+        </scroll-view>
+      </view>
+    </view>
+  </view>
+  <view class="fixed-bottom-tools">
+    <button catchtap="confirm" class="g_bottomBtn">确定</button>
+  </view>
+</view>

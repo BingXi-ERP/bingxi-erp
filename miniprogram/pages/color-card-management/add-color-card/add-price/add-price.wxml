@@ -1,0 +1,69 @@
+<view class="price-page">
+    <view class="price-item">
+        <view class="fl title">计量单位</view>
+        <view class="fl price-unit">
+            <view bindtap="statusChange" class="checkBox {{item.checked=='true'?'isCheckedBox':''}}" data-radio="unit" data-value="{{item.value}}" wx:for="{{radiogroupitems}}" wx:key="index">{{item.value}}</view>
+        </view>
+    </view>
+    <view class="price-item">
+        <view class="fl title" wx:if="{{!isAllChange}}">报价方式</view>
+        <view class="price-list price-type" wx:if="{{!isAllChange}}">
+            <radio-group bindchange="statusChange" class="fr-between-center radio-group" data-radio="price">
+                <label class="bdd-radio radio" wx:for="{{priceTypes}}" wx:key="index">
+                    <radio checked="{{item.checked}}" name="priceType" value="{{item.name}}"></radio>
+                    <view class="checkBtn {{priceType==item.name?'btnChecked':''}}">{{item.value}}</view>
+                </label>
+            </radio-group>
+        </view>
+    </view>
+    <view class="price-item" wx:if="{{priceType==1}}">
+        <view class="fl title">价格区间</view>
+        <view class="price-list price-number" id="0">起订量<input bindblur="priceType1_input" data-id="0-1" maxlength="8" name="minShearingSales" type="number" value="{{PriceJson1[0].minShearingSales}}"></input>{{unitName}}及以上<input bindblur="priceType1_input" data-id="0-2" maxlength="8" name="shearingPrice" type="digit" value="{{PriceJson1[0].shearingPrice}}"></input>元 / {{unitName}}</view>
+        <view class="price-list price-number price-number-img" id="1" wx:if="{{addPriceListShow==1}}">
+            <view bindtap="removePriceList" class="price-list-del" id="1">
+                <image mode="aspectFit" src="{{icon.delete}}"></image>
+            </view>购买<input bindblur="priceType1_input" data-id="1-1" maxlength="8" name="quantity1" type="number" value="{{PriceJson2[0].minShearingSales}}"></input>{{unitName}}及以上<input bindblur="priceType1_input" data-id="1-2" maxlength="8" name="quantityPrice1" type="digit" value="{{PriceJson2[0].shearingPrice}}"></input>元 / {{unitName}}</view>
+        <view class="border-b" wx:if="{{addPriceListShow==1}}"></view>
+        <view class="price-list price-number  price-number-img" id="2" wx:if="{{addPriceListShow1==1}}">
+            <view bindtap="removePriceList" id="2">
+                <image mode="aspectFit" src="{{icon.delete}}"></image>
+            </view>购买<input bindblur="priceType1_input" data-id="2-1" maxlength="8" name="quantity2" type="number" value="{{PriceJson3[0].minShearingSales}}"></input>{{unitName}}及以上<input bindblur="priceType1_input" data-id="2-2" maxlength="8" name="quantityPrice2" type="digit" value="{{PriceJson3[0].shearingPrice}}"></input>元 / {{unitName}}</view>
+        <view class="border-b" wx:if="{{addPriceListShow1==1}}"></view>
+        <view bindtap="addPriceList" class="add-number" wx:if="{{addPriceListShow==0||addPriceListShow1==0}}">
+            <van-icon color="#FB562C" name="add-o" size="30rpx"></van-icon>
+            <text>增加价格区间</text>
+        </view>
+    </view>
+    <block wx:if="{{priceType==2}}">
+        <view>
+            <view class="price-color-list marTop36">
+                <view class="all-price">
+                    <view class="all-price-name">批量设置</view>
+                    <view class="all-price-val">
+                        <input bindinput="changeListPrice" maxlength="8" placeholder="请输入统一价格" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{allPrice}}"></input>
+                        <view class="price-list-dw">{{unitName}}</view>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <view>
+            <view class="price-color-list margin">
+                <view class="price-list price-color-title">
+                    <view>色号</view>
+                    <view>价格</view>
+                </view>
+                <view class="price-list price-color price-color-data" wx:for="{{priceColorList}}" wx:key="index">
+                    <view class="limtRow">{{item.colorVal}}{{item.colorName}}</view>
+                    <view>
+                        <input bindinput="changeColorPrice" data-index="{{index}}" maxlength="8" placeholder="0.00" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{item.bulkPrice}}"></input>
+                    </view>
+                    <view class="price-list-unit">元/{{unitName}}</view>
+                </view>
+            </view>
+        </view>
+    </block>
+</view>
+<view class="heihgt-line"></view>
+<view class="fixed-bottom-tools">
+    <button catchtap="savePriceList" class="g_bottomBtn">保存</button>
+</view>

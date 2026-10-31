@@ -1,0 +1,94 @@
+.header {
+  align-items: center;
+  background-color: #f7f7f7;
+  display: -webkit-flex;
+  display: flex;
+  height: 80rpx;
+}
+.header > view {
+  flex: 1;
+  font-size: 28rpx;
+}
+.has-chosen-card-text {
+  margin-left: 30rpx;
+}
+.del-list-text {
+  margin-right: 40rpx;
+  text-align: right;
+}
+.item-block {
+  align-items: center;
+  border-bottom: 1rpx solid #ddd;
+  display: -webkit-flex;
+  display: flex;
+  height: 154rpx;
+}
+.item-block:last-child {
+  border-bottom: none;
+}
+.item-block > view {
+  flex: 1;
+}
+.title {
+  color: #333;
+  font-size: 32rpx;
+  margin-bottom: 8rpx;
+}
+.subtitle {
+  color: #999;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 24rpx;
+}
+.content .icon {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 28rpx;
+  margin-right: 10rpx;
+  width: 28rpx;
+}
+.item-name {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  margin-left: 30rpx;
+}
+.item-name .min {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 40rpx;
+  margin-right: 30rpx;
+  width: 40rpx;
+}
+.stepper-wrapper {
+  margin-right: 54rpx;
+  text-align: right;
+}
+.stepper-wrapper .count {
+  color: #999;
+  font-size: 28rpx;
+}
+.footer {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: center;
+}
+.footer > view {
+  flex: 1;
+  height: 100rpx;
+  line-height: 100rpx;
+  text-align: center;
+}
+.has-chosen-btn {
+  background-color: #f5f5f9;
+  color: #4667e9;
+  font-size: 32rpx;
+}
+.confirm-btn {
+  background-color: #2f7bfd;
+  color: #fff;
+  font-size: 32rpx;
+}

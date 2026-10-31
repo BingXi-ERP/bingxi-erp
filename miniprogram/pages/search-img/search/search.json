@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "搜索结果",
+  "component": true,
+  "usingComponents": {
+    "color-card-list-block": "/components/color-card-list-block/color-card-list-block",
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

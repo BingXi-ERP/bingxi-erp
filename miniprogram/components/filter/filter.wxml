@@ -1,0 +1,19 @@
+<view class="filter-wrapper">
+  <view
+    bindtap="filterTap"
+    class="item filter{{index}}"
+    data-index="{{index}}"
+    data-sort="{{item.sort}}"
+    data-value="{{item.value}}"
+    wx:for="{{filterList}}"
+    wx:key="index"
+  >
+    <view class="value {{idx==index?'active':''}}">{{item.value}}</view>
+    <view class="img-wrapper">
+      <image
+        mode="aspectFit"
+        src="{{_value==item.value&&(sortType=='desc'||sortType=='asc')?sortType=='desc'?item.iconDesc:item.iconAsc:item.iconDefault}}"
+      ></image>
+    </view>
+  </view>
+</view>

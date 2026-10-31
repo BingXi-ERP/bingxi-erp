@@ -1,0 +1,113 @@
+<view class="order-receipt">
+    <view class="card">
+        <view class="card-body">
+            <view class="cell cell-item">
+                <view class="cell-title">订单总额</view>
+                <view class="cell-value">{{toFixNum(total,2,true,true)}}</view>
+            </view>
+            <view class="cell cell-item">
+                <view class="cell-title">应收款</view>
+                <view class="cell-value">{{toFixNum(actualPay,2,true,true)}}</view>
+            </view>
+            <view class="cell cell-item">
+                <view class="cell-title">已收款</view>
+                <view class="cell-value">{{toFixNum(payed,2,true,true)}}</view>
+            </view>
+            <view class="cell cell-item">
+                <view class="cell-title">待收款</view>
+                <view class="cell-value strong">{{toFixNum(unpay,2,true,true)}}</view>
+            </view>
+        </view>
+        <view class="card-extra">
+            <view class="discount-cell">
+                <view class="cell-title">本次优惠</view>
+                <view class="cell-value">
+                    <input bindblur="handleBlurInput" bindinput="handleInputDiscount" data-key="discount" placeholder="请填写优惠(选填)" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{discount}}"></input>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="payment-content">
+        <view class="payment-title">
+            <text>收款方式</text>
+            <view class="tips">
+                <van-icon color="#C0C0C0" name="info-o" size="24rpx"></van-icon>可填写多个</view>
+        </view>
+        <view class="payment-cell {{paymentWechat?'payment-cell-val':''}}">
+            <view class="cell-title">
+                <image mode="aspectFit" src="{{icon.weixin}}"></image>
+                <text>微信</text>
+            </view>
+            <view class="cell-value">
+                <input bindblur="handleBlurInput" bindinput="handleValUpdatePay" data-key="paymentWechat" placeholder="请输入支付金额" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{paymentWechat}}"></input>
+            </view>
+        </view>
+        <view class="payment-cell {{paymentAlipay?'payment-cell-val':''}}">
+            <view class="cell-title">
+                <image mode="aspectFit" src="{{icon.zhifubao}}"></image>
+                <text>支付宝</text>
+            </view>
+            <view class="cell-value">
+                <input bindblur="handleBlurInput" bindinput="handleValUpdatePay" data-key="paymentAlipay" placeholder="请输入支付金额" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{paymentAlipay}}"></input>
+            </view>
+        </view>
+        <view class="payment-cell {{paymentCash?'payment-cell-val':''}}">
+            <view class="cell-title">
+                <image mode="aspectFit" src="{{icon.xianjin}}"></image>
+                <text>现金</text>
+            </view>
+            <view class="cell-value">
+                <input bindblur="handleBlurInput" bindinput="handleValUpdatePay" data-key="paymentCash" placeholder="请输入支付金额" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{paymentCash}}"></input>
+            </view>
+        </view>
+        <view class="payment-cell {{paymentCard?'payment-cell-val':''}}">
+            <view class="cell-title">
+                <image mode="aspectFit" src="{{icon.shuaka}}"></image>
+                <text>刷卡</text>
+            </view>
+            <view class="cell-value">
+                <input bindblur="handleBlurInput" bindinput="handleValUpdatePay" data-key="paymentCard" placeholder="请输入支付金额" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{paymentCard}}"></input>
+            </view>
+        </view>
+        <view class="payment-cell {{paymentRemit?'payment-cell-val':''}}">
+            <view class="cell-title">
+                <image mode="aspectFit" src="{{icon.huikuan}}"></image>
+                <text>汇款</text>
+            </view>
+            <view class="cell-value">
+                <input bindblur="handleBlurInput" bindinput="handleValUpdatePay" data-key="paymentRemit" placeholder="请输入支付金额" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{paymentRemit}}"></input>
+            </view>
+        </view>
+    </view>
+    <view class="card order-payment-record">
+        <view class="card-head">收款记录</view>
+        <view class="card-body">
+            <view class="card-box" wx:if="{{paymentRecord.length!==0}}">
+                <view class="payment-record" wx:for="{{paymentRecord}}" wx:key="index">
+                    <view class="payment-name">{{item.paymentMethod}}</view>
+                    <view class="payment-amount">+ {{item.paymentAmount}}</view>
+                    <view class="payment-create-at">{{item.paymentDate}}</view>
+                </view>
+            </view>
+            <view class="no-data" wx:if="{{paymentRecord.length==0}}">
+                <image src="{{icon.nodata}}"></image>
+                <view class="data-empty">暂无收款记录信息～</view>
+            </view>
+        </view>
+    </view>
+    <view class="fixed-toolbar-bottom iphone_bottom" style="padding:0 32rpx">
+        <view class="toolbar-left">
+            <view class="totle-name">本次收款</view>
+            <view class="totle-content">
+                <text>￥</text>
+                <text class="totle-number">{{toFixNum(payment)}}</text>
+            </view>
+        </view>
+        <view class="toolbar-right">
+            <view class="toolbar-button-group-right">
+                <button bind:tap="savePayment" class="g_samllBtn">确定</button>
+            </view>
+        </view>
+    </view>
+    <van-toast id="van-toast"></van-toast>
+</view>

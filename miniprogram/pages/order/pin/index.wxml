@@ -1,0 +1,103 @@
+<view class="order-pin">
+  <view class="data-empty" wx:if="{{list.length<1}}">
+    <view>
+      <view class="data-empty-image">
+        <image mode="aspectFill" src="{{noDataBg}}"></image>
+      </view>
+      <view class="data-empty-content">
+        <text class="data-empty-title">暂无数据 </text>
+      </view>
+    </view>
+  </view>
+  <view class="list">
+    <view class="list-item" wx:for="{{list}}" wx:key="index">
+      <view class="order-type">
+        <text class="order-create-at">{{item.orderTime}}</text>
+      </view>
+      <view class="order-info">
+        <view class="order-create-by">
+          <image
+            mode="aspectFill"
+            src="{{addDefaultAvatar(item.buyerHeadImg,initImgApp)}}"
+          ></image>
+          <text>{{item.buyerName}}</text>
+        </view>
+        <text class="order-status">挂单中</text>
+      </view>
+      <view class="order-product">
+        <view class="sale-type"
+          >{{item.saleType==1?'大货':''}}{{item.saleType==2?'剪样':''}}</view
+        >
+        <view class="product" wx:for="{{item.orderGoods}}" wx:key="index">
+          <image
+            class="product-image"
+            mode="aspectFill"
+            src="{{replImage(item.goodsImgPath,initImgApp,180)}}"
+          ></image>
+          <view class="product-content">
+            <text class="product-title">{{item.goodsName}}</text>
+            <text class="product-total"
+              >合计：{{item.colorCount}}个颜色,{{item.totalQuantity}}{{item.goodsUnit}}</text
+            >
+          </view>
+        </view>
+      </view>
+      <view class="order-actions">
+        <button
+          bind:tap="hanleConcatCustom"
+          class="button-normal"
+          data-mobild="{{item.buyerMobile}}"
+          wx:if="{{userAuthList['crm:contact']}}"
+        >
+          联系买家
+        </button>
+        <button
+          bind:tap="hanleCloseOrder"
+          class="button-normal"
+          data-id="{{item.id}}"
+          wx:if="{{userAuthList['order:closeOrder']}}"
+        >
+          关闭订单
+        </button>
+        <button
+          bind:tap="hanleCreateOrder"
+          class="button-primary"
+          data-id="{{item.id}}"
+          data-order-no="{{item.orderNo}}"
+          wx:if="{{userAuthList['order:saveBilling']}}"
+        >
+          继续开单
+        </button>
+      </view>
+    </view>
+  </view>
+  <van-dialog
+    asyncClose
+    showCancelButton
+    useSlot
+    bind:cancel="handleCloseOrder"
+    bind:confirm="handleCloseOrderNoreason"
+    cancelButtonText="提交"
+    class="dialog-close-reason"
+    confirmButtonText="无理由，跳过"
+    show="{{show}}"
+  >
+    <view class="close-reason">
+      <image
+        bind:tap="closeDialog"
+        class="button-close"
+        mode="aspectFill"
+        src="../../../assets/images/icon2nd/ic_tianjia@3x.png"
+      ></image>
+      <textarea
+        bindinput="handleInputReason"
+        maxlength="50"
+        placeholder="请输入关闭订单的理由"
+        placeholderClass="{{className}}"
+        value="{{closeReason}}"
+      ></textarea>
+    </view>
+  </van-dialog>
+  <van-dialog id="van-dialog"></van-dialog>
+  <van-toast id="van-toast"></van-toast>
+</view>

@@ -1,0 +1,127 @@
+page {
+  background: #eff0f7;
+}
+.QRcode {
+  overflow-x: hidden;
+}
+.headers {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  padding: 32rpx;
+}
+.headers .delCode {
+  color: #ee0a24;
+  cursor: pointer;
+  font-size: 14px;
+}
+.qr-box {
+  padding: 70rpx 28rpx 300rpx;
+  text-align: center;
+}
+.imgContent {
+  height: 314rpx;
+  width: 314rpx;
+}
+.qr-name {
+  color: #5d5d5d;
+  font-size: 26rpx;
+  margin-bottom: 28rpx;
+  margin-top: 88rpx;
+  padding-left: 20rpx;
+  position: relative;
+  text-align: left;
+}
+.qr-name::before {
+  background: linear-gradient(180deg, #fb562c, #ff8b6c);
+  border-radius: 4rpx;
+  content: "";
+  height: 28rpx;
+  left: 0;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8rpx;
+}
+.qr-tips {
+  font-size: 26rpx;
+  text-align: left;
+}
+.imgPrev {
+  align-items: center;
+  color: #4c7cf9;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+}
+.codeImgItem {
+  box-sizing: border-box;
+  padding: 0 24rpx;
+}
+.itemContent {
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  color: #fff;
+  padding: 28rpx 28rpx 40rpx;
+  width: 100%;
+}
+.wxbg {
+  background-color: #00b558;
+}
+.alibg {
+  background-color: #0662fd;
+}
+.itemContent .itemText {
+  justify-content: center;
+  margin-top: 42rpx;
+}
+.itemContent .itemText text {
+  font-size: 26rpx;
+  margin-left: 18rpx;
+}
+swiper {
+  height: 750rpx;
+}
+.noCodeImg {
+  align-items: center;
+  background: #edeff6;
+  border-radius: 14rpx;
+  color: #0b0b0b;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  font-size: 24rpx;
+  height: 504rpx;
+  justify-content: center;
+  width: 504rpx;
+}
+.pageMask {
+  background: rgba(0, 0, 0, 0.6);
+  height: 100vh;
+  left: 0;
+  position: fixed;
+  top: 0;
+  width: 100vw;
+  z-index: 98;
+}
+.pageMask .imgContent {
+  height: 900rpx;
+  top: 35%;
+  transform: translate(-50%, -30%);
+  width: 600rpx;
+}
+.pageMask .btn,
+.pageMask .imgContent {
+  left: 50%;
+  position: absolute;
+  z-index: 99;
+}
+.pageMask .btn {
+  bottom: 50rpx;
+  transform: translateX(-50%);
+  width: 480rpx;
+}

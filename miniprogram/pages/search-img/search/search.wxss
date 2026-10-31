@@ -1,0 +1,54 @@
+page {
+  background: #f5f5f8;
+}
+.no-date-wrapper {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  font-size: 28rpx;
+  justify-content: center;
+  margin-top: 100rpx;
+}
+.no-date-wrapper .no-list-bg {
+  height: 300rpx;
+  margin-bottom: 60rpx;
+  width: 300rpx;
+}
+.no-date-wrapper .text {
+  margin-bottom: 20rpx;
+}
+.canvas-popup-wrapper {
+  background-color: transparent !important;
+}
+.share-monents-notice-wrapper {
+  color: #fff;
+  font-size: 26rpx;
+  margin-top: 20rpx;
+  text-align: center;
+}
+.save-share-btn {
+  background-color: #2f7bfd;
+  border-radius: 10rpx;
+  color: #fff;
+  height: 68rpx;
+  line-height: 68rpx;
+  margin: 20rpx 0;
+  text-align: center;
+  width: 250px;
+}
+.hideCanvas {
+  display: none;
+  height: 0;
+  overflow: hidden;
+  width: 0;
+}
+.showBigCanvas {
+  left: -1500rpx;
+  opacity: 0;
+  position: absolute;
+  top: -2700rpx;
+}
+.hideBigCanvas {
+  display: none;
+}

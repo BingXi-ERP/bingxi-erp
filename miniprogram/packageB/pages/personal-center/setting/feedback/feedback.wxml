@@ -1,0 +1,13 @@
+<view class="wrapper">
+  <form bindsubmit="formSubmit">
+    <view class="feedback-text">
+      <textarea
+        bindinput="textarea_val"
+        placeholder="请输入您的宝贵意见,我们会尽快回复"
+      ></textarea>
+    </view>
+    <view class="fd-btn">
+      <button class="g_bottomBtn" formType="submit">提交反馈</button>
+    </view>
+  </form>
+</view>

@@ -1,0 +1,75 @@
+page {
+  background-color: #eff0f7;
+  padding-top: 32rpx;
+}
+.center-list {
+  min-height: 90vh;
+  overflow-x: hidden;
+  padding-bottom: 62rpx;
+  position: relative;
+}
+.optionlMuen {
+  background: #fff;
+  border-radius: 20rpx;
+  margin-bottom: 32rpx;
+  margin-left: 40rpx;
+  width: calc(100vw - 80rpx);
+}
+.muenItem {
+  box-sizing: border-box;
+  height: 112rpx;
+  padding: 0 32rpx;
+  position: relative;
+}
+.muenItem:not(:last-child)::after {
+  border-bottom: 2rpx solid #f4f4f4;
+  bottom: 0;
+  content: "";
+  height: 2rpx;
+  left: 32rpx;
+  position: absolute;
+  width: calc(100vw - 150rpx);
+}
+.meunIcon {
+  height: 48rpx;
+  margin-right: 20rpx;
+  width: 48rpx;
+}
+.loginout,
+.muenText {
+  color: #373c55;
+  font-family: PingFangSC-Medium;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+.loginout {
+  background: #fff;
+  border-radius: 20rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  margin-left: 40rpx;
+  margin-top: 20rpx;
+  text-align: center;
+  width: calc(100vw - 80rpx);
+}
+.version {
+  bottom: 0;
+  color: #ccc;
+  font-size: 12px;
+  font-weight: 400;
+  height: 62rpx;
+  left: 0;
+  line-height: 62rpx;
+  position: absolute;
+  text-align: center;
+  width: 100%;
+}
+.QRcodeRed {
+  background: #f66767;
+  border-radius: 50%;
+  height: 16rpx;
+  left: 135rpx;
+  position: absolute;
+  top: 38rpx;
+  width: 16rpx;
+}

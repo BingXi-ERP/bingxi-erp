@@ -1,0 +1,12 @@
+{
+  "usingComponents": {
+    "van-dialog": "../../../miniprogram_npm/@vant/weapp/dialog/index",
+    "van-toast": "../../../miniprogram_npm/@vant/weapp/toast/index",
+    "van-tabs": "../../../miniprogram_npm/@vant/weapp/tabs/index",
+    "van-tab": "../../../miniprogram_npm/@vant/weapp/tab/index",
+    "search-bar": "/components/search-bar/search-bar",
+    "van-popup": "../../../miniprogram_npm/@vant/weapp/popup/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  },
+  "navigationBarTitleText": "搜索"
+}

@@ -1,0 +1,257 @@
+<view class="container-gray order-create">
+  <view class="panel" style="position: relative">
+    <view class="grayInfo">带有*号的信息为必填项</view>
+    <view class="cell">
+      <view class="cell-title">
+        <text>客户</text>
+        <view class="required">*</view>
+      </view>
+      <view bind:tap="handlelSelectCustomer" class="cell-value">
+        <view
+          class="g_limtRow customerName {{customerName?'strong':''}}"
+          style="padding-left: 30rpx"
+          >{{customerName?customerName:'请选择'}}
+          {{!!customerMobile?customerMobile:''}}</view
+        >
+        <view class="arrow"></view>
+      </view>
+    </view>
+    <view class="cell">
+      <view class="cell-title">
+        <text>退货时间</text>
+      </view>
+      <view class="cell-value">
+        <picker
+          bindchange="handleDateChange"
+          end="{{maxDate}}"
+          mode="date"
+          value="{{createDate}}"
+        >
+          <text style="padding-left: 30rpx">{{createDate||'请选择'}}</text>
+        </picker>
+        <view class="arrow"></view>
+      </view>
+    </view>
+    <view class="cell">
+      <view class="cell-title">
+        <text>业务员</text>
+      </view>
+      <view bindtap="handlelSelectSales" class="cell-value">
+        <view
+          class="g_limtRow customerName {{salesList.salesName?'strong':''}}"
+          style="padding-left: 30rpx"
+          >{{salesList.salesName?salesList.salesName:'请选择'}}</view
+        >
+        <view class="arrow" wx:if="{{getIndentifyType===3}}"></view>
+      </view>
+    </view>
+  </view>
+  <view class="panel">
+    <view class="panel-title" wx:if="{{products.length!==0}}">
+      <text>退单信息</text>
+    </view>
+    <view
+      class="product-cell cell {{index===products.length-1?'cell-border-no':''}}"
+      wx:if="{{products.length!==0}}"
+      wx:for="{{products}}"
+      wx:key="index"
+    >
+      <view class="cell-value flex-direction-column">
+        <view class="post">
+          <view bind:tap="" class="post-image" data-id="{{item.id}}">
+            <image
+              mode="aspectFill"
+              src="{{replImage(item.image,globalApp,300)}}"
+            ></image>
+          </view>
+          <view class="post-content" wx:if="{{item.billingStatus!==10}}">
+            <view class="post-title g_limtRow">{{item.name}}</view>
+            <view class="fr-between-center post-extra">
+              <text class="hl"
+                >共：{{item.colors.length}}个颜色, {{item.totalQuantity}}</text
+              >
+              <view
+                bind:tap="handleToggle"
+                class="buttom-toggle"
+                data-id="{{item.id}}"
+              >
+                <text>明细</text>
+                <text
+                  class="arrow {{item.isOpened?'arrow-top':'arrow-bottom'}}"
+                ></text>
+              </view>
+            </view>
+            <image
+              bind:tap="handleProductEdit"
+              class="button-edit"
+              data-id="{{item.id}}"
+              mode="aspectFill"
+              src="{{icon.edit}}"
+            ></image>
+            <image
+              bind:tap="handleProductDel"
+              class="button-del"
+              data-id="{{item.id}}"
+              mode="aspectFill"
+              src="{{icon.del}}"
+            ></image>
+          </view>
+        </view>
+        <view class="product-detail" wx:if="{{item.isOpened}}">
+          <text class="product-detail-title">颜色</text>
+          <view class="product-detail-tab">
+            <view
+              bind:tap="handleSwitchColor"
+              class="badge {{colorItem.id===item.tabCurrentColorId?'badge-primary':'badge-gray'}}"
+              data-index="{{idx}}"
+              data-product-id="{{item.id}}"
+              wx:for="{{item.colors}}"
+              wx:for-index="idx"
+              wx:for-item="colorItem"
+              wx:key="{{idx}}"
+            >
+              <text class="badge-button g_limtRow"
+                >{{colorItem.color+''+colorItem.colorName}}</text
+              >
+              <text class="badge-sup">{{colorItem.dyelotArr.length}}</text>
+            </view>
+          </view>
+          <view class="productNum">
+            <text class="product-detail-title">缸号</text>
+            <view class="product-detail-tab">
+              <view
+                bind:tap="changeCurrentDyelot"
+                class="badge {{dyelotItem.id===item.tabCurrentDyelotId?'badge-primary':'badge-gray'}}"
+                data-index="{{dyelotIndex}}"
+                data-product-id="{{item.id}}"
+                data-product-item="{{item}}"
+                wx:for="{{item.tabCurrentDyelot}}"
+                wx:for-index="dyelotIndex"
+                wx:for-item="dyelotItem"
+                wx:key="{{dyelotIndex}}"
+              >
+                <text class="badge-button"
+                  >{{dyelotItem.dyelotName?dyelotItem.dyelotName:dyelotItem.id}}</text
+                >
+                <text class="badge-sup">{{dyelotItem.list.length}}</text>
+              </view>
+            </view>
+          </view>
+          <view class="table" wx:if="{{item.isOpened}}">
+            <view class="tr">
+              <text class="th">{{productType==='full'?'编号':'颜色'}}</text>
+              <text class="th">单价(元)</text>
+              <text class="th">数量</text>
+              <text class="th">小计</text>
+            </view>
+            <view
+              class="tr"
+              wx:for="{{item.tabCurrentColorList}}"
+              wx:for-index="idx"
+              wx:for-item="colorItem"
+              wx:key="{{idx}}"
+            >
+              <text class="">{{idx+1}}</text>
+              <text>{{colorItem.price}}</text>
+              <text>{{colorItem.quantity}}{{colorItem.priceUnit}}</text>
+              <text class="align-right">{{toFixNum(colorItem.total)}}</text>
+            </view>
+            <view class="fr-between-center tr">
+              <text class="totle">合计: {{item.total}}</text>
+              <text class="totle strong">￥ {{item.totalPrice}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="panel">
+    <view class="fr-between-center cellItem">
+      <view>商品<view class="required">*</view> </view>
+      <view bindtap="addProduct" class="title">
+        <text>添加商品</text>
+        <van-icon color="#FB562C" name="add" size="34rpx"></van-icon>
+      </view>
+    </view>
+  </view>
+  <view class="panel">
+    <view class="fr-between-center cellItem">
+      <view>关联销售单</view>
+      <view bindtap="handlelSelectBill" class="cell-value">
+        <view
+          class="g_limtRow customerName {{selectSalesBillNo?'strong':''}}"
+          style="padding-left: 30rpx"
+          >{{selectSalesBillNo?selectSalesBillNo:'请选择'}}</view
+        >
+        <view class="arrow" style="margin-left: 15rpx"></view>
+      </view>
+    </view>
+  </view>
+  <view class="order-info panel" wx:if="{{orderTime}}">
+    <view class="panel-title">订单信息</view>
+    <view class="panel-content">
+      <view class="order-info-item">买家留言：{{buyerRemarks}}</view>
+      <view class="order-info-item">报单时间：{{orderTime}}</view>
+    </view>
+  </view>
+  <view class="panel">
+    <view class="cell-remarks cell">
+      <view class="cell-title">
+        <text>备注</text>
+      </view>
+      <view class="cell-value">
+        <textarea
+          autoHeight
+          bindblur="handleHideTextarea"
+          bindfocus="handleShowTextarea"
+          bindinput="handleUpdateVal"
+          class="remarks-input text-right"
+          data-key="remarks"
+          focus="{{remarksFocus}}"
+          maxlength="30"
+          placeholder="请输入备注"
+          placeholderClass="place-holder place-holder-right"
+          placeholderStyle="text-align: right;"
+          showConfirmBar="{{false}}"
+          value="{{remarks}}"
+          wx:if="{{remarksFocus}}"
+        ></textarea>
+        <view
+          bind:tap="handleShowTextarea"
+          class="remarks-input text-right {{remarks==''?'placeholder-text':''}}"
+          wx:if="{{!remarksFocus}}"
+        >
+          <text>{{remarks||'请填写备注信息(30字以内)'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="panel">
+    <view class="imgTitle">退款记录</view>
+    <view class="uploadText">
+      <uploadImg
+        bind:delImg="delImg"
+        bind:uoloadImg="uoloadImg"
+        list="{{billingPurchaseImgList}}"
+        uploadPiece="6"
+      ></uploadImg>
+    </view>
+  </view>
+  <view class="fixed-toolbar-bottom iphone_bottom">
+    <view class="toolbar-left">
+      <view class="totle-name">合计退货：</view>
+      <view class="totle-content">￥{{totalAccount}}</view>
+    </view>
+    <view class="toolbar-right">
+      <view class="flex-row toolbar-button-group-right">
+        <button bind:tap="handleEntryReturnList" class="marR g_samllNormalBtn">
+          退货单
+        </button>
+        <button bind:tap="saveRutenRequest" class="marR g_samllBtn">
+          保存
+        </button>
+      </view>
+    </view>
+  </view>
+</view>
+<van-dialog id="van-dialog"></van-dialog>

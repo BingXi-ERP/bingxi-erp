@@ -1,0 +1,12 @@
+<view bindtap="toCustomDetail" class="wrapper {{showBorder?'border':''}}" data-action="{{list.action}}" data-customerType="{{list.customerType}}" data-id="{{list.id}}">
+    <view class="left" style="border-radius:50%;background-image:url(\"{{list.img||list.avatar||list.headImg}}\");width:{{iconSize.width}}rpx;height:{{iconSize.height}}rpx"></view>
+    <view class="center">
+        <view class="title">{{list.title||list.name||list.fullname}} {{list.count}}</view>
+        <view class="subTitle {{fontRed?'font-red':''}}" wx:if="{{list.subTitle||list.mobile}}">{{list.subTitle||'手机：'+list.mobile}}</view>
+    </view>
+    <view class="right1" wx:if="{{BlockType==1}}"></view>
+    <view class="right2" wx:if="{{BlockType==2}}">欠款：{{list.debt}}</view>
+    <form bindsubmit="formSubmit" reportSubmit="{{true}}">
+        <button class="form-btn" formType="submit"></button>
+    </form>
+</view>

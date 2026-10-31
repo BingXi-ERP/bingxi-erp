@@ -1,0 +1,220 @@
+page {
+  background: #f5f5f5;
+  overflow-y: hidden;
+  padding-bottom: 200rpx;
+}
+.invitation {
+  background: #fff;
+  overflow-x: hidden;
+  position: relative;
+}
+.hearImg,
+.inviteContent,
+.stepImg {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+.hearImg {
+  height: 786rpx;
+  width: 100vw;
+}
+.stepImg {
+  height: 514rpx;
+  width: 100vw;
+}
+.inviteContent {
+  height: 402rpx;
+  position: relative;
+  width: 100vw;
+}
+.inviteInfo {
+  bottom: 70rpx;
+  color: #fff;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 500rpx;
+}
+.inviteInfo .title {
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+}
+.inviteInfo .num {
+  font-family: DIN-Medium;
+  font-size: 24px;
+  font-weight: 500;
+  height: 100rpx;
+  line-height: 100rpx;
+  text-align: center;
+}
+.inviteList {
+  box-sizing: border-box;
+  padding: 0 48rpx;
+}
+.listItem {
+  height: 140rpx;
+  position: relative;
+}
+.listItem::before {
+  border-bottom: 1rpx solid #f5f5f5;
+  bottom: 0;
+  content: "";
+  left: 0;
+  position: absolute;
+  width: 100%;
+}
+.listItem .headLogo {
+  border-radius: 50%;
+  height: 80rpx;
+  margin-right: 24rpx;
+  width: 80rpx;
+}
+.listItem .itemContent {
+  flex: 2;
+}
+.listItem .itemContent .name {
+  color: #373c55;
+  font-family: PingFangSC-Medium;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 50rpx;
+  max-width: 400rpx;
+}
+.listItem .itemContent .inviteTime {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+}
+.listItem .getMoney {
+  color: #ff4a4a;
+  font-family: DIN-Medium;
+  font-size: 18px;
+  font-weight: 500;
+}
+.more {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+  padding: 40rpx 0;
+  text-align: center;
+}
+.popupContent {
+  height: 520rpx;
+  width: 100vw;
+}
+.popCancel,
+.popHeader {
+  color: #373c55;
+  font-family: PingFangSC-Medium;
+  font-size: 16px;
+  font-weight: 500;
+  height: 150rpx;
+  line-height: 150rpx;
+  text-align: center;
+}
+.popCancel {
+  color: #373c55;
+  font-family: PingFangSC-Regular;
+  font-size: 14px;
+  font-weight: 400;
+}
+.popupContent image {
+  height: 96rpx;
+  width: 96rpx;
+}
+.shareBtn {
+  height: 215rpx;
+  padding: 0 180rpx;
+}
+.transmit {
+  position: relative;
+}
+.transmit .transmitBtn {
+  border: 0;
+  border-radius: 0;
+  bottom: 0;
+  left: 0;
+  margin: 0;
+  opacity: 0;
+  padding: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.mask,
+.shareMask {
+  background: rgba(0, 0, 0, 0.6);
+  height: 100vh;
+  left: 0;
+  position: fixed;
+  top: 0;
+  width: 100vw;
+  z-index: 900;
+}
+.mask text {
+  background-color: rgba(0, 0, 0, 0.8);
+  border-radius: 20rpx;
+  color: #fff;
+  height: 60rpx;
+  left: 50%;
+  line-height: 60rpx;
+  margin-left: -130rpx;
+  position: absolute;
+  text-align: center;
+  top: 40%;
+  width: 260rpx;
+  z-index: 999;
+}
+.blur {
+  filter: blur(2px);
+  height: 100vh;
+  left: 0;
+  position: fixed;
+  top: 0;
+  width: 100vw;
+}
+.shareToFriend {
+  border-radius: 10rpx;
+  box-sizing: border-box;
+  height: 800rpx;
+  left: 50%;
+  position: absolute;
+  top: 35%;
+  transform: translate(-50%, -35%);
+  width: 600rpx;
+  z-index: 999;
+}
+.shareToFriend .shareFriendImg {
+  border-radius: 32rpx;
+  height: 800rpx;
+  width: 600rpx;
+}
+.saveImg {
+  bottom: -145rpx;
+  height: 96rpx;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+  width: 288rpx;
+}
+.closeIcon {
+  height: 48rpx;
+  position: absolute;
+  right: 0;
+  top: -65rpx;
+  width: 48rpx;
+}
+.shareText {
+  color: #373c55;
+  font-family: PingFangSC-Regular;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: center;
+}
+.shareText image {
+  margin-bottom: 32rpx;
+}

@@ -1,0 +1,18 @@
+<view class="phone">
+  <image src="{{wxId.length>0?headImg:''}}"></image>
+  <block wx:if="{{wxId.length>0}}">
+    <view class="number-bind">你的微信号：{{nickName}}</view>
+    <button bindtap="bindUser" class="btn-active" id="0">解绑微信号</button>
+  </block>
+  <block wx:else>
+    <view class="number-bind">你还未绑定任何微信号</view>
+    <button
+      bindtap="getUserProfile"
+      class="btn-active"
+      id="1"
+      withCredentials="true"
+    >
+      绑定微信号
+    </button>
+  </block>
+</view>

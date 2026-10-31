@@ -1,0 +1,5 @@
+<form bindsubmit="formSubmit" data-item-type="toPostDemand" reportSubmit="true">
+  <button class="colorBtn" disabled="{{disabled}}" formType="submit">
+    {{title}}
+  </button>
+</form>

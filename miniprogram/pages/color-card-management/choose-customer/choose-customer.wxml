@@ -1,0 +1,103 @@
+<view wx:if="{{!allDisplay}}">
+  <view style="padding: 30rpx 50rpx">
+    <span catchtap="addCustomer" class="addCustomer">+ 添加成员</span>
+  </view>
+  <view class="itemList" wx:for="{{allCustomerList}}" wx:key="index">
+    <view style="width: 20%">
+      <image
+        src="{{item.avatar||avatarUrl}}"
+        style="width: 80rpx; height: 80rpx; border-radius: 50%"
+      ></image>
+    </view>
+    <view style="display: flex; flex-direction: row">
+      <view style="width: 80%">
+        <view
+          style="
+            font-size: 32rpx;
+            width: 100%;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+          "
+          >{{item.customerName}}</view
+        >
+        <view class="smallFontSize" style="width: 500rpx">
+          <span>手机:{{item.customerPhone}}</span>
+        </view>
+      </view>
+      <view catchtap="deleteItem" data-index="{{index}}">
+        <image
+          src="../../../assets/images/icon2nd/icon_trash.png"
+          style="
+            width: 30rpx;
+            height: 30rpx;
+            margin-top: 20rpx;
+            margin-right: 10rpx;
+          "
+        ></image>
+        <span class="smallFontSize">删除</span>
+      </view>
+    </view>
+  </view>
+</view>
+<view wx:if="{{allDisplay}}">
+  <view class="serch-wrapper bg-white">
+    <search-input
+      bind:confirm="search"
+      bind:getValue="getValue"
+      bind:search="search"
+      placeholder="{{input.placeholder}}"
+      width="648"
+    ></search-input>
+  </view>
+  <view
+    style="
+      padding-left: 50rpx;
+      padding-top: 20rpx;
+      height: 60rpx;
+      font-size: 28rpx;
+    "
+  >
+    <radio-group catchtap="isCheckedAll" class="radio-group">
+      <label class="radio">
+        <radio
+          checked="{{allChecked}}"
+          color="#2F7BFD"
+          value="{{item.customerName}}"
+        ></radio
+        >全部</label
+      >
+    </radio-group>
+  </view>
+  <view class="itemList" wx:for="{{customerList}}" wx:key="index">
+    <view style="width: 10%; line-height: 110rpx">
+      <image
+        catchtap="itemIscheck"
+        data-id="{{item.id}}"
+        src="{{item.ischeck?icon.checked:icon.noCheck}}"
+        style="width: 40rpx; height: 40rpx"
+      ></image>
+    </view>
+    <view style="width: 20%">
+      <image
+        src="{{item.avatar||avatarUrl}}"
+        style="width: 80rpx; height: 80rpx; border-radius: 50%"
+      ></image>
+    </view>
+    <view>
+      <view style="font-size: 32rpx">{{item.customerName}}</view>
+      <view>
+        <span style="font-size: 24rpx; color: #999"
+          >手机:{{item.customerPhone}}</span
+        >
+      </view>
+    </view>
+  </view>
+</view>
+<view class="bottomSpace"></view>
+<view catchtap="choosedAll" class="g_bottomBtn" wx:if="{{!allDisplay}}">
+  <view>确定</view>
+</view>
+<view catchtap="addALLcustomer" class="g_bottomBtn" wx:if="{{allDisplay}}">
+  <view>确定</view>
+</view>

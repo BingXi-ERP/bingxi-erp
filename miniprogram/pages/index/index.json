@@ -1,0 +1,13 @@
+{
+  "navigationBarTitleText": "工作台",
+  "enablePullDownRefresh": true,
+  "navigationBarTextStyle": "black",
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "usingComponents": {
+    "cmp-tab-bar": "/components/tab-bar/tab-bar",
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-image": "/miniprogram_npm/@vant/weapp/image/index",
+    "van-icon": "/miniprogram_npm/@vant/weapp/icon/index",
+    "van-notice-bar": "../../miniprogram_npm/@vant/weapp/notice-bar/index"
+  }
+}

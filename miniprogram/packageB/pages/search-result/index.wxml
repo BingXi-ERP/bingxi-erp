@@ -1,0 +1,75 @@
+<view class="search-result">
+    <view class="search-result_top">
+        <view class="result_inset">
+            <search-pic-color data="{{searchTopData}}"></search-pic-color>
+        </view>
+    </view>
+    <view class="result_tool">
+        <view class="station">
+            <text bindtap="handleSwithStation" class="{{isAllStation?'':'active'}}" data-station="1">本店</text>
+            <text bindtap="handleSwithStation" class="{{isAllStation?'active':''}}" data-station="2" wx:if="{{userAuthList&&userAuthList['fabric_search:all_search']}}">平台</text>
+        </view>
+        <view class="bar_tools">
+            <view bindtap="handleShowSearchBar" class="bar_tools_item">
+                <text>搜索</text>
+                <image mode="aspectFit" src="../../../assets/images/icon2nd/icon_ResultSs.png"></image>
+            </view>
+            <view bindtap="handleShowFilter" class="{{isUseFilter?'bar_tools_item bar_tools_active':'bar_tools_item'}}">
+                <text>筛选</text>
+                <image mode="aspectFit" src="../../../assets/images/icon2nd/icon_ResultSx.png"></image>
+            </view>
+        </view>
+        <van-transition name="fade-left" show="{{showSearch}}" wx:if="{{showSearch}}">
+            <view class="result_search">
+                <image class="result_search_icon" mode="aspectFit" src="/assets/images/icon2nd/ic_sous@3x.png"></image>
+                <input bindconfirm="onSearchConfirm" bindinput="onSearchInput" class="result_search-input" confirmType="search" placeholder="搜索品名/编号" type="text" value="{{searchFilterVal}}"></input>
+                <view class="tools">
+                    <text bindtap="onSearchConfirm">搜索</text>
+                    <text bindtap="handleShowSearchBar">取消</text>
+                </view>
+            </view>
+        </van-transition>
+    </view>
+    <view class="result_type_bar" wx:if="{{!isAllStation&&!isUseFilter}}">
+        <text bindtap="onSwitchSearchType" class="{{item.value===formInline.sortType?'active':''}}" data-type="{{item.value}}" wx:for="{{searchTypeOpt}}" wx:key="value">{{item.label}}</text>
+    </view>
+    <view class="result_content {{isAllStation?'result_content_plat':''}}">
+        <van-empty description="暂无数据" wx:if="{{searchBotData.length===0}}"></van-empty>
+        <scroll-view bindrefresherrefresh="onRefresh" bindscrolltolower="onScrollTolower" refresherEnabled="{{isRefresher}}" refresherThreshold="{{100}}" refresherTriggered="{{triggeredPull}}" scrollTop="{{scrollTop}}" scrollY="true" style="height:98%" wx:else>
+            <result-card authList="{{userAuthList}}" data="{{item}}" index="{{index}}" plat="{{isAllStation}}" sampleData="{{searchTopData}}" searchId="{{formInline.searchId}}" wx:for="{{searchBotData}}" wx:key="uuid">
+                <view class="item_recommand flex-justify-end" style="line-height:30px;" wx:if="{{isAllStation}}">
+                    <view catchtap="handleColorCard" class="recommand_r" data-item="{{item}}">电子色卡<van-icon class="icon" color="#909090" name="arrow"></van-icon>
+                    </view>
+                </view>
+            </result-card>
+        </scroll-view>
+    </view>
+    <search-filter bind:confirm="onConfirmFilter" familyParams="{{searchData.familyParams}}" id="searchFilter" isAllStation="{{isAllStation}}" searchId="{{formInline.searchId}}" show="{{showSearchFilter}}"></search-filter>
+</view>
+<van-popup bind:close="closePopup" customClass="popup-wrapper" show="{{hasColorCard}}" zIndex="999">
+    <swiper autoplay="{{swiper.autoplay}}" class="card-swiper" duration="{{swiper.duration}}" indicatorActiveColor="{{swiper.indicatorActiveColor}}" indicatorColor="{{swiper.indicatorColor}}" indicatorDots="{{swiper.indicatorDots}}" interval="{{swiper.interval}}">
+        <swiper-item wx:for="{{colorList}}" wx:key="index">
+            <view class="share-save-wrap">
+                <view class="share-color">
+                    <view class="share-color-wrap">
+                        <view class="color-item" wx:for="{{item}}" wx:for-item="node" wx:key="{{node.colorVal}}">
+                            <view class="color" wx:if="{{node.colorImagePath}}">
+                                <image mode="aspectFill" src="{{replImage(node.colorImagePath,globalApp)}}"></image>
+                            </view>
+                            <view class="color" style="background-color:{{node.colorValue||''}}" wx:else>
+                                <image mode="aspectFit" src="{{icon.colorCard}}" style="width:40rpx;height:40rpx;" wx:if="{{!node.colorValue}}"></image>
+                            </view>
+                            <view class="color-name">
+                                <view class="color-name-arrow"></view>{{node.colorVal||''}}</view>
+                            <view class="color-name" style="margin-top:0" wx:if="{{node.colorName}}">{{node.colorName||''}}</view>
+                        </view>
+                    </view>
+                </view>
+            </view>
+        </swiper-item>
+        <swiper-item class="share-swipe-item" wx:for="{{colorChartPaths}}" wx:key="index">
+            <image mode="aspectFit" src="{{replImage(item,globalApp)}}" style="width:100%;height:100%;"></image>
+        </swiper-item>
+    </swiper>
+</van-popup>
+<van-toast id="van-toast"></van-toast>

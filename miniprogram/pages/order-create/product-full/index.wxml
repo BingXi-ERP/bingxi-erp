@@ -1,0 +1,239 @@
+<view class="add-fine-code">
+    <view class="colors">
+        <view bindtap="{{item.checked?item.btn:''}}" class="chooseInfo margin20" wx:if="{{colors.length===0}}" wx:for="{{chooseInfo}}" wx:key="type">
+            <view class="right title">{{item.title}}</view>
+            <view class="left fl">
+                <van-icon class="{{item.checked?'yellow':'gray'}}" name="add-o" size="30rpx"></van-icon>
+                <text class="f14 {{item.checked?'yellow':'gray'}}">{{item.detail}}</text>
+            </view>
+        </view>
+        <view class="checkInfo" wx:if="{{colors.length!==0}}">
+            <view class="infoDetail" wx:for="{{chooseInfo}}" wx:key="type">
+                <view bindtap="{{item.btn}}" class="chooseInfo" wx:if="{{!isEdit}}">
+                    <view class="right title">{{item.title}}</view>
+                    <view class="codeCount" wx:if="{{item.title==='细码'}}">已录入{{tabCurrentColorList.length}}条</view>
+                </view>
+                <view class="fr-between-center chooseInfo" wx:else>
+                    <view class="right title">{{item.title}}</view>
+                    <view class="codeCount" wx:if="{{item.title==='细码'}}">已录入{{tabCurrentColorList.length}}条</view>
+                </view>
+                <view class="content underLine" wx:if="{{item.title==='颜色'}}">
+                    <view class="badge marRight {{item.id===tabCurrentColorId?'badge-primary':'badge-gray'}}" data-id="{{item.id}}" data-index="{{index}}" wx:for="{{colors}}" wx:key="index">
+                        <text bind:tap="handleSwitchColor" class="badge-button g_limtRow" data-id="{{item.id}}" data-index="{{index}}">{{item.color+''+item.colorName}}</text>
+                        <text class="badge-sup" wx:if="{{!isEdit}}">{{item.dyelotArr.length}}</text>
+                        <view bind:tap="handleDelTabColor" class="badge-del" data-id="{{item.id}}" wx:if="{{isEdit}}">
+                            <image mode="scaleToFill" src="../../../assets/images/icon2nd/ic_close.svg"></image>
+                        </view>
+                    </view>
+                </view>
+                <view class="content underLine " wx:if="{{item.title==='缸号'}}">
+                    <view class="badge marRight {{item.index===tabCurrentDyelotId?'badge-primary':'badge-gray'}}" data-id="{{item.id}}" data-index="{{index}}" wx:for="{{tabCurrentDyelot}}" wx:key="index">
+                        <text bind:tap="changeCurrentDyelot" class="badge-button g_limtRow" data-id="{{item.id}}" data-index="{{index}}">{{item.dyelotName?item.dyelotName:item.id}}</text>
+                        <text class="badge-sup" wx:if="{{!isEdit}}">{{item.list.length}}</text>
+                        <view bind:tap="deleteDylot" class="badge-del" data-id="{{item.id}}" wx:if="{{isEdit}}">
+                            <image mode="scaleToFill" src="../../../assets/images/icon2nd/ic_close.svg"></image>
+                        </view>
+                    </view>
+                </view>
+                <view class="content underLine" wx:if="{{item.title==='细码'}}">
+                    <view class="detailTable" wx:if="{{tabCurrentColorList.length!==0}}">
+                        <view bindtap="showCodePop" class="fl">
+                            <view class="fl showCodeRow g_limtRow">
+                                <view class="codeItem" wx:for="{{tabCurrentColorList}}" wx:key="index">{{item.quantity+item.priceUnit}}</view>
+                            </view>
+                            <view class="toCodeDetail">全部<van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                            </view>
+                        </view>
+                    </view>
+                </view>
+                <view bindtap="{{item.btn}}" class="c-choose">
+                    <van-icon color="#FB562C" name="add-o" size="30rpx"></van-icon>{{item.detail}}</view>
+            </view>
+            <view class="returnData" wx:if="{{openType==='salesReturn'}}">
+                <view class="fr-between-center returnDataItem">
+                    <view class="title">数据处理:</view>
+                    <view class="fr-between-center salesItem">
+                        <view class="fl differenceSymbol">
+                            <image bindtap="chooseSymbol" data-id="{{item.id}}" mode="aspectFit" src="{{item.click?item.pre:item.nor}}" wx:for="{{differenceCountData}}" wx:key="{{item.value}}"></image>
+                        </view>
+                        <input bindblur="toDifferenceNum" bindinput="limitInputDecimalLeng4" cursorSpacing="50" data-key="differenceNum" placeholder="请输入数量" placeholderClass="place-holder" placeholderStyle="text-align: right" style="text-align:right" type="digit" value="{{differenceNum}}"></input>
+                    </view>
+                </view>
+                <view class="fr-between-center returnDataItem">
+                    <view class="returnTitle">退货条数:</view>
+                    <view class="fl" style="margin-left:25rpx;">
+                        <view>{{totalNum}}条</view>
+                    </view>
+                </view>
+                <view class="fr-between-center returnDataItem returnAlignItems">
+                    <view class=" returnTitle">退货数量:</view>
+                    <view class="fl totalCodeNumItem">
+                        <view style="margin-left:25rpx;" wx:for="{{totalCodeNum}}" wx:key="quantity">{{toFixNum(item.quantity,1,false)}}{{item.priceUnit}}</view>
+                    </view>
+                </view>
+                <view class="fr-between-center returnAlignItems returnDataItem marLeftAuto">
+                    <view class="title">计价数量:</view>
+                    <view class="fl totalCodeNumItem">
+                        <view style="margin-left:25rpx;" wx:for="{{totalCodeNum}}" wx:key="quantity">{{toFixNum(item.differenceQuantity,2,false)}}{{item.priceUnit}}</view>
+                    </view>
+                </view>
+            </view>
+            <view class="returnData" wx:if="{{openType==='offline'}}">
+                <view class="order-info">开单信息</view>
+                <view class="fr-between-center returnDataItem">
+                    <view class="title">销售总数</view>
+                    <view class="salesItem">{{totalNum}}条</view>
+                </view>
+                <view class="fr-between-center returnAlignItems returnDataItem marLeftAuto">
+                    <view class="title">标签数量</view>
+                    <view class="fl totalCodeNumItem">
+                        <view style="margin-left:25rpx;" wx:for="{{totalCodeNum}}" wx:key="quantity">{{toFixNum(item.quantity,2,false)}}{{item.priceUnit}}</view>
+                    </view>
+                </view>
+                <view class="fr-between-center returnAlignItems returnDataItem marLeftAuto">
+                    <view class="title">计价数量</view>
+                    <view class="fl totalCodeNumItem">
+                        <view style="margin-left:25rpx;" wx:for="{{totalCodeNum}}" wx:key="quantity">{{toFixNum(item.differenceQuantity,2,false)}}{{item.priceUnit}}</view>
+                    </view>
+                </view>
+                <view class="returnDataItem">
+                    <view class="title">优惠</view>
+                    <view class="fr-between-center salesItem">
+                        <input bindblur="toDifferenceNum" bindinput="limitInputDecimalLeng4" cursorSpacing="50" data-key="differenceNum" placeholder="请输入优惠数量" placeholderClass="place-holder" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{differenceNum}}"></input>
+                        <view class="fl differenceSymbol">
+                            <image bindtap="chooseSymbol" data-id="{{item.id}}" mode="aspectFit" src="{{item.click?item.pre:item.nor}}" wx:for="{{differenceCountData}}" wx:key="index"></image>
+                        </view>
+                    </view>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="fixed-toolbar-bottom">
+        <view class="toolbar-left ">
+            <view class="totle-info">
+                <text wx:if="{{openType==='salesReturn'}}">合计退货：</text>
+                <text wx:if="{{openType==='offline'}}">合计：</text>
+                <text class="current">￥</text>
+                <text class="total-amount">{{toFixNum(totalPrice,2,true,true,'')}}</text>
+            </view>
+        </view>
+        <view class="fr-between-center toolbar-right">
+            <button bind:tap="handleToggleEdit" class="marR g_samllNormalBtn" wx:if="{{colors.length!==0}}">{{isEdit?'完成':'编辑'}}</button>
+            <button bind:tap="handleNextStep" class="marR g_samllBtn" disabled="{{colors.length===0||isEdit}}">下一步</button>
+        </view>
+    </view>
+    <view class="picker-custom picker-color-select ">
+        <view bindtap="handleHidePickerColorSelect" class="picker-custom-overlay " hidden="{{!showPickerColorSelect}}"></view>
+        <view class="picker-custom-wrapper {{showPickerColorSelect?'openAnimate':'closeAnimate'}}">
+            <view class="p-title-box">
+                <text bindtap="closeColor" class="c_cancel">取消</text>
+                <text class="p-custom-title">选择颜色</text>
+                <text bindtap="addColor" class="c_btn">添加色号</text>
+            </view>
+            <view class="picker-custom-content">
+                <scroll-view class="fr-between-center color-list overAtuo" scrollY="true" wx:if="{{colorList.length!==0}}">
+                    <view class="inline_block" wx:for="{{colorList}}" wx:key="index">
+                        <view bind:tap="selectColor" class="badge  {{item.id===willAddColorId?'b-yellow':'b-gray'}}" data-color="{{item.color}}" data-color-name="{{item.colorName}}" data-id="{{item.id}}" data-index="{{index}}">
+                            <view class="b-button">{{item.color+''+item.colorName}}</view>
+                        </view>
+                    </view>
+                </scroll-view>
+                <view class="empty-data" wx:else>该商品暂时没有颜色数据 ~</view>
+            </view>
+        </view>
+    </view>
+    <view class="picker-custom picker-color-select" wx:if="{{showDialogColorFineCode}}">
+        <view bindtap="handleHideDialogColorFineCode" class="picker-custom-overlay"></view>
+        <view class="picker-custom-wrapper  {{showDialogColorFineCode?'openAnimate':'closeAnimate'}}">
+            <view class="btnsTop">
+                <view bind:tap="reChooseColor">
+                    <van-icon color="#5D5D5D" name="arrow-left" size="24rpx"></van-icon>重选色号</view>
+                <text class="colorFineCodeItem">{{JSON.stringify(colorFineCodeItem)}}</text>
+                <text bind:tap="handleFinishedAddColorDetail" class="finsh" style="color:{{tabCurrentColorList.length===0&&(!colorFineCodeItem[0].inputVal||!willAddColorBasePrice)?'#C0C0C0':'#FB562C'}}">完成</text>
+            </view>
+            <view class="dialog-custom-content">
+                <view class="color-edit-form">
+                    <view class="form-item">
+                        <view class="form-item-label">缸号</view>
+                        <view class="form-item-content input-dyelot">
+                            <input bindinput="handleDyelotInput" data-key="dyelot" data-leng="1" maxlength="20" placeholder="请输入缸号(非必填)" placeholderClass="place-holder" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="text" value="{{dyelot}}"></input>
+                        </view>
+                    </view>
+                    <view class="priceAndCode">
+                        <view class="form-item ">
+                            <text class="form-item-label request">单价</text>
+                            <view class="form-item-content input-price">
+                                <input bindblur="handleBlurInput" bindinput="handleInputDecimalLeng" cursorSpacing="50" data-key="willAddColorBasePrice" placeholder="请输入单价" placeholderClass="place-holder" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{willAddColorBasePrice}}"></input>
+                                <text class="">元</text>
+                            </view>
+                        </view>
+                        <view class="form-item">
+                            <text class="form-item-label request">细码</text>
+                            <view class="form-item-content input-code">
+                                <input bindinput="handleInputDecimalLengOne" cursorSpacing="50" data-input="colorFineCodeItem" data-leng="1" focus="{{isFocus}}" placeholder="请输入细码" placeholderClass="place-holder" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{colorFineCodeItem[0].inputVal}}"></input>
+                                <picker bindchange="changeLargeCargo" data-key="colorFineCodeItem" range="{{arrayCargo}}" value="{{largeCargo}}">
+                                    <view class="pickerText">{{colorFineCodeItem[0].priceUnit}}<van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                                    </view>
+                                </picker>
+                            </view>
+                        </view>
+                    </view>
+                </view>
+            </view>
+            <view class="btns">
+                <view bindtap="addItem" class="addBtn" style="color:{{!colorFineCodeItem[0].inputVal||!willAddColorBasePrice?'#C0C0C0':'#FB562C'}}">
+                    <van-icon color="{{!colorFineCodeItem[0].inputVal||!willAddColorBasePrice?'#C0C0C0':'#FB562C'}}" name="add-o" size="30rpx"></van-icon>
+                    <text> {{showChoosedCode?'添加细码':'新增细码'}}</text>
+                </view>
+            </view>
+            <view class="moveCode" wx:if="{{showChoosedCode}}">
+                <scroll-view scrollWithAnimation scrollY class="scroll" scrollTop="{{scrollTop}}" style="height:650rpx;">
+                    <view class="fl showCodeItem">
+                        <view class="codeItem2" wx:for="{{tabCurrentColorList}}" wx:key="index">{{item.quantity+item.priceUnit}}</view>
+                    </view>
+                </scroll-view>
+            </view>
+        </view>
+    </view>
+    <view class="picker-custom picker-color-select ">
+        <view bindtap="showCodePop" class="picker-custom-overlay " hidden="{{!codePop}}"></view>
+        <view class="picker-custom-wrapper picker-code-wrapper {{codePop?'openAnimate':'closeAnimate'}}">
+            <view class="custom-title">
+                <text>全部细码({{tabCurrentColorList.length}}条)</text>
+            </view>
+            <view class="picker-custom-content detailTable marBottom200">
+                <view class="fl detailTr" style="padding-left:50rpx">
+                    <text class="th">编号</text>
+                    <text class="th align-right" style="flex:2;padding-right:50rpx">数量</text>
+                    <text class="th align-right">单价(元)</text>
+                </view>
+                <view class="codeScoll">
+                    <view class="detailTr" wx:for="{{tabCurrentColorList}}" wx:key="index">
+                        <van-cell-group customClass="van-hairline--top-bottom">
+                            <view class="fl">
+                                <view class="td-abslute">
+                                    <image bind:tap="handleRemoveFineCode" class="item-del" data-index="{{index}}" mode="aspectFill" src="{{icon.delete}}"></image>
+                                </view>
+                                <view class="th" style="color:black">{{index+1<10?'0'+index+1:index+1}}</view>
+                                <view class="fl inputBox th marRight65" style="flex:2">
+                                    <input bindblur="handleUpdateColorFineCode" bindinput="handleInputDecimalLengOne" cursorSpacing="50" data-index="{{index}}" data-key="quantity" type="digit" value="{{item.quantity}}"></input>
+                                    <picker bindchange="changeUnit" data-key="{{index}}" range="{{arrayCargo}}" value="{{largeCargo}}">
+                                        <view class="pickerText">
+                                            <text>{{item.priceUnit}}</text>
+                                            <van-icon color="#5D5D5D" name="arrow-down" size="24rpx"></van-icon>
+                                        </view>
+                                    </picker>
+                                </view>
+                                <view class="th inputBox">
+                                    <input bindblur="handleUpdateColorFineCode" bindinput="handleInputDecimalLeng" cursorSpacing="50" data-index="{{index}}" data-key="price" data-tab-current-color-id="{{tabCurrentColorId}}" type="digit" value="{{item.price}}"></input>
+                                </view>
+                            </view>
+                        </van-cell-group>
+                    </view>
+                </view>
+            </view>
+        </view>
+    </view>
+    <van-dialog id="van-dialog"></van-dialog>
+    <van-toast id="van-toast"></van-toast>
+</view>

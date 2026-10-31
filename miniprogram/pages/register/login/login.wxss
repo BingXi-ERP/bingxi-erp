@@ -1,0 +1,210 @@
+.page-container {
+  align-items: center;
+  background-color: #fff;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.top-area {
+  margin-top: 242rpx;
+  text-align: center;
+}
+.app-name {
+  height: 104rpx;
+  margin: auto;
+  width: 104rpx;
+}
+.app-name image {
+  height: 100%;
+  width: 100%;
+}
+.app-title {
+  font-size: 48rpx;
+  font-weight: 700;
+  margin-top: 28rpx;
+}
+.app-slogan {
+  color: #5d5d5d;
+  font-size: 24rpx;
+  margin-top: 14rpx;
+}
+.login-area {
+  margin-bottom: 60rpx;
+  margin-top: 70rpx;
+  width: 80%;
+}
+.phone-display {
+  align-items: center;
+  background-color: #fff;
+  border-bottom: 1px solid #d8d8d8;
+  margin-bottom: 60rpx;
+  padding: 24rpx 0;
+}
+.l-area,
+.phone-display {
+  display: -webkit-flex;
+  display: flex;
+}
+.l-area {
+  align-content: center;
+}
+.area-code {
+  font-size: 24rpx;
+  text-align: left;
+  width: 60rpx;
+}
+.arrow-up {
+  line-height: 26rpx;
+  text-align: center;
+  width: 50rpx;
+}
+.phone-number {
+  flex: 1;
+  font-size: 26rpx;
+  height: 40rpx;
+  padding-left: 26rpx;
+}
+.phone-number::before {
+  background-color: #f4f4f4;
+  content: "";
+  height: 28rpx;
+  left: 0;
+  margin-top: -14rpx;
+  position: absolute;
+  top: 50%;
+  width: 2rpx;
+}
+.next-button {
+  align-items: center;
+  background: linear-gradient(180deg, #ff8b6c, #fb562c);
+  border-radius: 35rpx;
+  color: #fff;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 24rpx;
+  height: 70rpx;
+  justify-content: center;
+  margin: 0 auto;
+  width: 100%;
+}
+.button-inner {
+  height: 100%;
+  width: 100%;
+}
+.agreement-area {
+  left: -10rpx;
+  position: relative;
+}
+.login-other {
+  bottom: 0;
+  display: -webkit-flex;
+  display: flex;
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  left: 50%;
+  padding-bottom: 80rpx;
+  position: absolute;
+  transform: translateX(-50%);
+}
+.other_type {
+  align-items: center;
+  color: #999;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 24rpx;
+  height: 40rpx;
+  justify-content: center;
+  line-height: 40rpx;
+  margin-bottom: 60rpx;
+  text-align: center;
+  width: 100%;
+}
+.other_type span {
+  background-color: #eaeaea;
+  flex: 1;
+  height: 1rpx;
+  max-width: 100rpx;
+}
+.other_type text {
+  padding: 0 20rpx;
+}
+.other_login {
+  justify-content: center;
+}
+.other_login,
+.share-btn-null {
+  display: -webkit-flex;
+  display: flex;
+}
+.share-btn-null {
+  align-items: center;
+  border-radius: 16rpx;
+  flex-direction: column;
+  margin: 0;
+  padding: 32rpx 80rpx;
+  transition: all 0.3s;
+}
+.share-btn-null::after {
+  border: none;
+}
+.share-btn-null image {
+  border-radius: 50%;
+  height: 80rpx;
+  margin-bottom: 30rpx;
+  width: 80rpx;
+}
+.share-btn-null text {
+  color: #333;
+  font-size: 24rpx;
+  font-weight: 500;
+}
+.weixinlogin {
+  background: #fff;
+  font-size: 24rpx;
+  margin-bottom: 30rpx;
+  text-align: center;
+}
+.d-text {
+  padding: 120rpx;
+  text-align: center;
+}
+.wx_login {
+  bottom: 270rpx;
+  position: absolute;
+  text-align: center;
+}
+.wx_login button {
+  border-radius: 50%;
+  margin: auto;
+  padding: 0;
+}
+.wx_login button,
+.wx_login image {
+  height: 70rpx;
+  width: 70rpx;
+}
+.wx_login .wx-login-text {
+  color: #5d5d5d;
+  font-size: 26rpx;
+  margin-top: 28rpx;
+  position: relative;
+}
+.wx_login .wx-login-text::before {
+  left: -30rpx;
+}
+.wx_login .wx-login-text::after,
+.wx_login .wx-login-text::before {
+  background-color: #d8d8d8;
+  content: "";
+  height: 2rpx;
+  position: absolute;
+  top: 50%;
+  transform: translateX(-50%);
+  width: 28rpx;
+}
+.wx_login .wx-login-text::after {
+  right: -56rpx;
+}

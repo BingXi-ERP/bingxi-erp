@@ -1,0 +1,76 @@
+page {
+  background-color: #f8f8f8;
+}
+.child-list .child-list-fd {
+  color: #2c2c2c;
+  padding-top: 0;
+}
+.child-list:nth-child(1) .child-list-fd,
+.child-list:nth-child(2) .child-list-fd {
+  padding-right: 0;
+}
+.gray {
+  color: #adadad;
+}
+.btn-active {
+  background: #ff6065;
+  border-radius: 8rpx;
+  color: #fff;
+  font-size: 32rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  margin: auto;
+  width: 80%;
+}
+.explain {
+  margin-top: 5rpx;
+}
+.del-wrapper {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: flex-end;
+  margin: 20rpx 30rpx 0 0;
+}
+.del-wrapper .icon {
+  height: 24rpx;
+  margin-right: 10rpx;
+  width: 24rpx;
+}
+.btn-active1 {
+  margin-bottom: 5%;
+  margin-top: 20%;
+}
+.wx-switch-input {
+  height: 28px !important;
+  width: 46px !important;
+}
+.wx-switch-input::before {
+  height: 26px !important;
+  width: 44px !important;
+}
+.wx-switch-input::after {
+  height: 25px !important;
+  width: 23px !important;
+}
+.multiple_sel_jobs {
+  margin-top: 50rpx;
+  padding: 0 32rpx;
+}
+.multile_checkbox {
+  margin-bottom: 25rpx;
+}
+.multile_checkbox .multile_checkbox_label {
+  width: 100%;
+}
+.flex-layout {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: flex-start;
+}
+.use-Status {
+  color: #c8c9cc;
+  font-size: 28rpx;
+  margin-left: 10px;
+}

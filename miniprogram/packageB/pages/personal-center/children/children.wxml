@@ -1,0 +1,47 @@
+<view class="j-tabs">
+    <view bindtap="onChange" class="j-tab {{tabActiveIndex==0?'active':''}}" data-index="0">账号管理</view>
+    <view bindtap="onChange" class="j-tab {{tabActiveIndex==1?'active':''}}" data-index="1">岗位管理</view>
+</view>
+<view wx:if="{{tabActiveIndex==0}}">
+    <view class="color-data-list-null flex-column" wx:if="{{subAccountList.length==0}}">
+        <view class="bg-img icon" style="background-image:url(\"{{icon.noData}}\")"></view>
+        <view>您还未创建账号~</view>
+    </view>
+    <view class="child-lists" wx:else>
+        <view bindtap="toJob" class="child-list" data-item="{{item.id}}" wx:for="{{subAccountList}}" wx:key="index">
+            <view class="child-list-bd">
+                <view class="child-list-bd-title">{{item.nickName||'-'}}</view>
+                <view class="itemView {{item.roleName?'':red}}">{{item.roleName?'岗位：'+item.roleName:'待选择岗位'}}</view>
+            </view>
+            <view class="userBtn">
+                <text class="{{item.isLock==0?'btnText':'disbtnText'}}">{{item.isLock==0?'已启用':'未启用'}}</text>
+            </view>
+        </view>
+    </view>
+    <view class="fixed-bottom-tools">
+        <button catchtap="toCode" class="g_bottomBtn">
+            <text class="n">新增账号</text>
+        </button>
+    </view>
+</view>
+<view wx:if="{{tabActiveIndex==1}}">
+    <view class="child-lists" wx:if="{{roleList.length>0}}">
+        <view bindtap="toJobs" data-item="{{item}}" data-type="1" wx:for="{{roleList}}" wx:key="index">
+            <view class="child-list">
+                <view class="child-list-bd">
+                    <view class="title">{{item.name}}</view>
+                    <view class="itemView">权限：{{item.menuNames||'-'}}</view>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="color-data-list-null flex-column" wx:else>
+        <view class="bg-img icon" style="background-image:url(\"{{icon.noData}}\")"></view>
+        <view>暂无可管理岗位~</view>
+    </view>
+    <view class="fixed-bottom-tools">
+        <button catchtap="toJobs" class="g_bottomBtn">
+            <text class="n">新增岗位</text>
+        </button>
+    </view>
+</view>

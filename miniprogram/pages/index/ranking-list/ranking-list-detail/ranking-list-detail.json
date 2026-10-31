@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "色卡领取详情",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

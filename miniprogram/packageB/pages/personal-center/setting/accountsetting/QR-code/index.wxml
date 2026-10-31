@@ -1,0 +1,111 @@
+<view class="QRcode">
+  <view class="headers">
+    <view class="imgPrev">
+      <van-icon
+        catchtap="showPopur"
+        color="#FB562C"
+        name="question-o"
+      ></van-icon>
+    </view>
+    <view catchtap="onDelCode" class="delCode" wx:if="{{isShowDelBtn}}"
+      >删除</view
+    >
+  </view>
+  <view class="coderContent">
+    <swiper
+      bindchange="changeSwiper"
+      current="{{printImgIndex}}"
+      indicatorActiveColor="#00B558"
+      indicatorColor="rgba(199,200,216,1)"
+      indicatorDots="true"
+      nextMargin="72rpx"
+      previousMargin="72rpx"
+    >
+      <swiper-item wx:for="{{codeImg}}" wx:key="{{index}}">
+        <view class="codeImgItem">
+          <view class="itemContent {{item.type==='wx'?'wxbg':'alibg'}}">
+            <view>
+              <view class="noCodeImg" wx:if="{{item.auditStatus==='0'}}">
+                <image
+                  class="slide-image"
+                  data-src="{{item}}"
+                  mode="aspectFill"
+                  src="{{icon.success}}"
+                  style="width: 82rpx; height: 52rpx; margin-bottom: 20rpx"
+                ></image>
+                <view class="noCodeImgText">已上传成功待系统确认有效性</view>
+                <view class="noCodeImgText">请稍做等待</view>
+              </view>
+              <view
+                bindtap="uploadCode"
+                class="noCodeImg"
+                data-type="{{item.type}}"
+                wx:if="{{item.auditStatus==='2'}}"
+              >
+                <image
+                  class="slide-image"
+                  data-src="{{item}}"
+                  mode="aspectFill"
+                  src="{{icon.upload}}"
+                  style="width: 82rpx; height: 52rpx; margin-bottom: 20rpx"
+                ></image>
+                <view class="noCodeImgText"
+                  >对不起，您上传的图片未通过系统确认</view
+                >
+                <view class="noCodeImgText">请重新上传</view>
+              </view>
+              <view
+                bindtap="uploadCode"
+                class="noCodeImg"
+                data-type="{{item.type}}"
+                wx:if="{{item.auditStatus==='null'}}"
+              >
+                <image
+                  class="slide-image"
+                  data-src="{{item}}"
+                  mode="aspectFill"
+                  src="{{icon.upload}}"
+                  style="width: 82rpx; height: 52rpx; margin-bottom: 20rpx"
+                ></image>
+                <view class="noCodeImgText">点击上传收款码</view>
+              </view>
+              <image
+                bindtap="uploadCode"
+                class="slide-image"
+                data-src="{{item}}"
+                data-type="{{item.type}}"
+                mode="aspectFill"
+                src="{{item.imgUrl}}"
+                style="width: 504rpx; height: 504rpx"
+                wx:if="{{item.auditStatus==='1'}}"
+              ></image>
+            </view>
+            <view>
+              <view class="fl itemText" wx:if="{{item.type==='wx'}}">
+                <van-icon color="#fff" name="wechat-pay"></van-icon>
+                <text>微信收款码</text>
+              </view>
+              <view class="fl itemText" wx:if="{{item.type==='ali'}}">
+                <van-icon color="#fff" name="alipay"></van-icon>
+                <text>支付宝收款码</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </swiper-item>
+    </swiper>
+  </view>
+</view>
+<van-action-sheet
+  bind:click-overlay="showPopur"
+  bind:close="showPopur"
+  class="explain_content"
+  show="{{showDemo}}"
+  title="示例说明"
+>
+  <view class="qr-box">
+    <image class="imgContent" src="{{icon.demoImg}}"></image>
+    <view class="qr-name">收款码说明</view>
+    <view class="qr-tips">1、左右滑动界面可查看其他收款码</view>
+  </view>
+</van-action-sheet>

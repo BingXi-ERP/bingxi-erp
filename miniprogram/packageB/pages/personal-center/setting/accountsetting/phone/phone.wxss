@@ -1,0 +1,21 @@
+page {
+  background-color: #eff0f7;
+  padding-top: 40rpx;
+}
+.phone {
+  background-color: #fff;
+  border-radius: 20rpx;
+  margin-left: 34rpx;
+  padding: 52rpx 0;
+  text-align: center;
+  width: calc(100vw - 68rpx);
+}
+.number-bind {
+  color: #161616;
+  font-size: 32rpx;
+}
+.btn-active {
+  color: #fb562c;
+  font-size: 26rpx;
+  margin-top: 52rpx;
+}

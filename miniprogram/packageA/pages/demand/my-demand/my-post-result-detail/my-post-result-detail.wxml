@@ -1,0 +1,139 @@
+<view class="resultDeail">
+  <view class="prviewPic">
+    <swiper bindchange="changeGoodsSwip">
+      <swiper-item wx:for="{{productDate.imgArr}}" wx:key="{{item}}">
+        <image
+          bindtap="previewImage"
+          class="slide-image"
+          data-src="{{item}}"
+          mode="aspectFill"
+          src="{{item}}"
+        ></image>
+      </swiper-item>
+    </swiper>
+  </view>
+  <view class="imgCount">
+    <view>{{current+1}}/{{productDate.imgArr.length}}</view>
+  </view>
+  <view class="detailData">
+    <view class="postTitle">
+      <view class="number">品名和编号</view>
+      <view class="categoryName g_limtRow">{{productDate.goodsInfo}}</view>
+      <view
+        class="status {{productDate.matchStatusName==='找版中'||productDate.matchStatusName==='待确认'?'oriange':productDate.matchStatusName==='已剪版'||productDate.matchStatusName==='已领取色卡'||productDate.matchStatusName==='已下大货'?'green':productDate.matchStatusName==='不匹配'?'red':''}}"
+        >{{productDate.matchStatusName}}</view
+      >
+    </view>
+    <view class=".parameters">
+      <view class="parametersLayout">
+        <text>大货价格</text>
+        <text class="parametersDatial remark-text"
+          >{{productDate.bulkPrice}} 元/{{productDate.bulkPriceUnit}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>剪版价格</text>
+        <text class="parametersDatial remark-text"
+          >{{productDate.partPrice}} 元/{{productDate.partPriceUnit}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>空差</text>
+        <text class="parametersDatial remark-text"
+          >{{productDate.deviation}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>货期</text>
+        <text class="parametersDatial remark-text"
+          >{{productDate.deliveryDay}} 天</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>描述</text>
+        <text class="parametersDatial remark-text"
+          >{{productDate.remark?productDate.remark:'-'}}</text
+        >
+      </view>
+    </view>
+  </view>
+  <view class="detailData" wx:if="{{productDate.isShowShopInfo===1}}">
+    <view class="postTitle">
+      <view class="categoryName g_limtRow">供应商</view>
+    </view>
+    <view class=".parameters">
+      <view class="parametersLayout">
+        <text>联系人</text>
+        <text class="g_limtRowTwo parametersDatial remark-text"
+          >{{productDate.shopContacts?productDate.shopContacts:'-'}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>联系电话</text>
+        <view
+          bindtap="showService"
+          class="parametersDatial contact flRow remark-text"
+          wx:if="{{productDate.shopTelephones.length!==0}}"
+        >
+          <view>{{hidePhoneNum( productDate.shopTelephones[0] )}}</view>
+          <view
+            class="phoneIcon"
+            style="background-image:url('{{icon.phone}}')"
+          ></view>
+        </view>
+        <view class="parametersDatial contact flRow remark-text" wx:else>
+          <view>-</view>
+        </view>
+      </view>
+      <view class="parametersLayout">
+        <text>档口微信</text>
+        <text class="parametersDatial remark-text"
+          >{{productDate.shopWxNo?productDate.shopWxNo:'-'}}</text
+        >
+        <text
+          bindtap="copyText"
+          class="copyIcon"
+          data-text="{{productDate.shopWxNo}}"
+          >复制</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>档口名</text>
+        <view class="g_limtRow parametersDatial remark-text"
+          >{{productDate.shopName?productDate.shopName:'-'}}</view
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>档口地址</text>
+        <view class="parametersDatial remark-text"
+          >{{productDate.shopAddressInfo?productDate.shopAddressInfo:'-'}}</view
+        >
+      </view>
+    </view>
+  </view>
+  <view class="{{productDate.isShowOrderBtn===1?'board':'bottomBoard'}}"
+    >注意: 价格以实际报单当天的为准</view
+  >
+  <view class="footer" wx:if="{{productDate.isShowOrderBtn===1}}">
+    <view class="detailBtn">
+      <view catch:tap="toPostResult" class="btn samllBtn" data-type="2"
+        >买大货</view
+      >
+      <view
+        catch:tap="toPostResult"
+        class="btn blueBtn"
+        data-item-type="cutDemo"
+        data-type="1"
+        >剪版</view
+      >
+      <view
+        bind:tap=""
+        catch:tap="toPostResult"
+        class="btn blueBtn"
+        data-item-id="{{productDate.id}}"
+        data-type="0"
+        >领色卡</view
+      >
+    </view>
+  </view>
+</view>

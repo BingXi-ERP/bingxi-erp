@@ -1,0 +1,54 @@
+page {
+  background: #f5f5f5;
+  padding-top: 32rpx;
+}
+.moneyRecord {
+  overflow-x: hidden;
+}
+.recordList {
+  background: #fff;
+  box-sizing: border-box;
+  height: 160rpx;
+  padding: 0 32rpx;
+  position: relative;
+}
+.recordList::after {
+  border-bottom: 1rpx solid #f5f5f5;
+  bottom: 0;
+  content: "";
+  height: 1rpx;
+  left: 32rpx;
+  position: absolute;
+  width: 100vw;
+}
+.right {
+  text-align: right;
+}
+.title {
+  color: #373c55;
+  font-family: PingFangSC-Regular;
+  font-size: 14px;
+  font-weight: 400;
+}
+.money {
+  color: #ff4a4a;
+  font-family: SFProText-Medium;
+  font-size: 18px;
+  font-weight: 500;
+}
+.money,
+.title {
+  line-height: 50rpx;
+}
+.more,
+.status,
+.time {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+}
+.more {
+  padding: 40rpx 0;
+  text-align: center;
+}

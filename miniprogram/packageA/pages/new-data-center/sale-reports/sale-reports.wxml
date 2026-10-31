@@ -1,0 +1,133 @@
+<view class="contain">
+    <view class="topTab">
+        <view catch:tap="changeTab" class="SalesVolume" data-index="1">销售额<view class="{{tabActive==1?'tabActive':''}}"></view>
+        </view>
+        <view catch:tap="changeTab" class="receivable" data-index="2">待收款<view class="{{tabActive==2?'tabActive':''}}"></view>
+        </view>
+        <view catch:tap="changeTab" class="receivables" data-index="3">己收款<view class="{{tabActive==3?'tabActive':''}}"></view>
+        </view>
+        <view catch:tap="changeTab" class="refund" data-index="4">己退货<view class="{{tabActive==4?'tabActive':''}}"></view>
+        </view>
+    </view>
+    <view class="topContent">
+        <view class="dateChoose">
+            <view class="explain">
+                <view>
+                    <image class="explainLogo" src="{{icon.gantan}}"></image>
+                </view>
+                <view>{{explain[tabActive]}}</view>
+            </view>
+            <view class="lately-date-choose">
+                <button catchtap="choosedWeek" class="dateB buttonSpace {{confirmDate==2?'choosedBotton':''}}">近7天</button>
+                <button catchtap="choosedMonth" class="dateB {{confirmDate==3?'choosedBotton':''}}">近30天</button>
+                <view bindtap="switchRoleTo" class="switch-btn" wx:if="{{userAuthList['stat:summary']&&userAuthList['stat:summary:person']}}">
+                    <button class="{{chooseRole==1?'active':''}}">个人</button>
+                    <button class="{{chooseRole==2?'active':''}}">全店</button>
+                </view>
+            </view>
+            <view class="date-choose displayFlex">
+                <picker bindchange="bindStartDateChange" end="2027-09-01" mode="date" start="2015-09-01" value="{{startDate}}">
+                    <view class="picker data-choose">{{startDate==''?'请选择时间':startDate}}</view>
+                </picker>
+                <span class="dateRange">至</span>
+                <picker bindchange="bindEndDateChange" end="2027-09-01" mode="date" start="2015-09-01" value="{{endDate}}">
+                    <view class="picker data-choose">{{endDate==''?'请选择时间':endDate}}</view>
+                </picker>
+            </view>
+        </view>
+    </view>
+    <view class="chartContent">
+        <view class="chartTitle">{{tabDisplay[tabActive]}}</view>
+        <view class="chartNum">
+            <view wx:if="{{tabActive==1}}">{{toFixNum(orderAmount,2,true)}}</view>
+            <view wx:if="{{tabActive==2}}">{{toFixNum(receivableAmount,2,true)}}</view>
+            <view wx:if="{{tabActive==3}}">{{toFixNum(receivedAmount,2,true)}}</view>
+            <view wx:if="{{tabActive==4}}">{{toFixNum(returnedGoodsAmount,2,true)}}</view>
+        </view>
+        <view class="canvas-container">
+            <ec-canvas canvasId="mychart-lineT" ec="{{ec}}" id="mychart-dom-lineT"></ec-canvas>
+        </view>
+    </view>
+    <view style="height:20rpx;background:#F5F5F9"></view>
+    <view>
+        <view class="dataList">
+            <view class="dataList-title">
+                <image class="dataSourceLogo" src="{{icon.sales}}"></image>
+                <view class="dataSource">数据来源</view>
+            </view>
+        </view>
+        <view class="list" wx:for="{{DataSourceList}}" wx:key="index">
+            <view class="list-date">{{item.orderDate}}</view>
+            <view bind:tap="toDetail" class="data-list" data-orderId="{{listItem.orderId}}" data-receivedType="{{listItem.receivedType}}" wx:for="{{item.orderList}}" wx:for-index="listIndex" wx:for-item="listItem" wx:key="index">
+                <view class="data-list-content {{listIndex==item.orderList.length-1?'noBorder':''}}">
+                    <view class="left">
+                        <image class="customerImage" mode="aspectFill" src="{{addDefaultAvatar(listItem.headImg?listItem.headImg+'?imageView2/2/w/200':'',initImgApp)}}"></image>
+                        <view class="customerInfo">
+                            <view class="orderNom">{{listItem.orderNo}}</view>
+                            <view class="orderCustomer {{tabActive==3?'limit':''}}">{{listItem.customer}}</view>
+                        </view>
+                    </view>
+                    <view class="orderList {{listIndex==item.orderList.length-1?'noBorder':''}}">
+                        <view class="orderInfo">
+                            <view class="orderMoney" wx:if="{{tabActive==1}}">
+                                <view>订单额</view>
+                                <view class="orderMoneyNum g_limtRow">{{toFixNum(listItem.orderAmount,2,true,true)}}</view>
+                            </view>
+                            <view class="orderMoney" wx:if="{{tabActive==2}}">
+                                <view>待收款</view>
+                                <view class="orderMoneyNum g_limtRow">{{toFixNum(listItem.receivableAmount,2,true,true)}}</view>
+                            </view>
+                            <view class="g_limtRow wd-limit" wx:if="{{tabActive==2}}">订单额: {{toFixNum(listItem.orderAmount,2,true,true)}}</view>
+                            <view wx:if="{{tabActive==3}}">
+                                <view class="flex-text" wx:if="{{listItem.receivedType==1}}">
+                                    <view class="orderMoney">
+                                        <view>销售收款</view>
+                                        <view class="orderMoneyNum g_limtRow">{{toFixNum(listItem.receivedAmount,2,true,true)}}</view>
+                                    </view>
+                                    <view class="g_limtRow wd-limit" style="margin-bottom:12rpx;">订单额: {{toFixNum(listItem.orderAmount,2,true,true)}}</view>
+                                    <view class="g_limtRow wd-limit">待收款: {{toFixNum(listItem.receivableAmount,2,true,true)}}</view>
+                                </view>
+                                <view class="flex-text" wx:if="{{listItem.receivedType==2}}">
+                                    <view class="orderMoney">
+                                        <view>对账收款</view>
+                                        <view class="orderMoneyNum g_limtRow">{{toFixNum(listItem.receivedAmount,2,true,true)}}</view>
+                                    </view>
+                                    <view class="g_limtRow wd-limit">合并收款: {{toFixNum(listItem.combinedReceivedAmount,2,true,true)}}</view>
+                                </view>
+                                <view class="flex-text" wx:if="{{listItem.receivedType==3}}">
+                                    <view class="orderMoney">
+                                        <view>系统冲抵</view>
+                                        <view class="orderMoneyNum g_limtRow">{{toFixNum(listItem.receivedAmount,2,true,true)}}</view>
+                                    </view>
+                                </view>
+                                <view class="flex-text" wx:if="{{listItem.receivedType==4}}">
+                                    <view class="orderMoney">
+                                        <view>对账退款</view>
+                                        <view class="orderMoneyNum g_limtRow">{{toFixNum(listItem.receivedAmount,2,true,true)}}</view>
+                                    </view>
+                                    <view class="g_limtRow wd-limit" style="margin-bottom:12rpx;">合并退款: {{toFixNum(listItem.combinedRefundAmount,2,true,true)}}</view>
+                                    <view>{{listItem.remark}}</view>
+                                </view>
+                                <view wx:if="{{listItem.receivedType==5}}">
+                                    <view class="orderMoney">
+                                        <view>{{listItem.receivedTypeName!=''?listItem.receivedTypeName:'退款'}}</view>
+                                        <view class="orderMoneyNum g_limtRow">{{toFixNum(listItem.receivedAmount,2,true,true)}}</view>
+                                    </view>
+                                </view>
+                            </view>
+                            <view class="orderMoney" wx:if="{{tabActive==4}}">
+                                <view>已退货</view>
+                                <view class="orderMoneyNum">{{toFixNum(listItem.returnedGoodsAmount,2,true,true)}}</view>
+                            </view>
+                        </view>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <view class="noDataComtent" wx:if="{{DataSourceList.length==0}}">
+            <view class="noDataBg" style="background-image:url(\"{{icon.noDataBg}}\")"></view>
+            <view class="noDataContent">暂无数据</view>
+        </view>
+    </view>
+    <view class="spaceBg"></view>
+</view>

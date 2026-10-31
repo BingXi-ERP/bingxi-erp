@@ -1,0 +1,116 @@
+.container-code {
+  background: linear-gradient(180deg, #f5f0ff, #f1f2fe);
+  box-sizing: border-box;
+  height: 100vh;
+  padding: 40px 20px 20px 60rpx;
+  position: relative;
+}
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.hint,
+.title {
+  box-sizing: border-box;
+  width: 100%;
+}
+.hint {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+.code-input {
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 30px;
+}
+.code-item {
+  background-color: #fff;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  caret-color: auto;
+  font-size: 20px;
+  height: 40px;
+  justify-content: center;
+  text-align: center;
+  width: 40px;
+}
+.code-item,
+.resend-wrap {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.resend-wrap {
+  justify-content: space-between;
+  margin-bottom: 50px;
+}
+.resend {
+  color: #fb562c;
+}
+.no-receive {
+  color: #666;
+}
+.agreement-wrap {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.agreement-checkbox {
+  height: 20px;
+  margin-right: 10px;
+  width: 20px;
+}
+.agreement-text {
+  font-size: 14px;
+}
+.agreement-area {
+  bottom: 100rpx;
+  margin-bottom: 88rpx;
+}
+.bottom-wrap {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 20rpx;
+}
+.agreement-checkbox {
+  height: 25rpx;
+  margin-right: 10rpx;
+  width: 25rpx;
+}
+.checked-icon {
+  height: 16rpx;
+  margin: 7rpx;
+  width: 16rpx;
+}
+.unchecked-icon {
+  height: 0;
+  width: 0;
+}
+.agreement-text {
+  color: #666;
+}
+.agreement-link {
+  color: #ff5722;
+}
+.weixinlogin {
+  background: #fff;
+  font-size: 24rpx;
+  margin-bottom: 30rpx;
+  text-align: center;
+}
+.agreement-area {
+  align-items: center;
+  bottom: 40rpx;
+  box-sizing: border-box;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: center;
+  left: 0;
+  margin: 0 auto;
+  position: absolute;
+  width: 100%;
+}

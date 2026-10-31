@@ -1,0 +1,148 @@
+<page-meta pageStyle="{{showColor?'overflow: hidden;':''}}"></page-meta>
+<view class="restock_container">
+    <view class="swiper">
+        <swiper autoplay="{{swiper.autoplay}}" duration="{{swiper.duration}}" indicatorDots="{{swiper.indicatorDots}}" interval="{{swiper.interval}}" style="height:480rpx">
+            <swiper-item wx:for="{{bannerImage}}" wx:key="index">
+                <view bindtap="previewImg" class="swiper-item bg-img" data-detailType="1" data-url="{{item}}" style="background-image:url(\"{{item}}\")"></view>
+            </swiper-item>
+        </swiper>
+    </view>
+    <van-tabs active="{{tabsActive}}" bind:click="onChangeTabs" customClass="product_tabs">
+        <van-tab name="{{1}}" title="产品信息">
+            <view class="product_content">
+                <view class="product-card">
+                    <text class="h1">{{productData.businessProductName}}</text>
+                    <text class="plat_spu">编号：{{productData.platformSpuNumber}}</text>
+                    <view class="name_price">
+                        <view class="price">{{productData.price&&productData.price!=='0'&&productData.price!=='0.0'?'￥'+productData.price:'面议'}}</view>
+                        <view class="product_view">
+                            <view class="product_view_item">
+                                <image class="svg-icon" mode="aspectFill" src="{{iconList.jthViewIcon}}"></image>
+                                <text class="span">{{productData.viewCount}}</text>
+                            </view>
+                            <view class="product_view_item">
+                                <image class="svg-icon" mode="aspectFill" src="{{iconList.jhtTimeIcon}}"></image>
+                                <text class="span">{{productData.updateTime}}</text>
+                            </view>
+                        </view>
+                    </view>
+                </view>
+                <view class="product-card card-mt-8">
+                    <view class="property_item" wx:for="{{propertyConfig}}" wx:key="prop">
+                        <view class="left">
+                            <image class="svg-icon" mode="aspectFill" src="{{iconList[item.icon]}}"></image>
+                            <text class="span">{{item.label}}</text>
+                        </view>
+                        <view class="right">{{(productData[item.prop]||'')+(item.unitProp?productData[item.unitProp]||'':'')}}</view>
+                    </view>
+                </view>
+                <view class="product-card card-mt-8 card-mb-8">
+                    <view class="flx-justify-between color_title">颜色<view bindtap="onShowColor" class="span">共{{productData.colorList&&productData.colorList.length||0}}个颜色<van-icon name="arrow"></van-icon>
+                        </view>
+                    </view>
+                    <van-row customClass="color_block_row" gutter="10">
+                        <van-col class="color_block" span="6" wx:for="{{productData.colorList}}" wx:key="id">
+                            <view class="color_block_div" wx:if="{{item.colorImagePath}}">
+                                <van-image bindtap="onViewColorImage" data-item="{{item}}" height="75" src="{{replImgPath(item.colorImagePath,globalApp,160)}}" width="75"></van-image>
+                            </view>
+                            <view class="color_block_div" style="background-color:{{item.colorValue}}" wx:else>
+                                <image class="svg-icon" mode="aspectFill" src="{{iconList.jhtTimeIcon}}" wx:if="{{!item.colorValue}}"></image>
+                            </view>
+                            <text class="color_block_p">{{item.colorVal+item.colorName}}</text>
+                        </van-col>
+                    </van-row>
+                    <van-popup closeable lockScroll round bind:close="onCloseColorPopup" customClass="color_sheet" customStyle="height: 65%" position="bottom" show="{{showColor}}">
+                        <view class="color_sheet_head">
+                            <view class="h1">颜色<text class="price">
+                  {{productData.price&&productData.price!=='0'&&productData.price!=='0.00'?'￥'+productData.price:'面议'}}
+                </text>
+                            </view>
+                        </view>
+                        <view class="color_ido_item" wx:for="{{productData.colorList}}" wx:key="id">
+                            <view class="left" wx:if="{{item.colorImagePath}}">
+                                <van-image bindtap="onViewColorImage" data-item="{{item}}" height="48" src="{{replImgPath(item.colorImagePath,globalApp,160)}}" width="48"></van-image>
+                            </view>
+                            <view class="left" style="background-color:{{item.colorValue}}" wx:else>
+                                <image class="svg-icon" mode="aspectFill" src="{{iconList.jhtTimeIcon}}" wx:if="{{!item.colorValue}}"></image>
+                            </view>
+                            <view class="right">
+                                <text>{{item.colorVal}}</text>
+                                <text class="price" wx:if="{{productData.priceType===2}}">
+                  {{item.bulkPrice&&item.bulkPrice!=='0'&&item.bulkPrice!=='0.00'?item.bulkPrice+item.bulkSaleUnit:'面议'}}
+                </text>
+                            </view>
+                        </view>
+                    </van-popup>
+                </view>
+            </view>
+            <view class="product_img">
+                <van-image bindtap="onViewDetailImage" data-index="{{index}}" height="375" src="{{item}}" width="100%" wx:for="{{detailImage}}" wx:key="index"></van-image>
+                <van-image bindtap="onViewCarouselColorImage" data-index="{{index}}" height="375" src="{{item}}" width="100%" wx:for="{{colorImage}}" wx:key="index"></van-image>
+            </view>
+        </van-tab>
+        <van-tab name="{{2}}" title="供应商信息" wx:if="{{supplierShow}}">
+            <view class="product_content">
+                <view class="supplier_info">
+                    <view class="supplier_top">
+                        <van-image useErrorSlot useLoadingSlot class="top_img" fit="cover" height="48" src="{{supplierData.logo}}" width="48">
+                            <van-image height="24" slot="error" src="{{iconList.defaultAvatar}}" width="24"></van-image>
+                            <van-image height="24" slot="loading" src="{{iconList.defaultAvatar}}" width="24"></van-image>
+                        </van-image>
+                        <view class="info">
+                            <text>{{supplierData.companyName}}</text>
+                            <view class="product_view">
+                                <view class="product_view_item">
+                                    <text>{{supplierData.areaTypeName}}</text>
+                                </view>
+                            </view>
+                            <view class="shop-btn-wrap" wx:if="{{domain=='BDD'}}">
+                                <van-button round bind:tap="entryShop" size="small" type="info">进入店铺</van-button>
+                            </view>
+                        </view>
+                    </view>
+                    <view class="category van-hairline--bottom">
+                        <view class="left">主营</view>
+                        <view class="right">
+                            <text class="span" wx:for="{{supplierData.clusterNames}}" wx:key="index">
+                {{item}}
+              </text>
+                        </view>
+                    </view>
+                    <view class="contact van-hairline--bottom">
+                        <text class="h1">联系人</text>
+                        <view class="p" wx:for="{{supplierData.linkManList}}" wx:key="index">
+                            <text>{{item.contacts}}</text>
+                            <text>{{item.phone}}</text>
+                        </view>
+                    </view>
+                    <view class="address">
+                        <view class="item">
+                            <view class="h1">档口地址<text class="span">默认地址</text>
+                            </view>
+                            <text>
+                {{supplierData.province?supplierData.province+supplierData.city+supplierData.area+supplierData.addr:'无'}}
+              </text>
+                        </view>
+                        <view class="item">
+                            <view class="h1">仓库地址</view>
+                            <text>
+                {{supplierData.warehouseProvince?supplierData.warehouseProvince+supplierData.warehouseCity+supplierData.warehouseArea+supplierData.warehouseAddr:'无'}}
+              </text>
+                        </view>
+                    </view>
+                </view>
+            </view>
+        </van-tab>
+    </van-tabs>
+    <view class="btn-box" wx:if="{{orderBtn}}">
+        <van-button block round bind:tap="contact" type="info">咨询下单</van-button>
+    </view>
+    <van-popup round position="bottom" show="{{showPhone}}">
+        <view class="phone-box">
+            <view bind:tap="callPhone" class="phone" data-phone="13631457237">欧阳晓恩 136 3145 7237</view>
+            <view bind:tap="callPhone" class="phone" data-phone="19866169906">秦亦禧 198 6616 9906</view>
+            <view bind:tap="callPhone" class="phone" data-phone="13647199172">侯名赐 136 4719 9172</view>
+        </view>
+        <view bind:tap="cancel" class="cancel-btn">取消</view>
+    </van-popup>
+</view>

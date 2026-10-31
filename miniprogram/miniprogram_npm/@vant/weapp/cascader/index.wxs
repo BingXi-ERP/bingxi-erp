@@ -1,0 +1,34 @@
+var utils = require("p_./miniprogram_npm/@vant/weapp/wxs/utils.wxs");
+var style = require("p_./miniprogram_npm/@vant/weapp/wxs/style.wxs");
+function isSelected(tab, valueKey, option) {
+  return (
+    tab.selected &&
+    tab.selected[
+      ((nt_0 = valueKey),
+      null == nt_0 ? undefined : "number" === typeof nt_0 ? nt_0 : "" + nt_0)
+    ] ===
+      option[
+        ((nt_1 = valueKey),
+        null == nt_1 ? undefined : "number" === typeof nt_1 ? nt_1 : "" + nt_1)
+      ]
+  );
+}
+function optionClass(tab, valueKey, option) {
+  return utils.bem("cascader__option", {
+    selected: isSelected(tab, valueKey, option),
+    disabled: option.disabled,
+  });
+}
+function optionStyle(data) {
+  var color =
+    data.option.color ||
+    (isSelected(data.tab, data.valueKey, data.option)
+      ? data.activeColor
+      : undefined);
+  return style({ color });
+}
+module.exports = {
+  isSelected: isSelected,
+  optionClass: optionClass,
+  optionStyle: optionStyle,
+};

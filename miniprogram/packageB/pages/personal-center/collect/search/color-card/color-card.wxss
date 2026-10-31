@@ -1,0 +1,23 @@
+page {
+  background-color: #f8f8f8;
+}
+.color-search-res text.red {
+  font-size: 28rpx;
+}
+.color-search-res {
+  background-color: #fff;
+  border-bottom: 2rpx solid #f4f4f4;
+  margin: auto;
+  padding: 20rpx 0;
+  width: 100%;
+}
+.search-panel {
+  position: relative;
+}
+.search-panel .search-box input.search-input {
+  width: 85%;
+}
+.color-search-res .media-list {
+  margin-bottom: 20rpx;
+  width: 80%;
+}

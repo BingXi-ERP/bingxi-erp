@@ -1,0 +1,20 @@
+<view class="search-box">
+    <image alt="" class="search-icon" mode="aspectFit" src="{{image.search}}"></image>
+    <input bindtap="inputTyping" class="search-input" disabled="true" placeholder="请输入品类名称搜索" type="text"></input>
+</view>
+<view class="stall-categories">
+    <view class="categories-left">
+        <view bindtap="changeChild" class="categories-left-item  {{item.isChecked==1?'active':''}}" data-index="{{index}}" id="{{item.id}}" wx:for="{{list}}" wx:key="index">{{item.name}}<view class="categories-tag" wx:if="{{item.id==status.id}}" wx:for="{{checkStatus}}" wx:for-item="status" wx:key="index">
+                <span>{{item.selectedCount}}</span>
+            </view>
+        </view>
+    </view>
+    <view class="categories-right">
+        <scroll-view scrollY style="height:100%">
+            <view bindtap="changeSubChild" class="categories-right-item categories-child-tag" data-parent-Id="{{item.parentId}}" id="{{item.id}}" wx:for="{{childList}}" wx:key="index">{{item.name}}<view class="categories-tag" wx:if="{{item.parentId==status.id&&item.id==status.childId}}" wx:for="{{checkStatus}}" wx:for-item="status" wx:key="index">
+                    <span>{{status.subChildId.length}}</span>
+                </view>
+            </view>
+        </scroll-view>
+    </view>
+</view>

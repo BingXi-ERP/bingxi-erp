@@ -1,0 +1,345 @@
+<view class="order-list container-gray" wx:if="{{userAuthList['order:query']}}">
+  <view class="tab-wrapper">
+    <van-tabs
+      sticky
+      active="{{activedIndex}}"
+      bind:change="handleTabChange"
+      bind:click="handleTabClick"
+      border="{{tab.border}}"
+      class="tab-vantabs"
+      color="{{tab.color}}"
+    >
+      <view slot="nav-right" wx:if="{{activedIndex==0}}">
+        <van-icon
+          bind:tap="changeDropShow"
+          class="drop-arrow-top"
+          color="#fff"
+          name="arrow-down"
+          wx:if="{{!showDrop}}"
+        ></van-icon>
+        <van-icon
+          bind:tap="changeDropShow"
+          class="drop-arrow-top"
+          color="#fff"
+          name="arrow-up"
+          wx:if="{{showDrop}}"
+        ></van-icon>
+      </view>
+      <van-tab class="drop-tab" title="{{chooseTitle}}">
+        <view
+          catchtap="chooseModalDisplayCon"
+          catchtouchmove="banScroll"
+          class="chooseModal"
+          wx:if="{{showDrop}}"
+        >
+          <view class="chooseItems">
+            <span
+              catchtap="changechooseItem"
+              class="chooseItem {{chooseStatus==0?'chooseItemActive':''}}"
+              data-index="0"
+              >全部</span
+            >
+            <span
+              catchtap="changechooseItem"
+              class="chooseItem {{chooseStatus==40?'chooseItemActive':''}}"
+              data-index="40"
+              >未结算</span
+            >
+            <span
+              catchtap="changechooseItem"
+              class="chooseItem {{chooseStatus==50?'chooseItemActive':''}}"
+              data-index="50"
+              >已结算</span
+            >
+          </view>
+          <view
+            class="chooseItems"
+            style="
+              justify-content: flex-start;
+              padding-top: 36rpx;
+              padding-bottom: 46rpx;
+              top: 108rpx;
+            "
+          >
+            <span
+              catchtap="changechooseItem"
+              class="chooseItem {{chooseStatus==-20?'chooseItemActive':''}}"
+              data-index="-20"
+              >已作废</span
+            >
+            <span
+              catchtap="changechooseItem"
+              class="chooseItem {{chooseStatus==-10?'chooseItemActive':''}}"
+              data-index="-10"
+              >已关闭</span
+            >
+          </view>
+          <view
+            catchtouchmove="banScroll"
+            class="mask"
+            style="height:{{pageHeight}}rpx"
+            wx:if="{{showDrop}}"
+          ></view>
+        </view>
+      </van-tab>
+      <van-tab title="待处理"></van-tab>
+      <van-tab title="挂单中"></van-tab>
+    </van-tabs>
+    <image
+      bind:tap="toSearchList"
+      class="searchIcon"
+      src="{{searchIconUrl}}"
+    ></image>
+  </view>
+  <view class="date-choose displayFlex">
+    <picker
+      bindchange="bindStartDateChange"
+      end="2027-09-01"
+      mode="date"
+      start="2015-09-01"
+      value="{{startDate}}"
+    >
+      <view class="picker data-choose {{startDate?'active-date':''}}"
+        >{{startDate==''?'开始时间':startDate}}</view
+      >
+    </picker>
+    <span class="dateRange">至</span>
+    <picker
+      bindchange="bindEndDateChange"
+      end="2027-09-01"
+      mode="date"
+      start="2015-09-01"
+      value="{{endDate}}"
+    >
+      <view class="picker data-choose">{{endDate==''?'结束时间':endDate}}</view>
+    </picker>
+    <text bindtap="onResetDate" class="date-reset">重置</text>
+  </view>
+  <view class="list-wrapper" wx:if="{{list.length>0}}">
+    <scroll-view scrollY bindscrolltolower="arrivedBottom" style="height: 98%">
+      <view wx:for="{{list}}" wx:key="index">
+        <view class="list" wx:if="{{list.length>0}}">
+          <view
+            bind:tap="toDetail"
+            class="list-item"
+            data-orderId="{{item.id}}"
+            data-orderNo="{{item.orderNo}}"
+            data-orderStatus="{{item.orderStatus}}"
+          >
+            <view class="order-info">
+              <view class="fl order-create-by">
+                <image
+                  mode="aspectFill"
+                  src="{{item.buyerHeadImg||testFace}}"
+                ></image>
+                <view class="g_limtRow userName">{{item.buyerName}}</view>
+              </view>
+              <view class="order-status order-status-hl">
+                <text
+                  class="order-create-at {{item.saleType==1||item.saleType==2?'timeSpace':''}}"
+                  wx:if="{{activedIndex==0&&chooseStatus!=-10||activedIndex!=0}}"
+                >
+                  {{item.orderTime}}
+                </text>
+                <text
+                  class="order-create-at {{item.saleType==1||item.saleType==2?'timeSpace':''}}"
+                  wx:if="{{activedIndex==0&&chooseStatus==-10}}"
+                >
+                  {{item.orderClosedTime}}
+                </text>
+                <text>{{orderConditon[item.orderStatus]}}</text>
+              </view>
+            </view>
+            <view class="order-product">
+              <view class="product" wx:for="{{item.orderGoods}}" wx:key="index">
+                <image
+                  class="product-image"
+                  mode="aspectFill"
+                  src="{{item.goodsImgPath}}"
+                ></image>
+                <view class="product-content">
+                  <text class="product-title"
+                    >{{item.goodsName}} {{item.goodsNo||''}}</text
+                  >
+                  <text class="product-total">
+                    合计：{{item.colorCount}}个颜色,
+                    {{item.totalQuantity}}{{item.goodsUnit||'米'}}
+                  </text>
+                </view>
+              </view>
+            </view>
+            <view class="type-unpay">
+              <view
+                class="order-type"
+                wx:if="{{item.saleType==1||item.saleType==2}}"
+              >
+                <text
+                  >{{item.saleType==1?'大货':''}}{{item.saleType==2?'剪样':''}}</text
+                >
+              </view>
+              <text
+                class="order-unpay"
+                wx:if="{{item.orderStatus===40||item.orderStatus===45}}"
+                >欠款： {{toFixNum(item.payableAmount,2,true,true)}}
+              </text>
+            </view>
+            <view class="order-total">
+              <view class="total-before">共：{{item.colorCount}}种颜色</view>
+              <view
+                >合计：<text class="strong"
+                  >{{toFixNum(item.orderAmount,2,true,true)}}</text
+                >
+              </view>
+            </view>
+            <view class="order-actions">
+              <button
+                catch:tap="handleOrderPrint"
+                class="button-normal"
+                data-id="{{item.id}}"
+                data-mobile="{{item.buyerMobile}}"
+                data-orderId="{{item.id}}"
+                wx:if="{{(item.orderStatus===40||item.orderStatus===45||item.orderStatus===50)&&userAuthList['order:print']}}"
+              >
+                打印
+              </button>
+              <button
+                catch:tap="hanleConcatCustom"
+                class="button-normal"
+                data-mobild="{{item.buyerMobile}}"
+                wx:if="{{(item.orderStatus===-20||item.orderStatus===30||item.orderStatus===10)&&userAuthList['crm:contact']}}"
+              >
+                联系买家
+              </button>
+              <button
+                catch:tap="hanleCloseOrder"
+                class="button-normal"
+                data-id="{{item.id}}"
+                wx:if="{{(item.orderStatus===10||item.orderStatus===30)&&userAuthList['order:closeOrder']}}"
+              >
+                关闭订单
+              </button>
+              <button
+                catch:tap="hanleOrderCreate"
+                class="button-primary"
+                data-id="{{item.id}}"
+                data-order-no="{{item.orderNo}}"
+                wx:if="{{item.orderStatus===10&&userAuthList['order:saveBilling']}}"
+              >
+                去开单
+              </button>
+              <button
+                catch:tap="againOrderCreate"
+                class="button-normal"
+                data-id="{{item.id}}"
+                data-order-no="{{item.orderNo}}"
+                wx:if="{{item.orderStatus===-20&&userAuthList['order:saveBilling']}}"
+              >
+                重新开单
+              </button>
+              <button
+                catch:tap="hanleCreateOn"
+                class="button-primary"
+                data-id="{{item.id}}"
+                data-order-no="{{item.orderNo}}"
+                wx:if="{{item.orderStatus===30&&userAuthList['order:saveBilling']}}"
+              >
+                继续开单
+              </button>
+              <button
+                catch:tap="hanlePay"
+                class="button-primary"
+                data-item="{{item}}"
+                wx:if="{{item.orderStatus===40||item.orderStatus===45}}"
+              >
+                收款
+              </button>
+              <button
+                catch:tap="handleOrderDelete"
+                class="button-normal"
+                data-id="{{item.id}}"
+                wx:if="{{item.orderStatus==-10}}"
+              >
+                删除订单
+              </button>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+  <view class="data-empty" wx:if="{{list.length===0}}">
+    <view>
+      <view class="data-empty-content">
+        <text class="data-empty-title">暂无数据 ~</text>
+      </view>
+    </view>
+  </view>
+  <van-dialog
+    asyncClose
+    showCancelButton
+    useSlot
+    bind:cancel="handleCloseOrder"
+    bind:confirm="handleCloseOrderNoreason"
+    cancelButtonText="提交"
+    class="dialog-close-reason"
+    confirmButtonText="无理由，跳过"
+    show="{{show}}"
+  >
+    <view class="close-reason">
+      <image
+        bind:tap="closeDialog"
+        class="button-close"
+        mode="aspectFill"
+        src="../../../assets/images/icon2nd/ic_tianjia@3x.png"
+      ></image>
+      <textarea
+        bindinput="handleInputReason"
+        placeholder="请输入关闭订单的理由"
+        placeholderClass="{{className}}"
+        value="{{closeReason}}"
+      ></textarea>
+    </view>
+  </van-dialog>
+  <van-dialog id="van-dialog"></van-dialog>
+  <van-toast id="van-toast"></van-toast>
+</view>
+<view class="no-power-wrapper" wx:if="{{!userAuthList['order:query']}}">
+  <view class="img-wrapper">
+    <image
+      mode="aspectFit"
+      src="../../../assets/images/icon2nd/img_404@2x.png"
+    ></image>
+  </view>
+  <view class="title">访问失败</view>
+  <view class="text1">不好意思！您没有权限访问</view>
+</view>
+<van-popup
+  bind:close="handleCloseShareOrder"
+  id="van-popup"
+  show="{{showShareImage}}"
+>
+  <view class="image-preview">
+    <view class="image-content">
+      <text class="n">分享订单</text>
+      <image mode="scaleToFill" src="{{QRCode}}"></image>
+    </view>
+    <view class="image-tip"
+      >此订单仅下单的采购商有权限查看 保存图片，分享给微信好友</view
+    >
+    <view class="actions">
+      <button bindtap="handleDownload">保存图片</button>
+    </view>
+  </view>
+</van-popup>
+<van-dialog
+  asyncClose
+  showCancelButton
+  useSlot
+  bind:close="handleCloseAuthDialog"
+  bind:opensetting="openSetting"
+  confirmButtonOpenType="openSetting"
+  show="{{showAuth}}"
+>
+  <view class="auth-apply">“秉羲工作台商家”需要保存图片或者视频到你的相册</view>
+</van-dialog>
+<cmp-tab-bar active="{{active}}"></cmp-tab-bar>

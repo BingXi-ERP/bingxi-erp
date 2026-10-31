@@ -1,0 +1,66 @@
+<page-meta pageStyle="{{popupInit.canvas.show?'overflow:hidden':'overflow:auto'}}"></page-meta>
+<view class="bg-gray searchPage" id="search">
+    <view class="serch-wrapper bg-white">
+        <search-input bind:confirm="search" bind:getValue="getValue" bind:search="search" placeholder="{{input.placeholder}}" val="{{input.value}}" width="648"></search-input>
+    </view>
+    <view class="customer-list" wx:if="{{searchType=='customer'}}">
+        <view class="item-wrapper bg-white" wx:for="{{customerList}}" wx:key="index">
+            <panel-img bind:toCustomDetail="toCustomDetail" list="{{item}}" rightType="1"></panel-img>
+        </view>
+        <van-empty description="暂无客户列表数据" wx:if="{{customerList.length===0&&noData}}"></van-empty>
+    </view>
+    <view class="cargoPass-list" wx:if="{{searchType=='cargoPass'}}">
+        <cargo-pass-list-block bind:revokeApply="revokeApply" idx="{{index}}" list="{{item}}" wx:for="{{cargoPassList}}" wx:key="index"></cargo-pass-list-block>
+        <van-empty description="暂无放货列表数据" wx:if="{{cargoPassList.length===0&&noData}}"></van-empty>
+    </view>
+    <view class="color-card-list">
+        <color-card-list-block bind:colorCard="shareColorCard" bind:moveBottomCard="ontoProductCard" bind:onOrOff="onOrOff" bind:shareF="shareF" bind:shareM="shareM" isShareProd="{{true}}" list="{{item}}" searchMode="{{true}}" wx:for="{{colorCardList}}" wx:key="index"></color-card-list-block>
+        <van-empty description="暂无色卡列表数据" wx:if="{{colorCardList.length===0&&noData}}"></van-empty>
+    </view>
+    <view class="history-wrapper" wx:if="{{(searchType=='colorCard'&&colorCardList.length==0||searchType=='cargoPass'&&cargoPassList.length==0)&&!noData}}">
+        <view class="title">
+            <view class="text">搜索范围<text class="tip">（选择后，会扩大搜索范围）</text>
+            </view>
+        </view>
+        <view class="history searchRange">
+            <view bindtap="searchRangeTap" class="item {{item.checked?'active':''}}" data-item="{{item}}" wx:for="{{searchRange}}" wx:key="prop">{{item.label}}</view>
+        </view>
+        <view class="title" wx:if="{{historyList.length}}">
+            <view class="text">最近搜索：</view>
+            <view bindtap="delHistory" class="bg-img icon" style="background-image:url(\"{{icon.del}}\")"></view>
+        </view>
+        <view class="history">
+            <view bindtap="historyTap" class="item" data-keyword="{{item}}" wx:for="{{historyList}}" wx:key="index">{{item}}</view>
+        </view>
+    </view>
+    <view class="no-data flex-column" wx:if="{{noData&&noData!=1}}">
+        <view class="icon bg-img" style="background-image:url(\"{{icon.noData}}\")"></view>
+        <view class="text f16 font-black">暂无数据</view>
+        <view class="text2 f28 font-gray2">SORRY</view>
+    </view>
+</view>
+<van-popup bind:close="closePopup" customClass="canvas-popup-wrapper" show="{{popupInit.canvas.show}}" zIndex="999">
+    <view class="{{popupInit.canvas.show?'showBigCanvas':'hideBigCanvas'}}">
+        <block wx:if="{{popupInit.canvas.type==='colorCard'}}">
+            <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas+'0'}}" height="1050" style="width:610px;height:{{popupInit.canvasHeight2}}px;" width="610" wx:if="{{shareColorList.length>0}}"></canvas>
+            <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas+'0'}}" height="1050" style="width:500px;height:900px" width="610" wx:else></canvas>
+        </block>
+        <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas}}" height="1350" style="width:600px;height:900px" width="750" wx:else></canvas>
+    </view>
+    <view class="canvas-wrapper {{popupInit.canvas.show?'':'hideCanvas'}} {{popupInit.canvas.type}}" style="border-radius:6px;">
+        <scroll-view scrollWithAnimation scrollY style="height:550px;" wx:if="{{popupInit.canvas.type==='colorCard'}}">
+            <canvas canvasId="{{popupInit.canvas.canvasId.shareCanvas+'0'}}" height="525" style="width:305px;height:{{popupInit.canvas.type==='colorCard'?popupInit.canvasHeight+'px':'450px'}}" width="300"></canvas>
+        </scroll-view>
+        <canvas canvasId="{{popupInit.canvas.canvasId.shareCanvas}}" height="900" style="width:300px;height:{{popupInit.canvas.type==='colorCard'?popupInit.canvasHeight+'px':'450px'}}" width="500" wx:else></canvas>
+    </view>
+    <view class="share-monents-notice-wrapper">
+        <view class="btn_panel">
+            <view bindtap="colorSetting" class="c_btn">
+                <image mode="aspectFill" src="{{icon.set}}" style="width:16px;height:16px"></image>色卡设置</view>
+            <view catchtap="saveColorCardImg" class="c_btn">
+                <image mode="aspectFill" src="{{icon.save}}" style="width:16px;height:16px"></image>一键保存</view>
+        </view>
+        <view>保存图片后分享到朋友圈</view>
+        <view>会有更多的人来您的店铺哦~</view>
+    </view>
+</van-popup>

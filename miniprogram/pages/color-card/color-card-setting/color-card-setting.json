@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "电子色卡设置",
+  "usingComponents": {
+    "van-dialog": "/miniprogram_npm/@vant/weapp/dialog/index",
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

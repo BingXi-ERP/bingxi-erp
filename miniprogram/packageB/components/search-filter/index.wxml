@@ -1,0 +1,40 @@
+<van-popup rootPortal bind:close="onClose" customClass="searchFilter" customStyle="width: 100%; height: 95%;border-radius: 32rpx 32rpx 0 0;" position="right" safeAreaInsetTop="true" show="{{show}}">
+    <view class="filter_title">筛选<image bindtap="onClose" class="close_icon" mode="aspectFit" src="{{icon.delete}}"></image>
+    </view>
+    <view class="filter_content">
+        <view class="filter_item" wx:for="{{filterOptionsComputed}}" wx:key="index">
+            <view class="title" wx:if="{{item.options.length||item.children.length}}">{{item.title}}<van-checkbox bind:change="onFamilyAllChecked" class="tcheckbox" iconSize="16px" value="{{isSelectedFamily}}" wx:if="{{item.selectProp==='clusterCode'}}">全选</van-checkbox>
+            </view>
+            <view wx:if="{{item.deviceProp}}">
+                <text class="title_f">{{item.ftitle}}</text>
+                <view class="filter_select">
+                    <text bindtap="onTapSelectChildData" class="{{node.paramValue===filterFormInline[item.selectProp+item.deviceProp]?'item_active':''}}" data-item="{{item}}" data-schild="{{node}}" wx:for="{{item.children}}" wx:for-item="node" wx:key="id">±{{node.paramLabel}}</text>
+                </view>
+            </view>
+            <view class="plat_material" wx:if="{{item.selectProp==='baiBuMaterial'}}">
+                <view class="plat_material_item" wx:for="{{filterFormInline.baiBuMaterial}}" wx:for-item="node" wx:key="id">
+                    <text class="plat_material-label"> {{node.name}}:</text>
+                    <view class="plat_material-field">
+                        <input type="number" value="{{node.percent}}"></input>
+                        <text>%</text>
+                    </view>
+                </view>
+            </view>
+            <text class="title_f" wx:if="{{item.stitle}}">{{item.stitle}}</text>
+            <view class="{{judgeActive.tabClassName(item)}}">
+                <text bindtap="onTapSelectData" class="{{judgeActive.isActive(node,item,filterFormInline,isRestock)}}" data-item="{{item}}" data-schild="{{node}}" wx:for="{{item.options}}" wx:for-item="node" wx:key="id">{{node.paramLabel}}</text>
+                <text bindtap="onTapSelectOtherData" class="{{filterFormInline[item.selectProp+item.otherProp]?'item_active':''}}" data-item="{{item}}" wx:if="{{item.otherProp}}">其他</text>
+                <view class="select_input_area" wx:if="{{item.otherProp&&filterFormInline[item.selectProp+item.otherProp]}}">
+                    <input bindblur="onFilterInput" class="area-input" data-inputarea="{{item.selectProp}}" data-prop="{{item.selectProp+item.minProp}}" placeholder="最小{{item.title}}" type="number" value="{{filterFormInline[item.selectProp+item.minProp]}}"></input>
+                    <input bindblur="onFilterInput" class="area-input" data-inputarea="{{item.selectProp}}" data-prop="{{item.selectProp+item.maxProp}}" placeholder="最大{{item.title}}" type="number" value="{{filterFormInline[item.selectProp+item.maxProp]}}"></input>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="filter_tools">
+        <van-button bindtap="onResetFilter" customClass="filter_btn" type="default">重置</van-button>
+        <van-button bindtap="onConfirmFilter" customClass="filter_btn confirm_btn" type="primary">确定</van-button>
+    </view>
+</van-popup>
+<van-toast id="van-toast"></van-toast>
+<van-notify id="van-notify"></van-notify>

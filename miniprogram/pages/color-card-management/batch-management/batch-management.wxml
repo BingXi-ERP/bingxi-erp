@@ -1,0 +1,44 @@
+<view class="batch-management-wrapper">
+    <view class="serch-input-wrapper bg-white">
+        <search-input bind:confirm="keyboardConfirm" bind:getValue="getValue" bind:search="search" placeholder="请输入色卡编号/品名搜索" width="648"></search-input>
+    </view>
+    <view class="list-wrapper" wx:if="{{colorCardList.length>0}}">
+        <view bindtap="checkTap" class="item {{item.check?'active':''}}" data-goodsName="{{item.businessProductName}}" data-goodsNo="{{item.spuNumber}}" data-goodsid="{{item.id}}" data-index="{{index}}" data-mainImgPath="{{item.mainImgPath}}" wx:for="{{colorCardList}}" wx:key="index">
+            <view class="check-wrapper">
+                <view class="checked" style="background-image:url(\"{{item.check?icon.checked:icon.noCheck}}\")"></view>
+            </view>
+            <view class="img-wrapper">
+                <view class="img" style="background-image:url(\"{{replImage(item.mainImgPath,app,240)}}\")"></view>
+                <view class="off flex" wx:if="{{saleStatus==0}}">
+                    <view class="text">已下架</view>
+                </view>
+            </view>
+            <view class="info-wrapper">
+                <view class="name f13 font-black g_limtRowTwo" style="width:390rpx;overflow:hidden;line-height:40rpx;height:80rpx">{{item.businessProductName}} {{item.spuNumber||''}}</view>
+                <view class="price fontColor" wx:if="{{item.price&&item.price!=='0'&&item.price!=='0.0'}}">
+                    <text class="line">¥ {{item.price||''}} </text>
+                    <text class="f12">{{item.priceUnit||''}}</text>
+                </view>
+                <view class="price fontColor" wx:else>面议</view>
+                <view class="other">
+                    <view class="see f12 font-gray">浏览量 {{item.viewCount}}</view>
+                    <view class="collect f12 font-gray">收藏量 {{item.favoriteCount}}</view>
+                </view>
+            </view>
+        </view>
+        <view class="bottom"></view>
+    </view>
+    <view class="footer-wrapper flex bg-white iphone_bottom">
+        <view bindtap="allChoice" class="fl allChoice f14">
+            <view class="checked allImg marR" style="background-image:url(\"{{allItem?icon.checked:icon.noAllChecked}}\")"></view>
+            <text class="marR">全选</text>
+            <text class="totleItem marR" wx:if="{{allItem}}">共 {{selectedArr.length}} 个</text>
+        </view>
+        <view bindtap="footerBarTap" class="item flex item{{index}}" data-action="{{item.action}}" wx:if="{{hideDel?index>0:index>=0}}" wx:for="{{footerBar}}" wx:key="index">
+            <view class="footer-icon bg-img" style="background-image:url(\"{{item.icon}}\")"></view>
+            <view>{{item.name}}</view>
+        </view>
+        <view style="height:220rpx;"></view>
+    </view>
+</view>
+<popup-color-card-category bind:cancel="closePopup" bind:confirm="confirmPopup" bind:onClose="closePopup" categoryList="{{categoryList}}" show="{{showPopup}}"></popup-color-card-category>

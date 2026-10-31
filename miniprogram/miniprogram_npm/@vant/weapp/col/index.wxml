@@ -1,0 +1,6 @@
+<view
+  class="custom-class {{utils.bem( 'col',[span] )}} {{offset?'van-col--offset-'+offset:''}}"
+  style="{{computed.rootStyle( {gutter:gutter} )}}"
+>
+  <slot></slot>
+</view>

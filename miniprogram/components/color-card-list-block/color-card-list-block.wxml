@@ -1,0 +1,54 @@
+<view class="color-card-list-block">
+    <view catchtap="goEditPage" class="info {{showbottom&&list.goodsStatus===0?'newInfo':''}}" data-goodsid="{{list.id}}" data-parentid="{{list.parentId}}">
+        <view class="bg-wrapper">
+            <view class="img-bg" style="background-image:url(\"{{mainImgPath}}\")"></view>
+        </view>
+        <view class="info-info">
+            <view class="g_limtRowTwo name f13">{{list.businessProductName||list.goodsName}} {{list.spuNumber||''}}<van-tag class="car_tag" type="primary" wx:if="{{searchMode&&list.parentId>0}}">底卡</van-tag>
+            </view>
+            <view class="price">
+                <view wx:if="{{list.price&&list.price!=='0'&&list.price!=='0.0'}}">¥<text class="line" style="font-size:24rpx;color:#373C55;">{{list.price||''}}</text>
+                    <text style="font-size:24rpx;color:#373C55;">{{list.priceUnit||''}}</text>
+                </view>
+                <view style="font-size:24rpx;color:#373C55;" wx:else>面议</view>
+            </view>
+            <view class="visit {{searchMode&&list.parentId>0?'bot_card_mt':''}}">浏览量 {{list.viewCount}}</view>
+        </view>
+        <view class="tool">
+            <view catchtap="printTap" class="print" data-goodsid="{{list.id}}" wx:if="{{list.onSale==1}}">打印</view>
+            <view class="off" wx:if="{{list.onSale==0}}">已下架</view>
+            <view catch:tap="ontoProductCard" class="btCardButton" data-item="{{list}}" wx:if="{{searchMode&&list.parentId>0}}">移出底卡</view>
+            <view class="collect">收藏量 {{list.favoriteCount}}</view>
+        </view>
+    </view>
+    <view class="fl listBottom" wx:if="{{showbottom&&list.onSale===1}}">
+        <view class="fl" wx:if="{{filterKey==0||filterKey==7}}">
+            <view catchtap="moveup" class="fl listBottomItem" data-curid="{{list.id}}">
+                <image class="opIoc" src="{{idx==0?icon.moveupDisable:icon.moveup}}"></image>
+                <view>上移</view>
+            </view>
+            <view catchtap="movedown" class="fl listBottomItem" data-curid="{{list.id}}">
+                <image class="opIoc" src="{{idx==listTotle?icon.movedownDisable:icon.movedown}}"></image>
+                <view>下移</view>
+            </view>
+        </view>
+        <view class="fl" wx:else>
+            <view class="fl listBottomItem" data-curid="{{list.id}}">
+                <image class="opIoc" src="{{icon.moveupDisable}}"></image>
+                <view>上移</view>
+            </view>
+            <view class="fl listBottomItem" data-curid="{{list.id}}">
+                <image class="opIoc" src="{{icon.movedownDisable}}"></image>
+                <view>下移</view>
+            </view>
+        </view>
+    </view>
+    <view wx:if="{{showbottom&&list.onSale===0}}"></view>
+    <view class="action" wx:if="{{!showbottom&&(!searchMode||list.parentId<=0)}}">
+        <view bindtap="actionTap" class="action-item" data-action="{{item.action}}" data-goodsid="{{list.id}}" data-idx="{{idx}}" data-name="{{item.name}}" wx:if="{{item.action!=='share'&&list.onSale===0||list.onSale===1}}" wx:for="{{action}}" wx:key="index">
+            <view class="icon" style="background-image:url(\"{{item.icon}}\")"></view>
+            <view class="name">{{item.name}}</view>
+        </view>
+    </view>
+</view>
+<popup-share bind:colorCard="shareColorCard" bind:friend="shareF" bind:moment="shareM" bind:onClose="popupHide" goodsId="{{list.id}}" isShareProd="{{isShareProd}}" show="{{popupShow}}"></popup-share>

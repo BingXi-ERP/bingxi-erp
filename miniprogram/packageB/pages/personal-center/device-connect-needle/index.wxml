@@ -1,0 +1,39 @@
+<view class="device-needle">
+    <view class="block-gray">
+        <view bindtap="onShowClosePrint" class="close_text" wx:if="{{linkNeedId}}">断开连接</view>
+    </view>
+    <form bindsubmit="handleSubmitForm" reportSubmit="true">
+        <view class="form-box">
+            <view class="child">
+                <view class="child-title">制造编号<text>*</text>
+                </view>
+                <view class="child-value">
+                    <input name="serialNumber" placeholder="输入制造编号" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="text" value="{{serialNumber}}"></input>
+                </view>
+            </view>
+            <view class="child">
+                <view class="child-title">校验码<text>*</text>
+                </view>
+                <view class="child-value">
+                    <input name="checkCode" placeholder="输入校验码" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="text" value="{{checkCode}}"></input>
+                </view>
+            </view>
+            <view class="child">
+                <view class="child-title">状态</view>
+                <view class="child-value">
+                    <text class="status {{statusCode==='1'?'status-online':''}} {{statusCode==='2'?'status-offline':''}}">
+            {{statusText}}
+          </text>
+                    <text class="dot {{statusCode==='1'?'dot-online':''}} {{statusCode==='2'?'dot-offline':''}}" wx:if="{{statusCode==='1'||statusCode==='2'}}"></text>
+                </view>
+            </view>
+        </view>
+        <view class="fixed-bottom-tools">
+            <button class="g_bottomBtn" formType="submit">
+                <text class="n">保存</text>
+            </button>
+        </view>
+    </form>
+    <van-toast id="van-toast"></van-toast>
+    <van-action-sheet actions="{{linkNeedOptions}}" bind:cancel="onClosePrintSheet" bind:select="onNeedPrintSelect" cancelText="取消" show="{{showNeedPrintTerm}}"></van-action-sheet>
+</view>

@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "面料详情",
+  "usingComponents": {
+    "popup-share": "/components/popup-share/popup-share",
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-divider": "/miniprogram_npm/@vant/weapp/divider/index",
+    "van-dialog": "/miniprogram_npm/@vant/weapp/dialog/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

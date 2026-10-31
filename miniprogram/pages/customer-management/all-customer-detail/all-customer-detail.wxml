@@ -1,0 +1,171 @@
+<view catchtouchmove="banScroll" class="topCard" style="position:relative;z-index:9999">
+    <view class="flex-wrp bg-img">
+        <view class="flex-item-lef">
+            <view class="img-wrapper">
+                <image class="imgStyle" mode="aspectFill" src="{{customerInfo.headImg?customerInfo.headImg+'?imageView2/2/w/200':customerInfo.headImg}}"></image>
+            </view>
+        </view>
+        <view class="flex-item-middle">
+            <view class="customerName">{{customerInfo.customerName}}<view class="Blacklist" wx:if="{{customerInfo.status==0}}">黑名单</view>
+            </view>
+            <view class="g_limtRow mobile">{{customerInfo.customerCompany||'-'}}</view>
+            <view class="g_limtRowTwo mobile" wx:if="{{customerInfo.provinceName}}">{{customerInfo.provinceName||''}}{{customerInfo.cityName}}{{customerInfo.areaName}}{{customerInfo.addr}}</view>
+            <view class="g_limtRowTwo mobile" wx:else>-</view>
+        </view>
+        <view bindtap="toCustomerDeit" class="flex-item-right flex" wx:if="{{userAuthList['crm:editCustomer']}}">
+            <view class="bg-img icon" style="background-image:url(\"{{icon.edit}}\")"></view>
+        </view>
+    </view>
+    <view class="detailNum">
+        <view class="cardBottom">
+            <view class="dealNum dealCondition">
+                <view>交易额(元)</view>
+                <view class="g_limtRow">{{toFixNum(customerInfo.tradeAmount)}}</view>
+            </view>
+            <view class="dealCondition" style="margin-top:22rpx;">
+                <view>收款额(元)</view>
+                <view class="g_limtRow">{{toFixNum(customerInfo.receiveAmount)}}</view>
+            </view>
+            <view class="dealCondition" style="margin-top:22rpx;">
+                <view>欠款额(元)</view>
+                <view class="g_limtRow">{{toFixNum(customerInfo.debtAmount)}}</view>
+            </view>
+        </view>
+    </view>
+</view>
+<view class="{{fixedTab?'fixedTab':''}}">
+    <view class="tabBar">
+        <view catchtouchmove="banScroll" class="tabStyle ">
+            <view class="tab">
+                <span bindtap="orderRecordTab" class="unactiveTab {{displayContent==2?'active':''}}" style="position:relative;">订单记录 <view class="{{displayContent==2?'recordActiveTab':''}}"></view>
+                </span>
+            </view>
+            <view class="tab">
+                <span bindtap="costomerFollowTab" class="unactiveTab {{displayContent==1?'active':''}}">客户跟踪</span>
+                <view class="{{displayContent==1?'followActiveTab':''}}"></view>
+            </view>
+            <view class="tab">
+                <span bindtap="rebackTab" class="unactiveTab {{displayContent==3?'active':''}}">退货</span>
+                <view class="{{displayContent==3?'activeTab':''}}"></view>
+            </view>
+            <view style="width:160rpx;" wx:if="{{displayContent==2}}">
+                <span catchtap="chooseModalDisplayCon" class="actived">
+                    <span>
+                        <image src="{{orderChoosedCondition!='筛选'?icon.saixuan01:icon.saixuan}} " style="width:24rpx;height:24rpx;"></image>
+                    </span>{{orderChoosedCondition}}</span>
+            </view>
+        </view>
+        <view catchtouchmove="banScroll" class="chooseModal" wx:if="{{chooseModalDisplay}}">
+            <view class="chooseItems">
+                <span catchtap="changechooseItem" class="chooseItem {{chooseItemActive==0?'chooseItemActive':''}}" data-index="0">全部({{customerOrderRecordNum.totalOrderCount}})</span>
+                <span catchtap="changechooseItem" class="chooseItem {{chooseItemActive==10?'chooseItemActive':''}}" data-index="10">待处理({{customerOrderRecordNum.waitDealOrderCount}})</span>
+                <span catchtap="changechooseItem" class="chooseItem {{chooseItemActive==20?'chooseItemActive':''}}" data-index="20">交易完成({{customerOrderRecordNum.clearOrderCount}})</span>
+            </view>
+            <view class="chooseItems" style="justify-content:flex-start;padding-top:24rpx;padding-bottom:46rpx;top:110rpx;">
+                <span catchtap="changechooseItem" class="chooseItem {{chooseItemActive==30?'chooseItemActive':''}}" data-index="30">未结算({{customerOrderRecordNum.debtOrderCount}})</span>
+                <span catchtap="changechooseItem" class="chooseItem {{chooseItemActive==-10?'chooseItemActive':''}}" data-index="-10">已关闭({{customerOrderRecordNum.closeOrderCount}})</span>
+            </view>
+            <view catchtouchmove="banScroll" class="mask" style="height:{{pageHeight-240}}rpx" wx:if="{{chooseModalDisplay}}"></view>
+        </view>
+    </view>
+</view>
+<view class="bottom-centent" style="margin-top:{{fixedTab?'100':''}}rpx;" wx:if="{{displayContent==1}}">
+    <view class="add-wrapper">
+        <view class="today font-black">今天</view>
+        <view bindtap="toaddRecord" class="addRecord f14">+ 添加记录</view>
+    </view>
+    <view style="margin-bottom:20rpx;" wx:for="{{customerRecordList}}" wx:for-item="fItem" wx:key="index">
+        <view class="content-left" style="font-size:24rpx">{{fItem.recordTime}}</view>
+        <view bindtap="toRecordCondition" class="flexDisplay top" data-flag="{{item.scanFlag}}" data-index="{{item}}" wx:for="{{fItem.recordList}}" wx:key="index">
+            <view class="content-left" style="font-size:24rpx">{{item.createTime}}</view>
+            <view class="content-spright">
+                <view class="record">
+                    <view class="recordPe" wx:if="{{item.createUser}}">记录人:{{item.createUser}}</view>
+                    <view style="padding:10rpx 0;color:#000000;font-size:28rpx;display:flex;">
+                        <view>
+                            <image src="../../../assets/images/icon2nd/ic_chakanseka@2x.png" style="width:44rpx;height:44rpx;margin-right:10rpx;" wx:if="{{item.scanFlag==1}}"></image>
+                        </view>
+                        <view>{{item.content}}</view>
+                    </view>
+                    <view>
+                        <image src="{{item.imgPath?item.imgPath+'?imageView2/2/w/200':item.imgPath}}" style="width:80rpx;height:80rpx;margin:10rpx;" wx:if="{{index<4}}" wx:for="{{item.trackRecordImgList}}" wx:key="index"></image>
+                    </view>
+                    <view class="{{item.fetchGoodsList.length>0?'gotCard':' '}}">
+                        <view class="flexDisplay" wx:for="{{item.fetchGoodsList}}" wx:key="index">
+                            <view style="width:30%;">
+                                <image src="{{item.goodsImgPath?item.goodsImgPath+'?imageView2/2/w/200':item.goodsImgPath}}" style="width:80rpx;height:80rpx;margin:10rpx"></image>
+                            </view>
+                            <view>
+                                <span style="color:#2F7BFD">领取色卡#</span>{{item.goodsName}}</view>
+                        </view>
+                    </view>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="bottom-up"></view>
+</view>
+<view class="orderRecordContent" style="margin-top:{{fixedTab?'80rpx':''}}" wx:if="{{displayContent==2}}">
+    <view bindtap="toDetailPage" class="orderRecordCard" data-id="{{item.id}}" data-order-no="{{item.orderNo}}" data-state="{{item.orderStatus}}" wx:if="{{orderRecordList.length&&chooseItemActive!=-30}}" wx:for="{{orderRecordList}}" wx:key="index">
+        <view class="top">
+            <view class="dataTime">{{item.orderTime}}</view>
+            <view class="orderCondition g_limtRow" wx:if="{{item.orderStatus==40||item.orderStatus==45}}">欠款：¥ {{toFixNum(item.payableAmount)}}</view>
+            <view class="orderCondition orderConditionClose" wx:if="{{item.orderStatus==-10}}">已关闭</view>
+            <view class="orderCondition orderConditionClose" wx:if="{{item.orderStatus==10}}">待开单</view>
+            <view class="orderCondition orderConditionClose" wx:if="{{item.orderStatus==30}}">挂单中</view>
+            <view class="orderCondition orderConditionClose" wx:if="{{item.orderStatus==-20}}">已作废</view>
+            <view class="orderCondition orderConditionClose" wx:if="{{item.orderStatus==50}}">已收全款: ￥<span style="color:red;">{{item.receivedAmount}}</span>元</view>
+        </view>
+        <view class="middle" wx:for="{{item.orderGoods}}" wx:key="index">
+            <view class="detailImg">
+                <image src="{{item.goodsImgPath}}" style="width:100rpx;height:100rpx;"></image>
+            </view>
+            <view>
+                <view class="detail">{{item.goodsName}}</view>
+                <view class="detail detialColor">合计：{{item.colorCount}}种颜色，{{item.totalQuantity}}{{item.goodsUnit}}</view>
+            </view>
+        </view>
+        <view class="top line" style="margin-top:18rpx;padding-bottom:18rpx;">
+            <view class="dataTime">开单人：{{item.operator||'-'}}</view>
+            <view class="dataTime">共{{item.colorCount}}种颜色<span wx:if="{{item.goodsUnit.length>0}}">,{{item.totalQuantity}}{{item.goodsUnit}}</span>
+            </view>
+        </view>
+        <view class="Total">
+            <view>合计：¥{{toFixNum(item.orderAmount)}}</view>
+        </view>
+    </view>
+</view>
+<view class="orderRecordContent" style="margin-top:{{fixedTab?'80rpx':''}}" wx:if="{{displayContent==3}}">
+    <view bindtap="toDetailPage" class="orderRecordCard" data-id="{{item.id}}" data-order-no="{{item.billingNo}}" data-state="0" wx:if="{{refundList.length}}" wx:for="{{refundList}}" wx:key="index">
+        <view class="top">
+            <view class="orderNo">{{item.billingNo}}</view>
+            <view class="orderCondition orderConditionClose">{{item.billingDate}}</view>
+        </view>
+        <view class="middle" wx:for="{{item.refundGoodsDetailModels}}" wx:key="index">
+            <view class="detailImg">
+                <image src="{{item.goodsImgPath}}" style="width:100rpx;height:100rpx;"></image>
+            </view>
+            <view>
+                <view class="detail">{{item.goodsName}}</view>
+                <view class="detail detialColor">合计退货：{{item.colorCount}}个颜色 {{item.totalQuantity}}{{item.goodsUnit}}</view>
+            </view>
+        </view>
+        <view class="Total">
+            <span class="text">共{{item.colorCount}}种颜色</span>
+            <span class="text">合计退款：¥</span>
+            <span class="num">{{toFixNum(item.orderAmount)}}</span>
+        </view>
+    </view>
+</view>
+<view class="noResult" wx:if="{{displayContent==2&&!orderRecordList.length||displayContent==3&&!refundList.length}}">
+    <view class="noPage"></view>
+    <view class="title">暂无订单数据</view>
+</view>
+<view class="bottom-up"></view>
+<view class="fixedBC" wx:if="{{!chooseModalDisplay}}">
+    <view class="fixBottom" wx:if="{{userAuthList['crm:contact']}}">
+        <view bindtap="bindServiceTel" class="">
+            <view class="bg-img icon" style="background-image:url(\"{{icon.contact}}\")"></view>
+        </view>
+    </view>
+</view>

@@ -1,0 +1,9 @@
+{
+  "usingComponents": {
+    "van-checkbox": "../../../miniprogram_npm/@vant/weapp/checkbox/index",
+    "van-checkbox-group": "../../../miniprogram_npm/@vant/weapp/checkbox-group/index",
+    "agreement-bottom": "/components/agreementBottom/agreementBottom",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  },
+  "navigationBarTitleText": "电话"
+}

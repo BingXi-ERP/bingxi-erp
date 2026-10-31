@@ -1,0 +1,38 @@
+<view id="news-center">
+  <view class="news-wrapper" wx:if="{{newsList.length>0}}">
+    <view
+      class="listItem"
+      data-item="{{item}}"
+      wx:for="{{newsList}}"
+      wx:key="index"
+    >
+      <view class="list-content">
+        <view class="content-top">
+          <view class="top-left">
+            <text class="name">{{item.title}}</text>
+          </view>
+          <text class="top-right">{{item.createTime||'-'}}</text>
+        </view>
+        <view class="content-bottom">
+          <rich-text nodes="{{item.content}}"></rich-text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="noResult" wx:if="{{newsList.length==0}}">
+    <view class="noPage"></view>
+    <view class="title">暂无消息</view>
+  </view>
+</view>
+<van-popup
+  :close-on-click-overlay="true"
+  class="tip-dialog"
+  show="{{showPop}}"
+  zIndex="10000"
+>
+  <text class="popTitle">{{currData.title}}</text>
+  <view class="popContent">{{currData.content}}</view>
+  <view class="popBtn">
+    <button catch:tap="dataConfirm" class="popBtn" size="small">确定</button>
+  </view>
+</van-popup>

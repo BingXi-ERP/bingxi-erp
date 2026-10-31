@@ -1,0 +1,38 @@
+<view
+  class="bankCardnormal bankCardBg"
+  wx:for="{{bankAccountInfo.accountList}}"
+  wx:key="index"
+>
+  <view class="bankCard">
+    <view class="b-del-icon" wx:if="{{type=='editor'}}">
+      <image
+        bindtap="deleteBankCard"
+        class="deleteImg"
+        data-card="{{item.bankName}}"
+        data-id="{{item.id}}"
+        data-pickerIndex="{{index}}"
+        src="{{icon.delete}}"
+      ></image>
+    </view>
+    <view class="b-card" style="background:{{item.color}};">
+      <view class="b-card-top">
+        <image src="{{icon.bank}}{{item.icon}}.jpg"></image>
+        <text>{{item.bankName}}</text>
+      </view>
+      <view class="b-card-bottom">{{item.account}}</view>
+    </view>
+  </view>
+</view>
+<view
+  bindtap="addBankCard"
+  class="normal"
+  wx:if="{{bankAccountInfo.accountList.length<6}}"
+>
+  <van-icon color="#0B0B0B" name="plus" size="16"></van-icon>
+  <text bindtap="addBankCard" class="addRecord">添加银行卡</text>
+</view>
+<view class="fixed-bottom-tools">
+  <button catchtap="cator" class="g_bottomBtn">
+    {{type=='editor'?'完成':'管理'}}
+  </button>
+</view>

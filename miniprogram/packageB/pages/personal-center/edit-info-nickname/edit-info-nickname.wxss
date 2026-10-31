@@ -1,0 +1,35 @@
+page {
+  background-color: #eff0f7;
+}
+.dataItem {
+  background-color: #fff;
+  border-radius: 24rpx;
+  margin-left: 34rpx;
+  margin-top: 40rpx;
+  width: calc(100% - 68rpx);
+}
+.input-list-li {
+  font-size: 24rpx;
+  padding: 24rpx 32rpx;
+  position: relative;
+}
+.input-list-li::after {
+  border-bottom: 2rpx solid #f4f4f4;
+  bottom: 0;
+  content: "";
+  height: 2rpx;
+  left: 30rpx;
+  position: absolute;
+  width: calc(100vw - 120rpx);
+}
+.input-list-li input {
+  width: 100%;
+}
+.tips {
+  color: silver;
+  font-size: 20rpx;
+  padding: 28rpx;
+}
+.tips .img {
+  margin-right: 10rpx;
+}

@@ -1,0 +1,145 @@
+<view class="print-content">
+    <view class="print-list">
+        <view class="print-list-bd">
+            <text>色卡显示</text>
+            <view class="color-show">
+                <view bindtap="changeStatus" class="pr-ls-shape" id="shape">
+                    <text>方形</text>
+                    <image mode="aspectFit" src="{{nowList.shape==1?image.select:image.unSelect}}"></image>
+                </view>
+                <view bindtap="changeStatus" class="pr-ls-shape" id="shape2">
+                    <text>圆形</text>
+                    <image mode="aspectFit" src="{{nowList.shape==2?image.select:image.unSelect}}"></image>
+                </view>
+            </view>
+        </view>
+        <view class="print-list-bd">
+            <text>面料图片</text>
+            <view class="color-show">
+                <view bindtap="changeStatus" class="pr-ls-shape" id="showImageTwo">
+                    <text>纹路图</text>
+                    <image mode="aspectFit" src="{{nowList.showImageTwo==1?image.select:image.unSelect}}"></image>
+                </view>
+                <view bindtap="changeStatus" class="pr-ls-shape" id="showImageTwo2">
+                    <text>面料图片</text>
+                    <image mode="aspectFit" src="{{nowList.showImageTwo==0?image.select:image.unSelect}}"></image>
+                </view>
+            </view>
+        </view>
+        <view class="print-list-bd">
+            <text>纹路图</text>
+            <view class="color-show">
+                <view bindtap="changeStatus" class="pr-ls-shape" id="colorImage">
+                    <text>纹路图</text>
+                    <image mode="aspectFit" src="{{nowList.colorImage==1?image.select:image.unSelect}}"></image>
+                </view>
+                <view bindtap="changeStatus" class="pr-ls-shape" id="colorImage2">
+                    <text>自定义</text>
+                    <image mode="aspectFit" src="{{nowList.colorImage==2?image.select:image.unSelect}}"></image>
+                </view>
+            </view>
+        </view>
+        <view class="card_setting_upload" wx:if="{{nowList.colorImage==2}}">
+            <view class="weui-uploader__bd">
+                <view class="weui-uploader__files">
+                    <view class="weui-uploader__file" wx:if="{{customColorImage}}">
+                        <image bindtap="goodsColorImgTap" class="weui-uploader__img item normal" data-src="{{customColorImage}}" lazyLoad="true" mode="aspectFill" src="{{customColorImage}}">
+                            <image catchtap="deleteImage" class="del-img" src="{{delImgIcon}}"></image>
+                        </image>
+                    </view>
+                    <view class="add-icon-wrapper" wx:else>
+                        <view bindtap="chooseImage" class="add-icon">+</view>
+                    </view>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="print-list print-list2">
+        <view bindtap="changeStatus" class="print-list-bd" id="showQrcode">
+            <text>商品二维码</text>
+            <image mode="aspectFit" src="{{nowList.showQrcode==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="showProductName">
+            <text>品名/DESC</text>
+            <image mode="aspectFit" src="{{image.select}}" wx:if="{{nowList.showProductName==1}}"></image>
+            <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="showShelvesNumber">
+            <text>编号</text>
+            <image mode="aspectFit" src="{{image.select}}" wx:if="{{nowList.showShelvesNumber==1}}"></image>
+            <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="showPrice">
+            <text>价格/Price</text>
+            <image mode="aspectFit" src="{{image.select}}" wx:if="{{nowList.showPrice==1}}"></image>
+            <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="showContacts">
+            <text>联系人/联系电话</text>
+            <image mode="aspectFit" src="{{image.select}}" wx:if="{{nowList.showContacts==1}}"></image>
+            <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="showMaterial">
+            <text>成分/Comp</text>
+            <image mode="aspectFit" src="{{image.select}}" wx:if="{{nowList.showMaterial==1}}"></image>
+            <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="showGramWeight">
+            <text>克重/Weight</text>
+            <image mode="aspectFit" src="{{image.select}}" wx:if="{{nowList.showGramWeight==1}}"></image>
+            <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="showClothWidth">
+            <text>幅宽/Width</text>
+            <image mode="aspectFit" src="{{image.select}}" wx:if="{{nowList.showClothWidth==1}}"></image>
+            <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="showClothEnough">
+            <text>空差/Gap</text>
+            <image mode="aspectFit" src="{{image.select}}" wx:if="{{nowList.showClothEnough==1}}"></image>
+            <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+        </view>
+        <view class="print-list-bd print-list-bd2">
+            <view bindtap="changeStatus" class="remark_label" id="showRemark">
+                <view style="display:flex;align-items:flex-start;color:#666666;flex-direction:column;">
+                    <view>备注</view>
+                    <view style="font-size:24rpx;color:#999999;line-height:24px">信息将展示在价格下面</view>
+                </view>
+                <image mode="aspectFit" src="{{image.select}}" wx:if="{{nowList.showRemark==1}}"></image>
+                <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+            </view>
+            <view class="textarea-wrp">
+                <input bindinput="inputgetName" class="explain-input" data-name="nowList.remark" focus="{{remarkFocus}}" maxlength="20" name="textarea" placeholder="请输入备注" value="{{nowList.remark}}"></input>
+                <view class="num-limit">{{nowList.remark.length||0}}/20</view>
+            </view>
+        </view>
+        <view style="height:220rpx;"></view>
+    </view>
+</view>
+<view class="print-btn">
+    <button bindtap="carterColorCard" class="g_bottomBtn">生成色卡</button>
+</view>
+<van-dialog bind:close="onCloseCreateCard" message="色卡生成中，请等待{{dateLayTime}}秒后再来查看" show="{{showCreateColorCard}}"></van-dialog>
+<van-popup bind:close="closePopup" customClass="canvas-popup-wrapper" show="{{popupInit.canvas.show}}" zIndex="999">
+    <view class="{{popupInit.canvas.show?'showBigCanvas':'hideBigCanvas'}}">
+        <block wx:if="{{popupInit.canvas.type==='colorCard'}}">
+            <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas+'0'}}" height="1050" style="width:610px;height:{{popupInit.canvasHeight2}}px;" width="610" wx:if="{{shareColorList.length>0}}"></canvas>
+            <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas+'0'}}" height="1050" style="width:500px;height:900px" width="610" wx:else></canvas>
+        </block>
+        <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas}}" height="1350" style="width:600px;height:900px" width="750" wx:else></canvas>
+    </view>
+    <view class="canvas-wrapper {{popupInit.canvas.show?'':'hideCanvas'}} {{popupInit.canvas.type}}" style="border-radius:6px;">
+        <scroll-view scrollWithAnimation scrollY style="height:550px;" wx:if="{{popupInit.canvas.type==='colorCard'}}">
+            <canvas canvasId="{{popupInit.canvas.canvasId.shareCanvas+'0'}}" height="525" style="width:305px;height:{{popupInit.canvas.type==='colorCard'?popupInit.canvasHeight+'px':'450px'}}" width="300"></canvas>
+        </scroll-view>
+        <canvas canvasId="{{popupInit.canvas.canvasId.shareCanvas}}" height="900" style="width:300px;height:{{popupInit.canvas.type==='colorCard'?popupInit.canvasHeight+'px':'450px'}}" width="500" wx:else></canvas>
+    </view>
+    <view class="share-monents-notice-wrapper" wx:if="{{popupInit.canvas.show}}">
+        <view class="btn_panel">
+            <view catchtap="saveColorCardImg" class="c_btn">
+                <image mode="aspectFill" src="{{icon.save}}" style="width:16px;height:16px"></image>一键保存</view>
+        </view>
+        <view>保存图片后分享到朋友圈</view>
+        <view>会有更多的人来您的店铺哦~</view>
+    </view>
+</van-popup>

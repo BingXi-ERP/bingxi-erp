@@ -1,0 +1,109 @@
+.j-tabs,
+page {
+  background-color: #eff0f7;
+}
+.j-tabs {
+  display: -webkit-flex;
+  display: flex;
+  left: 0;
+  padding: 26rpx 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 999;
+}
+.j-tabs .j-tab {
+  color: #5d5d5d;
+  font-size: 26rpx;
+  margin: 0 36rpx;
+}
+.j-tabs .active {
+  color: #fb562c;
+  position: relative;
+}
+.j-tabs .active::before {
+  background: #fb562c;
+  border-radius: 4rpx;
+  bottom: -16rpx;
+  content: "";
+  height: 4rpx;
+  position: absolute;
+  width: 52rpx;
+}
+.add,
+.j-tabs .active::before {
+  left: 50%;
+  transform: translateX(-50%);
+}
+.add {
+  bottom: 30rpx;
+  position: fixed;
+}
+.add .icon {
+  height: 36rpx;
+  margin-right: 10rpx;
+  width: 36rpx;
+}
+.color-data-list-null {
+  color: #5d5d5d;
+  font-size: 22rpx;
+  margin-top: 400rpx;
+}
+.color-data-list-null .icon {
+  height: 176rpx;
+  margin-bottom: 30rpx;
+  width: 182rpx;
+}
+.colour-fd view {
+  width: 100%;
+}
+.child-lists {
+  padding-bottom: 200rpx;
+  padding-top: 80rpx;
+}
+.userBtn {
+  color: #b3b3b3;
+  flex-shrink: 0;
+  padding-right: 10px;
+  text-align: right;
+  vertical-align: middle;
+  width: 120rpx;
+}
+.btnText {
+  background: #fff0ec;
+  color: #fb562c;
+}
+.btnText,
+.disbtnText {
+  align-items: center;
+  border-radius: 20rpx;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 22rpx;
+  height: 36rpx;
+  justify-content: center;
+  position: absolute;
+  right: 68rpx;
+  width: 106rpx;
+}
+.disbtnText {
+  background: #eff0f7;
+  color: #0b0b0b;
+}
+.itemView {
+  color: #5d5d5d;
+  font-size: 26rpx;
+  margin-top: 14rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+.title {
+  color: #0b0b0b;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+.arrow-right::after {
+  top: 45%;
+}

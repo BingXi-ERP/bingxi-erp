@@ -1,0 +1,26 @@
+<view id="news-center">
+  <view class="news-wrapper" wx:if="{{newsList.length>0}}">
+    <view
+      class="listItem"
+      data-item="{{item}}"
+      wx:for="{{newsList}}"
+      wx:key="index"
+    >
+      <view class="list-content">
+        <view class="content-top">
+          <view class="top-left">
+            <text class="name">{{item.title}}</text>
+          </view>
+          <text class="top-right">{{item.createTime||'-'}}</text>
+        </view>
+        <view class="content-bottom">
+          <rich-text nodes="{{item.content}}"></rich-text>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="noResult" wx:if="{{newsList.length==0}}">
+    <view class="noPage"></view>
+    <view class="title">暂无消息</view>
+  </view>
+</view>

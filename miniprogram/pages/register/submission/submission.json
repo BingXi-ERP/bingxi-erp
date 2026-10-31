@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "提交资料",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

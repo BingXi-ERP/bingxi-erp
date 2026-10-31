@@ -1,0 +1,43 @@
+<view class="containerss">
+  <view class="block" wx:for="{{supplierData}}" wx:key="id">
+    <h4 class="title">{{item.supplierName||item.subSupplierName}}</h4>
+    <van-cell-group
+      customClass="group-cell-label"
+      wx:for="{{item.supplierContactRespList}}"
+      wx:for-index="sindex"
+      wx:for-item="sitem"
+      wx:key="sindex"
+    >
+      <van-cell
+        title="{{node.label}}"
+        titleClass="cell-title-color"
+        value="{{colValueFormat.valueFormat(sitem,node.prop,dictData)}}"
+        valueClass="cell-value-color"
+        wx:for="{{contactColumns}}"
+        wx:for-item="node"
+        wx:key="prop"
+      ></van-cell>
+    </van-cell-group>
+    <van-cell-group
+      customClass="group-cell-label"
+      wx:for="{{item.supplierAddressRespList}}"
+      wx:for-index="tindex"
+      wx:for-item="titem"
+      wx:key="tindex"
+    >
+      <van-cell
+        title="{{snode.label}}"
+        titleClass="cell-title-color"
+        value="{{colValueFormat.valueFormat(titem,snode.prop,dictData)}}"
+        valueClass="cell-value-color"
+        wx:for="{{addressColumns}}"
+        wx:for-item="snode"
+        wx:key="prop"
+      ></van-cell>
+    </van-cell-group>
+  </view>
+  <van-empty
+    description="暂无数据"
+    wx:if="{{!supplierData||!supplierData.length}}"
+  ></van-empty>
+</view>

@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "客户信息",
+  "usingComponents": {
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-action-sheet": "/miniprogram_npm/@vant/weapp/action-sheet/index",
+    "van-toast": "/miniprogram_npm/@vant/weapp/toast/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

@@ -1,0 +1,69 @@
+<view class="containerr">
+  <view
+    class="addressItem"
+    data-item="{{item}}"
+    wx:for="{{addressInfoList}}"
+    wx:key="index"
+  >
+    <view class="address-title">
+      <view>{{item.name}}</view>
+      <view class="itemSpace">{{item.phone}}</view>
+      <view class="defaultChoosed itemSpace" wx:if="{{item.defaultFlag==1}}"
+        >默认</view
+      >
+    </view>
+    <view class="address-content"
+      >{{item.province}}{{item.city}}{{item.area}}{{item.detailAddress}}</view
+    >
+    <view class="address-footer">
+      <view class="address-checked" wx:if="{{item.defaultFlag==1}}">
+        <van-icon color="#FB562C" name="checked"></van-icon>
+        <text>已默认</text>
+      </view>
+      <view
+        catchtap="saveAddress"
+        class="address-checked"
+        data-item="{{item}}"
+        wx:else
+      >
+        <van-icon color="#DCDCDF" name="checked"></van-icon>
+        <text>设为默认</text>
+      </view>
+      <view class="address-group-btns">
+        <view
+          catchtap="deleteAddress"
+          class="address-delete"
+          data-id="{{item.id}}"
+          data-name="{{item.name}}"
+          >删除</view
+        >
+        <view catchtap="editAddress" class="address-edit" data-id="{{item.id}}"
+          >编辑</view
+        >
+      </view>
+    </view>
+  </view>
+  <view class="list-empty-wrapper" wx:if="{{addressInfoList.length===0}}">
+    <image class="noaddress" src="{{noDataBg}}"></image>
+    <view class="empty-text">暂无地址信息～</view>
+  </view>
+  <view class="fixed-bottom-tools">
+    <button catchtap="addEditAddress" class="g_bottomBtn">新增地址</button>
+  </view>
+</view>
+<van-dialog
+  showCancelButton
+  useSlot
+  bind:confirm="onConfirm"
+  cancelButtonColor="#5D5D5D"
+  cancelButtonText="取消"
+  confirmButtonColor="#FB562C"
+  confirmButtonText="确定"
+  overlay="true"
+  rootPortal="true"
+  show="{{showDialog}}"
+  title="删除地址"
+  zIndex="10000"
+>
+  <view class="d-text">{{delMsg}}</view>
+</van-dialog>

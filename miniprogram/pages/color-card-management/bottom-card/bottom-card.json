@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "所有底卡",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

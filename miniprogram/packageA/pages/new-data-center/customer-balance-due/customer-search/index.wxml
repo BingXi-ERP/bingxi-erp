@@ -1,0 +1,26 @@
+<view class="searchDemand container-gray">
+    <view class="searchBar fl">
+        <view class="searchInput ">
+            <view class="searchWrapper">
+                <image mode="aspectFit" src="/assets/images/icon2nd/Icon_Nav_Search_Gray@2x.png"></image>
+            </view>
+            <input autoFocus bindconfirm="search" bindinput="getValue" placeholder="请输入要搜索的客户名称" placeholderClass="placeholder" value="{{pageParams.customerName}}"></input>
+            <view bind:tap="searchCancel" class="searchWrapper" wx:if="{{pageParams.customerName!=''}}">
+                <image mode="aspectFit" src="{{icon.delete}}"></image>
+            </view>
+        </view>
+        <view bind:tap="backPage" class="searchCancel">取消</view>
+    </view>
+    <view class="no-data flex-column" wx:if="{{showNoData}}">
+        <view class="icon bg-img" style="background-image:url(\"{{icon.noData}}\")"></view>
+        <view class="text f14 font-black">暂无数据</view>
+    </view>
+    <view class="searchData" wx:else>
+        <view bindtap="gotoDetail" class="fl searchItem" data-cust-id="{{item.customerId}}" data-cust-name="{{item.customerName}}" data-shop-id="{{item.companyId}}" wx:for="{{searchData}}">
+            <image src="{{addDefaultAvatar(item.avatar,app)}}"></image>
+            <view class="customName g_limtRow">{{item.customerName}}</view>
+            <view class="customDebt f14 g_limtRow">欠款{{toFixNum(item.debtAmount,2,true,true)}}</view>
+        </view>
+        <view class="moreIcon " wx:if="{{searchData.length>0}}">{{isAll?'没有更多数据':'上拉加载更多'}}</view>
+    </view>
+</view>

@@ -1,0 +1,34 @@
+<view class="p-box">
+    <view class="l-title border-b">已添加的打印机</view>
+    <view bindtap="testPrint" class="p-list" data-index="{{index}}" wx:for="{{printList}}" wx:key="{{index}}">
+        <view class="p-item border-b">
+            <view>
+                <text class="iconfont icon-shuchudayin"></text>
+                <text class="p-name" wx:if="{{item.remark}}">{{item.remark}}（{{item.name=='未知设备'?item.localName:item.name}}）</text>
+                <text class="p-name" wx:else>{{item.name=='未知设备'?item.localName:item.name}}</text>
+            </view>
+            <view class="">
+                <text class="iconfont icon-xiangyou-copy"></text>
+            </view>
+        </view>
+    </view>
+</view>
+<view bindtap="cancelR" class="maskbox" wx:if="{{showM}}">
+    <view catchtap="catch" class="editbox">
+        <view class="e-l e-title">编辑备注</view>
+        <view class="e-l e-input">
+            <input bindinput="inputRemark" class="inputbox" cursorSpacing="100" placeholder="请输入" value="{{remark}}"></input>
+        </view>
+        <view class="e-l btn-box">
+            <view bindtap="cancelR" class="c-btn cancel">取消</view>
+            <view bindtap="confirmR" class="c-btn confirm">确定</view>
+        </view>
+    </view>
+</view>
+<view catch:tap="closeMask" class="maskModal" wx:if="{{maskDispaly}}">
+    <view class="modalCont">
+        <image class="printImg" src="{{icon.print}}"></image>
+        <view class="printS">布头打印成功!</view>
+        <view catch:tap="gobackColorCard" class="gobackB">{{successText}}</view>
+    </view>
+</view>

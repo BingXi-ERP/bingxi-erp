@@ -1,0 +1,125 @@
+<view class="printing-order">
+    <view wx:if="{{printType===1||printType==='order'}}">
+        <view class="cell-box">
+            <view class="cell-title">打印机</view>
+            <view class="cell-val">{{printerName}}</view>
+        </view>
+        <view class="cell-box">
+            <view class="cell-title">打印份数</view>
+            <view class="cell-val">
+                <input bindinput="handleUpdateVal" data-key="printCopies" maxlength="3" placeholder="请输入打印数量" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="number" value="{{printCopies}}"></input>
+            </view>
+        </view>
+        <view class="cell-val-pone">
+            <view class="cell-title">客户电话</view>
+            <view class="cell-boxx" wx:if="{{userAuthList['crm:contact']}}">
+                <image bind:tap="phoneCheckbox" class="icon-checkbox" data-key="printCustomerTel" data-value="0" mode="aspectFill" src="{{icon.checked}}" wx:if="{{printCustomerTel===1}}"></image>
+                <image bindtap="phoneCheckbox" class="icon-checkbox" data-key="printCustomerTel" data-value="1" mode="aspectFill" src="{{icon.noCheck}}" wx:if="{{printCustomerTel===0||printCustomerTel===-1}}"></image>
+            </view>
+            <view wx:if="{{!userAuthList['crm:contact']}}">
+                <view class="fakeCheck"></view>
+            </view>
+        </view>
+        <view catch:tap="showPrintSelectPopup" class="cell-box">
+            <view class="cell-title">收款方式</view>
+            <view class="cell-val  {{printSelectText[printPaymentType]?'':'grayColor'}}">{{printSelectText[printPaymentType]?printSelectText[printPaymentType]:'请选收款方式'}}<van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+            </view>
+        </view>
+        <view catch:tap="showSelectPopup" class="cell-box">
+            <view class="cell-title">制单人</view>
+            <view class="cell-val">{{printUserName}}<van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+            </view>
+        </view>
+        <view class="cell-box">
+            <view class="cell-title">送货人</view>
+            <view class="cell-val">
+                <input bindinput="handleUpdateVal" data-key="billingDeliveryman" placeholder="请输入送货人信息" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="text" value="{{billingDeliveryman}}"></input>
+            </view>
+        </view>
+    </view>
+    <view wx:if="{{printType==='return'}}">
+        <view>
+            <view class="panel-cell">
+                <view class="cell-title">打印机</view>
+                <view class="cell-val">{{printerName}}</view>
+            </view>
+            <view class="panel-cell">
+                <view class="cell-title">打印份数</view>
+                <view class="cell-val">
+                    <input bindinput="handleUpdateVal" data-key="printCopies" maxlength="3" placeholder="请输入打印数量" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="number" value="{{printCopies}}"></input>
+                </view>
+            </view>
+        </view>
+        <view>
+            <view class="row-cell">
+                <view class="cell-title">客户电话</view>
+                <view class="cell-val" wx:if="{{userAuthList['crm:contact']&&customMobile}}">
+                    <image bind:tap="phoneCheckbox" class="icon-checkbox" data-key="refundPrintTel" data-value="0" mode="aspectFill" src="{{icon.checked}}" wx:if="{{refundPrintTel==1}}"></image>
+                    <image bindtap="phoneCheckbox" class="icon-checkbox" data-key="refundPrintTel" data-value="1" mode="aspectFill" src="{{icon.noCheck}}" wx:if="{{refundPrintTel==0||refundPrintTel==-1}}"></image>
+                </view>
+                <view wx:else>
+                    <view class="fakeCheck"></view>
+                </view>
+            </view>
+            <view class="row-cell" wx:if="{{printType==='return'}}">
+                <view class="cell-title">打印销售单</view>
+                <view class="cell-val">
+                    <image bind:tap="saleOrderCheckbox" class="icon-checkbox" data-key="printerSale" data-value="0" mode="aspectFill" src="{{icon.checked}}" wx:if="{{printerSale==1}}"></image>
+                    <image bindtap="saleOrderCheckbox" class="icon-checkbox" data-key="printerSale" data-value="1" mode="aspectFill" src="{{icon.noCheck}}" wx:if="{{printerSale==0||printerSale==-1}}"></image>
+                </view>
+            </view>
+            <view catch:tap="showSelectPopup" class="panel-cell">
+                <view class="cell-title">制单人</view>
+                <view class="cell-val">{{printUserName}}<van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="panel-padding">
+        <view class="panel-title">自定义页脚</view>
+        <view class="textarea-wrapper">
+            <textarea bindblur="closeShow" bindinput="handleUpdateFooter" data-key="billingFooter" maxlength="{{footerMaxLeng}}" showConfirmBar="{{false}}" value="{{printType==='order'?billingFooter:refundBillingFooter}}" wx:if="{{showArea}}">
+                <text class="placeholder-mock" wx:if="{{printType==='order'&&billingFooter.length==0}}">请输入自定义页脚</text>
+                <text class="placeholder-mock" wx:if="{{printType==='return'&&refundBillingFooter.length==0}}">请输入自定义页脚</text>
+            </textarea>
+            <view bindtap="openShow" class="fakeArea" wx:if="{{!showArea}}">{{billingFooter||refundBillingFooter}} <text class="placeholder-mock" wx:if="{{printType==='order'&&billingFooter.length==0}}">请输入自定义页脚</text>
+                <text class="placeholder-mock" wx:if="{{printType==='return'&&refundBillingFooter.length==0}}">请输入自定义页脚</text>
+            </view>
+            <view class="limit-leng {{billingFooter.length>footerMaxLeng?'limit-leng-error':''}}">
+                <text class="n" wx:if="{{printType==='order'}}">{{billingFooter.length}}</text>
+                <text class="n" wx:if="{{printType==='return'}}">{{refundBillingFooter.length}}</text>
+                <text class="n">/{{footerMaxLeng}}</text>
+            </view>
+        </view>
+    </view>
+    <view class="panel-padding">
+        <view class="panel-title">备注</view>
+        <view class="textarea-wrapper no-border">
+            <textarea bindblur="closeShow" bindinput="handleUpdateRemark" data-key="printRemark" maxlength="{{remarkMaxLeng}}" placeholder="请输入备注信息" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" showConfirmBar="{{false}}" value="{{printRemark}}"></textarea>
+            <view class="limit-leng {{printRemark.length>remarkMaxLeng?'limit-leng-error':''}}">
+                <text class="n">{{printRemark.length}}</text>
+                <text class="n">/{{remarkMaxLeng}}</text>
+            </view>
+        </view>
+    </view>
+    <view class="fixed-bottom-tools z-index">
+        <view class="flex-row  ">
+            <button catch:tap="handlePintPreview" class="button-normal">预览</button>
+            <button catch:tap="handlePrint" class="button-normal-ineer">打印</button>
+        </view>
+    </view>
+    <van-toast id="van-toast"></van-toast>
+</view>
+<van-popup round position="bottom" show="{{showSelect}}">
+    <van-picker showToolbar bind:cancel="selectCreatorCancek" bind:confirm="selectCreator" columns="{{creatorList}}" title="选择制单人"></van-picker>
+</van-popup>
+<van-popup :close-on-click-overlay="true" class="tip-dialog" show="{{showTitsPopular}}">
+    <view class="popContent">{{showTipsText}}</view>
+    <view class="popBtn">
+        <view catch:tap="closeTitsPopular" class="popBtn cancelBtn">取消</view>
+        <view catch:tap="toAddCard" class="popBtn confirmBtn">去添加</view>
+    </view>
+</van-popup>
+<van-popup round position="bottom" show="{{printSelectPopup}}">
+    <van-picker showToolbar bind:cancel="popupClickCancek" bind:confirm="{{item.id=='1'&&!userAuthList['basic:bank:list']?'':'popupClick'}}" columns="{{printSelectArr}}" title="选择收款方式"></van-picker>
+</van-popup>

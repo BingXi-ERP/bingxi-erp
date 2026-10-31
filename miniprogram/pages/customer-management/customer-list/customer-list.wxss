@@ -1,0 +1,82 @@
+page {
+  background-color: #f5f5f9;
+}
+.header {
+  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/bg_qianzaikehu@3x.jpg?imageView2/2/w/750);
+  height: 264rpx;
+  width: 750rpx;
+}
+.header > view {
+  flex: 1;
+}
+.header .left .icon {
+  align-items: center;
+  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/ic_fangke@3x%20%282%29.png?imageView2/2/w/50);
+  height: 60rpx;
+  justify-content: center;
+  margin-bottom: 96rpx;
+  width: 56rpx;
+}
+.all {
+  margin-left: 40rpx;
+}
+.all,
+.blackList {
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.blackList {
+  align-items: center;
+}
+.header .left .all > view {
+  flex: 1;
+}
+.header .left .subTitle {
+  margin: 10rpx 0 24rpx;
+  opacity: 0.5;
+  width: 204rpx;
+}
+.header .right > view {
+  background-color: hsla(0, 0%, 100%, 0.05);
+  border-radius: 50rpx;
+  height: 66rpx;
+  line-height: 66rpx;
+  text-align: center;
+  width: 288rpx;
+}
+.header .right .block2 {
+  margin-top: 30rpx;
+}
+.explain-wrapper {
+  text-align: center;
+}
+.contain .explain {
+  border-radius: 34rpx;
+  display: -webkit-inline-flex;
+  display: inline-flex;
+  margin: 30rpx 0;
+  padding: 10rpx 20rpx;
+  text-align: center;
+}
+.explain .icon {
+  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/ic_tishi@3x.png?imageView2/2/w/750);
+  height: 26rpx;
+  margin-right: 10rpx;
+  width: 26rpx;
+}
+.filter-wrapper {
+  height: 100%;
+  overflow: hidden;
+  padding: 30rpx 0 0 70rpx;
+}
+.no-data {
+  margin-top: 150rpx;
+}
+.no-data .icon {
+  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/img_wuxinx@3x.png?imageView2/2/w/750);
+  height: 250rpx;
+  margin-bottom: 80rpx;
+  width: 300rpx;
+}

@@ -1,0 +1,17 @@
+<view class="search-panel">
+    <view class="search-box">
+        <image alt="" class="search-icon" mode="aspectFit" src="{{image.search}}"></image>
+        <input bindconfirm="onShow" bindinput="inputTyping" class="search-input" confirmType="search" data-page-Type="{{pageType}}" placeholder="{{pageType=='colorIndex'||pageType=='colorIndex1'?'请输入色卡编号/品名':pageType=='stallSearch'?'请输入档口名称/电话':'请输入色卡编号/品名'}}" type="text"></input>
+        <image alt="" class="clear-icon" mode="aspectFit" src="{{image.clearicon}}" wx:if="{{inputTyping.length>0}}"></image>
+        <text bindtap="canleSearch">取消</text>
+    </view>
+    <view class="search-history">
+        <view class="search-history-title" wx:if="{{sercherStorage.length!==0}}">
+            <text>最近搜索</text>
+            <text bindtap="clearSearchStorage">清空</text>
+        </view>
+        <view class="search-history-bd">
+            <view bindtap="tapSercherStorage" class="history-tag" data-name="{{item.name}}" data-page-Type="{{pageType}}" id="{{item.id}}" wx:for="{{sercherStorage}}" wx:key="index">{{item.name}}</view>
+        </view>
+    </view>
+</view>

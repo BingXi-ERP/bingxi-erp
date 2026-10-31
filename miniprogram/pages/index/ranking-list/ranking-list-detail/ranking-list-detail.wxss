@@ -1,0 +1,59 @@
+page {
+  background: #f5f5f9;
+}
+.displayFlex {
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+}
+.colorCard {
+  background: #fff;
+  margin: 30rpx;
+  padding: 26rpx;
+}
+.colorCard > view:nth-of-type(1) {
+  width: 24%;
+}
+.colorCard > view:nth-of-type(2) {
+  font-size: 28rpx;
+  width: 74%;
+}
+.colorCard > view:nth-of-type(2) > view {
+  margin: 6rpx 0;
+}
+.colorCard > view:nth-of-type(2) > view:nth-of-type(2) {
+  color: #999;
+  font-size: 24rpx;
+}
+.listTitle {
+  background: #fff;
+  color: #333;
+  font-size: 28rpx;
+  padding: 30rpx;
+}
+.listTitle > view:nth-of-type(1) {
+  width: 40%;
+}
+.listTitle > view:nth-of-type(2) {
+  width: 30%;
+}
+.listTitle > view:nth-of-type(3) {
+  text-align: center;
+  width: 30%;
+}
+.listData {
+  background: #fff;
+  color: #333;
+  font-size: 24rpx;
+  padding: 30rpx;
+}
+.listData > view:nth-of-type(1) {
+  width: 40%;
+}
+.listData > view:nth-of-type(2) {
+  width: 30%;
+}
+.listData > view:nth-of-type(3) {
+  text-align: center;
+  width: 30%;
+}

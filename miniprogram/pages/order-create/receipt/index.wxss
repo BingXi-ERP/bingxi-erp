@@ -1,0 +1,274 @@
+page {
+  background-color: #eff0f7;
+}
+#van-dialog {
+  position: relative;
+  z-index: 100002;
+}
+.steps {
+  display: -webkit-flex;
+  display: flex;
+  font-size: 24rpx;
+  padding: 45rpx;
+}
+.steps > view {
+  display: inline-block;
+  flex-basis: 33.333%;
+  flex-shrink: 1;
+  margin-right: 0;
+  position: relative;
+  text-align: center;
+}
+.steps .line {
+  background: #fb562c;
+  border-radius: 2rpx;
+  height: 4rpx;
+  left: 20rpx;
+  position: absolute;
+  top: 30rpx;
+  width: 88rpx;
+}
+.steps .flex-r {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.steps .pointer {
+  background: linear-gradient(180deg, #fb562c, #ff8b6c);
+  border-radius: 100%;
+  color: #fff;
+  display: inline-block;
+  font-size: 26rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  position: relative;
+  text-align: center;
+  width: 56rpx;
+  z-index: 1;
+}
+.gray {
+  background: silver !important;
+}
+.steps .step-line {
+  background-color: #fb562c;
+  border-color: inherit;
+  height: 4rpx;
+  left: 50%;
+  position: absolute;
+  right: -50%;
+  top: 13rpx;
+  width: 88rpx;
+}
+.steps .cur-step-line {
+  background: #5c84ff;
+}
+.steps .step-main {
+  margin-top: 20rpx;
+  opacity: 0.5;
+}
+.steps .current .step-main {
+  opacity: 1;
+}
+.card {
+  background-color: #fff;
+  border-radius: 20rpx;
+  margin: 30rpx 0 30rpx 34rpx;
+  width: calc(100vw - 68rpx);
+}
+.card-head {
+  border-bottom: 1rpx solid #ddd;
+  font-size: 28rpx;
+  font-weight: 600;
+  margin: 0 30rpx;
+  padding: 30rpx 0;
+}
+.order-receipt {
+  color: #333;
+  font-size: 28rpx;
+  overflow-x: hidden;
+  padding-bottom: 200rpx;
+}
+.order-receipt .placeholder-gray {
+  color: #ccc;
+}
+.order-receipt .fixed-toolbar-bottom .totle-name {
+  color: #0b0b0b;
+  font-size: 24rpx;
+}
+.order-receipt .fixed-toolbar-bottom .totle-content {
+  color: #ed5c5c;
+  font-size: 24rpx;
+}
+.order-receipt .fixed-toolbar-bottom .totle-content .totle-rmb {
+  font-size: 26rpx;
+  font-weight: 700;
+}
+.order-receipt .fixed-toolbar-bottom .totle-content .totle-number {
+  font-size: 42rpx;
+  font-weight: 700;
+}
+.order-receipt .card-body .cell {
+  border-bottom: none;
+  margin: 0 30rpx;
+  position: relative;
+}
+.order-receipt .cell-title {
+  color: #5d5d5d;
+  font-size: 26rpx;
+}
+.discount-cell {
+  margin: 0 28rpx;
+  padding: 20rpx 0;
+}
+.picker-order {
+  border-bottom: 2rpx solid #f4f4f4;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  padding: 22rpx 0 28rpx;
+  width: 626rpx;
+}
+.picker-order .total {
+  font-size: 26rpx;
+  font-weight: 700;
+}
+.order-receipt .card-body .cell-value {
+  color: #333;
+}
+.order-receipt .card-body .cell-value.strong {
+  color: #e2525a;
+}
+.order-receipt .card-extra .cell {
+  position: relative;
+}
+.card .cell {
+  border-bottom: none;
+  padding: 30rpx 0;
+}
+.card .cell::after {
+  border-top: 1rpx solid #f5f6fa;
+  bottom: 0;
+  content: "";
+  height: 1rpx;
+  left: 0;
+  position: absolute;
+  width: 100vw;
+}
+.order-receipt .card-extra .cell {
+  padding: 30rpx 0;
+}
+.order-receipt .card-extra input {
+  text-align: right;
+}
+.order-receipt .payment-name {
+  padding: 28rpx;
+}
+.order-receipt .payment-name text {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+.order-receipt .payment-title {
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 40rpx;
+}
+.order-receipt .payment-way {
+  color: #0b0b0b;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+.order-receipt .payment-tips {
+  color: silver;
+  font-size: 22rpx;
+}
+.order-receipt .payment-title text {
+  display: inline-block;
+  position: relative;
+}
+.payment-content {
+  background-color: #fff;
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  margin-bottom: 100rpx;
+  margin-left: 34rpx;
+  padding: 30rpx 30rpx 0;
+  width: calc(100vw - 68rpx);
+}
+.payment-content .cell {
+  padding: 20rpx 32rpx;
+}
+.payment-content .payment-cell {
+  background-color: #fff;
+  border: 1rpx solid #fff;
+  border-radius: 16rpx;
+  margin-bottom: 28rpx;
+}
+.payment-content .payment-cell .cell-title image {
+  height: 40rpx;
+  margin-right: 22rpx;
+  vertical-align: middle;
+  width: 40rpx;
+}
+.payment-content .payment-cell .cell-title text {
+  color: #333;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.payment-content .payment-cell .cell-title {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.payment-content .payment-cell .cell-value {
+  border-bottom: 2rpx solid #f4f4f4;
+  flex: 1;
+  padding: 20rpx 0 28rpx;
+}
+.payment-content .payment-cell .no-border {
+  border-bottom: none;
+}
+.payment-content .payment-cell .cell-value input {
+  box-sizing: border-box;
+  color: #373c55;
+  font-size: 26rpx;
+  font-weight: 500;
+  width: 100%;
+}
+.discount-cell .cell-title {
+  flex: none;
+}
+.card-b,
+.card-body {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+}
+.card-b {
+  padding: 30rpx 28rpx 40rpx;
+}
+.card-b .wait-get {
+  color: #0b0b0b;
+  font-size: 26rpx;
+  font-weight: 700;
+}
+.card-b .unpay {
+  color: #ea0a0a;
+  font-size: 42rpx;
+  font-weight: 700;
+}
+.discount-cell .cell-value {
+  border-bottom: 2rpx solid #f4f4f4;
+  flex: 1;
+  margin-top: 22rpx;
+  padding-bottom: 28rpx;
+}
+.discount-cell .cell-value input {
+  box-sizing: border-box;
+  color: #373c55;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  width: 100%;
+}

@@ -1,0 +1,65 @@
+<view class="myWallet">
+  <view class="walletInfo">
+    <view class="fr-between-center content">
+      <view>
+        <view class="head">可提现金额(元)</view>
+        <view>{{moneyInfoList.balanceAmount}}</view>
+      </view>
+      <button bindtap="toPath">提现</button>
+    </view>
+    <view class="allTips">
+      <view class="fr-between-center bg">
+        <view class="tips">获得总补贴：{{moneyInfoList.totalAmount}} 元</view>
+        <view bindtap="showRule" class="fl rule"
+          >提现规则<image src="{{icon.info}}"></image>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="walletList" wx:if="{{awardList.length}}">
+    <view class="fl recode">
+      <image src="{{icon.recode}}"></image>
+      <view>奖励记录</view>
+    </view>
+    <view
+      class="dateArea"
+      wx:for="{{awardList}}"
+      wx:key="{{awardList.rewardMonthTime}}"
+    >
+      <view class="fr-between-center title">
+        <view class="month">{{item.rewardMonthTime}}</view>
+        <view class="total g_limtRow">合计：{{item.rewardMonthAmount}}元</view>
+      </view>
+      <view
+        bindtap="toDetail"
+        class="fr-between-center listDetail"
+        data-ask-id="{{rewardList.askId}}"
+        data-inviteUser-id="{{rewardList.inviteUserId}}"
+        data-reply-id="{{rewardList.replyId}}"
+        data-type="{{rewardList.incomeExpendType}}"
+        wx:for="{{item.rewardList}}"
+        wx:for-item="rewardList"
+        wx:key="{{rewardList.askId}}"
+      >
+        <view class="left">
+          <view class="listText g_limtRowTwo">{{rewardList.remark}}</view>
+          <view class="detailDate" wx:if="{{rewardList.createTime}}"
+            >{{formatDateTime(rewardList.createTime,false,true)}}</view
+          >
+        </view>
+        <view class="fl right">
+          <view class="addMoney">+ {{rewardList.optAmount}}</view>
+          <view class="arrow_right"></view>
+        </view>
+      </view>
+    </view>
+    <view class="more">
+      <view wx:if="{{isAll}}">没有更多记录了</view>
+      <view wx:else>上拉更多数据</view>
+    </view>
+  </view>
+  <view class="noList" wx:if="{{!awardList.length}}">
+    <view class="noImg" style="background-image:url('{{icon.noImg}}')"></view>
+    <view class="text">暂无奖励记录</view>
+  </view>
+</view>

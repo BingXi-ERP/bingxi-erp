@@ -1,0 +1,124 @@
+<view class="print-title">已配对的设备</view>
+<view class="p-box">
+  <view
+    class="p-list"
+    data-index="{{index}}"
+    wx:if="{{storageList.length>0}}"
+    wx:for="{{storageList}}"
+    wx:key="index"
+  >
+    <view class="p-item">
+      <view class="p-container">
+        <image
+          class="print-icon"
+          mode="aspectFit"
+          src="{{icon.imagePrint2}}"
+        ></image>
+        <view class="p-name" wx:if="{{item.remark}}"
+          >{{item.remark}}（{{item.name=='未知设备'?item.localName:item.name}}）</view
+        >
+        <view class="p-name" wx:else
+          >{{item.name=='未知设备'?item.localName:item.name}}</view
+        >
+      </view>
+      <view class="p-add-right">
+        <van-icon
+          bindtap="showActionSheet"
+          class="link-icon"
+          data-qname="{{item.name=='未知设备'?item.localName:item.name}}"
+          id="{{index}}"
+          name="link-o"
+        ></van-icon>
+      </view>
+    </view>
+  </view>
+  <view class="no-print" wx:if="{{storageList.length==0}}">
+    <image
+      class="print-icon"
+      mode="aspectFit"
+      src="{{icon.imagePrint}}"
+    ></image>
+    <text>暂无{{spname}}</text>
+  </view>
+</view>
+<view class="print-title"
+  >可用设备<view bindtap="research" class="scan-print">
+    <image
+      class="print-icon"
+      mode="aspectFit"
+      src="{{icon.imageScanPrint}}"
+    ></image
+    >扫描{{spname}}</view
+  >
+</view>
+<view class="p-box">
+  <view
+    class="p-list"
+    data-index="{{index}}"
+    wx:for="{{printList}}"
+    wx:key="index"
+  >
+    <view bindtap="connectDevice" class="p-item" data-index="{{index}}">
+      <view class="p-container">
+        <image
+          class="print-icon"
+          mode="aspectFit"
+          src="{{icon.imagePrint}}"
+        ></image>
+        <view class="p-name"
+          >{{item.name=='未知设备'?item.localName:item.name}}</view
+        >
+      </view>
+    </view>
+  </view>
+  <view class="no-print" wx:if="{{printList.length==0}}">
+    <image
+      class="print-icon"
+      mode="aspectFit"
+      src="{{icon.imagePrint}}"
+    ></image>
+    <text>暂无{{spname}}</text>
+  </view>
+</view>
+<view class="print-title"
+  >操作说明<van-icon
+    bindtap="onShowExplain"
+    class="question-o"
+    name="question-o"
+  ></van-icon>
+</view>
+<view class="box-tip">
+  <view class="tip-item">1、打开{{spname}}，并使{{spname}}在唤醒状态；</view>
+  <view class="tip-item"
+    >2、打开手机蓝牙，部分安卓手机需要打开"定位"功能；</view
+  >
+  <view class="tip-item">3、点击扫描{{spname}}，选中{{spname}}后即可。</view>
+</view>
+<van-action-sheet
+  bind:click-overlay="onShowExplain"
+  bind:close="onShowExplain"
+  class="explain_content"
+  show="{{showExplain}}"
+  title="打印说明"
+>
+  <view class="tip-box">
+    <view class="tip-item-title">如遇无法连接</view>
+    <view class="tip-item">1、检查{{spname}}是否唤醒；</view>
+    <view class="tip-item">2、检查是否给与APP/微信/小程序蓝牙权限；</view>
+    <view class="tip-item"
+      >3、重启{{spname}}、重启蓝牙、重启微信、重启APP、重启手机；</view
+    >
+    <view class="tip-item">4、联系秉羲工作台客服，客服电话: 13360039559。</view>
+    <view class="tip-item-title">其他说明</view>
+    <view class="tip-item"
+      >1、{{spname}}型号：HM-A300L、HM-A300S、HM-A350；</view
+    >
+    <view class="tip-item">2、纸张尺寸：</view>
+    <view class="tip-item">（1）标签打印：70*40、60*40、38*30（双排）</view>
+    <view class="tip-item">（2）色号打印：70*40、60*40、38*30（双排）</view>
+    <view class="tip-item">（3）布头打印：60*80、80*100</view>
+    <view class="tip-item"
+      >3、纸张类型：热敏纸（如无法找到，可在淘宝搜索秉羲工作台）。</view
+    >
+  </view>
+</van-action-sheet>

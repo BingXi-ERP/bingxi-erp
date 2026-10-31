@@ -1,0 +1,133 @@
+<view class="print-content">
+    <view class="print-list1" style="background-image:url({{backImg}})"></view>
+    <view class="print-list">
+        <view class="print-list-bd picker-select">
+            <text class="comFont">标签类型</text>
+            <picker bindchange="bindPickerChange" range="{{array}}" value="{{labelType}}">
+                <view style="margin-right:20rpx;">{{array[labelType]}}</view>
+                <view class="arrow-picker">
+                    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </picker>
+        </view>
+        <view bind:tap="handlelSelectCustomer" class="print-list-bd no-border" wx:if="{{goodsId&&goodsId!==''}}">
+            <text class="comFont">客户</text>
+            <view style="display:flex;flex-direction:row;">
+                <view class="fontColor" wx:if="{{!customerInfo.fullname}}">选择客户</view>
+                <view class="customerInfo" wx:if="{{customerInfo.fullname}}">{{customerInfo.fullname}} {{customerInfo.mobile}}</view>
+                <view class="customer-icon" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder" wx:else>
+            <text class="comFont">客户</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printCustomer" data-nowInfo="{{colorCardInfo.printCustomer}}" src="{{colorCardInfo.printCustomer?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">二维码</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printQrCode" data-nowInfo="{{colorCardInfo.printQrCode}}" src="{{colorCardInfo.printQrCode?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+    </view>
+    <view class="print-list topSpace">
+        <view class="colorCardInfoC">色卡信息</view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">品名</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printGoodsName" data-nowInfo="{{colorCardInfo.printGoodsName}}" src="{{colorCardInfo.printGoodsName?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">编号</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printGoodsNo" data-nowInfo="{{colorCardInfo.printGoodsNo}}" src="{{colorCardInfo.printGoodsNo?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">色号</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printColorName" data-nowInfo="{{colorCardInfo.printColorName}}" src="{{colorCardInfo.printColorName?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">缸号</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printDyelot" data-nowInfo="{{colorCardInfo.printDyelot}}" src="{{colorCardInfo.printDyelot?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">幅宽</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printBreadth" data-nowInfo="{{colorCardInfo.printBreadth}}" src="{{colorCardInfo.printBreadth?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">克重</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printGramWeight" data-nowInfo="{{colorCardInfo.printGramWeight}}" src="{{colorCardInfo.printGramWeight?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+    </view>
+    <view class="print-list topSpace">
+        <view class="colorCardInfoC">其他信息</view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">店铺名称</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printShopName" data-nowInfo="{{colorCardInfo.printShopName}}" src="{{colorCardInfo.printShopName?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">客户电话 </text>
+            <view class="flexDispay">
+                <view class="disable" wx:if="customerInfo.id==undefined || !userAuthList[\"crm:contact\"] || !customerInfo.mobile"></view>
+                <image bind:tap="radioChange" data-name="colorCardInfo.printCustomerTel" data-nowInfo="{{colorCardInfo.printCustomerTel}}" src="{{colorCardInfo.printCustomerTel?icon.checked:icon.noCheck}}" wx:else></image>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">档口地址</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printShopAddress" data-nowInfo="{{colorCardInfo.printShopAddress}}" src="{{colorCardInfo.printShopAddress?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">联系电话</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printShopTel" data-nowInfo="{{colorCardInfo.printShopTel}}" src="{{colorCardInfo.printShopTel?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+        <view class="print-list-bd bottomBorder">
+            <text class="comFont">客户地址</text>
+            <view class="flexDispay">
+                <view class="disable" wx:if="customerInfo.id==undefined"></view>
+                <image bind:tap="radioChange" data-name="colorCardInfo.printCustomerAddress" data-nowInfo="{{colorCardInfo.printCustomerAddress}}" src="{{colorCardInfo.printCustomerAddress?icon.checked:icon.noCheck}}" wx:else></image>
+            </view>
+        </view>
+        <view class="print-list-bdc bottomBorder">
+            <view class="comFont">日期<image bindtap="radioChange" data-name="colorCardInfo.printDate" data-nowInfo="{{colorCardInfo.printDate}}" src="{{colorCardInfo.printDate?icon.checked:icon.noCheck}}"></image>
+            </view>
+            <picker bindchange="bindDateChange" class="dataChoose" mode="date" value="{{date}}">
+                <view class="choose-data">
+                    <input class="picker marRight" disabled="true" placeholder="请选择日期" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{date}}"></input>
+                    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </picker>
+            <view class="flexDispay"></view>
+        </view>
+        <view class="print-list-bd">
+            <text class="comFont">备注</text>
+            <view class="flexDispay">
+                <image bind:tap="radioChange" data-name="colorCardInfo.printRemarkTag" data-nowInfo="{{colorCardInfo.printRemarkTag}}" src="{{colorCardInfo.printRemarkTag?icon.checked:icon.noCheck}}"></image>
+            </view>
+        </view>
+        <view class="print-list-bd no-border" style="position:relative;padding-top:0!important">
+            <textarea autoFocus="{{autoFocus}}" bindconfirm="remaskDisplay" bindinput="inputgetName" class="remarks" data-name="remarks" maxlength="45" placeholder="青输入备注" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{remarks}}"></textarea>
+            <view class="numLimit">{{remarks.length}}/45</view>
+        </view>
+    </view>
+</view>
+<view style="height:200rpx;"></view>
+<view class="fixed-bottom-tools">
+    <button catchtap="printLink" class="g_bottomBtn">打印</button>
+</view>

@@ -1,0 +1,96 @@
+<view class="invitation {{showShareFriend?'blur':''}}">
+  <view
+    class="hearImg"
+    style="background-image:url('{{icon.headerImg}}')"
+  ></view>
+  <view class="stepImg" style="background-image:url('{{icon.step}}')"></view>
+  <view class="inviteContent" style="background-image:url('{{icon.content}}')">
+    <view class="fr-between-center inviteInfo">
+      <view class="invited">
+        <view class="num">{{inviteData.registerCount}}</view>
+        <view class="title">注册成功</view>
+      </view>
+      <view class="getHongBao">
+        <view class="num">{{inviteData.rewardCount}}</view>
+        <view class="title">获奖数</view>
+      </view>
+      <view class="getHongBao">
+        <view class="num">{{inviteData.rewardAmount}}</view>
+        <view class="title">获得红包</view>
+      </view>
+    </view>
+  </view>
+  <view class="inviteList" wx:if="{{inviteList.length}}">
+    <view
+      class="fr-between-center listItem"
+      data-inviteUserId="{{item.inviteUserId}}"
+      wx:for="{{inviteList}}"
+      wx:key="{{item.inviteUserId}}"
+    >
+      <image class="headLogo" src="{{item.headImg}}"></image>
+      <view class="itemContent">
+        <view class="g_limtRow name">{{item.inviteUserName}}</view>
+        <view class="inviteTime"
+          >注册时间: {{formatDateTime(item.inviteSuccessTime,false,true)}}</view
+        >
+      </view>
+      <view class="getMoney">+{{item.inviteRewardAmount}}</view>
+    </view>
+    <view class="more" wx:if="{{inviteList.length}}">
+      <view wx:if="{{isAll}}">没有更多记录了</view>
+      <view wx:else>查看更多</view>
+    </view>
+  </view>
+  <view class="more" wx:if="{{!inviteList.length}}"
+    >暂未有邀请成功的好友，赶紧点击下方按钮</view
+  >
+  <cpm-color-btn
+    disabled
+    bind:toPath="toPath"
+    class="color-btn"
+    title="立刻邀请"
+  ></cpm-color-btn>
+</view>
+<van-popup
+  bind:close="onCancel"
+  position="bottom"
+  safeAreaInsetTop="ture"
+  show="{{showSelect}}"
+>
+  <view class="popupContent">
+    <view class="popHeader">分享到</view>
+    <view class="fr-between-center shareBtn">
+      <view class="transmit shareText">
+        <image class="icon" src="{{icon.wxIcon}}"></image>
+        <button class="transmitBtn" openType="share"></button>
+        <view class="text">微信</view>
+      </view>
+      <view class="shareText">
+        <image bindtap="shareBtn" class="share" src="{{icon.firendIcon}}"
+          >分享朋友圈</image
+        >
+        <view class="text">朋友圈</view>
+      </view>
+    </view>
+    <view bindtap="onCancel" class="popCancel">取消</view>
+  </view>
+</van-popup>
+<view class="shareMask" wx:if="{{showShareFriend}}">
+  <view class="shareToFriend">
+    <image
+      class="shareFriendImg"
+      mode="widthFix"
+      src="{{friendImg+'?imageView2/2/w/600'}}"
+      wx:if="{{friendImg}}"
+    ></image>
+    <image
+      catch:tap="closeImg"
+      class="closeIcon"
+      src="{{icon.closeIcon}}"
+    ></image>
+    <image catch:tap="saveImg" class="saveImg" src="{{icon.saveImgBg}}"></image>
+  </view>
+</view>
+<view class="mask">
+  <text>活动已结束</text>
+</view>

@@ -1,0 +1,73 @@
+var toFixNum = function (num, digits, isThousand, isMark) {
+  digits = undefined === digits ? 2 : digits;
+  isThousand = undefined === isThousand ? true : isThousand;
+  isMark = undefined === isMark ? false : isMark;
+  num = Number(num);
+  if (num && typeof num === "number") {
+    var newNum = num.toFixed(digits);
+    return toThousand(newNum);
+  } else {
+    if (digits === 2) {
+      return toMark("0.00");
+    } else {
+      return toMark("0");
+    }
+  }
+  function toMark(number) {
+    if (isMark) {
+      if (number >= 0) {
+        return "¥" + " " + number;
+      } else {
+        return "-" + "¥" + " " + Math.abs(number).toFixed(digits);
+      }
+    } else {
+      return number;
+    }
+  }
+  function toThousand(newNum) {
+    if (isThousand) {
+      if (newNum > 0) {
+        if (isMark) {
+          newNum = "¥" + " " + changeThousand(newNum);
+        } else {
+          newNum = changeThousand(newNum);
+        }
+      } else if (newNum < 0) {
+        newNum = Math.abs(newNum).toFixed(digits);
+        if (isMark) {
+          newNum = "-" + "¥" + " " + changeThousand(newNum);
+        } else {
+          newNum = "-" + changeThousand(newNum);
+        }
+      }
+      return newNum;
+    } else {
+      return toMark(newNum);
+    }
+  }
+  function changeThousand(number) {
+    number.toString();
+    var dotIndex =
+      number.indexOf(".") == -1 ? number.length : number.indexOf(".");
+    var part = number.substring(0, dotIndex);
+    var flag = 0;
+    var result = "";
+    for (var i = part.length - 1; i >= 0; i--) {
+      result =
+        part[
+          ((nt_0 = i),
+          null == nt_0
+            ? undefined
+            : "number" === typeof nt_0
+            ? nt_0
+            : "" + nt_0)
+        ] + result;
+      if (i !== 0 && ++flag === 3) {
+        result = "," + result;
+        flag = 0;
+      }
+    }
+    return result + number.substring(dotIndex);
+  }
+};
+module.exports = toFixNum;

@@ -1,0 +1,43 @@
+<view class="color-ys">
+    <view class="color-color colorTitle barTitle">
+        <text bindtap="serviceConnnet">设备连接</text>
+    </view>
+    <view class="hasResult">
+        <view class="colot_content" id="viewColorContent">
+            <view bind:tap="clickHandle" class="color-col {{currentActiveIndex==index?'active':''}}" data-index="{{index}}" wx:for="{{colorcolorList}}" wx:key="index">
+                <view class="color_value">
+                    <view class="color_value_item" style="background-color:{{item.colorValue}};">
+                        <view style="background:{{item.duibuColorValue}};width:100%;height:100%;" wx:if="{{item.duibuColorValue.length>1}}"></view>
+                        <image mode="aspectFill" src="{{noColorBg}}" wx:else></image>
+                    </view>
+                    <image bindtap="removeIndex" class="imgStandard" data-colorName="{{item.colorName}}" data-colorVal="{{item.colorVal}}" data-id="{{item.id}}" data-index="{{index}}" mode="aspectFit" src="{{icon.delete}}"></image>
+                </view>
+                <input bindblur="colorValInputBlur" class="colorNumInp" data-a="{{item.valA}}" data-b="{{item.valB}}" data-dbvalue="{{item.duibuColorValue}}" data-id="{{item.id}}" data-index="{{index}}" data-l="{{item.valL}}" data-name="{{item.colorName}}" maxlength="20" placeholder="请选择" value="{{item.colorVal}}"></input>
+                <view bindtap="toColorName" class="choose" data-id="{{index}}" data-item="{{item}}">
+                    <input disabled="true" placeholder="请选择" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{item.colorName}}"></input>
+                </view>
+            </view>
+            <view bind:tap="clickHandle" class="empty-col {{currentActiveIndex==-1?'active':''}}" data-index="-1"></view>
+        </view>
+    </view>
+    <view class="save-btn-wrapper">
+        <view class="save-color fr-between-center">
+            <view bindtap="removeColorList" class="iconBtn">
+                <image class="" mode="widthFix" src="{{icon.del}}"></image>
+                <view class="iconText">清空色号</view>
+            </view>
+        </view>
+    </view>
+</view>
+<view class="mask-modall" wx:if="{{showClearNumber}}">
+    <view class="dialog-modall">
+        <view class="dialog-modal-bd">
+            <view class="dialog-name">清空色号</view>
+            <view class="dialog-content">确认清空所有颜色？</view>
+        </view>
+        <view class="dialog-modal-fds">
+            <button catchtap="cancelAdd" class="btn-cancel">取消</button>
+            <button catchtap="sureClear" class="btn-confirm">确认</button>
+        </view>
+    </view>
+</view>

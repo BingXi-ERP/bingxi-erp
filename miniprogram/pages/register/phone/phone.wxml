@@ -1,0 +1,14 @@
+<view class="container-code">
+    <view class="title">手机验证码登录</view>
+    <view class="hint">请输入您的手机号</view>
+    <view class="code-input">
+        <input bindinput="handleInput" class="code-item" data-index="{{index}}" focus="{{index===currentFocusIndex}}" maxlength="1" type="number" value="{{item}}" wx:for="{{codeArray}}" wx:key="index"></input>
+    </view>
+    <view class="resend-wrap">
+        <view bindtap="resendCode" class="resend">重新发送({{resendSeconds}}s)</view>
+        <view bindtap="handleNoReceive" class="no-receive">没有收到验证码？</view>
+    </view>
+    <view class="agreement-area">
+        <agreement-bottom bind:change="handleAgreementChange" isAgreed="{{true}}"></agreement-bottom>
+    </view>
+</view>

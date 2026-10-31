@@ -1,0 +1,28 @@
+<import src="../../../../tpl/color-card/search-color.wxml"></import>
+<import src="../../../../tpl/stall-card/stall-search.wxml"></import>
+<view class="navbarlist">
+  <view
+    bindtap="changeActive"
+    class="{{tabArr.curHdIndex==0?'active':''}}"
+    id="0"
+    >色卡<span></span>
+  </view>
+  <view
+    bindtap="changeActive"
+    class="{{tabArr.curHdIndex==1?'active':''}}"
+    id="1"
+    >档口<span></span>
+  </view>
+</view>
+<view class="navbarlist-top">
+  <template
+    is="searchcolor"
+    data="{{imageData:imageData,colorList:colorList,searchKey:searchKey,userMobile:userMobile}}"
+    wx:if="{{tabArr.curBdIndex==0}}"
+  ></template>
+  <template
+    is="stallsearch"
+    data="{{shopList:shopList,searchKey:searchKey}}"
+    wx:if="{{tabArr.curBdIndex==1}}"
+  ></template>
+</view>

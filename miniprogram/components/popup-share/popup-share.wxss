@@ -1,0 +1,35 @@
+.wrapper {
+  padding: 50rpx 0;
+}
+.item,
+.wrapper {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: center;
+}
+.item {
+  flex: 1;
+  flex-direction: column;
+}
+.icon {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 80rpx;
+  width: 80rpx;
+}
+.name {
+  font-size: 28rpx;
+  margin-top: 13px;
+}
+.toF image,
+button {
+  vertical-align: middle;
+}
+button {
+  background-color: #fff;
+}
+button::after {
+  border: none;
+}

@@ -1,0 +1,36 @@
+<view>
+    <view class="bg-null"></view>
+    <form bindsubmit="formSubmit">
+        <view class="page-body">
+            <view class="commodity-list">
+                <text class="validate-no">米长：</text>
+                <input class="weui-input" name="meterLength" placeholder="请输入米长" value="{{cardDetailsInfo.meterLength}}"></input>
+            </view>
+            <view class="commodity-list">
+                <text class="validate-no">纱支：</text>
+                <input class="weui-input" name="yarnCountFront" placeholder="请输入" value="{{cardDetailsInfo.yarnCountFront}}"></input>
+            </view>
+            <view class="commodity-list">
+                <text class="validate-no">密度：</text>
+                <input class="weui-input" name="density1" placeholder="请输入您的密度" value="{{cardDetailsInfo.density1}}"></input>
+            </view>
+            <view class="commodity-list">
+                <text class="validate-no">空差：</text>
+                <input class="weui-input" name="clothEnough" placeholder="请输入空差 如：足99" value="{{cardDetailsInfo.clothEnough}}"></input>
+            </view>
+            <view class="commodity-list">
+                <text class="validate-no">经纬编：</text>
+                <picker bindchange="bindPickerChange1" range="{{array1}}" value="{{index1}}">
+                    <view>{{array1s?array1[index1]:'请选择'}}</view>
+                </picker>
+            </view>
+            <view class="commodity-list">
+                <text class="validate-no">品质标准：</text>
+                <picker bindchange="bindPickerChange2" range="{{array2}}" value="{{index2}}">
+                    <view>{{array2s?array2[index2]:'请选择'}}</view>
+                </picker>
+            </view>
+        </view>
+        <button class="g_bottomBtn" formType="submit">完成</button>
+    </form>
+</view>

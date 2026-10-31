@@ -1,0 +1,118 @@
+page {
+  background-color: #eff0f7;
+  padding-bottom: 200rpx;
+  padding-top: 40rpx;
+}
+.normal {
+  background-color: #fff;
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  margin-left: 34rpx;
+  padding: 28rpx;
+  width: calc(100vw - 68rpx);
+}
+.tips {
+  height: 106rpx;
+  text-align: center;
+}
+.tipsContent {
+  background: #f5f5f9;
+  border-radius: 30rpx;
+  color: #66666e;
+  display: inline-block;
+  font-size: 20rpx;
+  height: 48rpx;
+  line-height: 48rpx;
+  width: 440rpx;
+}
+.tipsContent span,
+.tipsImg {
+  float: left;
+}
+.tipsImg {
+  height: 26rpx;
+  margin-left: 20rpx;
+  margin-right: 10rpx;
+  margin-top: 10rpx;
+  width: 26rpx;
+}
+.account {
+  border-bottom: 1rpx solid #ddd;
+  font-size: 28rpx;
+  height: 108rpx;
+  line-height: 108rpx;
+}
+.account .title {
+  color: #333;
+  float: left;
+}
+.account .content {
+  float: right;
+}
+.account .content input {
+  height: 100rpx;
+  line-height: 108rpx;
+  text-align: right;
+}
+.addRecord {
+  color: #0b0b0b;
+  font-size: 26rpx;
+  margin-left: 10rpx;
+}
+.bankCard {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  margin-bottom: 20rpx;
+  margin-left: 34rpx;
+  width: calc(100vw - 68rpx);
+}
+.b-del-icon {
+  margin-right: 34rpx;
+}
+.b-card {
+  background-color: #e15569;
+  border-radius: 20rpx;
+  flex: 1;
+  opacity: 0.8;
+  padding: 32rpx;
+}
+.b-card-top {
+  align-items: center;
+  color: #fff;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 32rpx;
+}
+.b-card-top image {
+  border-radius: 100%;
+  height: 54rpx;
+  margin-right: 20rpx;
+  width: 54rpx;
+}
+.b-card-bottom {
+  color: #fff;
+  font-size: 40rpx;
+  margin-top: 30rpx;
+}
+.deleteImg {
+  height: 40rpx;
+  width: 40rpx;
+}
+.bottom-up {
+  height: 200rpx;
+  width: 100%;
+}
+.add-btn-icon {
+  height: 38rpx;
+  margin-right: 16rpx;
+  width: 38rpx;
+}
+.btn-big {
+  bottom: 20rpx;
+  left: 0;
+  margin-left: auto;
+  margin-right: auto;
+  position: fixed;
+  right: 0;
+}

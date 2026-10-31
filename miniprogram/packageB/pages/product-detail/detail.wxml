@@ -1,0 +1,56 @@
+<page-meta pageStyle="{{showColor?'overflow: hidden;':''}}"></page-meta>
+<view class="restock_container">
+    <view class="swiper">
+        <swiper autoplay="{{swiper.autoplay}}" duration="{{swiper.duration}}" indicatorDots="{{swiper.indicatorDots}}" interval="{{swiper.interval}}" style="height:480rpx">
+            <swiper-item wx:for="{{bannerImage}}" wx:key="index">
+                <view bindtap="previewImg" class="swiper-item bg-img" data-detailType="1" data-url="{{item}}" style="background-image:url(\"{{item}}\")"></view>
+            </swiper-item>
+        </swiper>
+    </view>
+    <view class="product_tabs">
+        <view class="h1">{{productData.businessProductName}}</view>
+        <view>
+            <view class="price">{{productData.price!='0'&&productData.price!='0.0'&&productData.price?'￥'+productData.price:'面议'}}<text class="cell" wx:if="{{productData.price}}">元/米</text>
+            </view>
+        </view>
+        <view class="product_content">
+            <view class="product-card  card-mt-8">
+                <view class="card-title">产品属性</view>
+                <view class="property_item" wx:for="{{propertyConfig}}" wx:key="prop">
+                    <view class="left">
+                        <text class="span">{{item.label}}</text>
+                    </view>{{(productData[item.prop]?productData[item.prop]:'-')+(item.unitProp?productData[item.unitProp]?productData[item.unitProp]:'-':'')}}</view>
+            </view>
+            <view class="product-card  card-mt-8 card-mb-8">
+                <view class="card-title">产品颜色</view>
+                <van-row customClass="color_block_row" gutter="10">
+                    <van-col class="color_block" span="8" wx:for="{{productData.colorList}}" wx:key="id">
+                        <view class="color_block_div" style="background-color:{{item.colorValue}}">
+                            <image class="svg-icon" mode="aspectFill" src="{{iconList.jhtTimeIcon}}" wx:if="{{!item.colorValue}}"></image>
+                        </view>
+                        <text class="color_block_p">{{item.colorVal+item.colorName}}</text>
+                    </van-col>
+                </van-row>
+                <van-popup closeable lockScroll round :style="{ height: '65%', width: '100%' }" bind:close="onCloseColorPopup" customClass="color_sheet" customStyle="height: 65%" position="bottom" show="{{showColor}}" teleport="body">
+                    <view class="color_sheet_head">
+                        <view class="h1">颜色<text class="price">{{productData.price&&productData.price!=='0'&&productData.price!=='0.00'?'￥'+productData.price:'面议'}}</text>
+                        </view>
+                    </view>
+                    <view class="color_ido_item" wx:for="{{productData.colorList}}" wx:key="id">
+                        <view class="left" wx:if="{{item.colorImagePath}}">
+                            <van-image bindtap="onViewColorImage" data-item="{{item}}" height="48" src="{{replImgPath(item.colorImagePath,globalApp,160)}}" width="48"></van-image>
+                        </view>
+                        <view class="left" style="background-color:{{item.colorValue}}" wx:else>
+                            <image class="svg-icon" mode="aspectFill" src="{{iconList.jhtTimeIcon}}" wx:if="{{!item.colorValue}}"></image>
+                        </view>
+                        <view class="right">
+                            <text>{{item.colorVal}}</text>
+                            <text class="price" wx:if="{{productData.priceType===2}}">{{item.bulkPrice&&item.bulkPrice!=='0'&&item.bulkPrice!=='0.00'?item.bulkPrice+item.bulkSaleUnit:'面议'}}</text>
+                        </view>
+                    </view>
+                </van-popup>
+            </view>
+        </view>
+    </view>
+    <view></view>
+</view>

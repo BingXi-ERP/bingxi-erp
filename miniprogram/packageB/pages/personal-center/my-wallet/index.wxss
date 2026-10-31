@@ -1,0 +1,152 @@
+page {
+  background: #f5f5f5;
+}
+.walletInfo,
+page {
+  position: relative;
+}
+.walletInfo {
+  background: #fff;
+  padding-top: 50rpx;
+  text-align: center;
+}
+.walletInfo .head {
+  color: #70728c;
+  font-size: 14px;
+  position: relative;
+  text-align: left;
+}
+.tips,
+.walletInfo .head {
+  font-family: PingFangSC-Regular;
+  font-weight: 400;
+}
+.tips {
+  color: #336af8;
+  font-size: 12px;
+}
+.walletInfo .content {
+  color: #373c55;
+  font-family: SFProText-Medium;
+  font-size: 48px;
+  font-weight: 500;
+  margin-bottom: 50rpx;
+  padding: 0 32rpx;
+  position: relative;
+}
+.rule {
+  color: #336af8;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+}
+.rule image {
+  height: 32rpx;
+  margin-left: 10rpx;
+  width: 32rpx;
+}
+.content button {
+  align-self: flex-end;
+  background: linear-gradient(90deg, #7ab5ff, #336af8);
+  border-radius: 24px;
+  box-shadow: 0 6px 12px -2px rgba(120, 169, 255, 0.5);
+  color: #fff;
+  font-family: PingFangSC-Medium;
+  font-size: 16px;
+  font-weight: 500;
+  height: 80rpx;
+  line-height: 80rpx;
+  margin: 0 0 20rpx;
+  text-align: center;
+  width: 240rpx;
+}
+.content button[disabled] {
+  background: #d8d9e3;
+  box-shadow: 0 6px 12px -2px hsla(0, 0%, 77%, 0.5);
+  color: #fff;
+}
+.recode {
+  background: #fff;
+  color: #373c55;
+  font-family: PingFangSC-Medium;
+  font-size: 14px;
+  font-weight: 500;
+  height: 96rpx;
+  line-height: 96rpx;
+  padding: 0 32rpx;
+}
+.recode image {
+  height: 40rpx;
+  margin-right: 20rpx;
+  width: 40rpx;
+}
+.allTips {
+  padding: 0 32rpx;
+}
+.bg {
+  background: #e5f3ff;
+  border-radius: 16rpx 16rpx 0 0;
+  height: 80rpx;
+  padding: 0 30rpx;
+}
+.dateArea .title {
+  color: #999bb4;
+  font-family: SFProText-Regular;
+  font-size: 14px;
+  font-weight: 400;
+  height: 64rpx;
+  line-height: 64rpx;
+  padding: 0 32rpx;
+}
+.listDetail {
+  background: #fff;
+  height: 160rpx;
+  padding: 0 32rpx;
+  position: relative;
+}
+.listDetail::after {
+  border-bottom: 1rpx solid #f5f5f5;
+  bottom: 0;
+  content: "";
+  height: 1rpx;
+  left: 0;
+  position: absolute;
+  width: 100vw;
+}
+.listText {
+  color: #373c55;
+  font-family: PingFangSC-Regular;
+  font-size: 14px;
+  font-weight: 400;
+  margin-bottom: 10rpx;
+  max-width: 70vw;
+}
+.detailDate {
+  color: #999bb4;
+  font-family: SFProText-Regular;
+  font-size: 12px;
+  font-weight: 400;
+}
+.addMoney {
+  color: #ff4a4a;
+  font-family: SFProText-Medium;
+  font-size: 18px;
+  font-weight: 500;
+}
+.arrow_right {
+  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/ic_jinru.png?imageView2/2/w/750);
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 22rpx;
+  margin-left: 20rpx;
+  width: 12rpx;
+}
+.more {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+  padding: 40rpx 0;
+  text-align: center;
+}

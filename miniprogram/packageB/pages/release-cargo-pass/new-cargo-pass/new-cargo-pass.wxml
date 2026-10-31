@@ -1,0 +1,57 @@
+<view class="batch-management-wrapper">
+    <view class="serch-input-wrapper bg-white">
+        <search-input bind:confirm="search" bind:getValue="getValue" bind:search="search" placeholder="搜索品名、商品号" width="660"></search-input>
+    </view>
+    <view class="list-wrapper" wx:if="{{colorCardList.length>0}}">
+        <view bindtap="toDetail" class="item {{item.check?'active':''}}" data-goodsid="{{item.id}}" data-index="{{index}}" wx:for="{{colorCardList}}" wx:key="index">
+            <view catchtap="checkTap" class="lw_left" data-goodsName="{{item.businessProductName}}" data-goodsNo="{{item.spuNumber}}" data-goodsid="{{item.id}}" data-index="{{index}}" data-item="{{item}}" data-mainImgPath="{{item.mainImgPath}}">
+                <view class="check-wrapper">
+                    <view class="checked" style="background-image:url(\"{{item.check?icon.checked:icon.noCheck}}\")"></view>
+                </view>
+                <view class="img-wrapper">
+                    <view class="img" style="background-image:url(\"{{replImage(item.storagePath,app,240)}}\")"></view>
+                </view>
+            </view>
+            <view class="info-wrapper">
+                <view class="name f13 font-black g_limtRowTwo" style="width:390rpx;overflow:hidden;line-height:40rpx;height:80rpx">{{item.businessProductName}}{{item.spuNumber?'-'+item.spuNumber:''}}</view>
+                <view class="other">
+                    <view class="see f12 font-gray">色号：<text>{{item.gatherColorCount||0}}/{{item.colorCount||0}}</text>
+                    </view>
+                    <view class="see f12 font-gray">门幅：<text>{{item.clothWidth?item.clothWidth+item.clothWidthUnit:'-'}}</text>
+                    </view>
+                </view>
+                <view class="other">
+                    <view class="see f12 font-gray">空差：<text>{{item.clothEnough||'-'}}</text>
+                    </view>
+                    <view class="see f12 font-gray">克重：<text>{{item.gramWeight?item.gramWeight+item.weightUnit:'-'}}</text>
+                    </view>
+                </view>
+                <view class="other">
+                    <view class="see f12 font-gray">米长：<text>{{item.meterLength||'-'}}</text>
+                    </view>
+                    <view class="see f12 font-gray">成分：<text>{{item.material||'-'}}</text>
+                    </view>
+                </view>
+            </view>
+            <view class="freecargo_no_picture" wx:if="{{!item.twoFiveImageFlag||!item.material||!item.gramWeight}}">
+                <view class="tip_p">
+                    <van-icon name="warning-o"></van-icon>无法提交：</view>
+                <view class="tip_p" wx:if="{{!item.twoFiveImageFlag}}">* 未录入面料2/5倍图片信息</view>
+                <view class="tip_p" wx:if="{{!item.material||!item.gramWeight}}">* 成分、克重信息不完整</view>
+            </view>
+        </view>
+        <view class="bottom"></view>
+    </view>
+    <view class="footer-wrapper flex bg-white iphone_bottom">
+        <view class="bottom_left">
+            <view bindtap="allChoice" class="fl allChoice f14">
+                <view class="checked allImg marR" style="background-image:url(\"{{allItem?icon.checked:icon.noAllChecked}}\")"></view>
+                <text class="marR">全选符合条件产品</text>
+                <text class="totleItem marR">共 {{selectedArr.length}} 个</text>
+            </view>
+            <view class="f12 ltip">资料齐全，审核更容易通过哦</view>
+        </view>
+        <view bindtap="submit" class="bottom_right" style="{{selectedArr.length>0?'background: #4177F5;':'background: #d8dde6;'}}">提交申请</view>
+        <view style="height:220rpx;"></view>
+    </view>
+</view>

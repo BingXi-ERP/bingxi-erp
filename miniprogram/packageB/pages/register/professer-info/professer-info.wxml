@@ -1,0 +1,29 @@
+<view class="proInfo">
+    <view class="head">
+        <view class="title">您工作的商铺信息？</view>
+        <view class="titleIllustrate">请完善您工作的商铺信息以便联系</view>
+    </view>
+    <view class="content">
+        <view class="item fl">
+            <view class="label">档口名</view>
+            <input bindinput="inputVal" data-item="shopName" maxlength="50" placeholder="与门牌或营业执照一致" placeholderClass="placeholder" type="text" value="{{shopName}}"></input>
+        </view>
+        <view class="item fl">
+            <view class="label">所在地区</view>
+            <view class="showArea">
+                <picker bindchange="bindRegionChange" customItem="{{customItem}}" mode="region" value="{{region}}">
+                    <view class="picker">
+                        <view wx:if="{{!region||region.length===0}}">请选择所在地区</view>
+                        <view class="area-text g_limtRow" wx:else>{{region[0]}} {{region[1]}} {{region[2]}}</view>
+                    </view>
+                </picker>
+            </view>
+            <image class="img" src="{{icon.rightArrow}}"></image>
+        </view>
+        <view class="item fl">
+            <view class="label">详细地址</view>
+            <input bindinput="inputVal" data-item="address" maxlength="50" placeholder="请输入详细地址精确到门牌号" placeholderClass="placeholder" type="text" value="{{address}}"></input>
+        </view>
+        <button bindtap="toPath" class="newBtn" disabled="{{!shopName.length||!address.length}}">下一步</button>
+    </view>
+</view>

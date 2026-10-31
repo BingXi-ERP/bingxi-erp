@@ -1,0 +1,20 @@
+page {
+  background-color: #eff0f7;
+  padding-top: 40rpx;
+}
+.img-list {
+  background-color: #fff;
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  margin-left: 34rpx;
+  padding: 28rpx;
+  width: calc(100vw - 68rpx);
+}
+.save-btn {
+  background: linear-gradient(90deg, #7ab5ff, #336af8);
+  border-radius: 48rpx;
+  box-shadow: 0 12rpx 24rpx -2px rgba(120, 169, 255, 0.5);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 500;
+}

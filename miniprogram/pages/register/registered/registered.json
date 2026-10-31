@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "开店成功",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

@@ -1,0 +1,29 @@
+<view class="b-box">
+    <view class="b-box-child">
+        <view class="title">户头</view>
+        <view>
+            <input bindinput="inputVal" data-name="accountName" placeholder="请输入持卡人姓名(选填)" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{accountName}}"></input>
+        </view>
+    </view>
+    <view class="b-box-child">
+        <view class="title">卡号</view>
+        <view>
+            <input bindinput="inputVal" data-name="account" placeholder="请输入银行卡号" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{account}}"></input>
+        </view>
+    </view>
+    <view class="b-box-child">
+        <view class="title">银行</view>
+        <view>
+            <picker bindchange="bankPickerChange" data-pickerIndex="{{index}}" range="{{bankList}}" value="{{selectedIndex}}">
+                <view class="picker">
+                    <text class="nochoose" wx:if="{{selectedIndex==null}}">{{noChoice}}</text>
+                    <text class="choose" wx:else>{{bankList[selectedIndex]}}</text>
+                    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </picker>
+        </view>
+    </view>
+</view>
+<view class="fixed-bottom-tools">
+    <button catchtap="saveBankAccount" class="g_bottomBtn">确认</button>
+</view>

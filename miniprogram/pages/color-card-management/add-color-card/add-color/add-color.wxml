@@ -1,0 +1,78 @@
+<view class="color-ys">
+    <view class="list-empty-wrapper" wx:if="{{!colorcolorList.length}}">
+        <image class="noaddress" src="{{icon.noDataBg}}"></image>
+        <view class="empty-text">暂无色号信息～</view>
+    </view>
+    <view class="hasResult" wx:else>
+        <view class="color-color colorTitle barTitle">
+            <text bindtap="handleRpSort">一键排序</text>
+        </view>
+        <view class="color-color colorTitle">
+            <view></view>
+            <view class="colorTab">颜色</view>
+            <view class="colorTab">色号</view>
+            <view class="colorTab">颜色名称</view>
+        </view>
+        <view class="colot_content" id="viewColorContent">
+            <view class="color-col" wx:for="{{pageColorList}}" wx:key="index">
+                <view bindtap="removeIndex" data-colorName="{{item.colorName}}" data-colorVal="{{item.colorVal}}" id="{{index}}">
+                    <image class="imgStandard" mode="aspectFit" src="{{icon.delete}}"></image>
+                </view>
+                <view class="color_value">
+                    <view class="color_value_item" wx:if="{{!item.colorValue}}">
+                        <image mode="aspectFill" src="{{noColorBg}}"></image>
+                    </view>
+                    <view style="background-color:{{item.colorValue}};width:56rpx;height:56rpx;border-radius:8rpx;" wx:else></view>
+                </view>
+                <view>
+                    <input bindblur="colorValInputBlur" bindinput="inputgetName" class="colorNumInp" data-index="{{index}}" maxlength="20" placeholder="请选择" value="{{item.colorVal}}"></input>
+                </view>
+                <view bindtap="toColorName" data-id="{{index}}" data-item="{{item}}">
+                    <input disabled="true" placeholder="请选择" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{item.colorName}}"></input>
+                    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="save-btn-wrapper">
+        <view class="save-color fr-between-center">
+            <view bindtap="addSingleColorList" class="iconBtn">
+                <image class="" mode="widthFix" src="{{icon.add}}"></image>
+                <view class="iconText">添加色号</view>
+            </view>
+            <view bindtap="addColorList" class="iconBtn">
+                <image class="" mode="widthFix" src="{{icon.moreAdd}}"></image>
+                <view class="iconText">批量添加</view>
+            </view>
+            <view bindtap="removeColorList" class="iconBtn">
+                <image class="" mode="widthFix" src="{{icon.del}}"></image>
+                <view class="iconText">清空色号</view>
+            </view>
+            <button bindtap="saveColorList" class="g_samllBtn SaveBtn">保存</button>
+        </view>
+    </view>
+</view>
+<view class="mask-modall" wx:if="{{showAddNumber==1}}">
+    <view class="dialog-modall">
+        <view class="dialog-modal-bdd">
+            <view class="dialog-title">批量添加色号</view>
+            <input bindinput="addNumber" placeholder="请输入您要添加的色号数量" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="number" value="{{numbers}}"></input>
+        </view>
+        <view class="dialog-modal-fds">
+            <button catchtap="cancelAdd" class="btn-cancel">取消</button>
+            <button catchtap="sureAdd" class="btn-confirm" data-list="{{colorcolorList}}">添加</button>
+        </view>
+    </view>
+</view>
+<view class="mask-modall" wx:if="{{showClearNumber==1}}">
+    <view class="dialog-modall">
+        <view class="dialog-modal-bd">
+            <view class="dialog-name">清空色号</view>
+            <view class="dialog-content">确认清空所有颜色？</view>
+        </view>
+        <view class="dialog-modal-fds">
+            <button catchtap="cancelAdd" class="btn-cancel">取消</button>
+            <button catchtap="sureClear" class="btn-confirm">确认</button>
+        </view>
+    </view>
+</view>

@@ -1,0 +1,254 @@
+page {
+  background-color: #eff0f7;
+}
+.price-page {
+  overflow-x: hidden;
+}
+.price-item {
+  background-color: #fff;
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  margin-left: 34rpx;
+  width: calc(100vw - 68rpx);
+}
+.title {
+  color: #5d5d5d;
+  font-size: 26rpx;
+  font-weight: 500;
+  height: 96rpx;
+  margin-top: 36rpx;
+  padding: 0 36rpx;
+  position: relative;
+}
+.title::after {
+  border-bottom: 2rpx solid #f4f4f4;
+  bottom: 0;
+  content: "";
+  height: 2rpx;
+  left: 36rpx;
+  position: absolute;
+  right: 20rpx;
+}
+.price-list {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  font-size: 28rpx;
+  padding: 28rpx;
+}
+.price-list,
+.price-unit {
+  flex-wrap: wrap;
+}
+.price-unit {
+  display: -webkit-flex;
+  display: flex;
+  padding: 20rpx 14rpx 0;
+  width: 100%;
+}
+.checkBtn {
+  border: 2rpx solid #e2e2e2;
+  border-radius: 36rpx;
+  box-sizing: border-box;
+  color: #0b0b0b;
+  font-size: 26rpx;
+  font-weight: 400;
+  height: 64rpx;
+  line-height: 64rpx;
+  margin-right: 18rpx;
+  text-align: center;
+  width: 240rpx;
+}
+.btnChecked {
+  background-color: #fff0ec;
+  border: 2rpx solid #ffe6df;
+  color: #fb562c;
+  font-size: 26rpx;
+}
+.price-color-list,
+.price-number-list {
+  background-color: #fff;
+  border-radius: 20rpx;
+  margin-left: 34rpx;
+  width: calc(100vw - 68rpx);
+}
+.marTop36 {
+  margin-top: 36rpx;
+}
+.all-price {
+  padding: 28rpx;
+}
+.all-price .all-price-name {
+  color: #5d5d5d;
+  font-size: 26rpx;
+}
+.all-price .all-price-val {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  margin: 20rpx 0 0;
+}
+.margin {
+  margin-bottom: 100rpx;
+  margin-top: 20rpx;
+}
+.price-color,
+.price-number {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  position: relative;
+}
+.add-number,
+.price-color,
+.price-number {
+  font-size: 26rpx;
+  margin: 0 28rpx;
+  padding: 28rpx 0;
+}
+.add-number {
+  color: #fb562c;
+}
+.add-number text {
+  margin-left: 12rpx;
+}
+.price-number-list {
+  padding-left: 10rpx;
+}
+.price-color-data view {
+  float: left;
+}
+.price-color-data view:nth-child(1) {
+  width: 32%;
+}
+.price-color-data view:nth-child(2) {
+  text-align: right;
+  width: 53%;
+}
+.price-color-data view:nth-child(3) {
+  width: 15%;
+}
+.price-color input,
+.price-number input {
+  border: 1rpx solid #e2e2e2;
+  border-radius: 36rpx;
+  display: inline-block;
+  margin: 0 10rpx;
+  padding: 6rpx 15rpx;
+  width: 104rpx;
+}
+.price-color-data view:nth-child(2) input {
+  border: 2rpx solid #e2e2e2;
+  margin-top: 2rpx;
+  padding: 6rpx 15rpx;
+  text-align: left;
+  width: 200rpx;
+}
+.price-number image {
+  display: inline-block;
+  height: 22rpx;
+  margin-left: -30rpx;
+  margin-right: 10rpx;
+  margin-top: 27rpx;
+  width: 22rpx;
+}
+.price-number-img {
+  border-bottom: none;
+  margin: auto;
+  width: 93%;
+}
+.price-list-del {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.price-number-img image {
+  margin-left: 0;
+  margin-top: 0;
+  vertical-align: middle;
+}
+.border-b {
+  border-bottom: 1rpx solid #f1f1f1;
+  height: 1rpx;
+  margin: auto;
+  width: 86%;
+}
+.price-color input {
+  border: none;
+  text-align: right;
+  width: 350rpx;
+}
+.price-list-dw {
+  border-left: 2rpx solid #bababa;
+  color: #0b0b0b;
+  font-size: 26rpx;
+  text-align: right;
+  width: 70rpx;
+}
+.price-list-unit {
+  color: 0B0B0B;
+  text-align: right;
+  width: 70rpx;
+}
+.price-color-title {
+  border-bottom: 2rpx solid #f4f4f4;
+  color: #5d5d5d;
+  font-size: 26rpx;
+  margin: 0 28rpx;
+  padding: 28rpx 0;
+}
+.price-color-title view {
+  width: 49%;
+}
+.colour-fd button {
+  height: 80rpx;
+  line-height: 80rpx;
+  margin-top: 15rpx;
+  width: 45%;
+}
+.heihgt-line {
+  height: 150rpx;
+}
+.position-a {
+  background-color: #f8f8f8;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 999;
+}
+.position-a1 {
+  top: 300rpx;
+  width: 100%;
+}
+.position-a2 {
+  margin-top: 410rpx;
+}
+.checkBox {
+  border: 2rpx solid #e2e2e2;
+  border-radius: 36rpx;
+  color: #373c55;
+  font-size: 26rpx;
+  font-weight: 400;
+  height: 64rpx;
+  line-height: 64rpx;
+  margin: 0 12rpx 24rpx;
+  min-width: 136rpx;
+  text-align: center;
+}
+.isCheckedBox {
+  background: #fff0ec;
+  border: 2rpx solid #ffe6df;
+  color: #fb562c;
+  font-size: 26rpx;
+}
+.priceFontColor {
+  color: #70728c;
+}
+.limtRow {
+  color: #0b0b0b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

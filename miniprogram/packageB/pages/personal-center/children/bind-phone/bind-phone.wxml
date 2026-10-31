@@ -1,0 +1,18 @@
+<view class="heights"></view>
+<view class="bind-phone">
+    <view class="bind-phone-lists">
+        <view class="bind-phone-list">
+            <span>手机号</span>
+            <input bindinput="input_val" placeholder="作为登录手机号" value="{{login_member}}"></input>
+            <button bindtap="getVerificationCode" disabled="{{disabled}}">{{codeName}}</button>
+        </view>
+        <view class="hr-phone"></view>
+        <view class="bind-phone-list">
+            <span>验证码</span>
+            <input bindinput="code_val" placeholder="请输入" value="{{login_code}}"></input>
+        </view>
+    </view>
+    <view class="fd-btns">
+        <button bindtap="upLoadPhone">确认</button>
+    </view>
+</view>

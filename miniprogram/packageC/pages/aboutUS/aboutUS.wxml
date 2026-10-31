@@ -1,0 +1,12 @@
+<view class="about-us">
+  <image src="{{icon.duibuLogo}}"></image>
+  <view class="version">版本 {{appVersion}}</view>
+  <view bindtap="goToAgreementPage" class="about-item">
+    <text>用户协议</text>
+    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+  </view>
+  <view bindtap="goToPrivacyPolicyPage" class="about-item">
+    <text>隐私政策</text>
+    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+  </view>
+</view>

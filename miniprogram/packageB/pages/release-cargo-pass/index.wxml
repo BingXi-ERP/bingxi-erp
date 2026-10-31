@@ -1,0 +1,34 @@
+<page-meta pageStyle="{{popupInit.canvas.show?'overflow: hidden;':''}}">
+    <view class="wrapper">
+        <view class="filter-wrapper">
+            <release-cargo-pass-header bind:changeTab="changeTab" count="{{colorCardCount}}" style="flex:1;max-width:89%;" userType="{{saleStatus}}"></release-cargo-pass-header>
+            <view catchtap="handOperate" class="fl headerBtns">
+                <van-icon name="ellipsis" size="48rpx"></van-icon>
+                <view catchtap="closeOperate" class="showTips" wx:if="{{hasOperate}}">
+                    <view catchtap="toSearch" class="searchBtn">
+                        <image mode="aspectFill" src="{{icon.set_search}}"></image>
+                        <text>搜索</text>
+                    </view>
+                    <view catchtap="toSetting" class="pringRecode">
+                        <image mode="aspectFill" src="{{icon.set_icon}}"></image>
+                        <text>设置</text>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <view catchtap="handerListBg" class="color-card-list-wrapper" wx:if="{{cargoPassList.length>0}}">
+            <cargo-pass-list-block bind:isUpdate="isUpdate" bind:revokeApply="revokeApply" idx="{{index}}" list="{{item}}" wx:for="{{cargoPassList}}" wx:key="index"></cargo-pass-list-block>
+        </view>
+        <view bindtap="handerListBg" style="width:100%;height:100%;position:absolute;z-index:0;top:0;"></view>
+        <view class="no-color-card-list" wx:if="{{!isLoad&&cargoPassList.length<1}}">
+            <view class="bg-img no-list-bg" style="background-image:url(\"{{noColorCardBg}}\")"></view>
+            <view class="text" wx:if="{{userAuthList['release:cargo:pass:add']}}">您暂无放货通数据，建议您可以<text bindtap="toAddColorCard" class="font-blue2">新增放货></text>
+            </view>
+            <view class="text gray" wx:if="{{!userAuthList['release:cargo:pass:add']}}">您暂无放货通数据，建议您可以 新增放货</view>
+        </view>
+        <view class="bottom"></view>
+    </view>
+    <view class="footer-wrapper flex bg-white iphone_bottom" wx:if="{{userAuthList['release:cargo:pass:add']}}">
+        <view catchtap="toAddColorCard" class="g_bottomBtn" style="font-size:32rpx;">新增放货</view>
+    </view>
+</page-meta>

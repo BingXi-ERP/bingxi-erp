@@ -1,0 +1,21 @@
+<view class="img-list" id="add-record">
+  <upload-img
+    bind:delImg="delImg"
+    bind:uoloadImg="uploadImg"
+    list="{{showImgList}}"
+    uploadBtnBg="#ffffff"
+    uploadBtnBorder="2rpx solid #FFE6DF"
+    uploadBtnHeight="140"
+    uploadBtnIcon="{{icon.upload}}"
+    uploadBtnRadius="14"
+    uploadBtnWidth="140"
+    uploadBtnWord="上传图片"
+    uploadBtnWordFontColor="#FB562C"
+    uploadBtnWordFontSize="22"
+    uploadMargin="0 20rpx 20rpx 0"
+    uploadPiece="6"
+  ></upload-img>
+</view>
+<view class="fixed-bottom-tools">
+  <button catchtap="saveRemark" class="g_bottomBtn">保存</button>
+</view>

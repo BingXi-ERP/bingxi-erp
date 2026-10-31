@@ -1,0 +1,35 @@
+<view class="touchVideo">
+  <view class="list-empty-wrapper" wx:if="{{touchList.length===0}}">
+    <image class="noaddress" src="{{noDataBg}}"></image>
+    <view class="empty-text">暂无账号信息～</view>
+  </view>
+  <view wx:else>
+    <view
+      bindtap="onViewTeachVideo"
+      class="touch-item"
+      data-src="{{item.storagePath}}"
+      wx:for="{{touchList}}"
+      wx:key="id"
+    >
+      <view
+        class="bg-view"
+        style="background-image:url({{item.imagePath}});"
+      ></view>
+      <view class="touch-item-r">
+        <text class="title">{{item.title}}</text>
+        <text>{{item.createTime}}</text>
+      </view>
+    </view>
+  </view>
+</view>
+<van-overlay rootPortal="{{true}}" show="{{showVideo}}">
+  <view class="video-wrapper">
+    <van-icon bindtap="onCloseOverlay" class="v-close" name="close"></van-icon>
+    <video
+      controls
+      binderror="videoErrorCallback"
+      id="myVideo"
+      src="{{viewVideoSrc}}"
+    ></video>
+  </view>
+</van-overlay>

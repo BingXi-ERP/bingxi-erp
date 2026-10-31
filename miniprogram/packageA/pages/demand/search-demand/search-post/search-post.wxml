@@ -1,0 +1,62 @@
+<view class="sreachResult" wx:if="{{myPost.length}}">
+    <view catch:tap="toPostDetail" class="demandItem" data-item-id="{{i.id}}" data-type="{{i.statusName}}" wx:for="{{myPost}}" wx:for-item="i" wx:key="{{i.id}}">
+        <view class="itemHead fl">
+            <view>需求编号: {{i.askNo}}</view>
+            <view class="waitIcon {{i.statusName==='找版中'||i.statusName==='审核中'?'waitText':i.statusName==='已领色卡'||i.statusName==='已剪版'||i.statusName==='已下大货'?'successText':i.statusName==='审核不通过'||i.statusName==='找版失败'?'loseText':'closeText'}}">{{i.statusName}}</view>
+        </view>
+        <view class="itemContent fl">
+            <view class="itemImg" style="background-image:url(\"{{i.img}}?imageView2/2/w/160\")" wx:if="{{i.img}}"></view>
+            <view class="itemContentText">
+                <view class="titleName">{{i.detailText}}</view>
+                <view class="loseReason">{{formatDateTime(i.createTime,true)}}</view>
+            </view>
+        </view>
+        <view catch:tap="toDemandSchedule" class="fl scheduleTime" data-item-id="{{i.id}}">
+            <view class="limit">{{i.title}}</view>
+            <view class="i-scheduleTime">
+                <view class="time">{{formatDateTime(i.optTime,true)}}</view>
+                <view class="bg-img right-arrow" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+            </view>
+        </view>
+        <view class="itemFooterBtn">
+            <view catch:tap="toPostResult" class="btn blueBtn" data-item-id="{{i.id}}" wx:if="{{i.statusName==='已领色卡'||i.statusName==='已剪版'||i.statusName==='已下大货'||i.isMatch===1&&i.statusName==='找版中'}}">查看匹配结果<view class="point" wx:if="{{i.matchPushNum}}">{{i.matchPushNum}}</view>
+            </view>
+            <view catch:tap="closeDemand" class="btn nomalBtn" data-item-id="{{i.id}}" wx:if="{{i.statusName==='审核中'||i.statusName==='找版中'}}">关闭需求单</view>
+            <view catch:tap="toPost" class="btn nomalBtn" data-item-id="{{i.id}}" wx:if="{{i.statusName==='已关闭'||i.statusName==='审核不通过'||i.statusName==='找版失败'}}">重新发起</view>
+        </view>
+    </view>
+    <van-popup bind:close="popupClose" lockScroll="true" position="bottom" safeAreaInsetTop="true" show="{{popup.showPopup}}" vModel="true">
+        <view class="popupContent">
+            <view class="title fl">请选择关闭理由</view>
+            <van-radio-group bind:change="popupChange" value="{{popup.popupRadio}}">
+                <van-cell-group>
+                    <van-cell clickable bind:click="popupClick" data-name="1" title="已找到，无需匹配">
+                        <van-radio checkedColor="#66CF7E" name="1"></van-radio>
+                    </van-cell>
+                    <van-cell clickable bind:click="popupClick" data-name="2" title="填写错误，需重新发起需求">
+                        <van-radio checkedColor="#66CF7E" name="2"></van-radio>
+                    </van-cell>
+                    <van-cell clickable bind:click="popupClick" data-name="3" title="其他原因">
+                        <van-radio checkedColor="#66CF7E" name="3"></van-radio>
+                    </van-cell>
+                </van-cell-group>
+            </van-radio-group>
+            <view class="itemArea">
+                <view class="fackArea textarea-placeholder" wx:if="{{popup.popupRadio!=='3'}}">请输入原因</view>
+                <textarea bindinput="inputgetName" data-name="closeForm.closeReason" placeholder="请输入原因" placeholderStyle="fontSize:12px;" wx:if="{{popup.popupRadio==='3'}}"></textarea>
+            </view>
+            <view class="popupBtn">
+                <view bind:tap="popupComfirm" class="popupComfirm">确定</view>
+                <view bind:tap="popupCancle" class="popupCancle">取消</view>
+            </view>
+        </view>
+    </van-popup>
+    <view class="more">
+        <view class="moreIcon" wx:if="{{!isAll}}">上拉更多</view>
+        <view class="moreIcon" wx:if="{{isAll}}">没有更多数据</view>
+    </view>
+</view>
+<view class="noResult" wx:if="{{!myPost.length}}">
+    <view class="noPage"></view>
+    <view class="title">暂无数据</view>
+</view>

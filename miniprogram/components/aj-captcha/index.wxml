@@ -1,0 +1,86 @@
+<view class="{{opt.mode}}" wx:if="{{show}}">
+  <view class="aj-captcha-mask"></view>
+  <view class="aj-captcha">
+    <view class="verifybox-top">
+      <text>请完成安全验证</text>
+      <view bindtap="hide" class="verifybox-close"></view>
+    </view>
+    <view class="verifybox-bottom">
+      <view class="verify-img-out" style="height:{{verifyImgOutHeight}};">
+        <view
+          class="verify-img-panel"
+          style="width:{{opt.imgSize.width}};height:{{opt.imgSize.height}};"
+        >
+          <view bindtap="_refresh" class="verify-refresh"></view>
+          <text class="verify-tips {{verifyTipsClass}}"
+            >{{verifyTipsText}}</text
+          >
+          <image
+            catchtap="{{clickWordTapName}}"
+            class="backImg"
+            mode="aspectFit"
+            src="{{originalImageBase64}}"
+            style="width: 100%; height: 100%; display: block"
+          ></image>
+          <view
+            class="click-word-point"
+            style="left:{{clickWordPointList[0].left}};top:{{clickWordPointList[0].top}};display:{{clickWordPointList[0].display}};"
+            >1</view
+          >
+          <view
+            class="click-word-point"
+            style="left:{{clickWordPointList[1].left}};top:{{clickWordPointList[1].top}};display:{{clickWordPointList[1].display}};"
+            >2</view
+          >
+          <view
+            class="click-word-point"
+            style="left:{{clickWordPointList[2].left}};top:{{clickWordPointList[2].top}};display:{{clickWordPointList[2].display}};"
+            >3</view
+          >
+          <view
+            class="click-word-point"
+            style="left:{{clickWordPointList[3].left}};top:{{clickWordPointList[3].top}};display:{{clickWordPointList[3].display}};"
+            >4</view
+          >
+          <view
+            class="click-word-point"
+            style="left:{{clickWordPointList[4].left}};top:{{clickWordPointList[4].top}};display:{{clickWordPointList[4].display}};"
+            >5</view
+          >
+        </view>
+      </view>
+      <view
+        class="verify-bar-area {{verifyBarAreaClass}}"
+        style="width:{{opt.imgSize.width}};height:{{opt.barHeight}};line-height:{{opt.barHeight}}"
+      >
+        <text class="verify-msg">{{verifyMsgText}}</text>
+        <view
+          catchtouchcancel="{{aj_captcha.touchend}}"
+          catchtouchend="{{aj_captcha.touchend}}"
+          catchtouchmove="{{aj_captcha.touchmove}}"
+          catchtouchstart="{{aj_captcha.touchstart}}"
+          class="verify-left-bar {{leftBarClass}}"
+          style="width:{{opt.barHeight}};height:{{opt.barHeight}};"
+          wx:if="{{opt.captchaType=='blockPuzzle'}}"
+        >
+          <view
+            class="verify-move-block"
+            style="width:{{opt.barHeight}};height:{{opt.barHeight}};"
+          >
+            <view
+              class="verify-sub-block"
+              style="width:{{verifySubBlockWidth}};height:{{opt.imgSize.height}};top:{{verifySubBlockTop}};"
+            >
+              <image
+                class="bock-backImg"
+                mode="aspectFit"
+                src="{{jigsawImageBase64}}"
+                style="width: 100%; height: 100%; display: block"
+              ></image>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

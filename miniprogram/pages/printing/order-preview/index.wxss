@@ -1,0 +1,49 @@
+.mask {
+  background: rgba(0, 0, 0, 0.8);
+  bottom: 0;
+  height: 100vh;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 100vw;
+}
+.imgCon {
+  background-color: #fff;
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  height: 700rpx;
+  left: 50%;
+  margin-left: -500rpx;
+  margin-top: -400rpx;
+  position: absolute;
+  top: 50%;
+  transform: rotate(90deg);
+  width: 1000rpx;
+}
+.orderImg {
+  display: inline-block;
+  height: 100%;
+  width: 100%;
+}
+.add-btn-icon {
+  height: 38rpx;
+  margin-right: 16rpx;
+  width: 38rpx;
+}
+.add-btn-wrapper {
+  bottom: 0rpx;
+  height: 120rpx;
+  left: 50%;
+  position: fixed;
+  transform: translateX(-50%);
+  width: 100%;
+}
+.btn-big {
+  margin-top: 16rpx;
+}
+.space {
+  background: red;
+  height: 300rpx;
+  width: 750rpx;
+}

@@ -1,0 +1,9 @@
+.agreement {
+  margin: auto;
+  padding-bottom: 50rpx;
+  width: 80%;
+}
+.agreement button {
+  margin: 50rpx auto;
+  width: 80%;
+}

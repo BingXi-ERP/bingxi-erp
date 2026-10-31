@@ -1,0 +1,20 @@
+<view class="infoPage">
+    <view class="succssContent">
+        <image class="succssImg" src="{{icon.audit}}"></image>
+    </view>
+    <view class="succssTips textCenter">注册账号申请提交成功，2-3个工作日审核时间，</view>
+    <view class="succssTips textCenter">审核结果会以短信的方式发送至您的手机上。</view>
+    <van-popup :close-on-click-overlay="true" bind:close="codeDisplay" class="tip-dialog" show="{{codeDisplay}}">
+        <text class="popTitle">认证码</text>
+        <view class="popContent stopPop">
+            <view class="codeTip">由秉羲工作台工作人员输入，是档口认证的唯一凭证</view>
+            <view class="codeContent">
+                <input bindinput="input_val" class="infoFont" data-name="inviteCode" name="inviteCode" placeholderClass="phcolor" value="{{inviteCode}}"></input>
+                <image catchtap="clearInput" class="clear-img" id="1" src="{{icon.delImage}}" wx:if="{{inviteCode.length>0}}"></image>
+            </view>
+        </view>
+        <view class="popBtn stopBule">
+            <button bindtap="toWriteInfo" class="popBtn cancelBtn" size="small">提交</button>
+        </view>
+    </van-popup>
+</view>

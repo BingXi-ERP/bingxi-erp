@@ -1,0 +1,13 @@
+<view class="clothCategory">
+  <view class="content fl" wx:if="{{chooseList.length}}">
+    <view
+      bindtap="getItem"
+      class="item {{item.isChoose?'isChoose':''}}"
+      data-item="{{item.title}}"
+      wx:for="{{chooseList}}"
+      wx:key="{{item.title}}"
+      >{{item.title}}</view
+    >
+  </view>
+  <view class="content fl" wx:else>暂时没有获取信息</view>
+</view>

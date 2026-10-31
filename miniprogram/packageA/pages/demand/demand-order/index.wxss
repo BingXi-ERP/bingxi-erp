@@ -1,0 +1,130 @@
+page {
+  background: #f5f5f5;
+}
+.vanTabs .van-tabs__wrap {
+  height: 44px !important;
+  left: 0;
+  position: fixed;
+  top: 0;
+}
+.demandOrder {
+  overflow-x: hidden;
+  padding-bottom: 100rpx;
+}
+.headerBar {
+  background: #4c7cf9;
+  height: 96rpx;
+  margin-bottom: 36rpx;
+  padding: 0 200rpx;
+}
+.itemBar {
+  color: #94bbff;
+}
+.curItem {
+  color: #fff;
+}
+.flexRow {
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+}
+.limitName {
+  max-width: 210rpx;
+}
+.demandContent {
+  padding: 0 32rpx;
+}
+.contentItem {
+  background: #fff;
+  border-radius: 16rpx;
+  margin-bottom: 32rpx;
+  padding: 0 24rpx;
+}
+.contentItem .title {
+  border-bottom: 1rpx solid #f5f5f5;
+  color: #373c55;
+  font-family: PingFangSC;
+  font-size: 14px;
+  font-weight: 500;
+  height: 80rpx;
+}
+.contentItem .title .orderStatus {
+  color: #f7823c;
+}
+.orderDetail {
+  padding: 24rpx 0;
+}
+.orderDetail,
+.orderInfo {
+  color: #999bb4;
+  font-family: PingFangSC;
+  font-size: 12px;
+  font-weight: 400;
+}
+.leftItem {
+  flex: 1;
+}
+.orderDetail .orderImg {
+  height: 200rpx;
+  margin-right: 32rpx;
+  width: 200rpx;
+}
+.detailItem,
+.itemTitle {
+  margin-bottom: 20rpx;
+}
+.detailTotle {
+  align-items: flex-end;
+}
+.timeCount {
+  color: #999bb4;
+  font-family: SFProText;
+  font-size: 12px;
+  font-weight: 400;
+}
+.totleItem {
+  margin-left: auto;
+}
+.titleFont {
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 400;
+}
+.numBig,
+.titleFont {
+  color: #373c55;
+  font-family: SFProText;
+}
+.numBig {
+  font-size: 18px;
+  font-weight: 500;
+}
+.noResult {
+  left: 50%;
+  position: absolute;
+  text-align: center;
+  top: 35%;
+  transform: translate(-50%, -35%);
+}
+.noResult .noPage {
+  background: url(https://img.duibu.cn/duibu/shop/img/customer/Defaultpage_NoRecord_Color.png)
+    no-repeat;
+  background-position: 50%;
+  background-size: 320rpx 320rpx;
+  height: 320rpx;
+  margin-bottom: 32rpx;
+  width: 320rpx;
+}
+.noResult .title {
+  color: #70728c;
+  font-family: PingFangSC-Medium;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 16rpx;
+}
+.noResult .text {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+}

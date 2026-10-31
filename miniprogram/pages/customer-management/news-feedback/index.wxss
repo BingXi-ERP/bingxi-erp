@@ -1,0 +1,180 @@
+page {
+  background-color: #f5f6fa;
+}
+[alt] {
+  max-width: 100%;
+}
+.news-wrapper {
+  padding: 32rpx 32rpx 0;
+}
+.header {
+  height: 142rpx;
+  width: 750rpx;
+}
+.noResult {
+  left: 50%;
+  position: absolute;
+  text-align: center;
+  top: 35%;
+  transform: translate(-50%, -35%);
+}
+.noResult .noPage {
+  background: url(https://img.duibu.cn/duibu/shop/img/customer/Defaultpage_NoRecord_Color.png)
+    no-repeat;
+  background-position: 50%;
+  background-size: 320rpx 320rpx;
+  height: 320rpx;
+  margin-bottom: 32rpx;
+  width: 320rpx;
+}
+.noResult .title {
+  color: #70728c;
+  font-family: PingFangSC-Medium;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 16rpx;
+}
+.noResult .text {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+}
+.listItem {
+  align-items: center;
+  background-color: #fff;
+  border-radius: 16rpx;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 32rpx;
+  min-height: 160rpx;
+  padding: 15rpx 32rpx;
+  width: calc(100% - 64rpx);
+}
+.list-avatar {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border-radius: 50%;
+  height: 96rpx;
+  margin-right: 16rpx;
+  width: 96rpx;
+}
+.list-content {
+  flex-direction: column;
+}
+.content-top,
+.list-content {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+.top-left {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 56%;
+}
+.top-left .name {
+  color: #373c55;
+  font-size: 30rpx;
+  font-weight: 500;
+  margin-right: 16rpx;
+}
+.top-left .new-tag {
+  background: #fff0f0;
+  color: #ed5c5c;
+}
+.top-left .close-tag,
+.top-left .new-tag {
+  border-radius: 8px;
+  font-size: 20rpx;
+  padding: 0 18rpx;
+}
+.top-left .close-tag {
+  background: #edeff6;
+  color: #999bb4;
+}
+.top-right {
+  color: #c7c8d8;
+  font-size: 24rpx;
+}
+.content-bottom {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 12rpx;
+  width: 100%;
+}
+.content-bottom rich-text {
+  color: #70728c;
+  font-size: 24rpx;
+  line-height: 40rpx;
+  width: 100%;
+  word-break: break-word;
+}
+.content-bottom rich-text img {
+  width: 100%;
+}
+.g_limtRow {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.noPage {
+  background: url(https://img.duibu.cn/duibu/shop/img/v2.7.8/Defaultpage_NoMessages@2x.png)
+    no-repeat;
+  background-position: 50%;
+  background-size: 320rpx 320rpx;
+  height: 320rpx;
+  margin-bottom: 32rpx;
+  width: 320rpx;
+}
+.tip-dialog {
+  height: 100%;
+  width: 80%;
+}
+.tip-dialog .van-popup {
+  border-radius: 16rpx;
+  color: #64689e;
+  font-size: 28rpx;
+  padding: 64rpx 0 0;
+  width: 640rpx;
+}
+.popTitle {
+  color: #373c55;
+  display: inline-block;
+  font-size: 36rpx;
+  font-weight: 500;
+  text-align: center;
+  width: 100%;
+}
+.popContent {
+  margin: 20rpx 0 32rpx;
+  padding: 48rpx;
+}
+.popBtn {
+  align-items: center;
+  border-top: 1rpx solid #edeff6;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-around;
+}
+.popBtn button {
+  background-color: #fff;
+  border: none;
+  color: #336af8;
+  font-size: 32rpx;
+  font-weight: 500;
+  height: 100rpx;
+  line-height: 100rpx;
+  width: 50%;
+}
+.popBtn .cancelBtn {
+  border-right: 1rpx solid #edeff6;
+  box-sizing: border-box;
+}

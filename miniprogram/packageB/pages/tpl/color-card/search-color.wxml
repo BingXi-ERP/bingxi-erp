@@ -1,0 +1,34 @@
+<template name="searchcolor">
+    <view class="search-panel">
+        <view bindtap="toSearch" class="search-box" id="colorSearch">
+            <image alt="" class="search-icon" mode="aspectFit" src="{{imageData.search}}"></image>
+            <input class="search-input" disabled="true" placeholder="请输入色卡编号/品名" type="text" value="{{searchKey}}"></input>
+        </view>
+        <view class="color-search-res" wx:if="{{colorList.length>0}}">
+            <view class="media-list" wx:for="{{colorList}}" wx:key="index">
+                <view bindtap="onJump" class="list-info" data-goods-Id="{{item.goodsId}}">
+                    <view class="list-info-img">
+                        <image lazyLoad="true" mode="aspectFill" src="{{replImage(item.mainImgPath,app,210)}}"></image>
+                    </view>
+                    <view class="list-info-info">
+                        <text class="f14">品名：{{item.goodsName}}</text>
+                        <text class="f14" wx:if="{{item.goodsNo.length>0&&item.goodsNo!=0}}">编号：{{item.goodsNo||'--'}}</text>
+                        <text class="f14" wx:if="{{item.breadth!=0}}">幅宽：{{item.breadth}}  {{item.breadthUnit}}</text>
+                        <text class="f14" wx:if="{{item.ingredient!=0}}">成分：{{item.ingredient}}</text>
+                        <text class="f14" wx:if="{{userMobile==false||item.goodsPriceMin==0||item.goodsPriceMin==0}}">价格：<text class="red f18">面议</text>
+                        </text>
+                        <text class="f14" wx:elif="{{userMobile==true&&item.goodsPriceMin==item.goodsPriceMax}}">价格：<text class="red f18">￥{{item.goodsPriceMin}}/{{item.priceUnit}}</text>
+                        </text>
+                        <text class="f14" wx:elif="{{userMobile==true}}">价格：<text class="red">￥{{item.goodsPriceMin}}~{{item.goodsPriceMax}}/{{item.priceUnit}}</text>
+                        </text>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <view class="color-data-list-null" wx:else>
+            <image mode="aspectFit" src="{{imageData.colorNull}}"></image>
+            <text class="f14">没有找到你要的色卡~</text>
+        </view>
+    </view>
+</template>
+<wxs module="replImage" src="../../../../utils/replImages.wxs"/>

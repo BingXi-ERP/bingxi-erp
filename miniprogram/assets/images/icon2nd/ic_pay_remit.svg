@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="20px" height="20px" viewBox="0 0 20 20" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 52.2 (67145) - http://www.bohemiancoding.com/sketch -->
+    <title>ic_huikuazhfu@4.5x</title>
+    <desc>Created with Sketch.</desc>
+    <g id="开单" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="卖家端/开单收款" transform="translate(-30.000000, -694.000000)">
+            <g id="ic_huikuazhfu" transform="translate(30.000000, 694.000000)">
+                <rect id="矩形-copy-10" fill="#CF5B62" x="0" y="0" width="20" height="20" rx="3"></rect>
+                <g id="ic_kanuanidan" transform="translate(3.000000, 3.000000)">
+                    <circle id="椭圆形" fill="#FFFFFF" cx="7" cy="7" r="7"></circle>
+                    <polygon id="Path-2" fill="#CF5B62" fill-rule="nonzero" points="9.79289322 5.5 8.64644661 4.35355339 9.35355339 3.64644661 12.2071068 6.5 3 6.5 3 5.5"></polygon>
+                    <polygon id="Path-2-Copy" fill="#CF5B62" fill-rule="nonzero" transform="translate(6.603553, 9.073223) scale(-1, -1) translate(-6.603553, -9.073223) " points="8.79289322 9.5 7.64644661 8.35355339 8.35355339 7.64644661 11.2071068 10.5 2 10.5 2 9.5"></polygon>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

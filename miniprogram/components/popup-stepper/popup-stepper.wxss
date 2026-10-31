@@ -1,0 +1,73 @@
+.header {
+  align-items: center;
+  background-color: #f7f7f7;
+  display: -webkit-flex;
+  display: flex;
+  height: 80rpx;
+}
+.header > view {
+  flex: 1;
+  font-size: 28rpx;
+}
+.has-chosen-card-text {
+  color: #666;
+  font-size: 24rpx;
+  margin-left: 30rpx;
+}
+.del-list-text {
+  color: #666;
+  font-size: 24rpx;
+  margin-right: 40rpx;
+  text-align: right;
+}
+.item-block {
+  align-items: center;
+  border-bottom: 1rpx solid #ddd;
+  display: -webkit-flex;
+  display: flex;
+  height: 120rpx;
+}
+.item-block:last-child {
+  border-bottom: none;
+}
+.item-block > view {
+  flex: 1;
+}
+.item-name {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  margin-left: 30rpx;
+}
+.item-name .min {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 40rpx;
+  margin-right: 10rpx;
+  width: 40rpx;
+}
+.stepper-wrapper {
+  margin-right: 54rpx;
+  text-align: right;
+}
+.footer {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: center;
+}
+.footer > view {
+  flex: 1;
+  height: 100rpx;
+  line-height: 100rpx;
+  text-align: center;
+}
+.has-chosen-btn {
+  background-color: #e7ecff;
+  color: #4667e9;
+}
+.confirm-btn {
+  background-color: #4667e9;
+  color: #fff;
+}

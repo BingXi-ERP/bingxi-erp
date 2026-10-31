@@ -1,0 +1,34 @@
+var isActive = function (node, item, data, isRestock) {
+  if (item.selectProp === "baiBuMaterial") {
+    var baiBuMaterialIds = data.baiBuMaterial.map(function (f) {
+      return f.baiBuMaterialId;
+    });
+    return baiBuMaterialIds.indexOf(node.id) !== -1 ? "item_active" : "";
+  }
+  if (item.selectProp === "material" && isRestock) {
+    var materialIds = data.material.map(function (f) {
+      return f.materialId;
+    });
+    return materialIds.indexOf(node.id) !== -1 ? "item_active" : "";
+  }
+  var isCheck = item.multiple
+    ? data[
+        ((nt_0 = item.selectProp),
+        null == nt_0 ? undefined : "number" === typeof nt_0 ? nt_0 : "" + nt_0)
+      ].indexOf(node.paramValue) !== -1
+    : data[
+        ((nt_1 = item.selectProp),
+        null == nt_1 ? undefined : "number" === typeof nt_1 ? nt_1 : "" + nt_1)
+      ] === node.paramValue;
+  return isCheck ? "item_active" : "";
+};
+var tabClassName = function (item) {
+  return item.selectProp === "clusterCode" && item.multiple
+    ? "filter_select filter_select_mul filter_select_family"
+    : item.multiple
+    ? "filter_select filter_select_mul"
+    : item.selectProp === "clusterCode"
+    ? "filter_select filter_select_family"
+    : "filter_select";
+};
+module.exports = { isActive: isActive, tabClassName: tabClassName };

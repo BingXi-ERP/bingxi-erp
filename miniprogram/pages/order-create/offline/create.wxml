@@ -1,0 +1,395 @@
+<view class="container-gray order-create">
+  <van-toast id="van-toast"></van-toast>
+  <van-dialog id="van-dialog"></van-dialog>
+  <view class="marBottom65">
+    <view class="steps">
+      <view class="step current">
+        <view class="pointer">1</view>
+        <view class="step-main">订单详情</view>
+      </view>
+      <view class="step">
+        <view class="line"></view>
+      </view>
+      <view class="step">
+        <view class="pointer gray">2</view>
+        <view class="step-main">收款信息</view>
+      </view>
+      <view class="step">
+        <view class="line gray"></view>
+      </view>
+      <view class="step">
+        <view class="pointer gray">3</view>
+        <view class="step-main">开单成功</view>
+      </view>
+    </view>
+  </view>
+  <view class="c-panel" style="position: relative">
+    <view class="c-item">
+      <view class="c-item-title">客户<text class="required">*</text> </view>
+      <view bind:tap="handlelSelectCustomer" class="c-item-value">
+        <view class="g_limtRow {{customerName?'strong':''}}"
+          >{{customerName?customerName:'请选择'}}
+          {{!!customerMobile?customerMobile:''}}</view
+        >
+        <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+      </view>
+    </view>
+    <view class="c-item">
+      <view class="c-item-title">开单时间<text class="required">*</text> </view>
+      <view class="c-item-value">
+        <picker
+          bindchange="handleDateChange"
+          class="w-picker"
+          end="{{maxDate}}"
+          mode="date"
+          start="{{minDate}}"
+          value="{{createDate}}"
+        >
+          <div class="x-picker">
+            <text>{{createDate||'请选择'}}</text>
+            <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+          </div>
+        </picker>
+      </view>
+    </view>
+    <view class="c-item">
+      <view class="c-item-title">货品类型<text class="required">*</text> </view>
+      <view class="c-item-value">
+        <radio-group
+          bindchange="handleChangeProductType"
+          class="fr-between-center radio-group"
+        >
+          <label class="bdd-radio radio">
+            <radio value="full"></radio>
+            <view class="checkBtn {{productType==='full'?'chooseBtn':''}}"
+              >大货</view
+            >
+          </label>
+          <label class="bdd-radio radio">
+            <radio value="cut"></radio>
+            <view class="checkBtn {{productType==='cut'?'chooseBtn':''}}"
+              >剪样</view
+            >
+          </label>
+        </radio-group>
+      </view>
+    </view>
+    <view
+      class="c-item"
+      wx:if="{{userAuthList['goods:manage']&&userAuthList['goods:query']}}"
+    >
+      <view class="c-item-title c-item-title-sp"
+        >商品<text class="required">*</text>
+      </view>
+      <view>
+        <view
+          class="product-cell {{index===products.length-1?'cell-border-no':''}}"
+          wx:if="{{products.length!==0}}"
+          wx:for="{{products}}"
+          wx:key="index"
+        >
+          <view class="cell-value flex-direction-column">
+            <view class="post">
+              <view class="post-img" data-id="{{item.id}}">
+                <image
+                  mode="aspectFill"
+                  src="{{replImage(item.image,globalApp,300)}}"
+                ></image>
+              </view>
+              <view wx:if="{{item.billingStatus===10}}">
+                <view class="post-title g_limtRow midlle">{{item.name}}</view>
+                <view class="colorBtn">
+                  <button
+                    bindtap="addItem"
+                    class="addBtn"
+                    data-id="{{item.id}}"
+                    wx:if="{{item.expiredFlag===0}}"
+                  >
+                    <image src="{{icon.cross}}"></image>
+                    <text>添加细码</text>
+                  </button>
+                  <view class="fl colorBtn" wx:else>
+                    <button
+                      bindtap="reChoose"
+                      class="reAddBtn"
+                      data-old-id="{{item.id}}"
+                    >
+                      <text>重选</text>
+                    </button>
+                    <view class="reChoose"
+                      >{{expiredFlagText[item.expiredFlag]}}</view
+                    >
+                  </view>
+                  <view class="delIcon">
+                    <image
+                      bind:tap="handleProductDel"
+                      data-id="{{item.id}}"
+                      mode="aspectFit"
+                      src="{{icon.del}}"
+                    ></image>
+                  </view>
+                </view>
+              </view>
+              <view wx:if="{{item.billingStatus!==10}}">
+                <view class="post-title g_limtRow">{{item.name}}</view>
+                <view class="discountInfo" style="margin-top: 20rpx">
+                  <view class="tr">
+                    <text class="totle" style="text-align: left"
+                      >销售条数: {{item.totalNum}}条</text
+                    >
+                  </view>
+                  <view class="tr">
+                    <text class="totle" style="text-align: right"
+                      >优 惠:
+                      {{item.differenceSymbol==1?'x':item.differenceSymbol==2?'+':item.differenceSymbol?'-':''}}{{item.differenceNum?item.differenceNum:'0'}}</text
+                    >
+                  </view>
+                  <view
+                    class="fr-between-center tr"
+                    style="margin-top: 8rpx; align-items: inherit"
+                  >
+                    <view style="width: 320rpx">
+                      <view
+                        class="fl"
+                        style="width: 320rpx; display: block"
+                        wx:if="{{item.totalCodeNum}}"
+                        >标签数量:<block
+                          wx:for="{{item.totalCodeNum}}"
+                          wx:for-item="i"
+                          wx:key="quantity"
+                          >{{toFixNum(i.quantity,2,false)}}{{i.priceUnit}}</block
+                        >
+                      </view>
+                      <view
+                        class="fl"
+                        style="width: 320rpx; display: block"
+                        wx:else
+                        >标签数量:
+                        {{toFixNum(item.goodsQuantityInfo,2,false)}}</view
+                      >
+                    </view>
+                    <view style="width: 320rpx">
+                      <view
+                        class="fl"
+                        style="width: 320rpx; text-align: right; display: block"
+                        wx:if="{{item.totalCodeNum}}"
+                        >计价数量:<block
+                          wx:for="{{item.totalCodeNum}}"
+                          wx:for-item="i"
+                          wx:key="index"
+                          >{{i.differenceQuantity}}{{i.priceUnit}}</block
+                        >
+                      </view>
+                      <view
+                        class="fl"
+                        style="width: 320rpx; text-align: right; display: block"
+                        wx:else
+                        >计价数量: {{item.goodsPriceQuantityInfo}}</view
+                      >
+                    </view>
+                  </view>
+                </view>
+                <image
+                  bind:tap="handleProductEdit"
+                  class="button-edit"
+                  data-id="{{item.id}}"
+                  mode="aspectFill"
+                  src="{{icon.edit}}"
+                  wx:if="{{userAuthList['goods:query']}}"
+                ></image>
+                <image
+                  bind:tap="handleProductDel"
+                  class="button-del"
+                  data-id="{{item.id}}"
+                  mode="aspectFill"
+                  src="{{icon.del}}"
+                ></image>
+              </view>
+            </view>
+            <view
+              class="fl colorBtn"
+              wx:if="{{item.expiredFlag&&item.expiredFlag!==0}}"
+            >
+              <button
+                bindtap="reChoose"
+                class="reAddBtn"
+                data-old-id="{{item.id}}"
+              >
+                <text>重选</text>
+              </button>
+              <view class="reChoose"
+                >{{expiredFlagText[item.expiredFlag]}}</view
+              >
+            </view>
+            <view class="fr-between-center post-extra" wx:else>
+              <view class="hl"
+                >合计：<text class="rmb">￥</text>
+                <text class="price"
+                  >{{toFixNum(item.totalPrice,2,true,true,'')}}</text
+                >
+                <text class="col">（{{item.colors.length}}个颜色）</text>
+              </view>
+              <view
+                bind:tap="handleToggle"
+                class="buttom-toggle"
+                data-id="{{item.id}}"
+              >
+                <text>{{item.isOpened?'收起':'展开'}}</text>
+                <image src="{{item.isOpened?icon.up:icon.down}}"></image>
+              </view>
+            </view>
+            <view class="product-detail" wx:if="{{item.isOpened}}">
+              <text class="product-detail-title">颜色</text>
+              <view class="product-detail-tab">
+                <view
+                  bind:tap="handleSwitchColor"
+                  class="badge {{colorItem.id===item.tabCurrentColorId?'badge-primary':'badge-gray'}}"
+                  data-index="{{idx}}"
+                  data-product-id="{{item.id}}"
+                  wx:for="{{item.colors}}"
+                  wx:for-index="idx"
+                  wx:for-item="colorItem"
+                  wx:key="index"
+                >
+                  <text class="badge-button g_limtRow"
+                    >{{colorItem.color+''+colorItem.colorName}}</text
+                  >
+                  <text class="badge-sup">{{colorItem.dyelotArr.length}}</text>
+                </view>
+              </view>
+              <view class="productNum">
+                <text class="product-detail-title">缸号</text>
+                <view class="product-detail-tab">
+                  <view
+                    bind:tap="changeCurrentDyelot"
+                    class="badge"
+                    data-index="{{dyelotIndex}}"
+                    data-product-id="{{item.id}}"
+                    data-product-item="{{item}}"
+                    wx:for="{{item.tabCurrentDyelot}}"
+                    wx:for-index="dyelotIndex"
+                    wx:for-item="dyelotItem"
+                    wx:key="dyelotIndex"
+                  >
+                    <text class="badge-button g_limtRows"
+                      >{{dyelotItem.dyelotName?dyelotItem.dyelotName:dyelotItem.id}}</text
+                    >
+                    <text class="badge-sup">{{dyelotItem.list.length}}</text>
+                  </view>
+                </view>
+              </view>
+              <view class="table" wx:if="{{item.isOpened}}">
+                <view class="tr">
+                  <text class="th">{{productType==='full'?'编号':'颜色'}}</text>
+                  <text class="th">单价(元)</text>
+                  <text class="th">数量</text>
+                  <text class="th">小计(元)</text>
+                </view>
+                <view
+                  class="tr"
+                  wx:for="{{item.tabCurrentColorList}}"
+                  wx:for-index="idx"
+                  wx:for-item="colorItem"
+                  wx:key="index"
+                >
+                  <text class="">{{idx+1}}</text>
+                  <text>{{colorItem.price}}</text>
+                  <text>{{colorItem.quantity}}{{colorItem.priceUnit}}</text>
+                  <text class="align-right">{{toFixNum(colorItem.total)}}</text>
+                </view>
+                <view
+                  class="fr-between-center tr"
+                  style="padding-right: 18rpx; padding-left: 18rpx"
+                >
+                  <text class="totle" style="text-align: left">合计</text>
+                  <text class="totle strong" style="text-align: right"
+                    >{{toFixNum(item.totalPrice,2,true,true)}}</text
+                  >
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+      <view bindtap="addProduct" class="c-item-value c-item-value-sp">
+        <view class="goods-add">
+          <van-icon color="#FB562C" name="add-o" size="30rpx"></van-icon>
+          <text>添加</text>
+        </view>
+      </view>
+    </view>
+    <view class="c-item">
+      <view class="c-item-title">备注</view>
+      <view class="c-item-value">
+        <textarea
+          autoHeight
+          bindblur="handleHideTextarea"
+          bindfocus="handleShowTextarea"
+          bindinput="handleUpdateVal"
+          class="remarks-input"
+          data-key="remarks"
+          focus="{{remarksFocus}}"
+          maxlength="30"
+          placeholder="请输入备注信息(30字以内)"
+          placeholderClass="place-holder place-holder-right"
+          showConfirmBar="{{false}}"
+          style="width: 100%; height: 34rpx"
+          value="{{remarks}}"
+        ></textarea>
+      </view>
+    </view>
+    <view class="c-item">
+      <view class="c-item-title"
+        >采购记录<view class="tips">
+          <van-icon color="#C0C0C0" name="warning-o" size="13"></van-icon>
+          <text>最多上传6张图片</text>
+        </view>
+      </view>
+      <view class="c-item-value">
+        <uploadImg
+          bind:delImg="uoloadImg"
+          bind:uoloadImg="uoloadImg"
+          list="{{billingPurchaseImgList}}"
+          uploadBtnBg="#ffffff"
+          uploadBtnBorder="2rpx solid #FFE6DF"
+          uploadBtnHeight="140"
+          uploadBtnIcon="{{icon.upload}}"
+          uploadBtnRadius="14"
+          uploadBtnWidth="140"
+          uploadBtnWord="上传图片"
+          uploadBtnWordFontColor="#FB562C"
+          uploadBtnWordFontSize="22"
+          uploadMargin="0 20rpx 20rpx 0"
+          uploadPiece="6"
+        ></uploadImg>
+      </view>
+    </view>
+  </view>
+  <view class="fixed-toolbar-bottom billing {{isIPhoneX?'safe-bottom':''}}">
+    <view class="toolbar-left">
+      <text class="totle-name">合计：</text>
+      <text class="totle-currency">¥</text>
+      <text class="totle-content"
+        >{{toFixNum(totalAccount,2,true,true,'')}}</text
+      >
+    </view>
+    <view class="toolbar-right">
+      <view class="flex-row toolbar-button-group-right">
+        <button bind:tap="handleOrderPin" class="g_gd">挂单</button>
+        <button bind:tap="handleStepNext" class="g_next">下一步</button>
+      </view>
+    </view>
+  </view>
+</view>
+<cmp-tab-bar active="{{active}}"></cmp-tab-bar>
+<van-dialog
+  useSlot
+  bind:cancel="handleCloseDialog"
+  cancelButtonColor="#FB562C"
+  cancelButtonText="好的"
+  show="{{showDialog}}"
+  showCancelButton="{{true}}"
+  showConfirmButton="{{false}}"
+>
+  <view class="d-text">{{msg}}</view>
+</van-dialog>

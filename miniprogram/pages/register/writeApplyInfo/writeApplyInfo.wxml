@@ -1,0 +1,55 @@
+<view class="write-box">
+    <form bindsubmit="formSubmit">
+        <view class="register-bd">
+            <view class="photo">
+                <view class="photo-title">姓名<text>*</text>
+                </view>
+                <view class="photo-value">
+                    <input bindinput="input_val" class="infoFont " data-name="contacts" name="contacts" placeholder="请输入您的姓名" placeholderClass="phcolor" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{contacts}}"></input>
+                </view>
+            </view>
+            <view class="photo">
+                <view class="photo-title">主营类目<text>*</text>
+                </view>
+                <view class="photo-value">
+                    <view bindtap="choseCategory" class="picker infoFont " style="text-align:right">
+                        <span style="color:#C0C0C0;font-size:26rpx" wx:if="{{!category}}">请选择主营类目</span>
+                        <span wx:else>{{category}}</span>
+                        <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                    </view>
+                </view>
+            </view>
+            <view class="photo">
+                <view class="photo-title">档口名称<text>*</text>
+                </view>
+                <view class="photo-value">
+                    <input bindinput="input_val" class="infoFont " data-name="shopName" name="shopName" placeholder="请输入档口名称" placeholderClass="phcolor" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{shopName}}"></input>
+                </view>
+            </view>
+            <view class="photo">
+                <view class="photo-title">所在地区<text>*</text>
+                </view>
+                <view class="photo-value">
+                    <view bindtap="onShowSelectArea" class="picker infoFont " style="text-align:right">
+                        <span style="color:#babbd2;font-size:14px" wx:if="{{region.length===0}}">请选择所在的地区</span>
+                        <span wx:else>{{region[0]}} {{region[1]}} {{region[2]}}</span>
+                        <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                    </view>
+                </view>
+            </view>
+            <view class="photo">
+                <view class="photo-title">详细地址<text>*</text>
+                </view>
+                <view class="photo-value">
+                    <input bindinput="input_val" class="infoFont " data-name="shopAddress" name="shopAddress" placeholder="请输入详细的地址信息" placeholderClass="phcolor" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{shopAddress}}"></input>
+                </view>
+            </view>
+        </view>
+        <view class="w-wfoot">
+            <button class="r-bottomBtn" disabled="{{banSubmit}}" formType="submit">提交</button>
+        </view>
+    </form>
+    <van-popup round position="bottom" show="{{showArea}}">
+        <van-cascader bind:change="onAreaChange" bind:close="onAreaClose" bind:finish="onAreaFinish" fieldNames="{{fieldNames}}" options="{{areaOptions}}" title="请选择所在地区" value="{{cascaderValue}}" wx:if="{{showArea}}"></van-cascader>
+    </van-popup>
+</view>

@@ -1,0 +1,30 @@
+<view class="add-job-wrapper">
+    <view class="item">
+        <view class="add-job-title">岗位名称<text>*</text>
+        </view>
+        <view class="add-job-value">
+            <input bindinput="input_val" maxlength="10" placeholder="请输入岗位的名称，10字以内" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{roleName}}"></input>
+        </view>
+        <text class="add-job-n">{{roleName.length}}/10</text>
+    </view>
+    <view class="item">
+        <view class="add-job-title">岗位描述<text>*</text>
+        </view>
+        <view class="add-job-value">
+            <input bindinput="input_text" maxlength="25" placeholder="请输入岗位的描述，不超过25个字" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{roleRemark}}"></input>
+        </view>
+        <text class="add-job-n">{{roleRemark.length}}/25</text>
+    </view>
+    <view class="item">
+        <view class="add-job-title">权限设置<text>*</text>
+        </view>
+        <view bindtap="toPath" class="add-job-value">
+            <text class="a-auth" wx:if="{{authName}}">{{authName}}</text>
+            <text wx:else>请选择使用的权限</text>
+            <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+        </view>
+    </view>
+</view>
+<view class="fixed-bottom-tools">
+    <button catchtap="addRole" class="g_bottomBtn">{{pageType=='add'?'完成':'确定'}}</button>
+</view>
