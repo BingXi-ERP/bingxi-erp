@@ -114,7 +114,7 @@
 ## 三、未映射接口（275 个去重路径，直通 bingxiHost，预期 404）
 
 > 原则：**没有就是没有**——仓库后端不存在的端点不做模拟映射。这些请求会指向
-> `https://8.166.117.33/<旧路径>` 并收到 404，前端按错误分支处理，旧后端已彻底不再被调用。
+> bingxiHost 下的 `<旧路径>` 并收到 404，前端按错误分支处理，旧后端已彻底不再被调用。主机地址见本地配置（`miniprogram/mpHost.local.js`，模板 `mpHost.local.example.js`，真值不入库）。
 > 完整清单见 `work_patch/js_deobf/_apiref/baked_unmapped_paths.json`。
 
 | 业务域 | 数量 | 说明 |
@@ -311,5 +311,5 @@
 - **新增映射**：在 `bake_endpoints_v4.js` 的 RULES 加一条 `{ old, style, method, nw }`，
   手动修改对应调用点（或对全新源码重跑脚本），再跑 verify 确认端点存在。
 - 后端 Swagger: `http://<host>/swagger-ui`；OpenAPI: `/api-docs/openapi.json`
-- 环境地址：四环境 `bingxiHost` 均为 `https://8.166.117.33`（见 `envConfig.js`）。
+- 环境地址：四环境 `bingxiHost` 单点同源，由本地配置 `miniprogram/mpHost.local.js` 提供（主机地址见本地配置，模板为 `mpHost.local.example.js`，真值不入库，`envConfig.js` 读取后写入各环境块）。
   开发者工具需勾选"不校验合法域名"；真机需信任自签证书。

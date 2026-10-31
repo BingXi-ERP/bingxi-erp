@@ -6,7 +6,7 @@
 
 ## 一、环境 / 域名配置（核心，已集中管理 ✓）
 
-`envConfig.js`（根目录）是**唯一的**环境与域名配置源，定义 4 套环境：
+`envConfig.js`（根目录）是**唯一的**环境与域名配置源，定义 4 套环境；其中 `bingxiHost`（本仓后端主机）为四环境单点同源，真值来自本地配置 `mpHost.local.js`（主机地址见本地配置，模板 `mpHost.local.example.js`，真值不入库）：
 
 | key | 名称 | rootHost（接口域名） | imgHost（图片 CDN） | imgOssHost |
 |---|---|---|---|---|
