@@ -5,7 +5,7 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
 
 /**
  * 功能 批量切换色卡商品的上架与下架状态
- * 调用方 本文件的 batchSetOnSale 与 batchSetOffSale，上游为 pages/color-card-management/batch-management/batch-management.js 的 onOrOffShelves 与 pages/color-card-management/color-card-management.js 的 onOrOff
+ * 调用方 本文件的 batchSetOnSale 与 batchSetOffSale，上游为 packageB/pages/color-card-management/batch-management/batch-management.js 的 onOrOffShelves 与 packageB/pages/color-card-management/color-card-management.js 的 onOrOff
  * 入参 o.productIds 商品标识数组，o.onSale 上架标志（数值 1 上架，其余按下架处理）
  * 传给谁 本仓 products 批量更新口 POST（route-snapshot.txt 第 1492 行），载荷键按 BatchUpdateProductsPayload 的 products 数组与逐行 status 字段（backend/src/handlers/bulk_product_handler.rs 第 27 行）
  * 存什么 只把商品标识与状态两键组进载荷，状态词表取 active 与 inactive（frontend/src/api/product.ts 第 202 行）
@@ -25,7 +25,7 @@ function batchSwitchProductStatus(o) {
 
 /**
  * 功能 统计上架与下架两个状态下的色卡商品条数（列表页顶部计数）
- * 调用方 本文件的 queryColorCardCount，上游为 pages/color-card-management/color-card-management.js
+ * 调用方 本文件的 queryColorCardCount，上游为 packageB/pages/color-card-management/color-card-management.js
  *   的 queryColorCardCount（该处不传入参，统计全组织）与同类页面的按分类计数
  * 入参 o 可选，只认旧侧的 categoryId 一键（同一分类内的计数），缺席就统计全部
  * 传给谁 本仓产品列表读口 GET 两条，状态分别取 active 与 inactive（products.status 的小写词表，
@@ -122,7 +122,7 @@ var c =
       }),
       /**
        * 功能 色卡上下架计数（读口换成本仓产品列表两次读，组装见本文件 queryProductSaleCount 注释）
-       * 调用方 pages/color-card-management/color-card-management.js 的 queryColorCardCount
+       * 调用方 packageB/pages/color-card-management/color-card-management.js 的 queryColorCardCount
        * 入参 o 旧侧查询对象，本仓只认其中 categoryId 一键
        * 传给谁 本文件 queryProductSaleCount
        * 存什么/存哪里 不落盘，结果只回调用页

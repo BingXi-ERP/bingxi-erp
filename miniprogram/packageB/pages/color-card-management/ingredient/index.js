@@ -64,8 +64,8 @@ Page({
   saveIngredientList: function () {
     var e = getCurrentPages(),
       toConsumableArray = this.data.isCard
-        ? "pages/color-card-management/add-bottom-card/add-bottom-card"
-        : "pages/color-card-management/add-color-card/add-color-card",
+        ? "packageB/pages/color-card-management/add-bottom-card/add-bottom-card"
+        : "packageB/pages/color-card-management/add-color-card/add-color-card",
       i = e.find(function (e) {
         return e.route === toConsumableArray;
       });

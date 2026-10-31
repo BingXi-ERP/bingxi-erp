@@ -330,7 +330,7 @@ Page({
   onPullDownRefresh: function () {},
   onReachBottom: function () {},
   onShareAppMessage: function () {
-    var t = "/pages/color-card-management/preview/preview?goodsId=".concat(
+    var t = "/packageB/pages/color-card-management/preview/preview?goodsId=".concat(
       this.data.shareFriendData.goodsid,
     );
     return {

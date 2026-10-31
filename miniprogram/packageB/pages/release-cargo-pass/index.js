@@ -328,19 +328,19 @@ Page({
           wx.removeStorageSync("commodityType"),
           wx.removeStorageSync("bottomCardInfo"),
           wx.navigateTo({
-            url: "/pages/color-card-management/add-color-card/add-color-card?type=0",
+            url: "/packageB/pages/color-card-management/add-color-card/add-color-card?type=0",
           }));
         break;
       case "more":
         wx.navigateTo({
-          url: "/pages/color-card-management/batch-management/batch-management?saleStatus=".concat(
+          url: "/packageB/pages/color-card-management/batch-management/batch-management?saleStatus=".concat(
             this.data.saleStatus,
           ),
         });
         break;
       case "type":
         wx.navigateTo({
-          url: "/pages/color-card-management/type-management/type-management",
+          url: "/packageB/pages/color-card-management/type-management/type-management",
         });
     }
   },
@@ -355,12 +355,12 @@ Page({
         (this.data.colorCardInfo.setting.unit = this.data.shareFriendData.unit),
         console.log(this.data.colorCardInfo.setting),
         wx.navigateTo({
-          url: "/pages/color-card-management/color-card-setting/color-card-setting?colorCardInfo=".concat(
+          url: "/packageB/pages/color-card-management/color-card-setting/color-card-setting?colorCardInfo=".concat(
             JSON.stringify(this.data.colorCardInfo.setting),
           ),
         }))
       : wx.navigateTo({
-          url: "/pages/color-card-management/product-share-setting/product-share-setting?shareInfo=".concat(
+          url: "/packageB/pages/color-card-management/product-share-setting/product-share-setting?shareInfo=".concat(
             JSON.stringify(this.data.shareProdInfo.setting),
           ),
         });
@@ -478,7 +478,7 @@ Page({
         this.getCargoList());
   },
   onShareAppMessage: function () {
-    var t = "/pages/color-card-management/preview/preview?goodsId=".concat(
+    var t = "/packageB/pages/color-card-management/preview/preview?goodsId=".concat(
       this.data.shareFriendData.goodsid,
     );
     return {

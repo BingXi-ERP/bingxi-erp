@@ -5,7 +5,7 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
 
 /**
  * 功能 统计某个产品分类下上架与下架两个状态的色卡商品条数（与 ServicesCard.js 同一口径的分类版）
- * 调用方 本文件的 goodsSaleCount，上游为 pages/color-card-management/type-management
+ * 调用方 本文件的 goodsSaleCount，上游为 packageB/pages/color-card-management/type-management
  *   batch-management/batch-management.js 的 queryColorCardCount
  * 入参 t 旧侧查询对象，本仓只认其中 categoryId 一键（本分类内的计数）；
  *   该键在本调用链上必给（调用页从路由参数取到分类标识才发起计数），缺席即点名拒绝，不按全量凑数
@@ -105,7 +105,7 @@ var r = createClass(function t(r) {
       }),
       /**
        * 功能 分类内色卡上下架计数（组装与拒绝口径见本文件 queryCategorySaleCount 注释）
-       * 调用方 pages/color-card-management/type-management/batch-management/batch-management.js
+       * 调用方 packageB/pages/color-card-management/type-management/batch-management/batch-management.js
        * 入参 t 旧侧查询对象（本链上带 categoryId）
        * 传给谁 本文件 queryCategorySaleCount
        * 存什么/存哪里 不落盘，结果只回调用页

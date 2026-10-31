@@ -1,9 +1,0 @@
-{
-  "navigationBarTitleText": "打印预览",
-  "usingComponents": {
-    "van-icon": "../../../miniprogram_npm/@vant/weapp/icon/index",
-    "van-uploader": "../../../miniprogram_npm/@vant/weapp/uploader/index",
-    "van-popup": "../../../miniprogram_npm/@vant/weapp/popup/index",
-    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
-  }
-}

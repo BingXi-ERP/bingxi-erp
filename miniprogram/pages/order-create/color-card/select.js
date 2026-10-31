@@ -91,7 +91,7 @@ Page({
   },
   add: function () {
     wx.navigateTo({
-      url: "/pages/color-card-management/add-color-card/add-color-card?add=true&type=0&productType=".concat(
+      url: "/packageB/pages/color-card-management/add-color-card/add-color-card?add=true&type=0&productType=".concat(
         this.data.productType,
       ),
     });

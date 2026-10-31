@@ -6,7 +6,7 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
     (classCallCheck(this, e),
       (this.setUserHandleLog = function (e, r) {
         // 功能 上报一条店铺操作埋点（libs 份带附加维度对象）
-        // 调用方 libs 与 pages 各操作腿，如 pages/color-card-management/batch-management/batch-management.js
+        // 调用方 libs 与 pages 各操作腿，如 packageB/pages/color-card-management/batch-management/batch-management.js
         // 入参 e 旧侧的操作类型编号（数值），r 可选的附加维度对象
         // 传给谁 本仓 behavior 埋点写口 POST（route-snapshot.txt 第 1077 行），
         //   载荷键按 BehaviorRequest 的 event_type 与 event_data 两字段

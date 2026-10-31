@@ -134,7 +134,7 @@ Component({
         case "edit":
           (wx.removeStorageSync("checkColorItem"),
             wx.navigateTo({
-              url: "/pages/color-card-management/add-color-card/add-color-card?goodsId=".concat(
+              url: "/packageB/pages/color-card-management/add-color-card/add-color-card?goodsId=".concat(
                 s,
                 "&type=1&delType=1",
               ),
@@ -144,14 +144,14 @@ Component({
         case "preview":
           return (
             wx.navigateTo({
-              url: "/pages/color-card-management/preview/preview?goodsId=".concat(s),
+              url: "/packageB/pages/color-card-management/preview/preview?goodsId=".concat(s),
             }),
             void this.triggerEvent("isUpdate", !1)
           );
         case "bottom":
           (ServicesUserLog.servicesUserLog.setUserHandleLog(109),
             wx.navigateTo({
-              url: "/pages/color-card-management/bottom-card/bottom-card?goodsId=".concat(s),
+              url: "/packageB/pages/color-card-management/bottom-card/bottom-card?goodsId=".concat(s),
             }),
             this.triggerEvent("isUpdate", !0));
           break;
@@ -191,7 +191,7 @@ Component({
       var util = e.currentTarget.dataset.goodsid;
       if (this.properties.isSearch)
         wx.navigateTo({
-          url: "/pages/color-card-management/preview/preview?goodsId=".concat(util),
+          url: "/packageB/pages/color-card-management/preview/preview?goodsId=".concat(util),
         });
       else {
         if (!this.data.userAuthList["goods:update"])
@@ -200,7 +200,7 @@ Component({
             icon: "none",
           });
         wx.navigateTo({
-          url: "/pages/color-card-management/add-color-card/add-color-card?goodsId=".concat(
+          url: "/packageB/pages/color-card-management/add-color-card/add-color-card?goodsId=".concat(
             util,
             "&type=1&delType=1",
           ),

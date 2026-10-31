@@ -1457,7 +1457,7 @@ Page({
   },
   addColor: function () {
     wx.navigateTo({
-      url: "/pages/color-card-management/add-color-card/add-color/add-color",
+      url: "/packageB/pages/color-card-management/add-color-card/add-color/add-color",
     });
   },
 });

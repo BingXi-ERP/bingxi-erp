@@ -479,7 +479,7 @@ Page(
       (ServicesUserLog.servicesUserLog.setUserHandleLog(100),
         isVisitor.default.isVisitor().then(function (t) {
           wx.navigateTo({
-            url: "/pages/color-card-management/color-card-management",
+            url: "/packageB/pages/color-card-management/color-card-management",
           });
         }));
     },

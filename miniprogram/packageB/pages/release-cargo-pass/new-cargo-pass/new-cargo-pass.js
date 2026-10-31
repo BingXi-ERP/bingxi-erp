@@ -141,7 +141,7 @@ Page({
   toDetail: function (t) {
     var createForOfIteratorHelper = t.currentTarget.dataset.goodsid;
     wx.navigateTo({
-      url: "/pages/color-card-management/preview/preview?goodsId=".concat(
+      url: "/packageB/pages/color-card-management/preview/preview?goodsId=".concat(
         createForOfIteratorHelper,
       ),
     });

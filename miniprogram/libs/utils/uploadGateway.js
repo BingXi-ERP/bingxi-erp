@@ -5,7 +5,7 @@
  *   一样获得响应归一化、CSRF 一次性令牌取用与轮换、403 重放与写请求串行化
  * 调用方：components/upload-img/upload-img.js、components/panel-img/panel-img.js、
  *   packageB 的 edit-info 与 edit-shop 与 accountsetting/QR-code、pages/index、
- *   pages/color-card 与 pages/color-card-management 的上传站点、
+ *   pages/color-card 与 packageB/pages/color-card-management 的上传站点、
  *   pages/register/submission 与 writeApplyInfo、pages/search-img/search
  * 入参：spec { url, filePath, name, formData, header }
  *   url 完整地址、filePath 本地临时文件、name 表单文件字段名（默认 file）、
@@ -106,7 +106,7 @@ function upload(spec) {
  * wx.uploadFile 的回调式替身（调用点迁移用）
  * 功能：保持 wx.uploadFile({url, filePath, name, header, formData, success, fail}) 的入参形态，
  *   但实际发送交给 upload，即经 apiGateway.requestContract 走契约层
- * 调用方：pages/color-card 与 pages/color-card-management 的上传站点、pages/print 与
+ * 调用方：pages/color-card 与 packageB/pages/color-card-management 的上传站点、pages/print 与
  *   pages/search-img/search 与 pages/register 的申请资料页等沿用回调式写法的调用点
  * 入参：spec 同 wx.uploadFile，另 success(res) 收到的 res 是归一化后的响应体对象
  *   （不是 wx 的原始回调对象，因此调用点原先的 JSON.parse(x.data) 一律改为直接用 res）

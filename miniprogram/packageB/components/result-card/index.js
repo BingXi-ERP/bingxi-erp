@@ -95,7 +95,7 @@ Component({
     onNavTo: function (a) {
       var e = a.currentTarget.dataset.goodsid,
         t = a.currentTarget.dataset.mainproduct,
-        o = "/pages/color-card-management/preview/preview?goodsId="
+        o = "/packageB/pages/color-card-management/preview/preview?goodsId="
           .concat(e, "&showShare=")
           .concat(t)
           .concat(this.data.plat ? "&searchId=" + this.data.searchId : "");

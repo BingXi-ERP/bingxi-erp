@@ -330,8 +330,8 @@ Page({
             wx.setStorageSync("printParams", objectSpread2),
             n.data.newPrintType && 1 == n.data.newPrintType
               ? (console.log("新打印"),
-                (i = "/pages/color-card-management/printing-new/printing-new"))
-              : (console.log("旧打印"), (i = "/pages/color-card-management/printing/printing")),
+                (i = "/packageB/pages/color-card-management/printing-new/printing-new"))
+              : (console.log("旧打印"), (i = "/packageB/pages/color-card-management/printing/printing")),
             wx.navigateTo({
               url: ServicesPrint,
               complete: function () {

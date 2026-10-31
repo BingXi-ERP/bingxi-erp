@@ -99,7 +99,7 @@ Page({
   onJump: function (a) {
     var e = a.currentTarget.dataset.goodsId;
     wx.navigateTo({
-      url: "/pages/color-card-management/preview/preview?goodsId=" + e,
+      url: "/packageB/pages/color-card-management/preview/preview?goodsId=" + e,
     });
   },
 });

@@ -548,7 +548,7 @@ Page({
         },
         function () {
           wx.navigateTo({
-            url: "/pages/color-card-management/print-cloth-head/print-format/print-format?orderId="
+            url: "/packageB/pages/color-card-management/print-cloth-head/print-format/print-format?orderId="
               .concat(e, "&customMobile=")
               .concat(o, "&&billingId=")
               .concat(mta_analysis),

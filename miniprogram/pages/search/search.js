@@ -501,10 +501,10 @@ Page({
       ? ((this.data.colorCardInfo.setting.price = this.data.shareFriendData.price),
         (this.data.colorCardInfo.setting.unit = this.data.shareFriendData.unit),
         wx.navigateTo({
-          url: "/pages/color-card-management/color-card-setting/color-card-setting",
+          url: "/packageB/pages/color-card-management/color-card-setting/color-card-setting",
         }))
       : wx.navigateTo({
-          url: "/pages/color-card-management/product-share-setting/product-share-setting",
+          url: "/packageB/pages/color-card-management/product-share-setting/product-share-setting",
         });
   },
   getQRCode: function (t) {
@@ -1465,7 +1465,7 @@ Page({
       e =
         "cargoPass" === this.data.searchType
           ? "packageB/pages/release-cargo-pass/index"
-          : "pages/color-card-management/color-card-management",
+          : "packageB/pages/color-card-management/color-card-management",
       a = t.find(function (t) {
         return t.route === e;
       });
@@ -1561,7 +1561,7 @@ Page({
                 : this.getCardList(this.data.input.value)));
   },
   onShareAppMessage: function () {
-    var t = "/pages/color-card-management/preview/preview?goodsId=".concat(
+    var t = "/packageB/pages/color-card-management/preview/preview?goodsId=".concat(
       this.data.shareFriendData.goodsid,
     );
     return {

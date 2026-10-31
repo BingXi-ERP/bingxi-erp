@@ -197,7 +197,7 @@ Component({
         case "edit":
           (wx.removeStorageSync("checkColorItem"),
             wx.navigateTo({
-              url: "/pages/color-card-management/add-color-card/add-color-card?goodsId=".concat(
+              url: "/packageB/pages/color-card-management/add-color-card/add-color-card?goodsId=".concat(
                 r,
                 "&type=1&delType=1",
               ),
@@ -207,14 +207,14 @@ Component({
         case "preview":
           return (
             wx.navigateTo({
-              url: "/pages/color-card-management/preview/preview?goodsId=".concat(r),
+              url: "/packageB/pages/color-card-management/preview/preview?goodsId=".concat(r),
             }),
             void this.triggerEvent("isUpdate", !1)
           );
         case "bottom":
           (ServicesUserLog.servicesUserLog.setUserHandleLog(109),
             wx.navigateTo({
-              url: "/pages/color-card-management/bottom-card/bottom-card?goodsId=".concat(r),
+              url: "/packageB/pages/color-card-management/bottom-card/bottom-card?goodsId=".concat(r),
             }),
             this.triggerEvent("isUpdate", !0));
           break;
@@ -234,7 +234,7 @@ Component({
           break;
         case "color":
           wx.navigateTo({
-            url: "/pages/color-card-management/add-colour/add-colour?goodsId=".concat(r),
+            url: "/packageB/pages/color-card-management/add-colour/add-colour?goodsId=".concat(r),
           });
           break;
         case "share":
@@ -263,14 +263,14 @@ Component({
           0 == t.tapIndex
             ? (console.log("打印标签"),
               wx.navigateTo({
-                url: "/pages/color-card-management/print/print?goodsId="
+                url: "/packageB/pages/color-card-management/print/print?goodsId="
                   .concat(ServicesUserLog, "&&newPrintType=")
                   .concat(util),
               }))
             : 2 == t.tapIndex
               ? (console.log("打印布头"),
                 wx.navigateTo({
-                  url: "/pages/color-card-management/print-cloth-head/print-cloth-head?goodsId="
+                  url: "/packageB/pages/color-card-management/print-cloth-head/print-cloth-head?goodsId="
                     .concat(ServicesUserLog, "&&newPrintType=")
                     .concat(util),
                 }))
@@ -331,11 +331,11 @@ Component({
         app = ServicesUserLog.parentid;
       if (this.properties.isSearch)
         wx.navigateTo({
-          url: "/pages/color-card-management/preview/preview?goodsId=".concat(util),
+          url: "/packageB/pages/color-card-management/preview/preview?goodsId=".concat(util),
         });
       else if (this.properties.searchMode && app > 0)
         wx.navigateTo({
-          url: "/pages/color-card-management/add-bottom-card/add-bottom-card?id="
+          url: "/packageB/pages/color-card-management/add-bottom-card/add-bottom-card?id="
             .concat(util, "&goodsId=")
             .concat(app),
         });
@@ -346,7 +346,7 @@ Component({
             icon: "none",
           });
         wx.navigateTo({
-          url: "/pages/color-card-management/add-color-card/add-color-card?goodsId=".concat(
+          url: "/packageB/pages/color-card-management/add-color-card/add-color-card?goodsId=".concat(
             util,
             "&type=1&delType=1",
           ),

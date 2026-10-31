@@ -160,7 +160,7 @@ Page({
       app = getCurrentPages(),
       o = [
         "pages/order-create/offline/create",
-        "pages/color-card-management/print-cloth-head/print-format/print-format",
+        "packageB/pages/color-card-management/print-cloth-head/print-format/print-format",
         "packageB/pages/sales-return/index",
       ];
     if (

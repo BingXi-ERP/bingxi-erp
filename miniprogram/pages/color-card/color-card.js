@@ -90,7 +90,7 @@ Page({
   colorActionTap: function (t) {
     var a = t.currentTarget.dataset.goodsid;
     wx.navigateTo({
-      url: "/pages/color-card-management/add-colour/add-colour?goodsId=".concat(a),
+      url: "/packageB/pages/color-card-management/add-colour/add-colour?goodsId=".concat(a),
     });
   },
   changeStatus: function (e) {
