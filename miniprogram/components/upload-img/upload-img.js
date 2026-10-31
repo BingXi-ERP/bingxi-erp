@@ -1,3 +1,15 @@
+/**
+ * 图片上传组件
+ * ---------------------------------------------------------------
+ * 功能：宿主页面选图并逐张上传，把可显示地址回抛给宿主的 uoloadImg 事件
+ * 调用方：pages 与 packageB 里声明 <upload-img> 的页面（由各自 wxml 引入）
+ * 入参：组件属性 uploadPiece 与 filePath 与 uploadType；uploadType 大于 -1 走图片件通道，否则走通用文件通道
+ * 传给谁：libs/utils/uploadGateway.js 的 upload（内部由 apiGateway.requestContract 发出），
+ *   不再直发 wx.uploadFile，也不自拼 Authorization 头——凭据是后端 httpOnly Cookie，
+ *   由 wx 网络层自动维护，JS 侧读 storage 的 token 永远拿到空值，属凭据冒充登录态
+ * 存什么：不存任何凭据，只在内存里维护已上传地址表
+ * 存哪里：无（组件 data 与宿主页面事件载荷）
+ */
 var t,
   a,
   e,
@@ -6,6 +18,7 @@ var t,
   o,
   createForOfIteratorHelper = require("../../@babel/runtime/helpers/createForOfIteratorHelper"),
   util = require("../../libs/utils/util"),
+  uploadGateway = require("../../libs/utils/uploadGateway.js"),
   app = getApp(),
   l = function (t) {
     return Math.floor((t / 750) * wx.getSystemInfoSync().windowWidth);
@@ -164,77 +177,71 @@ Component({
         mediaType: ["image"],
         sourceType: [t],
         success: function (t) {
-          var a = t.tempFiles;
+          var files = t.tempFiles || [];
           setTimeout(function () {
             wx.showLoading({
               title: "上传中",
             });
           }, 500);
-          var app,
-            l = 0,
-            c = createForOfIteratorHelper(a);
-          try {
-            for (c.s(); !(h = c.n()).done;) {
-              var g = app.value;
-              wx.uploadFile({
-                url: d,
-                filePath: g.tempFilePath,
-                name: "file",
-                header: {
-                  "Content-Type": "multipart/form-data",
-                  Authorization: wx.getStorageSync("token"),
-                  terminalSource: 6,
-                  terminalType: 81,
-                },
-                formData: {
-                  type: i,
-                  filePath: s,
-                },
-                success: function (t) {
-                  var s = JSON.parse(t.data);
-                  if (0 === s.code) {
+          var uploaded = 0;
+          /** 全部文件处理完（成功或失败）后收起 loading，失败也计数，避免卡住不回落 */
+          var settleOne = function () {
+            uploaded += 1;
+            if (uploaded === files.length) {
+              setTimeout(function () {
+                (console.log("上传完成"), wx.hideLoading());
+              }, 500);
+            }
+          };
+          /** 把当前 showImgList 的地址表回抛给宿主页面 */
+          var emitList = function () {
+            var list = u.data.showImgList,
+              urls = [];
+            for (var k = 0; k < list.length; k++) urls.push(list[k].text);
+            u.triggerEvent("uoloadImg", {
+              showImgList: urls,
+            });
+          };
+          for (var pos = 0; pos < files.length; pos++) {
+            (function (file) {
+              uploadGateway
+                .upload({
+                  url: d,
+                  filePath: file.tempFilePath,
+                  name: "file",
+                  header: {
+                    terminalType: 81,
+                  },
+                  formData: {
+                    type: i,
+                    filePath: s,
+                  },
+                })
+                .then(function (res) {
+                  if (res && res.code === 0) {
                     (o.push({
-                      text: util.utils.replImage(s.data),
+                      text: util.utils.replImage(res.data),
                     }),
                       o.length > e && (o.length = e),
                       u.setData({
                         showImgList: o,
                       }));
-                    var i,
-                      app = [],
-                      d = createForOfIteratorHelper(u.data.showImgList);
-                    try {
-                      for (d.s(); !(i = d.n()).done;) {
-                        var c = i.value;
-                        app.push(c.text);
-                      }
-                    } catch (t) {
-                      d.e(t);
-                    } finally {
-                      d.f();
-                    }
-                    u.triggerEvent("uoloadImg", {
-                      showImgList: app,
-                    });
+                    emitList();
                   } else
                     wx.showToast({
-                      title: s.msg,
+                      title: (res && res.msg) || "上传失败",
                       icon: "none",
                     });
-                  (u.getWidth(),
-                    (l += 1) &&
-                      l === a.length &&
-                      setTimeout(function () {
-                        (console.log("上传完成"), wx.hideLoading());
-                      }, 500));
-                },
-                fail: function () {},
-              });
-            }
-          } catch (t) {
-            c.e(t);
-          } finally {
-            c.f();
+                  (u.getWidth(), settleOne());
+                })
+                .catch(function (err) {
+                  wx.showToast({
+                    title: (err && err.errMsg) || "上传失败",
+                    icon: "none",
+                  });
+                  (u.getWidth(), settleOne());
+                });
+            })(files[pos]);
           }
         },
         fail: function () {
