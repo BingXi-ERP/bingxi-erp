@@ -501,8 +501,8 @@ NODE
 #   是某条声明路由的前缀，即动态拼接场景，但前缀必须在段边界断开，且模板占位符 ${ 之前的部分
 #   同样受段边界约束。前缀放行逐条打印并计数，不静默吞。
 mp_routes() {
-  local root="$1"
-  node - "$root" "$MP_ROUTE_FLOOR" <<'NODE'
+  local root="$1" out rc
+  out="$(node - "$root" "$MP_ROUTE_FLOOR" <<'NODE'
 const fs = require('fs');
 const path = require('path');
 const root = process.argv[2];
@@ -617,7 +617,20 @@ if (dead.length > 0) {
 console.log('MP_ROUTE_OK urlLiterals=' + literals + ' exactOk=' + exactOk + ' prefixOk=' + prefixOk.length);
 process.exit(0);
 NODE
-  return $?
+)"
+  rc=$?
+  [ -n "$out" ] && printf '%s\n' "$out"
+  # 判定器退 9 是它自己失效（app.json 不可读、扫空、抽到零条字面量），必须走 TOOL_BUG 通道，
+  # 不能混进普通判红，否则末行哨兵会把"结论不可信"报成"有死链"
+  if [ "$rc" -eq 9 ]; then
+    tool_bug "路由对账判定器自身失效，第七道结论按不可信处理"
+    return 1
+  fi
+  if [ "$rc" -ne 0 ]; then
+    red "有跳转路由字面量落不到 app.json 声明页"
+    return 1
+  fi
+  return 0
 }
 
 if [ "$SELF_TEST" = 1 ]; then
