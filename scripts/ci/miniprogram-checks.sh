@@ -227,15 +227,38 @@ JSON
   MP_EXPOSURE_FLOOR=2 mp_exposure "$tmp/miniprogram" >/dev/null 2>&1; rc_x=$?
   rm -rf "$tmp"
 
+  # 第五道双向探针：暴露面判的是 git 可见面，不是文件系统。正反两侧必须同轮验住，
+  # 因为只验正侧会放过"把扫描面收成零文件"的假绿，只验反侧会放过"入库面漏扫"的假红。
+  # 正侧 入库文件带公网 IP 必判红 退 1；反侧 同一 IP 移进被 gitignore 的本地真值必判绿 退 0
+  local gtmp rc_g1 rc_g2
+  gtmp="$(mktemp -d "${TMPDIR:-/tmp}/mp-selftest-git.XXXXXX")" || { tool_bug "mktemp 失败"; return 1; }
+  mkdir -p "$gtmp/miniprogram"
+  printf 'module.exports = { bingxiHost: "https://203.0.113.10" };\n' > "$gtmp/miniprogram/envConfig.js"
+  if git -C "$gtmp" init -q >/dev/null 2>&1 && git -C "$gtmp" status >/dev/null 2>&1; then
+    printf '/miniprogram/mpHost.local.js\n' > "$gtmp/.gitignore"
+    MP_EXPOSURE_FLOOR=1 mp_exposure "$gtmp/miniprogram" >/dev/null 2>&1; rc_g1=$?
+    printf 'module.exports = { bingxiHost: require("./mpHost.local.js").host };\n' > "$gtmp/miniprogram/envConfig.js"
+    printf 'module.exports = { host: "https://203.0.113.10" };\n' > "$gtmp/miniprogram/mpHost.local.js"
+    MP_EXPOSURE_FLOOR=1 mp_exposure "$gtmp/miniprogram" >/dev/null 2>&1; rc_g2=$?
+    if [ "$rc_g1" -eq 1 ] && [ "$rc_g2" -eq 0 ]; then
+      caught=$((caught + 1))
+    else
+      missed="$missed exposure_scope(tracked=$rc_g1 ignored=$rc_g2)"
+    fi
+  else
+    missed="$missed exposure_git夹具建不起来"
+  fi
+  rm -rf "$gtmp"
+
   # 语法探针靠 node --check 的非零退出码；页面对账与端点对账靠判定器自己的非零退出码；
   # 暴露面必须恰好退 1（判红），退 9 说明是地板误伤，不算抓到泄露
   [ "$rc_s" -ne 0 ] && caught=$((caught + 1)) || missed="$missed syntax"
   [ "$rc_p" -ne 0 ] && caught=$((caught + 1)) || missed="$missed pages"
   [ "$rc_e" -ne 0 ] && caught=$((caught + 1)) || missed="$missed endpoints"
   [ "$rc_x" -eq 1 ] && caught=$((caught + 1)) || missed="$missed exposure(rc=$rc_x)"
-  say "SELFTEST caught=$caught/4${missed:+ missed:$missed}"
-  if [ "$caught" -eq 4 ]; then
-    say "MP_DETECTOR_OK 四道反向探针全部被抓到"
+  say "SELFTEST caught=$caught/5${missed:+ missed:$missed}"
+  if [ "$caught" -eq 5 ]; then
+    say "MP_DETECTOR_OK 五道反向探针全部被抓到"
     return 0
   fi
   tool_bug "反向探针有没被抓到的道，判定器无检测力，其绿不可信"
@@ -310,14 +333,42 @@ const IPV4 = /(?<![\w.])(\d{1,3}\.){3}\d{1,3}(?![\w.])/g;
 const SECRET_KEY = /(?:app_?secret|appsecret|private_?key|access_?key_?secret|secret_?key)\s*[:=]\s*['"]([^'"]{8,})['"]/i;
 const PHONE = /(?<!\d)1[3-9]\d{9}(?!\d)/g;
 const files = [];
-(function walk(dir) {
-  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (skip.has(e.name)) continue;
-    const full = path.join(dir, e.name);
-    if (e.isDirectory()) walk(full);
-    else if (exts.has(path.extname(e.name))) files.push(full);
+// 扫描面取 git 可见面而非文件系统：本道判的是「会不会把泄露物推进公开仓库」，而 gitignore
+//   排除的本地真值（如 miniprogram/mpHost.local.js 里的后端主机）永不进仓库，CI 检出里也
+//   根本没有该文件。按文件系统走会让「本地能跑」与「本地全绿」互斥，逼人把真值写回仓库面。
+// 取不到 git 时退回文件系统全扫并点名退回，退回态的 scanned 仍受地板约束，不静默放宽。
+let scope = 'git';
+let gitFiles = null;
+try {
+  const { execFileSync } = require('child_process');
+  gitFiles = execFileSync(
+    'git',
+    ['-C', root, 'ls-files', '--cached', '--others', '--exclude-standard', '-z'],
+    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+  )
+    .split('\0')
+    .filter((p) => p.length > 0);
+} catch (e) {
+  scope = 'filesystem';
+}
+if (scope === 'git') {
+  for (const rel of gitFiles) {
+    const base = rel.split('/').pop();
+    if (rel.split('/').some((seg) => skip.has(seg))) continue;
+    if (!exts.has(path.extname(base))) continue;
+    const full = path.join(root, rel);
+    if (fs.existsSync(full) && fs.statSync(full).isFile()) files.push(full);
   }
-})(root);
+} else {
+  (function walk(dir) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (skip.has(e.name)) continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (exts.has(path.extname(e.name))) files.push(full);
+    }
+  })(root);
+}
 const ipHits = [];
 const secretHits = [];
 const phoneHits = [];
@@ -338,7 +389,21 @@ for (const f of files) {
     for (const p of line.match(PHONE) || []) phoneHits.push(rel + ':' + (i + 1) + ' ' + p);
   });
 }
-console.log('MP_EXPOSURE scanned=' + files.length + ' publicIp=' + ipHits.length + ' secretLiteral=' + secretHits.length + ' phoneLiteral=' + phoneHits.length);
+console.log(
+  'MP_EXPOSURE scanned=' +
+    files.length +
+    ' scope=' +
+    scope +
+    ' publicIp=' +
+    ipHits.length +
+    ' secretLiteral=' +
+    secretHits.length +
+    ' phoneLiteral=' +
+    phoneHits.length
+);
+if (scope === 'filesystem') {
+  console.log('MP_EXPOSURE_NOTE scope=filesystem 取不到 git，本轮按文件系统全扫，泄露面只会判宽不会判窄');
+}
 if (files.length < floor) {
   console.log('TOOL_BUG 暴露面扫描只看到 ' + files.length + ' 个文件，低于地板 ' + floor + '，其"零命中"不可信');
   process.exit(9);
