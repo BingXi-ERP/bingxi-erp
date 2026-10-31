@@ -1,6 +1,27 @@
+/**
+ * 手机号绑定与更改页（packageB）
+ * ---------------------------------------------------------------
+ * 功能：用短信验证码绑定或更换本机手机号
+ * 调用方：packageB/pages/personal-center/setting/accountsetting 的手机号入口（wxml 绑定 toChange）
+ * 入参：页面参数 type（add 或其它）与 mobile，以及验证码输入
+ * 传给谁：提交经 ServicesIndex.changeMobile（POST 旧路径 /app-api/setting/changeMobile，
+ *   仓内权威面 frontend/scripts/route-snapshot.txt 1821 条内无任何短信与换绑手机号端点，
+ *   原样保留并登记待拍板，不改成像）；档案回读经 libs/utils/login.js 的 getUserInfo 走网关
+ *   打 GET /api/v1/erp/users/me（快照:968）
+ * 存什么：只由 login.js 落用户档案键
+ * 存哪里：wx.storage（键由 libs/utils/login.js 定义）
+ *
+ * 本文件的 getUserInfo 原是全仓最后一处 wx.setStorageSync("token", ...)，还按
+ * app.environment 把同一值分写 devToken 与 demoToken 与 productionToken。
+ * 三条都必假：后端 users/me 的出参 UserResponse 没有 token 与 loginToken 与 logoutFlag 与
+ * shopId 与 nickName 与 headImg 与 resCodeList 这些字段
+ * （backend/src/handlers/user_handler.rs:108 到 123 只有 id 与 username 与 real_name 与 avatar
+ * 与 email 与 phone 与 role_id 与 department_id 与 is_active 与 created_at 与 department_name
+ * 与 role_names），凭据是后端写入的 httpOnly Cookie（backend/src/middleware/auth.rs），
+ * 所以这批写入落盘的永远是 undefined，属凭据冒充登录态，整段换成会话口径。
+ */
 var ServicesIndex = require("../../../../../libs/services/ServicesIndex.js").ServicesIndex,
-  ServicesUser = require("../../../../../libs/services/ServicesUser.js").servicesUser,
-  util = require("../../../../../libs/utils/util.js").utils,
+  login = require("../../../../../libs/utils/login.js").login,
   app = getApp();
 Page({
   data: {
@@ -61,42 +82,21 @@ Page({
         duration: 1e3,
       });
   },
+  /**
+   * 换绑成功后回读档案
+   * 调用方：本页 toChange 的成功分支
+   * 入参：无
+   * 传给谁：libs/utils/login.js 的 getUserInfo -> ServicesUser.getUserInfo -> 传输层 ->
+   *   apiGateway 的 requestContract，打到 GET /api/v1/erp/users/me（快照:968）
+   * 存什么：用户档案键（id 与 nickName 与 fullName 与 mobile 与 avatar 与 myShopId 与
+   *   resCodeList 与 userType），由 login.js 单点落盘
+   * 存哪里：wx.storage
+   * 本方法原先自己写 token 与 devToken 与 demoToken 与 productionToken 与 loginToken 与
+   * logoutFlag 与 wxId 与 wxOpenId，其中 token 一族是全仓最后一处凭据写入，
+   * 值取自 UserResponse 并不存在的字段，落盘永远是 undefined，已全部退场
+   */
   getUserInfo: function () {
-    ServicesUser.getUserInfo({}).then(function (e) {
-      if (0 === e.code) {
-        switch (
-          ((app.globalData.userInfo = e.data),
-          wx.setStorageSync("wxOpenId", e.data.wxOpenId),
-          wx.setStorageSync("wxId", e.data.wxId),
-          app.environment)
-        ) {
-          case "dev":
-            wx.setStorageSync("devToken", e.data.token);
-            break;
-          case "demo":
-            wx.setStorageSync("demoToken", e.data.token);
-            break;
-          case "production":
-            wx.setStorageSync("productionToken", e.data.token);
-        }
-        (wx.setStorageSync("token", e.data.token),
-          wx.setStorageSync("loginToken", e.data.loginToken),
-          wx.setStorageSync("logoutFlag", e.data.logoutFlag),
-          wx.setStorageSync("id", e.data.id),
-          wx.setStorageSync("myShopId", e.data.shopId),
-          wx.setStorageSync("nickName", e.data.nickName),
-          wx.setStorageSync("mobile", e.data.mobile),
-          "" == e.data.headImg
-            ? wx.setStorageSync("avatar", util.addDefaultAvatar())
-            : wx.setStorageSync("avatar", e.data.headImg),
-          wx.setStorageSync("fullName", e.data.fullName),
-          wx.setStorageSync("resCodeList", e.data.resCodeList));
-      } else
-        wx.showToast({
-          title: e.msg,
-          icon: "none",
-        });
-    });
+    return login.getUserInfo();
   },
   onLoad: function (e) {
     (null != e.type &&
