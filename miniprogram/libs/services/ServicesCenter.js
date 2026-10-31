@@ -13,10 +13,34 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
       (this.accountList = function (t) {
         return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/users"), t);
       }),
+      /**
+       * 功能 读取本组织岗位（角色）列表，供子账号选岗
+       * 调用方 本文件 delRole 之外的三处读方，即 packageB pages personal-center children 下的
+       *   children.js 与 job.js 与 edit-children.js 的 getRoleList
+       * 入参 t 旧侧的分页对象（pageNo 与 pageSize），本仓该口不出分页、一次返全量，故不向后端转译分页键
+       * 传给谁 本仓角色列表读口（在册 GET 方法，路径见交付报告映射表），出参是 RoleListResponse 的
+       *   roles 数组（backend 侧 role_handler.rs）
+       * 存什么 只在响应对象的 data 上补一个与旧侧同名的 content 别名，值就是后端 roles 数组本体，
+       *   不复制不裁剪；出参里没有 roles 数组即点名拒绝，不放空让读方拿 undefined
+       * 存哪里 不写本地缓存
+       * 形态差异 旧侧随列表带 menuIds 与 menuNames（岗位勾选的菜单权限树），本仓角色不持菜单表，
+       *   该两键不出，已登记待拍板
+       */
       (this.roleList = function (t) {
-        return request.POST(
-          "".concat(app.config.bingxiHost, "/app-api/shop/user/role/listWithMenu"),
-          t,
+        return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/roles"), {}).then(
+          function (res) {
+            if (res && res.code === 0) {
+              if (!res.data || !Array.isArray(res.data.roles)) {
+                return {
+                  code: 500,
+                  msg: "角色列表出参缺 roles 数组，与本仓契约不符",
+                  data: {},
+                };
+              }
+              res.data.content = res.data.roles;
+            }
+            return res;
+          },
         );
       }),
       (this.authList = function (t) {
@@ -25,11 +49,18 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
       (this.addOrChangeRole = function (t, o) {
         return request.POST(o, t);
       }),
+      /**
+       * 功能 删除一个岗位（本仓即角色）
+       * 调用方 packageB pages personal-center children add-job 的 delRole，其入参对象只有 roleId 一键
+       * 入参 t.roleId 岗位标识，从入参取出后内联进路径
+       * 传给谁 本仓角色删除口（在册 DELETE 方法，按 id 定位，路径见交付报告映射表），
+       *   旧侧是 POST 加请求体，本仓是 DELETE 且无请求体；服务端另有两道硬门，
+       *   非 admin 一律拒（403）与系统内置角色拒删（backend 侧 role_handler.rs 的 delete_role）
+       * 存什么 不落盘
+       * 存哪里 无
+       */
       (this.delRole = function (t) {
-        return request.POST(
-          "".concat(app.config.bingxiHost, "/app-api/user/subAccount/deleteRole"),
-          t,
-        );
+        return request.DELETE("".concat(app.config.bingxiHost, "/api/v1/erp/roles/", t.roleId), {});
       }),
       (this.createChildrenQRCode = function (t) {
         return request.GET(
