@@ -138,10 +138,11 @@
         <van-button block round bind:tap="contact" type="info">咨询下单</van-button>
     </view>
     <van-popup round position="bottom" show="{{showPhone}}">
+        <!-- 联系人号码为占位演示号：公开仓库不落地他人真实手机号，真实联系号应改由接口下发后渲染 -->
         <view class="phone-box">
-            <view bind:tap="callPhone" class="phone" data-phone="13631457237">欧阳晓恩 136 3145 7237</view>
-            <view bind:tap="callPhone" class="phone" data-phone="19866169906">秦亦禧 198 6616 9906</view>
-            <view bind:tap="callPhone" class="phone" data-phone="13647199172">侯名赐 136 4719 9172</view>
+            <view bind:tap="callPhone" class="phone" data-phone="13800000001">欧阳晓恩 138 0000 0001</view>
+            <view bind:tap="callPhone" class="phone" data-phone="13800000002">秦亦禧 138 0000 0002</view>
+            <view bind:tap="callPhone" class="phone" data-phone="13800000003">侯名赐 138 0000 0003</view>
         </view>
         <view bind:tap="cancel" class="cancel-btn">取消</view>
     </van-popup>

@@ -204,7 +204,8 @@ Page({
       return !a.perm || e.data.userAuthList[a.perm];
     });
     var util = wx.getStorageSync("mobile");
-    (("19700000153" != util && util) || login.splice(0, 1),
+    // 演示账号特判占位号：真实演示号不入公开仓库面，命中占位号即无特判生效
+    (("13800000000" != util && util) || login.splice(0, 1),
       this.setData({
         panel: o,
         panelMuen: login,

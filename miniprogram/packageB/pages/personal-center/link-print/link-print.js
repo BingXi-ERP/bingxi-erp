@@ -220,7 +220,8 @@ Page({
   confirmR: function () {
     var t = this;
     wx.setClipboardData({
-      data: "gc13178391565",
+      // 厂商侧服务号占位：真实号码不再入公开仓库面，如需可达此入口应由接口下发
+      data: "gc13800000000",
       success: function (e) {
         (t.cancelR(),
           wx.showToast({
