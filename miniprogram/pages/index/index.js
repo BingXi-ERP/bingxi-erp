@@ -206,7 +206,7 @@ Page(
               url: "/packageA/pages/".concat(this.data.advertisData.linkAddress, "/index"),
             })
           : wx.navigateTo({
-              url: "/packageA/pages/web?url=".concat(this.data.advertisData.linkAddress),
+              url: "/packageA/pages/web/index?url=".concat(this.data.advertisData.linkAddress),
             }));
     },
     onClickBanner: function () {

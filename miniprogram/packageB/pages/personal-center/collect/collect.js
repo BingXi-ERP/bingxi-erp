@@ -45,17 +45,19 @@ Page({
   },
   toSearch: function (t) {
     wx.navigateTo({
-      url: "/pages/personal-center/collect/search/search?pageType=" + t.target.id,
+      url: "/packageB/pages/personal-center/collect/search/search?pageType=" + t.target.id,
     });
   },
-  toShop: function (t) {
-    (wx.removeStorageSync("paramShopId"),
-      wx.setStorageSync("paramShopId", t.currentTarget.id),
-      wx.switchTab({
-        url: "/pages/component/index",
-        success: function (t) {},
-      }));
-  },
+  // 功能 原 toShop 是收藏档口列表项的进入店铺入口，入参 t.currentTarget.id 是档口 id，
+  //   落盘键 paramShopId 供店铺页取用，传给 wx.switchTab。本文件已无该函数，
+  //   app.json 声明的 191 条路由里没有访客侧店铺页，原落点 /pages/component/index
+  //   不在声明集也不在磁盘，paramShopId 全仓零读方，wx.switchTab 又只能落 tabBar
+  //   三页之一，点击只会让微信报 page not found 而页面不动，入口从未接通，
+  //   故随 tpl/stall-card/stallcard.wxml 的按钮一并退场，店铺页迁入后按声明路由接回。
+  // 调用方 原由本目录 tpl 的按钮 bindtap 触发，现本页 wxml 与模板均无该绑定。
+  // 入参 无。传给谁 无。
+  // 存什么 本页只渲染色卡与档口收藏列表，退场后不再写任何本地键。
+  // 存哪里 不新增持久化，页面路径 packageB/pages/personal-center/collect/collect 不变。
   onLoad: function (t) {
     wx.hideShareMenu();
   },

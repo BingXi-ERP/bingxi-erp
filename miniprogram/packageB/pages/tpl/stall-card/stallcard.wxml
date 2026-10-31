@@ -9,7 +9,14 @@
                 <image class="picture" mode="aspectFit" src="{{item.ownerHeadImg}}?x-oss-process=image/resize,w_266"></image>
             </view>
             <view class="stall-list-info">
-                <view class="stall-list-info-hd">{{item.shopName}}<button bindtap="toShop" id="{{item.id}}" type="">进入店铺</button>
+                <!-- 原此处有 bindtap 到 toShop 的进入店铺按钮，入参是档口 id，跳转落点
+                /pages/component/index 不在 app.json 声明集也不在磁盘，paramShopId 全仓零读方，
+                且 wx.switchTab 只能落 tabBar 三页之一，入口从未接通，故按钮整体退场。
+                调用方本模板仅被 packageB/pages/personal-center/collect/collect.wxml 引入，
+                同目录 stall-search.wxml 是另一份模板，不受本次退场影响。
+                存什么 本模板只渲染档口收藏列表，不写任何本地键。
+                待访客侧店铺页与其读口迁入本仓后，按 app.json 声明路由重新接回该入口。 -->
+                <view class="stall-list-info-hd">{{item.shopName}}
                 </view>
                 <view class="stall-list-info-bd">
                     <text>电话：{{item.telephone}}</text>
