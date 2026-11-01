@@ -2,6 +2,7 @@ var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   slicedToArray = require("../../../@babel/runtime/helpers/slicedToArray"),
   mta_analysis = t(require("../../../utils/mta_analysis.js")),
   getWxInfo = t(require("../../../libs/utils/getWxInfo")),
+  isVisitor = t(require("../../../libs/utils/isVisitor")),
   throttle = t(require("../../../utils/throttle")),
   login = require("../../../libs/utils/login.js"),
   toast = t(require("../../../miniprogram_npm/@vant/weapp/toast/toast")),
@@ -117,17 +118,21 @@ Page({
   onReady: function () {},
   onShow: function () {
     this.tabBar();
-    var t = this.data.activedIndex;
+    var t = this.data.activedIndex,
+      self = this;
     (this.setData({
       nowPageNum: 1,
     }),
-      wx.getStorageSync("token") &&
-        (this.getNewPrintType(),
-        0 == t
-          ? this.getShopOrderList("", this.data.chooseStatus)
-          : 1 == t
-            ? this.getShopOrderList("", 10)
-            : 2 == t && this.getShopOrderList("", 30)));
+      // 登录门：判据为后端 GET /api/v1/erp/users/me 的回读结果，本地 token 键已不是判据
+      // （全仓无任何一处写 storage 的 token，原写法等于订单列表永不加载）
+      isVisitor.default.isVisitor().then(function () {
+        (self.getNewPrintType(),
+          0 == t
+            ? self.getShopOrderList("", self.data.chooseStatus)
+            : 1 == t
+              ? self.getShopOrderList("", 10)
+              : 2 == t && self.getShopOrderList("", 30));
+      }));
   },
   banScroll: function () {},
   chooseModalDisplayCon: function () {

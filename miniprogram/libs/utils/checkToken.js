@@ -48,6 +48,27 @@ var n = createClass(function e() {
     });
   };
 
+  /**
+   * 登录门的唯一入口：判据以后端回读为准，本地键存在不等于已登录
+   * 入参：无
+   * 传给谁：libs/utils/isVisitor.js 的登录门禁（各页面与组件经它消费本方法）
+   * 存什么：会话确认成立时由 apiGateway.verifySession 刷新 bingxiSession 的 verifiedAt；
+   *   会话不成立（401）时由 checkLogin -> clearLoginFlag 清会话、令牌与用户档案缓存
+   * 存哪里：wx.storage、app.globalData
+   *
+   * 判定分支（与 backend/src/routes/iam.rs 的 /users/me 与 middleware_bootstrap.rs 的层序同源）：
+   *   resolve                    —— 本地有会话快照且回读 200（valid）或 403（denied，
+   *                                 auth.rs 已放行、permission.rs 的 users:read 面拒绝，会话成立）
+   *   reject { state: "none" }    —— 本地无会话快照：同步判未登录，不发请求
+   *   reject { state: "invalid" } —— 回读 401：会话不成立，本方法内部已清档案并 reLaunch 登录页
+   *   reject { state: "error" }   —— 网络失败或 5xx：判据未知，保留既有快照，不据此登出
+   */
+  this.requireLogin = function () {
+    if (!apiGateway.isLoggedIn())
+      return Promise.reject({ state: "none", status: 0, msg: "本地无会话快照" });
+    return self.checkLogin();
+  };
+
   /** 作废本地登录痕迹并回到登录页 */
   this.clearLoginFlag = function () {
     wx.setStorageSync("logoutFlag", 1);

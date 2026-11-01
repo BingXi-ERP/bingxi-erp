@@ -92,10 +92,6 @@ Component({
                 if (!app.userAuthList["order:saveBilling"])
                   return (
                     wx.hideLoading(),
-                    wx.getStorageSync("token") ||
-                      wx.reLaunch({
-                        url: "/pages/register/login/login",
-                      }),
                     void wx.showToast({
                       title: "暂无权限",
                       icon: "none",
