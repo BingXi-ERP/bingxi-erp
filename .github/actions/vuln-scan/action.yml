@@ -215,6 +215,10 @@ runs:
       # 存什么：semgrep 的 JSON 结果（results 逐条含 check_id 与路径与行号）、本轮实际
       #   解析出的依赖闭包（pip freeze，供版本可审计）、stderr 原文日志。
       # 存哪里：$GITHUB_WORKSPACE/reports/audit/semgrep.json 与 semgrep-tools.txt 与 semgrep.log。
+      # 扫描面：仓库根整棵，另剔 .github 与 monitoring 两枚目录 —— 工作流与 composite action
+      #   定义的注入面与越权权限由本动作的 zizmor 步和 ci-static-checks 的 actionlint 步按
+      #   GitHub 方言审，Prometheus 规则属运维配置且没有 rust 与 ts 语言面；semgrep 1.183.0
+      #   的解析器对这两类合法内容自报 errors，留在集合里就成了把扫描器缺陷转成流水线判红。
       # 换实现的理由：原 uses: returntocorp/semgrep-action 是 docker 型第三方入口，该组织
       #   下同名仓库已从 GitHub 消失（取仓库根目录回 404），入参怎么被拼进命令行已无法
       #   核对；实测每轮报 "invalid configuration file found (3 configs were invalid)"，
@@ -274,7 +278,7 @@ runs:
         CFG_ARGS=()
         for rs in $SEMGREP_RULESETS; do CFG_ARGS+=(--config "$rs"); done
         set +e
-        env -u SEMGREP_URL -u SEMGREP_BASE_LEGACY_URL "$WORK/venv/bin/semgrep" scan --quiet --metrics=off --exclude 'miniprogram_npm' --exclude 'node_modules' --exclude 'target'           "${CFG_ARGS[@]}" --json --output "$R/semgrep.json" . > "$R/semgrep.log" 2>&1
+        env -u SEMGREP_URL -u SEMGREP_BASE_LEGACY_URL "$WORK/venv/bin/semgrep" scan --quiet --metrics=off --exclude 'miniprogram_npm' --exclude 'node_modules' --exclude 'target' --exclude '.github' --exclude 'monitoring'           "${CFG_ARGS[@]}" --json --output "$R/semgrep.json" . > "$R/semgrep.log" 2>&1
         SRC=$?
         set -e
         echo "semgrep exit=$SRC（0=无命中 1=有命中 2 及以上=用法或运行错误）"
