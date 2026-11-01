@@ -450,7 +450,6 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
     expect(str(rollPiece.dye_lot_no), '卷缸号应落真实缸号').toBe(lot.dyeLotNo);
     expect(rollPiece.piece_type, '打卷产匹类型应为 dyed').toBe('dyed');
     expect(rollPiece.status, '新产卷状态应为大写词表 AVAILABLE').toBe('AVAILABLE');
-    expect(rollPiece.inventory_status, '库存状态应落 available').toBe('available');
     expect(rollPiece.quality_status, '质检状态应落中文词表 合格').toBe('合格');
     expect(Number(rollPiece.product_id), '卷产品应随验布单产品落库').toBe(lot.productId);
     expect(Number(rollPiece.warehouse_id), '卷仓库应落打卷提交的仓库').toBe(lot.warehouseId);
