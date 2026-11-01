@@ -31,9 +31,7 @@ impl MigrationTrait for Migration {
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        m0128_bind_wechat_openid::Migration
-            .down(manager)
-            .await?;
+        m0128_bind_wechat_openid::Migration.down(manager).await?;
         Ok(())
     }
 }
