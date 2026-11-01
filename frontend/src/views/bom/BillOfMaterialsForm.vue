@@ -109,16 +109,11 @@
         </el-table-column>
         <el-table-column :label="$t('bomModule.form.lossRate')" width="130">
           <template #default="{ row }">
-            <!-- 损耗率 = API 百分比数值口径（10 = 10%），键名与后端 scrap_rate 同名；
-                 0–100 + 两位小数（0.01% 粒度）与后端写边界校验同口径，
-                 比率换算只发生在后端边界，前端不二次乘除 -->
-            <NumericInput
-              v-model="row.scrap_rate"
-              style="width: 100%"
-              :min="0"
-              :max="100"
-              :precision="2"
-            />
+            <!-- 损耗率 = API 百分比数值口径（10 = 10%），键名与后端 scrap_rate 同名，
+                 比率换算只发生在后端边界，前端不二次乘除。
+                 本列录入侧不传 min max precision 键入值原样进模型，不做静默钳位与截位，
+                 范围与精度改由提交前逐行校验点名下拦（见 validateScrapRates），非法不发请求 -->
+            <NumericInput v-model="row.scrap_rate" style="width: 100%" />
           </template>
         </el-table-column>
         <el-table-column :label="$t('bomModule.form.operation')" width="80" fixed="right">
@@ -150,6 +145,7 @@ import { Plus } from '@element-plus/icons-vue';
 import type { Bom } from '@/api/bom';
 import { getProductList } from '@/api/product';
 import type { Product } from '@/api/product';
+import { validateNumberInput, type NumberInputRuleOptions } from '@/utils/number-input';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -284,6 +280,33 @@ const handleRemoveItem = (index: number) => {
   localFormData.value.items.splice(index, 1);
 };
 
+/**
+ * 损耗率提交前判界口径 与后端写边界同源（api 口径为百分比数值 0-100 最多两位小数）
+ * 依据 handlers/bom_handler.rs 与 BomService::scrap_percent_to_ratio 的 fail-closed 判定
+ * 调用方 validateScrapRates 入参 label 走既有 i18n 键 失败消息点名是哪个字段
+ */
+const scrapRateSpecs: NumberInputRuleOptions = {
+  label: t('bomModule.form.lossRate'),
+  min: 0,
+  max: 100,
+  precision: 2,
+};
+
+/**
+ * 提交前逐行校验损耗率 明细表格行内单元格挂不进表头的 el-form rules 故在此单点走同一份校验器
+ * 首个非法值即外显点名字段与原因并拦下提交 不钳值 不四舍五入放行 不做默认值兜底
+ */
+const validateScrapRates = (): boolean => {
+  for (const item of localFormData.value.items) {
+    const message = validateNumberInput(item.scrap_rate, scrapRateSpecs);
+    if (message) {
+      ElMessage.warning(message);
+      return false;
+    }
+  }
+  return true;
+};
+
 const handleSubmit = async () => {
   if (!formRef.value) return;
 
@@ -295,6 +318,9 @@ const handleSubmit = async () => {
       ElMessage.warning(t('bomModule.form.itemsIncomplete'));
       return;
     }
+
+    // 数值非法在发出任何请求之前拦下 校验不过不进入提交面
+    if (!validateScrapRates()) return;
 
     submitLoading.value = true;
     try {
