@@ -283,14 +283,21 @@ const handleRemoveItem = (index: number) => {
 /**
  * 损耗率提交前判界口径 与后端写边界同源（api 口径为百分比数值 0-100 最多两位小数）
  * 依据 handlers/bom_handler.rs 与 BomService::scrap_percent_to_ratio 的 fail-closed 判定
- * 调用方 validateScrapRates 入参 label 走既有 i18n 键 失败消息点名是哪个字段
+ * 调用方 validateScrapRates 失败文案走本模块 i18n 键 与同族表单传 messages 的口径一致
+ * 取函数形态而非顶层常量：切换语言后 label 与各条文案都要按当前 locale 重取
  */
-const scrapRateSpecs: NumberInputRuleOptions = {
+const scrapRateSpecs = (): NumberInputRuleOptions => ({
   label: t('bomModule.form.lossRate'),
   min: 0,
   max: 100,
   precision: 2,
-};
+  messages: {
+    notNumber: t('bomModule.form.lossRateNotNumber'),
+    tooSmall: t('bomModule.form.lossRateTooSmall'),
+    tooLarge: t('bomModule.form.lossRateTooLarge'),
+    tooPrecise: t('bomModule.form.lossRateTooPrecise'),
+  },
+});
 
 /**
  * 提交前逐行校验损耗率 明细表格行内单元格挂不进表头的 el-form rules 故在此单点走同一份校验器
@@ -298,7 +305,7 @@ const scrapRateSpecs: NumberInputRuleOptions = {
  */
 const validateScrapRates = (): boolean => {
   for (const item of localFormData.value.items) {
-    const message = validateNumberInput(item.scrap_rate, scrapRateSpecs);
+    const message = validateNumberInput(item.scrap_rate, scrapRateSpecs());
     if (message) {
       ElMessage.warning(message);
       return false;
