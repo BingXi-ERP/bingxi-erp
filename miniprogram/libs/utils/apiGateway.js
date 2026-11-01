@@ -29,7 +29,8 @@
 var CSRF_KEY = "bingxiCsrf";
 var SESSION_KEY = "bingxiSession";
 var BINGXI_PREFIX = "/api/v1/erp";
-var USERS_ME_PATH = BINGXI_PREFIX + "/users/me";
+/** 会话回读端点：仅需 JWT 认证、免 RBAC 与 CSRF 消费的自服务身份端点（backend/src/middleware/public_routes.rs） */
+var AUTH_ME_PATH = BINGXI_PREFIX + "/auth/me";
 
 /** 无副作用方法（backend/src/middleware/csrf.rs is_safe_method 同源） */
 var SAFE_METHODS = { GET: !0, HEAD: !0, OPTIONS: !0 };
@@ -321,13 +322,16 @@ function requestContract(spec) {
 }
 
 // ---------- 登录态（以后端回读为唯一判据） ----------
-/** 会话快照写入：只存后端 users/me 认过的身份摘要，不存任何凭据 */
+/**
+ * 会话快照写入
+ * 入参：user —— 后端 /auth/me 回读确认过的 UserInfo（backend/src/handlers/auth_handler.rs）
+ * 传给谁：verifySession 的会话成立分支
+ * 存什么：只存后端认过的两枚身份摘要 id 与 username 加本次确认时间，不存任何凭据；
+ *   id 与 username 在 UserInfo 里都是非空字段，取不到即属上游契约破损，不做默认值掩盖
+ * 存哪里：wx.storage（键 bingxiSession）与 app.globalData.userInfo
+ */
 function markSession(user) {
-  var snap = {
-    id: user && user.id !== undefined ? user.id : 0,
-    username: (user && user.username) || "",
-    verifiedAt: Date.now(),
-  };
+  var snap = { id: user.id, username: user.username, verifiedAt: Date.now() };
   wx.setStorageSync(SESSION_KEY, snap);
   var a = app_();
   if (a.globalData) {
@@ -356,17 +360,30 @@ function isLoggedIn() {
 }
 
 /**
- * 回读 GET /api/v1/erp/users/me 判定登录态
- * 返回 { state: "valid" | "denied" | "invalid" | "error", status, user, msg }
- *   valid   —— HTTP 200 且信封 code 200，会话成立并写入快照
- *   denied  —— HTTP 403：auth.rs 已放行（会话成立），是 permission.rs 的 RBAC 面拒绝（users:read 缺失）
- *   invalid —— HTTP 401：缺少/无效认证凭据，会话不成立并清快照
- *   error   —— 网络失败或 5xx：判据未知，保留既有快照，不据此登出
+ * 回读 GET /api/v1/erp/auth/me 判定登录态
+ * 入参：无，凭据由 wx.request 自动维护的 Cookie 承载，本函数不构造 Authorization 头
+ * 传给谁：libs/utils/checkToken.js 的 checkLogin 与 requireLogin、libs/services/ServicesUser.js 的 userInit、
+ *   libs/utils/login.js 的 finishLogin、app.js 的冷启动自检，以及 packageB 下的对应副本
+ * 存什么：会话成立时把后端回读的 UserInfo 身份摘要写入会话快照（UserInfo 的 id 与 username 同名直取，
+ *   另带 permissions、role_name、phone、email、department_name 等键，本函数不落盘）
+ * 存哪里：wx.storage（键 bingxiSession）与 app.globalData
+ *
+ * 端点选型（backend/src/middleware/public_routes.rs 的 AUTH_ONLY_PATHS 与
+ * backend/src/middleware/permission.rs 的 is_auth_only_path 短路）：/auth/me 仅需 JWT 认证，
+ * 免 RBAC 也免 CSRF 一次性令牌消费，handler 只按 auth.user_id 回读调用者本人，任何已登录岗位都拿到 200。
+ * 此前用的 /users/me 按 URL 段派生权限码 users:read，该码只授内部岗位，客户与供应商岗不持，
+ * 有效会话会被 RBAC 判 403——那属端点选错，不该用额外的权限拒绝态去兜。
+ *
+ * 三态语义：
+ *   valid   —— HTTP 200 且信封 code 200：会话成立，写入身份快照
+ *   invalid —— HTTP 401 或 403：会话不被承认，清快照与令牌并回登录页。本端点免 RBAC，
+ *              403 已不再是权限面拒绝，出现即认证链或豁免清单本身失守，按未登录处理才安全
+ *   error   —— 网络失败或其余状态码（含 5xx）：判据未知，保留既有快照，不据此登出
  */
 function verifySession() {
   return new Promise(function (resolve) {
     wx.request({
-      url: bingxiBase() + USERS_ME_PATH,
+      url: bingxiBase() + AUTH_ME_PATH,
       method: "GET",
       header: authHeaders(!0, "GET"),
       success: function (res) {
@@ -378,23 +395,13 @@ function verifySession() {
           resolve({ state: "valid", status: status, user: markSession(data.data), msg: data.msg });
           return;
         }
-        if (status === 403) {
-          // 能走到 403 说明 auth.rs 已放行，是 permission.rs 的 RBAC 面拒绝（users/me 需 users:read）：
-          // 会话成立，只是拿不到档案，用登录响应已落盘的用户摘要补写快照，避免把无权限误判成未登录
+        if (status === 401 || status === 403) {
+          clearSession();
           resolve({
-            state: "denied",
+            state: "invalid",
             status: status,
-            user: markSession({
-              id: wx.getStorageSync("id") || 0,
-              username: wx.getStorageSync("nickName") || "",
-            }),
             msg: (data && data.msg) || "",
           });
-          return;
-        }
-        if (status === 401) {
-          clearSession();
-          resolve({ state: "invalid", status: status, msg: (data && data.msg) || "" });
           return;
         }
         resolve({ state: "error", status: status, msg: (data && data.msg) || "" });
@@ -412,7 +419,7 @@ function verifySession() {
  * -> 小程序 {code:0,data:{user,permissions,password_expired}}
  * 落盘内容：csrf_token 进 bingxiCsrf（否则本会话第一个写请求要先吃一次 403 才能拿到恢复令牌）、
  * 用户档案进 wx.storage 的各业务键
- * 登录响应体没有 token 字段，也不写任何 token 键：登录态由 verifySession() 的 users/me 回读确认
+ * 登录响应体没有 token 字段，也不写任何 token 键：登录态由 verifySession() 的 auth/me 回读确认
  */
 function adaptLogin(raw, isBingxi) {
   var res = normalize(raw, isBingxi);
@@ -473,6 +480,6 @@ module.exports = {
   serializeWrite: serializeWrite,
   CSRF_STORE_KEY: CSRF_KEY,
   SESSION_STORE_KEY: SESSION_KEY,
-  USERS_ME_PATH: USERS_ME_PATH,
+  AUTH_ME_PATH: AUTH_ME_PATH,
   BINGXI_PREFIX: BINGXI_PREFIX,
 };

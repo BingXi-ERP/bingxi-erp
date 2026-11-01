@@ -6,14 +6,14 @@
  *   packageB/pages/personal-center/device-connection（经 packageB/libs/utils/isVisitor.js 转手）
  * 入参：无
  * 传给谁：libs/utils/checkToken.js 的 requireLogin() —— 本地无会话快照直接判未登录（不发请求），
- *   本地有会话快照仍要回读 GET /api/v1/erp/users/me 确认才算已登录
+ *   本地有会话快照仍要回读 GET /api/v1/erp/auth/me 确认才算已登录
  * 存什么 / 存哪里：本文件不落任何数据；会话快照与一次性令牌由 apiGateway 读写 wx.storage
  *
  * 结算契约（消费方共 25 处一律写成 isVisitor.default.isVisitor().then(cb) 且都没有 catch 分支，
  * 这里刻意保持"未登录就不落定"的既有形状，改成 reject 会让这 25 处同时冒出未处理的 Promise 拒绝）：
  *   已登录        —— resolve()，调用方回调照常执行
  *   本地无快照    —— 弹「登录提示」，确认后跳登录页；本 Promise 不落定，调用方回调不执行
- *   回读 401      —— requireLogin 内部已清会话与档案并 reLaunch 登录页，本文件不再重复提示；不落定
+ *   回读 401 或 403 —— requireLogin 内部已清会话与档案并 reLaunch 登录页，本文件不再重复提示；不落定
  *   网络失败或 5xx —— 判据未知：提示「网络异常，请稍后重试」，不清会话、不跳登录；不落定
  *
  * 退场口径：本文件历史实现用 wx.getStorageSync("token") 当门。后端登录出参没有 token 字段
