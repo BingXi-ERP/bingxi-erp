@@ -410,7 +410,15 @@ test.describe.serial('56 读回可见性（保存显示成功→刷新→目标�
     expect(recipeNo, `[56-03] 建单应回 recipe_no（后端取号）：${cap.bodyRaw}`).not.toBe('');
 
     // 刷新后真读列值：唯一面料名应出现在「面料名称」列
+    // 该页路由是懒加载 chunk 且前端服务按需编译，reload 后页面外壳先挂、表体要等列表 GET 回来才挂；
+    // 取行前先把这次列表请求作锚点等回来，口径同本文件 56-02 的 tab 挂载等待。
+    const listEpFrag = '/api/v1/erp/production/production-recipes';
+    const listGet = page.waitForResponse(
+      r => r.url().includes(listEpFrag) && r.request().method() === 'GET' && r.status() === 200,
+      { timeout: 20_000 }
+    );
     await page.reload();
+    await listGet;
     const row = await locateRow(page, recipeNo, { match: 'first-cell-equals' });
     const fabricCell = await columnCell(page, row, '面料名称');
     await expect(
