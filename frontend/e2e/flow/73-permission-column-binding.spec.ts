@@ -4,10 +4,10 @@ import { formItemByExactLabel } from './ui-helpers';
 import {
   columnIndex,
   columnCellTexts,
+  expectPositiveRowCount,
   openPageTable,
   rowByText,
   rowCellText,
-  rowCount,
   waitFirstRow,
 } from './table-column';
 
@@ -114,10 +114,7 @@ test.describe.serial('权限域列绑定回归：真实数据逐格出值（防�
     ).toBeVisible({ timeout: 30_000 });
     await table.waitFor({ state: 'visible', timeout: 30_000 });
 
-    expect(
-      await rowCount(table),
-      '数据权限列表行数应为正（造数后仍空即绑定/取数缺陷）'
-    ).toBeGreaterThan(0);
+    await expectPositiveRowCount(table, '数据权限列表行数应为正（造数后仍空即绑定/取数缺陷）');
 
     const resourceIdx = await columnIndex(table, '资源类型');
     const scopeIdx = await columnIndex(table, '权限范围');
@@ -158,7 +155,7 @@ test.describe.serial('权限域列绑定回归：真实数据逐格出值（防�
     const table = page.locator('.el-table[aria-label="数据权限列表"]').first();
     await page.getByRole('menuitem', { name: role.name, exact: true }).click();
     await table.waitFor({ state: 'visible', timeout: 30_000 });
-    expect(await rowCount(table), '数据权限列表行数应为正').toBeGreaterThan(0);
+    await expectPositiveRowCount(table, '数据权限列表行数应为正');
 
     const createdIdx = await columnIndex(table, '创建时间');
     const createdCells = (await columnCellTexts(table, createdIdx)).filter(t => t.length > 0);
@@ -183,7 +180,7 @@ test.describe.serial('权限域列绑定回归：真实数据逐格出值（防�
     });
 
     const table = await openPageTable(page, '/field-permissions', '字段权限', '字段权限列表');
-    expect(await rowCount(table), '字段权限列表行数应为正').toBeGreaterThan(0);
+    await expectPositiveRowCount(table, '字段权限列表行数应为正');
 
     const roleIdx = await columnIndex(table, '角色');
     const readIdx = await columnIndex(table, '可读');
@@ -200,8 +197,10 @@ test.describe.serial('权限域列绑定回归：真实数据逐格出值（防�
 
   test('权限管理页：资源类型/操作/状态逐格出值', async ({ page }) => {
     const table = await openPageTable(page, '/permissions', '权限管理', '权限列表');
-    const n = await rowCount(table);
-    expect(n, '权限目录行数应为正（GET /permissions 裸数组取数失效则整表空白）').toBeGreaterThan(0);
+    const n = await expectPositiveRowCount(
+      table,
+      '权限目录行数应为正（GET /permissions 裸数组取数失效则整表空白）'
+    );
 
     const typeIdx = await columnIndex(table, '资源类型');
     const actionIdx = await columnIndex(table, '操作');
@@ -240,7 +239,7 @@ test.describe.serial('权限域列绑定回归：真实数据逐格出值（防�
     );
     try {
       const table = await openPageTable(page, '/roles', '角色管理', '角色列表');
-      expect(await rowCount(table), '角色列表行数应为正').toBeGreaterThan(0);
+      await expectPositiveRowCount(table, '角色列表行数应为正');
 
       const nameIdx = await columnIndex(table, '角色名称');
       const codeIdx = await columnIndex(table, '角色编码');
