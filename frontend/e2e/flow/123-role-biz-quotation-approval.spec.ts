@@ -215,7 +215,7 @@ async function getAuditDetail(
  * 调用方：管理员收口分别核对两张报价单的提交、批准、驳回迁移。
  * 入参：会话 page（admin）、资源 id 字符串、当事操作人 user_id 与 username、迁移前后状态字面量、断言上下文。
  * 传给谁：每轮 GET /audit-logs 以 resource_type+resource_id+user_id 三参服务端等值过滤取数
- *   （resource_id 等值参数为主干 #1138 新增的读取契约），对返回行再做一次 resource_id 与 user_id
+ *   （resource_id 等值参数是审计读取侧的既有契约），对返回行再做一次 resource_id 与 user_id
  *   严格相等的客户端复核（防后端忽略参数时把别家单据行当候选），再逐行 GET /audit-logs/{id}
  *   读快照，before.status、after.status、username 三者精确相等才算命中——判据与改造前完全一致，
  *   只是把"等落库"挪进找目标迁移这件事本身：命中即返回，窗口耗尽仍未命中才抛错。
@@ -584,7 +584,7 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
       // 审计：每次状态迁移一条 auto_audit，含整模型 before 与 after 快照与操作人 user_id/username。
       // 写侧全实体共用 resource_type=auto_audit 且 resource_id 用各实体自己的主键（如产品 id 会撞
       // 报价单 id），单按 resource_type 取一页再客户端精筛会把别家单据的审计行混进候选集，故按
-      // resource_type+resource_id+user_id 三参服务端等值过滤取数（#1138 读取侧新契约），并把
+      // resource_type+resource_id+user_id 三参服务端等值过滤取数（读取侧的 resource_id 等值契约），并把
       // "等异步落库"挪进匹配目标迁移的轮询本身。当事操作人 user_id 由 admin 会话按用户名经
       // /users 精确解析（工装同第一棒）；状态词表用 sales_quotations chk_status 的小写值。
       const repUserId = await resolveUserIdByUsername(
