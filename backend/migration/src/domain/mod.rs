@@ -172,3 +172,6 @@ pub mod product_grade_vocab_check;
 // 仓储两岗补授扫码入库细键的存量库通道。独立顶层域，理由与 purchase_greige_read_grant 一致
 // （并入已应用域会在复用库被整体跳过，补授永不执行）。
 pub mod scan_receipt_grant;
+// 裁片库存状态死列的探测式下线域。独立顶层域，理由与 product_roll_column_drop 一致
+// （并入已应用域会被台账整体跳过，DROP 在存量库永不执行），晚于代码面摘除读写。
+pub mod inventory_piece_status_column_drop;

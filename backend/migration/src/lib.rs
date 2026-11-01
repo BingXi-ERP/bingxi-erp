@@ -22,6 +22,7 @@
 //!   → textile_safety → purchase_inspection_result_check → export_approval_lifecycle
 //!   → product_grade_vocab_check
 //!   → scan_receipt_grant
+//!   → inventory_piece_status_column_drop
 //!
 //! 迁移名: m_system_domain / m_business_domain / m_sales_crm_domain /
 //!         m_production_domain / m_finance_domain / m_v15_domain / m_rls_dept_domain /
@@ -207,6 +208,16 @@
 //!    NOT EXISTS 守卫使重跑等价，命中 0 角色以 NOTICE 点名不静默通过，down 只回收本域
 //!    角色码的该行。依赖 system 建的 roles 与 role_permissions 早于本域；新建顶层域而不
 //!    并入已应用域（复用库上整域跳过会让补授永不执行），置于链尾必然执行。
+//! 36. inventory_piece_status_column_drop: 裁片库存状态死列的探测式下线域（m0130）——
+//!    inventory_piece.inventory_status 是死列，出库与入库腿均不以它为准，细码状态单源
+//!    走同表 status 列（大写权威词表见 models/status/purchase_inventory.rs 的
+//!    inventory_piece 模块），
+//!    代码面五处写点与实体字段已随支摘除（先改代码，再收列形态，同 m0109 口径）。DROP 前
+//!    探测依赖索引与约束，命中即 RAISE EXCEPTION 点名中止不静默级联破坏；非空原值整表备份
+//!    进专属备份表后才删列，词表外脏值只点名不阻断（原值已在备份内）。域内绝不 UPDATE、
+//!    绝不 DELETE 业务表数据；down 加回可空列并按备份逐行还原原值再清理备份表，构成精确
+//!    回退。新建顶层域而不并入已应用域（复用库上整域跳过会让 DROP 永不执行），置于链尾
+//!    必然执行，依赖 business 与 production 两域的加列语句与 v15 的归一 UPDATE 全部早于本域。
 
 pub use sea_orm_migration::prelude::*;
 
@@ -272,6 +283,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::product_grade_vocab_check::Migration),
             // 仓储两岗补授扫码入库细键，链尾独立域（roles 与 role_permissions 由 system 域先建）
             Box::new(domain::scan_receipt_grant::Migration),
+            // 裁片库存状态死列探测式下线，链尾独立域，晚于代码面摘除读写（先改代码，再收列形态）
+            Box::new(domain::inventory_piece_status_column_drop::Migration),
         ]
     }
 }

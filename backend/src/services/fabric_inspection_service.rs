@@ -781,8 +781,6 @@ impl FabricInspectionService {
             production_date: Default::default(),
             shelf_life: Default::default(),
             quality_status: Set(Some(quality_status::PASS.to_string())),
-            // 库存状态与上一行 status 列同源，取权威大写词表常量，不写字面量
-            inventory_status: Set(Some(piece_status::AVAILABLE.to_string())),
             created_by: Default::default(),
             updated_by: Default::default(),
             color_no: match model.color_no.clone() {
