@@ -3,8 +3,9 @@
 # frontend/scripts/pairing-fetch-base.sh
 #
 # 功能：把"分支起点那一枚提交"取到本地仓库，供配对门禁当基线来源。
-# 调用方：.github/workflows/e2e-pairing.yml 的两条取基线步骤（PR 传 base 提交号，
-#       push 传推送前的 main 提交号）；也可本地手工跑一次看数。
+# 调用方：.github/workflows/ci-cd.yml 的配对门 job（PR 传 base 提交号，硬拦位取不到就判负）
+#       与 .github/workflows/e2e-pairing.yml 的取基线步骤（push 传推送前的 main 提交号）；
+#       也可本地手工跑一次看数。
 # 入参：$1 起点提交的完整 sha。空串与全零 sha（新建分支的首推）视为没有起点。
 # 传给谁：结果只交给调用它的工作流步骤，成功时把 PAIRING_BASE_REF=FETCH_HEAD
 #       写进 $GITHUB_ENV，后续判定步据此拼 --baseline-ref；没有 $GITHUB_ENV 时只打印。

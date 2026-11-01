@@ -5091,6 +5091,76 @@ jobs:
       # 以 vue-tsc 阻塞 CI，这里再 npm ci + vue-tsc 只是多一次 5 分钟的冷装与全量类型检查。
 
 # ==============================================================================
+# Job 16.7: 新增端点与 E2E 用例配对门（PR 硬拦位）
+# ==============================================================================
+  ci-e2e-pairing:
+    name: 🔗 新增端点必须配套 E2E 用例（PR 硬拦位）
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: ci-info
+    # 功能：本支新增的后端端点在前端 e2e 语料里零引用即判红。
+    # 调用方：pull_request 事件；取数与判据与独立工作流 e2e-pairing.yml 同源，共用
+    #       frontend/scripts/check-e2e-feature-pairing.mjs 与 frontend/scripts/pairing-fetch-base.sh，
+    #       不另写第二套谓词。
+    # 入参：判定器吃 --baseline-ref（分支起点提交）与 --require-baseline-ref（禁止退回
+    #       工作树那份快照）；阈值、语料根与豁免台账由脚本自身常量与
+    #       frontend/scripts/e2e-feature-pairing-exempt.json 决定，本 job 不重复声明。
+    # 传给谁：结论进 $GITHUB_STEP_SUMMARY 与本 job 的 needs 结果，由收尾清理聚合。
+    # 存什么/存哪里：不落仓库文件，仅 Actions 日志与运行摘要。
+    #
+    # 为什么要进本工作流而不是只留独立工作流：主干分支规则集没有任何必需状态检查，
+    #   工作流自己红不会拦合并，只有挂进 ci-cleanup-retry 的 needs，这道门的红才会
+    #   出现在必检聚合门上。独立工作流的 main push 那条腿保留（本工作流的 push 触发
+    #   只认 v* tag，撤掉那条腿等于主干累积漏测再没人对账），它的 pull_request 触发
+    #   随之撤除，避免同一枚判定在同一支 PR 上跑两遍。
+    # 为什么本道取不到分支起点判红而独立工作流那条只打 notice：本 job 只在 pull_request
+    #   上跑，base 提交号必然存在，取不到只可能是环境或脚本坏了；硬拦位不能把"没比过"
+    #   记成通过。独立工作流还跑 push 与手工触发，那些事件本来就可能没有可比对象，
+    #   那边跳过不算结论，只点名。
+    if: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: 安装配对判定用 Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # 判定脚本零依赖，本 job 全程没有 npm ci 与 npm install，setup-node 的内置
+          # 依赖缓存没有消费者，一律关掉而不是留位豁免。
+          package-manager-cache: false
+
+      - name: 判定器反向自证（九道探针没全命中就判 TOOL_BUG）
+        # 判据必须先于结论：判定器要先证明自己能抓到已知违规、能放过合法配对、基线被
+        # 清空时会自曝、有界面入口的端点靠豁免救不活，它后面的绿才有意义。
+        shell: bash
+        working-directory: frontend
+        run: node scripts/check-e2e-feature-pairing.mjs --self-test
+
+      - name: 取 PR 分支起点的路由基线
+        shell: bash
+        working-directory: frontend
+        env:
+          PAIRING_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash scripts/pairing-fetch-base.sh "$PAIRING_BASE_SHA"
+
+      - name: 配对判定（基线只认分支起点那一版快照）
+        if: ${{ env.PAIRING_BASE_REF != '' }}
+        shell: bash
+        working-directory: frontend
+        run: |
+          node scripts/check-e2e-feature-pairing.mjs \
+            --baseline-ref "$PAIRING_BASE_REF" \
+            --require-baseline-ref | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: 硬拦位取不到分支起点就判负（没比过不算通过）
+        if: ${{ env.PAIRING_BASE_REF == '' }}
+        shell: bash
+        run: |
+          echo "::error::pull_request 事件下取不到分支起点提交，配对判定无法执行；本 job 是硬拦位，没有可比对象一律判负，不放行"
+          exit 1
+
+# ==============================================================================
 # Job 17: 收尾清理（仅报告，无自动重试）
 # ==============================================================================
   ci-cleanup-retry:
@@ -5121,6 +5191,7 @@ jobs:
       package-release,
       github-release,
       ci-e2e,
+      ci-e2e-pairing,
       role-permission-matrix,
       security-vulnerability-scan,
       ci-dead-code-audit,

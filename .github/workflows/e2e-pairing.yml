@@ -1,10 +1,11 @@
 # ==============================================================================
 # .github/workflows/e2e-pairing.yml
 #
-# 功能：把"新增后端端点必须配套 E2E 用例"这条 PR 门禁规则落成可执行检查——
-#       本支新增的端点在 frontend/e2e 的真用例文件里零引用即判负，禁止合并。
-# 调用方：改动 backend 路由与 handler、改动 frontend/e2e 用例面、改动路由基线、
+# 功能：把"新增后端端点必须配套 E2E 用例"这条门禁规则在主干侧落成可执行检查——
+#       本次合入新增的端点在 frontend/e2e 的真用例文件里零引用即判负。
+# 调用方：主干合入改动 backend 路由与 handler、改动 frontend/e2e 用例面、改动路由基线、
 #       改本门禁取基线的脚本或改本工作流定义时触发；也可 workflow_dispatch 手工跑一次看数。
+#       PR 侧的同一判定在 ci-cd.yml 的配对门 job 里跑（见下面"两条腿"那段）。
 # 入参：工作流向判定脚本传两样，--baseline-ref 指向分支起点的提交，
 #       --require-baseline-ref 钉住"基线不许退回工作树那份快照"；判据阈值
 #       （端点地板、语料根、前端源码根、豁免台账路径）由脚本自身常量与命令行参数决定。
@@ -14,9 +15,12 @@
 # 存什么：不落仓库文件；结论写进 $GITHUB_STEP_SUMMARY 供人读。
 # 存哪里：仅 Actions 运行摘要与日志
 #
-# 为什么单独一支工作流而不是往 ci-cd.yml 里加步骤：ci-cd.yml 是在途改动最密集的
-#   hub 文件，多支并行改它必然互相撞冲突；本门禁只需 Node 与仓库源码（脚本零依赖，
-#   不需要 npm 装配，也不需要编译后端），独立成支既省 runner 也不占别人的合并队列。
+# 为什么本工作流只留主干 push 与手工触发两条腿：PR 侧的硬拦位必须在必检聚合门的
+#   needs 里才谈得上拦合并（本仓主干分支规则集没有任何必需状态检查，独立工作流自己
+#   红不会拦），故 PR 判定搬进 ci-cd.yml 的配对门 job。本工作流不撤，是因为主工作流的
+#   push 触发只认版本 tag，主干合并后这次扫描只在独立工作流里跑——撤掉它等于主干
+#   累积漏测再没人对账。两条腿共用同一对脚本，判据只有一份。
+#   本门禁只需 Node 与仓库源码（脚本零依赖，不需要 npm 装配，也不需要编译后端）。
 # 为什么先跑 --self-test：判定器必须先证明"能抓到已知违规、能放过合法配对、
 #   基线被清空时会自曝、有界面入口的端点靠豁免救不活"，它的绿才有意义。本仓反复
 #   出现过"扫描面自己变窄导致零命中被当成通过"与"判据过宽导致恒绿"两类假绿，
@@ -32,16 +36,10 @@
 name: 新增功能与 E2E 用例配对门
 
 on:
-  pull_request:
-    paths:
-      - "backend/src/routes/**"
-      - "backend/src/handlers/**"
-      - "frontend/e2e/**"
-      - "frontend/scripts/route-snapshot.txt"
-      - "frontend/scripts/check-e2e-feature-pairing.mjs"
-      - "frontend/scripts/pairing-fetch-base.sh"
-      - "frontend/scripts/e2e-feature-pairing-exempt.json"
-      - ".github/workflows/e2e-pairing.yml"
+  # PR 侧不再由本工作流触发：同一枚判定已在主工作流里作为硬拦位运行（并进入必检聚合门
+  # 的 needs），这里再挂 pull_request 就是让同一次扫描在同一支 PR 上跑两遍。本工作流
+  # 保留的是主干 push 那条腿——主工作流的 push 触发只认版本 tag，这条腿是唯一还在给
+  # 主干累积漏测对账的位置，撤掉它等于主干再没人复核配对缺口。
   push:
     branches:
       - main
@@ -82,16 +80,10 @@ jobs:
         working-directory: frontend
         run: node scripts/check-e2e-feature-pairing.mjs --self-test
 
-      # PR 以 base 提交为起点，push 以推送前的 main 为起点；两条腿共用同一取法与
-      # 同一套校验（含空值与全零 sha），只有真取到提交才写 PAIRING_BASE_REF。
-      - name: 取 PR 分支起点的路由基线
-        if: ${{ github.event_name == 'pull_request' }}
-        shell: bash
-        working-directory: frontend
-        env:
-          PAIRING_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: bash scripts/pairing-fetch-base.sh "$PAIRING_BASE_SHA"
-
+      # 起点取法只留主干 push 这一条腿：push 以推送前的 main 为起点，手工触发没有可比
+      # 对象，交下面那步点名跳过。PR 侧的起点取法与判定搬进主工作流的硬拦位 job，
+      # 两条腿共用同一个取数脚本与同一套校验（含空值与全零 sha），只有真取到提交才写
+      # PAIRING_BASE_REF。
       - name: 取 push 前主干的路由基线
         if: ${{ github.event_name == 'push' }}
         shell: bash
