@@ -18,8 +18,9 @@
  *      GET /textile-submissions/{id}、GET /textile-submissions?target_market、
  *      GET /textile-export-requirements?market、DELETE /textile-submissions/{id}、
  *      GET /product-categories 与 POST /products（admin 腿自建品种并清理回收）。
- * 传给谁：请求走 flow/helpers 的 apiCallRaw 与 apiCallExpectFail，列表信封形态用 ui-helpers 的
- *      pickListArray 显式声明，会话与跨棒标识走 fixtures/relay，不另造请求或判据实现。
+ * 传给谁：请求走 flow/helpers 的 apiCallRaw 与 apiCallExpectFail，列表信封形态按各端点真实形状
+ *      显式声明并逐路判型（登记面 data.requirements 为数组），会话与跨棒标识走 fixtures/relay，
+ *      不另造请求或判据实现。
  * 存什么：送检草稿 4 枚（逐枚目标市场 色号 工艺 与推入清单行归因与范围回显）、产品档案 1 枚。
  * 存哪里：PostgreSQL textile_safety_submission 与 textile_safety_submission_item 与 products 表；
  *      出口要求集为 m0112 种子迁移写入的 textile_export_market_requirement 表六行（本用例只读）。
@@ -284,9 +285,7 @@ test.describe.serial('纺织品安全：目标市场加验口径四档差异、�
 
             // 清单本体两档对账：触发出口的 eu 与不触发的 other 都只剩 GB18401 十枚（EXPORT 组空集），
             // 归因逐行等值，证明差异走 scope_note 与 needs_attention 通道而非静默改集合
-            const euCodes = ((ge?.items ?? []) as Row[])
-              .map(r => String(r.item_code))
-              .sort();
+            const euCodes = ((ge?.items ?? []) as Row[]).map(r => String(r.item_code)).sort();
             expect(
               euCodes.join(','),
               `eu 单清单项编码集应恰为 GB18401 十枚（EXPORT 组在单源为空集），实际=${euCodes.join(',')}`
@@ -386,36 +385,54 @@ test.describe.serial('纺织品安全：目标市场加验口径四档差异、�
             ).toBe(REQUIREMENT_COUNT_OTHER);
 
             // 登记面过滤与内嵌逐码同源（同一市场两通道读到的编码集必须相等）
-            const euPage = await apiCallRaw<unknown>(
+            // 信封形态按该端点真实声明：data.requirements 为数组（非 bare 非 items）
+            const euPage = await apiCallRaw<{ requirements?: Row[] }>(
               session.page,
               'GET',
               `/textile-export-requirements?market=${MARKET_EU}`
             );
-            const euReqRows = pickListArray<Row>(euPage, 'requirements', 'eu 市场登记面过滤');
             expect(
-              euReqRows.map(r => String(r.requirement_code)).sort().join(','),
-              `登记面 market=eu 编码集应与内嵌面同源 [${REQ_OEKO},${REQ_REACH}]，实际=${euReqRows.map(r => String(r.requirement_code)).sort().join(',')}`
+              Array.isArray(euPage?.requirements),
+              `[eu 市场登记面过滤] 声明 data.requirements 为数组，实际=${JSON.stringify(euPage)?.slice(0, 200)}`
+            ).toBe(true);
+            const euReqRows = euPage?.requirements ?? [];
+            expect(
+              euReqRows
+                .map(r => String(r.requirement_code))
+                .sort()
+                .join(','),
+              `登记面 market=eu 编码集应与内嵌面同源 [${REQ_OEKO},${REQ_REACH}]，实际=${euReqRows
+                .map(r => String(r.requirement_code))
+                .sort()
+                .join(',')}`
             ).toBe([REQ_OEKO, REQ_REACH].sort().join(','));
-            const jpPage = await apiCallRaw<unknown>(
+            const jpPage = await apiCallRaw<{ requirements?: Row[] }>(
               session.page,
               'GET',
               `/textile-export-requirements?market=${MARKET_JP}`
             );
-            const jpReqRows = pickListArray<Row>(jpPage, 'requirements', 'jp 市场登记面过滤');
             expect(
-              jpReqRows.length,
-              `登记面 market=jp 应恰一行，实际=${jpReqRows.length}`
-            ).toBe(REQUIREMENT_COUNT_JP);
+              Array.isArray(jpPage?.requirements),
+              `[jp 市场登记面过滤] 声明 data.requirements 为数组，实际=${JSON.stringify(jpPage)?.slice(0, 200)}`
+            ).toBe(true);
+            const jpReqRows = jpPage?.requirements ?? [];
+            expect(jpReqRows.length, `登记面 market=jp 应恰一行，实际=${jpReqRows.length}`).toBe(
+              REQUIREMENT_COUNT_JP
+            );
             expect(
               String(jpReqRows[0]?.requirement_code),
               `登记面 jp 首行编码应为 ${REQ_JP}，实际=${JSON.stringify(jpReqRows[0]?.requirement_code)}`
             ).toBe(REQ_JP);
-            const domPage = await apiCallRaw<unknown>(
+            const domPage = await apiCallRaw<{ requirements?: Row[] }>(
               session.page,
               'GET',
               `/textile-export-requirements?market=${MARKET_DOM}`
             );
-            const domReqRows = pickListArray<Row>(domPage, 'requirements', 'dom 市场登记面过滤');
+            expect(
+              Array.isArray(domPage?.requirements),
+              `[dom 市场登记面过滤] 声明 data.requirements 为数组，实际=${JSON.stringify(domPage)?.slice(0, 200)}`
+            ).toBe(true);
+            const domReqRows = domPage?.requirements ?? [];
             expect(
               domReqRows.length,
               `内销不挂出口要求（登记面 market=dom 应零行，取值域本身不含 dom），实际=${domReqRows.length}`
@@ -428,7 +445,10 @@ test.describe.serial('纺织品安全：目标市场加验口径四档差异、�
               `/textile-submissions?target_market=${MARKET_EU}&product_id=${productId}&page=1&page_size=20`
             );
             expect(
-              (euFiltered?.items ?? []).map(r => Number(r.id)).sort((a, b) => a - b).join(','),
+              (euFiltered?.items ?? [])
+                .map(r => Number(r.id))
+                .sort((a, b) => a - b)
+                .join(','),
               `target_market=eu 过滤应命中且只命中本用例 eu 单 ${euId}，实际=${JSON.stringify((euFiltered?.items ?? []).map(r => r.id))}`
             ).toBe(String(euId));
             const domFiltered = await apiCallRaw<{ items: Row[] }>(
@@ -437,7 +457,10 @@ test.describe.serial('纺织品安全：目标市场加验口径四档差异、�
               `/textile-submissions?target_market=${MARKET_DOM}&product_id=${productId}&page=1&page_size=20`
             );
             expect(
-              (domFiltered?.items ?? []).map(r => Number(r.id)).sort((a, b) => a - b).join(','),
+              (domFiltered?.items ?? [])
+                .map(r => Number(r.id))
+                .sort((a, b) => a - b)
+                .join(','),
               `target_market=dom 过滤应命中且只命中本用例 dom 单 ${domId}（jp 与 other 不得混入），实际=${JSON.stringify((domFiltered?.items ?? []).map(r => r.id))}`
             ).toBe(String(domId));
 
@@ -509,7 +532,9 @@ test.describe.serial('纺织品安全：目标市场加验口径四档差异、�
             ).toBe(0);
 
             return {
-              artifacts: [{ key: 'crossCheckedMarkets', value: 'dom eu jp other 四档两身份同口径' }],
+              artifacts: [
+                { key: 'crossCheckedMarkets', value: 'dom eu jp other 四档两身份同口径' },
+              ],
             };
           },
         },

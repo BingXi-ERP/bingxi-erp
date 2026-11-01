@@ -107,7 +107,13 @@ test.describe.serial('纺织品安全：安全类别词表在册建档、越词�
             return {
               artifacts: [{ key: 'productId', value: productId }],
               // 清理位：送检草稿在第二棒体内删净后，本棒尾回收产品档案（URL 字面量写在调用点）
-              cleanup: [{ method: 'DELETE', path: `/products/${productId}`, label: '回收安全类别词表用例自建品种' }],
+              cleanup: [
+                {
+                  method: 'DELETE',
+                  path: `/products/${productId}`,
+                  label: '回收安全类别词表用例自建品种',
+                },
+              ],
             };
           },
         },
@@ -352,7 +358,9 @@ test.describe.serial('纺织品安全：安全类别词表在册建档、越词�
               Number(afterRejects?.total),
               `六次越词表拒绝后 total 应仍为 3（一行动都没多），实际=${JSON.stringify(afterRejects?.total)}`
             ).toBe(3);
-            const survivingCats = (afterRejects?.items ?? []).map(row => String(row.safety_category));
+            const survivingCats = (afterRejects?.items ?? []).map(row =>
+              String(row.safety_category)
+            );
             expect(
               survivingCats.slice().sort().join(','),
               `在册三枚的类别集合应恰为三档前缀码，实际=${JSON.stringify(survivingCats)}`
@@ -379,7 +387,11 @@ test.describe.serial('纺织品安全：安全类别词表在册建档、越词�
                 Number(deleted?.deleted),
                 `删除回执应回显被删 id ${id}，实际=${JSON.stringify(deleted)}`
               ).toBe(id);
-              const gone = await apiCallExpectFail(session.page, 'GET', `/textile-submissions/${id}`);
+              const gone = await apiCallExpectFail(
+                session.page,
+                'GET',
+                `/textile-submissions/${id}`
+              );
               expect(
                 gone.status,
                 `删除后按 id 回读应 404，实际 status=${gone.status} code=${JSON.stringify(gone.code)}`

@@ -69,7 +69,8 @@ const isoDay = (d: Date): string => d.toISOString().slice(0, 10);
 const TODAY_ISO = isoDay(new Date());
 const VALID_UNTIL_ISO = isoDay(new Date(Date.now() + 180 * 86_400_000));
 
-test.describe.serial('纺织品安全：QC 岗录结论可用、销售与财务被后端权限门拒绝、UI 与接口两路一致', () => {
+test.describe
+  .serial('纺织品安全：QC 岗录结论可用、销售与财务被后端权限门拒绝、UI 与接口两路一致', () => {
   test('四身份接力录判定与越权拒绝，菜单缺项与路由守卫与接口 403 互证', async ({ browser }) => {
     const relay = await createRelay(browser);
     try {
@@ -100,6 +101,12 @@ test.describe.serial('纺织品安全：QC 岗录结论可用、销售与财务�
               Number.isFinite(productId) && productId > 0,
               `建档应返回主键，实际=${JSON.stringify(created)?.slice(0, 200)}`
             ).toBe(true);
+            // 自建自读：产品行落库回读钉状态（只信回执会把给了 id 但行没落读成成功）
+            const back = await apiCallRaw<Row>(session.page, 'GET', `/products/${productId}`);
+            expect(
+              String(back?.status ?? ''),
+              `产品建档回读状态应为 active，实际=${JSON.stringify(back?.status)}`
+            ).toBe('active');
             return { artifacts: [{ key: 'productId', value: productId }] };
           },
         },
@@ -221,7 +228,8 @@ test.describe.serial('纺织品安全：QC 岗录结论可用、销售与财务�
               `/textile-reports/${reportId}/judgement`
             );
             expect(
-              (judged ?? []).length === 3 && (judged ?? []).every(r => String(r.verdict) === 'pass'),
+              (judged ?? []).length === 3 &&
+                (judged ?? []).every(r => String(r.verdict) === 'pass'),
               `三行实测（甲醛 40 对 75 上限、pH 6.8 对区间、异味无）应全判 pass，实际=${JSON.stringify(judged)?.slice(0, 300)}`
             ).toBe(true);
 

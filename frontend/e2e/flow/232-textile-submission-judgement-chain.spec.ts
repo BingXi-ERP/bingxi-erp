@@ -57,12 +57,7 @@
  * 棒间传标识随之失真（与 233 同口径）。
  */
 import { test, expect } from '../diagnose-fixture';
-import {
-  apiCallExpectFail,
-  apiCallRaw,
-  expectStateGateRejection,
-  genCode,
-} from './helpers';
+import { apiCallExpectFail, apiCallRaw, expectStateGateRejection, genCode } from './helpers';
 import { createRelay } from '../fixtures/relay';
 
 type Row = Record<string, unknown>;
@@ -438,9 +433,10 @@ test.describe.serial('纺织品安全：送检全流程跃迁、完整性门点�
               ['FAST_SALIVA', 'na'],
             ] as const) {
               const itemId = idByCode.get(code);
+              const got = itemId === undefined ? '<无行id>' : verdictByItem.get(itemId);
               expect(
-                itemId !== undefined ? verdictByItem.get(itemId) : '<缺行>',
-                `${code} 判定应逐字符等于 ${expected}（B 类限值矩阵产出，等级 3 恰压 3.0 下限含等，耐唾液 B 类法定不考核），实际=${JSON.stringify(verdictByItem.get(itemId))}`
+                got,
+                `${code} 判定应逐字符等于 ${expected}（B 类限值矩阵产出，等级 3 恰压 3.0 下限含等，耐唾液 B 类法定不考核），实际=${JSON.stringify(got)}`
               ).toBe(expected);
             }
 
