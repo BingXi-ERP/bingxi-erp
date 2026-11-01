@@ -41,7 +41,8 @@
 //
 // 审计面现实核到的字段清单（audit_log_service.rs build_update_audit_log 与 models/audit_log.rs）：
 // 报价每次经 update_with_audit 的跃迁落一行审计，现实字段为 user_id 与 username（操作人，
-// 反查 users 表补全）、action=UPDATE、operation_type=UPDATE、resource_type 字面量 "auto_audit"、
+// 反查 users 表补全）、action=UPDATE、operation_type=UPDATE、resource_type 落报价单实体的存储表名
+// （写入单点把历史占位串换成实体体表名，报价侧即 sales_quotations）、
 // resource_id 为报价单 id 字符串、created_at（时间）、old_value 与 new_value（变更前后整行快照，
 // 内含 status 与 rejection_reason 列）。
 // 缺的那一段（如实声明，不为其编造断言）：description request_path request_method 在
@@ -84,6 +85,12 @@ const QUOTATION_MENU_LABEL = '报价单';
 
 /** 列表筛选取页口径：只看第一页，配合唯一标记判定，不做多页归并 */
 const LIST_PAGE_QUERY = '?page=1&page_size=200';
+
+/**
+ * 审计行的资源类型真值：报价审批服务的写入单点传的是历史占位串，落库时被换成实体存储表名，
+ * 报价单实体的表名即此值（后端主干契约测试逐字钉过），故检索与断言都取体表名而非占位串。
+ */
+const AUDIT_RESOURCE_TYPE = 'sales_quotations';
 
 /**
  * 报价业务事实常量（含税事实与反算口径见文件头）。
@@ -161,7 +168,8 @@ function pickQuotationItem(detail: Row, productId: number): Row {
 /**
  * 审计跃迁定位（admin 读面）。
  * 入参：admin 会话 page 与筛选口径。传给谁：GET /audit-logs（handler 现实要求 admin 角色）。
- * 判据：resource_type 等于 auto_audit 且 resource_id 字符串包含报价 id，
+ * 判据：resource_type 等于报价单实体体表名且 resource_id 恰等于报价 id（读取侧的 resource_id
+ * 是等值契约，不用 keyword 模糊——keyword=5 会命中 resource_id 为 15 的行），
  * 再按 old_value 与 new_value 快照里的 status 对精确匹配一次跃迁，命中必须恰好一行。
  * 审计现实缺 description 与 request_path（均 NULL），因此跃迁语义只能由快照状态对判定，
  * 这一档与文件头"审计面现实核到的字段清单"一致。
@@ -176,12 +184,12 @@ async function findAuditTransition(
   const list = await apiCallRaw<unknown>(
     page,
     'GET',
-    `/audit-logs?resource_type=auto_audit&keyword=${quotationId}&page=1&page_size=100`
+    `/audit-logs?resource_type=${AUDIT_RESOURCE_TYPE}&resource_id=${quotationId}&page=1&page_size=100`
   );
   const rows = pickListArray<Row>(list, 'items', `${context}审计列表`);
   const hits = rows.filter(r => {
-    if (String(r.resource_type ?? '') !== 'auto_audit') return false;
-    if (!String(r.resource_id ?? '').includes(String(quotationId))) return false;
+    if (String(r.resource_type ?? '') !== AUDIT_RESOURCE_TYPE) return false;
+    if (String(r.resource_id ?? '') !== String(quotationId)) return false;
     const beforeRaw = r.old_value;
     const afterRaw = r.new_value;
     if (!beforeRaw || typeof beforeRaw !== 'object') return false;
