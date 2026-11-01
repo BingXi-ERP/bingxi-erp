@@ -20,7 +20,8 @@
  *   1 端点集来自 walkBackendRoutes()，与 check-api-paths 和 route-snapshot 同一套
  *     nest/merge 语义，不另起第二套解析口径（两套口径必然各自数出一套端点）。
  *   2 新增集 = 当前端点集 − 基线端点集，按 "METHOD PATH" 逐字对比。
- *   3 配对判据用静态前缀：/a/b/* 取 "/a/b/"，要求该前缀字面量出现在语料某文件里。
+ *   3 配对判据用静态前缀的两条检索串：/a/b/* 取 "/a/b/"，并同时给出摘掉 nest 挂载前缀
+ *     后的同形串（用例走相对 baseURL 写法，正文里根本没有那层前缀），命中任一即算配对。
  *     这是不依赖编译时能取到的最强判据；再窄会误杀模板串与字符串拼接的合法写法。
  *   4 前缀命中但该文件全文没有该 METHOD 记号时只点名为 WEAK 不判红：用例经封装的
  *     请求助手发请求时方法名不在 spec 里出现属正常形态，判红会把人推向"为过门硬塞
@@ -34,7 +35,7 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync } from 'fs';
 import { join, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
-import { walkBackendRoutes } from './check-api-paths.mjs';
+import { walkBackendRoutes, BASE_URL } from './check-api-paths.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
@@ -113,6 +114,24 @@ function staticPrefix(path) {
   return star < 0 ? path : path.slice(0, star);
 }
 
+/**
+ * 配对检索串：挂载前缀形态两侧不对称，必须两个都给。
+ * 后端快照里的端点带完整 nest 前缀，而用例发请求时走的是相对 baseURL 的写法
+ * （同一份 /api/v1/erp 前缀在 axios baseURL 里，不在 spec 文本里），只按快照整串
+ * 检索会让绝大多数真有用例的端点被判零引用：实测 1821 枚端点里整串只命中 128 枚，
+ * 去掉前缀后命中 1404 枚。命中任一串即算配对，去前缀串短于三段时不参与
+ * （只剩 '/' 一类的前缀会让任何含斜杠的文件都算命中，判据退化）。
+ */
+function matchNeedles(path) {
+  const full = staticPrefix(path);
+  const out = [full];
+  if (path.startsWith(BASE_URL)) {
+    const stripped = staticPrefix(path.slice(BASE_URL.length));
+    if (stripped.split('/').filter(Boolean).length >= 2) out.push(stripped);
+  }
+  return out;
+}
+
 function loadExempt(file) {
   if (!existsSync(file)) return { map: new Map(), error: null };
   try {
@@ -184,8 +203,8 @@ function judge(over = {}) {
   let exempted = 0;
   for (const key of added) {
     const { method, path } = cur.get(key);
-    const prefix = staticPrefix(path);
-    const hits = texts.filter(t => t.body.includes(prefix));
+    const needles = matchNeedles(path);
+    const hits = texts.filter(t => needles.some(n => t.body.includes(n)));
     if (hits.length > 0) {
       if (hits.some(t => new RegExp('\\b' + method + '\\b').test(t.body))) paired += 1;
       else {
@@ -262,9 +281,21 @@ function selfTest() {
   const texts = corpusFiles(CORPUS).map(f => readFileSync(f, 'utf8'));
   const covered = [];
   const uncovered = [];
+  const asymmetric = [];
   for (const key of cur.keys()) {
-    const prefix = staticPrefix(cur.get(key).path);
-    (texts.some(t => t.includes(prefix)) ? covered : uncovered).push(key);
+    const path = cur.get(key).path;
+    const needles = matchNeedles(path);
+    (texts.some(t => needles.some(n => t.includes(n))) ? covered : uncovered).push(key);
+    if (path.startsWith(BASE_URL)) {
+      const full = staticPrefix(path);
+      const stripped = staticPrefix(path.slice(BASE_URL.length));
+      if (
+        stripped.split('/').filter(Boolean).length >= 2 &&
+        !texts.some(t => t.includes(full)) &&
+        texts.some(t => t.includes(stripped))
+      )
+        asymmetric.push(key);
+    }
   }
   say(
     'SELFTEST_POOL current=' +
@@ -272,7 +303,9 @@ function selfTest() {
       ' covered=' +
       covered.length +
       ' uncovered=' +
-      uncovered.length
+      uncovered.length +
+      ' asymmetric=' +
+      asymmetric.length
   );
   if (covered.length === 0 || uncovered.length === 0) {
     return {
@@ -336,6 +369,19 @@ function selfTest() {
     'exemptWithoutReasonMustBeRed',
     judge({ baseline: dropBaseline(uncovered[1] || uncovered[0]), exempt: noReasonExempt }).code,
     1,
+  ]);
+  // 前缀不对称探针：快照串带 nest 前缀、用例串不带，这类端点占了真端点的绝大多数。
+  // 一旦有人把检索串退回"只认快照整串"，这里立刻从绿翻红，缺陷不会只体现在报错数量里。
+  if (asymmetric.length === 0) {
+    return {
+      code: 9,
+      head: 'TOOL_BUG 前缀不对称夹具为空：语料里已无"只写相对路径"的端点，检索串口径与语料形态脱节',
+    };
+  }
+  probes.push([
+    'prefixAsymmetryMustBeGreen',
+    judge({ baseline: dropBaseline(asymmetric[0]), exempt: emptyExempt }).code,
+    0,
   ]);
 
   let caught = 0;
