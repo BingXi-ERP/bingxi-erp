@@ -4,7 +4,8 @@
  * 调用方：libs/services/request.js、packageA/services/request.js、packageB/libs/services/request.js、
  *   libs/services/ServicesUser.js、libs/utils/login.js、三份 checkToken.js、app.js、登录页
  * 入参：wx.request 的 url / method / data 与原始响应对象
- * 传给谁：归一化响应体回给发起请求的业务 service；会话快照与 CSRF 令牌写 wx.storage
+ * 传给谁：归一化响应体回给发起请求的业务 service；会话快照与 CSRF 令牌写 wx.storage；
+ *   会话不被承认时的统一清退（清会话、令牌与用户档案缓存并回登录页）由 clearLoginState 承担
  * 存什么：bingxiCsrf（后端签发的一次性 CSRF 令牌）、bingxiSession（后端回读确认的会话快照）
  * 存哪里：wx.storage
  *
@@ -359,6 +360,66 @@ function isLoggedIn() {
   return !!wx.getStorageSync(SESSION_KEY);
 }
 
+/** 会话不成立时需要一并作废的用户档案缓存键 */
+var PROFILE_STORE_KEYS = [
+  "id",
+  "nickName",
+  "mobile",
+  "myShopId",
+  "resCodeList",
+  "userType",
+  "avatar",
+  "fullName",
+  "wxId",
+  "wxOpenId",
+];
+
+/**
+ * 清本地登录态并回到登录页
+ * 调用方：app.js 前台自检的 invalid 分支、libs/utils/checkToken.js 的 clearLoginFlag（含 checkLogin
+ *   与 requireLogin 的回读失败路径，经它统一进入本页）、需要主动登出的登录链
+ * 入参：无
+ * 传给谁：wx.removeStorageSync 逐键作废，app.globalData 重建，wx.reLaunch 到登录页
+ * 存什么：logoutFlag 记一枚登出标记；会话快照与一次性令牌与用户档案缓存键全部作废，
+ *   不留下任何能让门禁误判已登录的本地痕迹；app.userAuthList 与 app.statisticsCount 归零
+ * 存哪里：wx.storage 与 app.globalData
+ * 已在登录页时不重复 reLaunch，避免自跳转叠加
+ */
+function clearLoginState() {
+  var a = app_();
+  wx.setStorageSync("logoutFlag", 1);
+  clearSession();
+  for (var i = 0; i < PROFILE_STORE_KEYS.length; i++)
+    wx.removeStorageSync(PROFILE_STORE_KEYS[i]);
+  a.userAuthList = [];
+  a.statisticsCount = 0;
+  a.globalData = {
+    agreeCheck: "",
+    userOpenIdFlag: "",
+    statusBarHeight: 0,
+    titleBarHeight: 0,
+    isLoginPage: a.globalData ? a.globalData.isLoginPage : !1,
+    userInfo: {},
+    loginState: "invalid",
+    logoutFlag: 1,
+    mpVersion: "3.2.8",
+    categoriesList: [],
+    mobileInfo: {},
+    formIds: [],
+    inChannel: "",
+    subChannel: "",
+    wxId: "",
+  };
+  if (!(a.globalData && a.globalData.isLoginPage)) {
+    wx.reLaunch({
+      url: "/pages/register/login/login",
+      success: function () {
+        a.globalData.isLoginPage = !0;
+      },
+    });
+  }
+}
+
 /**
  * 回读 GET /api/v1/erp/auth/me 判定登录态
  * 入参：无，凭据由 wx.request 自动维护的 Cookie 承载，本函数不构造 Authorization 头
@@ -485,6 +546,7 @@ module.exports = {
   isLoggedIn: isLoggedIn,
   markSession: markSession,
   clearSession: clearSession,
+  clearLoginState: clearLoginState,
   verifySession: verifySession,
   serializeWrite: serializeWrite,
   CSRF_STORE_KEY: CSRF_KEY,

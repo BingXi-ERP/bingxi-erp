@@ -44,8 +44,26 @@ App({
         }));
     }
   },
+  /**
+   * 前台自检：本地有会话快照时回读 GET /api/v1/erp/auth/me 确认会话真伪，判定以回读为唯一准绳
+   * 入参：无
+   * 传给谁：libs/utils/apiGateway.js 的 verifySession 与 clearLoginState
+   * 存什么：valid 时 verifySession 已刷新 bingxiSession 的 verifiedAt；invalid（401 与 403）时
+   *   经 clearLoginState 清会话、令牌与用户档案缓存并回登录页；error（网络失败与 5xx）判据未知，
+   *   保留既有快照不清退，只留可追踪的日志，不把抖动当掉线
+   * 存哪里：wx.storage 与 app.globalData（落点在 apiGateway）
+   */
   onShow: function () {
-    apiGateway.isLoggedIn() && apiGateway.verifySession();
+    if (!apiGateway.isLoggedIn()) return;
+    apiGateway.verifySession().then(function (v) {
+      if (v.state === "invalid") {
+        apiGateway.clearLoginState();
+        return;
+      }
+      if (v.state === "error") {
+        console.log("会话回读未确认，保留本地快照：" + v.msg);
+      }
+    });
   },
   getSystemInfo: function () {
     var t = this;
@@ -103,7 +121,9 @@ App({
     titleBarHeight: 0,
     isLoginPage: !1,
     userInfo: {},
-    loginState: apiGateway.isLoggedIn() ? "valid" : "none",
+    // 本地快照只说明曾通过回读，不等于本次会话仍成立；冷启动一律记 unverified，
+    // 由 onShow 自检经 auth/me 回读改写为 valid 或 invalid（apiGateway 的两处写入）
+    loginState: apiGateway.isLoggedIn() ? "unverified" : "none",
     logoutFlag: wx.getStorageSync("logoutFlag"),
     mpVersion: "3.2.8",
     categoriesList: [],

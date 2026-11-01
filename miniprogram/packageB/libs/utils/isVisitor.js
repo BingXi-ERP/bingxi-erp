@@ -6,7 +6,7 @@
  * 传给谁：主包 libs/utils/isVisitor.js 的同一实现
  * 存什么 / 存哪里：本文件不落任何数据；会话快照与登录标记由主包实现经 apiGateway 读写 wx.storage
  *
- * 分包不再自持一份判据实现：登录态的唯一判据是后端 GET /api/v1/erp/users/me 的回读结果
+ * 分包不再自持一份判据实现：登录态的唯一判据是后端 GET /api/v1/erp/auth/me 的回读结果
  * （与 packageA/utils/checkToken.js、packageB/libs/utils/checkToken.js 同一惯例）。
  *
  * 退场口径：本副本原以 `5 === app.globalData.userInfo.type` 作门，判据取自用户档案的角色字段，

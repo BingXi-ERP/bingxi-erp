@@ -4,8 +4,9 @@
  * 调用方：libs/services/request.js 在收到 401 时调 checkLogin()；各页面需要登录门禁处可调 checkLogin()
  * 入参：无（读 app.config.bingxiHost 与 wx.storage 中的会话快照）
  * 传给谁：apiGateway.verifySession() —— 内部发 GET /api/v1/erp/auth/me 并按回读结果判登录态
- * 存什么：会话成立与否由 apiGateway 写 bingxiSession；本文件只负责在会话不成立时清登录标记与用户档案缓存
- * 存哪里：wx.storage、app.globalData
+ * 存什么：会话成立与否由 apiGateway 写 bingxiSession；本文件只负责在会话不成立时经
+ *   apiGateway.clearLoginState 统一清会话、令牌、用户档案缓存并回登录页
+ * 存哪里：wx.storage、app.globalData（清退动作落点在 apiGateway，本文件不再自持一份键清单）
  *
  * 判据口径（backend/src/handlers/auth_handler.rs 的 LoginResponse 无 token 字段，凭据只在 httpOnly Cookie）：
  *   valid   —— auth/me 回读 200，会话成立
@@ -17,22 +18,7 @@
  */
 var createClass = require("../../@babel/runtime/helpers/createClass"),
   classCallCheck = require("../../@babel/runtime/helpers/classCallCheck"),
-  apiGateway = require("./apiGateway.js"),
-  app = getApp();
-
-/** 会话不成立时需要一并作废的用户档案缓存键 */
-var PROFILE_KEYS = [
-  "id",
-  "nickName",
-  "mobile",
-  "myShopId",
-  "resCodeList",
-  "userType",
-  "avatar",
-  "fullName",
-  "wxId",
-  "wxOpenId",
-];
+  apiGateway = require("./apiGateway.js");
 
 var n = createClass(function e() {
   var self = this;
@@ -70,39 +56,15 @@ var n = createClass(function e() {
     return self.checkLogin();
   };
 
-  /** 作废本地登录痕迹并回到登录页 */
+  /**
+   * 作废本地登录痕迹并回到登录页
+   * 入参：无
+   * 传给谁：本文件 checkLogin 的 invalid 分支；需要主动登出回到登录页的调用点
+   * 存什么 / 存哪里：清退动作全部落点在 apiGateway.clearLoginState（会话、令牌、用户档案缓存键、
+   *   logoutFlag 与 globalData 重建与 reLaunch），本文件只保留入口形状，不再自持第二份清退实现
+   */
   this.clearLoginFlag = function () {
-    wx.setStorageSync("logoutFlag", 1);
-    apiGateway.clearSession();
-    for (var i = 0; i < PROFILE_KEYS.length; i++)
-      wx.removeStorageSync(PROFILE_KEYS[i]);
-    app.userAuthList = [];
-    app.statisticsCount = 0;
-    app.globalData = {
-      agreeCheck: "",
-      userOpenIdFlag: "",
-      statusBarHeight: 0,
-      titleBarHeight: 0,
-      isLoginPage: app.globalData ? app.globalData.isLoginPage : !1,
-      userInfo: {},
-      loginState: "invalid",
-      logoutFlag: 1,
-      mpVersion: "3.2.8",
-      categoriesList: [],
-      mobileInfo: {},
-      formIds: [],
-      inChannel: "",
-      subChannel: "",
-      wxId: "",
-    };
-    if (!(app.globalData && app.globalData.isLoginPage)) {
-      wx.reLaunch({
-        url: "/pages/register/login/login",
-        success: function () {
-          app.globalData.isLoginPage = !0;
-        },
-      });
-    }
+    apiGateway.clearLoginState();
   };
 });
 
