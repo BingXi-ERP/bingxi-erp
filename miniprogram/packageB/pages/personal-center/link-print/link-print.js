@@ -1,11 +1,15 @@
 var t = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
     require("../../../utils/mta_analysis.js"),
   ),
-  app = getApp();
+  app = getApp(),
+  envConfig = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
+    require("../../../../envConfig.js"),
+  );
 Page({
   data: {
-    servicePhone:
-      require("../../../../envConfig.js").default.contacts.servicePhone,
+    servicePhone: envConfig.default.contacts.servicePhone,
+    // 打印机无线热点名，取自 envConfig.printer.hotspotSsid 单点，改热点只改那一枚
+    hotspotSsid: envConfig.default.printer.hotspotSsid,
     spname: "打印机",
     printList: [],
     storageList: [],
@@ -222,8 +226,8 @@ Page({
   confirmR: function () {
     var t = this;
     wx.setClipboardData({
-      // 把打印机无线热点名复制到剪贴板，供用户去系统 WLAN 列表粘贴连接，热点名由后端配置下发
-      data: "gc13800000000",
+      // 把打印机无线热点名复制到剪贴板，供用户去系统 WLAN 列表粘贴连接，热点名取自 envConfig.printer.hotspotSsid 单点，改热点只改那一枚
+      data: this.data.hotspotSsid,
       success: function (e) {
         (t.cancelR(),
           wx.showToast({

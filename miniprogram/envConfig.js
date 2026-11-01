@@ -21,12 +21,25 @@ if (
 module.exports = {
   envPage: "production",
   appVersion: "1.0.0",
-  // contacts 存对外客服号码，单点一份，改号只改这里。读取面：app.js 的 customsPhoneNum 与
-  // packageB 打印帮助页展示的客服电话；传给谁：页面 data 与 wx.makePhoneCall 的号码入参。
+  // contacts 存对外客服号码，单点一份，改号只改这里。读取面：app.js 的 customsPhoneNum、
+  // packageB 打印帮助页与 restock-product 咨询下单弹窗展示的客服电话；
+  // 传给谁：页面 data 与 wx.makePhoneCall 的号码入参。
   // 缺键即取不到号码，属配置缺失，不做静默回退。
   contacts: {
     customsPhoneNum: "13178852281",
     servicePhone: "13178852281",
+  },
+  // account 存演示账号判定号，单点一份，改号只改这里。读取面：pages/personal-center 的登录入口隐藏特判；
+  // 传给谁：与本地缓存手机号（storage.key = "mobile"）的比较值。
+  // 缺键即取不到判定号，属配置缺失，不做静默回退。
+  account: {
+    demoMobileNum: "13800000000",
+  },
+  // printer 存打印机无线热点名，单点一份，改热点只改这里。读取面：packageB link-print 的 confirmR；
+  // 传给谁：wx.setClipboardData 的复制内容，供用户到系统 WLAN 列表粘贴连接。
+  // 缺键即复制不到热点名，属配置缺失，不做静默回退。
+  printer: {
+    hotspotSsid: "gc13800000000",
   },
   envList: {
       dev: {

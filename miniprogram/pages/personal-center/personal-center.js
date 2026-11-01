@@ -1,6 +1,7 @@
 var e = require("../../@babel/runtime/helpers/interopRequireDefault").default,
   mta_analysis = e(require("../../utils/mta_analysis.js")),
   isVisitor = e(require("../../libs/utils/isVisitor")),
+  envConfig = e(require("../../envConfig.js")),
   app = getApp(),
   ServicesCenter = require("../../libs/services/ServicesCenter.js").servicesCenter,
   login = require("../../libs/utils/login.js").login,
@@ -204,8 +205,8 @@ Page({
       return !a.perm || e.data.userAuthList[a.perm];
     });
     var util = wx.getStorageSync("mobile");
-    // 演示账号特判，本地缓存手机号等于演示号时隐藏登录入口，演示号由后端配置下发
-    (("13800000000" != util && util) || login.splice(0, 1),
+    // 演示账号特判，本地缓存手机号等于演示号时隐藏登录入口，演示号取自 envConfig.account.demoMobileNum 单点，改号只改那一枚
+    ((envConfig.default.account.demoMobileNum != util && util) || login.splice(0, 1),
       this.setData({
         panel: o,
         panelMuen: login,

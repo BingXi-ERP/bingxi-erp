@@ -2,6 +2,9 @@ require("../../../@babel/runtime/helpers/Arrayincludes");
 var t = require("../../../@babel/runtime/helpers/regeneratorRuntime"),
   e = require("../../../@babel/runtime/helpers/asyncToGenerator"),
   app = getApp(),
+  envConfig = (0, require("../../../@babel/runtime/helpers/interopRequireDefault").default)(
+    require("../../../envConfig.js"),
+  ),
   ServicesUser = require("../../../libs/services/ServicesUser.js").servicesUser,
   releaseCargoPass = require("../../libs/services/releaseCargoPass.js").servicesCargoPass,
   util = require("../../libs/utils/util.js").utils,
@@ -14,6 +17,8 @@ var t = require("../../../@babel/runtime/helpers/regeneratorRuntime"),
 Page({
   data: {
     domain: "",
+    // 咨询下单弹窗展示的客服电话，取自 envConfig.contacts.servicePhone 单点，改号只改那一枚
+    servicePhone: envConfig.default.contacts.servicePhone,
     orderBtn: !1,
     supplierShow: !0,
     showPhone: !1,

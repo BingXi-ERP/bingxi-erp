@@ -138,11 +138,9 @@
         <van-button block round bind:tap="contact" type="info">咨询下单</van-button>
     </view>
     <van-popup round position="bottom" show="{{showPhone}}">
-        <!-- 咨询下单联系人列表，联系人姓名与号码由后端配置下发，此处为示例占位 -->
+        <!-- 咨询下单联系电话，号码取自 envConfig.contacts.servicePhone 单点，改号只改那一枚 -->
         <view class="phone-box">
-            <view bind:tap="callPhone" class="phone" data-phone="13800000001">欧阳晓恩 138 0000 0001</view>
-            <view bind:tap="callPhone" class="phone" data-phone="13800000002">秦亦禧 138 0000 0002</view>
-            <view bind:tap="callPhone" class="phone" data-phone="13800000003">侯名赐 138 0000 0003</view>
+            <view bind:tap="callPhone" class="phone" data-phone="{{servicePhone}}">咨询下单 {{servicePhone}}</view>
         </view>
         <view bind:tap="cancel" class="cancel-btn">取消</view>
     </van-popup>

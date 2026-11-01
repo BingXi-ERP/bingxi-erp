@@ -1,11 +1,13 @@
 var t = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
     require("../../../utils/mta_analysis.js"),
   ),
-  app = getApp();
+  app = getApp(),
+  envConfig = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
+    require("../../../../envConfig.js"),
+  );
 Page({
   data: {
-    servicePhone:
-      require("../../../../envConfig.js").default.contacts.servicePhone,
+    servicePhone: envConfig.default.contacts.servicePhone,
     totalList: [],
     printList: [],
     storageList: [],
