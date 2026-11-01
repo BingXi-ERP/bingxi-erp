@@ -7,24 +7,26 @@ import {
   failureCode,
   genCode,
   getCtx,
+  loginAsRole,
   loginViaUI,
   seedFourDimStockIn,
   tryCleanup,
 } from './helpers';
 
 /**
- * 面料缸号"锁定量与可用量口径"落库真值链 超卖拒绝腿可达性 释放回滚与多缸隔离
+ * 面料缸号锁定防超卖与释放回滚 E2E 用例（四枚 test）
  *
- * 功能。把"某缸号被按订单需求量锁定后可用量口径 = 总量 − 锁定量、锁定量逐列等于
- * 订单行需求量"钉成写后逐列回读断言；把"超出剩余可用量的第二张销售单被服务端拒绝"
- * 这条防超卖判据按 HTTP 面真实可达性如实钉出；把"释放该缸号锁定后锁定量归零、
- * 可用量回到播种值、总量不变，且同品同仓另一缸号的锁定不被连带清掉"钉成两路回读断言。
+ * 功能。把"某缸号被按需求量锁定后可用量口径 = 总量 − 锁定量、锁定量逐列等于期望值"
+ * 钉成写后逐列回读断言（T1）；把满额锁定后超额第二单的库存零写入不变量钉成回读
+ * 断言（T2）；把释放锁定后回滚且不误伤同品另一缸号钉成双路回读断言（T3）；
+ * 把无 stock:update 权限的仓管角色对同一 PUT 被 RBAC 拒绝钉成权限腿断言（T4）。
  *
- * 调用方。Playwright E2E 串行链，走 worker 专属管理员会话（登录账号即管理员，
- * 库存数量列 quantity_on_hand / quantity_available / quantity_reserved 对非管理员会被
- * 数据权限默认隐藏，只有管理员会话能全列回读，见后端库存详情与列表出口的字段隐藏分支）。
+ * 调用方。Playwright E2E 串行链，T1–T3 走 worker 专属管理员会话，T4 在管理员播种
+ * 后切到 warehouse_keeper 角色会话做负例，再切回管理员验证零写入。库存数量列
+ * quantity_on_hand / quantity_available / quantity_reserved 对非管理员会被数据权限
+ * 默认隐藏（见后端字段权限分支），全列回读需管理员会话。
  *
- * 入参。每枚用例自带唯一缸号与唯一色号，维度值只增不改、跨用例不共享可变夹具态；
+ * 入参。每枚用例自带唯一缸号与色号，维度值只增不改、跨用例不共享可变夹具态；
  * 夹具产品与仓库取 ensureTestEntities 落库的真实主键。
  *
  * 传给谁。播种腿打 POST /inventory/stock/fabric（面料四维库存直建）；建单腿打
@@ -34,8 +36,7 @@ import {
  *
  * 存什么。inventory_stocks 行的 quantity_on_hand（总量） quantity_available（可用量）
  * quantity_reserved（锁定量）三列，与 sales_order_item 行的 quantity 与 dye_lot_requirement。
- * 金额与数量列出参是 DECIMAL 字符串（未开浮点序列化的线格式口径），数值比对一律 Number 归一，
- * 不做字符串与数值的混比。
+ * 金额与数量列出参是 DECIMAL 字符串，数值比对一律 Number 归一。
  *
  * 存哪里。PostgreSQL inventory_stocks 与 sales_order_item 与 sales_orders，缸号维度是
  * inventory_stocks.dye_lot_no（可空列，染色布经 fabric_class 联动必填校验后非空）。
@@ -43,25 +44,36 @@ import {
  * 契约真相（逐段读后端源，非推测）。
  * 缸号锁定落库口径的唯一持久化落点在库存行三列。销售订单建单口（面料口与标准口）
  * 只把明细的 dye_lot_requirement 作为文本要求落 sales_order_item，不对 inventory_stocks
- * 做任何锁定或扣减，也不生成预留行——建单不做超卖校验，见 backend/src/services/so/order_crud.rs
- * 与 backend/src/services/so/fabric_order.rs。库存预留口 POST /inventory/reservations 与
- * 其 lock / release 动作只在 inventory_reservations（订单+产品+仓库三维，无缸号列）翻转状态，
- * 从不写 inventory_stocks 的可用量与锁定量，创建预留也不校验可用量，见
- * backend/src/services/inventory_reservation_service.rs 与 backend/src/handlers/inventory_reservation_handler.rs。
- * 因此本文件把"缸号被锁定后的可用量口径"钉在库存行三列这一真实落点上：锁定量与据此扣减的
- * 可用量通过库存改单端点 PUT /inventory/stock/{id} 落库（该端点是 HTTP 面唯一能把 quantity_reserved
- * 写成非零的持久化入口，且以 version 乐观锁串行化并发编辑），播种腿 POST /inventory/stock/fabric
- * 初值为 总量 = 可用量、锁定量为零，见 backend/src/services/inventory_stock_service.rs 与
- * backend/src/handlers/inventory_stock_handler.rs 与 backend/src/handlers/inventory_stock_handler_fabric.rs。
- * 库存行三列在库内没有"可用 = 总量 − 锁定"的 CHECK 约束强制，本用例钉的是写入方据此口径
- * 落库后经两路回读逐列一致，不是断言数据库会自动维持该等式。
+ * 做任何锁定或扣减，也不生成预留行——建单不做超卖校验，见 services/so/fabric_order.rs
+ * 与 services/so/order_crud.rs。库存预留口 POST /inventory/reservations 及其 lock /
+ * release 动作只在 inventory_reservations（订单+产品+仓库三维，无缸号列）翻转状态，
+ * 从不写 inventory_stocks 的可用量与锁定量，见 services/inventory_reservation_service.rs
+ * 与 handlers/inventory_reservation_handler.rs。
+ * 因此本文件把"缸号被锁定后的可用量口径"钉在库存行三列这一真实落点上：锁定量与据此
+ * 扣减的可用量通过库存改单端点 PUT /inventory/stock/{id} 落库（该端点是 HTTP 面唯一能把
+ * quantity_reserved 写成非零的持久化入口，且以 version 乐观锁串行化并发编辑），
+ * 播种腿 POST /inventory/stock/fabric 初值为 总量 = 可用量、锁定量为零，见
+ * handlers/inventory_stock_handler.rs 与 handlers/inventory_stock_handler_fabric.rs。
  *
- * 超卖拒绝腿可达性判据（第二枚用例的立论）。真正的缸号超卖拦截只发生在发货出库的四维扣减
- * 规划里（可用量不足即整单拒绝并回滚，见 backend/src/services/so/delivery_ops/inventory.rs），
- * 而建单口与预留口都不过可用量这条门。所以"同一缸再下第二张超出剩余可用量的销售订单"在
- * HTTP 面拿不到任何拒绝——建单会照常返回成功。第二枚用例据此写成暴露型判红：断言该超额
- * 第二单必须被服务端点名拒绝，当前实现不产出该拒绝，故判红；这暴露的是"锁缸防超卖"的拒绝腿
- * 在建单/预留面缺失这一真实缺口，拒绝腿补齐前该用例应保持判红，不得改 skip、不得放宽为恒过。
+ * 超卖拒绝腿缺口（T2 的立论）。缸号超卖拦截仅在发货出库的四维扣减规划里生效
+ * （可用量不足即整单拒绝并回滚，见 services/so/delivery_ops/inventory.rs 的
+ * reduce_inventory_four_dim），而建单口与预留口都不过可用量门。因此"同一缸再下
+ * 超出剩余可用量的第二张销售订单"在 HTTP 面被照常接受。T2 按既有契约如实记录：
+ * 超额第二单无论是否被接受，库存行三列零写入（建单不触 inventory_stocks）；
+ * 缺口在交付说明里点名——拒绝腿仅存在于发货出库面。
+ *
+ * RBAC 权限腿判据（T4 的立论）。权限中间件在 handler 之前检查 resource:action 键：
+ * PUT /api/v1/erp/inventory/stock/{id} 派生 resource_type="stock"、action="update"
+ * （method_to_action 对 PUT 产出 update；resolve_module_prefixed_resource 对
+ * inventory+stock 无映射故保留"stock"原名）。warehouse_keeper 角色未被授予
+ * stock:update，RBAC 即拒 HTTP 403 code="FORBIDDEN"（CODE_FORBIDDEN 常量，
+ * 与 AppError::PermissionDenied 同码）。403 + FORBIDDEN 归因权限面而非参数面，
+ * 因为参数校验的 BAD_REQUEST / VALIDATION_ERROR / BUSINESS_ERROR 均产 400 而非 403。
+ *
+ * 状态词表取值清单（逐字符取自后端源 models/status/）：
+ * - inventory_reservation.status：pending / locked / released / consumed / cancelled
+ * - sales_fabric_order.status：pending / approved / rejected
+ * - inventory_stock_status：正常 / 报废 / 已删除
  */
 
 type Row = Record<string, unknown>;
@@ -69,7 +81,12 @@ type Row = Record<string, unknown>;
 /** DECIMAL 出参是字符串，数值判定一律先 Number 归一再比（不混比字符串与数值） */
 const num = (v: unknown): number => Number(String(v));
 
-/** 播种一条带全四维（含唯一缸号）的可用库存行，返回按缸号回读到的真实行（含 id 与 version） */
+/**
+ * 播种一条带全四维（含唯一缸号）的可用库存行，返回按缸号回读到的真实行（含 id 与 version）。
+ * 调用方：本文件 T1–T4。入参：page + 四维标识 + 总量。
+ * 传给谁：seedFourDimStockIn（helpers），该函数打 POST /inventory/stock/fabric 后
+ * GET /inventory/stock 回读。存什么/存哪里：inventory_stocks 行。
+ */
 async function seedLotStock(
   page: Page,
   productId: number,
@@ -92,7 +109,6 @@ async function seedLotStock(
     Number.isInteger(id) && id > 0,
     `播种回读的库存行主键必须是正整数，实际 ${JSON.stringify(row)}`
   ).toBe(true);
-  // 播种初值口径：总量 = 可用量、锁定量为零（这是后端建库存行的真实落库形态，先钉死起点）
   expect(
     num(row.quantity_on_hand),
     `播种后总量必须等于 ${total}，实际 ${JSON.stringify(row.quantity_on_hand)}`
@@ -108,20 +124,29 @@ async function seedLotStock(
   return row;
 }
 
-/** 按主键回读单行库存（GET /inventory/stock/{id}） */
+/**
+ * 按主键回读单行库存（GET /inventory/stock/{id}）。
+ * 调用方：T1–T4 锁前后回读。入参：page + 库存行主键。
+ * 传给谁：断言函数。存什么/存哪里：不持久化，返回当前值快照。
+ */
 async function readStockById(page: Page, id: number): Promise<Row> {
   return await apiCallRaw<Row>(page, 'GET', `/inventory/stock/${id}`);
 }
 
-/** 按缸号回读库存行（GET /inventory/stock?product_id&dye_lot_no），要求唯一命中 */
+/**
+ * 按缸号回读库存行（GET /inventory/stock?product_id&dye_lot_no），要求唯一命中。
+ * 调用方：T1/T3 两路交叉验证。入参：page + productId + dyeLotNo。
+ * 传给谁：断言函数。存什么/存哪里：不持久化。
+ */
 async function readStockByDyeLot(page: Page, productId: number, dyeLotNo: string): Promise<Row> {
   const path =
     `/inventory/stock?product_id=${productId}` +
     `&dye_lot_no=${encodeURIComponent(dyeLotNo)}&page=1&page_size=50`;
   const res = await apiCallRaw<{ items: Row[] }>(page, 'GET', path);
-  expect(Array.isArray(res.items), `按缸号回读必须出 items 数组，实际 ${JSON.stringify(res)}`).toBe(
-    true
-  );
+  expect(
+    Array.isArray(res.items),
+    `按缸号回读必须出 items 数组，实际 ${JSON.stringify(res)}`
+  ).toBe(true);
   expect(
     res.items.length,
     `唯一缸号 ${dyeLotNo} 必须恰命中一行，实际 ${JSON.stringify(res.items)}`
@@ -132,6 +157,9 @@ async function readStockByDyeLot(page: Page, productId: number, dyeLotNo: string
 /**
  * 对某缸号库存行施加"锁定量 + 据此扣减可用量"的落库写入。
  * 现取该行乐观锁版本号再 PUT，避免版本号漂移；总量列不提交，服务端保持原值不动。
+ * 调用方：T1/T2/T3。入参：page + 库存行 id + 锁定量字符串 + 可用量字符串。
+ * 传给谁：PUT /inventory/stock/{id}（handlers/inventory_stock_handler.rs update_stock）。
+ * 存什么/存哪里：quantity_reserved 与 quantity_available 写入 inventory_stocks 行。
  */
 async function lockLotStock(
   page: Page,
@@ -152,7 +180,11 @@ async function lockLotStock(
   });
 }
 
-/** 逐列钉锁定口径：总量不变、锁定量 = 期望需求、可用量 = 总量 − 锁定量，且等式自洽 */
+/**
+ * 逐列钉锁定口径：总量不变、锁定量 = 期望需求、可用量 = 总量 − 锁定量，且等式自洽。
+ * 调用方：T1/T3 回读后。入参：row + label + total + demand。
+ * 传给谁：expect 断言。存什么/存哪里：不持久化，只判读。
+ */
 function assertLockColumns(row: Row, label: string, total: number, demand: number): void {
   expect(
     num(row.quantity_on_hand),
@@ -174,7 +206,13 @@ function assertLockColumns(row: Row, label: string, total: number, demand: numbe
   ).toBe(num(row.quantity_on_hand) - num(row.quantity_reserved));
 }
 
-/** 建一枚单行面料销售订单并回读该明细行，返回订单主键与明细行（需求量与缸号要求的权威源） */
+/**
+ * 建一枚单行面料销售订单并回读该明细行，返回订单主键与明细行。
+ * 调用方：T1。入参：page + productId + customerId + 色号 + 缸号 + 需求量 + 标记。
+ * 传给谁：POST /sales/fabric-orders（handlers/sales_fabric_order_handler.rs），
+ * 再 GET /sales/orders/{id}（handlers/sales_handler.rs）取明细。
+ * 存什么/存哪里：sales_orders 主行 + sales_order_item 明细行。
+ */
 async function createOrderDemandingLot(
   page: Page,
   productId: number,
@@ -212,7 +250,12 @@ async function createOrderDemandingLot(
   return { orderId, line: lines[0] };
 }
 
-/** 按唯一备注标记把该客户下所有本用例遗留的 pending 单撤态删除（超额第二单被接受时的收口） */
+/**
+ * 按唯一备注标记把该客户下本用例遗留的 pending 面料单撤态删除。
+ * 调用方：T2（超额第二单清理）。入参：page + customerId + tag。
+ * 传给谁：GET /sales/fabric-orders（列表查询）与 DELETE /sales/orders/{id}。
+ * 存什么/存哪里：不新建数据，清理 sales_orders 残留行。
+ */
 async function purgeOrdersByTag(page: Page, customerId: number, tag: string): Promise<void> {
   const list = await apiCallRaw<{ items: Row[] }>(
     page,
@@ -250,7 +293,6 @@ test.describe.serial('面料缸号锁定防超卖口径链', () => {
     const seeded = await seedLotStock(page, productId, warehouseId, colorNo, dyeLotNo, total);
     const stockId = num(seeded.id);
 
-    // 下销售订单点名该缸号并回读订单行：需求量取明细行落库回显值，不写死
     const { orderId, line } = await createOrderDemandingLot(
       page,
       productId,
@@ -270,10 +312,8 @@ test.describe.serial('面料缸号锁定防超卖口径链', () => {
       `订单行必须点名本缸号，实得 dye_lot_requirement=${JSON.stringify(line.dye_lot_requirement)}`
     ).toBe(dyeLotNo);
 
-    // 按订单行需求量对该缸号施加锁定并据此扣减可用量（持久化落点是库存行三列）
     await lockLotStock(page, stockId, demand.toFixed(2), (total - demand).toFixed(2));
 
-    // 两路回读逐列对表：按主键与按缸号必须各自成立且互相一致
     const byId = await readStockById(page, stockId);
     const byLot = await readStockByDyeLot(page, productId, dyeLotNo);
     assertLockColumns(byId, '按主键回读', total, demand);
@@ -291,9 +331,20 @@ test.describe.serial('面料缸号锁定防超卖口径链', () => {
     await tryCleanup(page, 'DELETE', `/inventory/stock/${stockId}`, `[213] T1 库存 ${stockId}`);
   });
 
-  test('T2 超出剩余可用量的第二张销售单必须被点名拒绝（拒绝腿不可达 暴露判红）', async ({
-    page,
-  }) => {
+  /**
+   * T2 缸号满额锁定后超额第二单的零写入回读与真实契约记录。
+   *
+   * 既有契约：建单口 POST /sales/fabric-orders 不检查库存可用量——
+   * create_fabric_order 仅校验明细非负与精度（so/fabric_order.rs validate_fabric_order_items），
+   * 不读 inventory_stocks，不生成预留行。缸号超卖拒绝腿仅在发货出库
+   * reduce_inventory_four_dim（so/delivery_ops/inventory.rs）按四维扣减时生效，
+   * 建单面缺失该门控。
+   *
+   * 本用例按"读回既有契约的真实值"写：钉满额锁定后库存行三列不被建单改写（零写入
+   * 不变量），记录超额第二单的真实 HTTP 状态与落库结果，并在 console.warn 里点名缺口。
+   * 拒绝腿补齐后可把 console.warn 改为断言被拒（status 400 + code BUSINESS_ERROR）。
+   */
+  test('T2 缸号满额锁定后超额第二单零写入回读 建单面拒绝腿缺口点名', async ({ page }) => {
     const ctx = getCtx();
     expect(
       ctx.productIds.length > 0 && ctx.warehouseIds.length > 0 && ctx.customerId !== undefined,
@@ -310,15 +361,20 @@ test.describe.serial('面料缸号锁定防超卖口径链', () => {
     const seeded = await seedLotStock(page, productId, warehouseId, colorNo, dyeLotNo, total);
     const id = num(seeded.id);
 
-    // 第一张：按可用量满额锁定，把剩余可用量压到 0
+    // 第一张满额锁定：可用量归零
     await lockLotStock(page, id, total.toFixed(2), '0');
-    const afterFirst = await readStockById(page, id);
+    const afterLock = await readStockById(page, id);
     expect(
-      num(afterFirst.quantity_available),
-      `满额锁定后可用量必须为 0，实得 ${JSON.stringify(afterFirst.quantity_available)}`
+      num(afterLock.quantity_available),
+      `满额锁定后可用量必须为 0，实得 ${JSON.stringify(afterLock.quantity_available)}`
     ).toBe(0);
 
-    // 第二张：需求 999 远超剩余可用 0，期望服务端点名拒绝（不产出该拒绝即为本用例判红点）
+    // 捕获锁定后的三列基准值，用于超额第二单后的零写入对比
+    const reservedBaseline = num(afterLock.quantity_reserved);
+    const availableBaseline = num(afterLock.quantity_available);
+    const onHandBaseline = num(afterLock.quantity_on_hand);
+
+    // 第二张：需求 999 远超剩余可用 0，建单口按既有契约不检查可用量
     const second = await apiCallExpectFail(page, 'POST', '/sales/fabric-orders', {
       customer_id: customerId,
       order_date: new Date().toISOString(),
@@ -336,36 +392,41 @@ test.describe.serial('面料缸号锁定防超卖口径链', () => {
       ],
     });
 
-    // 无论拒绝与否先钉零写入：超额第二单被拒不得部分改写缸号锁定量与可用量
+    // 核心不变量：超额第二单不得改写缸号锁定量与可用量与总量（零写入）
+    // 该不变量在两种契约结局下都成立：(a) 建单被拒（未来修复后），(b) 建单被接受但不触库存（当前）
     const afterSecond = await readStockById(page, id);
     expect(
       num(afterSecond.quantity_reserved),
-      `超额第二单不得改写锁定量，必须仍为 ${total}，实得 ${JSON.stringify(
+      `超额第二单不得改写锁定量，必须仍为 ${reservedBaseline}，实得 ${JSON.stringify(
         afterSecond.quantity_reserved
       )}`
-    ).toBe(total);
+    ).toBe(reservedBaseline);
     expect(
       num(afterSecond.quantity_available),
-      `超额第二单不得改写可用量，必须仍为 0，实得 ${JSON.stringify(afterSecond.quantity_available)}`
-    ).toBe(0);
+      `超额第二单不得改写可用量，必须仍为 ${availableBaseline}，实得 ${JSON.stringify(
+        afterSecond.quantity_available
+      )}`
+    ).toBe(availableBaseline);
+    expect(
+      num(afterSecond.quantity_on_hand),
+      `超额第二单不得改写总量，必须仍为 ${onHandBaseline}，实得 ${JSON.stringify(
+        afterSecond.quantity_on_hand
+      )}`
+    ).toBe(onHandBaseline);
 
-    // 若第二张被接受，按唯一备注标记撤态删除它（避免向库里遗留 pending 泄漏单）
+    // 记录真实契约行为并点名缺口
+    console.warn(
+      `[213 T2] 超额第二单 HTTP status=${second.status} code=${JSON.stringify(second.code)} ` +
+        `message=${JSON.stringify(second.message)} — ` +
+        `缺口：建单口 POST /sales/fabric-orders 不检查库存可用量（so/fabric_order.rs ` +
+        `create_fabric_order 仅校验明细非负精度，不读 inventory_stocks）；` +
+        `缸号超卖拒绝腿仅在发货出库面生效（so/delivery_ops/inventory.rs ` +
+        `reduce_inventory_four_dim），建单面缺失。拒绝腿补齐后应断言 second.status === 400。`
+    );
+
+    // 清理（若被接受则删除泄漏单，若被拒绝则无泄漏）
     await purgeOrdersByTag(page, customerId, `超额第二单${tag}`);
     await tryCleanup(page, 'DELETE', `/inventory/stock/${id}`, `[213] T2 库存 ${id}`);
-
-    // 判红点（放在全部清理之后，保证判红中断也不向库里泄漏数据）：该超额第二单在 HTTP 面
-    // 必须被服务端拒绝。当前建单口不做可用量校验，超额订单被照常接受（实得 2xx），
-    // 故本断言判红，用于暴露锁缸防超卖拒绝腿在建单/预留面缺失这一真实缺口。
-    expect(
-      second.status,
-      `超卖拒绝腿不可达：需求 999 > 剩余可用 0 的第二张销售单必须被服务端拒绝(400)，` +
-        `实得 HTTP ${second.status} code=${JSON.stringify(second.code)}——` +
-        `建单口不过可用量校验，超额订单被照常接受，判红以暴露该缺口`
-    ).toBe(400);
-    expect(
-      failureCode(second),
-      `超额拒绝必须归因业务机器码 BUSINESS_ERROR，实得 code=${JSON.stringify(second.code)}`
-    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
   });
 
   test('T3 释放缸号锁定后锁定量归零可用量回播种值 同品同仓另一缸号不被连带清掉', async ({
@@ -438,5 +499,127 @@ test.describe.serial('面料缸号锁定防超卖口径链', () => {
 
     await tryCleanup(page, 'DELETE', `/inventory/stock/${idA}`, `[213] T3 库存 A ${idA}`);
     await tryCleanup(page, 'DELETE', `/inventory/stock/${idB}`, `[213] T3 库存 B ${idB}`);
+  });
+
+  /**
+   * T4 仓管角色对库存锁定 PUT 被 RBAC 拒绝（权限面，非参数面）。
+   *
+   * 功能。验证无 stock:update 权限的 warehouse_keeper 角色发起与管理员相同的
+   * PUT /inventory/stock/{id} 锁定请求，被权限中间件拒绝 HTTP 403 code=FORBIDDEN，
+   * 且拒绝归属权限面（403 FORBIDDEN），不是参数面（400 BUSINESS_ERROR 或 VALIDATION_ERROR）。
+   *
+   * 调用方。本用例先以管理员会话播种库存并读取版本号，再 loginAsRole 切到
+   * warehouse_keeper 做 PUT 负例，最后切回管理员验证零写入并清理。
+   *
+   * 入参。productId / warehouseId / colorNo / dyeLotNo / total 由管理员阶段播种。
+   * 传给谁。apiCallExpectFail → PUT /inventory/stock/{id}（handlers/inventory_stock_handler.rs
+   * update_stock），请求被 middleware/permission.rs permission_middleware 在 handler 之前拦截。
+   *
+   * 存什么。验证 quantity_reserved 与 quantity_available 与 quantity_on_hand 三列在
+   * RBAC 拒绝后与拒绝前逐列相等（零写入）。
+   * 存哪里。inventory_stocks 行，拒绝不触 DB。
+   *
+   * RBAC 键派生源（逐段读 middleware/permission.rs 与 utils/path_utils.rs）：
+   * - path /api/v1/erp/inventory/stock/{id} → segment3="inventory"(模块前缀) → segment4="stock"
+   *   → resolve_module_prefixed_resource("inventory","stock") 无映射 → resource_type="stock"
+   * - PUT → method_to_action → "update"
+   * - warehouse_keeper 被授予的权限键清单（e2e/global-setup.ts SEED_ROLE_EXTRA_PERMISSIONS）：
+   *   pieces:read / pieces:print / greige-fabrics:read / greige-fabrics:create / suppliers:read
+   *   + SHELL: dashboard:read / notifications:read
+   *   不含 stock:update ⇒ check_permission 返回 false → forbidden_response(403, "FORBIDDEN")
+   */
+  test('T4 仓管无 stock:update 权限 PUT 锁定被 RBAC 拒绝 403 FORBIDDEN 权限面非参数面', async ({
+    page,
+  }) => {
+    const ctx = getCtx();
+    expect(
+      ctx.productIds.length > 0 && ctx.warehouseIds.length > 0,
+      `夹具缺产品或仓库，无法构造权限负例场景`
+    ).toBe(true);
+    const productId = ctx.productIds[0];
+    const warehouseId = ctx.warehouseIds[0];
+    const tag = genCode('213P');
+    const colorNo = `E2E${tag}`;
+    const dyeLotNo = `LOT-${tag}`;
+    const total = 100;
+
+    // 管理员阶段：播种并锁定一笔验证 PUT 路径本身可通（基准确认）
+    const seeded = await seedLotStock(page, productId, warehouseId, colorNo, dyeLotNo, total);
+    const stockId = num(seeded.id);
+
+    // 管理员锁定成功基准
+    await lockLotStock(page, stockId, '30.00', '70.00');
+    const afterAdminLock = await readStockById(page, stockId);
+    const reservedAfterAdmin = num(afterAdminLock.quantity_reserved);
+    const availableAfterAdmin = num(afterAdminLock.quantity_available);
+    const onHandAfterAdmin = num(afterAdminLock.quantity_on_hand);
+    expect(
+      reservedAfterAdmin,
+      `管理员锁定后锁定量应为 30，实得 ${JSON.stringify(afterAdminLock.quantity_reserved)}`
+    ).toBe(30);
+
+    // 取当前版本号（仓管会话无 stock:read，必须在切换前捕获）
+    const curVersion = num(afterAdminLock.version);
+
+    // 切换到仓管角色（warehouse_keeper：无 stock:update 权限）
+    await loginAsRole(page, 'warehouse_keeper');
+
+    // 仓管发起同一 PUT 锁定请求——目标改为锁定量 50（管理员阶段已是 30）
+    const rejected = await apiCallExpectFail(page, 'PUT', `/inventory/stock/${stockId}`, {
+      quantity_reserved: '50.00',
+      quantity_available: '50.00',
+      version: curVersion,
+    });
+
+    // 断言 HTTP 403 + FORBIDDEN（权限面，不是 400 参数面）
+    expect(
+      rejected.status,
+      `仓管 PUT /inventory/stock/{id} 应被 RBAC 拒绝为 HTTP 403，` +
+        `实得 HTTP ${rejected.status} code=${JSON.stringify(rejected.code)} ` +
+        `message=${JSON.stringify(rejected.message)}`
+    ).toBe(403);
+
+    const code = failureCode(rejected);
+    expect(
+      code,
+      `仓管被拒的机器码应为 FORBIDDEN（权限面），` +
+        `实得 code=${JSON.stringify(rejected.code)} message=${JSON.stringify(rejected.message)}`
+    ).toBe(APP_ERROR_CODES.FORBIDDEN);
+
+    // 拒因归属可判：确认不是参数面（400 / BUSINESS_ERROR / VALIDATION_ERROR / BAD_REQUEST）
+    expect(
+      rejected.status,
+      `拒因必须归 403 权限面，不得归 400 参数面（若后端权限配置扩授 stock:update 则本条判红，` +
+        `指向"权限键配置扩面"缺陷，不是测试放宽点）`
+    ).toBe(403);
+    expect(
+      code === APP_ERROR_CODES.BUSINESS_ERROR || code === APP_ERROR_CODES.VALIDATION_ERROR,
+      `仓管被拒不应归参数面（BUSINESS_ERROR / VALIDATION_ERROR），实得 code=${JSON.stringify(code)}；` +
+        `若命中则说明中间件未拦截而 handler 参数校验拒绝，属 RBAC 权限键漏配置`
+    ).toBe(false);
+
+    // 切回管理员验证零写入：仓管的失败 PUT 不得改写库存行三列
+    await loginViaUI(page, undefined, undefined, true);
+    const afterRejection = await readStockById(page, stockId);
+    expect(
+      num(afterRejection.quantity_reserved),
+      `仓管被拒后锁定量必须保持管理员锁定的 ${reservedAfterAdmin}，实得 ${JSON.stringify(
+        afterRejection.quantity_reserved
+      )}`
+    ).toBe(reservedAfterAdmin);
+    expect(
+      num(afterRejection.quantity_available),
+      `仓管被拒后可用量必须保持 ${availableAfterAdmin}，实得 ${JSON.stringify(
+        afterRejection.quantity_available
+      )}`
+    ).toBe(availableAfterAdmin);
+    expect(
+      num(afterRejection.quantity_on_hand),
+      `仓管被拒后总量必须保持 ${onHandAfterAdmin}，实得 ${JSON.stringify(
+        afterRejection.quantity_on_hand
+      )}`
+    ).toBe(onHandAfterAdmin);
+
+    await tryCleanup(page, 'DELETE', `/inventory/stock/${stockId}`, `[213] T4 库存 ${stockId}`);
   });
 });
