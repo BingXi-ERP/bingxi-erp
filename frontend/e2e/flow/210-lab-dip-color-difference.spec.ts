@@ -252,14 +252,14 @@ test.describe.serial('化验室打样缸差登记：多版对色与复样开卡�
     expect(created.status, '通知单初值应为词表 pending').toBe('pending');
     expect(
       str(created.request_no).startsWith('LD'),
-      `通知单号应由服务端生成器出 LD 前缀（lab_dip_service.rs:42），实际 ${created.request_no}`
+      `通知单号应由服务端生成器出 LD 前缀（lab_dip_service.rs），实际 ${created.request_no}`
     ).toBe(true);
     expect(Number(created.sample_versions), '版数应落建单提交值 2').toBe(2);
     expect(created.light_source, '主光源应落提交值 D65').toBe('D65');
     expect(str(created.required_date), '要求交期应落提交日期').toBe(requiredDate);
     expect(
       created.created_by,
-      `建单人应取会话身份（handler 不收请求体身份，lab_dip_handler.rs:105），实际 ${JSON.stringify(created.created_by)}`
+      `建单人应取会话身份（handler 不收请求体身份，lab_dip_handler.rs），实际 ${JSON.stringify(created.created_by)}`
     ).not.toBeNull();
     expect(
       created.approved_sample_id,
@@ -705,7 +705,7 @@ test.describe.serial('化验室打样缸差登记：多版对色与复样开卡�
     const resampleFailedId = Number(resampleFailed.id);
     expect(
       str(resampleFailed.resample_no).startsWith('RS'),
-      `复样单号应由服务端生成器出 RS 前缀（lab_dip_service.rs:128），实际 ${resampleFailed.resample_no}`
+      `复样单号应由服务端生成器出 RS 前缀（lab_dip_service.rs），实际 ${resampleFailed.resample_no}`
     ).toBe(true);
     expect(resampleFailed.result, '新建复样结果应为词表 pending').toBe('pending');
     expect(Number(resampleFailed.source_sample_id), '复样应回指源 OK 样').toBe(okId);
@@ -806,7 +806,7 @@ test.describe.serial('化验室打样缸差登记：多版对色与复样开卡�
     ).toBe(true);
     expect(
       str(techCard.tech_card_no).endsWith(`-${String(passedId).padStart(6, '0')}`),
-      `技术卡号应含本复样主键六位补零段（resample.rs:341），实际 ${techCard.tech_card_no}`
+      `技术卡号应含本复样主键六位补零段（resample.rs），实际 ${techCard.tech_card_no}`
     ).toBe(true);
     expect(
       techCard.tech_card_issued_by,

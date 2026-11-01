@@ -124,7 +124,7 @@ test.describe.serial('面料缸差：验布录入、质检定级、后整读回�
             const inspectionNo = String(created?.inspection_no ?? '');
             expect(
               /^FIR-/.test(inspectionNo),
-              `验布单号应为服务端取号的 FIR- 前缀单号（fabric_inspection_service.rs:51/294-305），` +
+              `验布单号应为服务端取号的 FIR- 前缀单号（fabric_inspection_service.rs/294-305），` +
                 `实际=${JSON.stringify(inspectionNo)}`
             ).toBe(true);
             // 创建回执先钉一遍缸号/色号/门幅/状态原词，落库与回执不符在这里就断掉
