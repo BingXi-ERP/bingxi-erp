@@ -537,6 +537,12 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
     {
       label: 'CRM池规则',
       createApi: '/crm/pool/rules',
+      // crm_pool_handler.rs::list_pool_rules → ApiResponse<Value>，值是
+      // crm/pool.rs::list_rules 的 Vec<customer_pool_rule::Model> 序列化，data 为裸数组；
+      // 详情路径 /pool/rules/{id} 在 routes/crm.rs 只挂 put 与 delete，GET 预检必得 405，
+      // 删前删后证据只能走列表通道。
+      // 删除腿：crm/pool.rs::delete_rule 是 delete_by_id 硬删，删后该 id 必从列表消失。
+      listKey: 'bare',
       payload: {
         name: `P0池规则${TS}`,
         // 后端 crm_pool_handler.rs::create_pool_rule 仅接受
@@ -677,6 +683,13 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
     {
       label: '工作中心',
       createApi: '/production/capacity/work-centers',
+      // capacity_handler.rs::list_work_centers → ApiResponse<Value>，值是
+      // capacity_service.rs::list_work_centers 的 Vec<WorkCenterCapacity> 序列化，data 裸数组；
+      // 详情路径 /capacity/work-centers/{id} 在 routes/production.rs 只挂 put 与 delete，
+      // GET 预检必得 405，删前删后证据只能走列表通道。
+      // 删除腿：capacity_service.rs::delete_work_center 写 status='INACTIVE'，
+      // 而列表 handler 带 Status != 'INACTIVE' 过滤，删后该 id 必从列表消失。
+      listKey: 'bare',
       payload: {
         name: `P0中心${TS}`,
         code: `P0-WC-${TS}`,
@@ -708,6 +721,12 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
     {
       label: 'Webhook',
       createApi: '/webhooks',
+      // webhook_handler.rs::list_webhooks → ApiResponse<Vec<WebhookResponse>>，data 裸数组；
+      // analytics.rs 的 webhooks() 对 /{id} 只挂 delete，GET 预检必得 405，
+      // 删前删后证据只能走列表通道。
+      // 列表带 is_active=true 过滤，删除腿 webhook_service.rs::delete_webhook 写
+      // is_active=false，因此删前该 id 在列表可见、删后必从列表消失。
+      listKey: 'bare',
       payload: {
         name: `P0钩子${TS}`,
         url: 'https://example.com/p0hook',
