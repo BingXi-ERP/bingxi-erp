@@ -713,7 +713,6 @@ pub async fn register_scanned_roll<C: ConnectionTrait>(
         production_date: Set(None),
         shelf_life: Set(None),
         quality_status: Set(None),
-        inventory_status: Set(Some(piece_status::AVAILABLE.to_string())),
         supplier_piece_no: Set(None),
         package_no: Set(None),
         barcode: Set(Some(cmd.raw_qr.to_string())),
