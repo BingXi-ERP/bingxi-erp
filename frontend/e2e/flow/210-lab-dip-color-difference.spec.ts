@@ -382,9 +382,10 @@ test.describe.serial('化验室打样缸差登记：多版对色与复样开卡�
       readA.approved_by,
       `对色审核人应取会话身份而非请求体，实际 ${JSON.stringify(readA.approved_by)}`
     ).not.toBeNull();
-    expect(isRealTimestamp(readA.approved_at), `对色时间应落库，实际 ${JSON.stringify(readA.approved_at)}`).toBe(
-      true
-    );
+    expect(
+      isRealTimestamp(readA.approved_at),
+      `对色时间应落库，实际 ${JSON.stringify(readA.approved_at)}`
+    ).toBe(true);
     expect(str(readA.approval_comment), '对色意见应原样落库').toBe(
       `色差不足${COLOR_DIFF_OK_GRADE_TEXT}需重打`
     );
@@ -433,9 +434,12 @@ test.describe.serial('化验室打样缸差登记：多版对色与复样开卡�
     expect(str(approvedReadBack.customer_approval_comment), '客户确认意见应原样落库').toBe(
       `确认 B 版为 OK 样${stamp}`
     );
-    expect(str(approvedReadBack.customer_approved_at).length > 0, '客户确认时间应落库').not.toBe(
-      ''
-    );
+    // 取值断言而非布尔断言：布尔与空串比（expect(x.length>0).not.toBe('')）恒成立，
+    // 时间列为 null 时也放行，属假绿面，改为直接比字符串本体。
+    expect(
+      str(approvedReadBack.customer_approved_at),
+      `客户确认时间应落库为非空时间串，实际=${JSON.stringify(approvedReadBack.customer_approved_at)}`
+    ).not.toBe('');
 
     // 选中样升 selected，未选中样保持 not_matched（同单两版各自终值）
     expect((await readSample(page, idB)).matching_result, 'OK 样应转词表 selected').toBe(
@@ -453,11 +457,14 @@ test.describe.serial('化验室打样缸差登记：多版对色与复样开卡�
       `${LIP}/requests?request_no=${encodeURIComponent(str(created.request_no))}&page=1&page_size=10`
     );
     const listRow = (list.items ?? []).find(r => Number(r.id) === requestId);
+    // 未命中与命错态都在同一枚值断言里点名：取值式里把"没这行"落成可读哨兵，
+    // 不再用布尔断言先行放行（布尔放行会让下一行的 listRow! 变成不可诊断的空引用）。
     expect(
-      listRow,
-      `列表按单号过滤应命中本单，实际 items=${JSON.stringify(list.items)?.slice(0, 200)}`
-    ).toBeTruthy();
-    expect(listRow!.status, '列表行的 status 应与详情口一致为 approved').toBe('approved');
+      listRow
+        ? String(listRow.status ?? '')
+        : `<列表未命中 id=${requestId}：items=${JSON.stringify(list.items)?.slice(0, 200)}>`,
+      '列表按单号过滤应命中本单，且行内 status 与详情口同为 approved'
+    ).toBe('approved');
     expect(
       await readRequestStatusCodeCell(page, str(created.request_no)),
       '列表页状态列未随 approved 渲染词表标签'
@@ -805,7 +812,10 @@ test.describe.serial('化验室打样缸差登记：多版对色与复样开卡�
       techCard.tech_card_issued_by,
       `开卡人应取会话身份（研发组长），实际 ${JSON.stringify(techCard.tech_card_issued_by)}`
     ).not.toBeNull();
-    expect(str(techCard.tech_card_issued_at).length > 0, '开卡时间应落库').not.toBe('');
+    expect(
+      str(techCard.tech_card_issued_at),
+      `开卡时间应落库为非空时间串，实际=${JSON.stringify(techCard.tech_card_issued_at)}`
+    ).not.toBe('');
     const cardReadBack = await apiCallRaw<Row>(page, 'GET', `${LIP}/resamples/${passedId}`);
     expect(str(cardReadBack.tech_card_no), '技术卡号详情口回读应与动作响应同值').toBe(
       str(techCard.tech_card_no)

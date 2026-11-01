@@ -240,7 +240,10 @@ async function ensureLot(page: Page): Promise<Lot> {
   if (lotCache) return lotCache;
   const ctx = getCtx();
   const productId = ctx.productIds[0];
-  expect(productId, '前置缺失：ctx.productIds 未就绪，无法建带产品的验布单').toBeTruthy();
+  expect(
+    typeof productId === 'number' && Number.isInteger(productId) && productId > 0,
+    `前置缺失：ctx.productIds[0] 应为已建档的正整数产品 id，实际=${String(productId)}`
+  ).toBe(true);
   const target = await pickDyeableWarehouse(page);
   const dyeLotNo = genDyeLotNo();
   const colorNo = `E2E-RC-${genCode('C')}`;
