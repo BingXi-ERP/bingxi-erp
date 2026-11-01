@@ -503,7 +503,9 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
       await rowCellText(labelRow, await columnIndex(labelTable, '色号')),
       '标签列色号未随验布单出值'
     ).toBe(lot.colorNo);
-    await dialog.getByRole('button', { name: '关闭' }).click();
+    // exact 必需：el-dialog 头部自带 aria-label="关闭此对话框" 的关闭按钮，
+    // getByRole 的 name 默认按子串匹配，不加 exact 会同时命中头部那颗而 strict 判红
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
 
     // 关闭归档：rolled → closed，界面同步，且不清空已打卷的汇总
     const closed = await apiCallRaw<Row>(page, 'POST', `${FI}/${id}/close`);
