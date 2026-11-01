@@ -484,7 +484,11 @@ function judge(over = {}) {
       head: 'TOOL_BUG 棘轮基线不可用，禁止静默按 0 放行：' + cov.error + '｜' + pairingHead,
     };
   }
-  const covStats = coverageStats(cur, texts.map(t => t.body), srcTexts);
+  const covStats = coverageStats(
+    cur,
+    texts.map(t => t.body),
+    srcTexts
+  );
   const baseSet = new Set(cov.data[RATCHET_MEMBERS_FIELD]);
   let ratchet = 'ok';
   let ratchetNew = [];
@@ -831,9 +835,7 @@ function selfTest() {
     0,
   ]);
   if (down.code !== 0 || down.ratchet !== 'improved') {
-    say(
-      '  SELFTEST_RATCHET_DOWN got code=' + down.code + ' ratchet=' + down.ratchet
-    );
+    say('  SELFTEST_RATCHET_DOWN got code=' + down.code + ' ratchet=' + down.ratchet);
   }
   const covMissing = judge({
     ...ratchetProbeBase,
@@ -846,10 +848,7 @@ function selfTest() {
   ]);
   if (covMissing.code !== 9 || covMissing.ratchet !== 'toolbug') {
     say(
-      '  SELFTEST_RATCHET_MISSING got code=' +
-        covMissing.code +
-        ' ratchet=' +
-        covMissing.ratchet
+      '  SELFTEST_RATCHET_MISSING got code=' + covMissing.code + ' ratchet=' + covMissing.ratchet
     );
   }
 
@@ -878,16 +877,13 @@ function selfTest() {
     : { code: 9, head: 'TOOL_BUG 反向探针有没命中的道，判定器无检测力，其绿不可信' };
 }
 
-const out = WRITE_COVERAGE_BASELINE
-  ? writeCoverageBaseline()
-  : SELF_TEST
-    ? selfTest()
-    : judge();
+const out = WRITE_COVERAGE_BASELINE ? writeCoverageBaseline() : SELF_TEST ? selfTest() : judge();
 say(out.head || '');
 if (!SELF_TEST && !WRITE_COVERAGE_BASELINE) {
   if (out.code === 0) say('PAIRING_GREEN 新增端点全部有用例配对或已带理由豁免，存量漏测棘轮未上升');
   if (out.code === 1) say('PAIRING_RED 有新增端点未配套 E2E 用例，或存量漏测分母高于棘轮基线');
-  if (out.code === 9) say('PAIRING_TOOLBUG 判定器或输入不可用（含棘轮基线不可用），本道结论按不通过处理');
+  if (out.code === 9)
+    say('PAIRING_TOOLBUG 判定器或输入不可用（含棘轮基线不可用），本道结论按不通过处理');
 } else if (SELF_TEST && out.code === 0) {
   say('PAIRING_SELFTEST_OK');
 }
