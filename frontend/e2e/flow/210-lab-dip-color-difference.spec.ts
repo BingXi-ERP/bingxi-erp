@@ -86,6 +86,19 @@ function decimalEq(actual: unknown, expected: unknown): boolean {
 }
 
 /**
+ * 功能 判定时间列出参是真实时间字符串且可解析。
+ * 调用方 本文件对色时间、客户确认时间、开卡时间三处的非空判定。
+ * 入参 value 出参原始值。
+ * 传给谁 结果直接进 expect(...).toBe(true)，判红消息由调用方给出。
+ * 存什么 不存储。为什么不能只判长度：String(null) 得到 "null" 同样非空，
+ * 会把「审计时间没落库」读成「落了值」，故先判 typeof string 再判 Date.parse。
+ * 存哪里 无。
+ */
+function isRealTimestamp(value: unknown): boolean {
+  return typeof value === 'string' && value.length > 0 && !Number.isNaN(Date.parse(value));
+}
+
+/**
  * 功能 生成 N 天后的 YYYY-MM-DD 日期串，作打样通知单必填的 required_date。
  * 调用方 本文件三枚用例的建单载荷。
  * 入参 daysFromNow 距今天数（正整数）。
@@ -369,10 +382,9 @@ test.describe.serial('化验室打样缸差登记：多版对色与复样开卡�
       readA.approved_by,
       `对色审核人应取会话身份而非请求体，实际 ${JSON.stringify(readA.approved_by)}`
     ).not.toBeNull();
-    expect(
-      str(readA.approved_at).length > 0,
-      `对色时间应落库，实际 ${JSON.stringify(readA.approved_at)}`
-    ).not.toBe('');
+    expect(isRealTimestamp(readA.approved_at), `对色时间应落库，实际 ${JSON.stringify(readA.approved_at)}`).toBe(
+      true
+    );
     expect(str(readA.approval_comment), '对色意见应原样落库').toBe(
       `色差不足${COLOR_DIFF_OK_GRADE_TEXT}需重打`
     );
