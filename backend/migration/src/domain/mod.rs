@@ -116,6 +116,10 @@
 //!   schema，export_approval 流程定义行由 services/bpm_definition_seed.rs 出厂种子登记；
 //!   依赖 system 建的 bpm_process_instance、v15 建的 export_approval_request 与
 //!   download_token 等既有列，故必须排全链尾为新的顶层条目，复用库上也必然执行）
+//! - wechat_mp_binding: 用户与微信公众号 openid 绑定关系表（user_wechat_mp_binding，user_id
+//!   外键引用 system 域建的 users 并级联回收、openid 具名唯一索引固化一个 openid 只绑一个用户；
+//!   域内不播种数据行，users 的初始用户由 init 写入且晚于 migrate；置于链尾为新的顶层条目，
+//!   复用库上也必然执行）
 
 pub mod system;
 pub mod business;
@@ -172,3 +176,5 @@ pub mod product_grade_vocab_check;
 // 仓储两岗补授扫码入库细键的存量库通道。独立顶层域，理由与 purchase_greige_read_grant 一致
 // （并入已应用域会在复用库被整体跳过，补授永不执行）。
 pub mod scan_receipt_grant;
+// 用户与公众号 openid 绑定关系表。独立顶层域，理由见域头（并入已应用域会在复用库被整体跳过）。
+pub mod wechat_mp_binding;

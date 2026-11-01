@@ -22,6 +22,7 @@
 //!   → textile_safety → purchase_inspection_result_check → export_approval_lifecycle
 //!   → product_grade_vocab_check
 //!   → scan_receipt_grant
+//!   → wechat_mp_binding
 //!
 //! 迁移名: m_system_domain / m_business_domain / m_sales_crm_domain /
 //!         m_production_domain / m_finance_domain / m_v15_domain / m_rls_dept_domain /
@@ -272,6 +273,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::product_grade_vocab_check::Migration),
             // 仓储两岗补授扫码入库细键，链尾独立域（roles 与 role_permissions 由 system 域先建）
             Box::new(domain::scan_receipt_grant::Migration),
+            // 用户与公众号 openid 绑定关系表，链尾独立域（users 由 system 域 m0001 先建）
+            Box::new(domain::wechat_mp_binding::Migration),
         ]
     }
 }
