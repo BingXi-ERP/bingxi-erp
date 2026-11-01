@@ -27,9 +27,10 @@ Page({
     wx.showLoading({
       title: "数据加载中...",
     });
+    // 载荷里的 token 键是假凭据：storage 从无 token 键，值恒 undefined；凭据由 httpOnly
+    // Cookie 经网关承载，不再往查询参数塞登录态
     var ServicesCard = {
       type: 0,
-      token: wx.getStorageSync("token"),
     };
     this.getColorName(ServicesCard);
   },
@@ -39,7 +40,6 @@ Page({
     });
     var ServicesCard = {
       type: 1,
-      token: wx.getStorageSync("token"),
     };
     this.getColorName(ServicesCard);
   },

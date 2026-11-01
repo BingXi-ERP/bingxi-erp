@@ -3,7 +3,8 @@ var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   mta_analysis = t(require("../../../utils/mta_analysis.js")),
   app = getApp(),
   ServicesCard = require("../../../libs/services/ServicesCard.js").servicesCard,
-  util = require("../../../libs/utils/util.js").utils;
+  util = require("../../../libs/utils/util.js").utils,
+  uploadGateway = require("../../../libs/utils/uploadGateway.js");
 Page({
   data: {
     searchImgUrl: "",
@@ -37,24 +38,22 @@ Page({
     (wx.showLoading({
       title: "搜索中",
     }),
-      wx.uploadFile({
+      uploadGateway.uploadFile({
         url: "".concat(app.config.bingxiHost, "/app-api/goods/imgSearch/goodsImgSearch"),
         filePath: mta_analysis,
         name: "file",
         header: {
-          "content-type": "multipart/form-data;charset=utf-8",
-          Authorization: wx.getStorageSync("token"),
-          terminalSource: 6,
           terminalType: 81,
         },
         formData: {
           filePath: "/bdd/imgSearch",
         },
         success: function (a) {
-          var ServicesCard = a.data && JSON.parse(a.data),
-            util = t.data.searchList,
-            o = ServicesCard.data || [];
-          if (200 == a.statusCode) {
+          // uploadGateway 已归一信封：成功 code 0，data 为业务载荷；失败带 code 与 msg 走失败分支
+          var body = a || {},
+            list = t.data.searchList,
+            o = (0 === body.code && body.data) || [];
+          if (0 === body.code) {
             var r,
               l = createForOfIteratorHelper(o);
             try {
@@ -73,7 +72,7 @@ Page({
                         "/img/customer/ic_shangjiazhong@4.5x.png",
                       ),
                     }),
-                  util.push(c));
+                  list.push(c));
               }
             } catch (t) {
               l.e(t);
@@ -81,7 +80,7 @@ Page({
               l.f();
             }
             (t.setData({
-              searchList: util,
+              searchList: list,
             }),
               wx.hideLoading(),
               0 == o.length &&
@@ -90,7 +89,7 @@ Page({
                 }));
           } else
             (wx.showToast({
-              title: ServicesCard.msg,
+              title: body.msg || "识图搜索失败",
               icon: "none",
             }),
               wx.hideLoading());

@@ -8,6 +8,7 @@ var objectSpread2 = require("../../../../@babel/runtime/helpers/objectSpread2"),
   i =
     (require("../../../../libs/utils/cpcl-exp.js"),
     require("../../../../libs/services/ServicesCard.js").servicesCard),
+  uploadGateway = require("../../../../libs/utils/uploadGateway.js"),
   app = getApp(),
   r = {
     printGoodsNo: 1,
@@ -308,21 +309,18 @@ Page({
   afterRead: function (t) {
     var e = t.detail.file,
       a = this;
-    wx.uploadFile({
+    uploadGateway.uploadFile({
       url: "".concat(app.config.bingxiHost, "/app-api/file/uploadQrCode"),
       filePath: e.tempFilePath,
       name: "file",
       header: {
-        "Content-Type": "multipart/form-data",
-        Authorization: wx.getStorageSync("token"),
-        terminalSource: 6,
         terminalType: 81,
       },
       formData: {
         filePath: "/bdd/pay",
       },
       success: function (t) {
-        var i = JSON.parse(t.data);
+        var i = t;
         if (0 === i.code) {
           var app = i.data.qrCodeContent || i.data.uploadQrCode || "",
             r = i.data.qrCodeUrl || "",

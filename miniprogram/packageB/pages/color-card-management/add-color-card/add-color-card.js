@@ -13,6 +13,7 @@ var e,
   u = require("../../../../@babel/runtime/helpers/defineProperty"),
   mta_analysis = t(require("../../../../utils/mta_analysis.js")),
   util = require("../../../../libs/utils/util"),
+  uploadGateway = require("../../../../libs/utils/uploadGateway.js"),
   ServicesUserLog = require("../../../../libs/services/ServicesUserLog.js"),
   ServicesBase = require("../../../../libs/services/ServicesBase.js"),
   f = [["camera"], ["album"], ["camera", "album"]],
@@ -511,11 +512,8 @@ Page({
           isLoadingPhoto: 1,
         }),
           t.tempFiles.map(function (i) {
-            wx.uploadFile({
+            uploadGateway.uploadFile({
               header: {
-                "Content-Type": "multipart/form-data",
-                Authorization: wx.getStorageSync("token"),
-                terminalSource: 6,
                 terminalType: 81,
               },
               formData: {
@@ -524,37 +522,29 @@ Page({
               url: "".concat(app.config.bingxiHost, "/app-api/oss/upload"),
               filePath: i.tempFilePath,
               name: "file",
-              success: function (i) {
-                try {
-                  var s = JSON.parse(i.data);
-                  if (0 === s.code) {
-                    var r = s.data;
-                    (e.data.remoteImageFiles.push({
-                      text: util.utils.replImage(r, 300),
-                      name: r.substr(r.lastIndexOf("/") + 1),
-                      storagePath: util.utils.replImage(r, 300),
-                    }),
-                      e.data.remoteImageFiles.length > a && (e.data.remoteImageFiles.length = a),
-                      e.setData({
-                        remoteImageFiles: e.data.remoteImageFiles,
-                        isLoadingPhoto: 0,
-                      }));
-                  } else
-                    401 === s.code
-                      ? wx.showToast({
-                          icon: "none",
-                          title: "token失效,请重新上传",
-                        })
-                      : wx.showToast({
-                          icon: "none",
-                          title: e.data.msg.result,
-                        });
-                } catch (t) {
-                  wx.showToast({
-                    icon: "none",
-                    title: "上传图片失败",
-                  });
-                }
+              success: function (s) {
+                if (0 === s.code) {
+                  var r = s.data;
+                  (e.data.remoteImageFiles.push({
+                    text: util.utils.replImage(r, 300),
+                    name: r.substr(r.lastIndexOf("/") + 1),
+                    storagePath: util.utils.replImage(r, 300),
+                  }),
+                    e.data.remoteImageFiles.length > a && (e.data.remoteImageFiles.length = a),
+                    e.setData({
+                      remoteImageFiles: e.data.remoteImageFiles,
+                      isLoadingPhoto: 0,
+                    }));
+                } else
+                  401 === s.code
+                    ? wx.showToast({
+                        icon: "none",
+                        title: "登录状态已失效，请重新登录",
+                      })
+                    : wx.showToast({
+                        icon: "none",
+                        title: s.msg || "上传图片失败",
+                      });
                 (e.getWidth(),
                   (o += 1) &&
                     o === t.tempFiles.length &&
@@ -589,11 +579,8 @@ Page({
           isLoadingPhoto: 1,
         }),
           a.tempFiles.map(function (i) {
-            wx.uploadFile({
+            uploadGateway.uploadFile({
               header: {
-                "Content-Type": "multipart/form-data",
-                Authorization: wx.getStorageSync("token"),
-                terminalSource: 6,
                 terminalType: 81,
               },
               formData: {
@@ -603,38 +590,29 @@ Page({
               url: "".concat(app.config.bingxiHost, "/app-api/oss/uploadDetailImage"),
               filePath: i.tempFilePath,
               name: "file",
-              success: function (i) {
-                try {
-                  var s = JSON.parse(i.data);
-                  if (0 === s.code) {
-                    var r = s.data;
-                    (t.data.detailImageFiles.push({
-                      text: util.utils.replImage(r, 300),
-                      name: r.substr(r.lastIndexOf("/") + 1),
-                      storagePath: util.utils.replImage(r, 300),
-                    }),
-                      t.data.detailImageFiles.length > e && (t.data.detailImageFiles.length = e),
-                      t.setData({
-                        detailImageFiles: t.data.detailImageFiles,
-                        isLoadingPhoto: 0,
-                      }),
-                      console.log(t.data.detailImageFiles));
-                  } else
-                    401 === s.code
-                      ? wx.showToast({
-                          icon: "none",
-                          title: "token失效,请重新上传",
-                        })
-                      : wx.showToast({
-                          icon: "none",
-                          title: t.data.msg.result,
-                        });
-                } catch (t) {
-                  wx.showToast({
-                    icon: "none",
-                    title: "上传图片失败",
-                  });
-                }
+              success: function (s) {
+                if (0 === s.code) {
+                  var r = s.data;
+                  (t.data.detailImageFiles.push({
+                    text: util.utils.replImage(r, 300),
+                    name: r.substr(r.lastIndexOf("/") + 1),
+                    storagePath: util.utils.replImage(r, 300),
+                  }),
+                    t.data.detailImageFiles.length > e && (t.data.detailImageFiles.length = e),
+                    t.setData({
+                      detailImageFiles: t.data.detailImageFiles,
+                      isLoadingPhoto: 0,
+                    }));
+                } else
+                  401 === s.code
+                    ? wx.showToast({
+                        icon: "none",
+                        title: "登录状态已失效，请重新登录",
+                      })
+                    : wx.showToast({
+                        icon: "none",
+                        title: s.msg || "上传图片失败",
+                      });
                 (t.getWidth2(),
                   (o += 1) &&
                     o === a.tempFiles.length &&
@@ -668,11 +646,8 @@ Page({
           isLoadingPhoto: 1,
         }),
           t.tempFiles.map(function (i) {
-            wx.uploadFile({
+            uploadGateway.uploadFile({
               header: {
-                "Content-Type": "multipart/form-data",
-                Authorization: wx.getStorageSync("token"),
-                terminalSource: 6,
                 terminalType: 81,
               },
               formData: {
@@ -681,38 +656,30 @@ Page({
               url: "".concat(app.config.bingxiHost, "/app-api/oss/upload"),
               filePath: i.tempFilePath,
               name: "file",
-              success: function (i) {
-                try {
-                  var s = JSON.parse(i.data);
-                  if (0 === s.code) {
-                    var r = s.data;
-                    (e.data.goodsSampleImgList.push({
-                      text: util.utils.replImage(r, 300),
-                      name: r.substr(r.lastIndexOf("/") + 1),
-                      storagePath: util.utils.replImage(r, 300),
-                    }),
-                      e.data.goodsSampleImgList.length > a &&
-                        (e.data.goodsSampleImgList.length = a),
-                      e.setData({
-                        goodsSampleImgList: e.data.goodsSampleImgList,
-                        isLoadingPhoto: 0,
-                      }));
-                  } else
-                    401 === s.code
-                      ? wx.showToast({
-                          icon: "none",
-                          title: "token失效,请重新上传",
-                        })
-                      : wx.showToast({
-                          icon: "none",
-                          title: e.data.msg.result,
-                        });
-                } catch (t) {
-                  wx.showToast({
-                    icon: "none",
-                    title: "上传图片失败",
-                  });
-                }
+              success: function (s) {
+                if (0 === s.code) {
+                  var r = s.data;
+                  (e.data.goodsSampleImgList.push({
+                    text: util.utils.replImage(r, 300),
+                    name: r.substr(r.lastIndexOf("/") + 1),
+                    storagePath: util.utils.replImage(r, 300),
+                  }),
+                    e.data.goodsSampleImgList.length > a &&
+                      (e.data.goodsSampleImgList.length = a),
+                    e.setData({
+                      goodsSampleImgList: e.data.goodsSampleImgList,
+                      isLoadingPhoto: 0,
+                    }));
+                } else
+                  401 === s.code
+                    ? wx.showToast({
+                        icon: "none",
+                        title: "登录状态已失效，请重新登录",
+                      })
+                    : wx.showToast({
+                        icon: "none",
+                        title: s.msg || "上传图片失败",
+                      });
                 (e.getWidth3(),
                   (o += 1) &&
                     o === t.tempFiles.length &&
@@ -746,11 +713,8 @@ Page({
           isLoadingPhoto: 1,
         }),
           t.tempFiles.map(function (i) {
-            wx.uploadFile({
+            uploadGateway.uploadFile({
               header: {
-                "Content-Type": "multipart/form-data",
-                Authorization: wx.getStorageSync("token"),
-                terminalSource: 6,
                 terminalType: 81,
               },
               formData: {
@@ -759,37 +723,29 @@ Page({
               url: "".concat(app.config.bingxiHost, "/app-api/oss/upload"),
               filePath: i.tempFilePath,
               name: "file",
-              success: function (i) {
-                try {
-                  var s = JSON.parse(i.data);
-                  if (0 === s.code) {
-                    var r = s.data;
-                    (e.data.goodsColorImgList.push({
-                      text: util.utils.replImage(r, 300),
-                      name: r.substr(r.lastIndexOf("/") + 1),
-                      storagePath: util.utils.replImage(r, 300),
-                    }),
-                      e.data.goodsColorImgList.length > a && (e.data.goodsColorImgList.length = a),
-                      e.setData({
-                        goodsColorImgList: e.data.goodsColorImgList,
-                        isLoadingPhoto: 0,
-                      }));
-                  } else
-                    401 === s.code
-                      ? wx.showToast({
-                          icon: "none",
-                          title: "token失效,请重新上传",
-                        })
-                      : wx.showToast({
-                          icon: "none",
-                          title: e.data.msg,
-                        });
-                } catch (t) {
-                  wx.showToast({
-                    icon: "none",
-                    title: "上传图片失败",
-                  });
-                }
+              success: function (s) {
+                if (0 === s.code) {
+                  var r = s.data;
+                  (e.data.goodsColorImgList.push({
+                    text: util.utils.replImage(r, 300),
+                    name: r.substr(r.lastIndexOf("/") + 1),
+                    storagePath: util.utils.replImage(r, 300),
+                  }),
+                    e.data.goodsColorImgList.length > a && (e.data.goodsColorImgList.length = a),
+                    e.setData({
+                      goodsColorImgList: e.data.goodsColorImgList,
+                      isLoadingPhoto: 0,
+                    }));
+                } else
+                  401 === s.code
+                    ? wx.showToast({
+                        icon: "none",
+                        title: "登录状态已失效，请重新登录",
+                      })
+                    : wx.showToast({
+                        icon: "none",
+                        title: s.msg || "上传图片失败",
+                      });
                 (e.getWidth4(),
                   (o += 1) &&
                     o === t.tempFiles.length &&

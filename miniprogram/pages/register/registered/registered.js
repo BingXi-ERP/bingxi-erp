@@ -4,8 +4,8 @@
  * 功能：申请提交成功后展示结果，并提供回到登录页的入口
  * 调用方：pages/register 的注册链（由申请页 navigateTo/redirect 到本页），wxml 绑定 toIndex
  * 入参：onLoad 的页面参数（本页不使用）
- * 传给谁：getUserInfo 经 libs/utils/login.js 的 getUserInfo 发 GET /api/v1/erp/users/me
- *   （frontend/scripts/route-snapshot.txt:968 get_user_me），由 libs/services/request.js 与
+ * 传给谁：getUserInfo 经 libs/utils/login.js 的 getUserInfo 发 GET /api/v1/erp/auth/me
+ *   （frontend/scripts/route-snapshot.txt:230 get_current_user），由 libs/services/request.js 与
  *   libs/utils/apiGateway.js 的 requestContract 统一归一化与令牌处理
  * 存什么：登录档案摘要（id 与 nickName 与 fullName 与 mobile 与 avatar），由 login.js 落盘；
  *   本页不再写 token 与 loginToken 与 logoutFlag 与 userRole 与 lastAccessShopId 与 paramShopId

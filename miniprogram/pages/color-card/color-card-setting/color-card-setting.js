@@ -6,6 +6,7 @@ require("../../../@babel/runtime/helpers/Arrayincludes");
 var toConsumableArray = require("../../../@babel/runtime/helpers/toConsumableArray"),
   mta_analysis = t(require("../../../utils/mta_analysis.js")),
   util = require("../../../libs/utils/util"),
+  uploadGateway = require("../../../libs/utils/uploadGateway.js"),
   r =
     (require("../../../libs/utils/cpcl-exp.js"),
     require("../../../libs/services/ServicesCard.js").servicesCard),
@@ -127,11 +128,8 @@ Page({
         }, 500);
         var a = 0;
         t.tempFiles.map(function (o) {
-          wx.uploadFile({
+          uploadGateway.uploadFile({
             header: {
-              "Content-Type": "multipart/form-data",
-              Authorization: wx.getStorageSync("token"),
-              terminalSource: 6,
               terminalType: 81,
             },
             formData: {
@@ -140,33 +138,25 @@ Page({
             url: "".concat(app.config.bingxiHost, "/app-api/oss/upload"),
             filePath: o.tempFilePath,
             name: "file",
-            success: function (o) {
-              try {
-                var toConsumableArray = JSON.parse(o.data);
-                if (0 === toConsumableArray.code) {
-                  var mta_analysis = toConsumableArray.data;
-                  (e.setData({
-                    customColorImage: util.utils.replImage(mta_analysis, 300),
-                    "nowList.customColorImage": mta_analysis,
-                    "nowList.isRepeatUpload": !0,
-                  }),
-                    e.onSubColorSettingData());
-                } else
-                  401 === toConsumableArray.code
-                    ? wx.showToast({
-                        icon: "none",
-                        title: "token失效,请重新上传",
-                      })
-                    : wx.showToast({
-                        icon: "none",
-                        title: e.data.msg,
-                      });
-              } catch (t) {
-                wx.showToast({
-                  icon: "none",
-                  title: "上传图片失败",
-                });
-              }
+            success: function (resp) {
+              if (0 === resp.code) {
+                var mta_analysis = resp.data;
+                (e.setData({
+                  customColorImage: util.utils.replImage(mta_analysis, 300),
+                  "nowList.customColorImage": mta_analysis,
+                  "nowList.isRepeatUpload": !0,
+                }),
+                  e.onSubColorSettingData());
+              } else
+                401 === resp.code
+                  ? wx.showToast({
+                      icon: "none",
+                      title: "登录状态已失效，请重新登录",
+                    })
+                  : wx.showToast({
+                      icon: "none",
+                      title: resp.msg || "上传图片失败",
+                    });
               (a += 1) &&
                 a === t.tempFiles.length &&
                 setTimeout(function () {
@@ -923,11 +913,8 @@ Page({
                               },
                             }),
                             clearTimeout(c),
-                            wx.uploadFile({
+                            uploadGateway.uploadFile({
                               header: {
-                                "Content-Type": "multipart/form-data",
-                                Authorization: wx.getStorageSync("token"),
-                                terminalSource: 6,
                                 terminalType: 81,
                               },
                               formData: {
@@ -936,22 +923,17 @@ Page({
                               url: "".concat(app.config.bingxiHost, "/app-api/oss/upload"),
                               filePath: t.tempFilePath,
                               name: "file",
-                              success: function (t) {
-                                try {
-                                  var e = JSON.parse(t.data);
-                                  if ((console.log(e, "fileRepData"), 0 === e.code)) {
-                                    var a = {
-                                      productId: mta_analysis,
-                                      shareColorImg: e.data,
-                                    };
-                                    r.saveColorCardImage(a);
-                                  }
-                                } catch (t) {
-                                  console.log(t, "err");
+                              success: function (resp) {
+                                if (0 === resp.code) {
+                                  var a = {
+                                    productId: mta_analysis,
+                                    shareColorImg: resp.data,
+                                  };
+                                  r.saveColorCardImage(a);
                                 }
                               },
                               fail: function (t) {
-                                console.log("err", t);
+                                console.log("上传分享图失败", t);
                               },
                             }));
                         },

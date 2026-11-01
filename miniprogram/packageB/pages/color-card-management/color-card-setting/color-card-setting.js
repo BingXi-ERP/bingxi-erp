@@ -2,6 +2,7 @@ var e = require("../../../../@babel/runtime/helpers/interopRequireDefault").defa
   t = require("../../../../@babel/runtime/helpers/defineProperty"),
   mta_analysis = e(require("../../../../utils/mta_analysis.js")),
   util = require("../../../../libs/utils/util"),
+  uploadGateway = require("../../../../libs/utils/uploadGateway.js"),
   s =
     (require("../../../../libs/utils/cpcl-exp.js"),
     require("../../../../libs/services/ServicesCard.js").servicesCard),
@@ -85,11 +86,8 @@ Page({
         }, 500);
         var mta_analysis = 0;
         e.tempFiles.map(function (s) {
-          wx.uploadFile({
+          uploadGateway.uploadFile({
             header: {
-              "Content-Type": "multipart/form-data",
-              Authorization: wx.getStorageSync("token"),
-              terminalSource: 6,
               terminalType: 81,
             },
             formData: {
@@ -98,33 +96,25 @@ Page({
             url: "".concat(app.config.bingxiHost, "/app-api/oss/upload"),
             filePath: s.tempFilePath,
             name: "file",
-            success: function (s) {
-              try {
-                var app = JSON.parse(s.data);
-                if (0 === app.code) {
-                  var n = app.data;
-                  (t.setData({
-                    customColorImage: util.utils.replImage(n, 300),
-                    "nowList.customColorImage": n,
-                    "nowList.isRepeatUpload": !0,
-                  }),
-                    t.onSubColorSettingData());
-                } else
-                  401 === app.code
-                    ? wx.showToast({
-                        icon: "none",
-                        title: "token失效,请重新上传",
-                      })
-                    : wx.showToast({
-                        icon: "none",
-                        title: t.data.msg,
-                      });
-              } catch (e) {
-                wx.showToast({
-                  icon: "none",
-                  title: "上传图片失败",
-                });
-              }
+            success: function (resp) {
+              if (0 === resp.code) {
+                var n = resp.data;
+                (t.setData({
+                  customColorImage: util.utils.replImage(n, 300),
+                  "nowList.customColorImage": n,
+                  "nowList.isRepeatUpload": !0,
+                }),
+                  t.onSubColorSettingData());
+              } else
+                401 === resp.code
+                  ? wx.showToast({
+                      icon: "none",
+                      title: "登录状态已失效，请重新登录",
+                    })
+                  : wx.showToast({
+                      icon: "none",
+                      title: resp.msg || "上传图片失败",
+                    });
               (a += 1) &&
                 mta_analysis === e.tempFiles.length &&
                 setTimeout(function () {

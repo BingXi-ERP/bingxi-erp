@@ -1,6 +1,7 @@
 var e = require("../../../@babel/runtime/helpers/defineProperty"),
   app = getApp(),
   ServicesShop = require("../../../libs/services/ServicesShop.js").servicesShop,
+  uploadGateway = require("../../../libs/utils/uploadGateway.js"),
   global = require("../../../libs/services/global.js"),
   o = global.getProvince,
   n = global.getCity,
@@ -278,10 +279,8 @@ Page({
             global.setData({
               isLoadingPhoto: 1,
             }),
-            wx.uploadFile({
+            uploadGateway.uploadFile({
               header: {
-                "Content-Type": "multipart/form-data",
-                Authorization: wx.getStorageSync("token"),
                 terminalSource: 6,
               },
               formData: {
@@ -291,34 +290,21 @@ Page({
               filePath: r.tempFilePath,
               name: "file",
               success: function (t) {
-                try {
-                  var r = JSON.parse(t.data);
-                  if (0 == r.code) {
-                    var c =
-                      "1" === o ? global.data.remoteImageFiles : global.data.licenseImageFiles;
-                    c[n] = r.data;
-                    var d = "1" === o ? "remoteImageFiles" : "licenseImageFiles";
-                    global.setData({
-                      d: c,
-                      isLoadingPhoto: 0,
-                    });
-                  } else
-                    (global.data.imageList.pop(),
-                      global.setData({
-                        imageList: global.data.imageList,
-                      }),
-                      wx.showToast({
-                        icon: "none",
-                        title: global.data.msg,
-                      }));
-                } catch (e) {
+                if (0 == t.code) {
+                  var c = "1" === o ? global.data.remoteImageFiles : global.data.licenseImageFiles;
+                  c[n] = t.data;
+                  global.setData({
+                    d: c,
+                    isLoadingPhoto: 0,
+                  });
+                } else {
                   (global.data.imageList.pop(),
                     global.setData({
                       imageList: global.data.imageList,
                     }),
                     wx.showToast({
                       icon: "none",
-                      title: "上传图片失败",
+                      title: t.msg || "上传图片失败",
                     }));
                 }
                 (s += 1) &&

@@ -1,6 +1,7 @@
 var e = require("../../../../../@babel/runtime/helpers/defineProperty"),
   app = getApp(),
   ServicesUser = require("../../../../libs/services/ServicesUser.js").servicesUser,
+  request = require("../../../../libs/services/request.js").request,
   n =
     (require("../../../../libs/utils/login.js").login,
     require("../../../../libs/utils/util.js").utils),
@@ -169,18 +170,22 @@ Page({
       });
   },
   checkSubInviteStatus: function () {
-    var e = this,
-      ServicesUser = {
-        token: wx.getStorageSync("token"),
-        inviteToken: e.data.inviteToken,
-      };
-    wx.request({
-      url: "".concat(app.config.bingxiHost, "/app-api/user/subAccount/checkInviteCodeIsExpire"),
-      data: ServicesUser,
-      complete: function (e) {},
-      success: function (t) {
-        0 === t.data.code
-          ? (0 == t.data.data.status &&
+    var e = this;
+    // 两条一并收口：一 载荷 token 键是假凭据（storage 从无 token 键），删除；
+    // 二 原裸 wx.request 用 0 === t.data.code 判成功，后端成功信封是 code 200（
+    // backend/src/utils/response.rs），绕开网关就没有 200 转 0 的归一，恒假只弹空提示，
+    // 属真缺陷；接进 ServicesUser.requestPost 走传输层与契约层归一化。
+    // 目标 URL 是旧路径且本仓权威面无等价端点，原样保留并登记待拍板，不改成像
+    request
+      .GET(
+        "".concat(app.config.bingxiHost, "/app-api/user/subAccount/checkInviteCodeIsExpire"),
+        {
+          inviteToken: e.data.inviteToken,
+        },
+      )
+      .then(function (t) {
+        0 === t.code
+          ? (0 == t.data.status &&
               (wx.showToast({
                 title: "邀请二维码已过期",
                 icon: "none",
@@ -189,14 +194,13 @@ Page({
                 codeStatus: !1,
               })),
             e.setData({
-              shopName: t.data.data.shopName,
+              shopName: t.data.shopName,
             }))
           : wx.showToast({
-              title: t.data.msg.result,
+              title: t.msg || "邀请码校验失败",
               icon: "none",
             });
-      },
-    });
+      });
   },
   onGotUserInfo: function (e) {
     (console.log(e, "个人信息"),

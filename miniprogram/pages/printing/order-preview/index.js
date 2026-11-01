@@ -12,7 +12,10 @@ Page({
   },
   onLoad: function (e) {
     mta_analysis.default.Page.init();
-    var ServicesUserLog = wx.getStorageSync("token") || "",
+    // 原写法读 storage 的 token 拼进 webview 查询串：storage 从来没有 token 键，拼出的永远是
+    // token=undefined 假凭据；预览腿本身是旧路径待拍板面，这里只断凭据面，
+    // 改带会话快照里后端确认过的用户 id 作对账键（非凭据、非敏感）
+    var ServicesUserLog = (wx.getStorageSync("bingxiSession") || {}).id || "",
       ServicesOrder = e.orderId,
       o = e.billingFooter,
       r = e.refundBillingFooter,
@@ -28,7 +31,7 @@ Page({
       h = app.config.rootHost,
       w = ""
         .concat(h, "/app-api/order/print/previewImage/")
-        .concat(ServicesOrder, "?token=")
+        .concat(ServicesOrder, "?userId=")
         .concat(ServicesUserLog, "&billingFooter=")
         .concat(o, "&refundBillingFooter=")
         .concat(r, "&printPaymentType=")

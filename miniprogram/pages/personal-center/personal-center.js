@@ -5,6 +5,7 @@ var e = require("../../@babel/runtime/helpers/interopRequireDefault").default,
   app = getApp(),
   ServicesCenter = require("../../libs/services/ServicesCenter.js").servicesCenter,
   login = require("../../libs/utils/login.js").login,
+  apiGateway = require("../../libs/utils/apiGateway.js"),
   util = require("../../libs/utils/util.js").utils;
 Page({
   data: {
@@ -54,7 +55,9 @@ Page({
   },
   onShow: function () {
     var e = this;
-    (wx.getStorageSync("token")
+    // 原门读 storage 的 token 键：登录出参从不产 token，键永不存在，门恒假等于档案永不回读；
+    // 判据换成 apiGateway.isLoggedIn()（读的是 auth/me 回读确认后写入的会话快照，是真判据）
+    (apiGateway.isLoggedIn()
       ? this.getUserInfo().then(function () {
           var mta_analysis = util.addDefaultAvatar(app.globalData.userInfo.avatar),
             isVisitor = app.globalData.userInfo.type;
@@ -241,7 +244,9 @@ Page({
     var mta_analysis = e.currentTarget.dataset,
       app = mta_analysis.action,
       ServicesCenter = mta_analysis.auth;
-    if (wx.getStorageSync("token") || ServicesCenter)
+    // 原门 wx.getStorageSync("token") 恒假，只剩带 auth 标记的入口可走；凭 token 键判登录态
+    // 属假判据，换成会话快照判据，auth 数据属性维持原语义
+    if (apiGateway.isLoggedIn() || ServicesCenter)
       switch (app) {
         case "teach":
           wx.navigateTo({
