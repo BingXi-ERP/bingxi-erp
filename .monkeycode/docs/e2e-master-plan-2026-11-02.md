@@ -50,10 +50,10 @@ CI e2e 分片矩阵 45 片（flow 20 + smoke 5 + traversal 5 + extras 15），�
 
 | 门禁 | 现状 | 缺口与工单 |
 |---|---|---|
-| 新增端点必须配套 E2E（配对门） | 已落地主干，独立工作流 `.github/workflows/e2e-pairing.yml`，基线取分支起点提交，取不到起点显式跳过不算通过；反向自证 9 道全命中 | **缺口**：`ci-cd.yml` 零引用它，也不在必检聚合门 `ci-cleanup-retry` 的 needs 里，而主干 ruleset 无任何必需状态检查 ⇒ 该门红不拦合并。工单 G1：把配对判定并入 `ci-cleanup-retry` needs（27→28）或在 PR 正文强制认领，二选一 |
-| 存量漏测分母 | 配对门自测口径实测：端点 1822 枚，e2e 已覆盖 1166，**前端有调用点却零 e2e 引用 189 枚**，前端零调用 467 枚（豁免池） | 工单 G2：189 枚按域切批补测，号段见第 7 节预分配表 |
+| 新增端点必须配套 E2E（配对门） | 已落地主干，独立工作流 `.github/workflows/e2e-pairing.yml`，基线取分支起点提交，取不到起点显式跳过不算通过；反向自证 9 道全命中 | **缺口**：`ci-cd.yml` 零引用它，也不在必检聚合门 `ci-cleanup-retry` 的 needs 里，而主干 ruleset 无任何必需状态检查 ⇒ 该门红不拦合并。**已按裁定处置（本地待推）**：GitHub 的 `needs` 不能跨工作流，所以"并入 needs"只能落成把同一对脚本的判定做成 `ci-cd.yml` 内的 `ci-e2e-pairing` job（`pull_request` 才跑，缺起点按判负），并加进 `ci-cleanup-retry` 的 needs（27→28，job 总数 29）；独立工作流撤掉 `pull_request` 触发避免同一扫描跑两遍，保留 `push: main` 与手工触发两条腿（`ci-cd.yml` 的 push 只认 `v*` tag，撤掉那条腿主干累积漏测就再没人对账）。车道 `wt-pairing-hard`，提交 `041c32c7` 加一条 AGENTS 同步 |
+| 存量漏测分母 | 配对门自测口径实测：端点 1822 枚，e2e 已覆盖 1166，**前端有调用点却零 e2e 引用 189 枚**，前端零调用 467 枚（豁免池） | 工单 G2：189 枚按域切批补测，号段见第 7 节预分配表。**已按裁定处置（本地待推）**：G3 覆盖率宣称换成棘轮——判定器加"分母只准降不准升"档，基线 `frontend/scripts/e2e-pairing-coverage-baseline.json` 只能由 `--write-coverage-baseline` 重算，缺基线自曝退 9，反向自证由 9 道增至 12 道全命中，实跑 `ratchet=ok 189/189` 绿。车道 `wt-pairing-ratchet`，三枚提交 |
 | 测试真实性门 | `e2e-authenticity-guard` 已落地（动态 needs ＋ 静态禁 mock，带 DO-NOT-MODIFY 标记） | 工单 G3：底数口径对齐——历史登记只记 3 处，实测源级 `test.skip` 24 处，判定面偏窄会放行假绿 |
-| 覆盖率门 | `codecov.yml` 全部 `informational: true`；前端 vitest 四项阈值实际为 1%；80% 与跌幅 5% 只写在 codecov 且不阻塞 | 待裁项 3，见第 8 节。建议不用覆盖率百分比当门，改用"端点-e2e 配对覆盖率"棘轮（已有分母 1166/1822） |
+| 覆盖率门 | codecov 全 `informational` ＋ 前端 vitest 四项阈值实测 1，"80%／跌幅 5%"只是配置里的宣称 | **已按裁定处置**：不再用百分比覆盖率当门，改用上一行的配对覆盖率棘轮（分母可复现、只准降不准升）。宣称与实态的差异已在第 8 节裁定记录里点名 |
 | 小程序门禁（打包／依赖／语法／包大小） | **主干不存在**：main 无 `miniprogram` 跟踪文件；七道静态门与 `miniprogram-checks.yml` 只在在途分支 `feat/miniprogram-adapt` | 工单 G4：先裁小程序树是否入主干（待裁项 6），门才谈得上纳入；纳入时须与"构建 npm"同支，禁先排产物 |
 | 端点基线 | `route-snapshot.mjs --check` 在 `ci-static-checks` 内，绝对前缀只在 `routes/mod.rs` 一次 nest | 挂载重构必须让快照输出逐字节不变（既有硬规矩） |
 | 契约四向 | `check-contract`／`check-api-paths`／`check-api-envelope`／`check-api-request`／`check-route-mount` 同在 `ci-static-checks` | 新用例不许绕过信封声明，列表形状必填 listKey |
@@ -140,21 +140,27 @@ CI e2e 分片矩阵 45 片（flow 20 + smoke 5 + traversal 5 + extras 15），�
 
 ---
 
-## 8. 待裁项（需终裁，均已给推荐默认）
+## 8. 裁定与执行状态（2026-11-02 凌晨，按推荐默认裁定后回填）
 
-1. 主干是否由我发起一次 workflow_dispatch 全量验证（`full_suite=true`，锁主干顶点），把"主干红面"钉成对照基线。**推荐：做**，否则三支 PR 的继承红永远判不死。
-2. 配对门（新增端点必须配套 e2e）是否并入 `ci-cleanup-retry` needs 形成硬拦。**推荐：并入**——否则"无对应用例禁止合并"这条只剩人守。
-3. 覆盖率门口径：codecov 全 informational ＋ 前端阈值实际 1%，与"80%／跌幅 5%"宣称不符。**推荐：维持 informational，把宣称改成"端点-e2e 配对覆盖率棘轮"**（分母已实测 1166/1822），不用百分比凑精确。
-4. 客户与供应商账号：后端角色种子表里**不存在**客户／供应商门户角色（`supplier_manager` 是内部供应商管理员），`lab_technician` 等 18 个在册角色也无 e2e 基线。原文 A/I/M/N 里的客户与供应商动作现在无法测。**推荐：先走 W2 立最小门户角色与数据面，再补客户侧 e2e**；不建议为过用例而造假角色。
-5. 会话里给过的公众号与小程序凭据（AppID／AppSecret／代码上传密钥，值不落本文档）：仓库是 public，只进 gitignore 的本地配置与 GitHub Secrets 名。**推荐默认四项**：先接公众号模板消息；事件面取报价待审批／审批通过驳回／对账待确认三类；新增用户-openid 绑定迁移表（关注事件写、登录后绑定，不做手机号反查）；仓库侧只留环境变量名与读取代码。另：这两枚 Secret 已出现在会话记录里，建议按已暴露处理，方便时重置。
-6. 小程序树是否推送入主干（此前裁定先不推，本地照做）。**推荐：保持先不推**，待第 5 项凭据落点与 G4 门禁同支一起进。
+| 裁定项 | 状态 | 落点与证据 |
+|---|---|---|
+| 1 主干全量验证 | **已执行** | 发起 `workflow_dispatch`，run `41326285558`，`full_suite=true`、`skip_release=true`（只验证不产出 release 二进制），锁 `f9385ce9`。判读前提：现行门控已改为按 `ci-info` 的 `full_suite` 输出放行，dispatch 不再大面积 skip，且因为 `ci-cd.yml` 的 push 触发只认 `v*` tag，这条 run 就是主干顶点的唯一自证位。已挂 30 分钟一轮的只读监控（04:30 过期） |
+| 2 配对门成硬拦 | **已执行，机制已纠正** | 原推荐语"并入 `ci-cleanup-retry` needs"在 GitHub 语法上做不到——`needs` 不能跨工作流。实际落法：判定搬进 `ci-cd.yml` 做成 `ci-e2e-pairing` job（只在 `pull_request` 跑，缺分支起点判负而不是跳过），needs 27→28，顶层 job 29；独立工作流撤 `pull_request` 触发、留 `push: main` 与手工两条腿。车道 `wt-pairing-hard`（`041c32c7` ＋ AGENTS 计数与行号漂移同步一枚）。本地实测：YAML 可解析且 needs 全覆盖、actionlint 原生面零发现、`bash -n` 过、注释门命中 0（改动文件 4）。shellcheck 面与 CI 固定版 actionlint 1.7.12 交云端（本地工装下载的是 linux 二进制，Windows 跑不了，脚本自陈"拒绝判绿"属环境限制不是代码红） |
+| 3 覆盖率宣称换成棘轮 | **已执行** | 判定器加"分母只准降不准升"档，三态判定（缺基线或计数与成员清单不一致退 9、上升判红并逐条点名、改善只提示重算）；基线 `frontend/scripts/e2e-pairing-coverage-baseline.json` 由 `--write-coverage-baseline` 实测生成，含 189 枚成员清单以便点名。反向自证 9→12 道全命中，实跑 `ratchet=ok 189/189` 绿。车道 `wt-pairing-ratchet`（三枚提交） |
+| 4 客户与供应商门户角色 | **取证在跑** | 只读取证已派（权限键由 URL 段推导能否承载外部主体、`self/dept/all` 对"客户只见自己单据"的支持度、客户侧与供应商侧端点族存在性、最小实现路径三选一）。取证结论出来前不实施，避免为过用例造角色 |
+| 5 凭据落点 | **地基已落，代码腿在跑** | 本地配置 `backend/.env`（权限 0600，被 `backend/.gitignore` 命中，`git grep` 在全部被跟踪内容里对这些值零命中，工作树干净）。仓库侧只出现变量名：`WECHAT_MP_APPID`／`WECHAT_MP_SECRET`（公众号模板消息）、`WECHAT_MINIAPP_APPID`／`WECHAT_MINIAPP_SECRET`（小程序订阅消息，另用另一对凭据，公众号那对不能用）、三枚模板 ID 变量留空占位（等后台选定模板再填，代码缺失时须显式报"模板未配置"而不是静默）。openid 绑定迁移分派 `m0128`（域 `wechat_mp_binding`，链尾实测 `m0123`，`m0124` 至 `m0127` 与 `m0130` 已被在途与预留占走），车道 `wt-wxmp`。**GitHub Secrets 未创建**（属仓库设置写操作，需你授权或你在 UI 做）。两枚 Secret 已出现在会话记录里，建议按已暴露处理并重置 |
+| 6 小程序树 | **维持不推** | 主干仍无 `miniprogram` 跟踪文件；静态门与 `miniprogram-checks.yml` 留在 `feat/miniprogram-adapt`，与凭据落点同批进 |
+
+待你授权才能做的三件事：把 `wt-pairing-hard`、`wt-pairing-ratchet` 两条车道推上远端并各开一支 PR（hub 文件 `ci-cd.yml` 的改动会与在途 1144 撞面，需按串行推次序处理）；创建上述 GitHub Secrets；以及另一会话已就绪未推的三支换根分支。
 
 ---
 
 ## 9. 现状快照（截至本文件写就）
 
-- 主干顶点 `f9385ce9`（配对门基线取分支起点那版已合入）；工作本文件所在树干净。
+- 主干顶点 `f9385ce9`（配对门基线取分支起点那版已合入）；本文件所在树只有本文档与索引两处改动，已本地提交。
 - 开放 PR 5 支：1150 死列下线（head `12fe63c4`）、1149 报价含税口径（`abb4d8a2`）、1147 坯布夹具事实（`092117cb`）、1146 录入与删除门载体（`cdad064b`）、1144 报价五棒审批链 e2e（`734f2948`）。
+- 预检结论：这 5 支相对主干的端点增删实测均为 0（按 `route-snapshot.txt` 集合差比对），所以新的配对硬拦门合入后不会立刻把它们判红。
 - 已合入主干：1142（缸号锁定防超卖 e2e）、1148（配对门基线修复）、1140、1145、1143、1100、1141。
-- 红面归因结论：`🧹收尾清理`＝聚合器不代表本支缺陷；Rust 分片 2/10＝runner 磁盘写满（0 例未跑，基础设施红）；`contract_wave12` 的 400≠200＝夹具自相矛盾（已由 1147 处置）；flow 7/20 与 12/20 三支同撞＝指向主干侧，待 W0 第 1 项钉基线。
+- 红面归因结论：`🧹收尾清理`＝聚合器不代表本支缺陷；Rust 分片 2/10＝runner 磁盘写满（0 例未跑，基础设施红）；`contract_wave12` 的 400≠200＝夹具自相矛盾（已由 1147 处置）；flow 7/20 与 12/20 三支同撞＝指向主干侧，由 run `41326285558` 出对照基线。
+- 聚合门只覆盖 `ci-cd.yml` 内部 needs：独立工作流（含配对门主干 push 腿）的红不会出现在 `🧹 收尾清理` 上，数红时要分开看。
 - 换根就绪未推：三支落后分支已就地并基到主干顶点（零冲突），按串行推规矩等红面归属落地逐支推。
