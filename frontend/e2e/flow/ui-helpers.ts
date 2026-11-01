@@ -633,9 +633,7 @@ export async function createProductUI(page: Page): Promise<number | undefined> {
     .catch(e => {
       console.warn(`[E2E] 断言容错（元素可能未渲染）: ${(e as Error).message}`);
     });
-  const fabricItem = dropdownItems(dropdown)
-    .filter({ hasText: /面料/i })
-    .first();
+  const fabricItem = dropdownItems(dropdown).filter({ hasText: /面料/i }).first();
   if ((await fabricItem.count()) > 0) {
     await fabricItem.click();
   } else {
@@ -1635,6 +1633,11 @@ function firstCellSelectorFor(shape: TableRowShape): string {
   return shape === 'virtual' ? '.el-table-v2__row-cell' : 'td';
 }
 
+/** 表格容器取数的重试预算：预算内等挂载，耗尽仍无容器才判红（不放宽判据，只消慢首屏假红）。 */
+const ROW_SHAPE_WAIT_BUDGET_MS = 15_000;
+/** 预算内的取数间隔。 */
+const ROW_SHAPE_POLL_MS = 250;
+
 /**
  * 显式确定目标表格形态（禁止跨形态静默兜底探测）：
  * - 调用方传了 shape → 直接用（并存页必须由调用方点名要操作哪张表）。
@@ -1646,8 +1649,19 @@ async function resolveRowShape(page: Page, shape?: TableRowShape): Promise<Table
   if (shape) return shape;
   // 按「可见」容器判定：EP el-dialog 关闭不销毁内部 DOM（display:none 子树不计入 :visible），
   // 否则列表 V2Table 与隐藏表单里的 el-table 会被误判为「两形态并存」。
-  const virtualCount = await page.locator('.el-table-v2:visible').count();
-  const standardCount = await page.locator('.el-table:visible').count();
+  // 懒加载路由 chunk 与按需编译的前端服务让表体容器晚于页面外壳挂载，单次取计数会读到 0，
+  // 把慢首屏误判成取数缺陷；这里在固定预算内重试取数，预算耗尽仍为 0 才抛同一条 fail-visible
+  // 文案——保留"表格未渲染即判红，不返回 null 掩盖"的原意，判据不放宽。
+  const deadline = Date.now() + ROW_SHAPE_WAIT_BUDGET_MS;
+  let virtualCount = 0;
+  let standardCount = 0;
+  for (;;) {
+    virtualCount = await page.locator('.el-table-v2:visible').count();
+    standardCount = await page.locator('.el-table:visible').count();
+    if (virtualCount > 0 || standardCount > 0) break;
+    if (Date.now() >= deadline) break;
+    await page.waitForTimeout(ROW_SHAPE_POLL_MS);
+  }
   if (virtualCount > 0 && standardCount > 0) {
     throw new Error(
       `[findTableRow] 页面同时可见 .el-table-v2(${virtualCount}) 与 .el-table(${standardCount}) ` +
@@ -1929,10 +1943,9 @@ export function dropdownItems(panel: Locator): Locator {
  * 缺料补货筛选下拉切换面板前的隔离确认。
  */
 export async function expectDropdownClosed(page: Page, timeout = 10_000): Promise<void> {
-  await expect(page.locator('.el-select-dropdown:visible'), '应无任何可见下拉面板').toHaveCount(
-    0,
-    { timeout }
-  );
+  await expect(page.locator('.el-select-dropdown:visible'), '应无任何可见下拉面板').toHaveCount(0, {
+    timeout,
+  });
 }
 
 /**
@@ -2207,10 +2220,7 @@ export async function isFieldDisabled(
   const containerCls = (await container.getAttribute('class')) ?? '';
   if (containerCls.includes('is-disabled')) return true;
   // 兜底：部分版本把 is-disabled 只加在内层 __wrapper 上（getAttribute 命中失败会超时抛错）
-  const wrapperCls = await container
-    .locator('.el-select__wrapper')
-    .first()
-    .getAttribute('class');
+  const wrapperCls = await container.locator('.el-select__wrapper').first().getAttribute('class');
   return !!wrapperCls && wrapperCls.includes('is-disabled');
 }
 

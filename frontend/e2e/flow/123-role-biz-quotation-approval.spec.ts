@@ -10,7 +10,7 @@
  *     再做读侧控制组对照：同角色同读端点先按 id 读自己名下对照单 200、再按 id 读他人（rep 名下）单 403，
  *     把 403 归因到行级数据范围收敛（归属不在可见集合）而非权限码缺授；
  *   管理员收口由本文件用 page 夹具的 admin 会话完成：回读两张单终态与理由列、按
- *     resource_type+resource_id+user_id 三参服务端等值过滤取该单该操作人的 auto_audit 审计行，
+ *     resource_type+resource_id+user_id 三参服务端等值过滤取该单该操作人的实体体表名审计行，
  *     在超时窗口内轮询匹配目标状态迁移（逐行读 before 与 after 快照，三参精确相等才算命中），
  *     断言快照里的状态迁移与操作人、最后在详情页核对界面状态标签。
  *
@@ -22,7 +22,7 @@
  *   端点正负例走 flow/helpers 的 apiCall、apiCallRaw、apiCallExpectFail 与 expectDenied。
  *
  * 存什么：客户一行、产品一行、报价单三行（两张挂 rep 名下进审批链、一张挂 sales_manager 名下作读侧对照单）
- *   与各自明细行、每次状态迁移一条 auto_audit 审计行
+ *   与各自明细行、每次状态迁移一条审计行（resource_type 落报价单实体的存储表名）
  *   （含 before 与 after 整模型快照、操作人 user_id 与 username、变更时间）。
  *
  * 存哪里：客户、产品、报价单落各自业务表，审计行落 audit_log 表；
@@ -67,12 +67,13 @@ const APPROVE_REASON = 'E2E 双人审批链 通过';
 /** 驳回理由，落 sales_quotations.rejection_reason 列，收口时逐字回读 */
 const REJECT_REASON = 'E2E 双人审批链 驳回';
 
-/** 审计行的资源类型：报价审批服务每次状态迁移都以 auto_audit 落一行 UPDATE 审计 */
-const AUDIT_RESOURCE_TYPE = 'auto_audit';
+/** 审计行的资源类型：写入单点把历史占位串换成实体存储表名，报价单实体的表名即此值 */
+const AUDIT_RESOURCE_TYPE = 'sales_quotations';
 
-/** 审计行轮询上限与间隔：auto_audit 落库是异步的（audit_log_service record_async），
+/** 审计行轮询上限与间隔：状态跃迁的审计行由 update_with_audit 在业务事务内同事务直写
+ *   （实体 update 与审计 insert 同事务，非异步投递），轮询留的是读副本与列表分页延迟余量；
  *   等待必须挪进"找到目标迁移"的轮询本身，窗口内每轮重新取列表并逐行试匹配，
- *   命中即返回；窗口耗尽仍未命中才判红。留的是落库与读副本延迟余量，不是固定 sleep。 */
+ *   命中即返回；窗口耗尽仍未命中才判红。留的不是固定 sleep。 */
 const AUDIT_POLL_TIMES = 20;
 const AUDIT_POLL_INTERVAL_MS = 500;
 
@@ -203,10 +204,7 @@ async function resolveUserIdByUsername(
  * 传给谁：GET /audit-logs/{id}，返回 AuditLogDetailResponse。
  * 存什么/存哪里：只读请求，不持久化。
  */
-async function getAuditDetail(
-  page: Page,
-  auditId: number
-): Promise<Row> {
+async function getAuditDetail(page: Page, auditId: number): Promise<Row> {
   return apiCallRaw<Row>(page, 'GET', `/audit-logs/${auditId}`);
 }
 
@@ -416,7 +414,11 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
             });
 
             for (const id of [quotationAId, quotationBId]) {
-              const submitted = await apiCall<Row>(session.page, 'POST', `/quotations/${id}/submit`);
+              const submitted = await apiCall<Row>(
+                session.page,
+                'POST',
+                `/quotations/${id}/submit`
+              );
               expect(
                 submitted.message,
                 `第二棒提交报价单 ${id} 的响应文案应为已提交审批`
@@ -469,10 +471,9 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
               `/quotations/${quotationAId}/approve`,
               { approval_reason: APPROVE_REASON }
             );
-            expect(
-              approved.status,
-              `第三棒批准后报价单 ${quotationAId} 应为 approved`
-            ).toBe('approved');
+            expect(approved.status, `第三棒批准后报价单 ${quotationAId} 应为 approved`).toBe(
+              'approved'
+            );
             expect(
               String(approved.approval_reason ?? ''),
               `批准理由应逐字落 approval_reason 列`
@@ -489,10 +490,9 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
               `/quotations/${quotationBId}/reject`,
               { reason: REJECT_REASON }
             );
-            expect(
-              rejected.status,
-              `第三棒驳回后报价单 ${quotationBId} 应为 rejected`
-            ).toBe('rejected');
+            expect(rejected.status, `第三棒驳回后报价单 ${quotationBId} 应为 rejected`).toBe(
+              'rejected'
+            );
             expect(
               String(rejected.rejection_reason ?? ''),
               `驳回理由应逐字落 rejection_reason 列`
@@ -560,7 +560,9 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
       const repUsername = String(relay.artifacts.repUsername);
 
       const approved = await getQuotation(page, quotationAId);
-      expect(approved.status, `收口回读：报价单 ${quotationAId} 终态应为 approved`).toBe('approved');
+      expect(approved.status, `收口回读：报价单 ${quotationAId} 终态应为 approved`).toBe(
+        'approved'
+      );
       expect(String(approved.approval_reason ?? ''), '收口回读：批准理由应与提交值逐字一致').toBe(
         APPROVE_REASON
       );
@@ -581,8 +583,9 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
         managerUserId
       );
 
-      // 审计：每次状态迁移一条 auto_audit，含整模型 before 与 after 快照与操作人 user_id/username。
-      // 写侧全实体共用 resource_type=auto_audit 且 resource_id 用各实体自己的主键（如产品 id 会撞
+      // 审计：每次状态迁移一条审计行，含整模型 before 与 after 快照与操作人 user_id/username。
+      // 写侧 resource_type 落各实体自己的存储表名（占位串在写入单点被换真）且 resource_id 用各实体
+      // 自己的主键（如产品 id 会撞
       // 报价单 id），单按 resource_type 取一页再客户端精筛会把别家单据的审计行混进候选集，故按
       // resource_type+resource_id+user_id 三参服务端等值过滤取数（读取侧的 resource_id 等值契约），并把
       // "等异步落库"挪进匹配目标迁移的轮询本身。当事操作人 user_id 由 admin 会话按用户名经
@@ -613,7 +616,7 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
       });
       expect(
         String(submitAuditA.resource_type ?? ''),
-        '提交审计行的资源类型应为 auto_audit'
+        `提交审计行的资源类型应为报价单实体体表名 ${AUDIT_RESOURCE_TYPE}`
       ).toBe(AUDIT_RESOURCE_TYPE);
       expect(String(submitAuditA.operation_type ?? ''), '提交审计行的操作类型应为 UPDATE').toBe(
         'UPDATE'
@@ -638,10 +641,9 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
       });
       // 提交与批准两条迁移各自被坐实存在且迁移签名不同，即报价单 A 至少有这两条审计行；
       // 再坐实它们确为两条不同行，防把同一行既读成提交又读成批准。
-      expect(
-        Number(approveAuditA.id),
-        '批准迁移与提交迁移必须是两条不同的审计行'
-      ).not.toBe(Number(submitAuditA.id));
+      expect(Number(approveAuditA.id), '批准迁移与提交迁移必须是两条不同的审计行').not.toBe(
+        Number(submitAuditA.id)
+      );
       expect(
         String(approveAuditA.resource_id ?? ''),
         `批准审计行的 resource_id 应精确等于报价单 ${quotationAId}`
@@ -652,18 +654,16 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
       ).toBe(managerUserId);
       const approveBeforeA = (approveAuditA.before_snapshot ?? {}) as Row;
       const approveAfterA = (approveAuditA.after_snapshot ?? {}) as Row;
-      expect(
-        String(approveBeforeA.approval_reason ?? ''),
-        '批准前快照不应已有审批通过理由'
-      ).toBe('');
+      expect(String(approveBeforeA.approval_reason ?? ''), '批准前快照不应已有审批通过理由').toBe(
+        ''
+      );
       expect(
         String(approveAfterA.approval_reason ?? ''),
         '批准后快照的 approval_reason 应与本次通过理由逐字一致'
       ).toBe(APPROVE_REASON);
-      expect(
-        Number(approveAfterA.approved_by),
-        '批准后快照的审批人应为销售经理'
-      ).toBe(managerUserId);
+      expect(Number(approveAfterA.approved_by), '批准后快照的审批人应为销售经理').toBe(
+        managerUserId
+      );
       expect(String(approveAuditA.created_at ?? ''), '批准审计行必须带变更时间').not.toBe('');
 
       await waitForAuditTransition(page, {
@@ -691,10 +691,9 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
         String(rejectAfterB.rejection_reason ?? ''),
         '驳回后快照的 rejection_reason 应与本次驳回理由逐字一致'
       ).toBe(REJECT_REASON);
-      expect(
-        Number(rejectAuditB.user_id),
-        '驳回审计行的操作人 user_id 应为销售经理'
-      ).toBe(managerUserId);
+      expect(Number(rejectAuditB.user_id), '驳回审计行的操作人 user_id 应为销售经理').toBe(
+        managerUserId
+      );
 
       // 界面核对：详情页按状态渲染标签与理由行
       await page.goto(`${BASE_URL}/quotations/${quotationAId}`);
