@@ -9,7 +9,10 @@
  *   一次性 CSRF 令牌；登录态本身由 apiGateway 写 bingxiSession 会话快照
  * 存哪里：wx.storage
  *
- * 登录成功判据：后端登录返回码 0 且 GET /api/v1/erp/users/me 回读通过（valid 或 denied）
+ * 登录成功判据：后端登录返回码 0 且 GET /api/v1/erp/auth/me 回读判 valid
+ *   （frontend/scripts/route-snapshot.txt:230 get_current_user；verifySession 只产出
+ *   valid invalid error 三态，历史上针对 /users/me 403 的 denied 态已随端点切换退场——
+ *   /auth/me 在 AUTH_ONLY_PATHS 免 RBAC，403 不再可能是权限面拒绝，归入 invalid）
  * 本文件不再写 storage 的 token / loginToken：backend/src/handlers/auth_handler.rs 的 LoginResponse
  * 只有 csrf_token、user、permissions、password_expired，凭据在 httpOnly Cookie 里，JS 侧取不到也没有
  *
@@ -53,7 +56,7 @@ function cacheProfile(user) {
 }
 
 /**
- * 登录出参收尾：后端返回码为 0 后立刻回读 users/me 确认会话，确认通过才落登录态
+ * 登录出参收尾：后端返回码为 0 后立刻回读 auth/me 确认会话，确认通过才落登录态
  * 入参 res adaptLogin 的归一结果
  * 传给谁：登录入口的 Promise（页面按 code === 0 决定是否跳首页）
  * 存什么：会话有效时落用户档案；会话不成立时清会话与一次性令牌
@@ -62,7 +65,7 @@ function cacheProfile(user) {
 function finishLogin(res) {
   if (!res || res.code !== 0) return Promise.resolve(res);
   return apiGateway.verifySession().then(function (v) {
-    if (v.state === "valid" || v.state === "denied") {
+    if (v.state === "valid") {
       cacheProfile(res.data.user);
       return res;
     }
@@ -138,8 +141,10 @@ var s = createClass(function e() {
           .then(function (res) {
             if (res && res.code === 0) {
               var u = res.data || {};
-              // users/me 出参是 UserResponse（id/username/real_name/avatar/phone/department_name/role_names），
-              // 不含权限码；权限只在登录响应与 auth/me 里下发，这里缺失就不覆盖已落盘的 resCodeList
+              // auth/me 出参是 UserInfo（backend/src/handlers/auth_handler.rs：id username email
+              // role_id role_name permissions phone department_id department_name is_totp_enabled
+              // real_name avatar agreed_to_terms_at），带 permissions；real_name 与 avatar 当前恒为
+              // None（表有列但 UserInfo 未取，已登记需后端补字段），缺失时不覆盖已落盘值
               if (u.permissions) {
                 wx.setStorageSync("resCodeList", u.permissions);
                 o.userAuthList = util.getResList(u.permissions);

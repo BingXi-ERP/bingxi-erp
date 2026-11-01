@@ -119,7 +119,10 @@ var createClass = require("../../../@babel/runtime/helpers/createClass"),
         );
       }),
       (this.shopDetail = function (t, o) {
-        return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/users/me"), t);
+        // 全仓零调用方（复核 grep '\.shopDetail\b' 只命中本行与 libs 份定义行），留作会话档案回读，
+        // 原挂 /users/me 属端点选错（users:read 只授内部岗位，客户与供应商会话必 403），
+        // 收到 /auth/me（快照:230）；店铺资料读口另有 shopDetail2 走 /company-profile/full（快照:349）
+        return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/auth/me"), t);
       }),
       (this.shopDetail2 = function (t) {
         // 功能 读取本公司档案详情用于店铺资料页回显

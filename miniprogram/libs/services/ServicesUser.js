@@ -30,8 +30,10 @@ var t = require("../../@babel/runtime/helpers/interopRequireDefault").default,
        * 调用方：登录与冷启动需要确认微信侧会话在本仓后端成立时使用（当前全仓零调用方，
        *   改造前先复核：grep -rn 'userInit' 只命中本方法与 packageB 副本的定义行）
        * 入参：无
-       * 传给谁：apiGateway.verifySession() 发 GET /api/v1/erp/users/me 回读判登录态
-       *   （frontend/scripts/route-snapshot.txt:968）
+       * 传给谁：apiGateway.verifySession() 发 GET /api/v1/erp/auth/me 回读判登录态
+       *   （frontend/scripts/route-snapshot.txt:230 get_current_user，AUTH_ONLY_PATHS 内任何
+       *   登录态可读；该方法只产出 valid invalid error 三态，判定只认 valid——历史上针对
+       *   /users/me 403 权限面拒绝的 denied 态已随端点切换退场，不许复活）
        * 存什么：会话有效时由 apiGateway 写会话快照；不再有按环境分键的 token 缓存
        * 存哪里：wx.storage（键 bingxiSession）
        *
@@ -39,11 +41,11 @@ var t = require("../../@babel/runtime/helpers/interopRequireDefault").default,
        * demoToken 与 productionToken", o.data.token)。后端 LoginResponse 无 token 字段
        * （backend/src/handlers/auth_handler.rs 的 LoginResponse 只有 csrf_token、user、
        * permissions、password_expired），这套写入落盘的永远是 undefined，属凭据冒充登录态，已整段
-       * 换成 users/me 回读口径。
+       * 换成 auth/me 回读口径。
        */
       (this.userInit = function () {
         return apiGateway.verifySession().then(function (v) {
-          if (v.state === "valid" || v.state === "denied") return v;
+          if (v.state === "valid") return v;
           wx.showToast({
             title: v.msg || "登录状态校验失败，请重新登录",
             icon: "none",
@@ -108,10 +110,13 @@ var t = require("../../@babel/runtime/helpers/interopRequireDefault").default,
         return request.POST("".concat(app.config.bingxiHost, "/app-api/user"), t);
       }),
       (this.getUserInfo = function (t) {
+        // 档案回读统一走 /auth/me（快照:230，AUTH_ONLY_PATHS，任何登录态可读，出参 UserInfo
+        // 含 permissions）；/users/me 按 URL 段派生 users:read 权限码只授内部岗位，
+        // 客户与供应商会话必 403，不得作为档案回读端点
         return app.globalData.wxCode
-          ? request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/users/me"), t)
+          ? request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/auth/me"), t)
           : getWxInfo.default.getWxCode().then(function (o) {
-              return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/users/me"), t);
+              return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/auth/me"), t);
             });
       }),
       (this.sendCode = function (t) {

@@ -90,10 +90,11 @@ Page({
   /**
    * 提交反馈前先回读一次档案，确保用的是后端认过的当前用户
    * 入参：无
-   * 传给谁：libs/utils/login.js 的 getUserInfo（GET /api/v1/erp/users/me，快照:968），
+   * 传给谁：libs/utils/login.js 的 getUserInfo（GET /api/v1/erp/auth/me，快照:230），
    *   档案键由 login.js 单点落盘；原先在此重复写 userRole 与 lastAccessShopId 与 myShopId 与
-   *   loginToken 与 logoutFlag 的分支已退场，因 UserResponse
-   *   （backend/src/handlers/user_handler.rs:108）不出这些字段，写入值永远是 undefined
+   *   loginToken 与 logoutFlag 的分支已退场，auth/me 出参 UserInfo（
+   *   backend/src/handlers/auth_handler.rs）与旧 /users/me 的 UserResponse 都不出这些字段，
+   *   写入值永远是 undefined
    * 存什么/存哪里：见 libs/utils/login.js
    */
   getUserInfo: function () {

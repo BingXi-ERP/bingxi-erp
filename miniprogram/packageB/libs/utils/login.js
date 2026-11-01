@@ -4,7 +4,8 @@
  * 调用方：packageB 的 bind-phone、authSetting、release-cargo-pass 等页面
  * 入参：各登录入口的账号凭据（手机号与验证码 / 微信授权结果 / 子账号登录参数）
  * 传给谁：packageB/libs/services/ServicesUser.js 的 login2 -> libs/utils/apiGateway.js 的 adaptLogin 归一化，
- *   再由 verifySession 回读 GET /api/v1/erp/users/me 确认会话
+ *   再由 verifySession 回读 GET /api/v1/erp/auth/me 确认会话（快照:230，只产出
+ *   valid invalid error 三态；历史上针对 /users/me 403 权限面拒绝的 denied 态已随端点切换退场）
  * 存什么：用户档案（id、nickName、mobile、avatar、fullName、resCodeList、userType）与一次性 CSRF 令牌、
  *   会话快照 bingxiSession
  * 存哪里：wx.storage
@@ -44,7 +45,7 @@ function finishLogin(res) {
     return Promise.resolve(res);
   }
   return apiGateway.verifySession().then(function (v) {
-    if (v.state === "valid" || v.state === "denied") return res;
+    if (v.state === "valid") return res;
     apiGateway.clearSession();
     return {
       code: 401,
@@ -110,7 +111,8 @@ var r = createClass(function e() {
         wx.setStorageSync("mobile", u.phone || "");
         wx.setStorageSync("avatar", u.avatar || util.addDefaultAvatar());
         wx.setStorageSync("fullName", u.real_name || u.fullName || "");
-        // users/me 出参不含权限码，权限只在登录响应与 auth/me 里下发，缺失时不覆盖已落盘的 resCodeList
+        // auth/me 出参是 UserInfo（backend/src/handlers/auth_handler.rs），带 permissions，
+        // 缺失时不覆盖已落盘的 resCodeList；real_name 与 avatar 当前恒为 None（需后端补字段）
         if (u.permissions) wx.setStorageSync("resCodeList", u.permissions);
         wx.setStorageSync("userType", u.type);
         return res;

@@ -9,7 +9,8 @@
  *   目标是旧路径 /app-api/setting/bindWechat 与 /app-api/setting/unbindWechat
  *   （仓内权威面 frontend/scripts/route-snapshot.txt 1821 条内无微信绑定端点，
  *   原样保留并登记待拍板，不改成像）；档案回读经 libs/utils/login.js 的 getUserInfo 走网关打
- *   GET /api/v1/erp/users/me（快照:968）；退出作废交给 libs/utils/checkToken.js 的 clearLoginFlag
+ *   GET /api/v1/erp/auth/me（快照:230，AUTH_ONLY_PATHS 内任何登录态可读）；退出作废交给
+ *   libs/utils/checkToken.js 的 clearLoginFlag
  * 存什么：只由 login.js 落用户档案键；本文件不再写 userRole 与 lastAccessShopId 与 loginToken 与
  *   logoutFlag 与 wxId 与 wxOpenId
  * 存哪里：wx.storage（键由 libs/utils/login.js 定义）
@@ -144,7 +145,7 @@ Page({
    * 绑定或解绑成功后回读档案
    * 调用方：本页 bindWx 的成功分支
    * 入参：无
-   * 传给谁：libs/utils/login.js 的 getUserInfo（经网关打 GET /api/v1/erp/users/me，快照:968）
+   * 传给谁：libs/utils/login.js 的 getUserInfo（经网关打 GET /api/v1/erp/auth/me，快照:230）
    * 存什么/存哪里：档案键由 login.js 单点落盘，本页不再重复写一批非后端出参的键
    */
   getUserInfo: function () {
