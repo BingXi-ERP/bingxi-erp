@@ -4,6 +4,7 @@ import {
   apiCallExpectFail,
   apiCallRaw,
   ensureTestEntities,
+  expectDenied,
   failureCode,
   genCode,
   getCtx,
@@ -19,10 +20,12 @@ import {
  * 功能。把"某缸号被按需求量锁定后可用量口径 = 总量 − 锁定量、锁定量逐列等于期望值"
  * 钉成写后逐列回读断言（T1）；把满额锁定后超额第二单的库存零写入不变量钉成回读
  * 断言（T2）；把释放锁定后回滚且不误伤同品另一缸号钉成双路回读断言（T3）；
- * 把无 stock:update 权限的仓管角色对同一 PUT 被 RBAC 拒绝钉成权限腿断言（T4）。
+ * 把库存锁定 PUT 的权限面钉成双向两腿（T4）：未持有派生键 stock:update 的仓库经理角色被 RBAC
+ * 拒绝且库存行零写入，持有该键的仓管角色被放行且锁定量与可用量真实落库。
  *
  * 调用方。Playwright E2E 串行链，T1–T3 走 worker 专属管理员会话，T4 在管理员播种
- * 后切到 warehouse_keeper 角色会话做负例，再切回管理员验证零写入。库存数量列
+ * 并基准锁定后先切到 warehouse_manager 角色会话做拒绝腿、再切到 warehouse_keeper 做放行腿，
+ * 两腿之后都切回管理员做逐列回读与清理。库存数量列
  * quantity_on_hand / quantity_available / quantity_reserved 对非管理员会被数据权限
  * 默认隐藏（见后端字段权限分支），全列回读需管理员会话。
  *
@@ -62,13 +65,22 @@ import {
  * 超额第二单无论是否被接受，库存行三列零写入（建单不触 inventory_stocks）；
  * 缺口在交付说明里点名——拒绝腿仅存在于发货出库面。
  *
- * RBAC 权限腿判据（T4 的立论）。权限中间件在 handler 之前检查 resource:action 键：
- * PUT /api/v1/erp/inventory/stock/{id} 派生 resource_type="stock"、action="update"
- * （method_to_action 对 PUT 产出 update；resolve_module_prefixed_resource 对
- * inventory+stock 无映射故保留"stock"原名）。warehouse_keeper 角色未被授予
- * stock:update，RBAC 即拒 HTTP 403 code="FORBIDDEN"（CODE_FORBIDDEN 常量，
- * 与 AppError::PermissionDenied 同码）。403 + FORBIDDEN 归因权限面而非参数面，
- * 因为参数校验的 BAD_REQUEST / VALIDATION_ERROR / BUSINESS_ERROR 均产 400 而非 403。
+ * RBAC 权限腿判据（T4 的立论，两腿同源）。权限中间件在 handler 之前按 URL 段派生
+ * resource:action 键再查角色授权行（middleware/permission.rs 的 permission_middleware 与
+ * check_permission）：PUT /api/v1/erp/inventory/stock/{id} 派生 resource_type="stock"、
+ * action="update"、resource_id=记录主键（utils/path_utils.rs 判 inventory 为模块前缀并取其
+ * 下第四段 stock，RESOURCE_NAME_MAP 无 inventory+stock 消歧条目故保留 "stock" 原名；
+ * PUT 经 method_to_action 得 update；末段是数字主键故取为 resource_id）。该路径既不在
+ * 公共面也不在自助豁免面（middleware/public_routes.rs 两张清单均为精确匹配），白名单层放行
+ * segment3=inventory，所以这条面上的 200 只可能来自授权行命中、绝不来自豁免。
+ * 种子矩阵（init_service_ops/permission.rs 的库存仓储域分组）对 warehouse_keeper 逐动作授予
+ * stock 的 read/create/update 三行，仓管本就是库存维护岗（收货、录细码卷号、盘点、库位调拨），
+ * 因此仓管打这一腿得 200 是授权面的真实行为；同分组的 warehouse_manager 只有 pieces 与
+ * greige-fabrics 与 suppliers 与 scan-receipt 四族细键、不含任何 stock 键，同一条 PUT 对它
+ * 必 403。故 T4 钉成双向两腿：warehouse_manager 的 403 + FORBIDDEN 钉拒绝面（并钉拒绝不触库），
+ * warehouse_keeper 的 200 + 读回落库钉放行面。403 + FORBIDDEN 归因权限面而非参数面，因为参数
+ * 校验的 BAD_REQUEST / VALIDATION_ERROR / BUSINESS_ERROR 均产 400 而非 403；放行腿必须真写进
+ * inventory_stocks 三列，否则两腿任一被改动时另一腿无法独善，断言会空转。
  *
  * 状态词表取值清单（逐字符取自后端源 models/status/）：
  * - inventory_reservation.status：pending / locked / released / consumed / cancelled
@@ -502,39 +514,44 @@ test.describe.serial('面料缸号锁定防超卖口径链', () => {
   });
 
   /**
-   * T4 仓管角色对库存锁定 PUT 被 RBAC 拒绝（权限面，非参数面）。
+   * T4 库存锁定 PUT 的权限双向两腿：仓库经理被拒 403 且零写入、仓管放行且真实落库。
    *
-   * 功能。验证无 stock:update 权限的 warehouse_keeper 角色发起与管理员相同的
-   * PUT /inventory/stock/{id} 锁定请求，被权限中间件拒绝 HTTP 403 code=FORBIDDEN，
-   * 且拒绝归属权限面（403 FORBIDDEN），不是参数面（400 BUSINESS_ERROR 或 VALIDATION_ERROR）。
+   * 功能。同一枚 PUT /inventory/stock/{id} 锁定请求按角色拆成两腿钉死权限面。拒绝腿验证
+   * 不含任何 stock 键的 warehouse_manager 角色被权限中间件拒绝 HTTP 403 code=FORBIDDEN
+   * （归因权限面而非参数面），并钉拒绝后库存行三列与乐观锁版本号逐列不动。放行腿验证
+   * 持有派生键 stock:update 的 warehouse_keeper 角色同一请求得 200，且锁定量与可用量
+   * 真的写进库存行。两腿成对的意义：只钉拒绝腿会因"该面被全员豁免"而假绿，只钉放行腿
+   * 会因"全员都能写"而假绿。
    *
-   * 调用方。本用例先以管理员会话播种库存并读取版本号，再 loginAsRole 切到
-   * warehouse_keeper 做 PUT 负例，最后切回管理员验证零写入并清理。
+   * 调用方。本用例先以管理员会话播种库存并做一次基准锁定、捕获回读到的乐观锁版本号，
+   * 再依次 loginAsRole 切到 warehouse_manager 做拒绝腿、切到 warehouse_keeper 做放行腿，
+   * 每条腿之后都切回管理员做逐列回读，末尾清理库存行。
    *
-   * 入参。productId / warehouseId / colorNo / dyeLotNo / total 由管理员阶段播种。
+   * 入参。productId / warehouseId / colorNo / dyeLotNo / total 由管理员阶段播种；
+   * 拒绝腿与放行腿各用独立的目标锁定量，便于从回读值直接分辨是哪条腿写的。
    * 传给谁。apiCallExpectFail → PUT /inventory/stock/{id}（handlers/inventory_stock_handler.rs
-   * update_stock），请求被 middleware/permission.rs permission_middleware 在 handler 之前拦截。
+   * update_stock），拒绝发生在 middleware/permission.rs permission_middleware 进入 handler
+   * 之前；放行腿走 apiCallRaw 打同一端点，两腿回读均走 GET /inventory/stock/{id}。
    *
-   * 存什么。验证 quantity_reserved 与 quantity_available 与 quantity_on_hand 三列在
-   * RBAC 拒绝后与拒绝前逐列相等（零写入）。
-   * 存哪里。inventory_stocks 行，拒绝不触 DB。
+   * 存什么。拒绝腿存"四列不动"：quantity_reserved / quantity_available / quantity_on_hand
+   * 与 version 逐列等于基准值（version 不动同时证明请求没进 handler）。放行腿存"两列改到
+   * 目标值 + 总量不动 + version 前进"。
+   * 存哪里。PostgreSQL inventory_stocks 行；拒绝不触 DB，放行才写该行。
    *
-   * RBAC 键派生源（逐段读 middleware/permission.rs 与 utils/path_utils.rs）：
-   * - path /api/v1/erp/inventory/stock/{id} → segment3="inventory"(模块前缀) → segment4="stock"
-   *   → resolve_module_prefixed_resource("inventory","stock") 无映射 → resource_type="stock"
-   * - PUT → method_to_action → "update"
-   * - warehouse_keeper 被授予的权限键清单（e2e/global-setup.ts SEED_ROLE_EXTRA_PERMISSIONS）：
-   *   pieces:read / pieces:print / greige-fabrics:read / greige-fabrics:create / suppliers:read
-   *   + SHELL: dashboard:read / notifications:read
-   *   不含 stock:update ⇒ check_permission 返回 false → forbidden_response(403, "FORBIDDEN")
+   * RBAC 键派生与授权来源（逐段读后端源，非推测）：派生键 stock:update 的取段规则见
+   * middleware/permission.rs 的 extract_resource_info 与 extract_route_info、
+   * utils/path_utils.rs 的模块前缀与消歧表；warehouse_keeper 与 warehouse_manager 的授权行
+   * 清单在 init_service_ops/permission.rs 的库存仓储域分组（该分组对仓管逐动作授 stock 的
+   * read/create/update，对仓库经理不含任何 stock 键），迁移通道与 e2e 补授通道
+   * （e2e/global-setup.ts 的 SEED_ROLE_EXTRA_PERMISSIONS）都不向仓库经理写 stock 键。
    */
-  test('T4 仓管无 stock:update 权限 PUT 锁定被 RBAC 拒绝 403 FORBIDDEN 权限面非参数面', async ({
+  test('T4 库存锁定PUT权限双腿 warehouse_manager无stock:update被拒403零写入 warehouse_keeper持该键放行并落库', async ({
     page,
   }) => {
     const ctx = getCtx();
     expect(
       ctx.productIds.length > 0 && ctx.warehouseIds.length > 0,
-      `夹具缺产品或仓库，无法构造权限负例场景`
+      `夹具缺产品或仓库，无法构造权限双向面场景`
     ).toBe(true);
     const productId = ctx.productIds[0];
     const warehouseId = ctx.warehouseIds[0];
@@ -542,83 +559,129 @@ test.describe.serial('面料缸号锁定防超卖口径链', () => {
     const colorNo = `E2E${tag}`;
     const dyeLotNo = `LOT-${tag}`;
     const total = 100;
+    const adminReserved = 30;
+    const deniedTargetReserved = 50;
+    const allowedTargetReserved = 45;
 
-    // 管理员阶段：播种并锁定一笔验证 PUT 路径本身可通（基准确认）
+    // 管理员阶段：播种并做一次基准锁定，同时确认该 PUT 路径本身对有权角色可通
     const seeded = await seedLotStock(page, productId, warehouseId, colorNo, dyeLotNo, total);
     const stockId = num(seeded.id);
 
-    // 管理员锁定成功基准
-    await lockLotStock(page, stockId, '30.00', '70.00');
+    await lockLotStock(page, stockId, adminReserved.toFixed(2), (total - adminReserved).toFixed(2));
     const afterAdminLock = await readStockById(page, stockId);
-    const reservedAfterAdmin = num(afterAdminLock.quantity_reserved);
-    const availableAfterAdmin = num(afterAdminLock.quantity_available);
-    const onHandAfterAdmin = num(afterAdminLock.quantity_on_hand);
+    const reservedBaseline = num(afterAdminLock.quantity_reserved);
+    const availableBaseline = num(afterAdminLock.quantity_available);
+    const onHandBaseline = num(afterAdminLock.quantity_on_hand);
+    const versionBaseline = num(afterAdminLock.version);
     expect(
-      reservedAfterAdmin,
-      `管理员锁定后锁定量应为 30，实得 ${JSON.stringify(afterAdminLock.quantity_reserved)}`
-    ).toBe(30);
+      reservedBaseline,
+      `管理员基准锁定后锁定量应为 ${adminReserved}，实得 ${JSON.stringify(
+        afterAdminLock.quantity_reserved
+      )}`
+    ).toBe(adminReserved);
+    expect(
+      Number.isInteger(versionBaseline) && versionBaseline >= 0,
+      `基准回读的乐观锁版本号必须是非负整数，实得 ${JSON.stringify(afterAdminLock.version)}`
+    ).toBe(true);
 
-    // 取当前版本号（仓管会话无 stock:read，必须在切换前捕获）
-    const curVersion = num(afterAdminLock.version);
+    // 拒绝腿：切到仓库经理（init_service_ops/permission.rs 库存仓储域分组对它不含任何 stock 键）
+    await loginAsRole(page, 'warehouse_manager');
 
-    // 切换到仓管角色（warehouse_keeper：无 stock:update 权限）
-    await loginAsRole(page, 'warehouse_keeper');
-
-    // 仓管发起同一 PUT 锁定请求——目标改为锁定量 50（管理员阶段已是 30）
-    const rejected = await apiCallExpectFail(page, 'PUT', `/inventory/stock/${stockId}`, {
-      quantity_reserved: '50.00',
-      quantity_available: '50.00',
-      version: curVersion,
+    // 仓库经理发起同一 PUT 锁定请求，目标锁定量与放行腿刻意不同，便于回读值分辨归因
+    const denied = await apiCallExpectFail(page, 'PUT', `/inventory/stock/${stockId}`, {
+      quantity_reserved: deniedTargetReserved.toFixed(2),
+      quantity_available: (total - deniedTargetReserved).toFixed(2),
+      version: versionBaseline,
     });
 
-    // 断言 HTTP 403 + FORBIDDEN（权限面，不是 400 参数面）
+    // 断言 HTTP 403：消息点名派生键与角色码，避免日后误读成"任意角色都被拒"
     expect(
-      rejected.status,
-      `仓管 PUT /inventory/stock/{id} 应被 RBAC 拒绝为 HTTP 403，` +
-        `实得 HTTP ${rejected.status} code=${JSON.stringify(rejected.code)} ` +
-        `message=${JSON.stringify(rejected.message)}`
+      denied.status,
+      `warehouse_manager 未持有派生键 stock:update（PUT /api/v1/erp/inventory/stock/${stockId} ` +
+        `派生 resource_type=stock、action=update、resource_id=${stockId}），应被 RBAC 拒绝为 HTTP 403，` +
+        `实得 HTTP ${denied.status} code=${JSON.stringify(denied.code)} ` +
+        `message=${JSON.stringify(denied.message)}`
     ).toBe(403);
-
-    const code = failureCode(rejected);
-    expect(
-      code,
-      `仓管被拒的机器码应为 FORBIDDEN（权限面），` +
-        `实得 code=${JSON.stringify(rejected.code)} message=${JSON.stringify(rejected.message)}`
-    ).toBe(APP_ERROR_CODES.FORBIDDEN);
+    expectDenied(
+      denied,
+      `warehouse_manager 打 stock:update 面应被权限中间件拒绝（403 + FORBIDDEN，且不得是 CSRF 面拒绝）`
+    );
 
     // 拒因归属可判：确认不是参数面（400 / BUSINESS_ERROR / VALIDATION_ERROR / BAD_REQUEST）
+    const deniedCode = failureCode(denied);
     expect(
-      rejected.status,
-      `拒因必须归 403 权限面，不得归 400 参数面（若后端权限配置扩授 stock:update 则本条判红，` +
-        `指向"权限键配置扩面"缺陷，不是测试放宽点）`
-    ).toBe(403);
-    expect(
-      code === APP_ERROR_CODES.BUSINESS_ERROR || code === APP_ERROR_CODES.VALIDATION_ERROR,
-      `仓管被拒不应归参数面（BUSINESS_ERROR / VALIDATION_ERROR），实得 code=${JSON.stringify(code)}；` +
-        `若命中则说明中间件未拦截而 handler 参数校验拒绝，属 RBAC 权限键漏配置`
+      deniedCode === APP_ERROR_CODES.BUSINESS_ERROR ||
+        deniedCode === APP_ERROR_CODES.VALIDATION_ERROR ||
+        deniedCode === APP_ERROR_CODES.BAD_REQUEST,
+      `warehouse_manager 被拒不应归参数面（BUSINESS_ERROR / VALIDATION_ERROR / BAD_REQUEST），` +
+        `实得 code=${JSON.stringify(deniedCode)}；若命中则说明中间件未拦截而 handler 参数校验拒绝，` +
+        `属 RBAC 权限键漏配置而非权限门判定`
     ).toBe(false);
 
-    // 切回管理员验证零写入：仓管的失败 PUT 不得改写库存行三列
+    // 切回管理员验证拒绝腿零写入：失败 PUT 不得改写三列，也不得推进乐观锁版本号
+    // （版本号不动同时证明请求确实没进 handler，拒绝发生在权限中间件）
     await loginViaUI(page, undefined, undefined, true);
-    const afterRejection = await readStockById(page, stockId);
+    const afterDenied = await readStockById(page, stockId);
+    for (const [col, baseline] of [
+      ['quantity_reserved', reservedBaseline],
+      ['quantity_available', availableBaseline],
+      ['quantity_on_hand', onHandBaseline],
+      ['version', versionBaseline],
+    ] as Array<[string, number]>) {
+      expect(
+        num(afterDenied[col]),
+        `warehouse_manager 被拒后 ${col} 必须保持基准值 ${baseline}（拒绝不得触库），实得 ${JSON.stringify(
+          afterDenied[col]
+        )}`
+      ).toBe(baseline);
+    }
+
+    // 放行腿：切到仓管（同一分组对它逐动作授予 stock 的 read/create/update，含 stock:update）。
+    // 版本号沿用基准值——拒绝腿未改过该行，此处乐观锁必然成立。
+    await loginAsRole(page, 'warehouse_keeper');
+    let allowedErr: string | undefined;
+    try {
+      await apiCallRaw<Row>(page, 'PUT', `/inventory/stock/${stockId}`, {
+        quantity_reserved: allowedTargetReserved.toFixed(2),
+        quantity_available: (total - allowedTargetReserved).toFixed(2),
+        version: versionBaseline,
+      });
+    } catch (e) {
+      allowedErr = (e as Error).message;
+    }
     expect(
-      num(afterRejection.quantity_reserved),
-      `仓管被拒后锁定量必须保持管理员锁定的 ${reservedAfterAdmin}，实得 ${JSON.stringify(
-        afterRejection.quantity_reserved
-      )}`
-    ).toBe(reservedAfterAdmin);
+      allowedErr,
+      `warehouse_keeper 持有派生键 stock:update，PUT /inventory/stock/${stockId} 应被放行（HTTP 200），` +
+        `实得被拒或出错：${JSON.stringify(allowedErr)}；` +
+        `若命中 FORBIDDEN 说明该键从授权种子里掉了，属后端授权面收窄缺陷，不是本条的放宽点`
+    ).toBeUndefined();
+
+    // 切回管理员逐列回读放行腿的真实落库值（数量列对非管理员被字段权限隐藏，必须管理员会话读）
+    await loginViaUI(page, undefined, undefined, true);
+    const afterAllowed = await readStockById(page, stockId);
     expect(
-      num(afterRejection.quantity_available),
-      `仓管被拒后可用量必须保持 ${availableAfterAdmin}，实得 ${JSON.stringify(
-        afterRejection.quantity_available
+      num(afterAllowed.quantity_reserved),
+      `warehouse_keeper 放行后锁定量必须真实落库为 ${allowedTargetReserved}，实得 ${JSON.stringify(
+        afterAllowed.quantity_reserved
       )}`
-    ).toBe(availableAfterAdmin);
+    ).toBe(allowedTargetReserved);
     expect(
-      num(afterRejection.quantity_on_hand),
-      `仓管被拒后总量必须保持 ${onHandAfterAdmin}，实得 ${JSON.stringify(
-        afterRejection.quantity_on_hand
+      num(afterAllowed.quantity_available),
+      `warehouse_keeper 放行后可用量必须真实落库为 ${total - allowedTargetReserved}，实得 ${JSON.stringify(
+        afterAllowed.quantity_available
       )}`
-    ).toBe(onHandAfterAdmin);
+    ).toBe(total - allowedTargetReserved);
+    expect(
+      num(afterAllowed.quantity_on_hand),
+      `warehouse_keeper 放行不得改写总量，必须仍为播种值 ${total}，实得 ${JSON.stringify(
+        afterAllowed.quantity_on_hand
+      )}`
+    ).toBe(total);
+    expect(
+      num(afterAllowed.version) > versionBaseline,
+      `warehouse_keeper 放行必须推进乐观锁版本号（证明写入确实落库），基准 ${versionBaseline}，` +
+        `实得 ${JSON.stringify(afterAllowed.version)}`
+    ).toBe(true);
 
     await tryCleanup(page, 'DELETE', `/inventory/stock/${stockId}`, `[213] T4 库存 ${stockId}`);
   });
