@@ -13,7 +13,7 @@ App({
   contentData: [],
   chooseId: [],
   chooseName: "",
-  customsPhoneNum: "13727172916",
+  customsPhoneNum: envConfig.default.contacts.customsPhoneNum,
   showStopPop: !1,
   userAuthList: {},
   statisticsCount: 0,

@@ -24,7 +24,7 @@
 
 | 字段 | 当前值 | 性质 | 上线 / 联调建议 |
 |---|---|---|---|
-| `customsPhoneNum` | `"13727172916"` | ⚠️ **真·硬编码业务值**（客服电话） | 上线前确认是否为当前有效客服号；如需可配置，建议抽到 `envConfig` 或改为接口下发 |
+| `customsPhoneNum` | `envConfig.contacts.customsPhoneNum` | 对外号码单点值，展示与拨号都读这一枚 | 改号只改 `envConfig.contacts`，禁止在页面与 `app.js` 里再写字面量 |
 | `globalData.mpVersion` | `"3.2.8"` | ⚠️ **硬编码版本号，与 `envConfig.version`(`3.13.10`) 不一致** | 上报 / 埋点用的版本号，建议统一引用 `envConfig.version` 或 `wx.getAccountInfoSync().miniProgram.version`，避免新旧不一 |
 | 顶部 `appVersion` | `"2.6.1.20190824"` | ⚠️ **失效遗留值**：`initEnv` 会把它覆盖成 `envConfig.appVersion`(`1.0.0`) | 运行时不生效，仅误导维护者，可删（非阻塞） |
 | `envVersion` | `"release"` | 占位，会被 `judgeConfig` 覆盖 | 无需改 |

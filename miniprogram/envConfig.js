@@ -21,6 +21,13 @@ if (
 module.exports = {
   envPage: "production",
   appVersion: "1.0.0",
+  // contacts 存对外客服号码，单点一份，改号只改这里。读取面：app.js 的 customsPhoneNum 与
+  // packageB 打印帮助页展示的客服电话；传给谁：页面 data 与 wx.makePhoneCall 的号码入参。
+  // 缺键即取不到号码，属配置缺失，不做静默回退。
+  contacts: {
+    customsPhoneNum: "13178852281",
+    servicePhone: "13178852281",
+  },
   envList: {
       dev: {
         rootHost: "https://dshop.duibu.cn",

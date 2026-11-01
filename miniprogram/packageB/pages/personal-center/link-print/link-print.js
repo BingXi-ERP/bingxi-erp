@@ -4,6 +4,8 @@ var t = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").
   app = getApp();
 Page({
   data: {
+    servicePhone:
+      require("../../../../envConfig.js").default.contacts.servicePhone,
     spname: "打印机",
     printList: [],
     storageList: [],

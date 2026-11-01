@@ -80,7 +80,7 @@
     <view class="tip-item"
       >3、重启打印机、重启蓝牙、重启微信、重启APP、重启手机</view
     >
-    <view class="tip-item">4、联系秉羲工作台客服，客服电话: 13360039559</view>
+    <view class="tip-item">4、联系秉羲工作台客服，客服电话: {{servicePhone}}</view>
     <view class="tip-item-title">其他说明：</view>
     <view class="tip-item">1、打印机型号：HM-A300L、HM-A300S、HM-A350</view>
     <view class="tip-item">2、纸张尺寸：</view>
