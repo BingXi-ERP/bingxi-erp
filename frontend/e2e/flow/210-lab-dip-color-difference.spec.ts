@@ -117,7 +117,7 @@ function dateInDays(daysFromNow: number): string {
  * 调用方 本文件断言通知单状态列渲染真值的各步骤。
  * 入参 page 当前 Playwright Page。
  * 传给谁 返回的 Locator 交 table-column 原语（columnIndex / rowByText / rowCellText）消费。
- * 存什么 不存储。该页 el-table 未挂 aria-label（views/lab-dip/index.vue:27），
+ * 存什么 不存储。该页 el-table 未挂 aria-label（views/lab-dip/index.vue），
  * 共享原语 openPageTable 以 aria-label 锚定不可用，故本文件本地按页面 h2 标题锚定后
  * 取第一个 el-table（对话框未开时页面上唯一主表），不改共享夹具。
  * 存哪里 无。
@@ -139,7 +139,7 @@ async function openLabDipTable(page: Page): Promise<Locator> {
  * 调用方 本文件每步状态流转后的 UI 回读。
  * 入参 page 当前页；requestNo 服务端生成的通知单号。
  * 传给谁 文本回调用例断言，与后端 status 原值逐字比对词表渲染值
- * （views/lab-dip/index.vue:258-265 statusTextMap 取 locales/zh-CN.ts labDip.index.status*）。
+ * （views/lab-dip/index.vue-265 statusTextMap 取 locales/zh-CN.ts labDip.index.status*）。
  * 存什么 不存储。
  * 存哪里 无。
  */

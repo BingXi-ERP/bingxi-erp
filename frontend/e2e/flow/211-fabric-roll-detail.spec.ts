@@ -48,7 +48,7 @@ import { columnIndex, rowByText, rowCellText, waitFirstRow } from './table-colum
  * 逐列投影 length/weight/width/gram_weight/barcode/inspection_id/piece_seq/status，
  * 缺值如实投影 null，不洗成 0。
  * DECIMAL 列按 rust_decimal 默认为十进制字符串出参，比较一律 Number(String(v)) 归一；
- * 前端标签列同样按 Number(row.length) 归一展示（views/fabric-inspections/index.vue:280-300）。
+ * 前端标签列同样按 Number(row.length) 归一展示（views/fabric-inspections/index.vue-300）。
  *
  * 状态词表（唯一来源 models/status/quality_dyeing.rs 的 fabric_inspection 模块，全小写）：
  * pending → inspecting → graded → rolled → closed。疵点只在 inspecting 可加（service :901），
@@ -123,7 +123,7 @@ function assertTimestampOut(value: unknown, label: string): number {
  * 调用方 本文件的列表页状态列逐格读值与标签按钮入口。
  * 入参 page 当前 Playwright Page。
  * 传给谁 返回 Locator 交 table-column 原语与行内按钮定位消费。
- * 存什么 不存储。该页主表未挂 aria-label 且页面无 h2（views/fabric-inspections/index.vue:4-10
+ * 存什么 不存储。该页主表未挂 aria-label 且页面无 h2（views/fabric-inspections/index.vue-10
  * 标题在 el-card header 的 span 内，与侧边菜单同名文案不可区分），共享原语 openPageTable
  * 的 aria-label + h2 双锚都不可用，故本地改按该页独有的「新建验布单」按钮锚定，
  * 再取第一个 el-table（对话框未打开时页面上唯一主表），不改共享夹具。
