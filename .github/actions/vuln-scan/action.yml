@@ -297,9 +297,22 @@ runs:
         if not isinstance(data, dict) or not isinstance(data.get('results'), list):
             die('semgrep 结果缺 results 数组（实得 %s），无法区分"扫过且零命中"与"没扫成"' % type(data).__name__)
         errs = data.get('errors')
-        n_err = len(errs) if isinstance(errs, list) else int(errs or 0)
-        if n_err > 0:
-            die('semgrep 自报 errors=%d 条（本轮存在未成功处理的规则集或文件），不记为通过' % n_err)
+        if errs is None:
+            errs = []
+        elif not isinstance(errs, list):
+            errs = [{'type': 'UnknownShape', 'message': 'errors 字段非数组，实得 %s' % type(errs).__name__}]
+        if errs:
+            # 逐条外显错误归属，只报条数会让判红无法定位是哪一个规则集或哪一个文件没跑成
+            for e in errs[:10]:
+                if isinstance(e, dict):
+                    loc = e.get('path') or e.get('rule_id') or e.get('target') or '?'
+                    print('  - errors[%s] %s :: %s'
+                          % (e.get('type', '?'), loc, str(e.get('message', ''))[:200]))
+                else:
+                    print('  - errors %s' % str(e)[:260])
+            if len(errs) > 10:
+                print('  - 其余 %d 条见 reports/audit/semgrep.json 的 errors 数组' % (len(errs) - 10))
+            die('semgrep 自报 errors=%d 条（本轮存在未成功处理的规则集或文件），不记为通过' % len(errs))
         scanned = (data.get('paths') or {}).get('scanned') or []
         print('semgrep 命中 %d 条（规则集 %s 枚，实际扫描文件 %d 枚），命中仅记录不阻塞'
               % (len(data['results']), len(os.environ.get('SEMGREP_RULESETS', '').split()),
