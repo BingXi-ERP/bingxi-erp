@@ -543,7 +543,10 @@ function modeSkipOnly(opts) {
     isFail = true;
   }
   if (isFail) process.exit(EXIT_FAIL);
-  if (skipTotal < (typeof baseline.total === 'number' ? baseline.total : skipTotal)) {
+  // 基线总数先落成变量再比：比较式右侧内嵌三元让 semgrep 的 js 解析器整片放弃本文件，
+  // 判定与文案都不变，只是把取值时机挪到语句外。
+  const baselineTotal = typeof baseline.total === 'number' ? baseline.total : skipTotal;
+  if (skipTotal < baselineTotal) {
     log(`提示，当前 skip 总数 ${skipTotal} 已低于基线记录的 ${baseline.total}，可重生成基线让棘轮真实缩短，本轮判定不受影响`);
   }
   log(`skip 与 only 对账 PASS，扫描 ${totalTsFiles} 个 .ts 文件，skip 总数 ${skipTotal}，基线总数 ${baseline.total ?? '未登记'}`);
