@@ -3146,7 +3146,7 @@ jobs:
               41) SPEC_TARGETS="e2e/fullflow/27-crm-chain.spec.ts e2e/fullflow/26-master-data-partner.spec.ts e2e/fullflow/11-ar.spec.ts e2e/fullflow/14-asset-tax.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               42) SPEC_TARGETS="e2e/fullflow/28-bpm-approval-chain.spec.ts e2e/fullflow/30-system-config-chain.spec.ts e2e/fullflow/12-voucher-period.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               43) SPEC_TARGETS="e2e/fullflow/29-permission-data-scope.spec.ts e2e/fullflow/20-purchase-to-pay.spec.ts e2e/fullflow/15-report-export.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
-              44) SPEC_TARGETS="e2e/fullflow/21-sale-to-cash.spec.ts e2e/fullflow/22-inspection-to-return.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
+              44) SPEC_TARGETS="e2e/fullflow/21-sale-to-cash.spec.ts e2e/fullflow/22-inspection-to-return.spec.ts e2e/fullflow/40-quotation-role-journey.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               # 矩阵 extras 段与这里的 case 是同一份切分的两处表达，必须同步演进；
               # 漏同步时宁可整步红，不能静默少跑目录。
               *) echo "::error::extras 分片 $SHARD 未在按域重排清单中登记（应为 30-44），拒绝以空目标集静默通过"; exit 1 ;;

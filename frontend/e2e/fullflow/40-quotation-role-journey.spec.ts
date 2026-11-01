@@ -138,19 +138,15 @@ async function readQuotationStatus(page: Page, id: number): Promise<Row> {
   return res;
 }
 
-/** 从详情出参里按产品锚定唯一明细行（明细键两形态按后端出参现实探测，缺失即点名实际键） */
+/** 从详情出参里按产品锚定唯一明细行（明细键 items 来源 quotation_response_dto.rs，缺失即点名实际键） */
 function pickQuotationItem(detail: Row, productId: number): Row {
-  const key = Object.prototype.hasOwnProperty.call(detail, 'items')
-    ? 'items'
-    : Object.prototype.hasOwnProperty.call(detail, 'quotation_items')
-      ? 'quotation_items'
-      : '';
-  if (key === '') {
+  if (!Object.prototype.hasOwnProperty.call(detail, 'items')) {
     throw new Error(
-      `报价详情未含明细键 items 或 quotation_items，实际键=${Object.keys(detail).join(',')}`
+      `报价详情未含明细键 items（出参结构体该字段无 skip_serializing_if，缺失属契约漂移），` +
+        `实际键=${Object.keys(detail).join(',')}`
     );
   }
-  const rows = pickListArray<Row>(detail, key, '报价明细');
+  const rows = pickListArray<Row>(detail, 'items', '报价明细');
   const hit = rows.find(r => Number(r.product_id) === productId);
   if (!hit) {
     throw new Error(
@@ -263,7 +259,7 @@ function buildQuotationPayload(
     customer_id: customerId,
     sales_user_id: salesUserId,
     quotation_date: new Date().toISOString().slice(0, 10),
-    valid_until: new Date(Date.now() + 30 * 86400000).slice(0, 10),
+    valid_until: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     currency: 'CNY',
     exchange_rate: '1',
     base_currency: 'CNY',
@@ -367,7 +363,11 @@ test.describe('40 报价单多角色审批流转', () => {
               contact_phone: '13800000000',
             });
             const customerId = requireId(customer.id, '销售建客户');
-            const custBack = await apiCallRaw<Row>(session.page, 'GET', `/crm/customers/${customerId}`);
+            const custBack = await apiCallRaw<Row>(
+              session.page,
+              'GET',
+              `/crm/customers/${customerId}`
+            );
             expect(
               String(custBack.customer_name ?? ''),
               `销售按 id 回读客户名应为自建唯一名 ${custCode}，实际=${JSON.stringify(
@@ -385,7 +385,13 @@ test.describe('40 报价单多角色审批流转', () => {
               session.page,
               'POST',
               '/quotations',
-              buildQuotationPayload(customerId, session.userId, productId, productUnit, `E2E-F40-${marker}`)
+              buildQuotationPayload(
+                customerId,
+                session.userId,
+                productId,
+                productUnit,
+                `E2E-F40-${marker}`
+              )
             );
             const quotationId = requireId(created.id, '销售建报价');
             const detail = await readQuotationStatus(session.page, quotationId);
@@ -407,8 +413,18 @@ test.describe('40 报价单多角色审批流转', () => {
               `报价行单位应逐字符等于产品交易单位 ${productUnit}（后端 validate_item_units_against_products）`
             ).toBe(productUnit);
             expectDecimalString(item, 'quantity', Number(QTY), '报价行数量');
-            expectDecimalString(item, 'unit_price_with_tax', EXPECT_WITH_TAX_UNIT_PRICE, '报价行含税单价（录入事实）');
-            expectDecimalString(item, 'unit_price', EXPECT_NET_UNIT_PRICE, '报价行净额单价（由含税反算）');
+            expectDecimalString(
+              item,
+              'unit_price_with_tax',
+              EXPECT_WITH_TAX_UNIT_PRICE,
+              '报价行含税单价（录入事实）'
+            );
+            expectDecimalString(
+              item,
+              'unit_price',
+              EXPECT_NET_UNIT_PRICE,
+              '报价行净额单价（由含税反算）'
+            );
             expectDecimalString(item, 'amount', EXPECT_SUBTOTAL_NET, '报价行净额总额');
             expectDecimalString(item, 'amount_with_tax', EXPECT_TOTAL_WITH_TAX, '报价行含税总额');
             expectDecimalString(item, 'tax_amount', EXPECT_TAX_AMOUNT, '报价行税额');
@@ -563,7 +579,13 @@ test.describe('40 报价单多角色审批流转', () => {
               )}`
             ).toBe('draft');
             // 转单跃迁同样要求审计行含操作人与时间与前后状态
-            await findAuditTransition(session.page, quotationId, 'approved', 'converted', '转单跃迁');
+            await findAuditTransition(
+              session.page,
+              quotationId,
+              'approved',
+              'converted',
+              '转单跃迁'
+            );
             // 侧栏对照旁证：超管同样可见报价入口（可见性判据与授权面同源）
             await safeGoto(session.page, '/dashboard');
             await expectMenuItemPresent(session.page, QUOTATION_MENU_LABEL, '超管侧栏');
@@ -580,7 +602,8 @@ test.describe('40 报价单多角色审批流转', () => {
       const deniedLeg = relay.sessions[3];
       assertBuildApproverSeparation(repLeg.permissions, approverLeg.permissions, '按钮可达性对照');
       expect(
-        havePerms(deniedLeg.permissions, BUILD_KEYS) || havePerms(deniedLeg.permissions, APPROVE_KEYS),
+        havePerms(deniedLeg.permissions, BUILD_KEYS) ||
+          havePerms(deniedLeg.permissions, APPROVE_KEYS),
         '越权棒对建单面与批准面都应一无所有（持任一侧即扩权）'
       ).toBe(false);
       expect(new Set(relay.sessions.map(s => s.userId)).size, '五棒用户 id 应互不相同').toBe(5);
@@ -685,10 +708,9 @@ test.describe('40 报价单多角色审批流转', () => {
             // （canApprove canReject computed 要求状态 pending_approval 且持对应键，二者都满足）
             await safeGoto(session.page, `/quotations/${quotationId}`);
             const guard = session.page.url();
-            expect(
-              guard,
-              `审批棒进报价详情不应被守卫挡到无权限页，实际落在 ${guard}`
-            ).not.toMatch(/\/403(\?|#|$)/);
+            expect(guard, `审批棒进报价详情不应被守卫挡到无权限页，实际落在 ${guard}`).not.toMatch(
+              /\/403(\?|#|$)/
+            );
             const approveButtons = await session.page
               .locator('.actions .el-button', { hasText: '批准' })
               .count();
@@ -699,10 +721,9 @@ test.describe('40 报价单多角色审批流转', () => {
               approveButtons,
               `审批棒详情页应恰有 1 个批准按钮，实际 ${approveButtons} 个`
             ).toBe(1);
-            expect(
-              rejectButtons,
-              `审批棒详情页应恰有 1 个拒绝按钮，实际 ${rejectButtons} 个`
-            ).toBe(1);
+            expect(rejectButtons, `审批棒详情页应恰有 1 个拒绝按钮，实际 ${rejectButtons} 个`).toBe(
+              1
+            );
             // 真实办理拒绝（reject 端点理由必填并落库，handler 现实收口 trim 非空）
             await apiCall(session.page, 'POST', `/quotations/${quotationId}/reject`, {
               reason: 'E2E-F40 价格低于成本线驳回',
@@ -728,10 +749,9 @@ test.describe('40 报价单多角色审批流转', () => {
                 rejected
               ).join(',')}`
             ).toBe(true);
-            expect(
-              String(rejected.rejection_reason ?? ''),
-              '驳回意见应真实落列并可回读'
-            ).toBe('E2E-F40 价格低于成本线驳回');
+            expect(String(rejected.rejection_reason ?? ''), '驳回意见应真实落列并可回读').toBe(
+              'E2E-F40 价格低于成本线驳回'
+            );
 
             // 驳回后转销售订单准入必须被拒，且拒绝点名当前状态（不是只断 4xx 了事）
             const convFail = await apiCallExpectFail(
