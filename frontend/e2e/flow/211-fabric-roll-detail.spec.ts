@@ -22,7 +22,8 @@ import { columnIndex, rowByText, rowCellText, waitFirstRow } from './table-colum
  * 验布打卷的库存细码：卷级逐卷出值与米数合计。
  *
  * 覆盖面。面料库存的真实计量粒度是「一卷一匹」：验布打卷产出一条 inventory_piece 行
- * （卷号 + 米数 + 重量 + 幅宽 + 克重），验布单侧再累加卷数/总米数/总重量。既有 e2e 对该链
+ * （卷号 + 米数 + 重量 + 幅宽 + 克重），验布单侧记本单本卷的卷数与米数与重量（一单一卷，
+ * 同缸多卷靠另开验布单）。既有 e2e 对该链
  * 零命中（frontend/e2e 全库检索「卷号」「细码」「余码」零命中），既没钉打卷产匹的逐列落库，
  * 也没钉成品布入库标签对话框按卷逐格出值。本 spec 把两段都钉成写后必回读判据。
  *
@@ -42,8 +43,10 @@ import { columnIndex, rowByText, rowCellText, waitFirstRow } from './table-colum
  * models/status/purchase_inventory.rs::inventory_piece）、inventory_status='available'、
  * quality_status='合格'（中文词表 inventory_stock_quality_status::PASS，:782）、
  * inspection_id 回指本验布单（:792）、length/weight/width/gram_weight 直取打卷实测入参。
- * 打卷汇总（:801-822 apply_roll_summary）是累加语义：total_rolls+1、
- * total_roll_length+roll_length、total_roll_weight+roll_weight，状态推进 rolled。
+ * 打卷汇总是"一单一卷"的一次性语义：total_rolls 记本单本卷（恒为 1），
+ * total_roll_length 与 total_roll_weight 记本卷实测值，状态推进 rolled。
+ * 同缸多卷靠另开验布单实现，跨卷匹号由打卷侧按缸号取最大 piece_seq 递增，
+ * 因此同一张已 rolled 的验布单再打卷必须被状态门拒绝，不是漏放开。
  * 卷级细码的读回通道 GET /api/v1/erp/inventory/pieces（handlers/inventory_piece_handler.rs）
  * 逐列投影 length/weight/width/gram_weight/barcode/inspection_id/piece_seq/status，
  * 缺值如实投影 null，不洗成 0。
@@ -432,7 +435,7 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
 
     // 汇总列回读
     const rollReadBack = await readInspection(page, id);
-    expect(Number(rollReadBack.total_rolls), '总卷数应累加为 1').toBe(1);
+    expect(Number(rollReadBack.total_rolls), '总卷数应为本单本卷的 1').toBe(1);
     expect(num(rollReadBack.total_roll_length), '总米数应等于本卷实测米数').toBe(123.45);
     expect(num(rollReadBack.total_roll_weight), '总重量应等于本卷实测重量').toBe(30.5);
 
@@ -516,7 +519,7 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
     await tryCleanup(page, 'DELETE', `${FI}/${id}`, `fabric-inspection#${id}`);
   });
 
-  test('同一验布单打第二卷：卷数与米数必须按累加口径逐卷出值', async ({ page }) => {
+  test('同一验布单不得打第二卷：状态门拒绝且首卷汇总与细码零漂移', async ({ page }) => {
     const lot = await ensureLot(page);
     const created = await postInspection(page, lot);
     const id = Number(created.id);
@@ -534,13 +537,9 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
       1
     );
 
-    // 第二卷。打卷汇总在 backend/src/services/fabric_inspection_service.rs-822 是
-    // 累加语义（total_rolls+1、total_roll_length+roll_length、total_roll_weight+roll_weight），
-    // 模型注释与前端标签清单口径（「本验布单打卷产出的匹均在此列」）也都按多卷设计；
-    // 但同文件 :661 的打卷门要求来源状态恒为 graded，而 :818 打卷成功即把状态改写为 rolled，
-    // 且无任何端点把 rolled 退回 graded —— 累加腿因此永不可达第二卷。
-    // 本断言按累加口径钉真判据：第二卷必须能打、总卷数为 2、总米数为两卷之和。
-    // 现状返回 400 即判红，这是源码缺陷（状态机与汇总累加自相矛盾），禁止放宽回「拒绝即合理」。
+    // 同单第二卷必须被状态门拒绝。口径依据：打卷门只放行 graded，而打卷成功即推进 rolled，
+    // 且无端点把 rolled 退回 graded；同缸多卷靠另开验布单，其跨卷 piece_seq 递增回归已由
+    // 生产染色链用例覆盖，本用例不重复主张同单累加。
     const second = await apiCallExpectFail(page, 'POST', `${FI}/${id}/roll`, {
       warehouse_id: lot.warehouseId,
       roll_length: '98.20',
@@ -548,32 +547,38 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
       roll_width: '180.0',
       roll_gram_weight: '210.0',
     });
+    expectStateGateRejection(second, '已打卷（rolled）的验布单不得再打第二卷');
     expect(
-      second.status,
-      `同一验布单第二卷应能打卷入库（打卷汇总是累加语义），实际被拒 status=${second.status} ` +
-        `code=${JSON.stringify(second.code)}——total_rolls 累加腿不可达，属源码缺陷，勿放宽本断言`
-    ).toBe(200);
+      String(second.message ?? ''),
+      `同单第二卷的拒绝文案必须点名状态门，实际 message=${JSON.stringify(second.message)}`
+    ).toMatch(/仅已评级\(graded\)状态可打卷入库/);
 
+    // 拒绝必须零写入：状态与本卷汇总都不得被这次失败的请求带跑
     const afterSecond = await readInspection(page, id);
-    expect(afterSecond.status, '第二卷后状态仍应为 rolled').toBe('rolled');
-    expect(Number(afterSecond.total_rolls), '总卷数应随第二卷累加为 2').toBe(2);
+    expect(afterSecond.status, '第二卷被拒后状态应仍为 rolled').toBe('rolled');
     expect(
-      decimalEq(afterSecond.total_roll_length, 123.45 + 98.2),
-      `总米数应为两卷实测之和 221.65，实际 ${JSON.stringify(afterSecond.total_roll_length)}`
+      Number(afterSecond.total_rolls),
+      `第二卷被拒后总卷数不得增加，实际 ${JSON.stringify(afterSecond.total_rolls)}`
+    ).toBe(1);
+    expect(
+      decimalEq(afterSecond.total_roll_length, 123.45),
+      `第二卷被拒后总米数不得被改写，应仍为首卷 123.45，实际 ${JSON.stringify(
+        afterSecond.total_roll_length
+      )}`
     ).toBe(true);
     expect(
-      decimalEq(afterSecond.total_roll_weight, 30.5 + 25.05),
-      `总重量应为两卷实测之和 55.55，实际 ${JSON.stringify(afterSecond.total_roll_weight)}`
+      decimalEq(afterSecond.total_roll_weight, 30.5),
+      `第二卷被拒后总重量不得被改写，应仍为首卷 30.5，实际 ${JSON.stringify(
+        afterSecond.total_roll_weight
+      )}`
     ).toBe(true);
 
-    // 逐卷出值：两卷各成一行细码，米数互不覆盖
+    // 细码侧同样零新增：本单只产出一卷，卷号按同缸序号落 -002 且米数重量为打卷实测值
     const rolls = await readRollsOfInspection(page, lot.dyeLotNo, id);
-    expect(rolls.length, `本次验布单应产出 2 卷细码，实际 ${rolls.length}`).toBe(2);
+    expect(rolls.length, `本单应只产出 1 卷细码，实际 ${rolls.length}`).toBe(1);
     expect(str(rolls[0].piece_no), '首卷卷号应为同缸 -002').toBe(`${lot.dyeLotNo}-002`);
-    expect(str(rolls[1].piece_no), '次卷卷号应为同缸递增 -003').toBe(`${lot.dyeLotNo}-003`);
     expect(num(rolls[0].length), '首卷米数应独立保真').toBe(123.45);
-    expect(num(rolls[1].length), '次卷米数应独立保真').toBe(98.2);
-    expect(num(rolls[1].weight), '次卷重量应独立保真').toBe(25.05);
+    expect(num(rolls[0].weight), '首卷重量应独立保真').toBe(30.5);
 
     await tryCleanup(page, 'DELETE', `${FI}/${id}`, `fabric-inspection#${id}`);
   });
