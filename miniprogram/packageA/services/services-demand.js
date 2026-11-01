@@ -5,15 +5,18 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
   a = createClass(function t() {
     (classCallCheck(this, t),
       (this.addAskDetailLog = function (t) {
-        return request.POST(
-          "".concat(app.config.bingxiHost, "/app-api/access/log/ask/addAskDetailLog"),
-          t,
-          {
-            headers: {
-              "content-type": "application/json",
-            },
-          },
-        );
+        // 功能 上报需求详情停留埋点
+        // 调用方 packageA/pages/demand/demand-detail/demand-detail.js 的 endCountUser（不落消费响应）
+        // 入参 t 旧载荷 {askId, stayTime}
+        // 传给谁 本仓行为埋点写口 POST /api/v1/erp/behavior（route-snapshot.txt 第 1077 行
+        //   record_behavior，backend/src/handlers/tracking_handler.rs 的 BehaviorRequest），
+        //   旧载荷整体放进 event_data 键，event_type 取稳定事件名 addAskDetailLog
+        // 存什么 不落本地；旧 ask 日志读侧词表与本仓 behavior 表不存在对应，形态差异登记交付报告
+        // 存哪里 服务端行为分析域（analytics），经 packageA 请求层与 apiGateway 契约层发出
+        return request.POST("".concat(app.config.bingxiHost, "/api/v1/erp/behavior"), {
+          event_type: "addAskDetailLog",
+          event_data: t,
+        });
       }),
       (this.demandList = function (t) {
         return request.GET("".concat(app.config.bingxiHost, "/app-api/goods/ask/askList"), t);
@@ -74,10 +77,19 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
         return request.GET("".concat(app.config.bingxiHost, "/app-api/goods/ask/matchDetail"), t);
       }),
       (this.contactLog = function (t) {
-        return request.GET(
-          "".concat(app.config.bingxiHost, "/app-api/access/log/ask/addContactLog"),
-          t,
-        );
+        // 功能 上报联系商家动作埋点，本仓写口只认 POST 请求体
+        // 调用方 packageA/pages/demand/demand-detail/demand-detail.js 的 makeCall 与
+        //   my-post-result-detail.js 的 showService，两腿只读 code 与 msg，失败经传输层外显
+        // 入参 t 旧载荷 {replyId}
+        // 传给谁 本仓行为埋点写口 POST /api/v1/erp/behavior（route-snapshot.txt 第 1077 行
+        //   record_behavior，backend/src/handlers/tracking_handler.rs 的 BehaviorRequest）
+        // 存什么 不落本地；event_type 取稳定事件名 addContactLog，旧载荷放进 event_data；
+        //   响应回的是埋点写口信封，读方按 code 判成败的形状不变
+        // 存哪里 服务端行为分析域（analytics）
+        return request.POST("".concat(app.config.bingxiHost, "/api/v1/erp/behavior"), {
+          event_type: "addContactLog",
+          event_data: t,
+        });
       }),
       (this.addPrice = function (t) {
         return request.POST("".concat(app.config.bingxiHost, "/app-api/goods/ask/addPrice"), t, {
@@ -94,10 +106,17 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
         });
       }),
       (this.addSearchHistory = function (t) {
-        return request.POST("".concat(app.config.bingxiHost, "/app-api/access/addSearchHistory"), t, {
-          headers: {
-            "content-type": "application/json",
-          },
+        // 功能 上报需求搜索动作埋点，本仓搜索历史的列表与删除只走 wx.storage 本地键
+        //   joinHistoryList 与 postHistoryList，这条网络腿纯上报，读侧不依赖它
+        // 调用方 packageA/pages/demand/search-demand/search-demand.js 的 setStorage（响应只进 console.log）
+        // 入参 t 旧载荷 {keyword, sourceType, searchType}
+        // 传给谁 本仓行为埋点写口 POST /api/v1/erp/behavior（route-snapshot.txt 第 1077 行
+        //   record_behavior，backend/src/handlers/tracking_handler.rs 的 BehaviorRequest）
+        // 存什么 不落本地；event_type 取稳定事件名 addSearchHistory，旧载荷放进 event_data
+        // 存哪里 服务端行为分析域（analytics）
+        return request.POST("".concat(app.config.bingxiHost, "/api/v1/erp/behavior"), {
+          event_type: "addSearchHistory",
+          event_data: t,
         });
       }),
       (this.myJoinList = function (t) {

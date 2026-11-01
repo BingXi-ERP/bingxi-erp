@@ -28,10 +28,17 @@ var e = require("../../@babel/runtime/helpers/interopRequireDefault").default,
               });
       }),
       (this.addSubscribeLog = function (e) {
-        return request._POST(
-          "".concat(app.config.bingxiHost, "/app-api/access/wx/maMsg/addSubscribeLog"),
-          e,
-        );
+        // 功能 上报订阅消息动作埋点
+        // 调用方 当前全仓零调用方（复核 grep 只命中本定义行），保留方法形状并接回在册写口
+        // 入参 e 旧载荷（订阅模板参数对象）
+        // 传给谁 本仓行为埋点写口 POST /api/v1/erp/behavior（route-snapshot.txt 第 1077 行
+        //   record_behavior，backend/src/handlers/tracking_handler.rs 的 BehaviorRequest）
+        // 存什么 不落本地；event_type 取稳定事件名 addSubscribeLog，旧载荷放进 event_data
+        // 存哪里 服务端行为分析域（analytics）
+        return request.POST("".concat(app.config.bingxiHost, "/api/v1/erp/behavior"), {
+          event_type: "addSubscribeLog",
+          event_data: e,
+        });
       }));
   });
 module.exports = {

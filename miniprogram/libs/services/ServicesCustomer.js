@@ -121,11 +121,33 @@ var createClass = require("../../@babel/runtime/helpers/createClass"),
         return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/sales/orders"), t);
       }),
       (this.customerDealNum = function (t) {
-        return request.GET("".concat(app.config.bingxiHost, "/app-api/crm/customerLedger"), t, {
-          headers: {
-            "content-type": "application/json",
+        // 功能 读取指定客户的色卡成交台账
+        // 调用方 当前全仓零调用方（复核 grep 只命中本定义行），保留方法形状并接回在册读口
+        // 入参 t.customerId 客户标识，本仓该口按路径段定位
+        // 传给谁 本仓色卡客户台账读口 GET /api/v1/erp/color-cards/reports/customer-ledger/ 下挂
+        //   客户标识路径段（route-snapshot.txt 第 329 行 customer_color_card_ledger，
+        //   backend/src/handlers/color_card/analytics.rs 的 Path(customer_id) 与 require_issue_permission read）
+        // 存什么 customerId 缺席即点名拒绝，不拼空路径段去撞 404；不写本地缓存，结果只回调用方
+        // 存哪里 不写本地缓存
+        if (!t || t.customerId === undefined || t.customerId === "") {
+          return Promise.resolve({
+            code: 500,
+            msg: "台账读取缺 customerId，本仓该口按客户标识路径段定位",
+            data: {},
+          });
+        }
+        return request.GET(
+          "".concat(
+            app.config.bingxiHost,
+            "/api/v1/erp/color-cards/reports/customer-ledger/",
+          ).concat(t.customerId),
+          {},
+          {
+            headers: {
+              "content-type": "application/json",
+            },
           },
-        });
+        );
       }),
       (this.refundrOrderList = function (t) {
         // 功能 分页读取指定客户的退货单列表
