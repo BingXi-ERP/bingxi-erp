@@ -9,8 +9,10 @@
  *   第三棒 sales_manager 批准一张、驳回另一张且都带理由，断言响应里的状态与理由列；
  *     再做读侧控制组对照：同角色同读端点先按 id 读自己名下对照单 200、再按 id 读他人（rep 名下）单 403，
  *     把 403 归因到行级数据范围收敛（归属不在可见集合）而非权限码缺授；
- *   管理员收口由本文件用 page 夹具的 admin 会话完成：回读两张单终态与理由列、按资源 id 取
- *     auto_audit 审计详情断言 before 到 after 快照里的状态迁移与操作人、最后在详情页核对界面状态标签。
+ *   管理员收口由本文件用 page 夹具的 admin 会话完成：回读两张单终态与理由列、按
+ *     resource_type+resource_id+user_id 三参服务端等值过滤取该单该操作人的 auto_audit 审计行，
+ *     在超时窗口内轮询匹配目标状态迁移（逐行读 before 与 after 快照，三参精确相等才算命中），
+ *     断言快照里的状态迁移与操作人、最后在详情页核对界面状态标签。
  *
  * 调用方：Playwright E2E 套件，由 CI 的 e2e flow 分片按文件哈希收集执行。
  *
@@ -68,7 +70,9 @@ const REJECT_REASON = 'E2E 双人审批链 驳回';
 /** 审计行的资源类型：报价审批服务每次状态迁移都以 auto_audit 落一行 UPDATE 审计 */
 const AUDIT_RESOURCE_TYPE = 'auto_audit';
 
-/** 审计行轮询上限与间隔：快照审计在同事务内直写，理论立即可见，留出读副本与索引延迟余量 */
+/** 审计行轮询上限与间隔：auto_audit 落库是异步的（audit_log_service record_async），
+ *   等待必须挪进"找到目标迁移"的轮询本身，窗口内每轮重新取列表并逐行试匹配，
+ *   命中即返回；窗口耗尽仍未命中才判红。留的是落库与读副本延迟余量，不是固定 sleep。 */
 const AUDIT_POLL_TIMES = 20;
 const AUDIT_POLL_INTERVAL_MS = 500;
 
@@ -162,29 +166,34 @@ async function getQuotation(page: Page, id: number): Promise<Row> {
 }
 
 /**
- * 取某张报价单的 auto_audit 审计行（列表层，不含快照）。
- * 调用方：管理员收口核对审计记录。
- * 入参：会话 page 与报价单 id 字符串。
- * 传给谁：GET /audit-logs 按 resource_type 过滤，再在客户端按 resource_id 精确匹配，
- *   不用 keyword 模糊搜索，避免同前缀 id 混入别家单据。
+ * 按用户名经 /users 精确解析 user_id（admin 会话工装，口径同第一棒对照单归属人解析）。
+ * 调用方：管理员收口为提交迁移（sales_rep）与审批迁移（sales_manager）各自解析当事操作人 id。
+ * 入参：会话 page、当事角色 username、断言上下文。
+ * 传给谁：GET /users?keyword=<username>，再在客户端按 username 严格相等精筛，必须命中 1 行。
  * 存什么/存哪里：只读请求，不持久化。
  */
-async function pollAuditRows(
+async function resolveUserIdByUsername(
   page: Page,
-  quotationId: string
-): Promise<Row[]> {
-  let rows: Row[] = [];
-  for (let i = 0; i < AUDIT_POLL_TIMES; i++) {
-    const listed = await apiCallRaw<{ items?: Row[] }>(
-      page,
-      'GET',
-      `/audit-logs?page=1&page_size=100&resource_type=${AUDIT_RESOURCE_TYPE}`
+  username: string,
+  context: string
+): Promise<number> {
+  const listed = await apiCallRaw<{ users?: Row[]; total?: number }>(
+    page,
+    'GET',
+    `/users?page=1&page_size=20&keyword=${encodeURIComponent(username)}`
+  );
+  const exact = (listed?.users ?? []).filter(u => String(u.username ?? '') === username);
+  expect(
+    exact.length,
+    `${context}：/users 按用户名精确匹配 ${username} 应命中 1 行，实际 ${exact.length} 行，当事操作人 user_id 不可判`
+  ).toBe(1);
+  const userId = Number(exact[0].id);
+  if (!Number.isFinite(userId) || userId <= 0) {
+    throw new Error(
+      `${context}：${username} 的 /users 出参 id 非有效数值，实际 id=${JSON.stringify(exact[0].id)}`
     );
-    rows = (listed?.items ?? []).filter(row => String(row.resource_id ?? '') === quotationId);
-    if (rows.length > 0) return rows;
-    await new Promise(resolve => setTimeout(resolve, AUDIT_POLL_INTERVAL_MS));
   }
-  return rows;
+  return userId;
 }
 
 /**
@@ -202,36 +211,85 @@ async function getAuditDetail(
 }
 
 /**
- * 从一批审计行里筛出满足状态迁移与操作人的那一行详情。
- * 调用方：管理员收口分别核对提交、批准、驳回三条迁移。
- * 入参：会话 page、审计行列表、迁移前后状态字面量、期望操作人 username、断言上下文。
- * 传给谁：逐行 GET /audit-logs/{id} 读快照后按 before.status 与 after.status 与 username 匹配。
+ * 在超时窗口内轮询等待"某单据、某当事操作人、某条状态迁移"的审计行，命中即返回其详情。
+ * 调用方：管理员收口分别核对两张报价单的提交、批准、驳回迁移。
+ * 入参：会话 page（admin）、资源 id 字符串、当事操作人 user_id 与 username、迁移前后状态字面量、断言上下文。
+ * 传给谁：每轮 GET /audit-logs 以 resource_type+resource_id+user_id 三参服务端等值过滤取数
+ *   （resource_id 等值参数为主干 #1138 新增的读取契约），对返回行再做一次 resource_id 与 user_id
+ *   严格相等的客户端复核（防后端忽略参数时把别家单据行当候选），再逐行 GET /audit-logs/{id}
+ *   读快照，before.status、after.status、username 三者精确相等才算命中——判据与改造前完全一致，
+ *   只是把"等落库"挪进找目标迁移这件事本身：命中即返回，窗口耗尽仍未命中才抛错。
+ * 报错外显：点名服务端过滤串实得值、末轮服务端返回行数与复核后候选行数、疑似参数被忽略的标记、
+ *   已检视迁移签名清单与轮数，让下一次判红能直接区分"没落库"还是"归属不对"。
  * 存什么/存哪里：只读请求，不持久化。
  */
-async function findAuditTransition(
+async function waitForAuditTransition(
   page: Page,
-  rows: Row[],
-  fromStatus: string,
-  toStatus: string,
-  actorUsername: string,
-  context: string
+  args: {
+    resourceId: string;
+    actorUserId: number;
+    actorUsername: string;
+    fromStatus: string;
+    toStatus: string;
+    context: string;
+  }
 ): Promise<Row> {
   const seen: string[] = [];
-  for (const row of rows) {
-    const detail = await getAuditDetail(page, Number(row.id));
-    const before = (detail.before_snapshot ?? {}) as Row;
-    const after = (detail.after_snapshot ?? {}) as Row;
-    const beforeStatus = String(before.status ?? '');
-    const afterStatus = String(after.status ?? '');
-    const username = String(detail.username ?? '');
-    seen.push(`${beforeStatus}->${afterStatus}@${username}`);
-    if (beforeStatus === fromStatus && afterStatus === toStatus && username === actorUsername) {
-      return detail;
+  let lastRawCount = 0;
+  let lastCandidateCount = 0;
+  let serverFilterSuspect = false;
+  for (let round = 1; round <= AUDIT_POLL_TIMES; round++) {
+    const listed = await apiCallRaw<{ items?: Row[] }>(
+      page,
+      'GET',
+      `/audit-logs?page=1&page_size=100` +
+        `&resource_type=${encodeURIComponent(AUDIT_RESOURCE_TYPE)}` +
+        `&resource_id=${encodeURIComponent(args.resourceId)}` +
+        `&user_id=${args.actorUserId}`
+    );
+    const items = listed?.items ?? [];
+    lastRawCount = items.length;
+    const candidates = items.filter(
+      row =>
+        String(row.resource_id ?? '') === args.resourceId &&
+        Number(row.user_id) === args.actorUserId
+    );
+    lastCandidateCount = candidates.length;
+    if (items.length > candidates.length) {
+      serverFilterSuspect = true;
+    }
+    for (const row of candidates) {
+      const detail = await getAuditDetail(page, Number(row.id));
+      const before = (detail.before_snapshot ?? {}) as Row;
+      const after = (detail.after_snapshot ?? {}) as Row;
+      const beforeStatus = String(before.status ?? '');
+      const afterStatus = String(after.status ?? '');
+      const username = String(detail.username ?? '');
+      const signature = `${beforeStatus}->${afterStatus}@${username}`;
+      if (!seen.includes(signature)) seen.push(signature);
+      if (
+        beforeStatus === args.fromStatus &&
+        afterStatus === args.toStatus &&
+        username === args.actorUsername
+      ) {
+        return detail;
+      }
+    }
+    if (round < AUDIT_POLL_TIMES) {
+      await new Promise(resolve => setTimeout(resolve, AUDIT_POLL_INTERVAL_MS));
     }
   }
   throw new Error(
-    `${context}：审计行里找不到 ${fromStatus} 到 ${toStatus} 且操作人为 ${actorUsername} 的迁移，` +
-      `已检视=${seen.join(',') || '无'}（审计行数=${rows.length}）`
+    `${args.context}：轮询 ${AUDIT_POLL_TIMES} 轮（间隔 ${AUDIT_POLL_INTERVAL_MS}ms）内` +
+      `未找到 ${args.fromStatus} 到 ${args.toStatus} 且操作人为 ${args.actorUsername}` +
+      `（user_id=${args.actorUserId}）的迁移。` +
+      `服务端过滤串实得 resource_type=${AUDIT_RESOURCE_TYPE}、resource_id=${args.resourceId}、` +
+      `user_id=${args.actorUserId}；末轮服务端返回 ${lastRawCount} 行、` +
+      `客户端按 resource_id 与 user_id 严格相等复核后剩 ${lastCandidateCount} 行` +
+      (serverFilterSuspect
+        ? '——服务端返回了不满足等值条件的行，疑似 resource_id/user_id 参数被忽略，候选集不可信'
+        : '') +
+      `；已检视=${seen.join(',') || '无（候选集始终为空：优先怀疑审计行未落库或 resource_id/user_id 归属不对）'}`
   );
 }
 
@@ -523,20 +581,36 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
         managerUserId
       );
 
-      // 审计：每次状态迁移一条 auto_audit，含整模型 before 与 after 快照与操作人 username
-      const rowsA = await pollAuditRows(page, String(quotationAId));
-      expect(
-        rowsA.length,
-        `报价单 ${quotationAId} 应有提交与批准两条 auto_audit 审计行，实际 ${rowsA.length} 条`
-      ).toBeGreaterThanOrEqual(2);
-      const submitAuditA = await findAuditTransition(
+      // 审计：每次状态迁移一条 auto_audit，含整模型 before 与 after 快照与操作人 user_id/username。
+      // 写侧全实体共用 resource_type=auto_audit 且 resource_id 用各实体自己的主键（如产品 id 会撞
+      // 报价单 id），单按 resource_type 取一页再客户端精筛会把别家单据的审计行混进候选集，故按
+      // resource_type+resource_id+user_id 三参服务端等值过滤取数（#1138 读取侧新契约），并把
+      // "等异步落库"挪进匹配目标迁移的轮询本身。当事操作人 user_id 由 admin 会话按用户名经
+      // /users 精确解析（工装同第一棒）；状态词表用 sales_quotations chk_status 的小写值。
+      const repUserId = await resolveUserIdByUsername(
         page,
-        rowsA,
-        'draft',
-        'pending_approval',
         repUsername,
-        `报价单 ${quotationAId} 的提交迁移`
+        '收口核对提交迁移：解析销售代表当事操作人'
       );
+      const managerUserIdFromUsers = await resolveUserIdByUsername(
+        page,
+        managerUsername,
+        '收口核对批驳迁移：解析销售经理当事操作人'
+      );
+      expect(
+        managerUserIdFromUsers,
+        `收口按用户名解析出的 sales_manager user_id=${managerUserIdFromUsers} 必须等于第三棒会话钉下的 ` +
+          `managerUserId=${managerUserId}，不一致说明按名字解析不可信，审计行 user_id 归属无法坐实`
+      ).toBe(managerUserId);
+
+      const submitAuditA = await waitForAuditTransition(page, {
+        resourceId: String(quotationAId),
+        actorUserId: repUserId,
+        actorUsername: repUsername,
+        fromStatus: 'draft',
+        toStatus: 'pending_approval',
+        context: `报价单 ${quotationAId} 的提交迁移`,
+      });
       expect(
         String(submitAuditA.resource_type ?? ''),
         '提交审计行的资源类型应为 auto_audit'
@@ -545,15 +619,37 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
         'UPDATE'
       );
       expect(String(submitAuditA.created_at ?? ''), '提交审计行必须带变更时间').not.toBe('');
+      expect(
+        String(submitAuditA.resource_id ?? ''),
+        `提交审计行的 resource_id 应精确等于报价单 ${quotationAId}`
+      ).toBe(String(quotationAId));
+      expect(
+        Number(submitAuditA.user_id),
+        `提交审计行的操作人 user_id 应为销售代表 ${repUserId}`
+      ).toBe(repUserId);
 
-      const approveAuditA = await findAuditTransition(
-        page,
-        rowsA,
-        'pending_approval',
-        'approved',
-        managerUsername,
-        `报价单 ${quotationAId} 的批准迁移`
-      );
+      const approveAuditA = await waitForAuditTransition(page, {
+        resourceId: String(quotationAId),
+        actorUserId: managerUserId,
+        actorUsername: managerUsername,
+        fromStatus: 'pending_approval',
+        toStatus: 'approved',
+        context: `报价单 ${quotationAId} 的批准迁移`,
+      });
+      // 提交与批准两条迁移各自被坐实存在且迁移签名不同，即报价单 A 至少有这两条审计行；
+      // 再坐实它们确为两条不同行，防把同一行既读成提交又读成批准。
+      expect(
+        Number(approveAuditA.id),
+        '批准迁移与提交迁移必须是两条不同的审计行'
+      ).not.toBe(Number(submitAuditA.id));
+      expect(
+        String(approveAuditA.resource_id ?? ''),
+        `批准审计行的 resource_id 应精确等于报价单 ${quotationAId}`
+      ).toBe(String(quotationAId));
+      expect(
+        Number(approveAuditA.user_id),
+        `批准审计行的操作人 user_id 应为销售经理 ${managerUserId}`
+      ).toBe(managerUserId);
       const approveBeforeA = (approveAuditA.before_snapshot ?? {}) as Row;
       const approveAfterA = (approveAuditA.after_snapshot ?? {}) as Row;
       expect(
@@ -570,27 +666,26 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
       ).toBe(managerUserId);
       expect(String(approveAuditA.created_at ?? ''), '批准审计行必须带变更时间').not.toBe('');
 
-      const rowsB = await pollAuditRows(page, String(quotationBId));
+      await waitForAuditTransition(page, {
+        resourceId: String(quotationBId),
+        actorUserId: repUserId,
+        actorUsername: repUsername,
+        fromStatus: 'draft',
+        toStatus: 'pending_approval',
+        context: `报价单 ${quotationBId} 的提交迁移`,
+      });
+      const rejectAuditB = await waitForAuditTransition(page, {
+        resourceId: String(quotationBId),
+        actorUserId: managerUserId,
+        actorUsername: managerUsername,
+        fromStatus: 'pending_approval',
+        toStatus: 'rejected',
+        context: `报价单 ${quotationBId} 的驳回迁移`,
+      });
       expect(
-        rowsB.length,
-        `报价单 ${quotationBId} 应有提交与驳回两条 auto_audit 审计行，实际 ${rowsB.length} 条`
-      ).toBeGreaterThanOrEqual(2);
-      await findAuditTransition(
-        page,
-        rowsB,
-        'draft',
-        'pending_approval',
-        repUsername,
-        `报价单 ${quotationBId} 的提交迁移`
-      );
-      const rejectAuditB = await findAuditTransition(
-        page,
-        rowsB,
-        'pending_approval',
-        'rejected',
-        managerUsername,
-        `报价单 ${quotationBId} 的驳回迁移`
-      );
+        String(rejectAuditB.resource_id ?? ''),
+        `驳回审计行的 resource_id 应精确等于报价单 ${quotationBId}`
+      ).toBe(String(quotationBId));
       const rejectAfterB = (rejectAuditB.after_snapshot ?? {}) as Row;
       expect(
         String(rejectAfterB.rejection_reason ?? ''),
