@@ -13,11 +13,19 @@
  *       （CI 传分支起点，本地传 origin/main）；--require-baseline-ref 缺 ref 直接判 9；
  *       --corpus <目录> 覆盖用例语料根（缺省 frontend/e2e）；--src <目录> 覆盖前端源码根
  *       （缺省 frontend/src，用来判端点有没有真界面入口）；--exempt <json> 覆盖豁免台账；
- *       --floor <数> 覆盖端点数地板；--self-test 跑反向探针。
+ *       --floor <数> 覆盖端点数地板；--self-test 跑反向探针；
+ *       --coverage-baseline <json路径> 覆盖棘轮基线（缺省
+ *       frontend/scripts/e2e-pairing-coverage-baseline.json）；--write-coverage-baseline
+ *       生成模式，把实测分母写进棘轮基线后退出，基线数值只能由它重算、禁止人手改。
  * 传给谁：结论只写标准输出与退出码，不回调任何服务；CI 按退出码判负。
- * 存什么：不写仓内任何既有文件；自证模式在 frontend/scripts 下临时生成基线与台账夹具，
- *       结束时逐个删除，删不掉的会点名。
- * 存哪里：临时夹具只落 frontend/scripts，运行后清除。
+ * 存什么：主判定不写仓内任何既有文件；生成模式写棘轮基线
+ *       frontend/scripts/e2e-pairing-coverage-baseline.json，内容为 endpoints、covered、
+ *       withUiUncovered、noUiUncovered、recordedOn 五个计数/时间字段，外加
+ *       withUiUncoveredEndpoints 成员清单（棘轮判红要逐条点名"新增的零引用端点"，
+ *       只有计数没有成员就点不出名，只能人肉对数）；自证模式在 frontend/scripts 下
+ *       临时生成基线、台账与棘轮夹具，结束时逐个删除，删不掉的会点名。
+ * 存哪里：棘轮基线落 frontend/scripts/e2e-pairing-coverage-baseline.json 并由 git 跟踪；
+ *       临时夹具只落 frontend/scripts，运行后清除。
  *
  * 判据语义（写死在此，回报同口径）：
  *   1 端点集来自 walkBackendRoutes()，与 check-api-paths 和 route-snapshot 同一套
@@ -38,8 +46,17 @@
  *     否则"登记一条带理由的豁免"就成了绕开这道门的正门。台账里存在但已不在新增集的条目
  *     判红（过期锁），否则同一位次再发时没人能发现这条豁免早已失去意义。
  *   6 基线、当前集、用例语料或前端源码任一解析量低于地板时退 9：判定器瞎了时它的绿不可信。
+ *   7 棘轮档（存量漏测分母只准降不准升）：主判定（新增端点配对）之后另跑一遍全量覆盖统计，
+ *     拿实测 withUiUncovered（前端有调用点却零 e2e 引用的端点数）与棘轮基线里的同名计数
+ *     比较，三态判定：基线文件或必需字段取不到、JSON 不合法、计数与成员清单长度不一致 →
+ *     TOOL_BUG 哨兵退 9，禁止静默按 0 放行；实测高于基线 → 判红，按成员清单逐条点名新增
+ *     的零引用端点（"METHOD PATH"，即路径与方法），退 1；实测低于基线 → 不判红，只打一行
+ *     "分母改善，请用 --write-coverage-baseline 重算基线"的提示。棘轮档与主判定互不遮蔽：
+ *     任一判负整体退非零，主判定的豁免台账语义不受棘轮档影响（豁免仍只适用于前端零调用
+ *     的内部端点，豁免过的端点依旧计入 noUiUncovered 现状、不计入分母上升）。
  *
- * 退出码：0 通过；1 有判红项；9 判定器或输入不可用。
+ * 退出码：0 通过；1 有判红项（新增未配对或棘轮分母上升）；9 判定器或输入不可用
+ *        （含棘轮基线不可用，9 优先于 1：判定器瞎了时它的红也不可信）。
  */
 import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync } from 'fs';
 import { join, dirname, relative } from 'path';
@@ -62,6 +79,16 @@ const CORPUS = flag('corpus', join(REPO, 'frontend', 'e2e'));
 const SRC = flag('src', join(REPO, 'frontend', 'src'));
 const EXEMPT = flag('exempt', join(HERE, 'e2e-feature-pairing-exempt.json'));
 const FLOOR = Number(flag('floor', 1000));
+const COVERAGE_BASELINE = flag(
+  'coverage-baseline',
+  join(HERE, 'e2e-pairing-coverage-baseline.json')
+);
+const WRITE_COVERAGE_BASELINE = argv.includes('--write-coverage-baseline');
+
+// 棘轮基线的必需字段：五个计数/时间字段之外，成员清单是判红时逐条点名的唯一依据，
+// 缺任何一个都在 loadCoverageBaseline 里按 TOOL_BUG 处理，不做默认值兜底。
+const RATCHET_COUNT_FIELDS = ['endpoints', 'covered', 'withUiUncovered', 'noUiUncovered'];
+const RATCHET_MEMBERS_FIELD = 'withUiUncoveredEndpoints';
 
 const say = m => process.stdout.write(m + '\n');
 
@@ -207,9 +234,101 @@ function loadExempt(file) {
 }
 
 /**
- * 判定主体。
- * @param {object} over 自证用的入参覆盖（baseline corpus exempt floor）
- * @returns {{code:number}} code 与退出码同义
+ * 全量覆盖统计：对当前端点集逐枚判"e2e 语料有没有引用它"，再对零引用的按
+ * "前端 src 有没有调用点"分成有界面入口（withUi）与零调用（noUi）两池。
+ * 调用方是 judge() 的棘轮档与 writeCoverageBaseline() 生成模式，两处同一谓词，
+ * 与 selfTest() 的夹具池口径一致（同一套 matchNeedles，不允许第二套数法）。
+ * @param {Map<string,{method:string,path:string}>} cur 当前端点集
+ * @param {string[]} textBodies 用例语料全文（正文字符串数组）
+ * @param {string[]} srcTexts 前端源码全文（正文字符串数组）
+ * @returns {{endpoints:number,covered:string[],withUi:string[],noUi:string[]}}
+ */
+function coverageStats(cur, textBodies, srcTexts) {
+  const covered = [];
+  const withUi = [];
+  const noUi = [];
+  for (const key of cur.keys()) {
+    const needles = matchNeedles(cur.get(key).path);
+    if (textBodies.some(b => needles.some(n => b.includes(n)))) covered.push(key);
+    else if (needles.some(n => srcTexts.some(s => s.includes(n)))) withUi.push(key);
+    else noUi.push(key);
+  }
+  return { endpoints: cur.size, covered, withUi, noUi };
+}
+
+/**
+ * 棘轮基线的序列化形态：计数与成员清单同源自同一次实测，长度不一致的写法不存在。
+ * 调用方是 writeCoverageBaseline()（生成）与 selfTest()（构造临时夹具）。
+ * @param {{endpoints:number,covered:string[],withUi:string[],noUi:string[]}} s coverageStats 结果
+ * @param {string} recordedOn 记录时间标识（生成模式写 ISO 时间，探针写夹具名）
+ */
+function ratchetDoc(s, recordedOn) {
+  return {
+    endpoints: s.endpoints,
+    covered: s.covered.length,
+    withUiUncovered: s.withUi.length,
+    noUiUncovered: s.noUi.length,
+    recordedOn,
+    [RATCHET_MEMBERS_FIELD]: [...s.withUi].sort(),
+  };
+}
+
+/**
+ * 读棘轮基线并逐字段校验，返回 {data, error}；任何取不到或不合法都交调用方判 9，
+ * 绝不静默按 0 处理（按 0 放行等于"基线丢了门就永远绿"，正是这道棘轮要防的假绿）。
+ * 调用方是 judge() 的棘轮档与 selfTest() 的棘轮探针（后者传临时夹具路径）。
+ * @param {string} file 棘轮基线 json 路径
+ */
+function loadCoverageBaseline(file) {
+  if (!existsSync(file)) {
+    return {
+      data: null,
+      error: '缺棘轮基线文件 ' + file + '，须由 --write-coverage-baseline 生成后由 git 跟踪',
+    };
+  }
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (e) {
+    return { data: null, error: '棘轮基线 ' + file + ' 不是合法 JSON：' + e.message };
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { data: null, error: '棘轮基线 ' + file + ' 不是 JSON 对象' };
+  }
+  for (const f of [...RATCHET_COUNT_FIELDS, 'recordedOn', RATCHET_MEMBERS_FIELD]) {
+    if (!(f in raw)) return { data: null, error: '棘轮基线缺字段 ' + f };
+  }
+  for (const f of RATCHET_COUNT_FIELDS) {
+    if (typeof raw[f] !== 'number' || !Number.isInteger(raw[f]) || raw[f] < 0) {
+      return { data: null, error: '棘轮基线字段 ' + f + ' 不是非负整数，实测为 ' + raw[f] };
+    }
+  }
+  if (typeof raw.recordedOn !== 'string' || !raw.recordedOn.trim()) {
+    return { data: null, error: '棘轮基线字段 recordedOn 不是非空字符串' };
+  }
+  if (!Array.isArray(raw[RATCHET_MEMBERS_FIELD])) {
+    return { data: null, error: '棘轮基线字段 ' + RATCHET_MEMBERS_FIELD + ' 不是数组' };
+  }
+  if (raw[RATCHET_MEMBERS_FIELD].length !== raw.withUiUncovered) {
+    return {
+      data: null,
+      error:
+        '棘轮基线 withUiUncovered=' +
+        raw.withUiUncovered +
+        ' 与成员清单长度 ' +
+        raw[RATCHET_MEMBERS_FIELD].length +
+        ' 不一致，那是人手改数的痕迹，基线只能用 --write-coverage-baseline 重算',
+    };
+  }
+  return { data: raw, error: null };
+}
+
+/**
+ * 判定主体：先跑主判定（新增端点必须配对），再跑棘轮档（存量漏测分母只准降不准升），
+ * 两档互不遮蔽，任一判负整体退非零，棘轮档不可用按 9 处理且 9 优先。
+ * @param {object} over 自证用的入参覆盖（baseline corpus exempt floor coverageBaseline）
+ * @returns {{code:number,ratchet:string,ratchetNew:string[]}} code 与退出码同义，
+ *          ratchet ∈ ok|worse|improved|toolbug，ratchetNew 为棘轮点名的新增零引用端点
  */
 function judge(over = {}) {
   const baselineFile = over.baseline || BASELINE;
@@ -332,29 +451,89 @@ function judge(over = {}) {
       say('  EXEMPT_STALE ' + key + ' 已不在新增集里，豁免条目该删（留着会掩盖同位再发）');
     }
   }
+  const pairingHead =
+    'PAIRING baseline=' +
+    b.keys.size +
+    ' current=' +
+    cur.size +
+    ' added=' +
+    added.length +
+    ' paired=' +
+    paired +
+    ' weak=' +
+    weak +
+    ' exempt=' +
+    exempted +
+    ' unpaired=' +
+    fail +
+    ' corpusFiles=' +
+    files.length +
+    ' srcFiles=' +
+    srcFiles.length +
+    ' baselineSource=' +
+    (baselineRef ? 'ref' : 'worktree');
+
+  // ---- 棘轮档：存量漏测分母只准降不准升，主判定之后另判，两档互不遮蔽 ----
+  const covFile = over.coverageBaseline || COVERAGE_BASELINE;
+  const cov = loadCoverageBaseline(covFile);
+  if (cov.error) {
+    return {
+      code: 9,
+      ratchet: 'toolbug',
+      ratchetNew: [],
+      head: 'TOOL_BUG 棘轮基线不可用，禁止静默按 0 放行：' + cov.error + '｜' + pairingHead,
+    };
+  }
+  const covStats = coverageStats(cur, texts.map(t => t.body), srcTexts);
+  const baseSet = new Set(cov.data[RATCHET_MEMBERS_FIELD]);
+  let ratchet = 'ok';
+  let ratchetNew = [];
+  if (covStats.withUi.length > cov.data.withUiUncovered) {
+    ratchetNew = covStats.withUi.filter(k => !baseSet.has(k)).sort();
+    if (ratchetNew.length === 0) {
+      return {
+        code: 9,
+        ratchet: 'toolbug',
+        ratchetNew: [],
+        head:
+          'TOOL_BUG 棘轮实测分母 ' +
+          covStats.withUi.length +
+          ' 高于基线 ' +
+          cov.data.withUiUncovered +
+          '，但按成员清单逐条比对找不到新增端点，基线口径与当前判据脱节：' +
+          covFile +
+          '｜' +
+          pairingHead,
+      };
+    }
+    ratchet = 'worse';
+    for (const key of ratchetNew) {
+      say('  RATCHET_RED ' + key + ' 存量漏测分母上升：该端点有前端调用点却在 frontend/e2e 零引用');
+    }
+  } else if (covStats.withUi.length < cov.data.withUiUncovered) {
+    ratchet = 'improved';
+    say(
+      '  RATCHET_IMPROVED 分母改善（实测 ' +
+        covStats.withUi.length +
+        ' < 基线 ' +
+        cov.data.withUiUncovered +
+        '），请用 --write-coverage-baseline 重算基线'
+    );
+  }
+  let code = fail > 0 ? 1 : 0;
+  if (ratchet === 'worse') code = 1;
   return {
-    code: fail > 0 ? 1 : 0,
+    code,
+    ratchet,
+    ratchetNew,
     head:
-      'PAIRING baseline=' +
-      b.keys.size +
-      ' current=' +
-      cur.size +
-      ' added=' +
-      added.length +
-      ' paired=' +
-      paired +
-      ' weak=' +
-      weak +
-      ' exempt=' +
-      exempted +
-      ' unpaired=' +
-      fail +
-      ' corpusFiles=' +
-      files.length +
-      ' srcFiles=' +
-      srcFiles.length +
-      ' baselineSource=' +
-      (baselineRef ? 'ref' : 'worktree'),
+      pairingHead +
+      ' ratchet=' +
+      ratchet +
+      ' ratchetWithUi=' +
+      covStats.withUi.length +
+      '/' +
+      cov.data.withUiUncovered,
   };
 }
 
@@ -367,10 +546,82 @@ function makeTemp(name, content, cleanup) {
 }
 
 /**
- * 反向自证：用真谓词与真语料，靠"从基线里挖掉一条真端点"造出新增，验九条——
+ * 棘轮基线生成模式（--write-coverage-baseline 的唯一入口）：用与 judge() 棘轮档、
+ * selfTest() 夹具池同一套 coverageStats 谓词实测当前端点集，把五个计数/时间字段
+ * 加成员清单写进 COVERAGE_BASELINE（缺省 frontend/scripts/e2e-pairing-coverage-baseline.json，
+ * 可被 --coverage-baseline 改落点）。此后基线只能由它重算，人手改数会被
+ * loadCoverageBaseline 的"计数与成员清单长度一致"校验抓到。扫描量低于地板时
+ * 拒绝落盘：瞎了的扫描写不进基线。
+ */
+function writeCoverageBaseline() {
+  const cur = currentKeys();
+  if (cur.size < FLOOR) {
+    return {
+      code: 9,
+      ratchet: 'toolbug',
+      head:
+        'TOOL_BUG 拒绝生成棘轮基线：当前路由面只解析出 ' +
+        cur.size +
+        ' 枚端点，低于地板 ' +
+        FLOOR +
+        '，不能把瞎了的扫描写成基线',
+    };
+  }
+  const files = corpusFiles(CORPUS);
+  if (files.length < 10) {
+    return {
+      code: 9,
+      ratchet: 'toolbug',
+      head:
+        'TOOL_BUG 拒绝生成棘轮基线：用例语料只看到 ' +
+        files.length +
+        ' 个文件，扫面过窄，covered 分母不可信',
+    };
+  }
+  const srcFiles = sourceFiles(SRC);
+  if (srcFiles.length < 100) {
+    return {
+      code: 9,
+      ratchet: 'toolbug',
+      head:
+        'TOOL_BUG 拒绝生成棘轮基线：前端源码只看到 ' +
+        srcFiles.length +
+        ' 个文件，扫面过窄，withUiUncovered 分母不可信',
+    };
+  }
+  const s = coverageStats(
+    cur,
+    files.map(f => readFileSync(f, 'utf8')),
+    srcFiles.map(f => readFileSync(f, 'utf8'))
+  );
+  const doc = ratchetDoc(s, new Date().toISOString());
+  writeFileSync(COVERAGE_BASELINE, JSON.stringify(doc, null, 2) + '\n');
+  return {
+    code: 0,
+    ratchet: 'ok',
+    head:
+      'RATCHET_BASELINE_WRITTEN ' +
+      relative(REPO, COVERAGE_BASELINE).replace(/\\/g, '/') +
+      ' endpoints=' +
+      doc.endpoints +
+      ' covered=' +
+      doc.covered +
+      ' withUiUncovered=' +
+      doc.withUiUncovered +
+      ' noUiUncovered=' +
+      doc.noUiUncovered +
+      ' recordedOn=' +
+      doc.recordedOn,
+  };
+}
+
+/**
+ * 反向自证：用真谓词与真语料，靠"从基线里挖掉一条真端点"造出新增，验十二道——
  * 无引用必判红、有引用必判绿、空基线必判 9（不许报"零新增"当过）、带理由的零界面豁免
  * 能救红、缺理由不放行、有界面入口的端点不许靠豁免过门、基线取提交树时必须与已提交快照
- * 同量、要求 base 侧基线却不给 ref 必判 9。任一没命中就判判定器无检测力。
+ * 同量、要求 base 侧基线却不给 ref 必判 9、前缀不对称必判绿，外加棘轮档三道：分母上升
+ * 必判红且逐条点名到新增那枚端点、分母下降不判红且状态为 improved（放行并要求重算基线）、
+ * 棘轮基线文件取不到必自曝 TOOL_BUG（不许静默按 0 放行）。任一没命中就判判定器无检测力。
  */
 function selfTest() {
   const cleanup = [];
@@ -533,6 +784,75 @@ function selfTest() {
   ]);
   if (refBase.error) say('  SELFTEST_REF_BASELINE ' + refBase.error);
 
+  // 棘轮档三道探针：夹具直接用实测池构造"基线比现状少一枚/多一枚/根本没有"三种形态，
+  // 主判定腿统一走"挖掉一枚已配对端点再配对回来"（新增必绿），让判负只可能来自棘轮档。
+  const ratchetProbeBase = { baseline: dropBaseline(covered[0]), exempt: emptyExempt };
+  const upDoc = {
+    endpoints: cur.size,
+    covered: covered.length,
+    withUiUncovered: withUi.length - 1,
+    noUiUncovered: noUi.length,
+    recordedOn: 'selftest-up',
+    [RATCHET_MEMBERS_FIELD]: withUi.filter(k => k !== withUi[0]).sort(),
+  };
+  const covUpFile = makeTemp(
+    '.selftest-coverage-up.json',
+    JSON.stringify(upDoc, null, 2) + '\n',
+    cleanup
+  );
+  const downDoc = {
+    endpoints: cur.size,
+    covered: covered.length,
+    withUiUncovered: withUi.length + 1,
+    noUiUncovered: noUi.length,
+    recordedOn: 'selftest-down',
+    [RATCHET_MEMBERS_FIELD]: [...withUi, 'GET /selftest/ratchet-improved-probe'].sort(),
+  };
+  const covDownFile = makeTemp(
+    '.selftest-coverage-down.json',
+    JSON.stringify(downDoc, null, 2) + '\n',
+    cleanup
+  );
+  const up = judge({ ...ratchetProbeBase, coverageBaseline: covUpFile });
+  probes.push([
+    'ratchetDenominatorUpMustBeRed',
+    up.code === 1 && up.ratchet === 'worse' && up.ratchetNew.join('|') === withUi[0] ? 0 : 1,
+    0,
+  ]);
+  if (up.code !== 1 || up.ratchet !== 'worse') {
+    say('  SELFTEST_RATCHET_UP got code=' + up.code + ' ratchet=' + up.ratchet);
+  } else if (up.ratchetNew.join('|') !== withUi[0]) {
+    say('  SELFTEST_RATCHET_UP 点名不符 want=' + withUi[0] + ' got=' + up.ratchetNew.join('|'));
+  }
+  const down = judge({ ...ratchetProbeBase, coverageBaseline: covDownFile });
+  probes.push([
+    'ratchetDenominatorDownMustGiveRecalcHintNotRed',
+    down.code === 0 && down.ratchet === 'improved' ? 0 : 1,
+    0,
+  ]);
+  if (down.code !== 0 || down.ratchet !== 'improved') {
+    say(
+      '  SELFTEST_RATCHET_DOWN got code=' + down.code + ' ratchet=' + down.ratchet
+    );
+  }
+  const covMissing = judge({
+    ...ratchetProbeBase,
+    coverageBaseline: join(HERE, '.selftest-coverage-missing.json'),
+  });
+  probes.push([
+    'ratchetMissingBaselineMustBeToolBug',
+    covMissing.code === 9 && covMissing.ratchet === 'toolbug' ? 0 : 1,
+    0,
+  ]);
+  if (covMissing.code !== 9 || covMissing.ratchet !== 'toolbug') {
+    say(
+      '  SELFTEST_RATCHET_MISSING got code=' +
+        covMissing.code +
+        ' ratchet=' +
+        covMissing.ratchet
+    );
+  }
+
   let caught = 0;
   const missed = [];
   for (const [name, got, want] of probes) {
@@ -558,13 +878,17 @@ function selfTest() {
     : { code: 9, head: 'TOOL_BUG 反向探针有没命中的道，判定器无检测力，其绿不可信' };
 }
 
-const out = SELF_TEST ? selfTest() : judge();
+const out = WRITE_COVERAGE_BASELINE
+  ? writeCoverageBaseline()
+  : SELF_TEST
+    ? selfTest()
+    : judge();
 say(out.head || '');
-if (!SELF_TEST) {
-  if (out.code === 0) say('PAIRING_GREEN 新增端点全部有用例配对或已带理由豁免');
-  if (out.code === 1) say('PAIRING_RED 有新增端点未配套 E2E 用例');
-  if (out.code === 9) say('PAIRING_TOOLBUG 判定器或输入不可用，本道结论按不通过处理');
-} else if (out.code === 0) {
+if (!SELF_TEST && !WRITE_COVERAGE_BASELINE) {
+  if (out.code === 0) say('PAIRING_GREEN 新增端点全部有用例配对或已带理由豁免，存量漏测棘轮未上升');
+  if (out.code === 1) say('PAIRING_RED 有新增端点未配套 E2E 用例，或存量漏测分母高于棘轮基线');
+  if (out.code === 9) say('PAIRING_TOOLBUG 判定器或输入不可用（含棘轮基线不可用），本道结论按不通过处理');
+} else if (SELF_TEST && out.code === 0) {
   say('PAIRING_SELFTEST_OK');
 }
 process.exit(out.code);
