@@ -40,13 +40,15 @@ var e = require("../../@babel/runtime/helpers/interopRequireDefault").default,
  */
 function cacheProfile(user) {
   wx.setStorageSync("id", user.id);
+  // adaptLogin 的 companyId 是登记待后端补的空占位，这里写等值空保持读方现状
   wx.setStorageSync("myShopId", user.companyId);
   wx.setStorageSync("nickName", user.nickName);
   wx.setStorageSync("mobile", user.phone);
   wx.setStorageSync("avatar", user.avatar || util.addDefaultAvatar());
   wx.setStorageSync("fullName", user.fullName);
   wx.setStorageSync("resCodeList", user.perms);
-  wx.setStorageSync("userType", 2);
+  // 原写法硬编码 userType 2：后端出参没有用户类型键，任何字面量都是造值，
+  // 停写并登记；消费面（packageB setting 的类型分支）在补字段前维持不成立
   o.globalData.userInfo = user;
   wx.getSystemInfo({
     success: function (res) {
@@ -152,12 +154,16 @@ var s = createClass(function e() {
               o.globalData.userInfo = u;
               if (!profileOnly) {
                 wx.setStorageSync("id", u.id);
-                wx.setStorageSync("nickName", u.username || u.nickName || "");
-                wx.setStorageSync("fullName", u.real_name || u.fullName || "");
+                wx.setStorageSync("nickName", u.username || "");
+                wx.setStorageSync("fullName", u.real_name || u.username || "");
                 wx.setStorageSync("mobile", u.phone || "");
                 wx.setStorageSync("avatar", u.avatar || util.addDefaultAvatar());
-                wx.setStorageSync("myShopId", u.companyId || u.department_id || "");
-                wx.setStorageSync("userType", u.type);
+                // myShopId：auth/me 出参没有店铺归属键，原写法 u.companyId 恒取不到、
+                // 拿 u.department_id 兜是字段挪用（部门不是店铺）；写空保读方维持现状
+                // （改造前后本就恒空），已登记需后端补字段
+                wx.setStorageSync("myShopId", "");
+                // userType：出参没有用户类型键，原写法落盘 undefined 并覆盖登录链已有缓存值；
+                // 停写，消费面（packageB setting 的类型分支）登记为待后端补字段后再接
               }
               t(res);
               return;

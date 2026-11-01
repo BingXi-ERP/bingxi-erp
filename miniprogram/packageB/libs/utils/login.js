@@ -105,16 +105,18 @@ var r = createClass(function e() {
           if (u.permissions) wx.setStorageSync("resCodeList", u.permissions);
           return res;
         }
+        // 取值键与 auth/me 出参 UserInfo 逐键对表（backend/src/handlers/auth_handler.rs）：
+        // 原写法 u.companyId 与 u.type 不在出参里恒取不到，u.department_id 兜店铺是字段挪用；
+        // myShopId 写空保读方现状，userType 停写（storage 键无真值读方，登记需后端补字段）
         wx.setStorageSync("id", u.id);
-        wx.setStorageSync("myShopId", u.companyId || u.department_id || "");
-        wx.setStorageSync("nickName", u.username || u.nickName || "");
+        wx.setStorageSync("myShopId", "");
+        wx.setStorageSync("nickName", u.username || "");
         wx.setStorageSync("mobile", u.phone || "");
         wx.setStorageSync("avatar", u.avatar || util.addDefaultAvatar());
-        wx.setStorageSync("fullName", u.real_name || u.fullName || "");
+        wx.setStorageSync("fullName", u.real_name || u.username || "");
         // auth/me 出参是 UserInfo（backend/src/handlers/auth_handler.rs），带 permissions，
         // 缺失时不覆盖已落盘的 resCodeList；real_name 与 avatar 当前恒为 None（需后端补字段）
         if (u.permissions) wx.setStorageSync("resCodeList", u.permissions);
-        wx.setStorageSync("userType", u.type);
         return res;
       });
     }));

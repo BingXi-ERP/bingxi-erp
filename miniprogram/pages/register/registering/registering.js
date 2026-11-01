@@ -49,8 +49,10 @@ Page({
    * 入参：无
    * 传给谁：login.getUserInfo（经网关归一化），结果落 globalData.userInfo 与档案键
    * 存什么/存哪里：由 login.js 决定，本页只按回读结果 setData
-   * 判据：账号启用（is_active）且已归属组织（department_id 非空）才允许进店铺，
-   *   对应 users/me 出参 UserResponse 的真实字段
+   * 判据：回读成功即账号启用——auth/me 过认证中间件，中间件默认开启的 is_active 实时校验
+   *   （backend/src/middleware/auth.rs）对禁用账号直接 401，前端拿不到 code 0；
+   *   auth/me 的 UserInfo 不出 is_active 键，原写法 !!u.is_active 恒假属假判据，已去掉。
+   *   再叠加已归属组织（department_id 非空，UserInfo 出参有此键）才给出回登录入口
    */
   getUserInfo: function () {
     wx.showLoading({
@@ -63,7 +65,7 @@ Page({
         wx.hideLoading();
         var u = (res && res.code === 0 && res.data) || {};
         t.setData({
-          showBtn: !!u.is_active && u.department_id !== null && u.department_id !== undefined,
+          showBtn: !!res && res.code === 0 && u.department_id !== null && u.department_id !== undefined,
         });
         return res;
       })

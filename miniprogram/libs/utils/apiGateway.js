@@ -420,6 +420,14 @@ function verifySession() {
  * 落盘内容：csrf_token 进 bingxiCsrf（否则本会话第一个写请求要先吃一次 403 才能拿到恢复令牌）、
  * 用户档案进 wx.storage 的各业务键
  * 登录响应体没有 token 字段，也不写任何 token 键：登录态由 verifySession() 的 auth/me 回读确认
+ *
+ * 取值键与后端真实出参逐键对表（LoginResponse.user 即 UserInfo，
+ * backend/src/handlers/auth_handler.rs）：出参键只有 id username email role_id role_name
+ * permissions phone department_id department_name is_totp_enabled real_name avatar
+ * agreed_to_terms_at；原写法读的 companyId 与 tenant_id 与 nickname 与 nickName 与 mobile
+ * 与 role_names 与 fullName 与 full_name 全不在出参里，恒取 undefined，属键名漂移，已清除。
+ * 需后端补两笔（交调度方）：real_name 与 avatar 表有列（backend/src/models/user.rs）但
+ * UserInfo 恒返回 None；出参无店铺归属与用户类型字段，myShopId 与 userType 无权威来源。
  */
 function adaptLogin(raw, isBingxi) {
   var res = normalize(raw, isBingxi);
@@ -429,14 +437,15 @@ function adaptLogin(raw, isBingxi) {
   putCsrf(d.csrf_token);
   var user = {
     id: u.id !== undefined ? u.id : "",
-    companyId: u.companyId || u.tenant_id || "",
-    nickName: u.nickname || u.nickName || u.username || "",
+    // 出参无店铺归属字段，留空占位；读方维持现状（改造前也恒为空），已登记需后端补字段
+    companyId: "",
+    nickName: u.username || "",
     username: u.username || "",
-    phone: u.phone || u.mobile || "",
+    phone: u.phone || "",
     avatar: u.avatar || "",
-    fullName: u.fullName || u.full_name || u.real_name || u.username || "",
+    fullName: u.real_name || u.username || "",
     perms: d.permissions || u.permissions || [],
-    roleNames: u.role_names || (u.role_name ? [u.role_name] : []),
+    roleNames: u.role_name ? [u.role_name] : [],
     email: u.email || "",
     departmentName: u.department_name || "",
     isTotpEnabled: !!u.is_totp_enabled,
