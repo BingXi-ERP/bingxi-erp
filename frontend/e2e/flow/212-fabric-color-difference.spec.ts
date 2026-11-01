@@ -4,7 +4,7 @@
  * 功能：用一条跨角色接力链钉死"缸差"事实在后端的真实落点与跨角色可见性——
  * 一，验布员建一张带缸号(dye_lot_no)、色号(color_no)、门幅(fabric_width_inches)的四分制验布单，
  *    开验后录入两条 color_diff（缸差/色差）疵点并逐字段回读自证真落库；
- * 二，质检员（另一身份）对同一张单定级，写入受检米数(inspected_yards)，
+ * 二，质检员（另一身份）对同一张单定级，写入受检码数(inspected_yards)，
  *    服务端按四分制聚合出总扣分 4、每百平方码分数 2.32、等级 first；
  * 三，后整主管（第三种身份）按 HTTP 直读、按单号读、按单读疵点三路回读，
  *    断言看到的缸号/色号/机号/备注/疵点描述与写入值逐字符相等、数值字段与定级产出逐值相等；
@@ -220,7 +220,7 @@ test.describe.serial('面料缸差：验布录入、质检定级、后整读回�
         },
         {
           role: 'quality_inspector',
-          label: '质检员定级并写入受检米数',
+          label: '质检员定级并写入受检码数',
           run: async ({ session, require }) => {
             const inspectionId = Number(require('inspectionId'));
             const graded = await apiCallRaw<Row>(
@@ -229,12 +229,12 @@ test.describe.serial('面料缸差：验布录入、质检定级、后整读回�
               `/production/fabric-inspections/${inspectionId}/grade`,
               { inspected_yards: INSPECTED_YARDS }
             );
-            // 服务端聚合口径逐值钉：米数、总扣分（两条 color_diff 各 2 分、分码不封顶）、
+            // 服务端聚合口径逐值钉：码数、总扣分（两条 color_diff 各 2 分、分码不封顶）、
             // 每百平方码分数（4×3600/(100×62) 落 numeric(10,2)=2.32）、等级（≤40 判 first）、状态 graded
             expect(String(graded?.status), '定级后状态应为 graded').toBe('graded');
             expect(
               Number(graded?.inspected_yards),
-              `受检米数应等于质检棒写入值 ${INSPECTED_YARDS}`
+              `受检码数应等于质检棒写入值 ${INSPECTED_YARDS}`
             ).toBe(100);
             expect(
               Number(graded?.total_defect_points),
@@ -293,7 +293,7 @@ test.describe.serial('面料缸差：验布录入、质检定级、后整读回�
               Number(detail?.fabric_width_inches),
               `读回门幅应等于写入值 ${FABRIC_WIDTH_INCHES}`
             ).toBe(62);
-            expect(Number(detail?.inspected_yards), '读回米数应等于质检棒写入值 100').toBe(100);
+            expect(Number(detail?.inspected_yards), '读回码数应等于质检棒写入值 100').toBe(100);
             expect(Number(detail?.total_defect_points), '读回总扣分应为服务端聚合值 4').toBe(
               EXPECTED_TOTAL_POINTS
             );
