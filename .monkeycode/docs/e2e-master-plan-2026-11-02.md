@@ -131,7 +131,7 @@ CI e2e 分片矩阵 45 片（flow 20 + smoke 5 + traversal 5 + extras 15），�
 |---|---|---|---|---|---|
 | W0 解锁 | ①主干人工 dispatch 全量验证（把主干红面钉成基线）②三支已换根分支串行推 ③配对门纳入硬拦（G1） | 现有 5 支在途 PR 之内 | 不新增 | 主编排＋质量交付 | 主干红面清单落地成表；三支 PR 的继承红有对照依据 |
 | W1 存量 189 补测第一批 | C2 写后回读＋C1 可见性，销售／报价域端点 | 新建测试面支（一支 3-6 项同域） | 214-219 | 质量交付 | 每枚端点断言指名期望键与期望值；配对门 added 计数下降可复现 |
-| W2 门户角色前置 | 客户／供应商外部门户角色与数据面（见第 8 节待裁 4） | 功能面支＋迁移单独支 | 不新增 | 研发专家 | 角色种子登记在代码侧，登录可达且权限键由 URL 段推导 |
+| W2 门户角色前置 | 客户／供应商外部主体（按第 10 节实测切三片：归属维度收口 → 客户侧缺端点 → 供应商录发货） | 功能面支三枚＋迁移单支 | 不新增 | 研发专家 | 归属反查不再靠 email 取首个活跃客户；缺的端点族建齐后才开客户侧 e2e |
 | W3 协同并发时序 | C7＋C6（报价未审批转订单、签收前禁对账、确认后禁开票、超信用额度拦截、超折扣需主管） | 测试面支 | 220-226 | 质量交付 | 前置态两侧断言（UI＋接口）；并发用多 context 真跑 |
 | W4 财务与追溯 | C8 缺腿（多币种端到端、核销、批次成本归集）＋C11 审计前后值 | 测试面支＋be 支 | 227-229、235-239 | 研发＋质量交付 | 只认序列化字符串；明细与合计无分差；追溯按缸号命中 |
 | W5 人工清单交付 | C12＋L4 第 3 线清单成文并挂验收人 | 文档面支 | 不新增 | 调度与决策 | 每条写明验收环境与预期现象，不进 CI |
@@ -147,7 +147,7 @@ CI e2e 分片矩阵 45 片（flow 20 + smoke 5 + traversal 5 + extras 15），�
 | 1 主干全量验证 | **已执行** | 发起 `workflow_dispatch`，run `41326285558`，`full_suite=true`、`skip_release=true`（只验证不产出 release 二进制），锁 `f9385ce9`。判读前提：现行门控已改为按 `ci-info` 的 `full_suite` 输出放行，dispatch 不再大面积 skip，且因为 `ci-cd.yml` 的 push 触发只认 `v*` tag，这条 run 就是主干顶点的唯一自证位。已挂 30 分钟一轮的只读监控（04:30 过期） |
 | 2 配对门成硬拦 | **已执行，机制已纠正** | 原推荐语"并入 `ci-cleanup-retry` needs"在 GitHub 语法上做不到——`needs` 不能跨工作流。实际落法：判定搬进 `ci-cd.yml` 做成 `ci-e2e-pairing` job（只在 `pull_request` 跑，缺分支起点判负而不是跳过），needs 27→28，顶层 job 29；独立工作流撤 `pull_request` 触发、留 `push: main` 与手工两条腿。车道 `wt-pairing-hard`（`041c32c7` ＋ AGENTS 计数与行号漂移同步一枚）。本地实测：YAML 可解析且 needs 全覆盖、actionlint 原生面零发现、`bash -n` 过、注释门命中 0（改动文件 4）。shellcheck 面与 CI 固定版 actionlint 1.7.12 交云端（本地工装下载的是 linux 二进制，Windows 跑不了，脚本自陈"拒绝判绿"属环境限制不是代码红） |
 | 3 覆盖率宣称换成棘轮 | **已执行** | 判定器加"分母只准降不准升"档，三态判定（缺基线或计数与成员清单不一致退 9、上升判红并逐条点名、改善只提示重算）；基线 `frontend/scripts/e2e-pairing-coverage-baseline.json` 由 `--write-coverage-baseline` 实测生成，含 189 枚成员清单以便点名。反向自证 9→12 道全命中，实跑 `ratchet=ok 189/189` 绿。车道 `wt-pairing-ratchet`（三枚提交） |
-| 4 客户与供应商门户角色 | **取证在跑** | 只读取证已派（权限键由 URL 段推导能否承载外部主体、`self/dept/all` 对"客户只见自己单据"的支持度、客户侧与供应商侧端点族存在性、最小实现路径三选一）。取证结论出来前不实施，避免为过用例造角色 |
+| 4 客户与供应商门户角色 | **取证已回，实施切片已重划** | 只读取证结论见第 10 节：外部主体归属没有通用机制，客户侧与供应商侧多数端点根本不存在，新开 portal 前缀会撞权限白名单 fail-closed 与键退化。因此 W2 从"加两枚角色"改切三片，取证结论出来前不动代码，避免为过用例造角色 |
 | 5 凭据落点 | **地基已落，代码腿在跑** | 本地配置 `backend/.env`（权限 0600，被 `backend/.gitignore` 命中，`git grep` 在全部被跟踪内容里对这些值零命中，工作树干净）。仓库侧只出现变量名：`WECHAT_MP_APPID`／`WECHAT_MP_SECRET`（公众号模板消息）、`WECHAT_MINIAPP_APPID`／`WECHAT_MINIAPP_SECRET`（小程序订阅消息，另用另一对凭据，公众号那对不能用）、三枚模板 ID 变量留空占位（等后台选定模板再填，代码缺失时须显式报"模板未配置"而不是静默）。openid 绑定迁移分派 `m0128`（域 `wechat_mp_binding`，链尾实测 `m0123`，`m0124` 至 `m0127` 与 `m0130` 已被在途与预留占走），车道 `wt-wxmp`。**GitHub Secrets 未创建**（属仓库设置写操作，需你授权或你在 UI 做）。两枚 Secret 已出现在会话记录里，建议按已暴露处理并重置 |
 | 6 小程序树 | **维持不推** | 主干仍无 `miniprogram` 跟踪文件；静态门与 `miniprogram-checks.yml` 留在 `feat/miniprogram-adapt`，与凭据落点同批进 |
 
@@ -164,3 +164,17 @@ CI e2e 分片矩阵 45 片（flow 20 + smoke 5 + traversal 5 + extras 15），�
 - 红面归因结论：`🧹收尾清理`＝聚合器不代表本支缺陷；Rust 分片 2/10＝runner 磁盘写满（0 例未跑，基础设施红）；`contract_wave12` 的 400≠200＝夹具自相矛盾（已由 1147 处置）；flow 7/20 与 12/20 三支同撞＝指向主干侧，由 run `41326285558` 出对照基线。
 - 聚合门只覆盖 `ci-cd.yml` 内部 needs：独立工作流（含配对门主干 push 腿）的红不会出现在 `🧹 收尾清理` 上，数红时要分开看。
 - 换根就绪未推：三支落后分支已就地并基到主干顶点（零冲突），按串行推规矩等红面归属落地逐支推。
+
+---
+
+## 10. 门户角色取证结论（本轮新查出的三条硬事实，都带 文件:行号）
+
+这一节决定原清单里所有"客户账号／供应商账号"类用例能不能开工，所以单列。
+
+一 **外部主体归属没有通用机制**。数据隔离只有 `all/dept/self` 三档，入参一律是内部组织维度——归属人列与用户或部门成员集合（`backend/src/utils/data_scope.rs:18-25` 定义、`:83-111` 构造条件、`:116-140` RLS 专用列），注入链是 `middleware/auth.rs:304-333` → `middleware/auth_context.rs:92-128` → `middleware/rls_context.rs:71-117`。唯一的"按客户过滤"实现藏在应收核销一处：`services/data_permission_service.rs:286-304` 明确 user 表无 customer_id，改用 `users.email = customers.contact_email` 取**首个活跃客户**（消费点 `handlers/ar_verification_handler.rs:36,231,254` 与 `services/ar_ops/verification_ops/query.rs:151,160,182,191`）。一个邮箱对应多个客户时这个语义就是错的，而且它只服务 AR 域。供应商侧按 `supplier_id` 归属当前登录人的机制：**查不到**。
+
+二 **客户侧与供应商侧多数动作没有可对端的功能端点**。**（快照里路径参数段一律写作 `*`，下文 `{id}` 与 `*` 同指一枚）**已存在：`GET /api/v1/erp/quotations`、`GET /api/v1/erp/quotations/{id}`、`POST /api/v1/erp/quotations/{id}/approve|reject`（这两个是内部审批语义）、`GET /api/v1/erp/sales/orders/{id}`、`.../history`、`.../deliveries`、`POST /api/v1/erp/ar-reconciliations/{id}/confirm|dispute|send`、`GET /api/v1/erp/purchase/orders` 与其明细与导出、`GET /api/v1/erp/ap/reconciliations` 与其 `confirm|dispute`（路径均见 `frontend/scripts/route-snapshot.txt:864,865,1550,1553,893,894,896,1048-1050,803-808,175-178,1031-1032`）。不存在：客户专用报价确认（只有 approve/reject，没有 `quotations/{id}/confirm`）、订单进度读（progress 只有生产单的 `POST /production/production-orders/orders/{id}/progress`，`:1463`）、客户签收（sign 只有内部 `POST /inventory/logistics/{id}/sign`，`:1315`）、客户上传确认样、供应商录发货（发货写面只有内部 `POST /sales/orders/{id}/deliveries`，`:1584`；`purchase/receipts` 仅读与删）。⇒ 原清单的"客户确认报价／客户签收／供应商录发货"三条属**功能缺口**，不是补测试能了结的。
+
+三 **新开 portal 前缀这条路会踩两道硬约束**。权限键由 URL 第三段推导（`middleware/permission.rs:212-223`），新开 `/api/v1/erp/portal/...` 只会得到 `resource_type=portal`；而 `:59-70` 的路由白名单要求该段是已知资源段，未登记即对**全员含 admin** fail-closed 403（`utils/path_utils.rs:101`、`:305-306`）；把 `portal` 登记成模块前缀又会与内部 `quotations`／`orders` 撞成同名键（`path_utils.rs:236` 的默认臂保留原名），独立收细反而做不到。授键是双通道，必须同批改：角色矩阵种子 `services/init_service_ops/permission.rs:1193-1194,1281-1282` 与存量库补授迁移 `backend/migration/src/domain/ap_family_grant/m0001_grant_ap_family_keys.rs:1-6`，一致性由 `backend/tests/contract_ap_family_grant_channels_test.rs:144-150,182` 锁。另有一处代码假设与种子不一致：`middleware/permission.rs:562,565` 已经写了角色 code 为 `customer` 的打印与导出黑名单分支，而种子表里根本没有这个角色 ⇒ 单独立一条待查项，别让它长期当死分支留着。
+
+四 **由此 W2 切成三片，顺序不可颠倒**：S1 归属建模收口（外部主体与用户的绑定关系落到列或绑定表，用探测式迁移，替换 email 反查"取首个"的错误语义）；S2 客户侧端点族（确认、进度读、签收、上传确认样）；S3 供应商录发货。每片动手前要先定口径（谁有权确认、状态机怎么流转、是否记真实委托人），因为这三条都落状态词表与审计面。C1 簇里"客户只见自己单据"在 S1 之前判**不可测阻塞**，不许用内部角色冒充客户去凑用例。
