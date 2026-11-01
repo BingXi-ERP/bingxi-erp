@@ -97,6 +97,26 @@ export async function waitFirstRow(table: Locator): Promise<void> {
   await table.locator(BODY_ROW).first().waitFor({ state: 'visible', timeout: 30_000 });
 }
 
+/**
+ * 主表体正行断言：行数必须严格大于 0，超时判红，返回判定通过时的行数供调用方继续参与列对齐比对。
+ *
+ * 调用方 权限域各功能页的列表行数断言（flow/73 数据权限 字段权限 权限管理 角色页，
+ * flow/26 按角色视图 登录日志 打印模板页）。
+ * 入参 table 主表 Locator（与 rowCount 同容器），message 判红时外显的口径文案。
+ * 传给谁 判定结果只回给调用方用例，不外传；返回值由调用方用于整列单元格数对齐断言。
+ * 存什么 不存储 仅断言
+ * 存哪里 不落库
+ *
+ * 为什么不用一次性 await rowCount(table) 再比：el-table 的表根节点在页面骨架挂载时即可见，
+ * 而表体行要等列表接口返回才挂上，openPageTable 的结构等待先于数据到达通过，
+ * 此刻单次 .count() 会读到 0，把慢首屏误判成取数缺陷。expect.poll 按固定节奏重取，
+ * 判据本身不放宽（仍要求严格正行），只是把取值时机交给等待。
+ */
+export async function expectPositiveRowCount(table: Locator, message: string): Promise<number> {
+  await expect.poll(() => rowCount(table), { message, timeout: 30_000 }).toBeGreaterThan(0);
+  return rowCount(table);
+}
+
 /** 按行内文本（自建数据的唯一业务值）定位数据行；传正则时可同时命中渲染真值的多种语言形态 */
 export async function rowByText(table: Locator, text: string | RegExp): Promise<Locator> {
   const row = table.locator(BODY_ROW).filter({ hasText: text }).first();
