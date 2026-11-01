@@ -719,12 +719,25 @@ test.describe('40 报价单多角色审批流转', () => {
             expect(guard, `审批棒进报价详情不应被守卫挡到无权限页，实际落在 ${guard}`).not.toMatch(
               /\/403(\?|#|$)/
             );
-            const approveButtons = await session.page
-              .locator('.actions .el-button', { hasText: '批准' })
-              .count();
-            const rejectButtons = await session.page
-              .locator('.actions .el-button', { hasText: '拒绝' })
-              .count();
+            // 动作区整块在详情数据回来之后才渲染，返回按钮是无条件渲染的那一枚，
+            // 先等它可见再计数，否则 count 会跑在渲染之前恒得 0
+            await session.page
+              .locator('.actions .el-button', { hasText: '返回' })
+              .first()
+              .waitFor({ state: 'visible', timeout: 15000 });
+            let approveButtons = 0;
+            let rejectButtons = 0;
+            await expect
+              .poll(async () => {
+                approveButtons = await session.page
+                  .locator('.actions .el-button', { hasText: '批准' })
+                  .count();
+                rejectButtons = await session.page
+                  .locator('.actions .el-button', { hasText: '拒绝' })
+                  .count();
+                return `${approveButtons}:${rejectButtons}`;
+              }, `审批棒详情页动作区应各出 1 枚批准与拒绝按钮`)
+              .toBe('1:1');
             expect(
               approveButtons,
               `审批棒详情页应恰有 1 个批准按钮，实际 ${approveButtons} 个`
