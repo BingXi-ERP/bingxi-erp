@@ -28,8 +28,8 @@ import { columnIndex, rowByText, rowCellText, waitFirstRow } from './table-colum
  *
  * 契约真相（逐段读后端源，非推测）。
  * 路由装配在 backend/src/routes/production.rs 的 fabric_inspections()，前缀
- * /api/v1/erp/production/fabric-inspections 与 /fabric-defects（routes/mod.rs:551 nest）。
- * 建单入参 CreateInspectionRequest（services/fabric_inspection_service.rs:190）只有
+ * /api/v1/erp/production/fabric-inspections 与 /fabric-defects（routes/mod.rs nest）。
+ * 建单入参 CreateInspectionRequest（services/fabric_inspection_service.rs）只有
  * inspection_date 为必键，缸号/产品/色号/评分制式/门幅均可缺席；评分制式缺席默认 four_point，
  * 制式非 four_point|ten_point 直接业务拒绝（:273）。门幅非正数拒绝（:284）。
  * 打卷入参 RollFabricRequest（同文件 :230）：warehouse_id 与 roll_length 为必键，
@@ -44,7 +44,7 @@ import { columnIndex, rowByText, rowCellText, waitFirstRow } from './table-colum
  * inspection_id 回指本验布单（:792）、length/weight/width/gram_weight 直取打卷实测入参。
  * 打卷汇总（:801-822 apply_roll_summary）是累加语义：total_rolls+1、
  * total_roll_length+roll_length、total_roll_weight+roll_weight，状态推进 rolled。
- * 卷级细码的读回通道 GET /api/v1/erp/inventory/pieces（handlers/inventory_piece_handler.rs:92）
+ * 卷级细码的读回通道 GET /api/v1/erp/inventory/pieces（handlers/inventory_piece_handler.rs）
  * 逐列投影 length/weight/width/gram_weight/barcode/inspection_id/piece_seq/status，
  * 缺值如实投影 null，不洗成 0。
  * DECIMAL 列按 rust_decimal 默认为十进制字符串出参，比较一律 Number(String(v)) 归一；
@@ -56,7 +56,7 @@ import { columnIndex, rowByText, rowCellText, waitFirstRow } from './table-colum
  * 归档放行 graded|rolled（:828）。打卷另强制缸号与产品（:626、:634），
  * 缸号必须在 batch_dye_lot 建档（:690 按 dye_lot_no 取档，取不到即业务拒绝）——
  * 本 spec 因此先走真实委外染色链播种缸号（helpers.seedDyedPieceChain，该链在回仓确认时
- * find_or_create 缸号档案，services/piece_domain_service.rs:568-597），
+ * find_or_create 缸号档案，services/piece_domain_service.rs-597），
  * 不手工往库里塞缸号、不伪造产品，也不在迁移里造值圆场。
  *
  * 假绿防线。每步写后按主键独立回读逐列比对；打卷产匹除 API 回读外，另开成品布入库标签
@@ -68,7 +68,7 @@ import { columnIndex, rowByText, rowCellText, waitFirstRow } from './table-colum
 
 type Row = Record<string, unknown>;
 
-/** 面料验布域前缀：routes/mod.rs:551 nest /api/v1/erp/production + routes/production.rs:279 */
+/** 面料验布域前缀：routes/mod.rs nest /api/v1/erp/production + routes/production.rs */
 const FI = '/production/fabric-inspections';
 
 /** 真实链播种出的缸号维度（同批用例复用，避免重复跑整条委外染色链） */
@@ -145,7 +145,7 @@ async function openInspectionTable(page: Page): Promise<Locator> {
  * 功能 读列表页某验布单号行的状态列文本（词表渲染后的中文标签）。
  * 调用方 本文件每次状态流转后的界面回读。
  * 入参 page 会话页；inspectionNo 服务端生成的验布单号。
- * 传给谁 文本回调用例断言，与后端 status 原值按 api/fabric-inspection.ts:119 的
+ * 传给谁 文本回调用例断言，与后端 status 原值按 api/fabric-inspection.ts 的
  * INSPECTION_STATUS_LABEL 词表渲染值逐字比对（pending 待验布 / inspecting 检验中 /
  * graded 已定级 / rolled 已打卷 / closed 已关闭）。
  * 存什么 不存储。
@@ -195,7 +195,7 @@ async function readDyedPiecesByLot(page: Page, dyeLotNo: string): Promise<Row[]>
  * 调用方 本文件的逐卷出值与合计断言。
  * 入参 page 会话页；dyeLotNo 缸号；inspectionId 验布记录主键。
  * 传给谁 返回数组按下标交调用方逐卷比对 length/weight/width/gram_weight 与卷号。
- * 存什么 不存储。锚点是产匹行 inspection_id 列（services/fabric_inspection_service.rs:792
+ * 存什么 不存储。锚点是产匹行 inspection_id 列（services/fabric_inspection_service.rs
  * 打卷时写入本验布单 id），据此把本次产出的卷与同缸其它来源的匹严格区分。
  * 存哪里 无。
  */
@@ -269,7 +269,7 @@ async function ensureLot(page: Page): Promise<Lot> {
  * 调用方 本文件需要自行控制流转次序的用例。
  * 入参 page 会话页；lot 缸号维度；opts.width 门幅(英寸)字符串，opts.omitWidth 为真时不提交门幅键。
  * 传给谁 返回行的 id 与 inspection_no 供后续 start/grade/roll 与逐列断言。
- * 存什么 不存储；单号由服务端生成器出 FIR- 前缀（services/fabric_inspection_service.rs:51）。
+ * 存什么 不存储；单号由服务端生成器出 FIR- 前缀（services/fabric_inspection_service.rs）。
  * 存哪里 无。
  */
 async function postInspection(
@@ -535,7 +535,7 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
       1
     );
 
-    // 第二卷。打卷汇总在 backend/src/services/fabric_inspection_service.rs:801-822 是
+    // 第二卷。打卷汇总在 backend/src/services/fabric_inspection_service.rs-822 是
     // 累加语义（total_rolls+1、total_roll_length+roll_length、total_roll_weight+roll_weight），
     // 模型注释与前端标签清单口径（「本验布单打卷产出的匹均在此列」）也都按多卷设计；
     // 但同文件 :661 的打卷门要求来源状态恒为 graded，而 :818 打卷成功即把状态改写为 rolled，

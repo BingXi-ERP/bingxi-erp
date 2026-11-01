@@ -26,45 +26,45 @@ import { columnIndex, rowByText, rowCellText, waitFirstRow } from './table-colum
  *
  * 契约真相（逐段读后端源，非推测）。
  * 路由装配在 backend/src/routes/production.rs 的 lab_dip()，挂载前缀
- * /api/v1/erp/production/lab-dip（同文件 routes() merge、routes/mod.rs:551 nest）。
+ * /api/v1/erp/production/lab-dip（同文件 routes() merge、routes/mod.rs nest）。
  * 请求体字段面在 backend/src/services/lab_dip_ops/types.rs：建通知单必填 light_source
  * 与 required_date（其余可缺席），小样必填 request_id，对色必填 color_difference_grade
  * 且 color_difference_value 可空，复样必填 request_id 与 source_sample_id，
- * 技术卡端点无请求体（handler 不绑定 Json 提取器，lab_dip_handler.rs:504）。
+ * 技术卡端点无请求体（handler 不绑定 Json 提取器，lab_dip_handler.rs）。
  * 出参是实体全列（lab_dip_request / lab_dip_sample / lab_dip_resample Model），
  * DECIMAL 列按 rust_decimal 默认为十进制字符串出参，比较一律 Number(String(v)) 归一。
  *
  * 判定线与状态机（唯一来源，不照字面猜大写）。
  * 通知单状态机 pending→sampling→submitted→approved|rejected→completed，
- * rejected→sampling 重打，completed 终态（lab_dip_service.rs:58-75）；取值小写，
+ * rejected→sampling 重打，completed 终态（lab_dip_service.rs-75）；取值小写，
  * 白名单来自 backend/src/models/status/quality_dyeing.rs 的 lab_dip_request 模块
- * （lab_dip_* 三张表在 migration/src/domain/v15/mod.rs:2984-3077 建表时未施加状态 CHECK，
+ * （lab_dip_* 三张表在 migration/src/domain/v15/mod.rs-3077 建表时未施加状态 CHECK，
  * 故本 spec 的状态判据以该词表常量的字面值为准，不另发明取值）。
  * 小样对色结果 pending / matched / not_matched / selected 同源（同文件 lab_dip_sample）。
- * 色差判定线 COLOR_DIFF_OK_GRADE = 4（lab_dip_service.rs:33）：等级 ≥4 判 matched、
- * <4 判 not_matched；复样同线判 passed / failed（resample.rs:219-223）。
- * 等级取值域 1-5，越界在任何 DB 访问前拒绝（sample.rs:253、resample.rs:214）。
- * 写入门：小样必须挂在 sampling 状态的通知单下（sample.rs:73），版数受通知单
- * sample_versions 上限约束且同单版本标识唯一（sample.rs:99-120）；
- * 对色结果非 pending 不可更新也不可删除（sample.rs:177、:318）；
- * 送客户确认前至少 1 个小样（request.rs:316）；复样需通知单 approved 且源样 selected
- * 且车间半制品布批号必填（resample.rs:104、:127、:137）；复样结果非 pending 不可重复记录、
- * 技术卡仅 passed 可开且不可重复开（resample.rs:207、:326、:334）。
+ * 色差判定线 COLOR_DIFF_OK_GRADE = 4（lab_dip_service.rs）：等级 ≥4 判 matched、
+ * <4 判 not_matched；复样同线判 passed / failed（resample.rs-223）。
+ * 等级取值域 1-5，越界在任何 DB 访问前拒绝（sample.rs、resample.rs）。
+ * 写入门：小样必须挂在 sampling 状态的通知单下（sample.rs），版数受通知单
+ * sample_versions 上限约束且同单版本标识唯一（sample.rs-120）；
+ * 对色结果非 pending 不可更新也不可删除（sample.rs、:318）；
+ * 送客户确认前至少 1 个小样（request.rs）；复样需通知单 approved 且源样 selected
+ * 且车间半制品布批号必填（resample.rs、:127、:137）；复样结果非 pending 不可重复记录、
+ * 技术卡仅 passed 可开且不可重复开（resample.rs、:326、:334）。
  *
  * 假绿防线。每步写后按主键或按单号过滤独立回读逐列比对，不判「接口 200」即通过；
  * 负例钉 HTTP 400 + 状态门机器族（expectStateGateRejection，403/404/5xx 都不算门生效）
  * 并在拒绝后回读原值确认零写入；单号前缀按服务端生成器口径断（LD / RS 前缀常量
- * lab_dip_service.rs:42、:128）；建单人审核人复核人开卡人三列都断非空，
+ * lab_dip_service.rs、:128）；建单人审核人复核人开卡人三列都断非空，
  * 因为它们的唯一来源是会话身份（handler 不接收请求体身份字段）。
  * 造数用唯一色号与色名后缀，并发 worker 互不干扰。
  */
 
 type Row = Record<string, unknown>;
 
-/** 面料打样域前缀：routes/mod.rs:551 nest /api/v1/erp/production + routes/production.rs:148 /lab-dip */
+/** 面料打样域前缀：routes/mod.rs nest /api/v1/erp/production + routes/production.rs /lab-dip */
 const LIP = '/production/lab-dip';
 
-/** 色差判定线的权威值（lab_dip_service.rs:33 COLOR_DIFF_OK_GRADE），只用于文案，判据按行为断 */
+/** 色差判定线的权威值（lab_dip_service.rs COLOR_DIFF_OK_GRADE），只用于文案，判据按行为断 */
 const COLOR_DIFF_OK_GRADE_TEXT = '4 级';
 
 const num = (v: unknown): number => Number(String(v));
@@ -103,7 +103,7 @@ function isRealTimestamp(value: unknown): boolean {
  * 调用方 本文件三枚用例的建单载荷。
  * 入参 daysFromNow 距今天数（正整数）。
  * 传给谁 直接进 POST /lab-dip/requests 请求体 required_date 键，由后端
- * services/lab_dip_ops/request.rs:71 与当天比较（早于今天即拒）。
+ * services/lab_dip_ops/request.rs 与当天比较（早于今天即拒）。
  * 存什么 不存储，纯函数。
  * 存哪里 无。
  */
@@ -155,7 +155,7 @@ async function readRequestStatusCodeCell(page: Page, requestNo: string): Promise
  * 调用方 本文件对色登记与三态更新后的逐列比对。
  * 入参 page 会话页；id 小样主键。
  * 传给谁 返回行交调用方逐列断言。读的是 GET /lab-dip/samples/{id}
- * （handlers/lab_dip_handler.rs:343）。
+ * （handlers/lab_dip_handler.rs）。
  * 存什么 不存储。
  * 存哪里 无。
  */
@@ -172,7 +172,7 @@ async function readSample(page: Page, id: number): Promise<Row> {
  * 调用方 本文件建单与每步状态流转后的逐列比对。
  * 入参 page 会话页；id 通知单主键。
  * 传给谁 返回行交调用方逐列断言。读的是 GET /lab-dip/requests/{id}
- * （handlers/lab_dip_handler.rs:86）。
+ * （handlers/lab_dip_handler.rs）。
  * 存什么 不存储。
  * 存哪里 无。
  */
@@ -190,7 +190,7 @@ async function readRequest(page: Page, id: number): Promise<Row> {
  * 调用方 本文件版数上限与逐列回读。
  * 入参 page 会话页；requestId 通知单主键。
  * 传给谁 返回数组交调用方按下标与 version_seq 升序断言
- * （GET /lab-dip/samples/by-request/{request_id}，services/lab_dip_ops/sample.rs:309 按 version_seq 升序）。
+ * （GET /lab-dip/samples/by-request/{request_id}，services/lab_dip_ops/sample.rs 按 version_seq 升序）。
  * 存什么 不存储。
  * 存哪里 无。
  */
@@ -204,7 +204,7 @@ async function readSamples(page: Page, requestId: number): Promise<Row[]> {
  * 调用方 本文件复样门拒绝后的零写入回读与两笔复样的合计回读。
  * 入参 page 会话页；requestId 通知单主键。
  * 传给谁 返回数组交调用方断言行数与逐列取值
- * （GET /lab-dip/resamples/by-request/{request_id}，services/lab_dip_ops/resample.rs:364）。
+ * （GET /lab-dip/resamples/by-request/{request_id}，services/lab_dip_ops/resample.rs）。
  * 存什么 不存储。
  * 存哪里 无。
  */

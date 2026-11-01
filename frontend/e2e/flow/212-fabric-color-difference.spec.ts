@@ -21,39 +21,39 @@
  *
  * 【清理腿不可达声明（按判红口径不造规避，交主编排裁定）】
  * 本用例落库的验布单定级后停在 graded，疵点挂在 graded 单下：
- * - DELETE /fabric-inspections/{id} 有 pending-only 状态门（backend/src/services/fabric_inspection_service.rs:395-404）；
+ * - DELETE /fabric-inspections/{id} 有 pending-only 状态门（backend/src/services/fabric_inspection_service.rs-404）；
  * - DELETE /fabric-defects/{id} 有 inspecting-only 状态门（同文件 :982-995）；
- * - 状态机端点只进不退，无任何回退到 inspecting/pending 的通路（routes/production.rs:286-289 仅
+ * - 状态机端点只进不退，无任何回退到 inspecting/pending 的通路（routes/production.rs-289 仅
  *   start/grade/roll/close 正向流转）。
  * 因此"先撤状态再删"在 API 侧不成立，本文件不登记必败的假清理；残留 1+2 行属已知不可回收面。
  *
  * 【为什么读回棒是后整主管而不是派工提到的仓管/财务】
  * 后端授权矩阵中持有 ("fabric-inspections","read") 的岗位是：gm/deputy_gm（高管，
- * init_service_ops/permission.rs:495/536）、finishing_master（:982）、quality_inspector（:1103）、
+ * init_service_ops/permission.rs/536）、finishing_master（:982）、quality_inspector（:1103）、
  * qc_manager（:1073 通配）、fabric_inspector（:1125 通配）；仓管（warehouse_keeper，:861 分组）
  * 与财务域各岗均无该资源任何键。用仓管读必然恒 403——那是造出来的假腿，不是被测行为。
  * 后整主管正是验布等级（first/second）的真实下游消费岗（等级决定放行/返工路线），读回语义成立。
  * 仓管无键这一事实不浪费，正好充当第四棒的权限门负向判据。
  *
  * 【角色权限面来源（不是推测）】
- * fabric_inspector 由后端初始化建角（init_service_ops/role.rs:265）并授
- * ("fabric-inspections","*") + ("fabric-defects","*")（permission.rs:1125-1126）⇒ 建单/开验/录疵点；
- * quality_inspector 建角 role.rs:262、持 ("fabric-inspections","read")+("fabric-inspections","create")
- * （permission.rs:1103-1104）⇒ 定级动作键派生为 fabric-inspections:create
- * （POST /{id}/grade 末段 grade 非动作关键字，按 HTTP 方法派生，middleware/permission.rs:270-291、
+ * fabric_inspector 由后端初始化建角（init_service_ops/role.rs）并授
+ * ("fabric-inspections","*") + ("fabric-defects","*")（permission.rs-1126）⇒ 建单/开验/录疵点；
+ * quality_inspector 建角 role.rs、持 ("fabric-inspections","read")+("fabric-inspections","create")
+ * （permission.rs-1104）⇒ 定级动作键派生为 fabric-inspections:create
+ * （POST /{id}/grade 末段 grade 非动作关键字，按 HTTP 方法派生，middleware/permission.rs-291、
  * utils/path_utils.rs 将 production 判为模块前缀 ⇒ 资源名取第四段 fabric-inspections）；
- * finishing_master 建角 role.rs:210、持 ("fabric-inspections","read")（permission.rs:982）⇒ 只读回；
- * warehouse_keeper 建角 role.rs:189，permission.rs:861 分组内无 fabric-inspections/fabric-defects 任何键
+ * finishing_master 建角 role.rs、持 ("fabric-inspections","read")（permission.rs）⇒ 只读回；
+ * warehouse_keeper 建角 role.rs，permission.rs 分组内无 fabric-inspections/fabric-defects 任何键
  * （且 e2e global-setup 的 SEED_ROLE_EXTRA_PERMISSIONS 补授面仅 pieces/greige-fabrics/suppliers，
- * global-setup.ts:749-755，不会把负向棒喂成 200）⇒ 三端点恒被权限门拒。
+ * global-setup.ts-755，不会把负向棒喂成 200）⇒ 三端点恒被权限门拒。
  *
  * 【断言判据与后端口径出处】
- * 疵点类型 color_diff 在册（fabric_inspection_service.rs:871-884 validate_defect_type）；
+ * 疵点类型 color_diff 在册（fabric_inspection_service.rs-884 validate_defect_type）；
  * 四分制扣分档位 3<len≤6 寸 = 2 分（:65-82 calculate_four_point_points，两条疵点分别 4.00/5.00 寸各 2 分）；
  * 总扣分按同码封顶聚合（:10c 见 sum_four_point_points_capped_per_yard 调用，两疵点分居 12/55 码位不触封顶）；
  * 每百平方码分数 = 总扣分×3600/(受检码数×幅宽)（:149-163），本例 4×3600/(100×62)=2.32258…，
- * 落库列 numeric(10,2) 归到 2.32（models/fabric_inspection_record.rs:61-62）；
- * ≤40 判首级 first（:166-171 determine_grade_by_four_point；词表 models/status/quality_dyeing.rs:180-186）；
+ * 落库列 numeric(10,2) 归到 2.32（models/fabric_inspection_record.rs-62）；
+ * ≤40 判首级 first（:166-171 determine_grade_by_four_point；词表 models/status/quality_dyeing.rs-186）；
  * 状态词表 pending/inspecting/graded（同文件 :153-168）；
  * 定级仅 inspecting 可发起（:485-495）、录疵点仅 inspecting（:896-911）——第二棒的前置由第一棒开验保证。
  * 金额/长度类 Decimal 出参按字符串或数值编码不可预判，故数值判据统一 Number() 归一后逐值相等；
