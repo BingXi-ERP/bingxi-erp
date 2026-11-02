@@ -656,7 +656,6 @@ impl BulkColorApprovalService {
             production_date: Set(None),
             shelf_life: Set(None),
             quality_status: Set(Some(quality_status::PASS.to_string())),
-            inventory_status: Set(Some(piece_status::SAMPLE.to_string())),
             warehouse_id: Set(stock.warehouse_id),
             remarks: Set(Some("剪大货样产生的样布".to_string())),
             barcode: Set(None),

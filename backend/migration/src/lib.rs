@@ -22,6 +22,7 @@
 //!   → textile_safety → purchase_inspection_result_check → export_approval_lifecycle
 //!   → product_grade_vocab_check
 //!   → scan_receipt_grant
+//!   → piece_inventory_status_drop
 //!
 //! 迁移名: m_system_domain / m_business_domain / m_sales_crm_domain /
 //!         m_production_domain / m_finance_domain / m_v15_domain / m_rls_dept_domain /
@@ -207,6 +208,9 @@
 //!    NOT EXISTS 守卫使重跑等价，命中 0 角色以 NOTICE 点名不静默通过，down 只回收本域
 //!    角色码的该行。依赖 system 建的 roles 与 role_permissions 早于本域；新建顶层域而不
 //!    并入已应用域（复用库上整域跳过会让补授永不执行），置于链尾必然执行。
+//! 36. piece_inventory_status_drop: 库存匹冗余库存状态列的探测式下线域（m0127），同 28 的
+//!    先后口径；该列是真相列 status 的照抄副本且全仓零读取方，探测到非空且与 status 不等的
+//!    行即 RAISE EXCEPTION 点名中止，不 UPDATE 不 DELETE，down 只回空壳不回填
 
 pub use sea_orm_migration::prelude::*;
 
@@ -272,6 +276,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::product_grade_vocab_check::Migration),
             // 仓储两岗补授扫码入库细键，链尾独立域（roles 与 role_permissions 由 system 域先建）
             Box::new(domain::scan_receipt_grant::Migration),
+            // 库存匹冗余库存状态列探测式下线，同上一条口径：本支已摘除该列全部读写与实体字段
+            Box::new(domain::piece_inventory_status_drop::Migration),
         ]
     }
 }
