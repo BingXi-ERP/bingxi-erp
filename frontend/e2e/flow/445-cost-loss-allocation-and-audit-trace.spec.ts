@@ -39,7 +39,7 @@ import {
  * 词表与算量真相（backend/src/services/cost_collection_service.rs 与
  * handlers/cost_collection_handler.rs、services/audit_log_service.rs）。
  * 建单 status 固定写 draft，审核通过写 approved、拒绝写 rejected，
- * 非 draft 再审核被业务门拒绝且文案不含状态 token。单号 COST 前缀加日期八位加流水三位。
+ * 非 draft 再审核被业务门拒绝且文案不含状态字面量。单号 COST 前缀加日期八位加流水三位。
  * total_cost 为五明细列直加，无其他系数；unit_cost 为总额除以产量后 round_dp(2)，
  * 产量缺省存 NULL。rust_decimal 出参为字符串。删除审计行 operation_type 为 DELETE
  * 大写、severity 为 INFO、username 由 user_id 反查、before_snapshot 为删除前整行快照、
