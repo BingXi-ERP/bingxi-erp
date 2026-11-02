@@ -17,6 +17,7 @@ import {
   failureCode,
   APP_ERROR_CODES,
 } from './helpers';
+import { testPassword } from './helpers';
 
 test.describe.serial('Shard 6: 多角色协作 + 权限隔离 + 状态显示', () => {
   test.beforeEach(async ({ page }) => {
@@ -60,7 +61,7 @@ test.describe.serial('Shard 6: 多角色协作 + 权限隔离 + 状态显示', (
     const username = `e2e_user_${Date.now().toString().slice(-6)}`;
     const result = await apiCall<{ id?: number }>(page, 'POST', '/users', {
       username,
-      password: 'E2e@TestPass2026!',
+      password: testPassword(),
       email: `e2e_${Date.now().toString().slice(-6)}@test.com`,
       role_id: ctx.roleId,
       department_id: ctx.departmentIds[0] || 1,

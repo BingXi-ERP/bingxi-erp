@@ -10,6 +10,7 @@ import {
   testStorageStatePath,
   tryCleanup,
 } from './helpers';
+import { testPassword } from './helpers';
 import { pickListArray, type ListShapeKey } from './ui-helpers';
 // 产品类型单源常量（与后端 product_type 词表同源）：建品夹具取值必须经成员引用。
 import { PRODUCT_TYPE } from '../../src/constants/product-type';
@@ -1044,7 +1045,7 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
       listKey: 'users',
       payload: {
         username: `p0user${TS}`,
-        password: 'P0Test!2026xY',
+        password: testPassword(),
         email: `p0user${TS}@test.com`,
         phone: '13600000001',
       },
