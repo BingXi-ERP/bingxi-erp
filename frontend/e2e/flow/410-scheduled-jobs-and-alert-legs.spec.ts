@@ -274,10 +274,9 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
     const defaults = await apiCallRaw<ShortageSummary>(page, 'POST', '/material-shortage/check', {
       threshold: { safety_factor: '1', critical_threshold: '100', severe_threshold: '50' },
     });
-    expect(
-      defaults.shortage_count,
-      '用回默认阈值复检后汇总恒等式仍须成立'
-    ).toBe(defaults.critical_count + defaults.severe_count + defaults.warning_count);
+    expect(defaults.shortage_count, '用回默认阈值复检后汇总恒等式仍须成立').toBe(
+      defaults.critical_count + defaults.severe_count + defaults.warning_count
+    );
     expect(
       defaults.total_materials_checked >= defaults.shortage_count,
       '被检物料数不应少于缺料数'
@@ -305,18 +304,14 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
           `列表状态必须在 shortage_alert_status 词表内，实际 ${String(item.status)}`
         ).toContain(String(item.status));
       }
-      expect(
-        typeof item.shortage_quantity,
-        '缺口数量是 Decimal，出参必须是字符串而不是数字'
-      ).toBe('string');
+      expect(typeof item.shortage_quantity, '缺口数量是 Decimal，出参必须是字符串而不是数字').toBe(
+        'string'
+      );
     }
 
-    const badStatus = await apiCallExpectFail(
-      page,
-      'PUT',
-      '/material-shortage/999999999/status',
-      { status: 'not_a_status' }
-    );
+    const badStatus = await apiCallExpectFail(page, 'PUT', '/material-shortage/999999999/status', {
+      status: 'not_a_status',
+    });
     expect(
       failureCode(badStatus),
       `词表外状态必须被取值域校验拒绝，失败体 ${JSON.stringify(badStatus)}`
@@ -340,10 +335,9 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
       '/material-shortage/alerts?status=RESOLVED&page_size=5'
     );
     for (const item of legalStatus.items) {
-      expect(
-        item.status,
-        `大小写不敏感归一后只能返回规范落库值，实际 ${String(item.status)}`
-      ).toBe('resolved');
+      expect(item.status, `大小写不敏感归一后只能返回规范落库值，实际 ${String(item.status)}`).toBe(
+        'resolved'
+      );
     }
   });
 
@@ -650,10 +644,7 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
       'GET',
       '/bulk-color-approvals/reminders/pending?threshold_hours=999999'
     );
-    expect(
-      impossible.total,
-      '把阈值推到 999999 小时后必须查无记录，否则时间条件没起作用'
-    ).toBe(0);
+    expect(impossible.total, '把阈值推到 999999 小时后必须查无记录，否则时间条件没起作用').toBe(0);
     expect(impossible.items).toEqual([]);
 
     const badThreshold = await apiCallExpectFail(

@@ -184,10 +184,7 @@ async function seedDedicatedCustomer(page: import('@playwright/test').Page): Pro
 }
 
 /** 读回客户信用视图：GET /crm/customers/{customer_id}/credit */
-async function readCredit(
-  page: import('@playwright/test').Page,
-  customerId: number
-): Promise<Row> {
+async function readCredit(page: import('@playwright/test').Page, customerId: number): Promise<Row> {
   return apiCallRaw<Row>(page, 'GET', `/crm/customers/${customerId}/credit`);
 }
 
@@ -306,9 +303,7 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
       quantity: 500,
       unit: '米',
       custom_requirements: { yarn_spec: '40S', dye_method: 'reactive' },
-      expected_delivery_date: new Date(Date.now() + 30 * 86400000)
-        .toISOString()
-        .split('T')[0],
+      expected_delivery_date: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
       notes: `E2E 时序门控定制订单 ${genCode('N')}`,
     });
     const id = requireId(created.id, '建定制订单');
@@ -347,9 +342,7 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
       quantity: 300,
       unit: '米',
       custom_requirements: { yarn_spec: '40S' },
-      expected_delivery_date: new Date(Date.now() + 20 * 86400000)
-        .toISOString()
-        .split('T')[0],
+      expected_delivery_date: new Date(Date.now() + 20 * 86400000).toISOString().split('T')[0],
       notes: `E2E 前置门负例 ${genCode('N')}`,
     });
     const id = requireId(created.id, '建定制订单');
@@ -359,12 +352,10 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
     const toLabDip = await apiCallRaw<Row>(page, 'POST', `/custom-orders/${id}/advance`, {});
     expect(String(toLabDip.status), '顺序推进到 lab_dip').toBe('lab_dip');
 
-    const gateQuotation = await apiCallExpectFail(
-      page,
-      'POST',
-      `/custom-orders/${id}/advance`,
-      { to_status: 'quotation', notes: 'E2E 未确认样请求报价阶段' }
-    );
+    const gateQuotation = await apiCallExpectFail(page, 'POST', `/custom-orders/${id}/advance`, {
+      to_status: 'quotation',
+      notes: 'E2E 未确认样请求报价阶段',
+    });
     expectAppErrorEnvelope(
       gateQuotation,
       APP_ERROR_CODES.BUSINESS_ERROR,
@@ -398,7 +389,9 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
 
     const before = await readCredit(page, customerId);
     expect(moneyScaled2(before.credit_limit, 'credit_limit'), '写入的额度初值').toBe(1000n);
-    expect(moneyScaled2(before.available_credit, 'available_credit'), '可用额度等于额度').toBe(1000n);
+    expect(moneyScaled2(before.available_credit, 'available_credit'), '可用额度等于额度').toBe(
+      1000n
+    );
     expect(moneyScaled2(before.used_credit, 'used_credit'), '已用额度起点为 0').toBe(0n);
     expect(String(before.status), '信用评级起点词值 active').toBe('active');
 
@@ -587,7 +580,7 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
     expect(gross, '含税总额 3×50×1.13 = 169.50 由后端算出').toBe(16950n);
     const net = divRound(gross * 100n, 113n);
     expect(net, '净额由除法反算 = 150.00').toBe(15000n);
-    expect(net * 113n / 100n, '反算净额乘回税率应回到含税总额（口径自洽）').toBe(gross);
+    expect((net * 113n) / 100n, '反算净额乘回税率应回到含税总额（口径自洽）').toBe(gross);
 
     const lines = detail.items as Row[];
     expect(Array.isArray(lines), '订单明细必须存在').toBe(true);
