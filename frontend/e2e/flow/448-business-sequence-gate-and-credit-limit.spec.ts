@@ -80,6 +80,21 @@ function expectAppErrorEnvelope(
   expect(res.timestamp !== undefined, `${label}：timestamp 必须存在`).toBe(true);
 }
 
+/**
+ * 成功信封校验：后端成功体是 ApiResponse{code,data}（utils/response.rs，
+ * `ApiResponse::success()` 恒置 code=200 并携带 data 载荷），
+ * 信封上根本没有 success 布尔位——读 `.success` 只会永远拿到 undefined，把成败判定悬空。
+ * 因此成功腿只断真实承载位：code=200 + data 载荷类型与非空。三个信用动作端点
+ * （occupy / adjust / deactivate）出参均为 ApiResponse<String>，data 是落库确认文案。
+ */
+function expectSuccessEnvelope(res: import('./helpers').ApiResponse<string>, label: string): void {
+  expect(res.code, `${label}：成功信封 code 应为 200，raw=${JSON.stringify(res)}`).toBe(200);
+  expect(typeof res.data, `${label}：成功体必须带 data 载荷（后端 ApiResponse<String>）`).toBe(
+    'string'
+  );
+  expect(res.data.trim().length, `${label}：data 载荷非空`).toBeGreaterThan(0);
+}
+
 async function readQuotation(page: import('@playwright/test').Page, id: number): Promise<Row> {
   return apiCallRaw<Row>(page, 'GET', `/quotations/${id}`);
 }
@@ -324,10 +339,21 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
     const advanced = await apiCallRaw<Row>(page, 'POST', `/custom-orders/${id}/advance`, {});
     expect(String(advanced.status), '顺序推进进入 lab_dip').toBe('lab_dip');
 
-    // 时间线回读：GET /custom-orders/{id}/timeline 必须返回真实节点集合，不得空壳
+    // 时间线回读：GET /custom-orders/{id}/timeline 必须返回真实节点集合，不得空壳。
+    // 出参 ProcessTimeline{order_id,order_no,current_status,nodes[]}，节点数组挂在 data.nodes
+    // （models/custom_order_response_dto.rs），每节点必出 logs（后端该键是非 Option 的 Vec）。
     const timeline = await apiCall<unknown>(page, 'GET', `/custom-orders/${id}/timeline`);
-    const rows = pickListArray(timeline.data, '定制订单工艺时间线');
+    const rows = pickListArray(timeline.data, 'nodes', '定制订单工艺时间线');
     expect(Array.isArray(rows), '时间线必须是数组形态').toBe(true);
+    // 建单即落 5 个默认工艺节点（services/custom_order_crud_service.rs），空壳即契约破坏
+    expect(rows.length, '时间线必须返回真实工艺节点').toBeGreaterThan(0);
+    for (const node of rows) {
+      expect(Number(node.id), `工艺节点缺少 id：${JSON.stringify(node)}`).toBeGreaterThan(0);
+      expect(
+        Array.isArray(node.logs),
+        `工艺节点缺少 logs 数组键（后端必出 Vec，缺即契约破坏）：${JSON.stringify(node)}`
+      ).toBe(true);
+    }
   });
 
   test('448-05 未确认 OK 样不得推进到报价阶段，未审批报价不得推进到生产阶段', async ({ page }) => {
@@ -429,13 +455,13 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
     );
     expectAppErrorEnvelope(blocked, APP_ERROR_CODES.BUSINESS_ERROR, '放大额度前的超额占用');
 
-    const adjusted = await apiCall<unknown>(
+    const adjusted = await apiCall<string>(
       page,
       'POST',
       `/crm/customer-credits/${customerId}/adjust`,
       { adjustment_type: 'increase', amount: '100.00', reason: 'E2E 放大额度以验证实时生效' }
     );
-    expect(adjusted.success, '额度调整应回成功信封').toBe(true);
+    expectSuccessEnvelope(adjusted, '额度调整');
 
     // 写后读回：额度变更必须已落库并对后续请求生效
     const afterAdjust = await readCredit(page, customerId);
@@ -445,13 +471,13 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
     );
 
     // 重放同一笔占用：这次必须通过，且金额按减法落到两个字段上
-    const replay = await apiCall<unknown>(
+    const replay = await apiCall<string>(
       page,
       'POST',
       `/crm/customer-credits/${customerId}/occupy`,
       { amount: '50.00' }
     );
-    expect(replay.success, '放大额度后同一占用请求应通过').toBe(true);
+    expectSuccessEnvelope(replay, '放大额度后重放的占用请求');
     const afterOccupy = await readCredit(page, customerId);
     expect(moneyScaled2(afterOccupy.used_credit, 'used_credit'), '已用 = 50.00').toBe(5000n);
     expect(moneyScaled2(afterOccupy.available_credit, 'available_credit'), '可用 = 110 - 50').toBe(
@@ -530,12 +556,12 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
     });
     CLEANUP.push({ path: `/crm/customer-credits/${customerId}`, label: `credit#${customerId}` });
 
-    const deactivated = await apiCall<unknown>(
+    const deactivated = await apiCall<string>(
       page,
       'POST',
       `/crm/customer-credits/${customerId}/deactivate`
     );
-    expect(deactivated.success, '停用信用评级应回成功信封').toBe(true);
+    expectSuccessEnvelope(deactivated, '停用信用评级');
     const view = await readCredit(page, customerId);
     expect(String(view.status), '停用后评级状态词值 inactive').toBe('inactive');
 

@@ -180,13 +180,13 @@ function sameDecDiff(a: unknown, b: unknown, c: unknown, label: string): void {
 }
 
 /** 两组后端出参各自补零对齐求和后逐位相等（跨环节合计守恒） */
-function sameDecSum(left: unknown[], right: unknown[], label: string): void {
+function sameDecSum(left: string[], right: string[], label: string): void {
   const scale = decMaxScale([
     ...left.map(v => ({ v, label: `${label}[左成员]` })),
     ...right.map(v => ({ v, label: `${label}[右成员]` })),
   ]);
-  const sumOf = (vals: unknown[]): bigint =>
-    vals.reduce((acc, v) => acc + decScaled(v, `${label}[成员]`, scale), 0n);
+  const sumOf = (vals: string[]): bigint =>
+    vals.reduce<bigint>((acc, v) => acc + decScaled(v, `${label}[成员]`, scale), 0n);
   expect(
     sumOf(left),
     `${label}：合计差必须为 0 左=${JSON.stringify(left)} 右=${JSON.stringify(right)}`
@@ -930,7 +930,9 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       batchNo: bundle.dyeLotNo,
     };
     const pieceNo = String(piece.piece_no);
-    const shipQty = decField(piece, 'length', '452-05 整匹实测长度');
+    // 匹是 GET /inventory/pieces 回读的 DyedSeedPiece 声明行：length 按字段直取（同 452-03 的 parent.length），
+    // 值仍是后端真实读数，不经只吃泛化 Row 的入口
+    const shipQty = decKey(piece.length, '452-05 整匹实测长度');
     const order = await seedApprovedOrderFor(page, productId, shipQty, '452-05');
 
     // 出库前基线：库存行主计量、订单行已发量、匹状态与长度（三路真接口）
