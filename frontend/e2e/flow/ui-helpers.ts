@@ -724,12 +724,12 @@ export async function createColorCardUI(page: Page): Promise<number | undefined>
 
 /** 创建染色批次 */
 export async function createDyeBatchUI(page: Page): Promise<number | undefined> {
-  // 表单契约（views/dye-batch/index.vue:247-326 + formRules:415-439，如实对齐现状，不改必填口径）：
+  // 表单契约（views/dye-batch/index.vue + formRules:415-439，如实对齐现状，不改必填口径）：
   // - 批次号 batch_no：必填（blur）
   // - 「产品」下拉实为**坯布选择器**（prop=greige_fabric_id，选项源 GET /production/greige-fabrics，
-  //   index.vue:259-271 + 392-393）：必填（change）——列表为空时无选项可选，UI 路径必红；
-  // - 色号 color_no：自由文本；色号非空 ⇒ 缸号 dye_lot_no 必填（index.vue:421-432 validator）；
-  //   且后端创建时强制反查色卡档案（dye_batch_handler.rs:204-254 resolve_dye_color_identity：
+  //   index.vue + 392-393）：必填（change）——列表为空时无选项可选，UI 路径必红；
+  // - 色号 color_no：自由文本；色号非空 ⇒ 缸号 dye_lot_no 必填（index.vue validator）；
+  //   且后端创建时强制反查色卡档案（dye_batch_handler.rs resolve_dye_color_identity：
   //   color_no 必须在 color_card_items.color_code 恰好命中一条），任意串必 400；
   // - 染色日期 / 数量：必填。
   // 本函数仅供「染色批次表单 UI 创建」专项用例复用；通用种子不再走此 UI 路径
@@ -1361,7 +1361,7 @@ export async function uiImportUpload(
 /**
  * 表格行 DOM 形态：
  * - 'standard'：Element Plus `<el-table>`，行类名 `.el-table__row`，单元格 `td`
- *   （如 occupational-health 危害监测表 index.vue:38）。
+ *   （如 occupational-health 危害监测表 index.vue）。
  * - 'virtual'：`<el-table-v2>`（本仓 components/V2Table 包装），行类名 `.el-table-v2__row`、
  *   单元格 `.el-table-v2__row-cell`（如 sales-contract 列表 SalesContractTable.vue 已迁移）。
  * 两形态行类名互不通用：`.el-table__row` 对虚拟表恒空（N4/S6 直接来源）。
@@ -1492,7 +1492,7 @@ export async function findTableRow(
  * 「目标行 → 该行行内操作元素」跨 fixed 层定位（68-03 根因修复，findTableRow 的点击面对端）。
  *
  * 为什么不能直接在 findTableRow 返回的行上找按钮：el-table-v2 对 fixed:'right' 操作列
- *（如 SalesContractTable.vue:176-183 的 __actions__ 列）**拆层渲染**——主表层行永远不含
+ *（如 SalesContractTable.vue 的 __actions__ 列）**拆层渲染**——主表层行永远不含
  * 操作单元格，按钮在 `.el-table-v2__right`（或 left）独立覆盖层的同数据行里；行文本命中
  * 的恰是没按钮的主表行 ⇒ 行内作用域选择器恒 0 命中、30s 超时（68-03），或被 try/catch 吞掉
  * 成为系统性假绿（uiDeleteRow 旧实现）。

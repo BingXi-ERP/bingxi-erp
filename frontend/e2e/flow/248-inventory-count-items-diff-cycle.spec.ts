@@ -20,59 +20,59 @@
 //
 // 判据来源（逐段读后端源，非推测）。
 // 一、明细出参键名。详情与建单响应的 items 元素是 CountItemResponse
-// （handlers/inventory_count_handler.rs:90-127），键 = id、count_id、stock_id、product_id、
+// （handlers/inventory_count_handler.rs），键 = id、count_id、stock_id、product_id、
 // warehouse_id、quantity_before、quantity_actual、quantity_difference、unit_cost、total_cost、
 // notes、created_at、updated_at（snake_case，与 models/inventory_count_item.rs 列名逐字相同）。
-// PUT 写腿的响应体只有 6 键（handlers/inventory_count_handler.rs:505-512，
+// PUT 写腿的响应体只有 6 键（handlers/inventory_count_handler.rs，
 // id、count_id、stock_id、quantity_actual、quantity_difference、notes），
 // 不含 quantity_before 与 unit_cost/total_cost，因此改写后的账面量与成本必须走详情腿读回。
-// 二、差异符号口径。quantity_difference = 实盘 - 账面（services/inventory_count_service.rs:424
+// 二、差异符号口径。quantity_difference = 实盘 - 账面（services/inventory_count_service.rs
 // 批量录入、:701 单条改写两处同一口径），盘盈为正、盘亏为负，账面量取建单时的
-// inventory_stocks.quantity_on_hand 快照（services/inventory_count_service.rs:216）。
+// inventory_stocks.quantity_on_hand 快照（services/inventory_count_service.rs）。
 // 三、改明细不动库存。apply_stock_adjustments 只在 approve_count 事务内被调用
-// （services/inventory_count_service.rs:539-580、:606-624），PUT 与 DELETE 两条写腿都不落库存，
+// （services/inventory_count_service.rs、:606-624），PUT 与 DELETE 两条写腿都不落库存，
 // 所以本用例把"改写与删行前后库存行两列分文未动"按现状钉住，不写成"改明细即调库存"。
 // 四、状态词表。唯一写入方是 models/status/inventory_count.rs 的三枚小写常量
-// pending、in_review、completed（services/inventory_count_service.rs:185、:484、:591、:753），
+// pending、in_review、completed（services/inventory_count_service.rs、:484、:591、:753），
 // 词表里没有 in_progress；比较点与写入值逐字符相同，不做大小写归一。
-// 五、三态入参。PUT 体是 RFC 7386 三态（handlers/inventory_count_handler.rs:186-197）——
+// 五、三态入参。PUT 体是 RFC 7386 三态（handlers/inventory_count_handler.rs）——
 // 键缺席保持原值、显式 null 清空可空列 notes、quantity_actual 为 NOT NULL 列的显式 null 被拒。
 // 六、拒绝通道。写腿的不存在子行走 AppError::not_found 脱敏通道
-// （handlers/inventory_count_handler.rs:490、:531），出参 message 恒为固定常量「资源未找到」
-// （utils/error.rs:848、utils/messages.rs:42），真实文案「盘点明细不存在」只进日志；
+// （handlers/inventory_count_handler.rs、:531），出参 message 恒为固定常量「资源未找到」
+// （utils/error.rs、utils/messages.rs），真实文案「盘点明细不存在」只进日志；
 // 因此 404 腿以 HTTP 状态 + 机器码 NOT_FOUND + 脱敏文案三者同断，不拿"任一非 2xx"充当通过。
 //
 // 查出的后端缺陷（本用例一律按源码现状钉住，点名在此，不改判据方向）。
 // 一、counted_items 两套口径分叉。批量录入按"本次提交条数"累加
-// （services/inventory_count_service.rs:432、:442），而单条明细改写与删除后的
+// （services/inventory_count_service.rs、:442），而单条明细改写与删除后的
 // recalc_count_stats 把 counted_items 直接取明细总行数（:635、:645），
 // 于是只改其中一条也会把从未录入实盘的另一行算成已盘。本用例按后者现状断
 // counted_items 等于明细行数，并在断言信息里点名该口径。
 // 二、total_items 不随删行重算。recalc_count_stats 只写 counted_items 与 variance_items
-// （services/inventory_count_service.rs:627-655），delete_count_item 也只调用它（:731），
+// （services/inventory_count_service.rs），delete_count_item 也只调用它（:731），
 // 故删掉一行明细后表头 total_items 仍是建单快照值，与 items 实际行数永久失配。
 // 本用例把"随动的两枚"与"不随动的一枚"同时钉死，任一侧被改动都会立刻判红。
 // 三、状态门两腿外显口径不一致。PUT 腿用 AppError::business 脱敏
-// （services/inventory_count_service.rs:682，出参固定文案「业务处理失败」，utils/messages.rs:43），
+// （services/inventory_count_service.rs，出参固定文案「业务处理失败」，utils/messages.rs），
 // DELETE 腿用 AppError::business_displayable 可外显（:726，出参逐字为真实拒绝原因），
 // 同一族的两个前置状态拒绝在 HTTP 面上给出不同可见信息。
 // 四、GET /inventory/counts/generate-no 属仓内"单据号展示端点"待废除族，本用例按假可供现状钉住。
-// 该腿走 DocumentNumberGenerator::generate_no（handlers/inventory_count_handler.rs:455-470），
-// 内部只开事务取号并显式回滚式结束、探测全程只有 SELECT（utils/number_generator.rs:84-104），
+// 该腿走 DocumentNumberGenerator::generate_no（handlers/inventory_count_handler.rs），
+// 内部只开事务取号并显式回滚式结束、探测全程只有 SELECT（utils/number_generator.rs），
 // 不落库、不占号段；真落库单号由建单在自身事务内另取一次 max+1
-// （services/inventory_count_service.rs:114-121）。因此展示号与随后建单号可能同值、
+// （services/inventory_count_service.rs）。因此展示号与随后建单号可能同值、
 // 且该端点自身从不写入号段（只 SELECT 探测），出参只有 count_no 一键（无 id、无 status），
 // 与真号源（已落库单据）形状不一致。本用例不为它编造"已预留可用单号"的成功语义。
 //
 // 覆盖面缺口（如实登记，不凑绿）。
-// 一、差异是否驱动库存变化只由 approve_count 落账（services/inventory_count_service.rs:606-624），
+// 一、差异是否驱动库存变化只由 approve_count 落账（services/inventory_count_service.rs），
 // 该面的库存两列真值已被既有盘点用例覆盖，本文件只把"两条明细写腿不动库存"钉成反向证据，
 // 不重复过账面，避免同一张单被两条用例过账后彼此污染库存基线。
 // 二、非授权角色的放行面只取列表腿（counts:read 命中 GET /inventory/counts，与行级数据范围无关）。
 // 详情腿 GET /inventory/counts/{id} 对仓管要过 check_resource_owner_by_member_scope
-// （services/inventory_count_service.rs:300-307），归属人是建单的管理员，
+// （services/inventory_count_service.rs），归属人是建单的管理员，
 // 而角色的 data_scope 取值由库里 role 表决定，放行与否非源码可确定，故不用它做判据。
-// 三、写腿成功面的 owner 由本 worker 管理员自建自改（handlers/inventory_count_handler.rs:492-500
+// 三、写腿成功面的 owner 由本 worker 管理员自建自改（handlers/inventory_count_handler.rs
 // 的子行上溯归属门只校 owner，跨 owner 代改面属数据范围专题，本文件不展开）。
 import { test, expect } from '../diagnose-fixture';
 import {
@@ -236,7 +236,7 @@ async function seedTwoItemCount(
 }
 
 /**
- * 收掉本用例自建的盘点单（连带删除明细，services/inventory_count_service.rs:373-377）。
+ * 收掉本用例自建的盘点单（连带删除明细，services/inventory_count_service.rs）。
  * 主体删除腿只允许 pending，故对已提交（in_review）的先走 reject 退回 pending 再删。
  */
 async function cleanupCount(page: import('@playwright/test').Page, countId: number): Promise<void> {
@@ -691,7 +691,7 @@ test.describe('盘点明细改写与删除配对', () => {
       `取号出参应只有 count_no 一键（假可供，无落库单据形状），实际键=${Object.keys(first).join(',')}`
     ).toBe(1);
 
-    // 不占号段的确定性证据，取号全程只 SELECT（utils/number_generator.rs:90），
+    // 不占号段的确定性证据，取号全程只 SELECT（utils/number_generator.rs），
     // 两次取号只断流水单调不减，放行同分片并发建单把 max+1 抬高这一真实并发面，
     // 不写成"两次必同值"（那是把别的车道写入当成不存在）
     const second = await apiCallRaw<Row>(page, 'GET', '/inventory/counts/generate-no');

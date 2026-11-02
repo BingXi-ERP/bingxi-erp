@@ -14,23 +14,23 @@ import {
  * 254 审计高危标记 / 审计不可篡改 / 缸号-供应商-客户追溯腿 的 e2e 配对真契约
  *
  * 守的是什么（判据全部取自后端源码实核，不凭响应形状猜）：
- * - 严重级别词表的唯一真源是 models/audit_log.rs:77-88 的 Severity::as_str()，只有
+ * - 严重级别词表的唯一真源是 models/audit_log.rs 的 Severity::as_str()，只有
  *   INFO / WARN / ERROR / CRITICAL 四个大写 token，**没有 HIGH**：本仓「高危单独标记」的实现
- *   形态是高危动作被写成 WARN 及以上。全后端扫描确认：角色授予变更（role_handler.rs:464/509/
- *   571/619）、用户软删除与改密失败（user_handler.rs:714/858）、权限合规与导出合规服务
+ *   形态是高危动作被写成 WARN 及以上。全后端扫描确认：角色授予变更（role_handler.rs/509/
+ *   571/619）、用户软删除与改密失败（user_handler.rs/858）、权限合规与导出合规服务
  *   （permission_compliance_service.rs / export_compliance_service.rs）、鉴权中间件
- *   （permission.rs:190）写 WARN/CRITICAL，其余常规台账一律 INFO（audit_log_service.rs:299/475/592、
- *   audit_log_handler.rs:345/682）。本 spec 因此用「批量整批替换角色级授予」这条真业务写腿
- *   （role_handler.rs:550-587：operation_type=UPDATE、severity=Severity::Warn、resource_type=
+ *   （permission.rs）写 WARN/CRITICAL，其余常规台账一律 INFO（audit_log_service.rs/475/592、
+ *   audit_log_handler.rs/682）。本 spec 因此用「批量整批替换角色级授予」这条真业务写腿
+ *   （role_handler.rs：operation_type=UPDATE、severity=Severity::Warn、resource_type=
  *   role_permission、resource_id=role_id、before_snapshot 与 after_snapshot 双双 Some(serde_json::Value)，
- *   由 role_permission_service.rs:907-960 以稳定排序的授予明细数组落库）做高危对账，
+ *   由 role_permission_service.rs 以稳定排序的授予明细数组落库）做高危对账，
  *   而不是挑一条只产 INFO 的动作冒充高危。
- * - 变更前后值的真实列名：models/audit_log.rs:110-113 是旧字段 old_value/new_value（注释逐字标明
+ * - 变更前后值的真实列名：models/audit_log.rs 是旧字段 old_value/new_value（注释逐字标明
  *   「与 before_snapshot/after_snapshot 同义」），:122-125 是推荐字段 before_snapshot/after_snapshot。
- *   详情 DTO（audit_log_handler.rs:247-253）四列一起外显，故本 spec 同时读回推荐列与旧列，
+ *   详情 DTO（audit_log_handler.rs）四列一起外显，故本 spec 同时读回推荐列与旧列，
  *   并点名 :126-128 的 condition 列只存在于库侧、AuditLogListItem 与详情 DTO 均未暴露，
  *   API 面读不到它，测试侧不假装能读。
- * - 审计不可篡改：审计挂载面 routes/system.rs:272-296 只注册 GET /audit-logs、
+ * - 审计不可篡改：审计挂载面 routes/system.rs 只注册 GET /audit-logs、
  *   GET /audit-logs/export、GET /audit-logs/{id}、POST /audit-logs/record-print、
  *   GET /audit-logs/export-logs、GET /audit-logs/summary —— 读腿 + 一条纯追加写腿，
  *   **不存在任何 PUT/PATCH/DELETE 或批量改写入口**。本 spec 因此在「已注册路径 + 未注册方法」
@@ -40,17 +40,17 @@ import {
  * - 追溯三条腿的入参维度（handler:73-95）：/forward 必填 supplier_id(i32)+batch_no、
  *   /backward 必填 customer_id(i32)+batch_no、/snapshot/{trace_chain_id} 是路径参数主键；
  *   两腿出参信封 message 逐字同源「正向追溯完成」（handler:204）/「反向追溯完成」（handler:252）。
- *   快照腿有真存在性检查：business_trace_service.rs:110-114 查不到链即
+ *   快照腿有真存在性检查：business_trace_service.rs 查不到链即
  *   AppError::not_found("追溯链不存在")；两枚读腿对不存在主键无检查、返回 200+traces:[]+total:0。
  *   本 spec 把这一「写侧 404、读侧空壳」的不对称按现状钉死并点名（与 252 已点名的 backward
  *   空壳、数据权限详情 200+null 同型，且新增覆盖 forward 正腿）。
  *   快照写入→读回的正腿在本车道物理不可达：business_trace_chain 只由服务层账单流程内部插入
- *   （business_trace_service.rs:448/511），API 面没有任何创建入口（routes 全量 grep 只有
+ *   （business_trace_service.rs/511），API 面没有任何创建入口（routes 全量 grep 只有
  *   five-dimension/forward/backward/snapshot 四条），故无法先造链再读回节点标识；此处如实点名
  *   「缺可达种子」，不在测试侧伪造链节点、也不改成「任一状态码」糊过去。
  * - 权限档：审计读腿与快照腿的 handler 深度防御不齐——list/detail/record-print 走
- *   require_admin_role（audit_log_handler.rs:37-56 + can_access_audit_logs，仅 admin/auditor），
- *   而 GET /audit-logs/summary（audit_log_handler.rs:705-707）签名是 `_auth`、无深度防御，
+ *   require_admin_role（audit_log_handler.rs + can_access_audit_logs，仅 admin/auditor），
+ *   而 GET /audit-logs/summary（audit_log_handler.rs）签名是 `_auth`、无深度防御，
  *   与 253 点名的观测族同型；business-trace 四条腿（handler:96/162/210/258）一律只挂 AuthContext。
  *   本 spec 按现状断非 admin 角色访问四枚读/写腿被 RBAC 拦成 403（FORBIDDEN 机器码，
  *   非 CSRF 拒绝码），并把缺深度防御这件事在断言语义里点名；若后端实际未拦该断言即判红，不放宽。
@@ -214,7 +214,7 @@ test.describe('254 审计高危标记与不可篡改配对', () => {
     expect(pair, '批量替换的 WARN 审计行必须同时带 1 条 before 与 3 条 after 授予快照').toBeTruthy();
     const hit = pair as { before: GrantDetail[]; after: GrantDetail[]; row: AuditRow };
 
-    // 高危标记：severity 逐字符等于词表高危 token（models/audit_log.rs:83 Self::Warn => "WARN"）
+    // 高危标记：severity 逐字符等于词表高危 token（models/audit_log.rs Self::Warn => "WARN"）
     expect(hit.row.severity, '高危写动作必须被单独标记为 WARN，不得混在 INFO 台账里').toBe('WARN');
     expect(hit.row.operation_type).toBe('UPDATE');
     expect(hit.row.resource_type).toBe('role_permission');
@@ -224,7 +224,7 @@ test.describe('254 审计高危标记与不可篡改配对', () => {
     expect(hit.row.request_path).toBe(`/api/v1/erp/roles/${roleId}/permissions`);
     expect(hit.row.created_at, '审计时间列不得为空').toBeTruthy();
     expect(hit.row.description).toContain(String(roleId));
-    // 批量计数由 service 统计口径外显（role_handler.rs:573-576）：read 保留、export/print 新增
+    // 批量计数由 service 统计口径外显（role_handler.rs）：read 保留、export/print 新增
     expect(hit.row.description).toMatch(/新增 2、更新 0、删除 0$/);
 
     // 前后值两向核对：变更前集合与变更后集合都可在同一行里读到，且 before ⊂ after
@@ -313,7 +313,7 @@ test.describe('254 审计高危标记与不可篡改配对', () => {
     expectDenied(deniedDetail, '非 admin 读取审计详情');
 
     const deniedSummary = await apiCallExpectFail(page, 'GET', '/audit-logs/summary');
-    expectDenied(deniedSummary, '非 admin 读取审计汇总（audit_log_handler.rs:705-707 缺深度防御）');
+    expectDenied(deniedSummary, '非 admin 读取审计汇总（audit_log_handler.rs 缺深度防御）');
 
     const deniedSnapshot = await apiCallExpectFail(
       page,
@@ -341,7 +341,7 @@ test.describe('254 审计高危标记与不可篡改配对', () => {
 
     const ghostChain = `E254-NO-SUCH-TRACE-${Date.now()}${Math.floor(Math.random() * 1e6)}`;
 
-    // 写侧：快照腿对不存在主键有真存在性检查（business_trace_service.rs:112-114）
+    // 写侧：快照腿对不存在主键有真存在性检查（business_trace_service.rs）
     const snapshot = await apiCallExpectFail(page, 'POST', `/business-trace/snapshot/${ghostChain}`);
     expect(snapshot.status, `不存在主键写快照应 404，实际 ${snapshot.status}`).toBe(404);
     expect(failureCode(snapshot)).toBe(APP_ERROR_CODES.NOT_FOUND);
@@ -373,7 +373,7 @@ test.describe('254 审计高危标记与不可篡改配对', () => {
       'GET',
       '/business-trace/forward?supplier_id=999999999&batch_no=E254-NO-SUCH-BATCH'
     );
-    expect(forwardGhost.message, '正向追溯文案逐字同源（business_trace_handler.rs:204）').toBe(
+    expect(forwardGhost.message, '正向追溯文案逐字同源（business_trace_handler.rs）').toBe(
       '正向追溯完成'
     );
     expect(Array.isArray(forwardGhost.data.traces)).toBe(true);

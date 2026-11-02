@@ -13,16 +13,16 @@ import {
  * 253 慢查询审计 / 设备连接观测族 的 e2e 配对真契约
  *
  * 守的是什么（判据全部取自后端源码实核，不凭响应形状猜）：
- * - GET /slow-queries（slow_query_handler.rs:84-142）：真台账非桩——直查 slow_query_log 表
- *   （models/slow_query.rs:15），信封 {items,total,page,page_size}，行键即 SlowQueryDto
- *   （models/slow_query.rs:56-77，snake_case）。分页防御：page 0 抬到 1（L90 max(1)）、
+ * - GET /slow-queries（slow_query_handler.rs）：真台账非桩——直查 slow_query_log 表
+ *   （models/slow_query.rs），信封 {items,total,page,page_size}，行键即 SlowQueryDto
+ *   （models/slow_query.rs，snake_case）。分页防御：page 0 抬到 1（L90 max(1)）、
  *   page_size clamp 到 [1,100]（L91）；min_duration 过滤单调（gte 谓词 L109）且按
  *   execution_time_ms 倒序（L122）。现状缺陷点名：min_duration 负值无校验（L107-110 直接
  *   进 gte 谓词），负阈值静默放行等于不加过滤——本 spec 按现状契约断言并在此点名，
  *   不在测试侧伪造 400。min_duration 非数字属 axum Query 抽取器直出 400，文案非本 handler
  *   源码可外显原文，故只钉状态码不硬写文案。
  * - POST /slow-queries/refresh（L368-391）：真采集非桩——SlowQueryCollector::collect_once
- *   （slow_query_collector.rs:132-196）直查 pg_stat_statements（阈值 100ms / 上限 100 行）
+ *   （slow_query_collector.rs）直查 pg_stat_statements（阈值 100ms / 上限 100 行）
  *   写入 slow_query_log，返回 {inserted,message}；文案两分支逐字同源（零条走「本次未发现
  *   新的慢查询…」，非零走「本次采集写入 N 条慢查询记录」）。
  * - GET /slow-queries/stats（L145-215）：近 7 天窗口按 query_text 分组的 TOP 10 真聚合，
@@ -30,9 +30,9 @@ import {
  *   自洽：分组样本数之和 ≤ 窗口总数 ≤ 全量台账数（分组不复制行、窗口是全量的子集）；
  *   refresh 本轮写入行 captured_at=now 必落窗口内 ⇒ total_count ≥ inserted；top10 按
  *   max_exec_time_ms 倒序且 sample_count ≥ 1（GROUP BY 语义）。
- * - POST /device-connections/register（device_connection_handler.rs:103-115 + service
+ * - POST /device-connections/register（device_connection_handler.rs + service
  *   L55-113）：真落库非桩——以 device_id 为唯一键 upsert，置 status=online（小写词表
- *   models/device_connection.rs:16），服务端签发 session_token 形如 dc_{device_id}_{ts}_{nonce}。
+ *   models/device_connection.rs），服务端签发 session_token 形如 dc_{device_id}_{ts}_{nonce}。
  *   device_id 空白（trim 后）走 validation_displayable 400「device_id 不能为空」逐字同源
  *   （handler L108-111）。
  * - GET /device-connections/online/count（handler L171-184 + service L269-277）：口径 =
@@ -44,10 +44,10 @@ import {
  *   （service L32），非数字/负值属 serde u64 直出 400（只钉状态码）。timeout_secs=0 时
  *   刚注册设备（last_heartbeat_at=注册时刻 < 清理时刻）必被扫入 ⇒ timed_out_count ≥ 1，
  *   且该 workshop 在线数回落到基线——写后回读闭环，不是只看 200。
- * - 权限档：六腿 handler 签名全部只挂 AuthContext（slow_query_handler.rs:86/147/370、
- *   device_connection_handler.rs:104/172/195 均为 `_auth`，无 require_admin_role），
- *   handler 层无深度防御，角色门只剩 RBAC 中间件一道（permission.rs:120 validate_route_whitelist
- *   + 资源键 slow-queries/device-connections 已在 path_utils.rs:389/433 登记）。本 spec 断
+ * - 权限档：六腿 handler 签名全部只挂 AuthContext（slow_query_handler.rs/147/370、
+ *   device_connection_handler.rs/172/195 均为 `_auth`，无 require_admin_role），
+ *   handler 层无深度防御，角色门只剩 RBAC 中间件一道（permission.rs validate_route_whitelist
+ *   + 资源键 slow-queries/device-connections 已在 path_utils.rs/433 登记）。本 spec 断
  *   未登录三枚 GET 401、非 admin 业务角色调 register/cleanup-timeout 被 RBAC 拦（403
  *   FORBIDDEN）；若后端实际未拦该断言即判红并点名，不放宽成任一状态码。
  *
@@ -143,7 +143,7 @@ test.describe('253 慢查询设备连接观测配对', () => {
     await loginViaUI(page);
 
     const base = await apiCall<SlowQueryListBody>(page, 'GET', '/slow-queries?page_size=500');
-    // 分页防御：page_size 被 clamp 到上限 100（slow_query_handler.rs:91）
+    // 分页防御：page_size 被 clamp 到上限 100（slow_query_handler.rs）
     expect(base.data.page_size, 'page_size=500 应被 clamp 到 100').toBe(100);
     expect(base.data.page).toBe(1);
     expect(base.data.total).toBeGreaterThanOrEqual(base.data.items.length);
@@ -199,10 +199,10 @@ test.describe('253 慢查询设备连接观测配对', () => {
     if (refreshed.data.inserted === 0) {
       expect(
         refreshed.data.message,
-        '零条分支文案须与 slow_query_handler.rs:382 逐字同源'
+        '零条分支文案须与 slow_query_handler.rs 逐字同源'
       ).toBe('本次未发现新的慢查询（最近 5 分钟内无 mean_exec_time > 100ms 的查询）');
     } else {
-      expect(refreshed.data.message, '非零分支文案族与 slow_query_handler.rs:384 同源').toMatch(
+      expect(refreshed.data.message, '非零分支文案族与 slow_query_handler.rs 同源').toMatch(
         /^本次采集写入 \d+ 条慢查询记录$/
       );
     }
@@ -300,7 +300,7 @@ test.describe('253 慢查询设备连接观测配对', () => {
     });
     expect(blank.status).toBe(400);
     expect(failureCode(blank)).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
-    expect(blank.message, '须与 device_connection_handler.rs:110 逐字同源').toBe(
+    expect(blank.message, '须与 device_connection_handler.rs 逐字同源').toBe(
       'device_id 不能为空'
     );
 

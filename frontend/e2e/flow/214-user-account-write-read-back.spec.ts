@@ -12,7 +12,7 @@ import { openSelectDropdownItems } from './ui-helpers';
  *
  * 调用方。Playwright 串行链，全程 worker 专属管理员会话（loginAsRole(page,'admin')）；
  * 仅重置密码取证腿另开一个隔离 context 用被建账号真实登录，避免踢掉管理员会话。
- * 打的是 frontend/src/router/index.ts:85 的 /users 路由（views/users/index.vue，
+ * 打的是 frontend/src/router/index.ts 的 /users 路由（views/users/index.vue，
  * 权限键 users:read），界面锚点全部按该模板的元素次序取，不钉任何中文文案字面量。
  *
  * 入参。用户名/邮箱/手机号都带本次运行的 Date.now() 后缀，逐次唯一，跨用例与跨 worker 不撞；
@@ -24,14 +24,14 @@ import { openSelectDropdownItems } from './ui-helpers';
  * department_id}）、PUT /users/{id}（UpdateUserRequest{email,phone,role_id,department_id,
  * status}）、POST /users/reset-password（ResetPasswordRequest{username,new_password}）、
  * GET /users?keyword&status&page&page_size、GET /users/{id}、GET /users/me、
- * DELETE /users/{id}，均由 backend/src/routes/iam.rs:20-35 注册。
+ * DELETE /users/{id}，均由 backend/src/routes/iam.rs 注册。
  *
  * 存什么。users 行的 username/email/phone/role_id/is_active 四列语义写回：创建落非空
  * email 与 phone、编辑覆盖为新值、删除只把 is_active 写成 false。角色名来自 users.role_id
- * LEFT JOIN roles.name（handlers/user_handler.rs:400 的 column_as(role::Column::Name,
+ * LEFT JOIN roles.name（handlers/user_handler.rs 的 column_as(role::Column::Name,
  * "role_name") → UserResponse.role_names），不是前端拼的假名。
  *
- * 存哪里。PostgreSQL users 表（软删除，见 services/user_service.rs:437-447 把
+ * 存哪里。PostgreSQL users 表（软删除，见 services/user_service.rs 把
  * is_active 置 false 而非删行）；审计与 JWT 吊销由同一 service 内部完成。
  *
  * 契约真相（逐段读后端源，非推测，与本用例判据直接相关三点）。
@@ -41,7 +41,7 @@ import { openSelectDropdownItems } from './ui-helpers';
  *    不是 404。因此"删除生效"的真实判据 = 活跃口径列表（status=1）零命中 + 详情读回
  *    is_active=false 两条同时成立；本用例把"详情不返回 404"也钉成显式断言，将来若改成
  *    硬删除，这里会红并要求同步改判据，不会被静默放过。
- * 3) status 查询参数按 is_active.eq(s != 0) 过滤（handlers/user_handler.rs:415），
+ * 3) status 查询参数按 is_active.eq(s != 0) 过滤（handlers/user_handler.rs），
  *    status=1 只看启用、status=0 只看禁用；缺省不过滤，故删除后仍会出现在不过滤的搜索里。
  */
 
@@ -88,7 +88,7 @@ const keywordInput = (page: Page): Locator =>
 const searchButton = (page: Page): Locator =>
   page.locator('.el-card').first().locator('.el-form-item').nth(2).locator('button').first();
 /**
- * 新建/编辑对话框表单项次序（views/users/index.vue:131-155）：
+ * 新建/编辑对话框表单项次序（views/users/index.vue）：
  * 新建 = 用户名、密码、手机号、邮箱、角色；编辑 = 用户名、手机号、邮箱、角色、状态
  * （密码项 v-if="!userForm.id" 隐藏，状态项 v-if="userForm.id" 出现）。
  * 对话框本身靠"是否存在 password 输入"区分新建与编辑，不靠标题文案。

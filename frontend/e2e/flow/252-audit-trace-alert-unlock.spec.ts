@@ -14,7 +14,7 @@ import {
  * 252 审计闭环 / 反向追溯 / 安全告警 / 账号解锁族 的 e2e 配对真契约
  *
  * 守的是什么（判据全部取自后端源码实核，不凭响应形状猜）：
- * - POST /audit-logs/record-print（audit_log_handler.rs:640-701）：字段校验逐字文案
+ * - POST /audit-logs/record-print（audit_log_handler.rs）：字段校验逐字文案
  *   「resource_type 长度必须在 1-64 个字符之间 / title 长度必须在 1-200 个字符之间 /
  *   record_count 不能为负数」，合法上报经 AuditLogService::record_async 异步落
  *   audit_logs（operation_type=PRINT、severity=INFO、resource_name=title、
@@ -23,27 +23,27 @@ import {
  *   PRINT 属追加事件，before_snapshot 按源码恒为 None，不断言）。回读 GET /audit-logs
  *   用本 spec 自埋的唯一 marker 做因果对账，钉住「发起→落库→可查」闭环，
  *   而非「列表非空即通过」。
- * - GET /audit-logs（audit_log_handler.rs:37-56 + can_access_audit_logs）：仅
+ * - GET /audit-logs（audit_log_handler.rs + can_access_audit_logs）：仅
  *   admin/auditor 角色可读，非 admin 会话与未登录会话都被拦。列表信封
- *   {items,total,page,page_size}，行字段即 AuditLogListItem（audit_log_handler.rs:92-108）；
- *   审计模型（models/audit_log.rs:94-141）存 账号(user_id/username)、IP、UA、变更前后快照、
+ *   {items,total,page,page_size}，行字段即 AuditLogListItem（audit_log_handler.rs）；
+ *   审计模型（models/audit_log.rs）存 账号(user_id/username)、IP、UA、变更前后快照、
  *   created_at，但不存独立「角色/终端」列，故只断言真实存在的列，不假装角色列存在。
- * - GET /business-trace/backward（business_trace_handler.rs:210-255）：customer_id 为
+ * - GET /business-trace/backward（business_trace_handler.rs）：customer_id 为
  *   i32 必填、batch_no 必填，缺参/非整数入参 400；出参 {traces,total}、message
- *   「反向追溯完成」逐字同源。服务层（business_trace_service.rs:70-105）对不存在主键
+ *   「反向追溯完成」逐字同源。服务层（business_trace_service.rs）对不存在主键
  *   无存在性检查、返回空数组 ⇒ 现状为 200+空壳而非 404，本 spec 按现状契约断言并在
  *   交接中点名该缺陷形状（与数据权限详情的 200+null 缺陷同型）。
- * - GET /alerts（login_security_handler.rs:247-297）：告警由近 24h SUCCESS 登录按
+ * - GET /alerts（login_security_handler.rs）：告警由近 24h SUCCESS 登录按
  *   user_id 聚合多 IP 实时计算，无持久化主键；出参 SecurityAlert 无 id 字段，
  *   alert_type 恒 MULTI_IP_LOGIN、description 形如「24小时内从 N 个不同 IP 登录」。
- *   POST /alerts/{id}/resolve（login_security_handler.rs:410-416）为纯桩：不校验 id
+ *   POST /alerts/{id}/resolve（login_security_handler.rs）为纯桩：不校验 id
  *   存在、不写任何状态，恒 200+「告警已解锁文案族」中的「告警已处理」。因此状态转移
  *   回读在本端点物理不可达——spec 按源码真相断言「resolve 前后告警集逐项不变」的
  *   无操作语义（含对不存在 id 放行），该桩缺陷已单独点名，不在测试侧伪造状态变化。
- * - GET /lock-status（login_security_handler.rs:153-220）：OptionalAuthContext——
+ * - GET /lock-status（login_security_handler.rs）：OptionalAuthContext——
  *   匿名与本人都可查；已登录非 admin 查他人 username 被拒。MAX_FAILED_ATTEMPTS=9、
  *   统计窗口 30 分钟（L:95-96）为锁定口径唯一来源。
- * - GET /locked-accounts（login_security_handler.rs:335-381）：按 FAILED 登录聚合，
+ * - GET /locked-accounts（login_security_handler.rs）：按 FAILED 登录聚合，
  *   lock_reason 形如「N 次登录失败」，仅列 ≥9 次者；与 /lock-status 同窗同阈值，
  *   故列表内每个账号的 lock-status.is_locked 必为 true（口径自洽断言）。
  * - POST /unlock 与 POST /locked-accounts/{id}/unlock（L:222-245、L:383-408）：均

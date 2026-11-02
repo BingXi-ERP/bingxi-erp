@@ -27,22 +27,22 @@
  *       inventory_transfer_item 与 inventory_transfer（services/inv/batch.rs add/update/delete_item）。
  *
  * 【本 spec 如实暴露的后端缺口（不作断言，交实现侧处置）】
- * 一，transfer 的公斤口径不守恒：inventory_stock_service.rs:1003-1004 与 :1024-1025 只对
+ * 一，transfer 的公斤口径不守恒：inventory_stock_service.rs 与 :1024-1025 只对
  *    quantity_on_hand/quantity_available（米数）做扣减与累加，源行 quantity_kg 原值不动，
  *    而新建目标行 quantity_kg 直接取本次调拨量（:1054），两侧公斤数之和凭空增加；
- * 二，transfer 无数量下界门：inventory_stock_service.rs:997 仅判 quantity_available < 传输量，
+ * 二，transfer 无数量下界门：inventory_stock_service.rs 仅判 quantity_available < 传输量，
  *    传 0 恒通过（空转成功）、传负数亦恒通过并使源批次数量凭空虚增，请求结构
- *    TransferBatchRequest（inventory_batch_handler.rs:119-125）的 from_warehouse_id 在
- *    服务侧被显式丢弃（inventory_stock_service.rs:982，源仓以批次自身 warehouse_id 为准）；
+ *    TransferBatchRequest（inventory_batch_handler.rs）的 from_warehouse_id 在
+ *    服务侧被显式丢弃（inventory_stock_service.rs，源仓以批次自身 warehouse_id 为准）；
  *    故本 spec 只断「超量」这一条有源码文案兜底的拒绝腿，0/负数与伪造源仓的腿留待入口校验补齐后再写；
  * 三，超卖与并发的真实前置（同一批次被两请求同时扣减）无法在单请求内构造，本 spec 只覆盖
  *    单请求级边界（超现有可用量被拒），并发扣减腿仍缺。
  *
  * 【断言判据与后端口径出处】
  * 出参键 = models/inventory_stock.rs Model 字段名（serde 直出 snake_case），批次详情与创建/更新
- *    返回体均为该 Model（handlers/inventory_batch_handler.rs:155、:201）；
+ *    返回体均为该 Model（handlers/inventory_batch_handler.rs、:201）；
  * 列表为 PaginatedResponse{items,total,page,page_size}，过滤列 batch_no/warehouse_id
- *    （BatchListQuery，inventory_batch_handler.rs:27-37；page_size clamp(1,100)）；
+ *    （BatchListQuery，inventory_batch_handler.rs；page_size clamp(1,100)）；
  * 数量列 quantity_on_hand/quantity_available/quantity_meters/quantity_kg 与明细 quantity、
  *    表头 total_quantity 均为 DECIMAL，本仓未开 serde-float，出参是字符串，故断言一律
  *    先取字符串再 Number 归一做逐值判等；本文件使用的数量取值（200.5/50.25/8.25）在二进制
@@ -50,16 +50,16 @@
  * 成功文案「批次创建成功」「批次更新成功」「批次转移成功」「批次删除成功」「调拨明细添加成功」
  *    「调拨明细更新成功」「调拨明细已删除」与 handler 字面同源；
  * 失败文案与后端源码逐字符同源（均非脱敏通用「业务处理失败」形态）：GET 不存在主键
- *    「库存记录 ID {id} 不存在」（inventory_stock_service.rs:272）、PUT 不存在主键
+ *    「库存记录 ID {id} 不存在」（inventory_stock_service.rs）、PUT 不存在主键
  *    「批次不存在」（:922）、DELETE 不存在主键「inventory_batch 记录不存在」
- *    （audit_log_service.rs:504 以 resource_type "inventory_batch" 拼接，delete_batch_with_audit
- *    inventory_stock_service.rs:961-967）、PUT 清空 NOT NULL 列「色号不能清空：该字段为必填项」
+ *    （audit_log_service.rs 以 resource_type "inventory_batch" 拼接，delete_batch_with_audit
+ *    inventory_stock_service.rs）、PUT 清空 NOT NULL 列「色号不能清空：该字段为必填项」
  *    （:897-901）、transfer 超量「库存数量不足」（:997-998）、transfer 源批次不存在「源批次不存在」
- *    （:996）、明细清空 NOT NULL 列「调拨数量不能清空：该字段为必填项」（inv/batch.rs:1297-1308）、
- *    明细不存在「调拨明细 {id} 未找到」（inv/batch.rs:1313、:1445）；
- * 明细的调拨单状态门（inv/batch.rs:1320-1327、:1452-1460）只在 SHIPPED/COMPLETED 拒绝，
+ *    （:996）、明细清空 NOT NULL 列「调拨数量不能清空：该字段为必填项」（inv/batch.rs）、
+ *    明细不存在「调拨明细 {id} 未找到」（inv/batch.rs、:1445）；
+ * 明细的调拨单状态门（inv/batch.rs、:1452-1460）只在 SHIPPED/COMPLETED 拒绝，
  *    故候选调拨单按大小写不敏感的同一规则筛除，取到即可写，无需猜测状态词表原值大小写；
- * 明细追溯四维按「生效色号非空即染色布、空串为白坯合法值」判定（inv/mod.rs:216-225），
+ * 明细追溯四维按「生效色号非空即染色布、空串为白坯合法值」判定（inv/mod.rs），
  *    本 spec 以 color_no 空串走白坯免填缸号/匹号路径，batch_no 提交唯一 marker 落库并回读。
  */
 import { test, expect } from '../diagnose-fixture'
@@ -338,7 +338,7 @@ test.describe.serial('批次增改删回读与调拨守恒及调拨明细契约'
             expect(onHandBefore).toBe(Q_INIT)
             expect(availableBefore).toBe(Q_INIT)
 
-            // 业务拒绝一：超现有可用量，文案与 inventory_stock_service.rs:997-998 同源
+            // 业务拒绝一：超现有可用量，文案与 inventory_stock_service.rs 同源
             const overFail = await apiCallExpectFail(
               page,
               'POST',

@@ -35,43 +35,43 @@ import {
  * 不用种子数据，保证可重复且可归因。
  *
  * 词表与判据来源（大小写按写入值逐字符对齐，不自行英文化）：
- * 加料状态 draft/approved/closed 取自 backend/src/models/status/quality_dyeing.rs:126-135
+ * 加料状态 draft/approved/closed 取自 backend/src/models/status/quality_dyeing.rs
  * 的 production_recipe_addition；大货处方状态同源同形（同文件 111 行起）。
- * 状态机转移表是 services/production_recipe_service.rs:314-328（加料）与 209-226（大货）：
+ * 状态机转移表是 services/production_recipe_service.rs（加料）与 209-226（大货）：
  * approved→approved 与 closed→approved 与 closed→closed 皆落 `_ => false` 终态拒绝。
- * 前置门：开加料单要求主单 status == approved（ops/addition.rs:42-47）；
- * 审核要求明细非空（addition.rs:173-176）。
- * 出参键名以实体列为准（models/production_recipe_addition.rs:33-75 的 snake_case 字段，
+ * 前置门：开加料单要求主单 status == approved（ops/addition.rs）；
+ * 审核要求明细非空（addition.rs）。
+ * 出参键名以实体列为准（models/production_recipe_addition.rs 的 snake_case 字段，
  * 无 rename 属性），本文件用 ADDITION_COLUMNS 逐列锁死键集。
- * 单号格式 `{前缀}{YYYYMMDD}{3 位流水}`（utils/number_generator.rs:44、75 行），
- * 大货处方前缀 RP、加料处方前缀 PA（services/production_recipe_service.rs:131、298 行）。
+ * 单号格式 `{前缀}{YYYYMMDD}{3 位流水}`（utils/number_generator.rs、75 行），
+ * 大货处方前缀 RP、加料处方前缀 PA（services/production_recipe_service.rs、298 行）。
  *
  * 查出的后端现状（按现状钉住，不写成成功，也不改源码）：
  * 缺陷一：加料处方与大货处方都没有关闭审计列。production_recipe_addition 的列全集只有
- *   approved_by/approved_at/issued_by（models/production_recipe_addition.rs:60-65），
- *   close 实际只写 status 与 updated_at（services/production_recipe_ops/addition.rs:190-199），
- *   主单 close 同形（recipe_state.rs:39-49）。故关闭腿的副作用只断 status 与 updated_at 两点，
+ *   approved_by/approved_at/issued_by（models/production_recipe_addition.rs），
+ *   close 实际只写 status 与 updated_at（services/production_recipe_ops/addition.rs），
+ *   主单 close 同形（recipe_state.rs）。故关闭腿的副作用只断 status 与 updated_at 两点，
  *   approved_by/approved_at 必须保持原值不清空。
  * 缺陷二：状态门拒绝文案不可外显。非法流转走 AppError::business（facade
- *   services/production_recipe_service.rs:220、322 行），出参 message 恒为脱敏常量
- *   「业务处理失败」（utils/messages.rs:43），含当前状态的原文只进日志；用量计算的入参门
+ *   services/production_recipe_service.rs、322 行），出参 message 恒为脱敏常量
+ *   「业务处理失败」（utils/messages.rs），含当前状态的原文只进日志；用量计算的入参门
  *   同走该通道（facade 178、180、184、192 行）。故本文件断的是脱敏常量逐字符本身，
  *   不假装能读出业务原因。
  * 缺陷三：不存在主键不回 200 空壳，回 404 且文案脱敏。get_by_id 用 AppError::not_found
- *   （addition.rs:110 行），message 恒「资源未找到」（utils/messages.rs:42），主键不外显。
+ *   （addition.rs 行），message 恒「资源未找到」（utils/messages.rs），主键不外显。
  * 缺陷四：创建加料单请求体的 production_recipe_id 是死字段，handler 264 行无条件用路径
  *   id 覆盖。本文件用「体填不存在主键 + 路径填真单」钉住覆盖行为，防止日后误读成体字段生效。
- * 缺口如实声明：加料处方没有 DELETE 路由（routes/production.rs:207-217 只登记 GET 与
+ * 缺口如实声明：加料处方没有 DELETE 路由（routes/production.rs 只登记 GET 与
  *   approve/close 两条动作腿），主单 DELETE 只放行 draft（facade 229-249 行），
  *   因此本文件的可回收面只有草稿主单一条 DELETE，已流转主单与全部加料单是终态残留行；
- *   dyeing_master 的 GET 面不判据（get_by_id 的行级归属门 addition.rs:114-121 取决于
+ *   dyeing_master 的 GET 面不判据（get_by_id 的行级归属门 addition.rs 取决于
  *   两个账号的部门归属关系，非本 spec 可控），只钉写面 403；匿名写面不判据（CSRF 门与
  *   认证门的先后不由本 spec 定义），只取匿名 GET 两条 401。
  */
 
 type Row = Record<string, unknown>;
 
-/** 失败信封四键（backend/src/utils/error.rs:775-780 的 ErrorResponse 结构体） */
+/** 失败信封四键（backend/src/utils/error.rs 的 ErrorResponse 结构体） */
 interface FailEnvelope {
   code?: string;
   message?: string;
@@ -79,7 +79,7 @@ interface FailEnvelope {
   timestamp?: number;
 }
 
-/** 处方物料明细项（models/production_recipe.rs:16-27 的 RecipeMaterialItem，出参键同名） */
+/** 处方物料明细项（models/production_recipe.rs 的 RecipeMaterialItem，出参键同名） */
 interface RecipeItemRow {
   material_code: string;
   material_name: string;
@@ -89,7 +89,7 @@ interface RecipeItemRow {
   category: string;
 }
 
-/** 加料明细项（models/production_recipe_addition.rs:17-28 的 AdditionMaterialItem，无浓度列） */
+/** 加料明细项（models/production_recipe_addition.rs 的 AdditionMaterialItem，无浓度列） */
 interface AdditionItemRow {
   material_code: string;
   material_name: string;
@@ -98,7 +98,7 @@ interface AdditionItemRow {
   category: string;
 }
 
-/** 出参键集锁：与实体声明序逐列对应（models/production_recipe_addition.rs:33-75） */
+/** 出参键集锁：与实体声明序逐列对应（models/production_recipe_addition.rs） */
 const ADDITION_COLUMNS = [
   'id',
   'addition_no',
@@ -119,22 +119,22 @@ const ADDITION_COLUMNS = [
   'updated_at',
 ];
 
-/** 状态词表原值（models/status/quality_dyeing.rs:128/131/134 行） */
+/** 状态词表原值（models/status/quality_dyeing.rs/131/134 行） */
 const DRAFT = 'draft';
 const APPROVED = 'approved';
 const CLOSED = 'closed';
 
-/** 脱敏常量原值（utils/messages.rs:42、43 行） */
+/** 脱敏常量原值（utils/messages.rs、43 行） */
 const MESSAGE_BUSINESS_MASKED = '业务处理失败';
 const MESSAGE_NOT_FOUND_MASKED = '资源未找到';
 
-/** 认证门机器码（utils/error.rs:785 行 CODE_UNAUTHORIZED，认证中间件复用同码） */
+/** 认证门机器码（utils/error.rs 行 CODE_UNAUTHORIZED，认证中间件复用同码） */
 const CODE_UNAUTHORIZED = 'UNAUTHORIZED';
 
 /** 不存在主键探针：落在 i32 范围内（路径提取器是 Path<i32>，handler 277 行），且远大于业务流水 */
 const GHOST_ID = 2_000_000_001;
 
-/** 延迟清理队列（本文件私有，afterEach 统一 flush，队列语义见 helpers.ts:3733-3766） */
+/** 延迟清理队列（本文件私有，afterEach 统一 flush，队列语义见 helpers.ts） */
 const CLEANUP: DeferredCleanup[] = [];
 test.afterEach(async ({ page }) => {
   await flushDeferredCleanups(page, CLEANUP);
@@ -164,7 +164,7 @@ function toNum(value: unknown): number {
 function assertFailEnvelope(body: FailEnvelope, context: string): void {
   expect(
     Object.keys(body).slice().sort(),
-    `${context}：失败体只有 AppError 一种形状（utils/error.rs:775-780），键集漂移即契约变更`
+    `${context}：失败体只有 AppError 一种形状（utils/error.rs），键集漂移即契约变更`
   ).toEqual(['code', 'message', 'timestamp', 'trace_id']);
   expect(
     typeof body.code === 'string' && body.code.length > 0,
@@ -172,7 +172,7 @@ function assertFailEnvelope(body: FailEnvelope, context: string): void {
   ).toBe(true);
   expect(
     typeof body.trace_id === 'string' && /^[0-9a-f]{32}$/.test(body.trace_id),
-    `${context}：trace_id 应为 Uuid::simple 的 32 位小写 hex（utils/response.rs:148-157 与响应头同源），实得 ${JSON.stringify(body.trace_id)}`
+    `${context}：trace_id 应为 Uuid::simple 的 32 位小写 hex（utils/response.rs 与响应头同源），实得 ${JSON.stringify(body.trace_id)}`
   ).toBe(true);
   expect(
     Number.isInteger(body.timestamp),
@@ -194,7 +194,7 @@ async function fetchFailEnvelope(
 
 /**
  * 建大货处方（功能：加料单的前置主单；调用方：本文件三条腿；
- * 入参：备布重量与浴比为必填（facade:53、56 行），明细必填审核门（recipe_state.rs:26-30）；
+ * 入参：备布重量与浴比为必填（facade:53、56 行），明细必填审核门（recipe_state.rs）；
  * 传给谁：handler create（94 行）→ recipe_crud.rs::create；存什么：production_recipe 表一行 draft；
  * 存哪里：production_recipe.recipe_no 取号 RP{YYYYMMDD}{3 位流水}）
  */
@@ -232,7 +232,7 @@ async function createRecipe(page: Page, tag: string): Promise<Row> {
   ).toBe(true);
   expect(
     /^RP\d{11}$/.test(String(row.recipe_no)),
-    `${tag} 大货处方单号应为 RP+日期八位+流水三位（number_generator.rs:44 与 service:131 行同源），实得 ${JSON.stringify(row.recipe_no)}`
+    `${tag} 大货处方单号应为 RP+日期八位+流水三位（number_generator.rs 与 service:131 行同源），实得 ${JSON.stringify(row.recipe_no)}`
   ).toBe(true);
   return row;
 }
@@ -251,7 +251,7 @@ async function readAddition(page: Page, id: number): Promise<Row> {
  * 开加料单（功能：被测状态机的入口；调用方：本文件全部流转腿；
  * 入参：production_recipe_id 由路径覆盖（handler:264 行），明细与原因落 addition_detail/addition_reason；
  * 传给谁：handler create_addition（257 行）→ addition.rs::create；存什么：production_recipe_addition
- * 一行 draft，approved_by/approved_at 置空（addition.rs:68-69 行）；存哪里：单号 PA{YYYYMMDD}{3 位流水}）
+ * 一行 draft，approved_by/approved_at 置空（addition.rs 行）；存哪里：单号 PA{YYYYMMDD}{3 位流水}）
  */
 async function createAddition(page: Page, recipeId: number, tag: string): Promise<Row> {
   const res = await apiCall<Row>(
@@ -314,7 +314,7 @@ function calcRequest(
 }
 
 /**
- * 后端公式的服务端独立复算（口径取 services/production_recipe_service.rs:198 行
+ * 后端公式的服务端独立复算（口径取 services/production_recipe_service.rs 行
  * 的乘除顺序：浓度 × 备布重量 × 浴比 ÷ 100 × 加成系数；无浓度项不重算，原值透传）
  */
 function expectedAmount(
@@ -347,8 +347,8 @@ test.describe.serial('255 加料处方状态机与配方计算契约', () => {
     );
     const draftRow = await readRecipe(page, draftRecipeId);
     expect(draftRow.status, '建单落库态必须是词表原值 draft').toBe(DRAFT);
-    expect(draftRow.approved_by, '建单不写审核人（recipe_crud.rs:106 行 Set(None)）').toBeNull();
-    expect(draftRow.approved_at, '建单不写审核时间（recipe_crud.rs:107 行 Set(None)）').toBeNull();
+    expect(draftRow.approved_by, '建单不写审核人（recipe_crud.rs 行 Set(None)）').toBeNull();
+    expect(draftRow.approved_at, '建单不写审核时间（recipe_crud.rs 行 Set(None)）').toBeNull();
     expect(Number(draftRow.issued_by), 'issued_by 取服务端会话（handler:100 行）').toBe(
       Number(draftRow.created_by)
     );
@@ -378,7 +378,7 @@ test.describe.serial('255 加料处方状态机与配方计算契约', () => {
     expectStateGateRejection(blocked, '草稿大货处方开加料单应被前置状态门拒绝');
     expect(
       failureCode(blocked),
-      `前置门拒绝码应为 BUSINESS_ERROR（AppError::business → error.rs:824 行），实得 ${JSON.stringify(blocked.code)}`
+      `前置门拒绝码应为 BUSINESS_ERROR（AppError::business → error.rs 行），实得 ${JSON.stringify(blocked.code)}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
     expect(
       blocked.message,
@@ -414,7 +414,7 @@ test.describe.serial('255 加料处方状态机与配方计算契约', () => {
     expect(
       typeof recipeBack.approved_at === 'string' &&
         !Number.isNaN(Date.parse(String(recipeBack.approved_at))),
-      `approved_at 必须是可解析时间串（recipe_state.rs:37 行 Set(Some(now))），实得 ${JSON.stringify(recipeBack.approved_at)}`
+      `approved_at 必须是可解析时间串（recipe_state.rs 行 Set(Some(now))），实得 ${JSON.stringify(recipeBack.approved_at)}`
     ).toBe(true);
 
     // 加料单建单：体填不存在主键、路径填真单 → 证明 handler:264 行的覆盖（缺陷四）
@@ -457,7 +457,7 @@ test.describe.serial('255 加料处方状态机与配方计算契约', () => {
     );
     expect(
       typeof additionApproved.approved_at === 'string',
-      '加料审核时间必须真写进去（addition.rs:183 行）'
+      '加料审核时间必须真写进去（addition.rs 行）'
     ).toBe('string');
     approvedAtAfterApprove = String(additionApproved.approved_at);
     updatedAtAfterApprove = String(additionApproved.updated_at);
@@ -477,7 +477,7 @@ test.describe.serial('255 加料处方状态机与配方计算契约', () => {
     expect(closedOut.data.status, '关闭出参与回读同值').toBe(CLOSED);
     expect(
       Number(additionClosed.approved_by),
-      '关闭不得清空审核人（实体无关闭审计列，addition.rs:194-197 行只写两列）'
+      '关闭不得清空审核人（实体无关闭审计列，addition.rs 行只写两列）'
     ).toBe(sessionUserId);
     expect(additionClosed.approved_at, '关闭不得清空审核时间，必须与审核腿回读值逐字符相同').toBe(
       approvedAtAfterApprove
@@ -578,7 +578,7 @@ test.describe.serial('255 加料处方状态机与配方计算契约', () => {
     expect(ghostClose.status, '不存在主键的关闭腿应 404').toBe(404);
     expect(failureCode(ghostClose)).toBe(APP_ERROR_CODES.NOT_FOUND);
 
-    // 不存在主单：加料列表先校验主单存在（recipe_crud.rs:380 行透传 get_by_id）
+    // 不存在主单：加料列表先校验主单存在（recipe_crud.rs 行透传 get_by_id）
     const ghostList = await fetchFailEnvelope(
       page,
       `/production/production-recipes/${GHOST_ID}/additions`
@@ -717,7 +717,7 @@ test.describe.serial('255 加料处方状态机与配方计算契约', () => {
     await anon.close();
 
     // 非授权角色档：dyeing_master 对 production-recipes 只有 read
-    // （init_service_ops/permission.rs:977 行 ("production-recipes","read")，无 approve、无 create）
+    // （init_service_ops/permission.rs 行 ("production-recipes","read")，无 approve、无 create）
     const gateRecipe = await createRecipe(page, 'PERM');
     const gateRecipeId = Number(gateRecipe.id);
     deferCleanup(
@@ -740,7 +740,7 @@ test.describe.serial('255 加料处方状态机与配方计算契约', () => {
     );
     expectDenied(
       deniedApprove,
-      'dyeing_master 无 production-recipes:approve 键（键由 URL 段推导，permission.rs:259 行起）'
+      'dyeing_master 无 production-recipes:approve 键（键由 URL 段推导，permission.rs 行起）'
     );
     const deniedClose = await apiCallExpectFail(
       page,
@@ -756,7 +756,7 @@ test.describe.serial('255 加料处方状态机与配方计算契约', () => {
     );
     expectDenied(
       deniedCalc,
-      'calculate 末段不在 PATH_ACTION_KEYWORDS（permission.rs:233-249 行），动作由方法派生，dyeing_master 无该键'
+      'calculate 末段不在 PATH_ACTION_KEYWORDS（permission.rs 行），动作由方法派生，dyeing_master 无该键'
     );
 
     // 换回本 worker 账号回读：三条被拒写腿都没有落库

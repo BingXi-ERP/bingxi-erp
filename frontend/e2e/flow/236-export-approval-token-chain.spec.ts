@@ -7,21 +7,21 @@ import { loginViaUI, loginAsRole, apiCallRaw, apiCallExpectFail, failureCode, AP
  * 判据全部取自服务端源码，注释里的 文件:行号 就是断言依据，不是装饰。
  *
  * 七枚端点的真实形状（逐条对着 routes + handler 返回值确认）：
- * - POST /api/v1/erp/export-approvals            routes/system.rs:439 + export_approval_handler.rs:44
+ * - POST /api/v1/erp/export-approvals            routes/system.rs + export_approval_handler.rs
  *   出参 = detail_masked(masked_json)（handler:53 / service:1207,1316），键 = export_approval_request 模型字段名（snake_case），
  *   且 download_token / token_hash 被强制置 null（service:1320-1321）——明文只能经 token-once 取一次。
  * - GET  /api/v1/erp/export-approvals            handler:58   → {items,total,page,page_size}（handler:73-78），非 admin 被强制覆盖 applicant（handler:69）
  * - GET  /api/v1/erp/export-approvals/pending-for-me handler:84 → 同上信封，集合只含 pending / pending_l2（service:1225-1227）
- * - POST /api/v1/erp/export-inspections          export_inspection_routes.rs:14 + export_inspection_handler.rs:53
- * - GET  /api/v1/erp/export-inspections          export_inspection_routes.rs:12 → PaginatedResponse{items,total,page,page_size}（handler:16-36）
- * - GET  /api/v1/erp/export-inspections/certificates/{id}   export_inspection_routes.rs:26 + certificate_of_origin_handler.rs:28
+ * - POST /api/v1/erp/export-inspections          export_inspection_routes.rs + export_inspection_handler.rs
+ * - GET  /api/v1/erp/export-inspections          export_inspection_routes.rs → PaginatedResponse{items,total,page,page_size}（handler:16-36）
+ * - GET  /api/v1/erp/export-inspections/certificates/{id}   export_inspection_routes.rs + certificate_of_origin_handler.rs
  *   直接 `Json(json!(item))`，不套 ApiResponse 信封（与全站成功信封不一致，本文件钉成断言并列为发现项）。
- * - GET  /api/v1/erp/export-inspections/certificates/{id}/print export_inspection_routes.rs:39 + print_handler.rs:249
- *   → docx 二进制（print_handler.rs:255 docx_response），不是 JSON。
+ * - GET  /api/v1/erp/export-inspections/certificates/{id}/print export_inspection_routes.rs + print_handler.rs
+ *   → docx 二进制（print_handler.rs docx_response），不是 JSON。
  *
- * 状态词表唯一事实来源 = 写入方 models/export_approval_request.rs:37-65（全小写）：
+ * 状态词表唯一事实来源 = 写入方 models/export_approval_request.rs（全小写）：
  * pending / pending_l2 / approved / rejected / expired / cancelled / consumed / exhausted。
- * 敏感资源清单与取值同源 models/export_approval_request.rs:222-242（customer/supplier/dye_recipe/price_list/finance_report/audit_log/product）。
+ * 敏感资源清单与取值同源 models/export_approval_request.rs（customer/supplier/dye_recipe/price_list/finance_report/audit_log/product）。
  * 受理门四态文案同源 export_approval_service.rs：缺令牌 :848、无效令牌 :733 与 :750、
  * 非本人 :855、异资源 :861、非 approved :770、已使用 :764。三条不同拒因同时在场才证明令牌真被读。
  *
@@ -61,12 +61,12 @@ interface TokenOncePayload {
   fingerprint?: string;
 }
 
-const STATUS_PENDING = 'pending'; // export_approval_request.rs:41
-const STATUS_APPROVED = 'approved'; // export_approval_request.rs:43
-const STATUS_CONSUMED = 'consumed'; // export_approval_request.rs:47
+const STATUS_PENDING = 'pending'; // export_approval_request.rs
+const STATUS_APPROVED = 'approved'; // export_approval_request.rs
+const STATUS_CONSUMED = 'consumed'; // export_approval_request.rs
 const IN_FLIGHT = [STATUS_PENDING, 'pending_l2']; // service:1225-1227 待办集合
 
-const MSG_NO_TOKEN = '敏感资源导出需先获得导出审批令牌'; // export_approval_service.rs:848
+const MSG_NO_TOKEN = '敏感资源导出需先获得导出审批令牌'; // export_approval_service.rs
 const MSG_BAD_TOKEN = '下载令牌无效'; // :733 空/未命中 与 :750 历史行回退未命中
 const MSG_CONSUMED = '导出令牌已被使用（状态 consumed），一次性令牌禁止复用'; // :764-767
 const MSG_RESOURCE_MISMATCH = '导出令牌资源类型不匹配'; // :861-864
@@ -303,7 +303,7 @@ test.describe('P236 导出审批令牌链与商检记录/产地证出参形状',
     const afterL1 = await apiCallRaw<ApprovalRow>(page, 'POST', `/export-approvals/${high.id}/approve`, { comments: 'e2e 一级' });
     expect(
       [STATUS_APPROVED, ...IN_FLIGHT],
-      `一级审批后状态必须落在写入方词表的可推进集合内，实际 ${afterL1.status}（词表见 export_approval_request.rs:37-65）`
+      `一级审批后状态必须落在写入方词表的可推进集合内，实际 ${afterL1.status}（词表见 export_approval_request.rs）`
     ).toContain(afterL1.status);
 
     const pending = await apiCallRaw<ApprovalPage>(page, 'GET', '/export-approvals/pending-for-me?page=1&page_size=100');
@@ -379,7 +379,7 @@ test.describe('P236 导出审批令牌链与商检记录/产地证出参形状',
     if (certList.status === 200) {
       expect(Array.isArray(certList.body.items), `证书集合出参 items 应为数组，实际 ${JSON.stringify(certList.body).slice(0, 160)}`).toBe(true);
       expect(typeof certList.body.total, '证书集合出参缺 total 键').toBe('number');
-      expect(certList.body.page, '证书集合出现了 page 键（与 handler certificate_of_origin_handler.rs:13-24 不符，需重新定性）').toBeUndefined();
+      expect(certList.body.page, '证书集合出现了 page 键（与 handler certificate_of_origin_handler.rs 不符，需重新定性）').toBeUndefined();
       expect(certList.body.page_size, '证书集合出现了 page_size 键（同上）').toBeUndefined();
       console.log(`[236] 证书集合 inspection_id=${inspectionId} total=${certList.body.total}（无 page/page_size，信封漂移已钉住）`);
     } else {
@@ -413,7 +413,7 @@ test.describe('P236 导出审批令牌链与商检记录/产地证出参形状',
       expect(print.status, `产地证打印应 200，实际 ${print.status}`).toBe(200);
       expect(
         print.headers['content-type'] ?? '',
-        `打印腿应回 docx MIME（print_handler.rs:255 docx_response），实际 ${print.headers['content-type']}`
+        `打印腿应回 docx MIME（print_handler.rs docx_response），实际 ${print.headers['content-type']}`
       ).toContain('wordprocessingml');
       expect(print.buf.length, '打印腿返回零字节 docx').toBeGreaterThan(0);
       expect(print.buf.readUInt16LE(0), `docx 应以 zip 魔数 PK 开头，实际 ${print.buf.subarray(0, 2).toString('hex')}`).toBe(0x4b50);

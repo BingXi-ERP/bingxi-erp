@@ -9,20 +9,20 @@ import { loginViaUI, loginAsRole, apiCall, apiCallRaw, apiCallExpectFail, API_BA
  * 判据源全部取自服务端源码，本文件注释里的 文件:行号 就是断言的依据，不是装饰。
  *
  * 三条腿的真实形状（逐条对着 handler 返回值确认，不按"导出=下载文件"想当然）：
- * - GET /api/v1/erp/export                       report_engine_handler.rs:190  → JSON 信封
+ * - GET /api/v1/erp/export                       report_engine_handler.rs  → JSON 信封
  *   ExportReportResponse{data,format,filename}，format=csv 时 data 是 CSV 原文（可直接做列名成员判定）。
- * - GET /api/v1/erp/audit-logs/export            audit_log_handler.rs:376      → xlsx 二进制，
+ * - GET /api/v1/erp/audit-logs/export            audit_log_handler.rs      → xlsx 二进制，
  *   先 require_admin_role(:384) 再 enforce_export_download_secured(:391)，无令牌 fail-closed。
- * - GET /api/v1/erp/login-logs/export            login_security_handler.rs:418 → xlsx 二进制，
+ * - GET /api/v1/erp/login-logs/export            login_security_handler.rs → xlsx 二进制，
  *   handler 内既不读 download_token 也不做角色门（与审计日志腿形成不对称，本文件把它钉成断言）。
- * - GET /api/v1/erp/crm/leads/export             crm_handler.rs:261            → xlsx 二进制，
+ * - GET /api/v1/erp/crm/leads/export             crm_handler.rs            → xlsx 二进制，
  *   行级 data_scope + 字段级掩码：非 admin 且无数据权限行时 mask_export_pii_columns(:537)。
- * - GET /api/v1/erp/sales/sales-prices/export    sales_price_handler.rs:395    → xlsx 二进制，
+ * - GET /api/v1/erp/sales/sales-prices/export    sales_price_handler.rs    → xlsx 二进制，
  *   受理门 resource_type="price_list"，无令牌 fail-closed。
- * - GET /api/v1/erp/production/cost-collections/export cost_collection_handler.rs:379 → xlsx 二进制，
+ * - GET /api/v1/erp/production/cost-collections/export cost_collection_handler.rs → xlsx 二进制，
  *   只套行级 data_scope，无审批令牌门、无字段级掩码（与同族的 sales-prices 腿不对称，列为发现项）。
  *
- * 掩码算法同源判据：utils/field_mask.rs:4-12 mask_phone 取前 3 位 + '****' + 后 4 位，
+ * 掩码算法同源判据：utils/field_mask.rs mask_phone 取前 3 位 + '****' + 后 4 位，
  * 11 位手机号脱敏后仍是 11 字符，所以"字节数变短"不可用作判据，必须做值的成员判定。
  *
  * xlsx 是 zip 容器（Cargo.toml:129 rust_xlsxwriter 0.98，条目按 deflate 存储），
@@ -109,7 +109,7 @@ function assertXlsxEnvelope(res: { status: () => number; headers: () => Record<s
   expect(ct, `GET ${path} Content-Type 应为 xlsx MIME，实际 ${ct}`).toContain('spreadsheetml');
 }
 
-const TOKEN_GATE_MESSAGE = '敏感资源导出需先获得导出审批令牌'; // export_approval_service.rs:848
+const TOKEN_GATE_MESSAGE = '敏感资源导出需先获得导出审批令牌'; // export_approval_service.rs
 
 interface ReportColumn {
   field: string;
@@ -148,7 +148,7 @@ test.describe('P235 导出族列可见性与受理门配对', () => {
     expect(payload.format, `出参 format 应回显 csv，实际 ${payload.format}`).toBe('csv');
     expect(
       payload.filename,
-      `出参 filename 应为 <template_id>.csv（report_engine_handler.rs:230），实际 ${payload.filename}`
+      `出参 filename 应为 <template_id>.csv（report_engine_handler.rs），实际 ${payload.filename}`
     ).toBe(`${(tpl as ReportTemplate).id}.csv`);
     expect(typeof payload.data, `出参 data 必须是 CSV 文本，实际类型 ${typeof payload.data}`).toBe('string');
     expect(payload.data.length, 'CSV 文本为空＝导出腿只出信封不出内容').toBeGreaterThan(0);
@@ -208,7 +208,7 @@ test.describe('P235 导出族列可见性与受理门配对', () => {
     expect(noToken.status, `admin 无令牌导出应 403（fail-closed），实际 ${noToken.status}`).toBe(403);
     expect(
       noToken.message ?? '',
-      `拒绝原因应逐字同源 export_approval_service.rs:848，实际：${noToken.message}`
+      `拒绝原因应逐字同源 export_approval_service.rs，实际：${noToken.message}`
     ).toContain(TOKEN_GATE_MESSAGE);
 
     const fakeToken = await apiCallExpectFail(page, 'GET', '/audit-logs/export?download_token=e2e235-not-a-real-token');
@@ -218,7 +218,7 @@ test.describe('P235 导出族列可见性与受理门配对', () => {
       `伪造令牌的拒绝原因不应是"缺令牌"文案（否则说明令牌根本没被读），实际：${fakeToken.message}`
     ).not.toContain(TOKEN_GATE_MESSAGE);
 
-    // manager：先撞 require_admin_role(audit_log_handler.rs:384)，其文案必然不同于受理门文案
+    // manager：先撞 require_admin_role(audit_log_handler.rs)，其文案必然不同于受理门文案
     await loginAsRole(page, 'manager');
     const manager = await apiCallExpectFail(page, 'GET', '/audit-logs/export');
     expect(manager.status, `manager 导出审计日志应 403，实际 ${manager.status}`).toBe(403);
@@ -236,10 +236,10 @@ test.describe('P235 导出族列可见性与受理门配对', () => {
     assertXlsxEnvelope(res, '/login-logs/export');
 
     // 对照腿：同族 /audit-logs/export 在完全相同的无令牌条件下是 403（上一条用例已证），
-    // 这里断言 200 就是把 login_security_handler.rs:418 不读 download_token 的现状钉成回归护栏。
+    // 这里断言 200 就是把 login_security_handler.rs 不读 download_token 的现状钉成回归护栏。
     const text = await xlsxTextOf(res);
     const cols = headerCellCount(text);
-    expect(cols, `登录日志导出表头单元格数为 ${cols}（应为 8 列，见 login_security_handler.rs:443-452）`).toBe(8);
+    expect(cols, `登录日志导出表头单元格数为 ${cols}（应为 8 列，见 login_security_handler.rs）`).toBe(8);
     expect(text, '导出的工作表里没有任何表头文本条目').toContain('<is>');
     console.log(`[235] /login-logs/export 无令牌 200，表头列数=${cols}，解压 XML 文本 ${text.length} 字符`);
 
@@ -280,14 +280,14 @@ test.describe('P235 导出族列可见性与受理门配对', () => {
     assertXlsxEnvelope(adminExport, '/crm/leads/export');
     const adminText = await xlsxTextOf(adminExport);
     expect(adminText, `admin 导出应含线索原文手机号 ${phone}（列表有、导出无＝两条腿读的不是同一份数据）`).toContain(phone);
-    expect(adminText, `admin 导出不该出现掩码占位 ${maskedPhone}（admin 判据源 crm_handler.rs:293 is_admin_role）`).not.toContain(maskedPhone);
+    expect(adminText, `admin 导出不该出现掩码占位 ${maskedPhone}（admin 判据源 crm_handler.rs is_admin_role）`).not.toContain(maskedPhone);
 
     await loginAsRole(page, 'manager');
     const managerExport = await getRaw(page, '/crm/leads/export');
     assertXlsxEnvelope(managerExport, '/crm/leads/export');
     const managerText = await xlsxTextOf(managerExport);
-    expect(managerText, `manager 导出仍含未脱敏手机号 ${phone}＝"列表打码、导出原文"旁路（判据源 crm_handler.rs:296-299 默认掩码）`).not.toContain(phone);
-    expect(managerText, `manager 导出应出现掩码形态 ${maskedPhone}（field_mask.rs:4-12）`).toContain(maskedPhone);
+    expect(managerText, `manager 导出仍含未脱敏手机号 ${phone}＝"列表打码、导出原文"旁路（判据源 crm_handler.rs 默认掩码）`).not.toContain(phone);
+    expect(managerText, `manager 导出应出现掩码形态 ${maskedPhone}（field_mask.rs）`).toContain(maskedPhone);
 
     // 列基数配对：掩码只改值不删列，两侧表头单元格数必须相同
     const adminCols = headerCellCount(adminText);
@@ -313,7 +313,7 @@ test.describe('P235 导出族列可见性与受理门配对', () => {
     expect(fakeToken.status, `伪造令牌价格表导出应 403，实际 ${fakeToken.status}`).toBe(403);
 
     // 跨资源令牌未被本端点误吃：拿 customer 资源的合法形状令牌打价格表导出必然不是 200
-    // （资源类型比对在 sales_price_handler.rs:422 传入 expected="price_list"）
+    // （资源类型比对在 sales_price_handler.rs 传入 expected="price_list"）
     const crossRes = await getRaw(page, '/sales/sales-prices/export?download_token=e2e235-customer-shaped-token');
     expect(crossRes.status(), `非本资源令牌打价格表导出不得 200，实际 ${crossRes.status()}`).not.toBe(200);
     console.log(`[235] sales-prices/export 受理门：无令牌=${noToken.status}"${noToken.message}" 伪令牌=${fakeToken.status} 异资源令牌=${crossRes.status()}`);
@@ -325,10 +325,10 @@ test.describe('P235 导出族列可见性与受理门配对', () => {
     assertXlsxEnvelope(res, '/production/cost-collections/export');
     const text = await xlsxTextOf(res);
     const cols = headerCellCount(text);
-    expect(cols, `成本归集导出表头列数为 ${cols}：0 表示 handler 只回了信封没有表结构（cost_collection_handler.rs:402 build_collections_table）`).toBeGreaterThan(0);
+    expect(cols, `成本归集导出表头列数为 ${cols}：0 表示 handler 只回了信封没有表结构（cost_collection_handler.rs build_collections_table）`).toBeGreaterThan(0);
     console.log(`[235] /production/cost-collections/export admin 无 download_token 直接 200，列数=${cols}（对照：sales-prices 同条件是 403）`);
 
-    // 行级 data_scope 是唯一在生效的层（cost_collection_handler.rs:385）：
+    // 行级 data_scope 是唯一在生效的层（cost_collection_handler.rs）：
     // manager 侧做列表腿/导出腿可达性配对，两边口径必须一致
     await loginAsRole(page, 'manager');
     const listRes = await getRaw(page, '/production/cost-collections?page=1&page_size=1');

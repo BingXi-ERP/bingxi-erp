@@ -23,7 +23,7 @@ const SCOPE_TYPE_VALUES: string[] = ["ALL", "DEPT", "DEPT_AND_BELOW", "SELF", "C
  *
  * 入参。角色 name/code 与账号 username 都带本次运行 Date.now().toString(36) 后缀，逐次唯一，
  * 跨用例与跨 worker 不撞；code 取值同时满足后端角色编码规范（小写字母、数字、下划线，3-50 字符，
- * services/role_permission_service.rs:271-282）。权限键一律引 frontend/src/constants/permissions.ts
+ * services/role_permission_service.rs）。权限键一律引 frontend/src/constants/permissions.ts
  * 的 PERMISSIONS 权威词表并拆成 resource_type/action 两段传入，不在本文件自造字符串字面量。
  * 口令一律 testPassword()（与 globalSetup 建号同源，已过强度校验）。
  *
@@ -31,8 +31,8 @@ const SCOPE_TYPE_VALUES: string[] = ["ALL", "DEPT", "DEPT_AND_BELOW", "SELF", "C
  * PUT /roles/{id}（UpdateRolePayload{name,description,is_system}，无 code 字段）、
  * PUT /roles/{id}/permissions（Vec<BatchPermissionEntry{resource_type,action,allowed}>）、
  * GET /roles、GET /roles/{id}、GET /roles/{id}/permissions、DELETE /roles/{id}、
- * GET /data-permissions/scope-types，注册见 backend/src/routes/iam.rs:38-62 与
- * backend/src/routes/analytics.rs:400-407；被授权账号腿打 GET /roles（同一路由的读面）。
+ * GET /data-permissions/scope-types，注册见 backend/src/routes/iam.rs 与
+ * backend/src/routes/analytics.rs；被授权账号腿打 GET /roles（同一路由的读面）。
  *
  * 存什么。roles 行的 name/code/description/is_system/data_scope 与 role_permission 关联行的
  * (role_id, resource_type, action, allowed, resource_id=null) 角色级授予语义：整批替换只写角色级行
@@ -41,27 +41,27 @@ const SCOPE_TYPE_VALUES: string[] = ["ALL", "DEPT", "DEPT_AND_BELOW", "SELF", "C
  *
  * 存哪里。PostgreSQL roles 与 role_permission 表（授予行走 services/role_permission_service.rs
  * 的单事务 diff：锁角色行 → 读现状 → 增/改/删 → 终集合 SoD 复算 → 一条批量审计）；
- * 鉴权判定读 role_permission 并带 role_id 维度缓存（middleware/permission.rs:450-471），
+ * 鉴权判定读 role_permission 并带 role_id 维度缓存（middleware/permission.rs），
  * 整批替换提交成功后按 role_id 失效，故本文件的「先授予后撤销」次序不会撞到过期缓存里的旧判定。
  *
  * 契约真相（逐条对着后端源核对，与本用例判据直接相关五点）。
- * 1) 列表出参是 RoleListResponse{roles,total}（handlers/role_handler.rs:81-84、124-153），
+ * 1) 列表出参是 RoleListResponse{roles,total}（handlers/role_handler.rs、124-153），
  *    不是通用 PaginatedResponse 的 items；total 恒等于 roles 长度（该端点全量返回无分页）。
  * 2) GET /roles/{id}/permissions 与 PUT 的出参元素是 PermissionResponse
- *    {id,resource_type,resource_id,action,allowed}（handlers/role_handler.rs:70-76），键名 snake_case；
- *    PUT 返回的是替换后的终集合（handlers/role_handler.rs:553-601 用 result.after 序列化），
+ *    {id,resource_type,resource_id,action,allowed}（handlers/role_handler.rs），键名 snake_case；
+ *    PUT 返回的是替换后的终集合（handlers/role_handler.rs 用 result.after 序列化），
  *    与 GET 读回的成员集合同源，因此本文件把「写入集合 = 读回集合」按排序后逐元素相等断言，不用包含。
- * 3) 粗域展开只在前端路由守卫，后端 middleware/permission.rs:709-727 matches_permission 是
+ * 3) 粗域展开只在前端路由守卫，后端 middleware/permission.rs matches_permission 是
  *    resource_type 与 action 的精确匹配（只有 "*" 通配例外）：新角色授予 roles:read 后该账号
  *    才能读 GET /roles，撤销到空集后同一会话同一请求必被后端拒 403，机器码 FORBIDDEN
- *    （utils/error.rs:787 CODE_FORBIDDEN、:821 映射）。这是本文件生效证据腿的判据，界面按钮显隐只作旁证。
+ *    （utils/error.rs CODE_FORBIDDEN、:821 映射）。这是本文件生效证据腿的判据，界面按钮显隐只作旁证。
  * 4) 非法输入的真实拒绝形状彼此不同：角色不存在=404 NotFound
- *    （services/role_permission_service.rs:882-886 lock_exclusive 后 ok_or_else not_found）；
+ *    （services/role_permission_service.rs lock_exclusive 后 ok_or_else not_found）；
  *    resource_type/action 为空或 (resource_type,action) 重复=400 ValidationError（同文件 846-878）；
  *    超管与系统内置角色的授予改写=400 BusinessError（同文件 887-896）；
- *    删除系统内置角色=400 BadRequest（handlers/role_handler.rs:439-443）。本文件逐形断状态码与机器码，
+ *    删除系统内置角色=400 BadRequest（handlers/role_handler.rs）。本文件逐形断状态码与机器码，
  *    不把 404 与 400 并成「任一非 2xx」。
- * 5) GET /data-permissions/scope-types 是词表常量端点（handlers/data_permission_handler.rs:296-325），
+ * 5) GET /data-permissions/scope-types 是词表常量端点（handlers/data_permission_handler.rs），
  *    出参元素键为 value/label/description；本文件断它的成员集合与该处字面量逐一对齐，
  *    与写入侧校验表 valid_scope_types（同文件 166-167）同源。
  */
@@ -130,7 +130,7 @@ async function findRoleByCode(page: Page, code: string): Promise<RoleResponse | 
 }
 
 /**
- * 界面新建对话框的三个表单项次序（views/roles/index.vue:82-90）：
+ * 界面新建对话框的三个表单项次序（views/roles/index.vue）：
  * 0 名称（input）、1 编码（input）、2 描述（textarea）。靠 textarea 区分角色表单与权限对话框。
  */
 const roleDialog = (page: Page): Locator =>

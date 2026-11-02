@@ -92,17 +92,17 @@ export interface ApiResponse<T = unknown> {
 // 全站 HTTP 失败体已收敛为一种形状（`utils/error.rs` 的 `ErrorResponse` 结构体）：
 //   { code: "<字符串机器码>", message: "<脱敏常量或可外显文案>", trace_id: "<uuid>", timestamp: <i64> }
 // 产出方：
-//   ① utils/error.rs:143-148 `AppError::into_response()`（状态码由
-//      error_status_and_type()（error.rs:168-182）决定）；
+//   ① utils/error.rs `AppError::into_response()`（状态码由
+//      error_status_and_type()（error.rs）决定）；
 //   ② utils/response.rs `unauthorized_response`/`forbidden_response`（auth/permission 中间件）
 //      与 middleware/auth_context.rs `AuthRejection::into_response`——三者都复用同一个
 //      `ErrorResponse` 结构体，因此键与类型完全相同，只是 message 原样外显固定文案。
 // 原先并存的两种数字 code 失败体（ApiResponse::error / error_with_status）与
 // `{ error: "Unauthorized", message }` 已从后端删除，失败体 code 恒为字符串。
 //
-// 唯一尚未收敛的例外：middleware/csrf.rs:234-242 `csrf_error_response()` 绕过 AppError
+// 唯一尚未收敛的例外：middleware/csrf.rs `csrf_error_response()` 绕过 AppError
 // 直出 `{ success: false, code: "<机器码>", message, data: null }`，配 HTTP 403，
-// 且消费竞败时响应头带 x-new-csrf-token（csrf.rs:146-152）。它的 code 同为字符串机器码，
+// 且消费竞败时响应头带 x-new-csrf-token（csrf.rs）。它的 code 同为字符串机器码，
 // 因此在比较点用 failureCode() 取码，避免与其它 403 判据互相误判。
 // ============================================================================
 
@@ -128,25 +128,25 @@ export const CSRF_ERROR_CODES = {
 } as const;
 
 /**
- * AppError 机器码（backend/src/utils/error.rs:461-476 AppError::error_code()）。
+ * AppError 机器码（backend/src/utils/error.rs AppError::error_code()）。
  * 仅登记 e2e 负例实际断言到的三类；新增判据时在此补一行，不在用例里散写字面量。
  */
 export const APP_ERROR_CODES = {
-  /** error.rs:467 AppError::ValidationError */
+  /** error.rs AppError::ValidationError */
   VALIDATION_ERROR: 'VALIDATION_ERROR',
-  /** error.rs:468-469 BusinessError / BusinessErrorDisplayable */
+  /** error.rs BusinessError / BusinessErrorDisplayable */
   BUSINESS_ERROR: 'BUSINESS_ERROR',
-  /** error.rs:464 AppError::BadRequest */
+  /** error.rs AppError::BadRequest */
   BAD_REQUEST: 'BAD_REQUEST',
-  /** utils/error.rs:709 `CODE_FORBIDDEN`；中间件与 AppError::PermissionDenied 同码 */
+  /** utils/error.rs `CODE_FORBIDDEN`；中间件与 AppError::PermissionDenied 同码 */
   FORBIDDEN: 'FORBIDDEN',
-  /** utils/error.rs:739 AppError::NotFound 分支的机器码 */
+  /** utils/error.rs AppError::NotFound 分支的机器码 */
   NOT_FOUND: 'NOT_FOUND',
 } as const;
 
 /**
  * 失败响应体：统一形状 `{code,message,trace_id,timestamp}`，失败时 code 恒为字符串机器码
- * （`utils/error.rs` 的 `ErrorResponse`）。`success`/`data` 仅由 csrf.rs:234-242 的直出体携带，
+ * （`utils/error.rs` 的 `ErrorResponse`）。`success`/`data` 仅由 csrf.rs 的直出体携带，
  * 该体没有 trace_id/timestamp。
  *
  * `code` 仍保留 `number` 分支：`apiCall` 解析的是成功信封 `ApiResponse`（数字 200），
@@ -288,7 +288,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
       page,
       '/warehouse',
       `${API_PREFIX}/warehouses`,
-      // warehouse_handler.rs:88 define_crud_handlers! → warehouse_service::list PaginatedResponse
+      // warehouse_handler.rs define_crud_handlers! → warehouse_service::list PaginatedResponse
       'items'
     );
   } catch (e) {
@@ -327,7 +327,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   // ---- 2. 产品（UI 创建）----
   // 前置：确保"面料"产品分类存在（表单 category_id 必填，系统初始化不创建分类种子数据）
   try {
-    // /product-categories：product_category_handler.rs:44 define_crud_handlers! →
+    // /product-categories：product_category_handler.rs define_crud_handlers! →
     // product_category_service::list 返回 PaginatedResponse，data 形状为 {items,total,page,page_size}。
     // 单一形状直读（'items'）：禁止裸数组容错与 `|| []` 兜底——后者把 items 键缺失
     // 当成"无分类"，分类端点若改形会静默走创建分支重复建"面料"。
@@ -341,7 +341,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     if (fabricCat) {
       ctx.productCategoryIds.push(fabricCat.id);
     } else {
-      // create（crud_macro.rs:89-134 define_crud_handlers!）返回 ApiResponse<to_value(item)>，
+      // create（crud_macro.rs define_crud_handlers!）返回 ApiResponse<to_value(item)>，
       // 载荷即实体本身，故泛型参数写载荷 { id?: number }，读 created.data.id；
       // 若把泛型参数写成 { data?: { id?: number } } 会双重包装，永远取不到 id。
       const created = await apiCall<{ id?: number }>(page, 'POST', '/product-categories', {
@@ -362,7 +362,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
       page,
       '/product',
       `${API_PREFIX}/products`,
-      // product_handler.rs:247 list_products → ApiResponse::success(PaginatedResponse) → {items}
+      // product_handler.rs list_products → ApiResponse::success(PaginatedResponse) → {items}
       'items'
     );
   } catch (e) {
@@ -371,7 +371,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   }
   // 夹具基数假设：消费用例要求 ctx.productIds 至少 3 个——
   // 03-production「3-8 创建 BOM」用 items: productIds.slice(1)（需 ≥2 才非空，
-  // 否则后端 bom_handler.rs:33 items min=1 合法 400）；
+  // 否则后端 bom_handler.rs items min=1 合法 400）；
   // 01-p2p「1-6b」用 ctx.productIds[1] 作「产品对不上」负例（需 ≥2 才不 undefined）。
   // 跨分片共库下 readEntityIds 可能读到 1~2 个现有产品（含 global-setup 全局种子先建的），
   // 故无条件补齐到至少 3：读到的现有 id（含 seed 产品）全部保留并计入基数，
@@ -524,7 +524,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
         page,
         '/departments',
         `${API_PREFIX}/departments`,
-        // department_handler.rs:53 define_crud_handlers! → department_service::list PaginatedResponse → {items}
+        // department_handler.rs define_crud_handlers! → department_service::list PaginatedResponse → {items}
         'items'
       );
     } catch (e) {
@@ -643,7 +643,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   }
 
   // ---- 9.5 报价专用产品（自建、显式带 unit、读回落库真实单位）----
-  // 后端 validate_item_units_against_products（quotation_ops/crud.rs:117）要求报价行 unit
+  // 后端 validate_item_units_against_products（quotation_ops/crud.rs）要求报价行 unit
   // 逐字符等于所引用产品 product.unit（单一真源，不一致直接 400，不静默覆盖）。
   // ctx.productIds 优先复用库中已有产品（见上方 unit 未知），报价块若写死 '米' 会与
   // 历史产品单位（可能为 个/公斤/码…）冲突。故本用例无条件自建一个带 unit 的产品，
@@ -750,9 +750,9 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   }
 
   // ---- 11. 染色批次（API 种子，flow/31d-auto-notification-chain.spec.ts 通知链前置）----
-  // 选 API 种子而非 UI 表单：dye-batch/index.vue:415-439 表单契约必填 greige_fabric_id
+  // 选 API 种子而非 UI 表单：dye-batch/index.vue 表单契约必填 greige_fabric_id
   // （选项源=坯布列表，本 ensure 步骤序内无坯布保障）且色号非空即要求缸号；色号还必须在
-  // 色卡档案 color_card_items.color_code 上恰好命中一条（dye_batch_handler.rs:204-254
+  // 色卡档案 color_card_items.color_code 上恰好命中一条（dye_batch_handler.rs
   // resolve_dye_color_identity）——"坯布非空 + 色号入档"两个跨实体前置塞进通用种子序列退化
   // 风险大。染色批次 UI 创建不是本通知链的被测对象，共用种子重复 UI 路径即"第二套实现"反
   // 模式；API 秒级确定性，把预算还给用例本体。createDyeBatchUI 保留并已与表单真实必填对齐
@@ -764,7 +764,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
       // 超时（批次页用 useTableApi 构造时自动初始加载，权限键 dye-batches:read）
       '/dye-batch',
       `${API_PREFIX}/production/dye-batches`,
-      // dye_batch_handler.rs:59 list_dye_batches → ApiResponse<PaginatedResponse> → {items}
+      // dye_batch_handler.rs list_dye_batches → ApiResponse<PaginatedResponse> → {items}
       'items'
     );
   } catch (e) {
@@ -775,7 +775,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     const archive = await seedColorCardArchive(page, { context: 'ensureTestEntities/dye-batch' });
     if (!ctx.dyeLotNo) ctx.dyeLotNo = genDyeLotNo();
     const result = await apiCall<{ id?: number }>(page, 'POST', '/production/dye-batches', {
-      // batch_no 不手工传入：dye_batch_handler.rs:320-345 对缺省缸号走
+      // batch_no 不手工传入：dye_batch_handler.rs 对缺省缸号走
       // DocumentNumberGenerator::insert_with_no_retry（事务内取号 + 23505 重试），
       // 手写时间戳号跨分片同秒撞 UNIQUE 概率非零（后端注释原话），故不手工传入。
       color_no: archive.colorCode,
@@ -982,7 +982,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
       page,
       '/custom-orders',
       `${API_PREFIX}/custom-orders`,
-      // custom_order_handler.rs:136 list_custom_orders → PagedResponse{items,...} → {items}
+      // custom_order_handler.rs list_custom_orders → PagedResponse{items,...} → {items}
       'items'
     );
   } catch (e) {
@@ -1003,7 +1003,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
       page,
       '/color-cards/list',
       `${API_PREFIX}/color-cards`,
-      // color_card/crud.rs:29 list_color_cards → PagedResponse{items,...} → {items}
+      // color_card/crud.rs list_color_cards → PagedResponse{items,...} → {items}
       'items'
     );
   } catch (e) {
@@ -1131,7 +1131,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
 
   // ---- 26. 验布记录（带 fabric_width_inches，供 flow20 定级→关闭链路使用）----
   // 后端 grade_inspection 要求 fabric_width_inches 非空（四分制计算），缺失则 400。
-  // 路由前缀 /production/fabric-inspections（routes/production.rs:276）。
+  // 路由前缀 /production/fabric-inspections（routes/production.rs）。
   try {
     const inspections = await apiCallRaw<{ items?: Array<{ id: number }> }>(
       page,
@@ -1165,7 +1165,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
  * （一个分片约 13 个测试 × 5 分钟 ensure 上限，最坏情况也不会触及 20 分钟分片强杀）。
  */
 /**
- * 通知列表项。后端 notification_handler.rs:75 的 list_notifications 返回
+ * 通知列表项。后端 notification_handler.rs 的 list_notifications 返回
  * `{ list, total, page, page_size }`，key 是 list 而非 items；
  * status 过滤仅接受大写 UNREAD/READ/PROCESSED（小写会匹配不到而被静默忽略）。
  */
@@ -1221,7 +1221,7 @@ export async function ensureTestEntities(page: Page): Promise<void> {
  *
  * 后端 Q3 重构后预算为「方案头 + 明细行」两级：POST /budgets（create_budget → create_item）
  * 的 plan_id 为 NOT NULL 且 create_item 会校验所属方案真实存在
- * （budget_management_service.rs:176-177 get_plan_by_id），缺失/非法即 4xx。
+ * （budget_management_service.rs get_plan_by_id），缺失/非法即 4xx。
  * 故预算明细造数前必须先有一个存在的方案：
  *   1. 优先复用库中已有方案（GET /budgets/plans 取首条，避免每次新增垃圾方案）；
  *   2. 无方案时用 ensureTestEntities 已确保的部门自建一条（POST /budgets/plans，
@@ -1314,7 +1314,7 @@ async function writeCsrfCookie(page: Page, url: string, value: string): Promise<
 }
 
 /**
- * 后端 CSRF Token 为一次性消费（csrf.rs:110 consume + :216-224 Set-Cookie 轮换）。
+ * 后端 CSRF Token 为一次性消费（csrf.rs consume + :216-224 Set-Cookie 轮换）。
  * page.request 成功写入后，响应 Set-Cookie 携带新 token，Playwright 自动存入 context。
  * 本函数为防御性保障：从响应的 set-cookie 头/ x-new-csrf-token 恢复头中显式提取 csrf_token 值
  * 并 addCookies，确保即便 Playwright 内部 cookie 传播存在微小时序差或 headers() 对多 Set-Cookie
@@ -1350,7 +1350,7 @@ async function syncCsrfFromResponse(
     }
   }
 
-  // 额外处理：后端 CSRF 拒绝时的恢复头 x-new-csrf-token（csrf.rs:144-151）
+  // 额外处理：后端 CSRF 拒绝时的恢复头 x-new-csrf-token（csrf.rs）
   if (!csrfValue) {
     const recovery = response.headers()['x-new-csrf-token'];
     if (recovery) csrfValue = recovery;
@@ -1384,9 +1384,9 @@ async function refreshCsrfToken(page: Page): Promise<string> {
 /**
  * CSRF 竞败重放的最大次数（有界，不是无限退避）。
  *
- * 为什么不能只重放一次：后端 token 是一次性消费（csrf.rs:110 consume + :216-224 轮换），
+ * 为什么不能只重放一次：后端 token 是一次性消费（csrf.rs consume + :216-224 轮换），
  * 而同一浏览器上下文里除了本 helper，UI 自己的写请求也在消费同一个 token
- * （前端 axios 拦截器同样"403 → 用 X-New-CSRF-Token 重放一次"，api/request.ts:197-223）。
+ * （前端 axios 拦截器同样"403 → 用 X-New-CSRF-Token 重放一次"，api/request.ts）。
  * 两侧各重放一次时，helper 换回的新 token 仍可能被对侧那次在途请求抢先消费——
  * 单侧重放把这种交错固化成"偶发成片 403"红（shard19/32/34/35 的
  * POST /products、POST /incoterms/cost-calculation、POST /production/dye-batches 即此族）。
@@ -1397,7 +1397,7 @@ const CSRF_RECOVERY_MAX_ATTEMPTS = 2;
 
 /**
  * CSRF 竞败后取回一个存活 token 所用：优先后端 `x-new-csrf-token` 恢复头
- * （csrf.rs:144-151，并发竞败场景的权威来源，无需重登），无恢复头时重新登录换新 token。
+ * （csrf.rs，并发竞败场景的权威来源，无需重登），无恢复头时重新登录换新 token。
  * 返回用该 token 重放后的响应（调用方负责继续判定，仍 403 则按各自语义判红）。
  */
 async function replayAfterCsrfRejection(
@@ -1426,7 +1426,7 @@ async function replayAfterCsrfRejection(
  * 于是带着死 csrf 返回 → 该用例首个写请求 403 CSRF_TOKEN_INVALID（成片 403 的会话级来源）。
  *
  * 探测方式（零业务副作用）：POST /webhooks 携带空体 '{}'。
- * - CreateWebhookRequest 的 name/url/events 均为非 Option 必填字段（webhook_handler.rs:29-34），
+ * - CreateWebhookRequest 的 name/url/events 均为非 Option 必填字段（webhook_handler.rs），
  *   空体在 axum `Json<T>` 抽取器反序列化阶段即报 422，早于 handler 主体、绝不触库，
  *   故不可能创建任何 webhook 行（对比 /warehouses、/products 的字段全是 Option，空体可过校验，
  *   会落 DB NOT NULL 500 甚至插脏行——不可用作探测）；
@@ -1587,7 +1587,7 @@ export async function apiCall<T = unknown>(
 
   // CSRF 校验失败恢复：有界重放（见 CSRF_RECOVERY_MAX_ATTEMPTS 的成因说明），
   // 每次优先读取后端 X-New-CSRF-Token 恢复头，无恢复头时重新登录取全新 token。
-  // 判据同 csrf.rs:234-242 直出体（字符串机器码 CSRF_* + HTTP 403）：统一失败信封的
+  // 判据同 csrf.rs 直出体（字符串机器码 CSRF_* + HTTP 403）：统一失败信封的
   // FORBIDDEN/UNAUTHORIZED 也是字符串码，故用 failureCode() + status===403 双判据区分，
   // 权限拒绝不会被当成竞败而重试吞掉。
   for (
@@ -1631,7 +1631,7 @@ export async function apiCall<T = unknown>(
   // 写请求（含 CSRF 竞败重试后的最终 response）完成后，先同步轮换后的 csrf 到会话，
   // 再判定业务错误——顺序至关重要。
   // 后端在 handler 之前即消费旧 token 并 Set-Cookie 下发轮换后的新 token
-  // （csrf.rs:199 consume → :215-224 把新 token append 到 next.run 的响应，业务 4xx/5xx 同样携带）。
+  // （csrf.rs consume → :215-224 把新 token append 到 next.run 的响应，业务 4xx/5xx 同样携带）。
   // 若把同步放在 `json.code !== 200` 抛错之后，业务错误分支抛出时同步永不执行，
   // 轮换出的新 token 丢失，同会话下一请求仍携带已消费的旧 token → 级联成片 403。
   // 故对携带请求体的方法无条件先同步，再决定是否抛业务错误。
@@ -2183,7 +2183,7 @@ export async function verifyIllegalTransition(
  * 判据全部下沉到 {@link expectDenied}（status + 信封机器码双钉），本函数只负责
  * 发起真实请求并转交判定；签名与返回形态（async → Promise<void>）保持向后兼容。
  * 为什么不能只判 status：本仓 CSRF 中间件与权限门**都**直出 403
- * （csrf.rs:232-234 → code=CSRF_*；response.rs:145 + error.rs:709/742 → code=FORBIDDEN），
+ * （csrf.rs → code=CSRF_*；response.rs + error.rs/742 → code=FORBIDDEN），
  * 只判 status 时权限门被删掉用例照样绿。详见 expectDenied 的判据说明。
  * 禁止断言或读取错误文案（权限拒绝文案永久脱敏）。
  */
@@ -2344,14 +2344,14 @@ export async function seedFourDimStockIn(
  * 白坯布库存播种（color_no 为空、无缸号、有批次）。
  *
  * 入库端点选择：POST /inventory/stock（通用建库存 handler `create_stock`，
- * backend/src/handlers/inventory_stock_handler.rs:146）。
+ * backend/src/handlers/inventory_stock_handler.rs）。
  * 该 handler 虽复用 `CreateStockFabricRequest` DTO（含 color_no min=1 校验注解），
  * 但**不调用 payload.validate()**（区别于 /stock/fabric 的 `create_stock_fabric`），
- * service 层 `create_stock`（inventory_stock_service.rs:276）直接 Set(color_no) 落库，
+ * service 层 `create_stock`（inventory_stock_service.rs）直接 Set(color_no) 落库，
  * 且 DB 列 `inventory_stocks.color_no VARCHAR(255)` 无 CHECK 约束——
  * 因此传 color_no="" 可合法写入白坯库存行。
  *
- * 另一条合法路径为采购收货入库（purchase_receipt_private.rs:327
+ * 另一条合法路径为采购收货入库（purchase_receipt_private.rs
  * `item.color_code.clone().unwrap_or_default()` 当 color_code=None 时落空串），
  * 但构造完整采购链（订单→收货→确认）复杂度过高且非本用例意图，
  * 故 e2e seed 统一走 /inventory/stock 通用端点。
@@ -2397,10 +2397,10 @@ export async function seedGreigeStockIn(
 /**
  * 出库第四维（匹号）seed 族 —— 出库对染色布强制四维 = 缸号/色号/批次/匹号
  * （用户 2026-10-02 拍板；后端 services/so/delivery_ops/inventory.rs 按四维 tuple 校验
- *  + services/piece_domain_service.rs:606 outbound_piece_filter CAS 消耗匹号）。
+ *  + services/piece_domain_service.rs outbound_piece_filter CAS 消耗匹号）。
  *
  * 写入方口径（唯一事实源，禁按测试偏好臆造维度）：
- * backend/src/services/piece_domain_service.rs:518-556 —— 染色外发回仓确认生成染色匹：
+ * backend/src/services/piece_domain_service.rs —— 染色外发回仓确认生成染色匹：
  *   piece_type='dyed'、piece_no=`{缸号}-{seq:03}`、**batch_no = 缸号（dye_lot_no 同源）**、
  *   color_no 从回仓单/委外订单透传、status='AVAILABLE'、warehouse_id = 回仓单仓库。
  * 因此出库可命中的染色匹 tuple 恒有 batch_no == dye_lot_no == 缸号；
@@ -2428,7 +2428,7 @@ export interface DyedSeedPiece {
 }
 
 /**
- * 选一个"可承载染色匹"的仓库（piece_domain_service.rs:25-49 validate_warehouse_for_piece_type：
+ * 选一个"可承载染色匹"的仓库（piece_domain_service.rs validate_warehouse_for_piece_type：
  * 染色匹只允许 成品仓(finished) 或 未设类型(NULL) 仓；胚布仓(greige) 必被拒）。
  * 返回含 warehouse_name/warehouse_code（发货对话框按名称选仓、API 出库按编码）。
  */
@@ -2523,7 +2523,7 @@ export async function readDyedPieceByNo(
  *
  * 链：生产订单 → 流转卡（schedule→备布→完成备布）→ 工序启动 → 报工逐匹（N 匹生产匹入非成品仓）
  *  → N 笔染色委外单（同缸号同色号；发料明细逐匹引用 AVAILABLE 生产匹——
- *    piece_domain_service.rs:160-205 发料必须精确到匹）→ 逐笔发料 → 回仓单（入目标仓）→ 确认
+ *    piece_domain_service.rs 发料必须精确到匹）→ 逐笔发料 → 回仓单（入目标仓）→ 确认
  *  → 每笔确认生成 1 匹染色匹（同缸 piece_seq 递增 → {缸号}-001/-002…，batch_no=缸号）。
  */
 export async function seedDyedPieceChain(
@@ -2784,7 +2784,7 @@ export async function verifyAuditLog(
 ): Promise<boolean> {
   // 业务操作审计有两条真实管道，两条都查、任一命中即通过：
   // 1. omni_audit 中间件（业务 CRUD）→ omni_audit_logs 表，查询端点
-  //    GET /finance/audit/search（module 列存事件类型，落库映射见 omni_audit_service.rs:207
+  //    GET /finance/audit/search（module 列存事件类型，落库映射见 omni_audit_service.rs
   //    module=event_type、:209 resource_type=infer_module_from_path 的业务段；
   //    事件类型取值以源码 middleware/omni_audit.rs::classify_operation 为唯一准：
   //    路径末段含 approve 或末段为 reject/submit → "APPROVE"（非 CREATE），
@@ -2973,9 +2973,9 @@ export async function verifySoDConflict(
  * 复用 {@link isStateGateRejection}：必须 HTTP 恰 400 且 code ∈ {VALIDATION_ERROR,
  * BUSINESS_ERROR, BAD_REQUEST}；不可宽松成 `status >= 400`——CSRF 中间件的一次性 token
  * 竞败 403、后端裸 5xx、端点未注册的 404 都会被宽松判据伪装成"门禁生效"。
- * 后端契约原文：services/so/delivery_ops/ship.rs:85-94 把
+ * 后端契约原文：services/so/delivery_ops/ship.rs 把
  * BulkColorApprovalError::InvalidState 映射为 `AppError::business` →
- * utils/error.rs:361 `(BAD_REQUEST, "BusinessError")`，出参机器码 BUSINESS_ERROR。
+ * utils/error.rs `(BAD_REQUEST, "BusinessError")`，出参机器码 BUSINESS_ERROR。
  * 判定结果与原始 status/code 一律打日志外显，不静默（发货成功返回 false 也看得见）。
  */
 export async function verifyBulkColorDeliveryBlock(
@@ -3086,9 +3086,9 @@ export async function getProcessSteps(
  * **不吞错**：请求失败直接抛出；成功则返回原始分页载荷，由用例自己做形状与过滤是否
  * 生效的断言（catch 返 null 再配 `v === null || typeof v === 'object'` 恒真断言会把
  * 端点 404/500/权限失败全算成通过）。
- * 后端真相：outsourcing_handler.rs:350 收 OutsourcingVoucherListQuery（含 voucher_type），
+ * 后端真相：outsourcing_handler.rs 收 OutsourcingVoucherListQuery（含 voucher_type），
  * :364 返回 ApiResponse<PaginatedResponse<...>> ⇒ data.items 是唯一形状。
- * 路由挂载：routes/mod.rs:510 nest("/api/v1/erp/production", production::routes())，
+ * 路由挂载：routes/mod.rs nest("/api/v1/erp/production", production::routes())，
  * 因此端点真实路径必须带 /production 前缀（缺前缀即 404）。
  */
 export async function verifyOutsourcingVoucher(
@@ -3107,8 +3107,8 @@ export async function verifyOutsourcingVoucher(
 /**
  * 读取试算平衡表，校验会计不变量"期末借方合计 === 期末贷方合计"。
  *
- * 后端真相：handler finance_report_handler.rs:121 返回 ApiResponse<TrialBalance>；
- * DTO models/dto/finance_report_dto.rs:78-87 字段为 total_ending_debit / total_ending_credit（Decimal）。
+ * 后端真相：handler finance_report_handler.rs 返回 ApiResponse<TrialBalance>；
+ * DTO models/dto/finance_report_dto.rs 字段为 total_ending_debit / total_ending_credit（Decimal）。
  * rust_decimal 默认 serde 序列化为字符串（"123.45"），需 Number() 解析。
  * apiCallRaw 剥离 ApiResponse 外层信封后返回 data 对象本身。
  *
@@ -3772,7 +3772,7 @@ export async function flushDeferredCleanups(page: Page, queue: DeferredCleanup[]
   queue.length = 0;
 }
 
-/** CSRF 家族机器码全集（csrf.rs:37-43 CODE_MISS/CODE_INVAL/CODE_IP_MM），均由中间件直出 HTTP 403 */
+/** CSRF 家族机器码全集（csrf.rs CODE_MISS/CODE_INVAL/CODE_IP_MM），均由中间件直出 HTTP 403 */
 const CSRF_REJECT_CODES: ReadonlySet<string> = new Set<string>(Object.values(CSRF_ERROR_CODES));
 
 /**
@@ -3781,10 +3781,10 @@ const CSRF_REJECT_CODES: ReadonlySet<string> = new Set<string>(Object.values(CSR
  * 判据 = status + `AppError` 信封机器码双钉，永不读取错误文案
  * （本仓权限拒绝文案永久脱敏，文案只可能空转，不能承载归因）。
  * 为什么只判 status 是假绿：本仓 CSRF 中间件与权限门**都**直出 403——
- * - CSRF 面：csrf.rs:232-234 `csrf_error_response` → `unified_error_response(FORBIDDEN, "CSRF_*")`；
+ * - CSRF 面：csrf.rs `csrf_error_response` → `unified_error_response(FORBIDDEN, "CSRF_*")`；
  *   且一次性 token 竞败重放耗尽/异常时 apiCallExpectFail 仍返回该 403（仅记日志不抛），
  *   `CSRF_TOKEN_BINDING_MISMATCH` 不在 isCsrfRejection 重放判据内、首次即原样返回。
- * - 权限面：RBAC 直出 response.rs:145 与 AppError::PermissionDenied（error.rs:709/742）同码 `FORBIDDEN`。
+ * - 权限面：RBAC 直出 response.rs 与 AppError::PermissionDenied（error.rs/742）同码 `FORBIDDEN`。
  * 只判 status 时，CSRF-403 会冒名权限-403 通过——权限门即使被删，本类用例照样绿。
  * 故拒绝归因必须钉到权限家族唯一机器码 `FORBIDDEN`：实际 code 为 CSRF_* 即判红并点名
  * "会话 CSRF 前置问题"（修复方向是确保调用前会话持有存活 token——复用本 helpers 既有的
@@ -3815,10 +3815,10 @@ export function expectDenied(
 
 /**
  * 状态机/业务门禁拒绝的机器码族。唯一事实来源是后端 HTTP 映射
- * （backend/src/utils/error.rs:358-366 `error_status_and_type`）：
+ * （backend/src/utils/error.rs `error_status_and_type`）：
  * ValidationError / ValidationErrorDisplayable / BusinessError / BusinessErrorDisplayable /
  * BadRequest 全部映射到 **HTTP 400**，对应字符串码
- * （error.rs:743-746 + error.rs:464）VALIDATION_ERROR / BUSINESS_ERROR / BAD_REQUEST。
+ * （error.rs + error.rs）VALIDATION_ERROR / BUSINESS_ERROR / BAD_REQUEST。
  * 403 不在此列——权限门与状态门是两条不同的门，混用即假绿。
  */
 const STATE_GATE_REJECT_CODES: ReadonlySet<string> = new Set<string>([
@@ -3854,7 +3854,7 @@ export function expectStateGateRejection(result: ApiFailureResult, context = '')
   const code = failureCode(result);
   expect(
     result.status,
-    `${prefix}：应恰为 HTTP 400（backend utils/error.rs:358-366 状态映射），实际 status=${result.status}` +
+    `${prefix}：应恰为 HTTP 400（backend utils/error.rs 状态映射），实际 status=${result.status}` +
       ` code=${JSON.stringify(result.code)}——403 属 CSRF 中间件拒绝或权限门（两条门都不是状态门）、` +
       `404 属端点未注册/路由漂移、5xx 属后端裸崩，均不构成"状态门拒绝生效"`
   ).toBe(400);
@@ -4066,17 +4066,17 @@ export async function withEntity(
  * 为「染色批次/缸号」建一条真实的色卡档案前置。
  *
  * 后端强校验（正当，不得放松）：dye_batch_handler.rs::resolve_dye_identity 归一
- * （backend/src/handlers/dye_batch_handler.rs:203-254）要求 color_no 非空即染色布，且该色号
+ * （backend/src/handlers/dye_batch_handler.rs）要求 color_no 非空即染色布，且该色号
  * 必须在全仓唯一的色卡明细档案 `color_card_items.color_code` 上**恰好命中一条**：
  * - 档案无此色 → 400 VALIDATION「色号 XXX 在色卡档案中不存在」（前置缺失即由本函数消除）；
  * - 同色号多条 → 显式业务错「无法唯一定位」，故色号取 genCode（时间戳+随机）保证全局唯一。
  *
  * 前置链全部走真实端点（与 fabric/02-dye.spec.ts 既有 seedColorCardItem 同型，
  * 提取到 helpers 供 flow 族多文件复用）：
- * 1. POST /color-cards（handlers/color_card/crud.rs:78-101，创建即 draft——色卡主体词表
+ * 1. POST /color-cards（handlers/color_card/crud.rs，创建即 draft——色卡主体词表
  *    color_card::DRAFT；出参 ColorCardListItem 含 id）；
- * 2. POST /color-cards/{id}/items（handlers/color_card/items.rs:48-58；服务门控
- *    EDITABLE_CARD_STATUSES=[draft]（color_card_item_service.rs:65），新建卡恒可挂色号；
+ * 2. POST /color-cards/{id}/items（handlers/color_card/items.rs；服务门控
+ *    EDITABLE_CARD_STATUSES=[draft]（color_card_item_service.rs），新建卡恒可挂色号；
  *    出参 ColorItemInfo 含 id/color_code）。
  *
  * 色卡档案不做清理：DELETE 端点是**归档**语义（crud.rs archive，非物理删除），物理删档会
@@ -4103,7 +4103,7 @@ export async function seedColorCardArchive(
       `[${tag}] 前置色卡创建未返回 id（后端契约：ColorCardListItem 必含 id）：${JSON.stringify(card)}`
     );
   }
-  // 载荷对照 ColorItemDto（backend/src/models/color_card_item_dto.rs:12-66）：
+  // 载荷对照 ColorItemDto（backend/src/models/color_card_item_dto.rs）：
   // color_code/color_name/rgb_r/g/b 必填，hex_value 必填且长度恰为 7（#RRGGBB）。
   const item = await apiCall<{ id?: number; color_code?: string }>(
     page,

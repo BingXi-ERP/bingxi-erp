@@ -17,22 +17,22 @@ import {
  * 聚合口径自洽、参数门与鉴权门。判据全部取自服务端源码，注释里的 文件:行号 就是断言依据。
  *
  * 界面入口：frontend/src/views/financial-analysis/tabs/AnalysisListTab.vue（路由 /financial-analysis），
- * 该页经 src/api/financial-analysis.ts:106-143 调用本族端点（列表/详情/更新/删除/带参执行/趋势查询），
+ * 该页经 src/api/financial-analysis.ts 调用本族端点（列表/详情/更新/删除/带参执行/趋势查询），
  * 但 e2e 侧此前从未做过出参形状配对：smoke/financial-analysis.smoke.spec.ts 只跑页面可达，
  * flow/29c 只断容器可见。POST /financial-analysis/trends 在前端零调用（api 层无 createFinancialTrend），
  * 只能直连接口面配对。
  *
- * 挂载与键形（routes/finance.rs:493-537，nest 前缀 /api/v1/erp，见 routes/mod.rs）：
+ * 挂载与键形（routes/finance.rs，nest 前缀 /api/v1/erp，见 routes/mod.rs）：
  * - GET  /financial-analysis/trends        handler:173 get_trends
  * - POST /financial-analysis/trends        handler:231 create_trend
  * - GET  /financial-analysis/reports/{id}  handler:483 get_report（{id} 为 i32，route-snapshot.txt:525）
  * - PUT  /financial-analysis/reports/{id}  handler:406 update_report（snapshot:1712）
  * - DELETE /financial-analysis/reports/{id} handler:461 delete_report（snapshot:50）
  * - POST /financial-analysis/reports/{id}/execute handler:513 execute_report（snapshot:1276）
- * 权限键由 URL 段推导（middleware/permission.rs:317 extract_resource_info）：`financial-analysis`
- * 是直接资源段（utils/path_utils.rs:284），派生键 = financial-analysis:read/create/update/delete；
- * `execute` 不在 PATH_ACTION_KEYWORDS（permission.rs:232-244）内，故执行腿派生 create 键。
- * 唯一持有助手种子：services/init_service_ops/permission.rs:1169 只给 finance_manager
+ * 权限键由 URL 段推导（middleware/permission.rs extract_resource_info）：`financial-analysis`
+ * 是直接资源段（utils/path_utils.rs），派生键 = financial-analysis:read/create/update/delete；
+ * `execute` 不在 PATH_ACTION_KEYWORDS（permission.rs）内，故执行腿派生 create 键。
+ * 唯一持有助手种子：services/init_service_ops/permission.rs 只给 finance_manager
  * ("financial-analysis","*")；manager（:430 起）不持有该键 ⇒ manager 全腿必 403。
  *
  * 出参键名以实体/handler 手挑键为准（snake_case）：
@@ -41,24 +41,24 @@ import {
  * - 报表写侧响应 = handler:360-367（5 键）/ :446-454（7 键）
  * DECIMAL 出参为字符串（Cargo.toml:60 rust_decimal 仅 serde 特性；与 api 层
  * FinancialTrend.indicator_value: string 同源），数值判定一律先 Number() 归一并显式断 typeof。
- * 状态词表唯一事实来源 = 写入方 models/status/general.rs:130-135 master_data（小写 active/inactive），
- * create_indicator 落 master_data::ACTIVE（services/financial_analysis_service.rs:229）；
+ * 状态词表唯一事实来源 = 写入方 models/status/general.rs master_data（小写 active/inactive），
+ * create_indicator 落 master_data::ACTIVE（services/financial_analysis_service.rs）；
  * 趋势方向中文词表 = service:262-270（上升/下降/持平），禁止英文化。
- * 失败信封只有 AppError 一种形状：NOT_FOUND/404、VALIDATION_ERROR/400（utils/error.rs:378-381,817-823）。
+ * 失败信封只有 AppError 一种形状：NOT_FOUND/404、VALIDATION_ERROR/400（utils/error.rs,817-823）。
  * 脱敏通道判定：handler 用的是 AppError::not_found（非 displayable）⇒ HTTP message 恒为
- * 固定公开文案「资源未找到」（utils/messages.rs:42，error.rs:848），含 ID 的原文只进日志；
- * validator 拒绝经 From<ValidationErrors>（error.rs:719-722）转 displayable 通道 ⇒ 字段文案可外显；
- * 提取器解码拒绝由 trace_context.rs:352 统一转 400 + REQUEST_DECODING_PUBLIC（error.rs:881-882）。
+ * 固定公开文案「资源未找到」（utils/messages.rs，error.rs），含 ID 的原文只进日志；
+ * validator 拒绝经 From<ValidationErrors>（error.rs）转 displayable 通道 ⇒ 字段文案可外显；
+ * 提取器解码拒绝由 trace_context.rs 统一转 400 + REQUEST_DECODING_PUBLIC（error.rs）。
  *
  * 本文件钉住的后端缺陷（按现状断，不写成成功，修法落地时须同步反转这些断言）：
  * D1 GET /trends 出参只有 {items,total}，没有 page/page_size（handler:198-201），与全站分页信封
- *    utils/response.rs:34 PaginatedResponse 四键不一致；且 total 取的是 limit 之后的长度
+ *    utils/response.rs PaginatedResponse 四键不一致；且 total 取的是 limit 之后的长度
  *    （handler:184 clamp + :200 trends.len()），调用方拿不到真实总数 —— handler:198,201 钉住。
  * D2 list_reports 把已减过 1 的页码再传进 service 的第二次减 1（handler:287 + service:207），
  *    第 1 页与第 2 页返回同一批数据、第 3 页起每页前跳一页；而 get_indicators 未预减（handler:117）
  *    故同表同服务的指标列表分页正常 —— 两腿并列断，缺陷面与对照面同框。
  * D3 POST /trends 不校验 indicator_id 存在性（service:239-290 直接 insert），孤儿趋势行可落库；
- *    且 routes/finance.rs:520-522 该路径只有 GET/POST，没有 DELETE —— 写脏不可回收，按现状钉住。
+ *    且 routes/finance.rs 该路径只有 GET/POST，没有 DELETE —— 写脏不可回收，按现状钉住。
  * D4 execute 腿对**用户自建报表恒 no_data**：calculate_indicators 只算 5 枚预定义指标
  *    （service:737-790 定义 + :567-583 逐枚 try_save），handler:540 按 indicator_id==报表 id 过滤
  *    永不命中（新建报表的 id 不在预定义集内）⇒ 返回 status=no_data + latest_result=null
@@ -182,7 +182,7 @@ interface ExecutePayload {
   total_indicators_computed: number;
 }
 
-/** 写入方词表（models/status/general.rs:131-135，小写） */
+/** 写入方词表（models/status/general.rs，小写） */
 const STATUS_ACTIVE = 'active'; // master_data::ACTIVE
 const STATUS_INACTIVE = 'inactive'; // master_data::INACTIVE
 /** 趋势方向中文词表（service:262-270） */
@@ -191,9 +191,9 @@ const TREND_DOWN = '下降';
 const TREND_FLAT = '持平';
 
 /** 同源文案（逐字符照抄后端常量，断言点即引用点） */
-const MSG_NOT_FOUND_MASKED = '资源未找到'; // utils/messages.rs:42（AppError::not_found 脱敏通道）
+const MSG_NOT_FOUND_MASKED = '资源未找到'; // utils/messages.rs（AppError::not_found 脱敏通道）
 const MSG_REQUEST_DECODING =
-  '请求格式不正确：请求体或查询参数存在缺失的必填字段、字段类型错误或内容类型错误，请修正后重试'; // utils/error.rs:881-882
+  '请求格式不正确：请求体或查询参数存在缺失的必填字段、字段类型错误或内容类型错误，请修正后重试'; // utils/error.rs
 const MSG_MISSING_INDICATOR_ID = '财务分析请求缺少指标ID'; // handler:183 validation_displayable
 const MSG_PERIOD_LENGTH = '周期长度必须在1到20字符之间'; // handler:53
 const MSG_ANALYSIS_TYPE_LENGTH = '分析类型长度不能超过30字符'; // handler:50
@@ -268,7 +268,7 @@ function shiftUtcDay(isoDate: string, days: number): string {
  * 传给谁：拼成 period 串，交 POST /trends 与 GET /trends 的 period 过滤、以及 execute 的 ?period=。
  * 存什么：不存业务数据，只在模块内记一个自增序号（worker 内单进程顺序执行，够用）。
  * 存哪里：模块变量 periodSeq；period 列本身是 VARCHAR(20) 且无格式 CHECK
- *        （m0012_add_ap_ar_finance_analysis.rs:362），长度 20 是硬上限，超了会被 handler:53 长度门拒。
+ *        （m0012_add_ap_ar_finance_analysis.rs），长度 20 是硬上限，超了会被 handler:53 长度门拒。
  */
 let periodSeq = 0;
 function uniqPeriod(tag: string): string {
@@ -289,7 +289,7 @@ function uniqPeriod(tag: string): string {
  * 存哪里：模块变量。
  * 为什么要隔秒（缺陷 D8）：报表编码由 handler:346 用 `RPT-<Utc::now().timestamp()>` 生成，
  * 秒级粒度，而 financial_indicators.indicator_code 是 NOT NULL UNIQUE
- * （m0012_add_ap_ar_finance_analysis.rs:346）⇒ 同一秒内的第二次建单必撞唯一键。
+ * （m0012_add_ap_ar_finance_analysis.rs）⇒ 同一秒内的第二次建单必撞唯一键。
  * 本文件用隔秒规避以保证造数确定性，不因此掩盖该缺陷（修法应是编码带上序列或改随机串）。
  */
 let lastReportCodeSecond = 0;
@@ -310,7 +310,7 @@ function markReportCodeSecond(): void {
  * 传给谁：CreateReportRequest（handler:80-90，全字段必填除 indicators/description）。
  * 存什么：服务端把它当作 financial_indicators 行写入（handler:344-355 复用 CreateIndicatorRequest，
  *        indicator_code = RPT-<unix 秒>），period/关联指标/描述拼进 remark（handler:331-342）。
- * 存哪里：表 financial_indicators（models/financial_analysis.rs:8 sea_orm table_name）。
+ * 存哪里：表 financial_indicators（models/financial_analysis.rs sea_orm table_name）。
  */
 async function createReport(
   page: import('@playwright/test').Page,
@@ -346,7 +346,7 @@ async function createReport(
  * 入参：指标 id、期间、值/目标值（DECIMAL 以字符串提交，避免 JSON 浮点进 service:249 的减法）。
  * 传给谁：CreateTrendDto（handler:48-61），service:239 create_analysis_result 落库。
  * 存什么：financial_analysis_results 一行，variance/variance_rate/trend 由 service:248-270 派生。
- * 存哪里：表 financial_analysis_results（models/financial_analysis_result.rs:10）。
+ * 存哪里：表 financial_analysis_results（models/financial_analysis_result.rs）。
  */
 async function createTrend(
   page: import('@playwright/test').Page,
@@ -437,7 +437,7 @@ test.describe('P263 财务分析趋势与报表：写后回读闭环、聚合口
       description: '越权靶子',
     });
 
-    // manager 不持有 financial-analysis 任何动作键（permission.rs:430 起的切片里没有该资源，
+    // manager 不持有 financial-analysis 任何动作键（permission.rs 起的切片里没有该资源，
     // 全仓该键只授 finance_manager，见 :1169）⇒ 六枚端点逐枚 403
     await loginAsRole(page, 'manager');
     const deniedLegs: Array<
@@ -457,7 +457,7 @@ test.describe('P263 财务分析趋势与报表：写后回读闭环、聚合口
         'POST',
         `/financial-analysis/reports/${target.id}/execute`,
         undefined,
-        'create（execute 段不派生动作，见 permission.rs:232-244）',
+        'create（execute 段不派生动作，见 permission.rs）',
       ],
     ];
     for (const [method, path, body, action] of deniedLegs) {
@@ -586,7 +586,7 @@ test.describe('P263 财务分析趋势与报表：写后回读闭环、聚合口
           variance,
           `variance 应等于 value-target=${v - t}，实际 ${JSON.stringify(row.variance)}`
         ).toBeCloseTo(v - t, 6);
-        // 差异率列刻度 DECIMAL(5,2)（migration/src/domain/business/m0012_add_ap_ar_finance_analysis.rs:367）：
+        // 差异率列刻度 DECIMAL(5,2)（migration/src/domain/business/m0012_add_ap_ar_finance_analysis.rs）：
         // 写侧不 round（service:249-256，见 D6）而列只留 2 位 ⇒ 按 2 位精度比数值，
         // 不把列刻度当成失败，也不放过量级错。
         expect(
@@ -623,12 +623,12 @@ test.describe('P263 财务分析趋势与报表：写后回读闭环、聚合口
       all.body.total,
       `total 应等于 items 长度（handler:200 取的是 trends.len()，见 D1）`
     ).toBe(all.body.items.length);
-    // D1 信封漂移钉住：全站分页信封是 PaginatedResponse{items,total,page,page_size}（utils/response.rs:34），
+    // D1 信封漂移钉住：全站分页信封是 PaginatedResponse{items,total,page,page_size}（utils/response.rs），
     // 该腿只回两键；若后端补齐 page/page_size，本行断言应随之反转。
     const envelopeKeys = Object.keys(all.body).sort();
     expect(
       envelopeKeys.includes('page') || envelopeKeys.includes('page_size'),
-      `GET /trends 出现 page/page_size 键（D1 已修，需同步反转本断言并更新前端 api/financial-analysis.ts:139 类型）：${envelopeKeys.join(',')}`
+      `GET /trends 出现 page/page_size 键（D1 已修，需同步反转本断言并更新前端 api/financial-analysis.ts 类型）：${envelopeKeys.join(',')}`
     ).toBe(false);
     const byId = new Map(all.body.items.map(r => [r.period, r]));
     for (const row of rows) {
@@ -760,7 +760,7 @@ test.describe('P263 财务分析趋势与报表：写后回读闭环、聚合口
       `缺指标应逐字外显 handler:183 文案，实际：${JSON.stringify(noIndicator.message)}`
     ).toBe(MSG_MISSING_INDICATOR_ID);
 
-    // indicator_id 类型错：Query 解码拒绝 → trace_context.rs:352 统一信封（固定公开文案）
+    // indicator_id 类型错：Query 解码拒绝 → trace_context.rs 统一信封（固定公开文案）
     const badType = await apiCallExpectFail(
       page,
       'GET',
@@ -772,12 +772,12 @@ test.describe('P263 财务分析趋势与报表：写后回读闭环、聚合口
     );
     expect(
       badType.message,
-      `解码拒绝文案应逐字等于 REQUEST_DECODING_PUBLIC（error.rs:881），实际：${JSON.stringify(badType.message)}`
+      `解码拒绝文案应逐字等于 REQUEST_DECODING_PUBLIC（error.rs），实际：${JSON.stringify(badType.message)}`
     ).toBe(MSG_REQUEST_DECODING);
     expect(
       String(badType.message).includes('financial_analysis') ||
         /line \d+ column \d+/.test(String(badType.message)),
-      'serde 原文（结构体名/行列号）不得外显（error.rs:877-880 安全边界）'
+      'serde 原文（结构体名/行列号）不得外显（error.rs 安全边界）'
     ).toBe(false);
 
     // period 空串：validator min=1（handler:53），经 From<ValidationErrors> 外显字段文案
@@ -811,7 +811,7 @@ test.describe('P263 财务分析趋势与报表：写后回读闭环、聚合口
     expect(noValue.message).toBe(MSG_REQUEST_DECODING);
 
     // D3：indicator_id 指向不存在的主键也照写不误（service:239-290 无外键存在性判定），
-    // 且该族只有 GET/POST（routes/finance.rs:520-522）⇒ 写脏无法回收。按现状钉住，不写成成功。
+    // 且该族只有 GET/POST（routes/finance.rs）⇒ 写脏无法回收。按现状钉住，不写成成功。
     const orphanId = 2147483001;
     const orphanPeriod = uniqPeriod('O');
     const orphan = await createTrend(page, {
@@ -834,7 +834,7 @@ test.describe('P263 财务分析趋势与报表：写后回读闭环、聚合口
       '未提交目标值的孤儿行 target_value 应为 null'
     ).toBeNull();
 
-    // D3 的后半：该族没有 DELETE /trends/{id}（routes/finance.rs:520-522 只挂 GET/POST，
+    // D3 的后半：该族没有 DELETE /trends/{id}（routes/finance.rs 只挂 GET/POST，
     // route-snapshot.txt 亦无 DELETE /financial-analysis/trends），孤儿行写下去就收不回。
     // 按现状钉"请求无效 + 数据仍在"，后端若补回收端点，本腿应改为断删除闭环。
     const noDelete = await apiCallExpectFail(
@@ -1033,7 +1033,7 @@ test.describe('P263 财务分析趋势与报表：写后回读闭环、聚合口
     expect(failureCode(missing)).toBe(APP_ERROR_CODES.NOT_FOUND);
     expect(
       missing.message,
-      `详情 404 文案应逐字等于脱敏公开常量（messages.rs:42），实际：${JSON.stringify(missing.message)}`
+      `详情 404 文案应逐字等于脱敏公开常量（messages.rs），实际：${JSON.stringify(missing.message)}`
     ).toBe(MSG_NOT_FOUND_MASKED);
     expect(String(missing.message).includes(String(MISSING_ID)), '脱敏通道不得把记录 ID 外显').toBe(
       false
@@ -1197,7 +1197,7 @@ test.describe('P263 财务分析趋势与报表：写后回读闭环、聚合口
       `updated_at 应由 handler:440 显式刷新（回退 ${noop.updated_at} < ${afterDesc.updated_at}）`
     ).toBe(true);
 
-    // 长度门逐条点名（validator ⇒ displayable 通道，文案原样外显，error.rs:719-722）
+    // 长度门逐条点名（validator ⇒ displayable 通道，文案原样外显，error.rs）
     const nameTooLong = '名'.repeat(101);
     const failName = await apiCallExpectFail(page, 'PUT', `/financial-analysis/reports/${id}`, {
       name: nameTooLong,

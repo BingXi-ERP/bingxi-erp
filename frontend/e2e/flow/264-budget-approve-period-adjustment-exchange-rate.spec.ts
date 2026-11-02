@@ -29,48 +29,48 @@ import {
  *
  * 判据来源（全部读后端源码实核，不凭响应形状猜）：
  *
- * 1. 期末调整面**没有更正腿**：backend/src/routes/period_adjustment.rs:21-38 只注册 POST / 、
+ * 1. 期末调整面**没有更正腿**：backend/src/routes/period_adjustment.rs 只注册 POST / 、
  *    GET / 、GET /{id} 与 POST /{id}/confirm|reverse|cancel，**不存在 PUT/PATCH /{id}**（快照同判）。
  *    台账一经落库只能靠状态流转处置，更正＝取消后重建。故任务书要求的「PUT 后再双读」在本域
  *    物理不成立，本 spec 以 confirm/reverse/cancel 三条真实状态写腿做「写后双读」，并把 PUT 面按
  *    「已注册路径 + 未注册方法」钉成 405（与 254 对审计不可篡改面的同一口径：405 体由 axum
  *    方法兜底直出、不经 AppError，故只钉状态码不硬写文案，同时回读证明 405 未发生写入）。
  * 2. 金额钩稽的真实形态：period_adjustment_record 全列清单（models/period_adjustment_record.rs
- *    :20-77 + migration/src/domain/v15/mod.rs:2106-2131）**没有余额列**，
+ *    :20-77 + migration/src/domain/v15/mod.rs）**没有余额列**，
  *    「调整前后余额」在本域不存在，可断的恒等式是三件：
  *    ① 落库 amount 的数值等于请求额（列 DECIMAL(14,2)，超两位小数会被静默舍入）；
  *    ② 同一期间台账的金额合计在任何状态流转前后**不变**（confirm/reverse/cancel 只改状态与
- *       操作人/时间列，services/period_adjustment_service.rs:184-257 全程不触碰 amount）；
+ *       操作人/时间列，services/period_adjustment_service.rs 全程不触碰 amount）；
  *    ③ 按 status 分区计数之和 == 列表 total（列表侧 count 在分页前下推、与可见集同源，:470-503）。
  *    任何「状态改了却丢行/多行/金额被改写」都会让 ②③ 直接判红，不是只断 200。
  * 3. 状态词表的写入方就是服务层字面量（backend/src/models/status/ 下**没有**期末调整词条）：
- *    services/period_adjustment_service.rs:35-40 定义 draft/confirmed/reversed/cancelled 四枚
+ *    services/period_adjustment_service.rs 定义 draft/confirmed/reversed/cancelled 四枚
  *    小写 token，:145 建单写 draft，:199 confirm 写 confirmed，:241 reverse 写 reversed，
  *    :256 cancel 写 cancelled。比较点逐字符取该词表。预算版本词表同样是服务层字面量
- *    （draft 见 services/budget_management_service.rs:1535，approved 见 :1576），
+ *    （draft 见 services/budget_management_service.rs，approved 见 :1576），
  *    models/status/ 下亦无对应文件，故两域都按写入方字面量断，不引前端标签件。
  * 4. 拒绝通道差异（不许拿脱敏文案当业务原因断，也不许反过来假设都可外显）：
  *    期末调整四枚状态门（:186-190 / :224-228 / :247-251）与建单四枚校验（:96-118）一律走
  *    `AppError::business` → 出参 message 被收敛成通用常量「业务处理失败」
- *    （utils/messages.rs:43 + utils/error.rs:850），真实原因只进 tracing 日志；
- *    主键不存在走 `AppError::not_found`（:440）→ message「资源未找到」（messages.rs:42）。
- *    预算版本审批门则走 `AppError::business_displayable`（budget_management_service.rs:1572）
+ *    （utils/messages.rs + utils/error.rs），真实原因只进 tracing 日志；
+ *    主键不存在走 `AppError::not_found`（:440）→ message「资源未找到」（messages.rs）。
+ *    预算版本审批门则走 `AppError::business_displayable`（budget_management_service.rs）
  *    → 文案「只有草稿状态的版本才能审批」可外显，本 spec 逐字符断原文。
  * 5. 点名缺陷 A（状态腿的静默失败）：confirm/reverse 调 create_adjustment_voucher
  *    （:265-272 起），失败**仅 warn 返回 None**，调用方无条件把 status 写 confirmed/reversed
  *    并把 voucher_id/reverse_voucher_id 落 None（:199-207 / :241-249）。凭证创建要过期间锁定与
- *    科目存在性校验（services/voucher_ops/crud.rs:47 + :95 precheck_subjects_exist_txn）。
+ *    科目存在性校验（services/voucher_ops/crud.rs + :95 precheck_subjects_exist_txn）。
  *    本用例引用一对必然不存在的科目码（E264D/E264C，VARCHAR(32) 容得下）→ 凭证必不生成，
  *    于是「voucher_id/reverse_voucher_id 落 null 而状态照转」是**当前可确定性成立**的形状，
  *    即「确认成功但账上无凭证」的半程状态被钉成失败可见：后端一旦改为传播错误或成功生成凭证，
  *    该断言立即判红。不伪造科目、不用兜底掩盖。
  * 6. 点名缺陷 B（凭证号展示端点，归入仓内单据号展示端点废除清单）：
- *    GET /vouchers/generate-no（handlers/voucher_handler.rs:401-418）签名只有 State，**不接任何入参**，
+ *    GET /vouchers/generate-no（handlers/voucher_handler.rs）签名只有 State，**不接任何入参**，
  *    前缀硬编码 "JZ"，且走自开事务的 DocumentNumberGenerator::generate_no
- *    （utils/number_generator.rs:45-58 → :61-91，探测过程只有 SELECT，号**不落库也不预留**）；
+ *    （utils/number_generator.rs → :61-91，探测过程只有 SELECT，号**不落库也不预留**）；
  *    而真号源按凭证类型派生前缀并在调用方事务内取号
- *    （services/voucher_ops/crud.rs:60-72：记→JZ / 收→SK / 付→FK / 转→ZZ，default JZ）。
- *    可写类型词表 available_voucher_types()（crud.rs:688-695）含「收/付/转」→ 对这三类
+ *    （services/voucher_ops/crud.rs：记→JZ / 收→SK / 付→FK / 转→ZZ，default JZ）。
+ *    可写类型词表 available_voucher_types()（crud.rs）含「收/付/转」→ 对这三类
  *    该端点给出的前缀必错。本 spec 钉「带 ?voucher_type=收 仍返回 JZ 前缀」这一形状与真号源
  *    不一致，并留出翻转说明：后端若按类型派生前缀，本断言判红即证明可移出清单。不为它编造
  *    「号已预留」的成功语义，也不断「连续两次返回同一号」这类受并发影响的伪判据。
@@ -81,37 +81,37 @@ import {
  * 8. 点名缺陷 D（信封漂移，按现状钉住）：预算版本三条腿绕过 ApiResponse 直出
  *    `{code: 200, message, data}`（handler:924-928 / :938-941 / :954-958），读腿出参是裸 Vec、
  *    **没有分页信封**，故本 spec 只断数组含目标行、不假装有 total；
- *    期末调整列表用 handlers/bad_debt_handler.rs:154-159 的 PagedResponse（items/total/page/
- *    page_size 四键，与 utils/response.rs:34-39 的 PaginatedResponse 同形却**是另一份定义**，
- *    仓内两套分页结构体并存）；汇率列表（currency_handler.rs:156-169）取回 total 后用 `_total`
+ *    期末调整列表用 handlers/bad_debt_handler.rs 的 PagedResponse（items/total/page/
+ *    page_size 四键，与 utils/response.rs 的 PaginatedResponse 同形却**是另一份定义**，
+ *    仓内两套分页结构体并存）；汇率列表（currency_handler.rs）取回 total 后用 `_total`
  *    丢弃、只出裸数组，同属该漂移族。失败体侧本域无旁路，一律 AppError 形状。
- * 9. 汇率查询口径（handlers/currency_handler.rs:124-146 + services/currency_service.rs:127-140）：
+ * 9. 汇率查询口径（handlers/currency_handler.rs + services/currency_service.rs）：
  *    GetExchangeRateQuery 只有 from_currency/to_currency **两个必填字段，没有任何日期入参**，
  *    服务层按 effective_date DESC 取首条 → 「查询日」维度在本端点不存在，取到的是该币种对的
  *    **最新生效行**（含未来生效日；本用例特意种一条 2999-12-31 的行把它钉住，并断带
  *    effective_date 参数仍返回同一行）。未知币种对**不是**「缺数据即空」：handler:141-144 显式
  *    AppError::not_found → 404 + 「资源未找到」，故按 404 断而不按空 data 断。
  *    DECIMAL 出参是字符串：ExchangeRateResponse.rate 由 model.rate.to_string() 显式产出
- *    （:83-102），列 scale 见 migration/src/domain/system/m0005_add_basic_data_and_system_tables.rs:38
+ *    （:83-102），列 scale 见 migration/src/domain/system/m0005_add_basic_data_and_system_tables.rs
  *    DECIMAL(20,8) → 先断 typeof string，再 Number() 比等值，并种一条 8 位小数汇率
  *    （3.14159265）作为小数位口径判据：任何截断/精度丢失都会判红。
- *    点名缺陷 E：service:132-137 未过滤 is_deleted 列（models/exchange_rate.rs:16 该列可空，
- *    migration/src/domain/system/mod.rs:151 后补），软删汇率仍会被查回；exchange_rates 在快照里
+ *    点名缺陷 E：service:132-137 未过滤 is_deleted 列（models/exchange_rate.rs 该列可空，
+ *    migration/src/domain/system/mod.rs 后补），软删汇率仍会被查回；exchange_rates 在快照里
  *    只有 GET 根、GET query、POST 根、按 ID 出 print 四条（:476-478 + :1248），**API 面无软删入口**，
  *    该缺陷只能源码判读、测试侧不可达，如实点名不伪造。
  * 10. 期间(period)列不受格式校验：服务层只判空（:110-112），列 VARCHAR(16)
- *     （migration/src/domain/v15/mod.rs:2110）→ 任意短串都能入账并被结账批处理按等值匹配纳入
+ *     （migration/src/domain/v15/mod.rs）→ 任意短串都能入账并被结账批处理按等值匹配纳入
  *     （:398-402）。本用例正是用这个形态做 worker 级数据隔离，同时把该事实写在这里点名。
  *
  * 权限档（判据 backend/src/middleware/permission.rs 的 URL 段派生 + 种子
  * backend/src/services/init_service_ops/permission.rs）：
  * - 全库角色授予集里**没有任何一条 ("period-adjustments", ...)**（backend/src 全量 grep 只在
- *   routes/mod.rs:543 挂载、handler 文档、init_service.rs:188 与 utils/path_utils.rs:427 的
- *   资源登记表出现），即期末调整台账只靠 admin 兜住（is_admin_role 短路，permission.rs:587/634）。
+ *   routes/mod.rs 挂载、handler 文档、init_service.rs 与 utils/path_utils.rs 的
+ *   资源登记表出现），即期末调整台账只靠 admin 兜住（is_admin_role 短路，permission.rs/634）。
  *   本 spec 因此把「写账腿唯一可用身份是 admin」钉成断言，非 admin 一律 403 FORBIDDEN。
- * - auditor 持 permission-audits:read 与 audit-logs:read（permission.rs:1465-1470），
+ * - auditor 持 permission-audits:read 与 audit-logs:read（permission.rs），
  *   不含 budgets / exchange-rates / vouchers / period-adjustments 任何一枚 → 用作 403 靶心角色。
- * - 未登录 401：认证面复用 CODE_UNAUTHORIZED（utils/error.rs:785）= "UNAUTHORIZED"；
+ * - 未登录 401：认证面复用 CODE_UNAUTHORIZED（utils/error.rs）= "UNAUTHORIZED"；
  *   helpers.ts 的 APP_ERROR_CODES 未登记该码（禁改共享件），故本文件就近声明常量并点名来源行。
  * - 401 腿只打 GET：CSRF 中间件对写方法先行，未登录写请求可能落到 CSRF 拒绝码而非 401，
  *   那不是本腿靶心；写腿的拒绝面由 auditor 403 腿覆盖并回读证明零半截写。
@@ -122,7 +122,7 @@ import {
  * 零写入。403/401 腿在被拒后一律回读证明零半截写。
  */
 
-/** 期末调整状态词表（写入方 services/period_adjustment_service.rs:35-40，逐字符比较） */
+/** 期末调整状态词表（写入方 services/period_adjustment_service.rs，逐字符比较） */
 const PA_STATUS = {
   DRAFT: 'draft',
   CONFIRMED: 'confirmed',
@@ -130,15 +130,15 @@ const PA_STATUS = {
   CANCELLED: 'cancelled',
 } as const;
 
-/** 未登录机器码（backend/src/utils/error.rs:785 pub const CODE_UNAUTHORIZED） */
+/** 未登录机器码（backend/src/utils/error.rs pub const CODE_UNAUTHORIZED） */
 const CODE_UNAUTHORIZED = 'UNAUTHORIZED';
 
-/** AppError 脱敏常量（backend/src/utils/messages.rs:42/43）：断的是通道，不是真实文案 */
+/** AppError 脱敏常量（backend/src/utils/messages.rs/43）：断的是通道，不是真实文案 */
 const MASKED_BUSINESS_MESSAGE = '业务处理失败';
 const MASKED_NOT_FOUND_MESSAGE = '资源未找到';
 
 /**
- * 期末调整台账行：键名与 handlers/period_adjustment_handler.rs:31-58 的 PeriodAdjustmentInfo
+ * 期末调整台账行：键名与 handlers/period_adjustment_handler.rs 的 PeriodAdjustmentInfo
  * 逐字段一一对应（amount 为 rust_decimal 直出字符串：backend/Cargo.toml:60 只开 "serde" 特性，
  * 序列化即十进制字面量串；日期列为 chrono RFC3339 串）。
  */
@@ -169,7 +169,7 @@ type PeriodAdjustmentRow = {
   updated_at: string;
 };
 
-/** 期末调整列表信封（handlers/bad_debt_handler.rs:154-159 PagedResponse 四键） */
+/** 期末调整列表信封（handlers/bad_debt_handler.rs PagedResponse 四键） */
 type PeriodAdjustmentListBody = {
   items: PeriodAdjustmentRow[];
   total: number;
@@ -177,7 +177,7 @@ type PeriodAdjustmentListBody = {
   page_size: number;
 };
 
-/** 预算版本行：键名对齐 models/budget_version.rs:10-24（total_amount 同为 Decimal 字符串直出） */
+/** 预算版本行：键名对齐 models/budget_version.rs（total_amount 同为 Decimal 字符串直出） */
 type BudgetVersionRow = {
   id: number;
   plan_id: number;
@@ -193,7 +193,7 @@ type BudgetVersionRow = {
   updated_at: string;
 };
 
-/** 汇率出参：handlers/currency_handler.rs:83-89 的四列（rate/effective_date 皆字符串） */
+/** 汇率出参：handlers/currency_handler.rs 的四列（rate/effective_date 皆字符串） */
 type ExchangeRateRow = {
   id: number;
   from_currency: string;
@@ -202,7 +202,7 @@ type ExchangeRateRow = {
   effective_date: string;
 };
 
-/** 凭证类型定义：services/voucher_service.rs:115-118 的 code/name 两列 */
+/** 凭证类型定义：services/voucher_service.rs 的 code/name 两列 */
 type VoucherTypeRow = {
   code: string;
   name: string;
@@ -210,7 +210,7 @@ type VoucherTypeRow = {
 
 /**
  * 建单入参：POST /period-adjustments 的 CreatePeriodAdjustmentRequest
- * （services/period_adjustment_service.rs:55-69，非 Option 字段必填）。
+ * （services/period_adjustment_service.rs，非 Option 字段必填）。
  * 调用方：264-01 与 264-02；传给谁：apiCall / apiCallExpectFail 的请求体；
  * 存什么：六个业务列的提交值；存哪里：period_adjustment_record 表（被拒腿不落库）。
  */
@@ -604,7 +604,7 @@ test.describe('264 期末调整台账 / 预算版本审批 / 汇率查询 / 凭�
       );
       expect(
         rejected.message,
-        `264-02 ${item.label} 出参 message 应等于脱敏常量（utils/messages.rs:43），实际 ${JSON.stringify(
+        `264-02 ${item.label} 出参 message 应等于脱敏常量（utils/messages.rs），实际 ${JSON.stringify(
           rejected.message
         )}；真实原因不外显是本域通道现状，不得拿它当业务原因断`
       ).toBe(MASKED_BUSINESS_MESSAGE);
@@ -643,7 +643,7 @@ test.describe('264 期末调整台账 / 预算版本审批 / 汇率查询 / 凭�
     });
     const draftId = draft.data.id;
 
-    // PUT/PATCH 更正面在本域不存在（routes/period_adjustment.rs:21-38 未注册）→ 已注册路径 + 未注册方法 = 405
+    // PUT/PATCH 更正面在本域不存在（routes/period_adjustment.rs 未注册）→ 已注册路径 + 未注册方法 = 405
     const putProbe = await apiCallExpectFail(page, 'PUT', `/period-adjustments/${draftId}`, {
       amount: 999,
     });
@@ -768,7 +768,7 @@ test.describe('264 期末调整台账 / 预算版本审批 / 汇率查询 / 凭�
     expect(version.version_name, '264-03 version_name 落库值漂移').toBe(`E264预算版本${marker}`);
     expect(
       version.status,
-      '264-03 建版本初始态必须写 draft（budget_management_service.rs:1535）'
+      '264-03 建版本初始态必须写 draft（budget_management_service.rs）'
     ).toBe(PA_STATUS.DRAFT);
     expect(version.approved_by, '264-03 draft 态审批人列应为 null').toBeNull();
     expect(version.approved_at, '264-03 draft 态审批时间列应为 null').toBeNull();
@@ -917,7 +917,7 @@ test.describe('264 期末调整台账 / 预算版本审批 / 汇率查询 / 凭�
     expect(typeof q.data.rate, '264-04 query 腿汇率应为字符串').toBe('string');
     expect(
       q.data.id,
-      '264-04 query 腿未取最新生效日行（应按 effective_date DESC 取首条，currency_service.rs:132-137）'
+      '264-04 query 腿未取最新生效日行（应按 effective_date DESC 取首条，currency_service.rs）'
     ).toBe(seeded2.data.id);
     expect(q.data.rate, '264-04 query 与写后回读的汇率字符串不同源').toBe(seeded2.data.rate);
     expect(q.data.effective_date, '264-04 query 腿生效日不等于未来生效行').toBe('2999-12-31');
@@ -1028,7 +1028,7 @@ test.describe('264 期末调整台账 / 预算版本审批 / 汇率查询 / 凭�
     ).toBe(true);
 
     // 带类型参数仍返回 JZ：证明签名不接入参（handler :401-403 只有 State），
-    // 而真号源按类型派生前缀（voucher_ops/crud.rs:60-66 记→JZ/收→SK/付→FK/转→ZZ），
+    // 而真号源按类型派生前缀（voucher_ops/crud.rs 记→JZ/收→SK/付→FK/转→ZZ），
     // 故对「收」类凭证该端点给的前缀必错。后端若按类型派生，本断言判红即证明可移出废除清单。
     const withType = await apiCall<{ voucher_no: string }>(
       page,
@@ -1037,7 +1037,7 @@ test.describe('264 期末调整台账 / 预算版本审批 / 汇率查询 / 凭�
     );
     expect(
       withType.data.voucher_no.startsWith('SK'),
-      `264-05 现状钉桩：真号源对「收」给 SK 前缀（crud.rs:62），本端点却忽略入参给 JZ，` +
+      `264-05 现状钉桩：真号源对「收」给 SK 前缀（crud.rs），本端点却忽略入参给 JZ，` +
         `实际 ${withType.data.voucher_no}——若已按类型派生则判红并应移出废除清单`
     ).toBe(false);
 
@@ -1045,7 +1045,7 @@ test.describe('264 期末调整台账 / 预算版本审批 / 汇率查询 / 凭�
     const typeCodes = types.data.map(item => item.code);
     expect(
       typeCodes.includes('记'),
-      `264-05 可写类型词表应含「记」（crud.rs:688-695），实际 ${typeCodes.join('/')}`
+      `264-05 可写类型词表应含「记」（crud.rs），实际 ${typeCodes.join('/')}`
     ).toBe(true);
     expect(
       typeCodes.includes('收'),
@@ -1083,7 +1083,7 @@ test.describe('264 期末调整台账 / 预算版本审批 / 汇率查询 / 凭�
         expect(resp.status(), `264-06 未登录 GET ${path} 应 401，实际 ${resp.status()}`).toBe(401);
         expect(
           parsedCode,
-          `264-06 未登录 GET ${path} 失败体机器码应为 UNAUTHORIZED（utils/error.rs:785），` +
+          `264-06 未登录 GET ${path} 失败体机器码应为 UNAUTHORIZED（utils/error.rs），` +
             `实际 body 前 120 字符 ${bodyText.slice(0, 120)}`
         ).toBe(CODE_UNAUTHORIZED);
       }

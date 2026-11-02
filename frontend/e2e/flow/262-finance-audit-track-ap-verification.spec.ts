@@ -42,7 +42,7 @@ import {
  * username 三列。因此本 spec 的唯一 marker 埋在 event_type（落 module 列）而不是
  * description，写后回读按 module 精确取回自己那一行，逐列对表 username、user_id、
  * trace_id、duration_ms、response_status、created_at 与写入值，替代"列表非空"式假绿。
- * status 列经 SUCCESS、FAILED、DENIED 映射为 200、500、403（omni_audit_service.rs:219-227），
+ * status 列经 SUCCESS、FAILED、DENIED 映射为 200、500、403（omni_audit_service.rs），
  * duration_ms 缺省记 0。
  * 统计 get_dashboard_stats（:109）单条 SQL 出四键，其中 ui_clicks_today 判据是
  * request_method IS NULL、api_calls_today 判据是 request_method IS NOT NULL，
@@ -50,17 +50,17 @@ import {
  * 本 spec 断该恒等式并断自埋 marker 行带来的自增量（该行 request_method 为 NULL，
  * 必计入 ui_clicks）。并发请求会同时写审计行，自增只断下界不断等值。
  * 检索信封漂移按现状钉：search_logs 出参只有 items 与 total 两键，没有分页词表的
- * page 与 page_size（omni_audit_handler.rs:196 的 json! 字面量），故本 spec 断
+ * page 与 page_size（omni_audit_handler.rs 的 json! 字面量），故本 spec 断
  * 键集合恰为 items,total，不改成迁就 PaginatedResponse 的四键判据。
  *
- * 审计族拒绝腿通道。字段长度门走 validator，经 utils/error.rs:719-723 的
+ * 审计族拒绝腿通道。字段长度门走 validator，经 utils/error.rs 的
  * From<ValidationErrors> 转 validation_displayable，无自定义 message 时文案由
  * :739 的 `字段名: 规则码` 生成，可逐字符外显。payload 超 10KB 走
- * validation_displayable 固定文案（omni_audit_handler.rs:69）。三类拒绝码同为
+ * validation_displayable 固定文案（omni_audit_handler.rs）。三类拒绝码同为
  * VALIDATION_ERROR，只有文案不同，本 spec 逐条断文案而不是只断状态码。
  *
- * 子账报表（handlers/finance_report_handler.rs:186 加 services/finance_report_service.rs:645）。
- * 出参为 SubsidiaryLedger（models/dto/finance_report_dto.rs:133）七键
+ * 子账报表（handlers/finance_report_handler.rs 加 services/finance_report_service.rs）。
+ * 出参为 SubsidiaryLedger（models/dto/finance_report_dto.rs）七键
  * dimension_type、dimension_value、entries、total_debit、total_credit、period_start、
  * period_end，行结构为 SubsidiaryLedgerEntry（:118）十键。total_debit 与 total_credit
  * 由 build_subsidiary_entries 对 entries 逐行累加得到，故"合计等于明细求和"是本族的
@@ -69,9 +69,9 @@ import {
  * DEPARTMENT 为大写，dimension_value 非数字与未知 dimension_type 两支都落到
  * `Err(_) => query` 与 :696 的 `_ => query`，即静默不加过滤条件（缺陷见下方点名）。
  * 该 handler 无 AuthContext 抽取器，鉴权只靠全局 auth_middleware（bootstrap/
- * middleware_bootstrap.rs:259 注册在 csrf 与 permission 之外层），所以未登录腿必 401。
+ * middleware_bootstrap.rs 注册在 csrf 与 permission 之外层），所以未登录腿必 401。
  *
- * 应付自动核销（handlers/ap_verification_handler.rs:96 加 services/ap_verification_service.rs:45）。
+ * 应付自动核销（handlers/ap_verification_handler.rs 加 services/ap_verification_service.rs）。
  * 自动核销先把该供应商未核销应付单与已确认付款单按到期日贪心配对，配对集为空即
  * `AppError::business("没有可核销的应付单和付款单")`（:59）。本 spec 为本 worker 新建专属
  * 供应商并只挂一张手工应付单，付款单侧恒为空集，因此拒绝腿是确定性的（不依赖库内他人数据）。
@@ -84,9 +84,9 @@ import {
  * 由 middleware/trace_context.rs 的 normalize_extractor_rejection 收口为
  * 400 加 VALIDATION_ERROR 加固定公开规则文案。
  * 未核销发票与付款单两腿缺 supplier_id 走 AppError::bad_request（:191 与 :219），
- * public_message 收敛为固定「请求参数错误」（utils/error.rs:853 加 utils/messages.rs:46）。
+ * public_message 收敛为固定「请求参数错误」（utils/error.rs 加 utils/messages.rs）。
  *
- * 年结（handlers/accounting_period_handler.rs:81 加 services/accounting_period_service.rs:217）。
+ * 年结（handlers/accounting_period_handler.rs 加 services/accounting_period_service.rs）。
  * year 是 Query 必填 i32，缺 ?year 即 400 加 VALIDATION_ERROR 加固定公开规则文案。
  * 第一步校验该年度期间数为 12，不满即 AppError::business（:230），真实拒因
  * 「年结失败：年度 N 仅有 K 个期间，需 12 个月完整」被收敛为通用「业务处理失败」；
@@ -96,28 +96,28 @@ import {
  * 总数前后不变以证明被拒时零半截写（无新期间、无结转凭证）。
  *
  * 查出的后端缺陷（按现状钉桩，不改源码，不改判据方向）。
- * D1 handlers/omni_audit_handler.rs:78-90 与 services/omni_audit_service.rs:207-212，
+ * D1 handlers/omni_audit_handler.rs 与 services/omni_audit_service.rs，
  *    track 入参的 resource 与 action 两键不落库（module 取 event_type、action 取 event_name），
  *    调用方以为报了资源与动作，检索面永远取不到，本 spec 断 resource_type、resource_id、
  *    resource_name 与 action 的实际落库形态把该错位钉住。
- * D2 services/omni_audit_service.rs:212 加 handlers/omni_audit_handler.rs:78-90，
+ * D2 services/omni_audit_service.rs 加 handlers/omni_audit_handler.rs，
  *    track 写入的 description 恒 NULL，而 search_logs 的 keyword 只过滤 description、
  *    resource_name、username，导致 UI 埋点族自己写的内容无法被关键词检索命中，
  *    本 spec 以"marker 作 keyword 检索 total 恒 0"钉住该现状。
- * D3 handlers/omni_audit_handler.rs:196，search 出参缺 page 与 page_size，
- *    与 PaginatedResponse（utils/response.rs:34）四键词表不一致，前端分页控件拿不到回显页码。
- * D4 services/omni_audit_service.rs:242 的 log() 是 fire-and-forget tokio::spawn，
+ * D3 handlers/omni_audit_handler.rs，search 出参缺 page 与 page_size，
+ *    与 PaginatedResponse（utils/response.rs）四键词表不一致，前端分页控件拿不到回显页码。
+ * D4 services/omni_audit_service.rs 的 log() 是 fire-and-forget tokio::spawn，
  *    且写入失败只记 error 日志（:152-156）不返回调用方，track 恒回 200，
  *    落库与否调用方无从判断，本 spec 用带界轮询回读把真实落库结果作为判据。
- * D5 handlers/omni_audit_handler.rs:56 的 track_event 没有 require_admin_role 门
+ * D5 handlers/omni_audit_handler.rs 的 track_event 没有 require_admin_role 门
  *    （:18-35 只挂在 stats 与 search 两腿），任何登录用户都能伪造审计轨迹条目写入。
- * D6 services/finance_report_service.rs:696 的 `_ => query` 与 :686、:693 的
+ * D6 services/finance_report_service.rs 的 `_ => query` 与 :686、:693 的
  *    `Err(_) => query`，未知 dimension_type 与非数字 dimension_value 一律静默降级为
  *    不加过滤的全量取数，既不报错也不收窄，跨维度数据可被读穿，本 spec 钉该现状并点名。
- * D7 services/ap_verification_service.rs:59 与 services/accounting_period_service.rs:230、:238
+ * D7 services/ap_verification_service.rs 与 services/accounting_period_service.rs、:238
  *    走 AppError::business 通道，拒因只到调用方眼前一句「业务处理失败」，
  *    年结的"缺几个月"与核销的"缺付款单"这类可操作信息全部丢失。
- * D8 handlers/ap_verification_handler.rs:92 的 AutoVerifyRequest 未实现 Validate，
+ * D8 handlers/ap_verification_handler.rs 的 AutoVerifyRequest 未实现 Validate，
  *    supplier_id 非法值（如 0 或负数）不进参数门，只会以零命中进入配对再被拒。
  *
  * 假绿防线。每个写腿为本 worker 另建专属供应商，使按 supplier_id 过滤的列表与聚合出口只有
@@ -128,14 +128,14 @@ import {
  * require_admin_role 保证，与被 permission_middleware 拒绝同码同文案，结论不受影响）。
  */
 
-/** 后端固定公开规则文案（utils/error.rs:881-882 REQUEST_DECODING_PUBLIC 字面量） */
+/** 后端固定公开规则文案（utils/error.rs REQUEST_DECODING_PUBLIC 字面量） */
 const REQUEST_DECODING_PUBLIC =
   '请求格式不正确：请求体或查询参数存在缺失的必填字段、字段类型错误或内容类型错误，请修正后重试';
-/** business 通道收敛后的通用文案（utils/messages.rs:43） */
+/** business 通道收敛后的通用文案（utils/messages.rs） */
 const BUSINESS_PUBLIC = '业务处理失败';
-/** bad_request 通道收敛后的通用文案（utils/messages.rs:46） */
+/** bad_request 通道收敛后的通用文案（utils/messages.rs） */
 const BAD_REQUEST_PUBLIC = '请求参数错误';
-/** permission_denied 通道收敛后的通用文案（utils/messages.rs:47） */
+/** permission_denied 通道收敛后的通用文案（utils/messages.rs） */
 const PERMISSION_PUBLIC = '无权限';
 
 type Json = Record<string, unknown>;
@@ -270,7 +270,7 @@ async function searchAudit(page: Page, module: string): Promise<AuditSearchPage>
 }
 
 /**
- * 带界轮询等审计行落库。omni_audit_service.rs:242 的 log() 是 fire-and-forget spawn，
+ * 带界轮询等审计行落库。omni_audit_service.rs 的 log() 是 fire-and-forget spawn，
  * 写失败只记日志不回错，故回读超时必须是显式失败而不是"取不到就当没有"。
  */
 async function waitForAuditRow(page: Page, module: string): Promise<AuditSearchPage> {
@@ -290,7 +290,7 @@ async function waitForAuditRow(page: Page, module: string): Promise<AuditSearchP
   }
   throw new Error(
     `写后 20 秒内未回读到 module=${module} 的审计行（回读 ${attempt} 次，最后 total=${String(last.total)}）。` +
-      '缺陷面：track 恒回 200，落库失败仅记 error 日志（omni_audit_service.rs:152-156、:242）'
+      '缺陷面：track 恒回 200，落库失败仅记 error 日志（omni_audit_service.rs、:242）'
   );
 }
 
@@ -413,7 +413,7 @@ test.describe.serial('262 财务审计轨迹与子账报表 应付核销与年�
     const envelopeKeys = Object.keys(row).sort().join(',');
     expect(
       envelopeKeys,
-      '检索行键集合必须等于 build_select_fields 未含敏感列时的 15 列（omni_audit_handler.rs:270-276）'
+      '检索行键集合必须等于 build_select_fields 未含敏感列时的 15 列（omni_audit_handler.rs）'
     ).toBe(
       'action,created_at,description,duration_ms,id,module,request_method,request_path,resource_id,resource_name,resource_type,response_status,trace_id,user_id,username'
     );
@@ -478,7 +478,7 @@ test.describe.serial('262 财务审计轨迹与子账报表 应付核销与年�
     }
     expect(
       Object.keys(b).sort().join(','),
-      '统计出参键集合必须等于 AuditStats 四键（services/omni_audit_query_service.rs:21-27）'
+      '统计出参键集合必须等于 AuditStats 四键（services/omni_audit_query_service.rs）'
     ).toBe('api_calls_today,security_alerts_today,total_events_today,ui_clicks_today');
     expect(
       b.total_events_today,
@@ -605,7 +605,7 @@ test.describe.serial('262 财务审计轨迹与子账报表 应付核销与年�
     const led = ledger.data;
     expect(
       Object.keys(led).sort().join(','),
-      '出参键集合必须等于 SubsidiaryLedger 七键（models/dto/finance_report_dto.rs:133-141）'
+      '出参键集合必须等于 SubsidiaryLedger 七键（models/dto/finance_report_dto.rs）'
     ).toBe(
       'dimension_type,dimension_value,entries,period_end,period_start,total_credit,total_debit'
     );
@@ -669,7 +669,7 @@ test.describe.serial('262 财务审计轨迹与子账报表 应付核销与年�
       const first = unknown.data.entries[0];
       expect(
         Object.keys(first).sort().join(','),
-        '行键集合必须等于 SubsidiaryLedgerEntry 十键（models/dto/finance_report_dto.rs:118-129）'
+        '行键集合必须等于 SubsidiaryLedgerEntry 十键（models/dto/finance_report_dto.rs）'
       ).toBe(
         'business_date,business_no,business_type,credit,customer_id,debit,subject_code,subject_name,summary,supplier_id'
       );

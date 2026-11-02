@@ -6,9 +6,9 @@
  *    POST 建一条带唯一 location_code marker 的库位，详情与列表按主键回读逐字段自证落库，
  *    PUT 改编码并写入 max_weight 后再读回确认持久化，DELETE 后回读确认 404 且列表不再含该 id；
  * 二，负向门三枚：PUT 对 NOT NULL 列 location_code 显式传 null 被入口拒绝（逐字符比对
- *    backend warehouse_handler.rs:283-286 的外显文案）；不存在 id 走 GET/PUT 断言 404
+ *    backend warehouse_handler.rs 的外显文案）；不存在 id 走 GET/PUT 断言 404
  *    「库位不存在」（:270、:290），走 DELETE 断言 404「warehouse_location 记录不存在」
- *    （audit_log_service.rs:501-504 以 resource_type "warehouse_location" 拼接）；
+ *    （audit_log_service.rs 以 resource_type "warehouse_location" 拼接）；
  * 三，扫码族（/scanner/scan-inventory、scan-statistics、scan-to-ship 的 GET 与 POST）按
  *    barcode_scanner_handler.rs 的出参形状逐字段断言类型与归属：统计五列均为数值且
  *    total_count 覆盖各分项；scan-to-ship 无 barcode 时返回分页信封（items 数组、
@@ -17,7 +17,7 @@
  *
  * 调用方：Playwright E2E 套件，由 CI 的 e2e flow 分片按文件哈希收集执行。
  * 入参：BASE_URL 与 API_BASE 取环境变量；admin 角色凭证由 global-setup 写入
- *       e2e/.auth/role-credentials.json（SEED_ROLES 含 admin，permission.rs:586 admin 短路）。
+ *       e2e/.auth/role-credentials.json（SEED_ROLES 含 admin，permission.rs admin 短路）。
  * 传给谁：会话由 fixtures/relay 的 createRelay 建立（单角色 admin 两棒），请求走 flow/helpers 的
  *       apiCall/apiCallRaw/apiCallExpectFail（内置 CSRF 有界重放与会话同步），唯一标识走 genCode，
  *       不另造登录或请求函数。
@@ -36,11 +36,11 @@
  * 【断言判据与后端口径出处】
  * 出参键 = models/location.rs Model 字段名（serde 直出 snake_case：id/warehouse_id/location_code/
  * location_type/max_weight/max_height/is_batch_managed/is_color_managed/created_at/updated_at）；
- * 列表为 PaginatedResponse{items,total,page,page_size}（warehouse_handler.rs:211-217），
+ * 列表为 PaginatedResponse{items,total,page,page_size}（warehouse_handler.rs），
  * 分页入参键 page/page_size，warehouse_id 为过滤列（:201）；
  * max_weight 为 Decimal，编码形态（数值或字符串）不可预判，统一 Number() 归一后逐值判；
  * scan-to-ship GET 无 barcode 时返回 items=[] 的空分页信封且 page_size clamp(1,100)
- * （barcode_scanner_handler.rs:60-70）；缺 order_id 走 validation_displayable
+ * （barcode_scanner_handler.rs）；缺 order_id 走 validation_displayable
  * 「扫码发货缺少 order_id 参数」（:73-76）；POST 与 GET 同走 scan_to_ship_impl，未知条码
  * not_found「未找到该条码对应的布卷」（:95-97）。
  * 扫码统计五列 available_count/shipped_count/defect_count/reserved_count/total_count

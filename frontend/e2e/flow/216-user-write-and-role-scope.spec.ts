@@ -6,7 +6,7 @@ import { PERMISSIONS } from '../../src/constants/permissions';
 const KEY_ROLES_READ = PERMISSIONS.ROLE_READ;
 const KEY_WAREHOUSES_READ = PERMISSIONS.WAREHOUSE_READ;
 
-/** roles.data_scope 写入侧词表（backend/src/utils/data_scope.rs:43-48 的 as_str 三值，小写） */
+/** roles.data_scope 写入侧词表（backend/src/utils/data_scope.rs 的 as_str 三值，小写） */
 const SCOPE_WRITE_VALUES = ['all', 'dept', 'self'];
 
 /**
@@ -22,65 +22,65 @@ const SCOPE_WRITE_VALUES = ['all', 'dept', 'self'];
  * 调用方。Playwright 串行链，主会话恒为 worker 专属超管（loginAsRole(page,'admin')）；
  * 后端放行证据腿另开隔离 context 用被授权账号真实登录。界面锚点零使用（本文件是契约腿，
  * 界面新建/编辑与整批替换面已由 214/215 覆盖），故不涉及下拉面板与 openSelectDropdownItems。
- * 路由与权限键依据：backend/src/routes/iam.rs:20-26（users 读写删）、iam.rs:45-47
- * （roles/{id}/data-scope PATCH→update 派生键 roles:update）、iam.rs:58-62（单键 POST 与
+ * 路由与权限键依据：backend/src/routes/iam.rs（users 读写删）、iam.rs
+ * （roles/{id}/data-scope PATCH→update 派生键 roles:update）、iam.rs（单键 POST 与
  * 整批 PUT 同路径不同方法）。
  *
  * 入参。用户名/邮箱/手机号与角色 name/code 都带本次运行 Date.now().toString(36) 后缀，逐次唯一，
  * 跨用例与跨 worker 不撞；角色一律用本文件新建的自建角色（is_system=false，系统角色与超管角色
- * 在授予面与 data-scope 面都被拒，services/role_permission_service.rs:392-394）；账号绑定的角色
+ * 在授予面与 data-scope 面都被拒，services/role_permission_service.rs）；账号绑定的角色
  * 从 GET /roles 里按 code !== 'admin' 取（admin 角色受 protect_last_admin 保护，
- * handlers/user_handler.rs:620-623，删除腿会被拒）。权限键一律引
+ * handlers/user_handler.rs，删除腿会被拒）。权限键一律引
  * frontend/src/constants/permissions.ts 的 PERMISSIONS 权威词表并拆成 resource_type/action 两段，
  * data_scope 一律取 data_scope.rs 的小写三值，不在本文件自造字符串。口令一律 testPassword()。
  *
  * 传给谁。POST /users（CreateUserRequest{username,password,email,phone,role_id}）、
  * PUT /users/{id}（UpdateUserRequest{email,phone,role_id,department_id,status}，
- * handlers/user_handler.rs:96-104，无 username 字段）、GET /users?keyword&status&page&page_size、
+ * handlers/user_handler.rs，无 username 字段）、GET /users?keyword&status&page&page_size、
  * GET /users/{id}、DELETE /users/{id}、POST /roles/{id}/permissions
- * （AssignPermissionPayload{resource_type,resource_id,action,allowed}，role_handler.rs:108-113，
+ * （AssignPermissionPayload{resource_type,resource_id,action,allowed}，role_handler.rs，
  * role_id 由路径给出、体里不传）、GET /roles/{id}/permissions、PUT /roles/{id}/permissions（仅作
  * 吊销收尾）、GET /roles/{id}、PATCH /roles/{id}/data-scope（UpdateDataScopePayload{data_scope}，
- * role_handler.rs:119-121）。
+ * role_handler.rs）。
  *
  * 存什么。users 行的 email/phone/is_active 三列语义写回（PUT 只覆盖请求里 Some 的字段，
- * services/user_service.rs:318-338）；status 字段是字符串 token，落库形态是 is_active 布尔
- * （user_service.rs:333-335 becoming_active = status_val == master_data::ACTIVE）。
+ * services/user_service.rs）；status 字段是字符串 token，落库形态是 is_active 布尔
+ * （user_service.rs becoming_active = status_val == master_data::ACTIVE）。
  * DELETE 写 is_active=false，不删行。role_permission 关联行写 (role_id, resource_type,
  * resource_id=null, action, allowed)，单键 POST 命中同键时改行不插行
- * （role_permission_service.rs:778-784 find_existing_permission → update_existing_permission）。
- * roles 行只写 data_scope 一列（PATCH 是该列唯一 API 写入口，role_handler.rs:308）。
+ * （role_permission_service.rs find_existing_permission → update_existing_permission）。
+ * roles 行只写 data_scope 一列（PATCH 是该列唯一 API 写入口，role_handler.rs）。
  *
  * 存哪里。PostgreSQL users / role_permission / roles 三表；users 读路径带 Redis 缓存
- * （user_service.rs:100-110 find_by_id 先读缓存、user_service.rs:347 更新后显式
+ * （user_service.rs find_by_id 先读缓存、user_service.rs 更新后显式
  * redis_cache_del），故本文件的「先写后按主键回读」不会被过期缓存喂旧值；role_permission 判定
  * 走带 role_id 维度缓存的 middleware/permission.rs，写入方成功后按 role_id 失效，故
  * 「先授予后吊销」次序成立；roles.data_scope 由 auth 中间件每请求现读库、无缓存需失效
- * （role_handler.rs:312-313）。
+ * （role_handler.rs）。
  *
  * 契约真相（逐条对着后端源核对，与本用例判据直接相关六点）。
- * 1) 列表出参键是 UserListResponse{users,total,page,page_size}（handlers/user_handler.rs:458-463），
- *    详情/改写出参键是 UserResponse 的 snake_case 字段（user_handler.rs:108-123 区），
+ * 1) 列表出参键是 UserListResponse{users,total,page,page_size}（handlers/user_handler.rs），
+ *    详情/改写出参键是 UserResponse 的 snake_case 字段（user_handler.rs 区），
  *    两个信封都不是通用 PaginatedResponse 的 items；本文件按这些真实键建模，不写 camelCase。
- * 2) DELETE /users/{id} 是软删除（user_handler.rs:626-628 注释 + user_service 置 is_active=false），
+ * 2) DELETE /users/{id} 是软删除（user_handler.rs 注释 + user_service 置 is_active=false），
  *    故删除后 GET /users/{id} 继续 200 且返回完整实体（find_by_id 不按 is_active 过滤，
- *    user_service.rs:107-110 只按主键取行）。本文件把「详情仍 200 且 username/email/phone/
+ *    user_service.rs 只按主键取行）。本文件把「详情仍 200 且 username/email/phone/
  *    role_names 逐字段仍是原值」钉成显式断言：一旦这条腿退化成 200 空壳（字段全 null），
  *    断言立刻红；一旦改成硬删除（404），同样红。两种漂移都不许被静默放过。
- * 3) 列表 status 谓词是 is_active.eq(s != 0)（handlers/user_handler.rs:415，214 已核对行号）：
+ * 3) 列表 status 谓词是 is_active.eq(s != 0)（handlers/user_handler.rs，214 已核对行号）：
  *    status=1 只看启用、status=0 只看禁用、缺省不过滤。删除后的三条计数判据直接由此推出，
  *    不是猜测：0 行 / 1 行 / 1 行。
- * 4) UpdateUserRequest 的校验只有两条（user_handler.rs:97-100：email 需过 email 格式、
+ * 4) UpdateUserRequest 的校验只有两条（user_handler.rs：email 需过 email 格式、
  *    phone 需长度 ≥1），没有 username、没有 email 长度上限、status 无任何校验注解。
- *    validator::ValidationErrors 一律映射为 400 + code=ValidationError（utils/error.rs:719-722）。
- *    status 传非法 token 不会被拒：user_service.rs:333-335 只比较相等，落库成 is_active=false，
+ *    validator::ValidationErrors 一律映射为 400 + code=ValidationError（utils/error.rs）。
+ *    status 传非法 token 不会被拒：user_service.rs 只比较相等，落库成 is_active=false，
  *    属于被观察到的真实形状，本文件断实际行为（200 + 被静默置为禁用）并把缺陷写进回报，
  *    不改成「应被拒」的假断言。
- * 5) 单键 POST 的出参是 PermissionResponse 单个对象（role_handler.rs:490），不是数组；
+ * 5) 单键 POST 的出参是 PermissionResponse 单个对象（role_handler.rs），不是数组；
  *    GET /roles/{id}/permissions 出参是数组，两者同源。重复追加同一键命中
- *    find_existing_permission 分支（role_permission_service.rs:778-781），是更新而非插入，
+ *    find_existing_permission 分支（role_permission_service.rs），是更新而非插入，
  *    故追加后集合长度不变、成员集合与上一次逐元素相等。
- * 6) PATCH data-scope 的词表往返校验先于存在性检查（role_permission_service.rs:375-390）：
+ * 6) PATCH data-scope 的词表往返校验先于存在性检查（role_permission_service.rs）：
  *    取值非法 → 400 ValidationError（文案由 :382-384 validation_displayable 构造）；
  *    取值合法但角色不存在 → 404 NotFound；系统角色 → 400 BusinessError。
  *    三类不并成「任一非 2xx」。DEPT_AND_BELOW 与 CUSTOM 本轮刻意不开放（:367 说明列宽
@@ -295,7 +295,7 @@ test.describe('用户改写与回收 + 角色单键授权与数据范围改写',
 
     // —— 第 9 段：非法 status token 的实际形状（后端不校验，只按相等比较落 is_active）——
     // 这是被观察到的真实行为，不是期望行为：期望是 400 拒绝未知词表值，实际是 200 并把用户静默
-    // 置为禁用（services/user_service.rs:333-335）。这里断实际值，缺陷写进回报，不假装它被拒。
+    // 置为禁用（services/user_service.rs）。这里断实际值，缺陷写进回报，不假装它被拒。
     const statusProbe = await apiCall<UserPayload>(page, 'PUT', `/users/${userId}`, {
       status: 'e2e216_not_a_status_token',
     });
@@ -468,7 +468,7 @@ test.describe('用户改写与回收 + 角色单键授权与数据范围改写',
       expect(grantKeys(revoked.data), '整批撤销后该角色授予集不为空').toEqual([...keys0].sort());
       const denied = await apiCallExpectFail(targetPage, 'GET', '/roles');
       expect(denied.status, '撤销授权后该账号 GET /roles 应被后端拒 403').toBe(403);
-      expect(denied.code, '后端拒绝机器码应为 FORBIDDEN（utils/error.rs:787 CODE_FORBIDDEN）').toBe(
+      expect(denied.code, '后端拒绝机器码应为 FORBIDDEN（utils/error.rs CODE_FORBIDDEN）').toBe(
         'FORBIDDEN'
       );
     } finally {
