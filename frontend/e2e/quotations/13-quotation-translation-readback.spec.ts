@@ -34,7 +34,9 @@ import {
   getCtx,
   apiCall,
   apiCallRaw,
-  tryCleanup,
+  apiCallExpectFail,
+  failureCode,
+  APP_ERROR_CODES,
   BASE_URL,
 } from '../flow/helpers';
 import { pickListArray } from '../flow/ui-helpers';
@@ -107,10 +109,23 @@ async function seedRecognizableDraft(page: Page, noteTag: string): Promise<numbe
 }
 
 const CREATED_QUOTATION_IDS: number[] = [];
+
+/**
+ * 报价单头级没有删除路由（路由快照 quotations 族只挂 GET/PUT 与动作 POST），在册的终止腿是
+ * POST /quotations/{id}/cancel：写 quotation 状态词表的 cancelled（全小写四值词表）退出活跃列表。
+ * 已转单的单据不进这里——cancel 对 converted 明确拒绝，那个终态由用例自己断言。
+ */
 test.afterEach(async ({ page }) => {
   while (CREATED_QUOTATION_IDS.length) {
     const id = CREATED_QUOTATION_IDS.pop();
-    if (id != null) await tryCleanup(page, 'DELETE', `/quotations/${id}`, `quotation#${id}`);
+    if (id != null) {
+      const cancelled = await apiCallRaw<{ status: string }>(
+        page,
+        'POST',
+        `/quotations/${id}/cancel`
+      );
+      expect(cancelled.status, `报价单 ${id} 清理腿取消后状态应为 cancelled`).toBe('cancelled');
+    }
   }
 });
 
@@ -120,7 +135,7 @@ test.describe('13 报价翻译回读', () => {
     await ensureTestEntities(page);
     const ctx = getCtx();
     const sourceId = await seedRecognizableDraft(page, 'CONV');
-    CREATED_QUOTATION_IDS.push(sourceId);
+    // 本例源单必然被 convert 推进到 converted 终态（该终态就是被断言的结论），无清理腿可用也无需清理。
 
     // draft → approved（金额 500 < 10 万，submit 自批）
     await apiCall(page, 'POST', `/quotations/${sourceId}/submit`);
@@ -150,6 +165,19 @@ test.describe('13 报价翻译回读', () => {
     expect(converted.status, '转订单后报价单状态应为 converted').toBe('converted');
     const soId = converted.converted_sales_order_id;
     expect(soId, '转订单应回填 converted_sales_order_id').toBeTruthy();
+
+    // 终态复证：converted 是本族唯一在册终止腿（cancel）的拒绝态，走 business_displayable
+    // → 400 + BUSINESS_ERROR。撤除清理腿的判据在此钉死，不是口头声明「不用清」。
+    const convCancel = await apiCallExpectFail(page, 'POST', `/quotations/${sourceId}/cancel`);
+    expect(
+      convCancel.status,
+      `converted 报价单取消应被状态门拒绝 400，实际=${convCancel.status}`
+    ).toBe(400);
+    expect(failureCode(convCancel), 'converted 取消被拒机器码').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
+    const convAfter = await apiCallRaw<{ status: string }>(page, 'GET', `/quotations/${sourceId}`);
+    expect(convAfter.status, '取消被拒后报价单状态不得从 converted 漂移').toBe('converted');
 
     // 回读订单明细：非仅断产出 id，逐项验证翻译正确性
     const order = await apiCallRaw<{

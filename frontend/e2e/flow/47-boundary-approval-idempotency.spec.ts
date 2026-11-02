@@ -12,6 +12,7 @@ import {
   APP_ERROR_CODES,
   type ApiFailureResult,
 } from './helpers';
+import { testPassword } from './helpers';
 
 /**
  * 47 边界值 / 审批纵深 / 幂等 / 审计完整性（L3+L4+L5+审计防线合并）
@@ -127,7 +128,7 @@ test.describe.serial('47 边界值/审批纵深/幂等/审计完整性', () => {
 
     const r1 = await apiCall<{ id?: number }>(page, 'POST', '/users', {
       username,
-      password: 'Dup47!Test#2026x',
+      password: testPassword(),
       email: `${username}@test.com`,
       role_id: roleId,
     });
@@ -137,7 +138,7 @@ test.describe.serial('47 边界值/审批纵深/幂等/审计完整性', () => {
 
     const r2 = await apiCallExpectFail(page, 'POST', '/users', {
       username,
-      password: 'Dup47!Test#2026x',
+      password: testPassword(),
       email: `${username}2@test.com`,
       role_id: roleId,
     });
