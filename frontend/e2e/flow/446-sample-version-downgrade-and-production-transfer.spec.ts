@@ -112,10 +112,10 @@ test.describe('面料样品打样版本链与降等转大货', () => {
   });
 
   test('revise 改版产生新版本且旧版本可追溯', async ({ page }) => {
-    // 功能：版本链唯一入口是 POST /contract-templates/{id}/revise（route-snapshot.txt:1163），
+    // 功能：版本链唯一入口是 POST /contract-templates/{id}/revise（route-snapshot.txt），
     // 服务端按同模板号最大版本 +1 生成新行，旧行不动。
-    // 调用方：contract_template_handler.rs:214 revise_template（无请求体）。
-    // 入参：模板 id；version 由 contract_template_service.rs:268 revise 自行计算。
+    // 调用方：contract_template_handler.rs revise_template（无请求体）。
+    // 入参：模板 id；version 由 contract_template_service.rs revise 自行计算。
     // 传给谁：contract_template_service.revise → contract_templates 表新增行。
     // 存什么：新行的 version / status（改版后回到 DRAFT）；旧行的 version 保持原值。
     // 存哪里：backend/src/models/contract_template.rs。
@@ -164,12 +164,12 @@ test.describe('面料样品打样版本链与降等转大货', () => {
 
   test('实测结果与实测等级回写落库可读回', async ({ page }) => {
     // 功能：把预测的实际风险等级/实际合格率与实测等级/索赔金额回写并读回。
-    // 调用方：ai_extend_handler.rs:550 record_actual_quality_result、:571 record_actual_grade。
+    // 调用方：ai_extend_handler.rs record_actual_quality_result、:571 record_actual_grade。
     // 入参 actual_risk_level（取该记录自身 risk_level 的真实取值域，不自造 token）、
     // actual_avg_qualification_rate、actual_grade、claim_amount。
     // 传给谁：ai_extend_service.record_actual_quality_result / record_actual_result。
     // 存什么：actual_* 回填列与 actual_recorded_at / claim_recorded_at 时间戳。
-    // 存哪里：ai_quality_predictions（backend/src/models/ai_quality_prediction.rs:36-52）。
+    // 存哪里：ai_quality_predictions（backend/src/models/ai_quality_prediction.rs）。
     const predictions = await safeGetList<Record<string, unknown>>(
       page,
       '/ai/quality-predictions?page=1&page_size=5'
@@ -234,9 +234,9 @@ test.describe('面料样品打样版本链与降等转大货', () => {
   });
 
   test('未剪样不得发送客户、未确认不得降等，且拒绝不落库', async ({ page }) => {
-    // 功能：钉住批色状态机两条非法跃迁（bulk_color_approval_service.rs:732 send_to_customer 只允许
+    // 功能：钉住批色状态机两条非法跃迁（bulk_color_approval_service.rs send_to_customer 只允许
     // sampled；:1211-1238 downgraded 必须从 approved 进入），并断言被拒后状态与时间戳零漂移。
-    // 调用方：bulk_color_approval_handler.rs:515 send_to_customer、:621 downgrade。
+    // 调用方：bulk_color_approval_handler.rs send_to_customer、:621 downgrade。
     // 入参：路径上的批色单 id；downgrade 需 reject_reason；send_to_customer 无请求体。
     // 传给谁：bulk_color_approval_service（状态流转 + 历史记录）。
     // 存什么：approval_status / sent_to_customer_at / reject_reason——被拒时三者都不得变化。
@@ -310,10 +310,10 @@ test.describe('面料样品打样版本链与降等转大货', () => {
 
   test('转大货关联配方写入后可读回，非法关联不落库', async ({ page }) => {
     // 功能：link-to-production 把工艺优化关联到大货生产配方（V15 P1 8.2）。
-    // 调用方：ai_extend_handler.rs:534 link_to_production；入参 production_recipe_id（i32）。
+    // 调用方：ai_extend_handler.rs link_to_production；入参 production_recipe_id（i32）。
     // 传给谁：ai_extend_service.link_to_production_recipe → ai_process_optimizations.production_recipe_id。
     // 存什么：production_recipe_id 一个外键列；非法关联必须保持 null。
-    // 存哪里：backend/src/models/ai_process_optimization.rs:32。
+    // 存哪里：backend/src/models/ai_process_optimization.rs。
     if (!optimizationId || !createdColorNo) {
       throw new Error('前置不成立：工艺优化句柄未建立，跳过转大货腿只会掩盖断链');
     }
@@ -370,9 +370,9 @@ test.describe('面料样品打样版本链与降等转大货', () => {
   test('无权限岗位调用降等与实测回写被拦，主管岗位同端点可达', async ({ page }) => {
     // 功能：垂直越权防护——只读岗位调用写端点必须被权限门拒绝（HTTP 403 + FORBIDDEN），
     // 同端点在主管岗位会话下可达，证明 403 来自 RBAC 而不是路由缺失或 CSRF 竞败。
-    // 调用方：loginAsRole + apiCallExpectFail + expectDenied（helpers.ts:3794）。
+    // 调用方：loginAsRole + apiCallExpectFail + expectDenied（helpers.ts）。
     // 入参：岗位名 report_viewer（只读报表岗）与 manager（主管岗）；权限键由 URL 段
-    // /api/v1/erp/{seg3}/{seg4} 推导（middleware/permission.rs:259）。
+    // /api/v1/erp/{seg3}/{seg4} 推导（middleware/permission.rs）。
     // 传给谁：权限中间件 → 被拒时不触达 service。
     // 存什么：被拒时零写入，断言状态与回填列均无漂移。
     // 存哪里：bulk_color_approvals / ai_quality_predictions。
