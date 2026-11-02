@@ -616,6 +616,17 @@ impl WechatMpTemplateKind {
             Self::PendingReconcile => "待对账提醒",
         }
     }
+
+    /// 该事件类型的稳定 ASCII 标识（落库与幂等台账用，与中文称谓、环境变量名三者分列）。
+    ///
+    /// 值一旦写入 `processed_events.event_type` 即为历史数据，禁止改名；新增事件类型只能追加新值。
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::PendingQuotation => "wechat_mp_pending_quotation",
+            Self::QuotationResult => "wechat_mp_quotation_result",
+            Self::PendingReconcile => "wechat_mp_pending_reconcile",
+        }
+    }
 }
 
 /// 微信公众号通知腿配置：接口凭证（appid/secret）+ 三枚模板 ID。
