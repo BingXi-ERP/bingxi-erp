@@ -1700,6 +1700,21 @@ jobs:
         # --test-threads=1 串行执行，避免集成测试竞态
         run: |
           mkdir -p reports
+          # 归档解包用的临时区与根分区同盘：约 4GB 归档要解出五百多枚测试二进制。
+          # 空间不足时解包中途失败，整片只剩"无 Summary 的进程异常退出"，看起来
+          # 像代码红。本 job 既不构建安卓也不跑前端，先把这些预装件清出来腾空间，
+          # 并把解包前的剩余量打进日志，让磁盘类失败一眼可辨。
+          df -h / | tail -1
+          for preinstalled in /usr/local/lib/android /usr/share/dotnet /opt/ghc; do
+            if [ -d "$preinstalled" ]; then
+              sudo rm -rf "$preinstalled" && echo "已释放 $preinstalled"
+            fi
+          done
+          FREE_KB=$(df -Pk / | awk 'NR==2 {print $4}')
+          echo "解包前根分区可用 ${FREE_KB} KB"
+          if [ "${FREE_KB:-0}" -lt 12000000 ]; then
+            echo "::warning::根分区可用不足 12GB，归档解包存在失败风险"
+          fi
           set +e
           cargo nextest run \
             --archive-file nextest-archive.tar.zst \
@@ -1795,6 +1810,14 @@ jobs:
             exit 1
           fi
           if [ "$EXIT_CODE" -ne "0" ]; then
+            # 解包写不下磁盘时同样是非零退出且无 Summary。不点名就会被读成代码红，
+            # 而这条红与本支改动毫无关系：断言一条都没跑起来。
+            if grep -aq "No space left on device" reports/nextest-output.clean.txt 2>/dev/null; then
+              echo "::error::分片 ${{ matrix.partition }} 因根分区空间不足失败（归档解包写不下），与用例断言无关"
+              echo "❌ 分片 ${{ matrix.partition }} 磁盘不足（os error 28，EXIT_CODE=$EXIT_CODE）"
+              df -h / | tail -1
+              exit 1
+            fi
             echo "❌ 分片 ${{ matrix.partition }} 进程异常退出（EXIT_CODE=$EXIT_CODE）"
             exit 1
           fi
