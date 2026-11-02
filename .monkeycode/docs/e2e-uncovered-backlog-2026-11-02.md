@@ -1,8 +1,12 @@
 # 存量漏测疑点清单与处置批次（2026-11-02）
 
-口径来源：`frontend/scripts/e2e-pairing-coverage-baseline.json` 的 `withUiUncoveredEndpoints`（由配对门生成器
-`--write-coverage-baseline` 实测落盘，可复现，不是估算）。定义＝该端点在前端源码有调用点，但在
-`frontend/e2e` 语料零引用。总数 189 枚，分母与成员同源，判红时逐条点名。
+口径来源（2026-11-02 实测更正）：`cd frontend && node scripts/check-e2e-feature-pairing.mjs --self-test`
+打印的 `SELFTEST_POOL current=… covered=… uncovered=… uncoveredNoUi=… uncoveredWithUi=…` 这一行。
+本仓不存在 `scripts/e2e-pairing-coverage-baseline.json`，配对门也不支持 `--write-coverage-baseline`
+（逐字 grep 该开关命中 0），早前一版把两者写成本数的出处属不实引用，已按实测改掉。定义＝该端点在
+前端源码有调用点，但在 `frontend/e2e` 语料零引用。主干实量 `uncoveredWithUi=189`（分母 1822 枚端点、
+已覆盖 1166 枚），这是 189 这个数的可复现来源；门体只打印计数不打印成员，逐条点名要用成员清单时
+须临时写探针把同一谓词命中的数组落盘，禁止凭记忆列成员。
 
 配套目标见 [E2E 与质量治理总纲](./e2e-master-plan-2026-11-02.md)，本文件只负责"这 189 枚怎么消化"。
 
@@ -38,8 +42,14 @@
 
 ## 三、每批合入后的可核对期望（防止"补了但没降"）
 
-合入一批就跑一次 `cd frontend && node scripts/check-e2e-feature-pairing.mjs --write-coverage-baseline`，
-再看 `withUiUncovered` 是否按该批端点数下降。判据三条，缺一条就算这批白做：
+合入一批就跑一次 `cd frontend && node scripts/check-e2e-feature-pairing.mjs --self-test`，取
+`SELFTEST_POOL` 行的 `uncoveredWithUi` 与 `covered` 两个计数，看 `uncoveredWithUi` 是否按该批点名的
+端点数下降。判据三条，缺一条就算这批白做：
+
+0. 实测样例（2026-11-02 本轮 W1 载体，15 枚 spec 全部入库后）：主干面 `covered=1166`、
+   `uncoveredWithUi=189`；载体面 `covered=1269`、`uncoveredWithUi=101`。即新增覆盖 103 枚端点，
+   有界面漏测债降 46.6%（两面的分母同为 1822，可直接相减）。同一分母是这条判据成立的前提，
+   分母不同说明两侧快照的 route-snapshot 不同版，数字不许比。
 
 1. 分母下降量等于该批点名的端点数（不等就说明有用例没有真引用到路径字面量，属本仓已知的
    "URL 收进 helper 体内导致判定器绑错实参"形态，正解是把路径字面量写回调用点）。
