@@ -159,6 +159,9 @@ async fn test_calculate_totals_bhsjejszq() {
 }
 
 /// test_calculate_totals_hsjesewl
+/// 含税录入态：小计仍取净额，总额取行腿含税事实，税额是两者的差额。
+/// 夹具里 净单价 10 与 含税单价 11.3 与 税率 13 三者互推，故本例三键与不含税态同值；
+/// 这条等式本身就是钩稽判据，任一侧改成乘法造含税或把税额写死 0 都会立刻断开。
 #[tokio::test]
 async fn test_calculate_totals_hsjesewl() {
     let db = setup_test_db().await;
@@ -167,8 +170,8 @@ async fn test_calculate_totals_hsjesewl() {
     dto.tax_inclusive = true;
     let (subtotal, tax_amount, total_amount) = svc.calculate_totals(&dto).unwrap();
     assert_eq!(subtotal, decs!(1000));
-    assert_eq!(tax_amount, Decimal::ZERO);
-    assert_eq!(total_amount, decs!(1000));
+    assert_eq!(tax_amount, decs!(130));
+    assert_eq!(total_amount, decs!(1130));
 }
 
 /// test_calculate_totals_dmxhzzq

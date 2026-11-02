@@ -715,6 +715,11 @@ const SEED_ROLE_EXTRA_PERMISSIONS: Record<string, string[]> = {
     // 出口商检只读（与后端 permission.rs 的 sales_rep ("export-inspections","read")
     // 同口径；建单/登记结果属 customs_specialist，CI 不建该角色码故本 SEED 面不含）
     'export-inspections:read',
+    // 报价单读面（与后端 permission.rs 的 sales_rep ("quotations","read") 同口径）。
+    // 报价族五条路由的可见门由粗域键改判细资源键 quotations:read，本岗在后端在册持该键；
+    // 缺码则侧栏报价入口对业务员不可达，遍历基线里业务员的两条报价可达路由随之失配。
+    // 只授读，建单改单提交撤销属后端 sales_rep 的写面，本 SEED 面不扩。
+    'quotations:read',
   ],
   // sales_manager 对齐 permission.rs：orders 只读+审批链（此处仅补读，其余 approve/reject
   // 由后端角色 init 授予，本 spec 只依赖 GET 列表/详情）。不授 purchase 侧任何码。
