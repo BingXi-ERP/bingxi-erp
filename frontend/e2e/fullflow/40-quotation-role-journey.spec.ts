@@ -93,10 +93,11 @@ const LIST_PAGE_QUERY = '?page=1&page_size=200';
 const AUDIT_RESOURCE_TYPE = 'sales_quotations';
 
 /**
- * 报价业务事实常量（含税事实与反算口径见文件头）。
- * 含税单价 113 与税率百分数 13 使反算净额恰为 100，全链路金额无除不尽位；
- * 明细行出参键取 services/quotation_ops/crud.rs 写入列：amount 净额行总额、
- * amount_with_tax 含税行总额、tax_amount 行税额。
+ * 报价业务事实常量（金额口径见 buildQuotationPayload 的 tax_inclusive 说明）。
+ * 净单价 100 与税率百分数 13 使含税单价恰为 113，全链路金额无除不尽位；
+ * 明细行出参键以 models/sales_quotation_item.rs 与 quotation_response_dto.rs 为准：
+ * 只有 amount（净额行总额）与 amount_with_tax（含税行总额）两列，
+ * 行税额后端不外露，故按差额钩稽而不是断一个不存在的 tax_amount 键。
  */
 const TAX_PERCENT = '13';
 const QTY = '2000';
@@ -272,7 +273,11 @@ function buildQuotationPayload(
     exchange_rate: '1',
     base_currency: 'CNY',
     price_terms: 'FOB',
-    tax_inclusive: true,
+    // 后端把 tax_inclusive 读作"unit_price 已是含税价、小计即含税额、税额列记 0"
+    // （quotation_ops/calc.rs 的含税分支）。本链要同时验净额、税额与含税总额三档，
+    // 故按不含税口径提交：净额由 unit_price 给，含税由 unit_price_with_tax 给，
+    // 税额由后端乘率算出，头与行才能钩稽。
+    tax_inclusive: false,
     tax_rate: TAX_PERCENT,
     items: [
       {
@@ -435,7 +440,28 @@ test.describe('40 报价单多角色审批流转', () => {
             );
             expectDecimalString(item, 'amount', EXPECT_SUBTOTAL_NET, '报价行净额总额');
             expectDecimalString(item, 'amount_with_tax', EXPECT_TOTAL_WITH_TAX, '报价行含税总额');
-            expectDecimalString(item, 'tax_amount', EXPECT_TAX_AMOUNT, '报价行税额');
+            // 明细出参没有 tax_amount 键（quotation_response_dto.rs 不暴露行税额，
+            // sales_quotation_item 只有 amount 与 amount_with_tax 两列），行税额只能按
+            // 含税与净额之差钩稽；并要求头税额等于各行差额之和，杜绝头与行分差。
+            const itemTaxDelta =
+              Number(item.amount_with_tax as string) - Number(item.amount as string);
+            expect(
+              itemTaxDelta,
+              `报价行税额应由含税减净额得出，实际 amount_with_tax=${String(
+                item.amount_with_tax
+              )} amount=${String(item.amount)}`
+            ).toBe(EXPECT_TAX_AMOUNT);
+            const detailTax = Number(detail.tax_amount as string);
+            const detailSubtotal = Number(detail.subtotal as string);
+            const detailTotal = Number(detail.total_amount as string);
+            expect(
+              detailTax,
+              `头税额应恰等于各行含税与净额之差，实际头=${detailTax} 行差=${itemTaxDelta}`
+            ).toBe(itemTaxDelta);
+            expect(
+              detailTotal - detailSubtotal,
+              `头含税总额与头净额之差应等于头税额（无分差），实际 ${detailTotal}-${detailSubtotal}!=${detailTax}`
+            ).toBe(detailTax);
 
             // 提交前的越权负例：建单棒自己尝试批准必须被 RBAC 权限门拒（SoD 真实成立）
             const selfApprove = await apiCallExpectFail(
@@ -714,13 +740,34 @@ test.describe('40 报价单多角色审批流转', () => {
             const quotationId = Number(require('rejQuotationId'));
             // UI 对照：审批棒进详情页，批准与拒绝按钮应各自恰有一个可达
             // （canApprove canReject computed 要求状态 pending_approval 且持对应键，二者都满足）
+            // 动作区整块在详情卡的 v-if="quotation" 内：读面失败时 quotation 为 null，
+            // 连返回按钮都不会渲染（views/quotations/detail.vue 的 loadData 失败分支）。
+            // 因此先显式等这次报价详情 GET 并点名状态码，把"读面被行级数据范围门挡"
+            // 与"按钮本身缺失"两种红分开，而不是让 15s 超时替两者一起背锅。
+            const detailRead = session.page.waitForResponse(
+              r => r.request().method() === 'GET' && r.url().includes(`/quotations/${quotationId}`),
+              { timeout: 15000 }
+            );
             await safeGoto(session.page, `/quotations/${quotationId}`);
+            let detailStatus = 0;
+            try {
+              detailStatus = (await detailRead).status();
+            } catch (e) {
+              throw new Error(
+                `审批棒进详情页后 15s 内没有拿到报价详情读响应，读面未发或被守卫吞掉：${
+                  (e as Error).message
+                }`
+              );
+            }
+            expect(
+              detailStatus,
+              `审批棒读报价详情应 200，实际 ${detailStatus}；非 200 时该会话被行级数据范围门挡在取数入口，动作区整块不会渲染`
+            ).toBe(200);
             const guard = session.page.url();
             expect(guard, `审批棒进报价详情不应被守卫挡到无权限页，实际落在 ${guard}`).not.toMatch(
               /\/403(\?|#|$)/
             );
-            // 动作区整块在详情数据回来之后才渲染，返回按钮是无条件渲染的那一枚，
-            // 先等它可见再计数，否则 count 会跑在渲染之前恒得 0
+            // 先等动作区渲染出来（返回按钮是那一块里唯一无条件渲染的），再数批准与拒绝
             await session.page
               .locator('.actions .el-button', { hasText: '返回' })
               .first()
