@@ -28,12 +28,12 @@
 
 | 批次 | 域组合 | 覆盖动机（对应总纲簇） | 号段 | 状态 |
 |---|---|---|---|---|
-| W1-A | scanner 全部 4 枚加 warehouses locations 5 枚 | C2 写后回读、C7 并发、L4 移动端扫码与视口 | 217、218、219 | 在跑（`wt-e2e-scan`） |
-| W1-B | inventory 的批次、盘点明细、调拨明细、物流签收 4 组读写 | C2、C3 删除联动、C6 时序门（未签收禁对账） | 248-251 | 待派 |
-| W1-C | B1 导出打印模板 18 枚 | C9 导出裁列与脱敏、模板配对 | 235-239 | 在跑（`wt-e2e-export`，实占 235-238） |
+| W1-A | scanner 全部 4 枚加 warehouses locations 5 枚 | C2 写后回读、C7 并发、L4 移动端扫码与视口 | 217、218（219 未启用） | 已写，本地未推（`wt-e2e-scan` 与 `wt-e2e-bundle`） |
+| W1-B | inventory 的批次、盘点明细、调拨明细、物流签收 4 组读写 | C2、C3 删除联动、C6 时序门（未签收禁对账） | 248、249（250、251 留空） | 在跑（`wt-e2e-inv` 与 `wt-e2e-sign`；批次与调拨已由 218 覆盖） |
+| W1-C | B1 导出打印模板 18 枚 | C9 导出裁列与脱敏、模板配对 | 235-239 | 在跑（`wt-e2e-export`，实占 235、236；237-239 空待派） |
 | W1-D | B2a 审计与账号 10 枚 | C11 追溯（按缸号／订单／客户反查）、C1 会话隔离 | 252-254 | 在跑（`wt-e2e-audit`） |
 | W1-E | production 与 ai 与 ai-models 共 24 枚 | C8 成本归集与分摊、面料专项场景（缸差、缩率、损耗） | 255-260 | 待派，需先确认 `ai` 族是否属真用户可达功能 |
-| W1-F | 财务族 financial-analysis、ar、ap、finance、budgets、period-adjustments、vouchers、exchange-rates 共 24 枚 | C8 结算口径（明细与合计无分差、核销、红冲应收联动、账期与逾期） | 261-266 | 待派，优先级 P0（含税与精度口径已出过真缺陷） |
+| W1-F | 财务族 financial-analysis、ar、ap、finance、budgets、period-adjustments、vouchers、exchange-rates 共 24 枚 | C8 结算口径（明细与合计无分差、核销、红冲应收联动、账期与逾期） | 261-264（265、266 留空） | 在跑，本地未推（`wt-e2e-acct` 261、`wt-e2e-scan` 262、`wt-e2e-export` 263、`wt-e2e-audit` 264），优先级 P0 |
 | W1-G | 其余长尾 13 个单枚域加 sales、purchase、quotations、crm、bpm、dashboard | C2、C6、C1 | 267 起 | 待派 |
 
 ## 三、每批合入后的可核对期望（防止"补了但没降"）
