@@ -56,12 +56,22 @@ function selfTest() {
   const tmp = fs.mkdtempSync(path.join(process.env.TEMP || '/tmp', 'credlit-'));
   const planted = path.join(tmp, 'planted.spec.ts');
   const clean = path.join(tmp, 'clean.spec.ts');
-  // 正向对照覆盖三种真实形态：裸 password 属性、驼峰前缀属性、模板串赋值
+  // 正向对照覆盖三种真实形态：裸 password 属性、驼峰前缀属性、模板串赋值。
+  // 样本值运行期拼装：仓库里只留碎片，完整字面量只存在于临时夹具文件，public 仓不落疑似凭据串。
+  const s1 = ['Planted', '2026pass'].join('@');
+  const s2 = ['Another', '2026x'].join('#');
+  const s3 = ['Static', '2026tick'].join('%');
   fs.writeFileSync(
     planted,
-    "const a = { username: 'u1', password: 'Planted@2026pass' };\n" +
-      "const b = { approverPassword: 'Another#2026x' };\n" +
-      'const c = { newPassword: `Static%2026tick` };\n'
+    "const a = { username: 'u1', password: '" +
+      s1 +
+      "' };\n" +
+      "const b = { approverPassword: '" +
+      s2 +
+      "' };\n" +
+      'const c = { newPassword: `' +
+      s3 +
+      '` };\n'
   );
   fs.writeFileSync(
     clean,
