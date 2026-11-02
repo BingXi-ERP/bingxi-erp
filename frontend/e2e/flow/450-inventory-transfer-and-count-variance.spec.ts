@@ -174,7 +174,9 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     const ctx = getCtx();
     const warehouseIds = ctx.warehouseIds;
     if (warehouseIds.length < 2) {
-      throw new Error(`[450-T1] 前置不成立：ctx.warehouseIds 不足两个（实际 ${warehouseIds.length}）`);
+      throw new Error(
+        `[450-T1] 前置不成立：ctx.warehouseIds 不足两个（实际 ${warehouseIds.length}）`
+      );
     }
 
     const preview = await apiCallRaw<{ transfer_no?: unknown }>(
@@ -190,10 +192,9 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
           `（后端 inventory_transfer_handler.rs:324-336 用 DocumentNumberGenerator 现生成）`
       );
     }
-    expect(
-      previewNo,
-      `单号格式应为 TRF{yyyyMMdd}{3 位流水}，实际 ${previewNo}`
-    ).toMatch(/^TRF\d{11}$/);
+    expect(previewNo, `单号格式应为 TRF{yyyyMMdd}{3 位流水}，实际 ${previewNo}`).toMatch(
+      /^TRF\d{11}$/
+    );
 
     const created = await apiCall<{ id?: number }>(page, 'POST', '/inventory/transfers', {
       from_warehouse_id: warehouseIds[0],
@@ -235,11 +236,11 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
         `建单未引用它仍落号 ${persistedNo}。前端调用点 frontend/src/api/inventory-transfer.ts:213，` +
         `后端注册点 backend/src/routes/inventory.rs:107，属废除族未下线。`
     );
-
-    await apiCallExpectFail(page, 'DELETE', `/inventory/transfers/${transferId}`);
   });
 
-  test('调拨双腿守恒：源库位减、目标库位增、调出量等于调入量且缸号逐字符可追溯', async ({ page }) => {
+  test('调拨双腿守恒：源库位减、目标库位增、调出量等于调入量且缸号逐字符可追溯', async ({
+    page,
+  }) => {
     const ctx = getCtx();
     const productId = ctx.productIds[0];
     if (productId === undefined) {
@@ -391,7 +392,11 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
       targetBefore === null
         ? targetOnHandAfter
         : targetOnHandAfter -
-          decimalFieldAsNumber(targetBefore, 'quantity_on_hand', `调拨前目标仓库存行 id=${targetBefore.id}`);
+          decimalFieldAsNumber(
+            targetBefore,
+            'quantity_on_hand',
+            `调拨前目标仓库存行 id=${targetBefore.id}`
+          );
     if (targetBefore === null) {
       expect(
         targetOnHandAfter,
@@ -406,7 +411,9 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     // 缸号/批次/匹号逐字符可追溯：两库位重读行的维度必须与 bundle 真实落库值完全相同
     expect(String(targetAfter.dye_lot_no), '目标仓行的缸号必须与调拨缸号逐字符相同').toBe(dyeLotNo);
     expect(String(targetAfter.batch_no), '目标仓行的批次必须与调拨批次逐字符相同').toBe(batchNo);
-    expect(String(sourceAfterShip.dye_lot_no), '源仓行的缸号必须与调拨缸号逐字符相同').toBe(dyeLotNo);
+    expect(String(sourceAfterShip.dye_lot_no), '源仓行的缸号必须与调拨缸号逐字符相同').toBe(
+      dyeLotNo
+    );
 
     // 双腿守恒的流水侧证据：同一批次号下应同时存在 TRANSFER_OUT（记在源仓）与
     // TRANSFER_IN（记在目标仓），且两笔的扣减/增加米数与库存行变化同值。
@@ -424,7 +431,8 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     }
     const rows = ledger.items as Array<Record<string, unknown>>;
     const outRow = rows.find(
-      r => r.transaction_type === TRANSACTION_TYPE.TRANSFER_OUT && Number(r.warehouse_id) === source.id
+      r =>
+        r.transaction_type === TRANSACTION_TYPE.TRANSFER_OUT && Number(r.warehouse_id) === source.id
     );
     const inRow = rows.find(
       r =>
@@ -499,7 +507,11 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     }
 
     // 未审批直接调出：ship_transfer 的状态门只放行 approved（inv/batch.rs 唯一权威落点）
-    const illegalShip = await apiCallExpectFail(page, 'POST', `/inventory/transfers/${pendingId}/ship`);
+    const illegalShip = await apiCallExpectFail(
+      page,
+      'POST',
+      `/inventory/transfers/${pendingId}/ship`
+    );
     expectAppErrorRejection(illegalShip, '未审批的调拨单直接执行出库');
 
     // 已完成（调入）的单据不得再次调出：走完整链后二次 ship 必被状态机拒绝
@@ -519,9 +531,17 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     await apiCall(page, 'POST', `/inventory/transfers/${fullId}/approve`, { approved: true });
     await apiCall(page, 'POST', `/inventory/transfers/${fullId}/ship`);
     await apiCall(page, 'POST', `/inventory/transfers/${fullId}/receive`);
-    const repeatedShip = await apiCallExpectFail(page, 'POST', `/inventory/transfers/${fullId}/ship`);
+    const repeatedShip = await apiCallExpectFail(
+      page,
+      'POST',
+      `/inventory/transfers/${fullId}/ship`
+    );
     expectAppErrorRejection(repeatedShip, '已完成调拨再次执行出库');
-    const repeatedReceive = await apiCallExpectFail(page, 'POST', `/inventory/transfers/${fullId}/receive`);
+    const repeatedReceive = await apiCallExpectFail(
+      page,
+      'POST',
+      `/inventory/transfers/${fullId}/receive`
+    );
     expectAppErrorRejection(repeatedReceive, '已完成调拨再次执行入库');
 
     // 跨库位数量不足：建单期即按四维预检源仓可用量（inv/batch.rs 出库预检），
@@ -565,7 +585,11 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     if (before === null) {
       throw new Error(`[450-T4] 盘点前该仓库(${warehouse.id})无四维库存行，seed 链路断裂`);
     }
-    const qtyBefore = decimalFieldAsNumber(before, 'quantity_available', `盘点前库存行 id=${stockId}`);
+    const qtyBefore = decimalFieldAsNumber(
+      before,
+      'quantity_available',
+      `盘点前库存行 id=${stockId}`
+    );
 
     const countResult = await apiCall<{ id?: number }>(page, 'POST', '/inventory/counts', {
       warehouse_id: warehouse.id,
@@ -578,7 +602,11 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
         `[450-T4] 盘点建单未返回 data.id，实际片段=${JSON.stringify(countResult).slice(0, 200)}`
       );
     }
-    const countCreated = await apiCallRaw<{ status?: unknown }>(page, 'GET', `/inventory/counts/${countId}`);
+    const countCreated = await apiCallRaw<{ status?: unknown }>(
+      page,
+      'GET',
+      `/inventory/counts/${countId}`
+    );
     expect(
       countCreated.status,
       `盘点建单初始状态必须逐字符等于 ${COUNT_STATUS.PENDING}` +
@@ -589,17 +617,27 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     // 盘盈 7 米：后端 RecordItemInput 真实字段 stock_id + quantity_actual（字符串十进制）
     const actualQty = qtyBefore + 7;
     await apiCall(page, 'POST', `/inventory/counts/${countId}/record`, {
-      items: [{ stock_id: stockId, quantity_actual: String(actualQty), notes: genCode('E2E-VARIANCE') }],
+      items: [
+        { stock_id: stockId, quantity_actual: String(actualQty), notes: genCode('E2E-VARIANCE') },
+      ],
     });
     await apiCall(page, 'POST', `/inventory/counts/${countId}/submit`);
-    const submitted = await apiCallRaw<{ status?: unknown }>(page, 'GET', `/inventory/counts/${countId}`);
+    const submitted = await apiCallRaw<{ status?: unknown }>(
+      page,
+      'GET',
+      `/inventory/counts/${countId}`
+    );
     expect(
       submitted.status,
       `提交后状态必须逐字符等于写入方值 ${COUNT_STATUS.IN_REVIEW}（inventory_count_service.rs:417），` +
         `实际 ${JSON.stringify(submitted.status)}`
     ).toBe(COUNT_STATUS.IN_REVIEW);
     await apiCall(page, 'POST', `/inventory/counts/${countId}/approve`);
-    const approvedCount = await apiCallRaw<{ status?: unknown }>(page, 'GET', `/inventory/counts/${countId}`);
+    const approvedCount = await apiCallRaw<{ status?: unknown }>(
+      page,
+      'GET',
+      `/inventory/counts/${countId}`
+    );
     expect(
       approvedCount.status,
       `审批后状态必须逐字符等于 ${COUNT_STATUS.COMPLETED}（词表无 approved），` +
@@ -613,10 +651,23 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     if (after === null) {
       throw new Error(`[450-T4] 盘点审批后库存行消失（缸号 ${dyeLotNo}），显式判红`);
     }
-    const qtyAfterAvailable = decimalFieldAsNumber(after, 'quantity_available', `盘点后库存行 id=${stockId}`);
-    const qtyAfterOnHand = decimalFieldAsNumber(after, 'quantity_on_hand', `盘点后库存行 id=${stockId}`);
-    expect(qtyAfterAvailable, `库存可用量应等于实盘量 ${actualQty}，实际 ${qtyAfterAvailable}`).toBe(actualQty);
-    expect(qtyAfterOnHand, `在库量应等于实盘量 ${actualQty}，实际 ${qtyAfterOnHand}`).toBe(actualQty);
+    const qtyAfterAvailable = decimalFieldAsNumber(
+      after,
+      'quantity_available',
+      `盘点后库存行 id=${stockId}`
+    );
+    const qtyAfterOnHand = decimalFieldAsNumber(
+      after,
+      'quantity_on_hand',
+      `盘点后库存行 id=${stockId}`
+    );
+    expect(
+      qtyAfterAvailable,
+      `库存可用量应等于实盘量 ${actualQty}，实际 ${qtyAfterAvailable}`
+    ).toBe(actualQty);
+    expect(qtyAfterOnHand, `在库量应等于实盘量 ${actualQty}，实际 ${qtyAfterOnHand}`).toBe(
+      actualQty
+    );
     expect(afterAvailableDyeLot(after), '盘点调整后行的缸号必须与录入时逐字符相同').toBe(dyeLotNo);
 
     const ledger = await apiCallRaw<{ items?: unknown }>(
@@ -643,15 +694,19 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
           )
         ).slice(0, 400)}`
     ).toBeGreaterThan(0);
-    expect(
-      String(varianceRows[0]!.batch_no),
-      '差异流水的批次号必须与盘点缸号逐字符相同'
-    ).toBe(batchNo);
+    expect(String(varianceRows[0]!.batch_no), '差异流水的批次号必须与盘点缸号逐字符相同').toBe(
+      batchNo
+    );
 
     // 已完成盘点再改数：record_count_items 的状态门只放行未审批单据
-    const illegalRecord = await apiCallExpectFail(page, 'POST', `/inventory/counts/${countId}/record`, {
-      items: [{ stock_id: stockId, quantity_actual: String(actualQty + 100) }],
-    });
+    const illegalRecord = await apiCallExpectFail(
+      page,
+      'POST',
+      `/inventory/counts/${countId}/record`,
+      {
+        items: [{ stock_id: stockId, quantity_actual: String(actualQty + 100) }],
+      }
+    );
     expectAppErrorRejection(illegalRecord, '已完成盘点的单据再次录入实盘差异');
   });
 
@@ -659,7 +714,9 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     const ctx = getCtx();
     const warehouseIds = ctx.warehouseIds;
     if (warehouseIds.length < 2) {
-      throw new Error(`[450-T5] 前置不成立：ctx.warehouseIds 不足两个（实际 ${warehouseIds.length}）`);
+      throw new Error(
+        `[450-T5] 前置不成立：ctx.warehouseIds 不足两个（实际 ${warehouseIds.length}）`
+      );
     }
 
     await loginAsRole(page, 'warehouse_keeper');
@@ -677,8 +734,15 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
 
     // 同一端点、同一请求体，无权限岗位必须被权限门拒绝（不是 CSRF、不是 404）
     await loginAsRole(page, 'accountant');
-    const deniedRead = await apiCallExpectFail(page, 'GET', '/inventory/transfers?page=1&page_size=5');
-    expectDenied(deniedRead, `会计岗调用仓管可读的 GET /inventory/transfers（键 ${PERMISSIONS.INVENTORY_TRANSFER_READ}）`);
+    const deniedRead = await apiCallExpectFail(
+      page,
+      'GET',
+      '/inventory/transfers?page=1&page_size=5'
+    );
+    expectDenied(
+      deniedRead,
+      `会计岗调用仓管可读的 GET /inventory/transfers（键 ${PERMISSIONS.INVENTORY_TRANSFER_READ}）`
+    );
     expect(
       deniedRead.code,
       `403 必须归因到权限门机器码 ${APP_ERROR_CODES.FORBIDDEN}，实际 code=${JSON.stringify(deniedRead.code)}`
@@ -691,7 +755,10 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
       notes: genCode('E2E-SOD'),
       items: [],
     });
-    expectDenied(deniedCreate, `会计岗调用建单端点 POST /inventory/transfers（键 ${PERMISSIONS.TRANSFER_CREATE}）`);
+    expectDenied(
+      deniedCreate,
+      `会计岗调用建单端点 POST /inventory/transfers（键 ${PERMISSIONS.TRANSFER_CREATE}）`
+    );
     expect(
       deniedCreate.trace_id,
       `权限拒绝同样走 AppError 统一信封，必须携带 trace_id，实际 ${JSON.stringify(deniedCreate.trace_id)}`
