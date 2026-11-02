@@ -1,6 +1,7 @@
 import { test, expect } from '../diagnose-fixture';
 import {
   APP_ERROR_CODES,
+  apiCall,
   apiCallExpectFail,
   apiCallRaw,
   ensureTestEntities,
@@ -8,6 +9,10 @@ import {
   genCode,
   getCtx,
   loginViaUI,
+  pickDyeableWarehouse,
+  readDyedPieceByNo,
+  seedDyedOutboundBundle,
+  seedGreigeStockIn,
 } from './helpers';
 import { pickListArray } from './ui-helpers';
 
@@ -52,11 +57,15 @@ import { pickListArray } from './ui-helpers';
  * 未覆盖腿（如实说明，不凭空造路径）。
  * 缩率：products 无缩率列，缩率只在 fabric_physical_test_record 检测实体上，后端没有任何以缩率为
  * 入参的计量换算端点，meterage↔kg/yard 换算只吃克重×幅宽，故守恒链不含缩率腿。
- * 码↔米：yards_to_meters 只作为报价/订单「码」视图的内部换算率，未对外暴露独立换算端点，
- * convert 端点显式拒绝 yards，本 spec 只能钉出「码在本换算端点不可达」这一契约边界，无法端到端验码数落库守恒。
- * 出库多单位录入：POST /sales/orders/:id/deliveries 的入参 DTO 只有 warehouse_id，不接受逐行按米/码/公斤录入，
- * 「一条按米一条按码一条按公斤」的出库面在该端点不存在；发货对库存的扣减与取消发货的恢复属 SalesService
- * 出库规划内部语义，未在取证预算内逐列核实，不在本 spec 臆断。
+ * 码↔米：POST /convert 只接受 meters 与 kg 两个小写词，yards 被 400 拒；码→米只发生在报价转订单
+ * （services/quotation_convert_service.rs 的 resolve_unit_conversion 命中 UnitStrategy::Yards 后调
+ * utils/dual_unit_converter.rs 的 yards_to_meters），且报价行 unit 必须逐字符等于产品交易单位，
+ * 故「出库数量直接以码录入」在出库端点面上没有入参字段可承载，不在本 spec 臆造该腿。
+ * 出库单位入参：POST /sales/orders/:id/ship 的行入参是 quantity 加批次/色号/缸号/匹号四维
+ * （services/so/delivery.rs 的 ShipOrderItemRequest），无单位字段，quantity 即主单位米；
+ * POST /sales/orders/:id/deliveries 的 DTO 只有 warehouse_id（handlers/sales_order_handler.rs 的
+ * CreateDeliveryDto），更无逐行计量入参。所以出库腿按「细码（匹号）录入 + 主单位米逐位守恒 +
+ * 零头余码扣减后单独可查」钉，见 452-03；撤销发货的计量与余码恢复见 452-05。
  *
  * 假绿防线。换算守恒一律以固定无歧义参数断后端出参本身，不自造舍入；自洽校验钉阈值内与阈值外两条独立分支；
  * 入库换算既断建单出参 quantity_kg，又按唯一批次从列表口读回再断一次，证明真实落库；
@@ -100,6 +109,159 @@ interface StockFabricRow {
 
 const toNum = (v: unknown): number => Number(String(v));
 const str = (v: unknown): string => String(v);
+
+/**
+ * 十进制线格式比对工具（452-03/04/05 的守恒断言专用）。
+ * 职责：把后端 DECIMAL 出参（serde 无 float 开关 ⇒ 序列化成十进制字符串）按字符串精确对齐后比较，
+ * 只做「去尾零 / 补零」这类无损归一，绝不舍入——舍入会把守恒差抹平成假绿。
+ * 入参：后端出参值或本用例提交的量值字符串；传给谁：sameDec / sameDecDiff / sameDecSum 的断言消息。
+ * 存什么：不持久化，纯函数。线格式不合（非纯数字）直接点名抛错，不返回默认值掩盖。
+ */
+function decKey(v: unknown, label: string): string {
+  const s = String(v);
+  if (!/^-?\d+(\.\d+)?$/.test(s)) {
+    throw new Error(`${label}：后端十进制出参不是纯数字线格式，实际 ${s}`);
+  }
+  return s.includes('.') ? s.replace(/0+$/, '').replace(/\.$/, '') : s;
+}
+
+function decFracLen(v: unknown, label: string): number {
+  const parts = decKey(v, label).split('.');
+  return parts.length === 2 ? parts[1].length : 0;
+}
+
+function decScaled(v: unknown, label: string, scale: number): bigint {
+  const parts = decKey(v, label).split('.');
+  const frac = parts.length === 2 ? parts[1] : '';
+  if (frac.length > scale) {
+    throw new Error(`${label}：小数位 ${frac.length} 超出对齐刻度 ${scale}，拒绝截断凑数`);
+  }
+  return BigInt(`${parts[0]}${frac.padEnd(scale, '0')}`);
+}
+
+function decMaxScale(items: Array<{ v: unknown; label: string }>): number {
+  return items.reduce((acc, it) => Math.max(acc, decFracLen(it.v, it.label)), 0);
+}
+
+/** 把对齐刻度整数还原为十进制串：只补零与插小数点，不做任何舍入 */
+function decFromScaled(units: bigint, scale: number): string {
+  const negative = units < 0n;
+  const digits = (negative ? -units : units).toString().padStart(scale + 1, '0');
+  const body =
+    scale === 0
+      ? digits
+      : `${digits.slice(0, digits.length - scale)}.${digits.slice(digits.length - scale)}`;
+  return negative ? `-${body}` : body;
+}
+
+/** 两个后端出参逐位相等（同一刻度下整数差为 0） */
+function sameDec(a: unknown, b: unknown, label: string): void {
+  const scale = decMaxScale([
+    { v: a, label: `${label}[左]` },
+    { v: b, label: `${label}[右]` },
+  ]);
+  expect(
+    decScaled(a, `${label}[左]`, scale),
+    `${label}：左=${String(a)} 右=${String(b)} 的差必须为 0`
+  ).toBe(decScaled(b, `${label}[右]`, scale));
+}
+
+/** a − b 逐位等于 c：三段全取后端出参，用例内不自造期望值 */
+function sameDecDiff(a: unknown, b: unknown, c: unknown, label: string): void {
+  const scale = decMaxScale([
+    { v: a, label: `${label}[被减]` },
+    { v: b, label: `${label}[减数]` },
+    { v: c, label: `${label}[差]` },
+  ]);
+  expect(
+    decScaled(a, `${label}[被减]`, scale) - decScaled(b, `${label}[减数]`, scale),
+    `${label}：${String(a)} − ${String(b)} 必须逐位等于 ${String(c)}`
+  ).toBe(decScaled(c, `${label}[差]`, scale));
+}
+
+/** 两组后端出参各自补零对齐求和后逐位相等（跨环节合计守恒） */
+function sameDecSum(left: unknown[], right: unknown[], label: string): void {
+  const scale = decMaxScale([
+    ...left.map(v => ({ v, label: `${label}[左成员]` })),
+    ...right.map(v => ({ v, label: `${label}[右成员]` })),
+  ]);
+  const sumOf = (vals: unknown[]): bigint =>
+    vals.reduce((acc, v) => acc + decScaled(v, `${label}[成员]`, scale), 0n);
+  expect(
+    sumOf(left),
+    `${label}：合计差必须为 0 左=${JSON.stringify(left)} 右=${JSON.stringify(right)}`
+  ).toBe(sumOf(right));
+}
+
+/** 必出键读取：缺键或非数字出参当场点名，不用 ?? 或 || 把缺键洗成合法值 */
+function decField(row: Row, key: string, label: string): string {
+  if (!Object.prototype.hasOwnProperty.call(row, key)) {
+    throw new Error(
+      `${label}：后端出参缺键 ${key}（该列是实体必出字段），实际 ${JSON.stringify(row).slice(0, 400)}`
+    );
+  }
+  return decKey(row[key], `${label}.${key}`);
+}
+
+/** 按产品取订单明细行：缺 items 键或缺行都点名（不兜底空对象） */
+function orderLineOf(detail: Row, productId: number, label: string): Row {
+  if (!Object.prototype.hasOwnProperty.call(detail, 'items')) {
+    throw new Error(
+      `${label}：订单详情出参缺 items 键，实际 ${JSON.stringify(detail).slice(0, 400)}`
+    );
+  }
+  const lines = detail.items as Row[];
+  const hit = lines.find(l => Number(l.product_id) === productId);
+  if (hit === undefined) {
+    throw new Error(
+      `${label}：订单明细没有产品 ${productId} 的行，实际 ${JSON.stringify(lines).slice(0, 400)}`
+    );
+  }
+  return hit;
+}
+
+/**
+ * 建单→提交→审批三段。行级 quantity_tolerance_pct 显式写 0：允许上下界等于行数量，
+ * 杜绝产品交易单位默认容差（utils/delivery_tolerance.rs resolve_tolerance_pct 按 unit 取值）
+ * 给守恒断言引入区间不确定性。出参键与状态词按 handlers/sales_order_handler.rs 与
+ * models/status/sales_order.rs 的写入方口径消费（审批回读小写 approved）。
+ */
+async function seedApprovedOrderFor(
+  page: import('@playwright/test').Page,
+  productId: number,
+  quantity: string,
+  tag: string
+): Promise<{ id: number; order_no: string }> {
+  const ctx = getCtx();
+  if (!ctx.customerId) {
+    throw new Error(`${tag} 前置不成立：ctx.customerId 未就绪（销售订单必填客户外键）`);
+  }
+  const created = await apiCallRaw<Row>(page, 'POST', '/sales/orders', {
+    customer_id: ctx.customerId,
+    order_date: new Date().toISOString(),
+    items: [
+      {
+        product_id: productId,
+        quantity,
+        unit_price: '37.50',
+        tax_percent: '13',
+        quantity_tolerance_pct: '0',
+      },
+    ],
+    notes: `E2E-${tag}-${genCode('SO')}`,
+  });
+  const id = Number(created.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error(
+      `${tag} 前置不成立：建销售订单未返回主键，实际 ${JSON.stringify(created).slice(0, 400)}`
+    );
+  }
+  await apiCall(page, 'POST', `/sales/orders/${id}/submit`);
+  await apiCall(page, 'POST', `/sales/orders/${id}/approve`);
+  const detail = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${id}`);
+  expect(String(detail.status), `${tag} 审批回读状态词（写入方小写）`).toBe('approved');
+  return { id, order_no: String(detail.order_no) };
+}
 
 // 本链唯一的换算基准参数：克重 200 g/m²、幅宽 150 cm(=1.5 m) ⇒ 每米 0.3 kg、每公斤 3.3333 米。
 // 米数 100 折公斤恰为 30.000（三位无舍入），公斤数 30 回米数恰为 100.00（两位无舍入），
@@ -327,5 +489,584 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       '按主计量米数折公斤与落库辅计量的差必须为 0'
     ).toBe(0);
     console.log(`[452-02] 面料库存入库换算守恒通过 id=${stockId} batch=${batchNo}`);
+  });
+
+  /**
+   * 452-03 出库按细码（匹号）录入并扣减：主单位米与订单行逐位一致，零头余码扣减后单独可查。
+   *
+   * 链与端点（逐条经 route-snapshot 在册核对，只写在册方法+路径）。
+   * POST /inventory/piece-split（split_fabric_piece）剪出零头子卷；
+   * POST /sales/orders（create_order）+ /submit + /approve 备出库源单；
+   * POST /sales/orders/{id}/ship（ship_order）按四维（批次/色号/缸号/匹号）出库母卷整匹；
+   * GET /inventory/stock/transactions（list_transactions）回读 SALES_DELIVERY 流水；
+   * GET /inventory/stock（list_stock）回读四维库存行；
+   * GET /inventory/pieces（list_pieces 经 readDyedPieceByNo）按匹号分别回读母卷与零头子卷。
+   *
+   * 契约真相。SplitPieceRequest 字段 parent_piece_id/cut_length/cut_weight/new_barcode，
+   * 出参 SplitPieceResponse{message,parent_piece,new_piece} 是 inventory_piece 整行；
+   * 母卷 length 被写成 remaining，original_length 首次拆分记为拆前全长，
+   * 服务端 validate_split_consistency 恒等式「母卷剩余 + Σ子卷 = 原始长度」不满足即 400；
+   * cut_weight 留 null ⇒ 母卷实测重量保持原值（服务端不猜、不塞 0）。
+   * 出库量语义：ShipOrderItemRequest 的 quantity 即主单位米（无单位字段），
+   * 流水行 quantity_before_meters − quantity_after_meters = quantity_meters，
+   * 订单行 shipped_quantity 由 update_order_item_shipped_qty 逐行按 id 升序分配回写。
+   * 词表：匹状态大写（AVAILABLE/SHIPPED，models/status/purchase_inventory.rs::inventory_piece）。
+   *
+   * 假绿防线。零头剪裁量与出库量都取后端回读值（母卷实测长度、拆分出参长度），不在用例内重算；
+   * 母卷出库后必须离开可用态、零头子卷必须仍按自身匹号单独查得到且长度逐位不变；
+   * 库存行扣后量与流水扣后量、订单行已发量与出库录入量两两逐位对照。
+   */
+  test('452-03 出库按细码（匹号）录入并扣减：主单位米与订单行逐位一致，零头余码扣减后单独可查', async ({
+    page,
+  }) => {
+    const ctx = getCtx();
+    const productId = ctx.productIds[0];
+    if (productId === undefined) {
+      throw new Error('452-03 前置不成立：夹具产品缺失 productIds[0]=undefined');
+    }
+    const target = await pickDyeableWarehouse(page);
+    // 真实委外染色链产 AVAILABLE 染色匹 + 同维（batch_no = 缸号）库存行，不造假匹
+    const bundle = await seedDyedOutboundBundle(page, {
+      productId,
+      warehouseId: target.id,
+      quantityMeters: '100',
+      pieceCount: 1,
+      context: '452-03',
+    });
+    const parent = bundle.pieces[0];
+    if (parent === undefined) {
+      throw new Error(
+        `452-03 前置不成立：委外染色链未产出可出库染色匹 缸号=${bundle.dyeLotNo} 匹数=${String(bundle.pieces.length)}`
+      );
+    }
+    const dims = {
+      productId,
+      warehouseId: target.id,
+      dyeLotNo: bundle.dyeLotNo,
+      batchNo: bundle.dyeLotNo,
+    };
+    // 零头剪裁量必须严格小于母卷实测长度（服务端额度门，相等即母卷留空壳）
+    const cutLength = '10';
+    const cutScale = decMaxScale([
+      { v: parent.length, label: '452-03 母卷实测长度' },
+      { v: cutLength, label: '452-03 零头剪裁量' },
+    ]);
+    if (
+      decScaled(parent.length, '452-03 母卷实测长度', cutScale) <=
+      decScaled(cutLength, '452-03 零头剪裁量', cutScale)
+    ) {
+      throw new Error(
+        `452-03 前置不成立：母卷实测长度 ${String(parent.length)} 不足以剪出 ${cutLength} 米零头`
+      );
+    }
+
+    // 1) 剪出零头子卷（POST /inventory/piece-split，cut_weight/new_barcode 传 null 让服务端保持原值/自生成匹号）
+    const split = await apiCallRaw<{ message: string; parent_piece: Row; new_piece: Row }>(
+      page,
+      'POST',
+      '/inventory/piece-split',
+      {
+        parent_piece_id: parent.id,
+        cut_length: cutLength,
+        cut_weight: null,
+        new_barcode: null,
+      }
+    );
+    const child = split.new_piece;
+    const parentAfter = split.parent_piece;
+    const childId = Number(child.id);
+    if (!Number.isInteger(childId) || childId <= 0) {
+      throw new Error(
+        `452-03 前置不成立：零头子卷未返回主键，实际 ${JSON.stringify(child).slice(0, 400)}`
+      );
+    }
+    const childPieceNo = String(child.piece_no);
+    const parentPieceNo = String(parent.piece_no);
+    // 拆匹长度守恒：母卷拆前 − 母卷拆后 = 子卷长度（三个值全是后端出参）
+    sameDecDiff(parent.length, parentAfter.length, child.length, '452-03 拆匹长度守恒');
+    // 服务端把拆前全长记进 original_length（首次拆分），拆前读数即该原值
+    sameDec(
+      decField(parentAfter, 'original_length', '452-03 母卷原始长度回记'),
+      parent.length,
+      '452-03 母卷原始长度回记 vs 拆前实测长度'
+    );
+    expect(String(parentAfter.status), '剪裁不改母卷状态词').toBe(String(parent.status));
+
+    // 2) 备出库源单：行数量 = 母卷拆后实测长度（后端出参），行级容差 0
+    const shipQty = decField(parentAfter, 'length', '452-03 母卷拆后长度');
+    const order = await seedApprovedOrderFor(page, productId, shipQty, '452-03');
+
+    // 3) 出库前按匹号回读零头子卷（证明零头已在册、可单独查到）
+    const childBeforeShip = await readDyedPieceByNo(page, { ...dims, pieceNo: childPieceNo });
+    if (childBeforeShip === null) {
+      throw new Error(`452-03 前置不成立：零头子卷 ${childPieceNo} 拆出后按匹号查不到`);
+    }
+
+    // 4) 出库母卷整匹（POST /sales/orders/{id}/ship，四维齐传）
+    await apiCall(page, 'POST', `/sales/orders/${order.id}/ship`, {
+      order_id: order.id,
+      warehouse_code: target.code,
+      items: [
+        {
+          product_id: productId,
+          quantity: shipQty,
+          batch_no: bundle.dyeLotNo,
+          color_no: bundle.colorNo,
+          dye_lot_no: bundle.dyeLotNo,
+          piece_no: parentPieceNo,
+        },
+      ],
+      remarks: `E2E 452-03 母卷整匹出库 ${parentPieceNo}`,
+    });
+
+    // 5) 订单行回读：已发量逐位等于出库录入量
+    const afterDetail = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${order.id}`);
+    const afterLine = orderLineOf(afterDetail, productId, '452-03 出库后订单行');
+    sameDec(
+      decField(afterLine, 'shipped_quantity', '452-03 出库后订单行已发量'),
+      shipQty,
+      '452-03 订单行已发量 vs 出库录入量'
+    );
+
+    // 6) 库存流水回读：出库量 = 录入量，且 扣前 − 扣后 = 出库量（全为后端出参）
+    const txnRaw = await apiCallRaw<unknown>(
+      page,
+      'GET',
+      `/inventory/stock/transactions?product_id=${productId}&batch_no=${encodeURIComponent(bundle.dyeLotNo)}&transaction_type=SALES_DELIVERY&page=1&page_size=100`
+    );
+    const txnAll = pickListArray<Row>(
+      txnRaw,
+      'items',
+      `452-03 出库库存流水 /inventory/stock/transactions 批次 ${bundle.dyeLotNo}`
+    );
+    const txns = txnAll.filter(r => String(r.source_bill_no) === order.order_no);
+    expect(
+      txns.length,
+      `出库流水必须恰 1 行（多行即重复扣减），实际 ${JSON.stringify(txnAll).slice(0, 400)}`
+    ).toBe(1);
+    const txn = txns[0];
+    const txnQty = decField(txn, 'quantity_meters', '452-03 出库流水主单位量');
+    sameDec(txnQty, shipQty, '452-03 流水出库量 vs 出库录入量');
+    sameDecDiff(
+      decField(txn, 'quantity_before_meters', '452-03 流水扣前量'),
+      decField(txn, 'quantity_after_meters', '452-03 流水扣后量'),
+      txnQty,
+      '452-03 流水前后差 vs 出库量'
+    );
+
+    // 7) 四维库存行回读：扣后量 = 流水扣后量，扣前量 = 出库前行读数（账实同一刻度零差）
+    const stockRaw = await apiCallRaw<unknown>(
+      page,
+      'GET',
+      `/inventory/stock?product_id=${productId}&warehouse_id=${target.id}&color_no=${encodeURIComponent(bundle.colorNo)}&dye_lot_no=${encodeURIComponent(bundle.dyeLotNo)}&batch_no=${encodeURIComponent(bundle.dyeLotNo)}&page=1&page_size=20`
+    );
+    const stockRow = pickListArray<Row>(
+      stockRaw,
+      'items',
+      `452-03 出库后四维库存行 /inventory/stock 缸号 ${bundle.dyeLotNo}`
+    ).find(
+      r =>
+        String(r.color_no) === bundle.colorNo &&
+        String(r.dye_lot_no) === bundle.dyeLotNo &&
+        String(r.batch_no) === bundle.dyeLotNo
+    );
+    if (stockRow === undefined) {
+      throw new Error('452-03 前置不成立：出库后按四维读不到库存行');
+    }
+    sameDec(
+      decField(stockRow, 'quantity_meters', '452-03 库存行扣后主计量'),
+      decField(txn, 'quantity_after_meters', '452-03 流水扣后量'),
+      '452-03 库存行扣后量 vs 流水扣后量'
+    );
+    sameDec(
+      decField(bundle.stockRow, 'quantity_meters', '452-03 出库前库存行主计量'),
+      decField(txn, 'quantity_before_meters', '452-03 流水扣前量'),
+      '452-03 出库前库存行量 vs 流水扣前量'
+    );
+
+    // 8) 母卷出库后离开可用态；零头余码仍可单独查到且长度逐位不变
+    const parentAfterShip = await readDyedPieceByNo(page, { ...dims, pieceNo: parentPieceNo });
+    if (parentAfterShip === null) {
+      throw new Error(`452-03 前置不成立：出库后按匹号 ${parentPieceNo} 读不到母卷行`);
+    }
+    expect(
+      String(parentAfterShip.status),
+      '母卷整匹出库后状态词必须是发货态（词表大写，写入方 models/status/purchase_inventory.rs::inventory_piece）'
+    ).toBe('SHIPPED');
+    const childAfterShip = await readDyedPieceByNo(page, { ...dims, pieceNo: childPieceNo });
+    if (childAfterShip === null) {
+      throw new Error(`452-03 零头余码 ${childPieceNo} 在母卷出库扣减后必须仍能单独查到`);
+    }
+    expect(String(childAfterShip.status), '零头子卷未被出库，状态词保持可用态').toBe('AVAILABLE');
+    sameDec(
+      childAfterShip.length,
+      decField(child, 'length', '452-03 零头子卷拆分出参长度'),
+      '452-03 零头余码长度在母卷扣减后逐位不变'
+    );
+    console.log(
+      `[452-03] 按匹出库与零头余码守恒通过 订单=${order.order_no} 母卷=${parentPieceNo} 零头=${childPieceNo} 出库量=${shipQty}`
+    );
+  });
+
+  /**
+   * 452-04 跨环节总量守恒：报价明细（按米）→ 销售订单 → 出库，三段各自回读后折回主单位合计分差为 0。
+   *
+   * 链与端点（逐条在册）。POST /quotations（create_quotation）+ /submit + /approve
+   * + POST /quotations/{id}/convert（convert_to_sales_order）；
+   * GET /quotations/{id}（get_quotation）与 GET /sales/orders/{id}（get_order）分别回读两段明细；
+   * POST /sales/orders/{id}/ship（ship_order）出库；
+   * GET /inventory/stock/transactions（list_transactions）回读第三段；
+   * 出库可扣库存由 POST /inventory/stock（seedGreigeStockIn 白坯腿）备齐。
+   *
+   * 契约真相。报价行 unit 必须逐字符等于产品交易单位（validate_item_units_against_products），
+   * 转订单按 UnitStrategy 换算：单位「米」⇒ 订单行 quantity_meters 即报价行 quantity 原值，
+   * quantity_kg 由 meters_to_kg(克重×幅宽) 折出，产品缺克重或幅宽即 VALIDATION 拒绝（不兜底 0）；
+   * 出库流水 quantity_meters 是被扣库存行的实际米数（跨缸回退时如实记实际缸号）。
+   * 三段合计一律用补零对齐的整数求和比较，用例内不出现任何舍入调用。
+   *
+   * 假绿防线。合计期望值全部来自三段后端出参本身（报价行 quantity、订单行 quantity_meters、
+   * 流水行 quantity_meters），不做「先算一遍再比」的自证；夹具产品单位不是「米」或缺换算元数据
+   * 时按前置不成立点名抛错，绝不静默跳过该段。
+   */
+  test('452-04 跨环节总量守恒：报价明细按米→销售订单→出库，三段折回主单位合计分差为 0', async ({
+    page,
+  }) => {
+    const ctx = getCtx();
+    const productId = ctx.quotationProductId;
+    if (productId === undefined) {
+      throw new Error(
+        '452-04 前置不成立：ctx.quotationProductId 未就绪（报价行必须引用单位已知的自建产品）'
+      );
+    }
+    if (ctx.quotationProductUnit !== '米') {
+      throw new Error(
+        `452-04 前置不成立：夹具报价产品交易单位为「${ctx.quotationProductUnit}」而非「米」，按米录入的跨环节合计链不可达`
+      );
+    }
+    const prod = await apiCallRaw<Row>(page, 'GET', `/products/${productId}`);
+    const gram = prod.gram_weight;
+    const widthMeta = prod.width;
+    if (gram === undefined || gram === null || widthMeta === undefined || widthMeta === null) {
+      throw new Error(
+        `452-04 前置不成立：报价产品 ${productId} 缺克重或幅宽元数据，转订单的米→公斤换算门必拒 实际 gram_weight=${String(gram)} width=${String(widthMeta)}`
+      );
+    }
+    const target = await pickDyeableWarehouse(page);
+    const batchNo = genCode('452C');
+    // 出库腿的可扣库存：白坯（色号空 ⇒ 服务端缸号归一 None），ShipOrderItemRequest 白坯分支免填匹号
+    await seedGreigeStockIn(page, {
+      productId,
+      warehouseId: target.id,
+      batchNo,
+      quantityMeters: '150',
+    });
+
+    // 段一：报价明细按米录入（两行同产品，验转订单逐行落量与合计守恒）
+    const noteTag = genCode('452Q');
+    const q = await apiCall<{ id?: number }>(page, 'POST', '/quotations', {
+      customer_id: ctx.customerId,
+      sales_user_id: ctx.userIds[0],
+      quotation_date: new Date().toISOString().slice(0, 10),
+      valid_until: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+      currency: 'CNY',
+      exchange_rate: '1',
+      base_currency: 'CNY',
+      price_terms: 'FOB',
+      tax_inclusive: false,
+      tax_rate: '0',
+      items: [
+        {
+          product_id: productId,
+          unit: '米',
+          quantity: '100',
+          unit_price: '12.5',
+          unit_price_with_tax: '12.5',
+        },
+        {
+          product_id: productId,
+          unit: '米',
+          quantity: '50',
+          unit_price: '12.5',
+          unit_price_with_tax: '12.5',
+        },
+      ],
+      notes: `E2E-452-04-${noteTag}`,
+    });
+    const quotationId = q.data?.id;
+    if (!quotationId) {
+      throw new Error(
+        `452-04 前置不成立：报价单创建未返回 id，实际 ${JSON.stringify(q).slice(0, 400)}`
+      );
+    }
+    const qDetail = await apiCallRaw<Row>(page, 'GET', `/quotations/${quotationId}`);
+    if (!Object.prototype.hasOwnProperty.call(qDetail, 'items')) {
+      throw new Error(
+        `452-04 前置不成立：报价详情出参缺 items 键，报价明细这一环节无回读口即合计不可证，实际 ${JSON.stringify(qDetail).slice(0, 400)}`
+      );
+    }
+    const quoteMeterLines = (qDetail.items as Row[])
+      .filter(it => Number(it.product_id) === productId && String(it.unit) === '米')
+      .map(it => decField(it, 'quantity', `452-04 报价行 标记 ${noteTag}`));
+    expect(quoteMeterLines.length, '段一：按米录入的报价行必须恰 2 行').toBe(2);
+
+    await apiCall(page, 'POST', `/quotations/${quotationId}/submit`);
+    await apiCall(page, 'POST', `/quotations/${quotationId}/approve`);
+
+    // 段二：转订单后回读订单行主计量
+    const converted = await apiCallRaw<Row>(page, 'POST', `/quotations/${quotationId}/convert`);
+    const orderId = Number(converted.id);
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      throw new Error(
+        `452-04 前置不成立：报价转订单出参未含销售订单主键，实际 ${JSON.stringify(converted).slice(0, 400)}`
+      );
+    }
+    const orderDetail = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${orderId}`);
+    const orderNo = String(orderDetail.order_no);
+    const orderMeterLines = (orderDetail.items as Row[])
+      .filter(l => Number(l.product_id) === productId)
+      .map(l => decField(l, 'quantity_meters', `452-04 订单行 订单 ${orderNo}`));
+    expect(orderMeterLines.length, '段二：转订单必须按报价行逐行落订单行（2 行）').toBe(2);
+    sameDecSum(quoteMeterLines, orderMeterLines, '452-04 报价明细折回主单位 vs 订单行主计量合计');
+
+    // 段三：出库（录入量 = 订单行主计量合计，由后端出参补零求和后原样回传）
+    const shipScale = decMaxScale(
+      orderMeterLines.map(v => ({ v, label: `452-04 订单行主计量 订单 ${orderNo}` }))
+    );
+    const shipQty = decFromScaled(
+      orderMeterLines.reduce(
+        (acc, v) => acc + decScaled(v, `452-04 订单行主计量 订单 ${orderNo}`, shipScale),
+        0n
+      ),
+      shipScale
+    );
+    await apiCall(page, 'POST', `/sales/orders/${orderId}/ship`, {
+      order_id: orderId,
+      warehouse_code: target.code,
+      items: [
+        {
+          product_id: productId,
+          quantity: shipQty,
+          batch_no: batchNo,
+          color_no: '',
+          dye_lot_no: null,
+          piece_no: null,
+        },
+      ],
+      remarks: `E2E 452-04 出库 ${noteTag}`,
+    });
+    const txnRaw = await apiCallRaw<unknown>(
+      page,
+      'GET',
+      `/inventory/stock/transactions?product_id=${productId}&batch_no=${encodeURIComponent(batchNo)}&transaction_type=SALES_DELIVERY&page=1&page_size=100`
+    );
+    const shipMeterLines = pickListArray<Row>(
+      txnRaw,
+      'items',
+      `452-04 出库库存流水 /inventory/stock/transactions 批次 ${batchNo}`
+    )
+      .filter(r => String(r.source_bill_no) === orderNo)
+      .map(r => decField(r, 'quantity_meters', `452-04 出库流水行 订单 ${orderNo}`));
+    expect(
+      shipMeterLines.length,
+      `段三：出库流水必须恰 1 行（多行即重复扣减），实际 ${JSON.stringify(shipMeterLines)}`
+    ).toBe(1);
+    sameDecSum(orderMeterLines, shipMeterLines, '452-04 订单行主计量合计 vs 出库流水主单位合计');
+    sameDecSum(
+      quoteMeterLines,
+      shipMeterLines,
+      '452-04 报价明细（按米）合计 vs 出库折回主单位合计'
+    );
+    console.log(
+      `[452-04] 三段折回主单位合计守恒通过 报价标记=${noteTag} 订单=${orderNo} 出库录入量=${shipQty}`
+    );
+  });
+
+  /**
+   * 452-05 反向腿：出库撤销后，主计量、订单行进度与匹（细码）逐项恢复到出库前的真接口读数。
+   *
+   * 链与端点（逐条在册）。POST /sales/orders/{id}/ship 出库整匹；
+   * GET /sales/orders/{id}/deliveries（get_order_deliveries，信封键 list/total）取发货单主键；
+   * POST /sales/orders/{id}/deliveries/{did}/cancel（cancel_delivery，CancelDeliveryRequest 的 reason）
+   * 撤销；GET /inventory/stock、GET /sales/orders/{id}、GET /inventory/pieces（经 readDyedPieceByNo）
+   * 三路回读恢复值。
+   *
+   * 契约真相（读源，非推测）。cancel_delivery 先做路径一致性门（发货单 order_id 与 path order_id
+   * 不符即 NOT_FOUND），再按四维把库存行 quantity_shipped/on_hand 回补（已发量小于回补量即业务拒绝），
+   * 并把订单行 shipped_quantity 按行 col_expr 减回本次发货量；匹的消耗由
+   * services/piece_domain_service.rs 的 outbound CAS 门控制，撤销按同四维回退。
+   * 基线全部取出库前真接口读数：库存行主计量、订单行已发量、匹状态与长度，
+   * 撤销后与基线在同一十进制刻度上逐位对照（分差 0）。
+   *
+   * 假绿防线。不看前端状态、不信撤销接口返回值，撤销后一律重新 GET 三路回读；
+   * 出库中间态也真读一次并用「扣前 − 扣后 = 出库量」钉住确实扣过（否则恢复等于没扣也能过）；
+   * 撤销后发货单是否仍留在列表未取证，故不断其状态词，只断计量与余码恢复。
+   */
+  test('452-05 反向腿：出库撤销后主计量、订单行进度与匹（细码）逐项回到出库前读数', async ({
+    page,
+  }) => {
+    const ctx = getCtx();
+    const productId = ctx.productIds[0];
+    if (productId === undefined) {
+      throw new Error('452-05 前置不成立：夹具产品缺失 productIds[0]=undefined');
+    }
+    const target = await pickDyeableWarehouse(page);
+    const bundle = await seedDyedOutboundBundle(page, {
+      productId,
+      warehouseId: target.id,
+      quantityMeters: '120',
+      pieceCount: 1,
+      context: '452-05',
+    });
+    const piece = bundle.pieces[0];
+    if (piece === undefined) {
+      throw new Error(
+        `452-05 前置不成立：委外染色链未产出可出库染色匹 缸号=${bundle.dyeLotNo} 匹数=${String(bundle.pieces.length)}`
+      );
+    }
+    const dims = {
+      productId,
+      warehouseId: target.id,
+      dyeLotNo: bundle.dyeLotNo,
+      batchNo: bundle.dyeLotNo,
+    };
+    const pieceNo = String(piece.piece_no);
+    const shipQty = decField(piece, 'length', '452-05 整匹实测长度');
+    const order = await seedApprovedOrderFor(page, productId, shipQty, '452-05');
+
+    // 出库前基线：库存行主计量、订单行已发量、匹状态与长度（三路真接口）
+    const stockQs =
+      `/inventory/stock?product_id=${productId}&warehouse_id=${target.id}` +
+      `&color_no=${encodeURIComponent(bundle.colorNo)}&dye_lot_no=${encodeURIComponent(bundle.dyeLotNo)}` +
+      `&batch_no=${encodeURIComponent(bundle.dyeLotNo)}&page=1&page_size=20`;
+    const stockBefore = pickListArray<Row>(
+      await apiCallRaw<unknown>(page, 'GET', stockQs),
+      'items',
+      `452-05 出库前四维库存行 /inventory/stock 缸号 ${bundle.dyeLotNo}`
+    ).find(
+      r =>
+        String(r.color_no) === bundle.colorNo &&
+        String(r.dye_lot_no) === bundle.dyeLotNo &&
+        String(r.batch_no) === bundle.dyeLotNo
+    );
+    if (stockBefore === undefined) {
+      throw new Error('452-05 前置不成立：出库前按四维读不到库存行');
+    }
+    const stockMetersBefore = decField(stockBefore, 'quantity_meters', '452-05 出库前库存行主计量');
+    const lineBefore = orderLineOf(
+      await apiCallRaw<Row>(page, 'GET', `/sales/orders/${order.id}`),
+      productId,
+      '452-05 出库前订单行'
+    );
+    const shippedBefore = decField(lineBefore, 'shipped_quantity', '452-05 出库前订单行已发量');
+    const pieceBefore = await readDyedPieceByNo(page, { ...dims, pieceNo });
+    if (pieceBefore === null) {
+      throw new Error(`452-05 前置不成立：出库前按匹号 ${pieceNo} 读不到染色匹`);
+    }
+
+    // 出库：整匹（四维齐传）
+    await apiCall(page, 'POST', `/sales/orders/${order.id}/ship`, {
+      order_id: order.id,
+      warehouse_code: target.code,
+      items: [
+        {
+          product_id: productId,
+          quantity: shipQty,
+          batch_no: bundle.dyeLotNo,
+          color_no: bundle.colorNo,
+          dye_lot_no: bundle.dyeLotNo,
+          piece_no: pieceNo,
+        },
+      ],
+      remarks: `E2E 452-05 整匹出库 ${pieceNo}`,
+    });
+
+    // 出库中间态真读一次：发货单在册且为出库态，库存确实扣了（否则"恢复"无意义）
+    const dlvRaw = await apiCallRaw<unknown>(page, 'GET', `/sales/orders/${order.id}/deliveries`);
+    const dlvRows = pickListArray<Row>(
+      dlvRaw,
+      'list',
+      `452-05 发货单列表 /sales/orders/{id}/deliveries 订单 ${order.order_no}`
+    );
+    expect(
+      dlvRows.length,
+      `出库后应恰 1 张发货单，实际 ${JSON.stringify(dlvRows).slice(0, 400)}`
+    ).toBe(1);
+    const deliveryId = Number(dlvRows[0].id);
+    if (!Number.isInteger(deliveryId) || deliveryId <= 0) {
+      throw new Error(
+        `452-05 前置不成立：发货单未返回主键，实际 ${JSON.stringify(dlvRows[0]).slice(0, 400)}`
+      );
+    }
+    expect(String(dlvRows[0].status), '发货单出库态词表值（写入方小写）').toBe('shipped');
+    const stockMid = pickListArray<Row>(
+      await apiCallRaw<unknown>(page, 'GET', stockQs),
+      'items',
+      `452-05 出库后四维库存行 /inventory/stock 缸号 ${bundle.dyeLotNo}`
+    ).find(
+      r =>
+        String(r.color_no) === bundle.colorNo &&
+        String(r.dye_lot_no) === bundle.dyeLotNo &&
+        String(r.batch_no) === bundle.dyeLotNo
+    );
+    if (stockMid === undefined) {
+      throw new Error('452-05 前置不成立：出库后按四维读不到库存行');
+    }
+    sameDecDiff(
+      stockMetersBefore,
+      decField(stockMid, 'quantity_meters', '452-05 出库后库存行主计量'),
+      shipQty,
+      '452-05 出库确实扣减：扣前 − 扣后 = 出库量'
+    );
+
+    // 反向腿：撤销发货（POST /sales/orders/{id}/deliveries/{did}/cancel）
+    await apiCall(page, 'POST', `/sales/orders/${order.id}/deliveries/${deliveryId}/cancel`, {
+      reason: `E2E 452-05 出库撤销守恒 ${pieceNo}`,
+    });
+
+    // 恢复断言：三路回读与出库前基线逐位对照（分差 0，不引用撤销接口返回值）
+    const stockAfterCancel = pickListArray<Row>(
+      await apiCallRaw<unknown>(page, 'GET', stockQs),
+      'items',
+      `452-05 撤销后四维库存行 /inventory/stock 缸号 ${bundle.dyeLotNo}`
+    ).find(
+      r =>
+        String(r.color_no) === bundle.colorNo &&
+        String(r.dye_lot_no) === bundle.dyeLotNo &&
+        String(r.batch_no) === bundle.dyeLotNo
+    );
+    if (stockAfterCancel === undefined) {
+      throw new Error('452-05 撤销后按四维必须仍能读到库存行');
+    }
+    sameDec(
+      decField(stockAfterCancel, 'quantity_meters', '452-05 撤销后库存行主计量'),
+      stockMetersBefore,
+      '452-05 撤销后库存行主计量 vs 出库前基线'
+    );
+    const lineAfterCancel = orderLineOf(
+      await apiCallRaw<Row>(page, 'GET', `/sales/orders/${order.id}`),
+      productId,
+      '452-05 撤销后订单行'
+    );
+    sameDec(
+      decField(lineAfterCancel, 'shipped_quantity', '452-05 撤销后订单行已发量'),
+      shippedBefore,
+      '452-05 撤销后订单行已发量 vs 出库前基线'
+    );
+    const pieceAfterCancel = await readDyedPieceByNo(page, { ...dims, pieceNo });
+    if (pieceAfterCancel === null) {
+      throw new Error(`452-05 撤销后按匹号 ${pieceNo} 必须仍能单独查到该匹（含零头余码）`);
+    }
+    sameDec(
+      pieceAfterCancel.length,
+      pieceBefore.length,
+      '452-05 撤销后匹（细码）长度 vs 出库前基线'
+    );
+    expect(
+      String(pieceAfterCancel.status),
+      '撤销后匹状态词必须回到出库前读到的值（词表来源 models/status/purchase_inventory.rs::inventory_piece）'
+    ).toBe(String(pieceBefore.status));
+    console.log(
+      `[452-05] 出库撤销反向腿恢复守恒通过 订单=${order.order_no} 发货单=${deliveryId} 匹=${pieceNo} 量=${shipQty}`
+    );
   });
 });
