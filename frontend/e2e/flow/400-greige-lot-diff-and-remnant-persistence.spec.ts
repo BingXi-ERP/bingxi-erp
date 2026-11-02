@@ -93,7 +93,7 @@ import {
   getCtx,
   loginViaUI,
   pickDyeableWarehouse,
-  seedDyedPieceChain
+  seedDyedPieceChain,
 } from './helpers';
 import { pickListArray } from './ui-helpers';
 
@@ -168,7 +168,7 @@ test.describe('面料缸差登记与零头余码持久化', () => {
       length_m: 50,
       weight_kg: 16,
       quantity_meters: 50,
-      quantity_kg: 16
+      quantity_kg: 16,
     };
     const createdA = await apiCall<{ id?: number }>(
       page,
@@ -181,20 +181,15 @@ test.describe('面料缸差登记与零头余码持久化', () => {
       throw new Error(`[${tag}] 坯布甲建档未返回 id：${JSON.stringify(createdA).slice(0, 200)}`);
     }
 
-    const createdB = await apiCall<{ id?: number }>(
-      page,
-      'POST',
-      '/production/greige-fabrics',
-      {
-        ...createBodyA,
-        fabric_no: fabricNoB,
-        dye_lot_no: lotB,
-        length_m: 40,
-        weight_kg: 12.8,
-        quantity_meters: 40,
-        quantity_kg: 12.8
-      }
-    );
+    const createdB = await apiCall<{ id?: number }>(page, 'POST', '/production/greige-fabrics', {
+      ...createBodyA,
+      fabric_no: fabricNoB,
+      dye_lot_no: lotB,
+      length_m: 40,
+      weight_kg: 12.8,
+      quantity_meters: 40,
+      quantity_kg: 12.8,
+    });
     const idB = createdB.data?.id;
     if (!idB) {
       throw new Error(`[${tag}] 坯布乙建档未返回 id：${JSON.stringify(createdB).slice(0, 200)}`);
@@ -243,7 +238,7 @@ test.describe('面料缸差登记与零头余码持久化', () => {
     const badRes = await apiCallExpectFail(page, 'POST', '/production/greige-fabrics', {
       ...createBodyA,
       fabric_no: `${sharedNo}-BAD`,
-      weight_kg: 30
+      weight_kg: 30,
     });
     expect(badRes.status, `${tag} 双单位越界应 400，实际 code=${badRes.code}`).toBe(400);
     expect(badRes.code, `${tag} 双单位越界机器码`).toBe('VALIDATION_ERROR');
@@ -282,7 +277,7 @@ test.describe('面料缸差登记与零头余码持久化', () => {
     expect(dec(outA.data?.weight_kg), `${tag} 甲出尽后剩余公斤数`).toBe(0);
     await apiCall(page, 'POST', `/production/greige-fabrics/${idB}/stock_out`, {
       length_m: 40,
-      weight_kg: 12.8
+      weight_kg: 12.8,
     });
     await apiCall(page, 'DELETE', `/production/greige-fabrics/${idA}`);
     await apiCall(page, 'DELETE', `/production/greige-fabrics/${idB}`);
@@ -308,7 +303,7 @@ test.describe('面料缸差登记与零头余码持久化', () => {
       dyeLotNo,
       pieceCount: 1,
       lengthPerPieceMeters: 100,
-      context: tag
+      context: tag,
     });
     const parent = pieces[0];
     const cutBarcode = genCode('E400CUT');
@@ -330,7 +325,7 @@ test.describe('面料缸差登记与零头余码持久化', () => {
     }>(page, 'POST', '/inventory/piece-split', {
       parent_piece_id: parent.id,
       cut_length: '30.00',
-      new_barcode: cutBarcode
+      new_barcode: cutBarcode,
     });
     const splitParent = split.data?.parent_piece;
     const child = split.data?.new_piece;
@@ -341,10 +336,9 @@ test.describe('面料缸差登记与零头余码持久化', () => {
     }
 
     // 拆分回显，剩余 = 现长 - 剪裁，原始 = 拆分前现长（守恒式两侧）。
-    expect(
-      typeof splitParent.length,
-      `${tag} DECIMAL 母卷剩余米数出参应为字符串线格式`
-    ).toBe('string');
+    expect(typeof splitParent.length, `${tag} DECIMAL 母卷剩余米数出参应为字符串线格式`).toBe(
+      'string'
+    );
     expect(dec(splitParent.length), `${tag} 母卷剩余米数`).toBe(70);
     expect(dec(splitParent.original_length), `${tag} 母卷原始米数首次拆分记拆分前现长`).toBe(100);
     expect(
@@ -373,14 +367,12 @@ test.describe('面料缸差登记与零头余码持久化', () => {
       String(child.width ?? 'null'),
       `${tag} 子卷幅宽与母卷物理同源（母卷 NULL 则子卷 NULL，不回落标称值）`
     ).toBe(String(parentBefore.width ?? 'null'));
-    expect(
-      String(child.gram_weight ?? 'null'),
-      `${tag} 子卷克重与母卷物理同源`
-    ).toBe(String(parentBefore.gram_weight ?? 'null'));
-    expect(
-      String(child.quality_status ?? 'null'),
-      `${tag} 子卷质检判定继承母卷`
-    ).toBe(String(parentBefore.quality_status ?? 'null'));
+    expect(String(child.gram_weight ?? 'null'), `${tag} 子卷克重与母卷物理同源`).toBe(
+      String(parentBefore.gram_weight ?? 'null')
+    );
+    expect(String(child.quality_status ?? 'null'), `${tag} 子卷质检判定继承母卷`).toBe(
+      String(parentBefore.quality_status ?? 'null')
+    );
 
     // 细码侧读回，守恒式在库侧真实行上成立，不是响应回声。
     const parentAfter = await fetchPieceByNo(page, parent.piece_no, tag);
@@ -416,7 +408,7 @@ test.describe('面料缸差登记与零头余码持久化', () => {
     // 额度门，剪裁米数超母卷剩余必被业务拒绝且零新增子卷。
     const overCut = await apiCallExpectFail(page, 'POST', '/inventory/piece-split', {
       parent_piece_id: parent.id,
-      cut_length: '70.5'
+      cut_length: '70.5',
     });
     expectBusinessRejection(overCut, `${tag} 剪裁米数超剩余应被额度门拒绝`);
     expect(overCut.code, `${tag} 超剪裁额度门机器码`).toBe('BUSINESS_ERROR');
