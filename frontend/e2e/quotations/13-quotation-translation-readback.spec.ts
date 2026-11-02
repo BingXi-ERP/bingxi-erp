@@ -34,7 +34,9 @@ import {
   getCtx,
   apiCall,
   apiCallRaw,
-  tryCleanup,
+  apiCallExpectFail,
+  failureCode,
+  APP_ERROR_CODES,
   BASE_URL,
 } from '../flow/helpers';
 import { pickListArray } from '../flow/ui-helpers';
@@ -107,10 +109,33 @@ async function seedRecognizableDraft(page: Page, noteTag: string): Promise<numbe
 }
 
 const CREATED_QUOTATION_IDS: number[] = [];
+
+/**
+ * 报价单清理腿：报价单头级没有删除路由，在册的终结跃迁是 POST /quotations/{id}/cancel。
+ * 未转单的单据取消后置 cancelled（quotation 状态词表小写值）退出活跃列表；已转单（converted）
+ * 由服务端状态门拒绝取消，回业务族 400 且状态不得漂移。两条分支都断响应，不发不判。
+ */
+async function cancelCreatedQuotation(page: Page, id: number): Promise<void> {
+  const before = await apiCallRaw<{ status: string }>(page, 'GET', `/quotations/${id}`);
+  if (before.status === 'converted') {
+    const rejected = await apiCallExpectFail(page, 'POST', `/quotations/${id}/cancel`);
+    expect(
+      rejected.status,
+      `已转单报价单 ${id} 取消应被状态门拒绝 400，实际=${rejected.status}`
+    ).toBe(400);
+    expect(failureCode(rejected), '已转单取消被拒的机器码').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    const after = await apiCallRaw<{ status: string }>(page, 'GET', `/quotations/${id}`);
+    expect(after.status, '取消被拒后报价单状态不得漂移').toBe('converted');
+    return;
+  }
+  const cancelled = await apiCallRaw<{ status: string }>(page, 'POST', `/quotations/${id}/cancel`);
+  expect(cancelled.status, `报价单 ${id} 清理腿取消后状态应为 cancelled`).toBe('cancelled');
+}
+
 test.afterEach(async ({ page }) => {
   while (CREATED_QUOTATION_IDS.length) {
     const id = CREATED_QUOTATION_IDS.pop();
-    if (id != null) await tryCleanup(page, 'DELETE', `/quotations/${id}`, `quotation#${id}`);
+    if (id != null) await cancelCreatedQuotation(page, id);
   }
 });
 
