@@ -52,12 +52,8 @@ import {
 
 /** PDF 魔数最小合法体：仅 %PDF 头即通过 detect_qualification_attachment_magic，扩展名同族判定为 pdf */
 function buildPdfBuffer(marker: string, padBytes = 0): Buffer {
-  const head = Buffer.from(`%PDF-1.4\n${marker}\n`, 'utf-8');
-  if (padBytes <= 0) {
-    return head;
-  }
-  const filler = Buffer.alloc(padBytes, 0x20);
-  return Buffer.concat([head, filler, Buffer.from('\n%%EOF', 'utf-8')]);
+  const pad = padBytes > 0 ? `\n${' '.repeat(padBytes)}\n%%EOF` : '';
+  return Buffer.from(`%PDF-1.4\n${marker}${pad}`, 'utf-8');
 }
 
 /** 统一 URL 拼装：apiCall 系列自带前缀，原始 page.request 腿必须显式拼 API_BASE + API_PREFIX */
