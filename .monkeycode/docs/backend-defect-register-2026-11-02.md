@@ -17,7 +17,7 @@
 | D-05 | 审计摘要 | 同族无深度防御：`get_audit_log_summary` 签名 `_auth` | backend/src/handlers/audit_log_handler.rs:705-707 | 亲验 | 源码修 | 254 按现状钉住 |
 | D-06 | 财务分析 | 反查与统计族同问题：文件内 `require_admin_role` 计数 0、`_auth: AuthContext` 5 处 | backend/src/handlers/financial_analysis_handler.rs | 亲验（计数） | 源码修 | 263 覆盖形状，权限档按现状 |
 | D-07 | 趋势配置 | 无 DELETE 也无 PUT：routes 只给 `trends` 挂 GET 与 POST，全 routes 无 `trends/{id}` 形态，服务侧亦无删除函数 ⇒ 经此入口写入的 analysis_result 行没有任何 API 回收面，自埋数据只能靠库侧清理 | backend/src/routes/finance.rs:516-522；frontend/scripts/route-snapshot.txt 的 financial-analysis 段 | 亲验（三处交叉） | 源码修（补 PUT/DELETE）或 归入"报表类只读派生数据"口径 | 263 的孤儿行断言已点名 |
-| D-08 | 物流面单 | 水平越权：运单在打印服务里登记为"无归属用户列"，任何过 RBAC 的登录用户可取任意运单 docx | backend/src/services/print_service.rs:170；handlers/print_handler.rs:420-421 | 自述（249 文件头，未逐行复验） | 源码修（补归属门） | 249 明确声明本轮不覆盖该水平面缺口 |
+| D-08 | 物流面单 | 行级归属门缺位（潜伏，非当前可控面）：运单登记在 `PRINT_SCOPE_NO_OWNER`，而归属门函数对一切非 `PRINT_SCOPE_GATED` 类型直接 `return Ok(())` 放行，注释自陈"PENDING 与 NO_OWNER 与未登记同样放行"，故 handler 传进去的 `DataScopeContext` 在这条腿上是死参数 | backend/src/services/print_service.rs:170-171 登记，同文件 269-277 门体放行；handlers/print_handler.rs:47-48 与 420-428 | 亲验（四处交叉） | 源码修（补归属门），且**必须与授权补授同支** | 249 已声明本轮不覆盖该水平面；**先前"任何过 RBAC 的登录用户可取任意运单"的说法被我证伪并撤下**，见下节口径 |
 | D-09 | 扫码族 | `scan_to_ship_impl` 收下 `_order_id` 不用；GET scan-to-ship 返回硬编码空信封 | backend/src/handlers/barcode_scanner_handler.rs（217 文件头带坐标） | 自述 | 源码修 | 217 已钉 |
 | D-10 | 导出族 | 登录日志与成本归集两条导出不读审批令牌、无 admin 门，与同族 sales-prices 腿不对称 | backend/src/handlers/login_security_handler.rs 导出腿；handlers/production/cost_collections 导出腿 | 自述 | 源码修（统一受理门） | 235 已把不对称钉成回归护栏 |
 | D-11 | 报表引擎 | xlsx 走 `from_utf8_lossy`，非法字节被静默替换 | backend/src/handlers/report_engine_handler.rs:230 | 自述 | 源码修 | 235 侧记录 |
@@ -26,6 +26,7 @@
 | D-14 | 数据范围 | `scope-types` 广播五个大写值，写入侧只认三个小写档，取值域两侧不同源 | backend/src/utils/data_scope.rs:43-48 与 services/role_permission_service.rs:367 | 自述 | 词表收口 | 216 钉住不对称 |
 | D-15 | 证书与商检 | 两个 handler 绕过 ApiResponse 信封直出模型，且不收 AuthContext | backend/src/handlers/certificate_of_origin_handler.rs:11-35；handlers/export_inspection_handler.rs:22 | 自述 | 信封统一 加 源码修 | 236 把两处信封漂移点名进交接 |
 | D-16 | 库存细码 | 盘点/批次改写腿未见 NOT NULL 与范围门之外的入口校验（0 与负数量可入库） | backend/src/services/inventory_stock_service.rs 与 services/inv/batch.rs | 自述 | 词表收口 | 218、248 侧记录 |
+| D-17 | 坏账核销打印 | 归属列其实存在，被"永久豁免"口径一刀切：清单头称这些表"不存在 created_by 或等效归属用户列因此永久豁免行级门"，但 `bad_debt_writeoff` 自己的条目注释写着归属语义由 `applicant_user_id` 承载、待裁定是否建等效门——同一清单里既有事实又有例外，按注释读会把可修的一条当成不可修 | backend/src/services/print_service.rs:161 起（清单头 158-160 与 bad_debt_writeoff 条目注释） | 亲验 | 口径裁定（定 applicant 序列是否算行级归属），裁定后转 源码修 | 尚无断言钉住 |
 
 ## 与推送次序绑定的两条依赖
 
@@ -33,3 +34,32 @@
    它必须晚于测试面 bundle 合入，并在同一支里带上 216 第 9 段的随动改判（改成断 400 拒绝且 `is_active`
    不变，属只加严）。顺序反了就会由我亲手写出一枚新红。
 2. D-01 补齐后要在 218 追加"零量""负量"两条拒绝腿，拒因文案与 `bad_request` 源码文案逐字同源。
+
+## D-08 的证伪过程与由此得出的排期口径
+
+spec 249 文件头原写"任何过 RBAC 的登录用户可取任意运单 docx"。**这句不成立，已从台账撤下。**
+
+不成立的原因在同枚 spec 内部就能自证矛盾：该腿是 `GET /api/v1/erp/logistics-tracking/waybills/*/print`
+（`frontend/scripts/route-snapshot.txt:598`），权限键按 URL 段推导，段名是 `logistics-tracking`；而
+`backend/src/services/init_service_ops/permission.rs` 全文对该段命中 0 次，种子只授 `("logistics", ...)`
+（同文件 501、542、1380-1398 段）。249 自己的权限腿断的正是 `logistics_coordinator` 对本族四动作全 403，
+与"任何登录用户可取"互相打脸。缺陷是真的，可达主体是假的。
+
+真实口径：行级归属门确实缺位——`print_service.rs:269-277` 对一切非 `PRINT_SCOPE_GATED` 的类型直接
+`return Ok(())`，注释自陈"PENDING 与 NO_OWNER 与未登记同样放行"，所以 `render_print_docx` 传进去的
+`DataScopeContext` 在运单这条腿上是死参数。但当前只有 admin 短路能走到这个分支，它是**补授即开面**的
+潜伏缺口，不是现网可控越权。
+
+由此得出一条排期红线：**给任何登记在 `PRINT_SCOPE_NO_OWNER` 的类型所属 URL 段补授给非 admin 角色的 PR，
+必须与该类型的归属门同支落地，不许拆成两支。** 拆开的后果是补授那支独立开出水平可控面，而那支自己一行
+断言都不会红（它加的只是授权数据，门的缺失早于它存在），CI 抓不到，只有 review 能抓。
+
+该清单在主干实量为 **十五枚**（`print_service.rs:161` 起，逐项数出，不是十枚）：`dye_batch_card`、
+`color_card_issue`、`bulk_color_approval`、`quality_inspection_record`、`logistics_waybill`、
+`unqualified_product`、`purchase_inspection`、`material_shortage`、`quality_8d_report`、
+`supplier_evaluation_record`、`safety_accident_report`、`dye_batch_rework`、`bad_debt_writeoff`、
+`after_sales`、`quality_issue`。一条红线管全部，逐个域补授时逐次生效。
+
+清单头的注释还自陈这是一次**一刀切**：这些表"不存在 `created_by` 或等效归属用户列…因此永久豁免行级门"，
+但其中 `bad_debt_writeoff` 自己的条目注释就写着归属语义由 `applicant_user_id` 承载、待后续工单裁定是否
+建等效门（D-17）。所以"永久豁免"这个措辞与清单内部事实不一致，排期时不能按"不可修"处理。
