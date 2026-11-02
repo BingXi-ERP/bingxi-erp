@@ -98,7 +98,7 @@ function centsOf(v: unknown, label: string): number {
 
 /** 对一行数据的五明细列与 total_cost 做逐分对平，返回单据总额分 */
 function assertLineReconciled(row: Row, label: string): number {
-  const feeCents = FEE_COLUMNS.map((c) => centsOf(row[c], `${label}.${c}`));
+  const feeCents = FEE_COLUMNS.map(c => centsOf(row[c], `${label}.${c}`));
   const sumCents = feeCents.reduce((a, b) => a + b, 0);
   const totalCents = centsOf(row.total_cost, `${label}.total_cost`);
   expect(
@@ -149,7 +149,13 @@ async function createCostDoc(page: Page, fees: FeeSet): Promise<DocHandle> {
   expect(detail.total_cost, '详情 total_cost 应与创建响应同串').toBe(created.total_cost);
   const totalCents = assertLineReconciled(detail, `单据 ${created.collection_no} 详情侧`);
 
-  return { id: Number(created.id), collectionNo: String(created.collection_no), batchNo, dyeLotNo, totalCents };
+  return {
+    id: Number(created.id),
+    collectionNo: String(created.collection_no),
+    batchNo,
+    dyeLotNo,
+    totalCents,
+  };
 }
 
 test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
@@ -167,9 +173,13 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
     });
 
     // 明细侧回读，批次列表出参 data 为模型数组本体，逐列与录入串等值
-    const rows = await apiCallRaw<Row[]>(page, 'GET', `/production/cost-collections?batch_no=${docA.batchNo}`);
+    const rows = await apiCallRaw<Row[]>(
+      page,
+      'GET',
+      `/production/cost-collections?batch_no=${docA.batchNo}`
+    );
     expect(Array.isArray(rows), '列表端点 data 应为模型数组').toBe(true);
-    const mine = rows.filter((r) => r.collection_no === docA?.collectionNo);
+    const mine = rows.filter(r => r.collection_no === docA?.collectionNo);
     expect(mine.length, `批次列表应恰含本次单据 1 行，实际 ${mine.length}`).toBe(1);
     expect(mine[0].dyeing_fee, '列表侧染费应与录入串逐字符一致').toBe('400.44');
     expect(mine[0].unit_cost_meters, '产量 100.00 时单位成本应非 NULL').not.toBeNull();
@@ -199,10 +209,9 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
       const cents = assertLineReconciled(row, `批次分析行 ${row.collection_no}`);
       batchSumCents += cents;
       const handle = row.collection_no === docA?.collectionNo ? docA : docB;
-      expect(
-        cents,
-        `批次分析行 ${row.collection_no} 的 total_cost 应与单据侧逐分一致`
-      ).toBe((handle as DocHandle).totalCents);
+      expect(cents, `批次分析行 ${row.collection_no} 的 total_cost 应与单据侧逐分一致`).toBe(
+        (handle as DocHandle).totalCents
+      );
       expect(row.status, '批次分析行应回显草稿状态 draft').toBe('draft');
     }
     expect(
@@ -229,15 +238,19 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
       { approved: true }
     );
     expect(again.status, '非 draft 再审核应被拒').toBeGreaterThanOrEqual(400);
-    expect(
-      failureCode(again),
-      `重复审核拒绝机器码应为 BUSINESS_ERROR，实际 ${again.code}`
-    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    expect(failureCode(again), `重复审核拒绝机器码应为 BUSINESS_ERROR，实际 ${again.code}`).toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
 
     const after = await apiCallRaw<Row>(page, 'GET', `/production/cost-collections/${docA?.id}`);
     expect(after.status, '被拒审核不得改状态').toBe('approved');
 
-    await tryCleanup(page, 'DELETE', `/production/cost-collections/${docA?.id}`, `清理单据 A ${docA?.collectionNo}`);
+    await tryCleanup(
+      page,
+      'DELETE',
+      `/production/cost-collections/${docA?.id}`,
+      `清理单据 A ${docA?.collectionNo}`
+    );
   });
 
   test('445-04 非法分摊拦截，缺列必拒，负额应被仓内校验拒掉且零残留', async ({ page }) => {
@@ -272,12 +285,23 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
       const leaked = (negative as unknown as { data?: Row }).data;
       console.error(`[445] 缺陷暴露，负额分摊被接受并落库 id=${leaked?.id}`);
       if (leaked?.id !== undefined) {
-        await tryCleanup(page, 'DELETE', `/production/cost-collections/${leaked.id}`, '回收负额残行');
+        await tryCleanup(
+          page,
+          'DELETE',
+          `/production/cost-collections/${leaked.id}`,
+          '回收负额残行'
+        );
       }
     }
-    expect(negative.status, '负额分摊应被校验拒绝，源码缺陷本支只暴露不修').toBeGreaterThanOrEqual(400);
+    expect(negative.status, '负额分摊应被校验拒绝，源码缺陷本支只暴露不修').toBeGreaterThanOrEqual(
+      400
+    );
 
-    const residue = await apiCallRaw<Row[]>(page, 'GET', `/production/cost-collections?batch_no=${probeBatch}`);
+    const residue = await apiCallRaw<Row[]>(
+      page,
+      'GET',
+      `/production/cost-collections?batch_no=${probeBatch}`
+    );
     expect(residue.length, `两次被拒写操作后批次 ${probeBatch} 应零残留`).toBe(0);
   });
 
@@ -292,7 +316,7 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
       `/audit-logs?resource_type=cost_collection&operation_type=DELETE&resource_id=${docB?.id}&page=1&page_size=20`
     );
     expect(logs.total, '删除审计应至少落 1 行').toBeGreaterThanOrEqual(1);
-    const hit = logs.items.filter((it) => String(it.resource_id) === String(docB?.id));
+    const hit = logs.items.filter(it => String(it.resource_id) === String(docB?.id));
     expect(hit.length, `按 resource_id=${docB?.id} 应命中删除审计`).toBeGreaterThanOrEqual(1);
 
     const item = hit[0];
@@ -300,7 +324,9 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
     expect(typeof item.username, '删除审计 username 由 user_id 反查落库').toBe('string');
     expect(String(item.username).length, '审计操作账号名应非空').toBeGreaterThan(0);
     expect(item.operation_type, '高危标记形态为 operation_type 大写 DELETE').toBe('DELETE');
-    expect(item.severity, '仓内删除审计 severity 实际落 INFO，未走高危标级，按真实形态断言').toBe('INFO');
+    expect(item.severity, '仓内删除审计 severity 实际落 INFO，未走高危标级，按真实形态断言').toBe(
+      'INFO'
+    );
     expect(String(item.created_at), '审计应落操作时间').toMatch(/^\d{4}-\d{2}-\d{2}T/);
     // 脱敏面，列表条目 DTO 不携带快照与请求体两键，详情端点才展开
     expect('before_snapshot' in item, '列表条目不应外显变更前快照').toBe(false);
@@ -319,8 +345,12 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
     expect(deleteAuditId, '445-05 依赖 445-04b 命中的审计 id').toBeDefined();
 
     const del = await apiCallExpectFail(page, 'DELETE', `/audit-logs/${deleteAuditId}`);
-    expect([404, 405], `审计删除通道应不存在于路由快照，实际 status=${del.status}`).toContain(del.status);
-    const put = await apiCallExpectFail(page, 'PUT', `/audit-logs/${deleteAuditId}`, { description: '篡改尝试' });
+    expect([404, 405], `审计删除通道应不存在于路由快照，实际 status=${del.status}`).toContain(
+      del.status
+    );
+    const put = await apiCallExpectFail(page, 'PUT', `/audit-logs/${deleteAuditId}`, {
+      description: '篡改尝试',
+    });
     expect([404, 405], `审计改道通道应不存在，实际 status=${put.status}`).toContain(put.status);
 
     const still = await apiCallRaw<Row>(page, 'GET', `/audit-logs/${deleteAuditId}`);
@@ -334,7 +364,8 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
       '/audit-logs?resource_type=cost_collection&operation_type=CREATE&page=1&page_size=100'
     );
     const createHit = (createLogs.items ?? []).filter(
-      (it) => String(it.resource_id) === String(docA?.id) || String(it.resource_id) === String(docB?.id)
+      it =>
+        String(it.resource_id) === String(docA?.id) || String(it.resource_id) === String(docB?.id)
     );
     expect(
       createHit.length,
@@ -343,7 +374,11 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
   });
 
   test('445-06 审计端点对非授权岗位整体拒绝，admin 对照可达', async ({ page }) => {
-    const adminView = await apiCallRaw<{ items: Row[] }>(page, 'GET', '/audit-logs?page=1&page_size=5');
+    const adminView = await apiCallRaw<{ items: Row[] }>(
+      page,
+      'GET',
+      '/audit-logs?page=1&page_size=5'
+    );
     expect(Array.isArray(adminView.items), 'admin 基线应可读审计列表').toBe(true);
 
     await loginAsRole(page, 'report_viewer');
