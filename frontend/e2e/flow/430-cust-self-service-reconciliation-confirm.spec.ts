@@ -6,24 +6,24 @@
 // 真调端点、真回读，并且把"拒绝"钉成"库中未发生二次跃迁、未落脏值"，而不是只判 HTTP 码。
 // 具体钉住的规则（判据全部来自写入方源码实核，不是从用例反推）：
 // - 建单落库初始态恒为草稿，且期末余额由权威纯函数重算：closing_balance =
-//   opening_balance + total_invoices - total_collections（services/ar/vfy_ops/match.rs:106-112），
+//   opening_balance + total_invoices - total_collections（services/ar/vfy_ops/match.rs），
 //   建单时 confirmed_by_customer / dispute_reason / confirmed_by / confirmed_at 一律留 NULL（未补录，
 //   不用 0 或 false 冒充）。
-// - 发送门：只有草稿可发送（services/ar/recon_ops/lifecycle.rs:71），draft → sent；重复发送被同一
+// - 发送门：只有草稿可发送（services/ar/recon_ops/lifecycle.rs），draft → sent；重复发送被同一
 //   状态门拒绝，且行状态不因重复调用再跃迁。
 // - 客户确认门（纯状态判定，生产与集成测同源）：confirmed 拒重复确认、disputed 须先解决争议，
-//   其余状态放行并写入 confirmed（services/ar/vfy_ops/confirm.rs:123-116）；放行时同批写入
+//   其余状态放行并写入 confirmed（services/ar/vfy_ops/confirm.rs）；放行时同批写入
 //   confirmed_by_customer=true、confirmed_by=会话用户 id、confirmed_at=当前时间。
 // - 客户争议门：confirmed 与 closed 拒绝提争议，其余放行并写入 disputed，dispute_reason 落原文
-//   （services/ar/vfy_ops/confirm.rs:117-145）。
+//   （services/ar/vfy_ops/confirm.rs）。
 // - 通用改状态白名单：仅 draft/sent/confirmed/disputed/closed/cancelled 六值可写，白名单外一律拒，
-//   拒绝后 reconciliation_status 保持原值（services/ar/recon_ops/lifecycle.rs:239-256）。
-// - 关闭门：仅 confirmed 或 disputed 可关闭，其余状态拒（services/ar/recon_ops/lifecycle.rs:128-141）。
-// - 更新门与删除门：均只放草稿（services/ar/recon_ops/crud.rs:171 与 lifecycle.rs:36-41）；草稿删除后
+//   拒绝后 reconciliation_status 保持原值（services/ar/recon_ops/lifecycle.rs）。
+// - 关闭门：仅 confirmed 或 disputed 可关闭，其余状态拒（services/ar/recon_ops/lifecycle.rs）。
+// - 更新门与删除门：均只放草稿（services/ar/recon_ops/crud.rs 与 lifecycle.rs）；草稿删除后
 //   按主键读回必须 404，非草稿删除被拒且行仍在。
-// - 行级归属门：base 面每条腿先取父客户走 data_scope::check_resource_owner（utils/data_scope.rs:155-177），
+// - 行级归属门：base 面每条腿先取父客户走 data_scope::check_resource_owner（utils/data_scope.rs），
 //   客户不存在 → 404，不可见 → 403 且固定脱敏文案，因此本文件只断机器码与信封形状，永不按文案判定；
-//   列表腿在查询构造处下推 data_scope，越权行既不进 items 也不进 total（handlers/ar_reconciliation_handler.rs:171-178）。
+//   列表腿在查询构造处下推 data_scope，越权行既不进 items 也不进 total（handlers/ar_reconciliation_handler.rs）。
 //   共享表不参与该判定（utils/data_scope.rs 全文对 share 零命中），所以客户共享只扩团队成员可见性，
 //   不扩财务对账单可见性；共享面自身的可见性链由同号段共享用例覆盖，本文件不重复也不臆造跨账号结论。
 //
@@ -45,12 +45,12 @@
 // period_end、customer_id、customer_name、opening_balance、total_invoices、total_collections、
 // closing_balance、reconciliation_status、confirmed_by_customer、dispute_reason、confirmed_by、
 // confirmed_at、notes。缺值写 NULL：未确认行的 confirmed_by_customer/confirmed_by/confirmed_at、
-// 无争议行的 dispute_reason。出参键名以 handlers/ar_reconciliation_handler.rs:41-56 的
+// 无争议行的 dispute_reason。出参键名以 handlers/ar_reconciliation_handler.rs 的
 // ReconciliationResponse 为准（与 models/ar_reconciliation.rs 的 Model 字段同名 snake_case，金额列为
 // DECIMAL 线格式即字符串）；确认与争议两条腿直接序列化整行 Model，因此可读到 confirmed_by_customer
 // 与 confirmed_at 这三列，而读单行腿读不到它们——本文件按各自真实出参面断言，不跨面借键。
 // 存哪里：表 ar_reconciliations（明细表 ar_reconciliation_item）；列表信封 PaginatedResponse
-// {items,total,page,page_size}（backend/src/utils/response.rs:34）；失败信封 {code,message,trace_id,
+// {items,total,page,page_size}（backend/src/utils/response.rs）；失败信封 {code,message,trace_id,
 // timestamp} 四键且 code 为字符串机器码。端点存在性逐条对 frontend/scripts/route-snapshot.txt 核实：
 //   POST   /api/v1/erp/ar-reconciliations                      :1039
 //   GET    /api/v1/erp/ar-reconciliations                      :190
@@ -63,7 +63,7 @@
 //   POST   /api/v1/erp/ar-reconciliations/*/close              :1047
 //   DELETE /api/v1/erp/ar-reconciliations/*                    :9
 //   POST   /api/v1/erp/crm/customers 与 DELETE /api/v1/erp/crm/customers/*（载体面）
-// 对账状态词表逐字符引用写入方常量（models/status/finance.rs:22-37）：
+// 对账状态词表逐字符引用写入方常量（models/status/finance.rs）：
 // draft / sent / confirmed / disputed / closed / cancelled，大小写与拼写不得改写，也不得把
 // inventory_count 那套小写词表（含 in_review）或任何 in_progress 之类本表不存在的取值当成合法值——
 // 本文件正是把 in_progress 作为白名单外非法值用来证伪"任意字符串都能写库"。
@@ -78,7 +78,7 @@ import {
   loginViaUI,
 } from './helpers';
 
-/** base 面出参形状（handlers/ar_reconciliation_handler.rs:41-56 ReconciliationResponse，snake_case 原样） */
+/** base 面出参形状（handlers/ar_reconciliation_handler.rs ReconciliationResponse，snake_case 原样） */
 type ReconRow = {
   id: number;
   reconciliation_no: string;
@@ -96,7 +96,7 @@ type ReconRow = {
   created_at: string;
 };
 
-/** 确认腿与争议腿直接序列化整行 Model，多出三列确认留痕（models/ar_reconciliation.rs:10-30） */
+/** 确认腿与争议腿直接序列化整行 Model，多出三列确认留痕（models/ar_reconciliation.rs） */
 type ReconModelRow = ReconRow & {
   reconciliation_date: string;
   confirmed_by_customer: boolean | null;
@@ -214,12 +214,14 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
     expect(created.customer_id, `客户归属未落库：${describeRow('建单', created)}`).toBe(customerId);
 
     const readback = await apiCallRaw<ReconRow>(page, 'GET', `/ar-reconciliations/${created.id}`);
-    expect(readback.reconciliation_status, `按主键回读状态漂移：${describeRow('回读', readback)}`).toBe(
-      'draft'
-    );
-    expect(readback.reconciliation_no, `按主键回读单据号漂移：${describeRow('回读', readback)}`).toBe(
-      created.reconciliation_no
-    );
+    expect(
+      readback.reconciliation_status,
+      `按主键回读状态漂移：${describeRow('回读', readback)}`
+    ).toBe('draft');
+    expect(
+      readback.reconciliation_no,
+      `按主键回读单据号漂移：${describeRow('回读', readback)}`
+    ).toBe(created.reconciliation_no);
     expect(
       readback.closing_balance,
       `按主键回读期末余额与建单不一致（线格式字符串逐字符）：建单=${created.closing_balance} 回读=${readback.closing_balance}`
@@ -238,9 +240,9 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
     expect(listed.total, `列表 total 非数值：实际 ${listed.total}`).toBeGreaterThan(0);
     const hit = listed.items.find(r => r.id === created.id);
     expect(
-      hit ? hit.reconciliation_no : `未命中（本客户 draft 行 ids=${listed.items
-        .map(r => r.id)
-        .join(',')}）`,
+      hit
+        ? hit.reconciliation_no
+        : `未命中（本客户 draft 行 ids=${listed.items.map(r => r.id).join(',')}）`,
       `自建 draft 行未进入 status=draft 过滤列表：${describeRow('列表命中', hit ?? null)}`
     ).toBe(created.reconciliation_no);
 
@@ -256,10 +258,9 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       total_collections: 1,
     });
     expect(ghost.status, `未知客户建单未判 404：实际 status=${ghost.status}`).toBe(404);
-    expect(
-      failureCode(ghost),
-      `未知客户建单的机器码非 NOT_FOUND：实际 code=${ghost.code}`
-    ).toBe(APP_ERROR_CODES.NOT_FOUND);
+    expect(failureCode(ghost), `未知客户建单的机器码非 NOT_FOUND：实际 code=${ghost.code}`).toBe(
+      APP_ERROR_CODES.NOT_FOUND
+    );
     const ghostListed = await apiCallRaw<PagedRows>(
       page,
       'GET',
@@ -277,20 +278,22 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
     expect(recMain, '前置建单腿未产出主链行 id，本条无法归因').toBeGreaterThan(0);
 
     const sent = await apiCallRaw<ReconRow>(page, 'POST', `/ar-reconciliations/${recMain}/send`);
-    expect(sent.reconciliation_status, `发送后未转 sent：${describeRow('发送', sent)}`).toBe('sent');
+    expect(sent.reconciliation_status, `发送后未转 sent：${describeRow('发送', sent)}`).toBe(
+      'sent'
+    );
     expect(sent.id, `发送腿返回的行不是被测行：${describeRow('发送', sent)}`).toBe(recMain);
 
     const readback = await apiCallRaw<ReconRow>(page, 'GET', `/ar-reconciliations/${recMain}`);
-    expect(readback.reconciliation_status, `回读未停在 sent：${describeRow('回读', readback)}`).toBe(
-      'sent'
-    );
+    expect(
+      readback.reconciliation_status,
+      `回读未停在 sent：${describeRow('回读', readback)}`
+    ).toBe('sent');
 
     const again = await apiCallExpectFail(page, 'POST', `/ar-reconciliations/${recMain}/send`);
     expect(again.status, `重复发送未判 400：实际 status=${again.status}`).toBe(400);
-    expect(
-      failureCode(again),
-      `重复发送的机器码非 BUSINESS_ERROR：实际 code=${again.code}`
-    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    expect(failureCode(again), `重复发送的机器码非 BUSINESS_ERROR：实际 code=${again.code}`).toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
 
     const afterAgain = await apiCallRaw<ReconRow>(page, 'GET', `/ar-reconciliations/${recMain}`);
     expect(
@@ -298,7 +301,11 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       `重复发送把状态推离了 sent（拒绝未做到零副作用）：${describeRow('二次发送后回读', afterAgain)}`
     ).toBe('sent');
 
-    const missing = await apiCallExpectFail(page, 'POST', `/ar-reconciliations/${GHOST_CUSTOMER_ID}/send`);
+    const missing = await apiCallExpectFail(
+      page,
+      'POST',
+      `/ar-reconciliations/${GHOST_CUSTOMER_ID}/send`
+    );
     expect(missing.status, `不存在主键的发送未判 404：实际 status=${missing.status}`).toBe(404);
     expect(failureCode(missing), `不存在主键的机器码非 NOT_FOUND：实际 code=${missing.code}`).toBe(
       APP_ERROR_CODES.NOT_FOUND
@@ -338,9 +345,10 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       `/ar-reconciliations/${disputeCreated.id}/dispute`,
       { reason: reasonText }
     );
-    expect(disputed.reconciliation_status, `提争议后未转 disputed：${describeRow('争议', disputed)}`).toBe(
-      'disputed'
-    );
+    expect(
+      disputed.reconciliation_status,
+      `提争议后未转 disputed：${describeRow('争议', disputed)}`
+    ).toBe('disputed');
     expect(
       disputed.dispute_reason,
       `dispute_reason 未落 reason 原文：实际 ${JSON.stringify(disputed.dispute_reason)}`
@@ -374,10 +382,9 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
 
     const stillDisputed = await apiRawStatus(page, `/ar-reconciliations/${recDispute}`);
-    expect(
-      stillDisputed,
-      `被拒的确认把 disputed 行推成了别的状态：实际 ${stillDisputed}`
-    ).toBe('disputed');
+    expect(stillDisputed, `被拒的确认把 disputed 行推成了别的状态：实际 ${stillDisputed}`).toBe(
+      'disputed'
+    );
 
     // 白名单外取值（本表词表里根本没有 in_progress）必须被挡，且不得写库
     const illegal = await apiCallExpectFail(
@@ -387,14 +394,14 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       { status: 'in_progress' }
     );
     expect(illegal.status, `白名单外状态值未判 400：实际 status=${illegal.status}`).toBe(400);
-    expect(failureCode(illegal), `白名单外状态值的机器码非 BUSINESS_ERROR：实际 code=${illegal.code}`).toBe(
-      APP_ERROR_CODES.BUSINESS_ERROR
-    );
-    const afterIllegal = await apiRawStatus(page, `/ar-reconciliations/${recDispute}`);
     expect(
-      afterIllegal,
-      `非法状态值被写进了库（白名单没挡住）：实际 ${afterIllegal}`
-    ).toBe('disputed');
+      failureCode(illegal),
+      `白名单外状态值的机器码非 BUSINESS_ERROR：实际 code=${illegal.code}`
+    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    const afterIllegal = await apiRawStatus(page, `/ar-reconciliations/${recDispute}`);
+    expect(afterIllegal, `非法状态值被写进了库（白名单没挡住）：实际 ${afterIllegal}`).toBe(
+      'disputed'
+    );
 
     // 合法值放行：disputed → cancelled，回读一致
     const cancelled = await apiCallRaw<ReconRow>(
@@ -403,9 +410,10 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       `/ar-reconciliations/${recDispute}/status`,
       { status: 'cancelled' }
     );
-    expect(cancelled.reconciliation_status, `合法改状态未落库：${describeRow('改 cancelled', cancelled)}`).toBe(
-      'cancelled'
-    );
+    expect(
+      cancelled.reconciliation_status,
+      `合法改状态未落库：${describeRow('改 cancelled', cancelled)}`
+    ).toBe('cancelled');
     const afterCancel = await apiRawStatus(page, `/ar-reconciliations/${recDispute}`);
     expect(afterCancel, `改状态后回读漂移：实际 ${afterCancel}`).toBe('cancelled');
 
@@ -415,9 +423,10 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       'POST',
       `/ar-reconciliations/${recDispute}/close`
     );
-    expect(closeBlocked.status, `cancelled 行关闭未判 400：实际 status=${closeBlocked.status}`).toBe(
-      400
-    );
+    expect(
+      closeBlocked.status,
+      `cancelled 行关闭未判 400：实际 status=${closeBlocked.status}`
+    ).toBe(400);
     expect(
       failureCode(closeBlocked),
       `cancelled 行关闭的机器码非 BUSINESS_ERROR：实际 code=${closeBlocked.code}`
@@ -438,9 +447,10 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       'POST',
       `/ar-reconciliations/${recMain}/confirm`
     );
-    expect(confirmed.reconciliation_status, `确认后未转 confirmed：${describeRow('确认', confirmed)}`).toBe(
-      'confirmed'
-    );
+    expect(
+      confirmed.reconciliation_status,
+      `确认后未转 confirmed：${describeRow('确认', confirmed)}`
+    ).toBe('confirmed');
     expect(
       confirmed.confirmed_by_customer,
       `confirmed_by_customer 未置 true：实际 ${JSON.stringify(confirmed.confirmed_by_customer)}`
@@ -468,9 +478,9 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
     );
     const confirmedHit = confirmedList.items.find(r => r.id === recMain);
     expect(
-      confirmedHit ? confirmedHit.reconciliation_status : `未命中（ids=${confirmedList.items
-        .map(r => r.id)
-        .join(',')}）`,
+      confirmedHit
+        ? confirmedHit.reconciliation_status
+        : `未命中（ids=${confirmedList.items.map(r => r.id).join(',')}）`,
       `已确认行未进入 status=confirmed 过滤列表：${describeRow('列表命中', confirmedHit ?? null)}`
     ).toBe('confirmed');
     const draftList = await apiCallRaw<PagedRows>(
@@ -546,13 +556,19 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       total_collections: 1.5,
       notes: '非草稿行不应受理更新',
     });
-    expect(updateBlocked.status, `非草稿行更新未判 400：实际 status=${updateBlocked.status}`).toBe(400);
+    expect(updateBlocked.status, `非草稿行更新未判 400：实际 status=${updateBlocked.status}`).toBe(
+      400
+    );
     expect(
       failureCode(updateBlocked),
       `非草稿行更新的机器码非 BUSINESS_ERROR：实际 code=${updateBlocked.code}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
 
-    const afterUpdateBlocked = await apiCallRaw<ReconRow>(page, 'GET', `/ar-reconciliations/${recMain}`);
+    const afterUpdateBlocked = await apiCallRaw<ReconRow>(
+      page,
+      'GET',
+      `/ar-reconciliations/${recMain}`
+    );
     expect(
       afterUpdateBlocked.closing_balance,
       `被拒的更新改写了期末余额（拒绝未做到零副作用）：实际 ${afterUpdateBlocked.closing_balance}，建单链值应为 ${closed.closing_balance}`
@@ -589,12 +605,15 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       updated.reconciliation_status,
       `草稿行更新被推离了草稿态：${describeRow('更新', updated)}`
     ).toBe('draft');
-    expect(
-      updated.notes,
-      `notes 未落更新入参原文：实际 ${JSON.stringify(updated.notes)}`
-    ).toBe(`e2e-430-${tag} 更新腿留痕`);
+    expect(updated.notes, `notes 未落更新入参原文：实际 ${JSON.stringify(updated.notes)}`).toBe(
+      `e2e-430-${tag} 更新腿留痕`
+    );
 
-    const updatedReadback = await apiCallRaw<ReconRow>(page, 'GET', `/ar-reconciliations/${recDraft}`);
+    const updatedReadback = await apiCallRaw<ReconRow>(
+      page,
+      'GET',
+      `/ar-reconciliations/${recDraft}`
+    );
     expect(
       updatedReadback.closing_balance,
       `按主键回读的期末余额与更新出参不一致：更新=${updated.closing_balance} 回读=${updatedReadback.closing_balance}`
@@ -609,7 +628,9 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
 
     // 删除门：closed 行不可删
     const deleteBlocked = await apiCallExpectFail(page, 'DELETE', `/ar-reconciliations/${recMain}`);
-    expect(deleteBlocked.status, `非草稿行删除未判 400：实际 status=${deleteBlocked.status}`).toBe(400);
+    expect(deleteBlocked.status, `非草稿行删除未判 400：实际 status=${deleteBlocked.status}`).toBe(
+      400
+    );
     expect(
       failureCode(deleteBlocked),
       `非草稿行删除的机器码非 BUSINESS_ERROR：实际 code=${deleteBlocked.code}`
@@ -635,7 +656,12 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
 
     // 终态收敛：争议行取消后留在 cancelled，主链行留在 closed，两条均无删除端点可用（删除门只放草稿），
     // 因此不悬挂 draft/sent/confirmed；载体客户 best-effort 删除，失败只登记不判负。
-    await tryCleanup(page, 'DELETE', `/ar-reconciliations/${recDispute}`, 'reconciliation_disputed');
+    await tryCleanup(
+      page,
+      'DELETE',
+      `/ar-reconciliations/${recDispute}`,
+      'reconciliation_disputed'
+    );
     await tryCleanup(page, 'DELETE', `/ar-reconciliations/${recMain}`, 'reconciliation_closed');
     await tryCleanup(page, 'DELETE', `/crm/customers/${customerId}`, 'carrier_customer');
   });
@@ -647,7 +673,10 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
  * 传给谁：GET /ar-reconciliations/{id} → get_reconciliation → ReconciliationResponse。
  * 存什么/存哪里：只读 ar_reconciliations.reconciliation_status，不落任何列。
  */
-async function apiRawStatus(page: Parameters<typeof apiCall>[0], path: string): Promise<string | null> {
+async function apiRawStatus(
+  page: Parameters<typeof apiCall>[0],
+  path: string
+): Promise<string | null> {
   const row = await apiCallRaw<{ reconciliation_status: string | null }>(page, 'GET', path);
   return row.reconciliation_status;
 }
