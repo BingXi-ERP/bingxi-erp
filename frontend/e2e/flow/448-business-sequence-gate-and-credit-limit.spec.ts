@@ -10,6 +10,7 @@ import {
   apiCall,
   apiCallRaw,
   apiCallExpectFail,
+  ApiResponse,
   ensureTestEntities,
   failureCode,
   genCode,
@@ -87,7 +88,7 @@ function expectAppErrorEnvelope(
  * 因此成功腿只断真实承载位：code=200 + data 载荷类型与非空。三个信用动作端点
  * （occupy / adjust / deactivate）出参均为 ApiResponse<String>，data 是落库确认文案。
  */
-function expectSuccessEnvelope(res: import('./helpers').ApiResponse<string>, label: string): void {
+function expectSuccessEnvelope(res: ApiResponse<string>, label: string): void {
   expect(res.code, `${label}：成功信封 code 应为 200，raw=${JSON.stringify(res)}`).toBe(200);
   expect(typeof res.data, `${label}：成功体必须带 data 载荷（后端 ApiResponse<String>）`).toBe(
     'string'
