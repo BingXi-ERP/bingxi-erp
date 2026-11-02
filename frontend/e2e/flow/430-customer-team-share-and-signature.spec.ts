@@ -341,7 +341,7 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     expect(memberA.is_active, '新入队成员的 is_active 应为 true').toBe(true);
     expect(memberA.left_at, '在队成员的 left_at 必须写 NULL').toBeNull();
     expect(memberA.created_by, 'created_by 应落操作人（当前登录人）').toBe(me.id);
-    expect(memberA.user_name, 'user_name 应落被添加人的真实登录名').toBeTypeOf('string');
+    expect(typeof memberA.user_name, 'user_name 应落被添加人的真实登录名').toBe('string');
     expect(
       memberA.user_name && !FAKE_NAME_PATTERN.test(memberA.user_name),
       `成员留痕名不得是造名形状，实际 ${JSON.stringify(memberA.user_name)}`
@@ -690,7 +690,7 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
       customer_id: cust.id,
       total_amount: '1250.00',
     });
-    expect(contract.id, '建销售合同应返回主键').toBeTypeOf('number');
+    expect(typeof contract.id, '建销售合同应返回主键').toBe('number');
     expect(contract.status, '新建合同的 status 应由写入方落词表 draft，不得自造').toBe(
       CONTRACT_STATUS_DRAFT
     );
