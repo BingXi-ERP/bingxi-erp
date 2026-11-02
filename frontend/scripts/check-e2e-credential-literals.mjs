@@ -89,12 +89,16 @@ if (args.includes('--self-test')) {
   process.exit(0);
 }
 
-const files = walk(E2E_DIR);
+// 基线必须按"清理腿合入后的主干形态"生成，否则会把正要删掉的点位白名单进去；
+// 这一参数让生成动作可以指向另一份工作树，跑门禁时不传即按脚本自身作用面扫。
+const dirIdx = args.indexOf('--e2e-dir');
+const e2eDir = dirIdx >= 0 && args[dirIdx + 1] ? path.resolve(args[dirIdx + 1]) : E2E_DIR;
+const files = walk(e2eDir);
 if (files.length === 0) {
-  console.log('TOOL_BUG e2e 目录零文件，判定器没有作用面');
+  console.log('TOOL_BUG e2e 目录零文件，判定器没有作用面：' + e2eDir);
   process.exit(9);
 }
-const sites = scan(files, FE_ROOT);
+const sites = scan(files, path.resolve(e2eDir, '..'));
 
 if (args.includes('--emit-baseline')) {
   console.log(JSON.stringify(sites.map(s => s.key).sort(), null, 2));
