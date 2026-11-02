@@ -760,7 +760,9 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   try {
     ctx.dyeBatchId = await readFirstEntityId(
       page,
-      '/production',
+      // 导航落点取染色批次列表页本身：生产总览页挂载时不发该列表请求，落它就只能等满
+      // 超时（批次页用 useTableApi 构造时自动初始加载，权限键 dye-batches:read）
+      '/dye-batch',
       `${API_PREFIX}/production/dye-batches`,
       // dye_batch_handler.rs:59 list_dye_batches → ApiResponse<PaginatedResponse> → {items}
       'items'
