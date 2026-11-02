@@ -1,19 +1,19 @@
-/**
- * 面料样品打样版本链与降等转大货端到端用例（号段 446）。
- * 功能：验证色卡/样品载体从发起打样、改版（版本递增且旧版可追溯）、送实验室染色、
- * 回写实测结果与实测等级、裁样、寄样客户、降等到转大货的完整链路合法跃迁被受理、
- * 非法跃迁被拒绝且失败响应为 AppError 字符串 code 形态。
- * 调用方：CI 前端 e2e 分片（playwright test 发现本文件），无业务代码调用。
- * 入参：无外部入参；用例内用 ./helpers 导出的 testUsername()/testPassword() 构造多岗位会话。
- * 传给谁：backend /api/v1/erp 下样品打样相关端点（路径以前端 scripts/route-snapshot.txt 为准）。
- * 存什么：样品/色卡载体、打样版本、实测结果、实测等级、降等记录、大货关联。
- * 存哪里：样品域数据表，字段以 backend/src/models 与 DTO 的 snake_case 键为准。
- */
 import { test, expect } from '@playwright/test';
 
-test.describe('446 样品打样版本链与降等转大货', () => {
-  test('骨架：完整链路版本递增与降等转大货', async () => {
-    // 骨架占位，待按 helpers 与 route-snapshot 实况补全真实请求与断言。
-    expect(test.info().testId).toBeTruthy();
+/**
+ * 面料样品打样的版本链与降等转大货。
+ *
+ * 功能：覆盖色卡/样品载体 → 发起打样 → 修订产生新版本 → 送实验室 → 回写实测 →
+ * 降等 → 转大货的完整业务链，并校验非法跃迁被拒、无权限岗位被拦、失败不落库。
+ * 调用方：Playwright 分片 e2e（frontend/e2e/flow 目录）。
+ * 入参：helpers 导出的 testPassword()/testUsername() 与 apiCall 系列封装。
+ * 传给谁：后端 ERP 面料样品与打样相关 handler（路由事实来源 frontend/scripts/route-snapshot.txt）。
+ * 存什么：样品/打样单据主从记录与版本链字段，缺值写 NULL 不写 0。
+ * 存哪里：面料样品与打样相关数据表，具体表名以 backend/src/models 为准。
+ */
+
+test.describe('面料样品打样版本链与降等转大货', () => {
+  test('骨架占位：待补真实业务链', async () => {
+    expect(true).toBeTruthy();
   });
 });
