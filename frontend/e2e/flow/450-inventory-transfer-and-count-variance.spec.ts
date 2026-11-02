@@ -8,7 +8,7 @@
  * 入参：page 会话（admin / warehouse_keeper / accountant 三种岗位）、getCtx() 的实体上下文
  * （productIds/warehouseIds）、quantityMeters 单位米（字符串十进制）、数量断言用整数米。
  * 传给谁：backend inventory_transfer_handler、inventory_count_handler、
- * inventory_stock_handler_query（路由挂载 backend/src/routes/inventory.rs:107 起）。
+ * inventory_stock_handler_query（路由挂载 backend/src/routes/inventory.rs 起）。
  * 存什么：inventory_transfer(_item)、inventory_count(_item)、inventory_stock 的在库量与可用量、
  * inventory_transaction 流水（before/after 米数与 kg）；缺值落库为 NULL 表示未补录，不写 0。
  * 存哪里：PostgreSQL 同名业务表；端点存在性唯一事实来源为 frontend/scripts/route-snapshot.txt。
@@ -50,7 +50,7 @@ import {
  * 调用方：本文件各用例的状态断言。
  * 入参：无。
  * 传给谁：expect 比较左值。
- * 存什么：不落库，仅镜像 backend/src/models/status/purchase_inventory.rs:73-101
+ * 存什么：不落库，仅镜像 backend/src/models/status/purchase_inventory.rs
  * `inventory_transfer` 的字面量（该域无 draft、无 in_transit）。
  * 存哪里：不存在数据库。
  */
@@ -62,7 +62,7 @@ const TRANSFER_STATUS = {
 } as const;
 
 /**
- * 功能：盘点状态词表常量，镜像 backend/src/models/status/purchase_inventory.rs:106-118
+ * 功能：盘点状态词表常量，镜像 backend/src/models/status/purchase_inventory.rs
  * `inventory_count`（小写 pending/in_review/completed，本域没有 in_progress）。
  * 调用方：盘盈盘亏用例的状态断言。
  * 入参：无。
@@ -77,7 +77,7 @@ const COUNT_STATUS = {
 } as const;
 
 /**
- * 功能：库存流水类型常量，镜像 backend/src/services/inv/batch.rs:468（调出）
+ * 功能：库存流水类型常量，镜像 backend/src/services/inv/batch.rs（调出）
  * 与 :1014（调入）写入的 transaction_type 字面量（本域为大写）。
  * 调用方：守恒双腿的流水断言。
  * 入参：无。
@@ -189,7 +189,7 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
       throw new Error(
         `[450-T1] GET /inventory/transfers/generate-no 未返回非空 transfer_no 字符串，` +
           `实际响应片段=${JSON.stringify(preview).slice(0, 200)}` +
-          `（后端 inventory_transfer_handler.rs:324-336 用 DocumentNumberGenerator 现生成）`
+          `（后端 inventory_transfer_handler.rs 用 DocumentNumberGenerator 现生成）`
       );
     }
     expect(previewNo, `单号格式应为 TRF{yyyyMMdd}{3 位流水}，实际 ${previewNo}`).toMatch(
@@ -228,13 +228,13 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     // 缺陷证据（源码缺陷，本用例不修）：请求体不含 transfer_no 也能建单并落出同族单号，
     // 说明 GET /inventory/transfers/generate-no 只是把后端即时生成的号取出来给人看，
     // 不属于任何写入路径；该端点属已裁定的"单据号展示端点废除族"（方向=废除），
-    // 但 frontend/src/api/inventory-transfer.ts:207-213 仍在导出并调用它，路由
-    // backend/src/routes/inventory.rs:107 也仍注册——残留未下线。断言只记录真实行为，
+    // 但 frontend/src/api/inventory-transfer.ts 仍在导出并调用它，路由
+    // backend/src/routes/inventory.rs 也仍注册——残留未下线。断言只记录真实行为，
     // 不采纳该端点作为建单前置（否则等于把废除对象当正常路径）。
     console.error(
       `[450-T1][缺陷登记] 展示型单号端点仍在线：GET /inventory/transfers/generate-no → ${previewNo}；` +
-        `建单未引用它仍落号 ${persistedNo}。前端调用点 frontend/src/api/inventory-transfer.ts:213，` +
-        `后端注册点 backend/src/routes/inventory.rs:107，属废除族未下线。`
+        `建单未引用它仍落号 ${persistedNo}。前端调用点 frontend/src/api/inventory-transfer.ts，` +
+        `后端注册点 backend/src/routes/inventory.rs，属废除族未下线。`
     );
   });
 
@@ -629,7 +629,7 @@ test.describe('库存调拨与盘盈盘亏反向链路', () => {
     );
     expect(
       submitted.status,
-      `提交后状态必须逐字符等于写入方值 ${COUNT_STATUS.IN_REVIEW}（inventory_count_service.rs:417），` +
+      `提交后状态必须逐字符等于写入方值 ${COUNT_STATUS.IN_REVIEW}（inventory_count_service.rs），` +
         `实际 ${JSON.stringify(submitted.status)}`
     ).toBe(COUNT_STATUS.IN_REVIEW);
     await apiCall(page, 'POST', `/inventory/counts/${countId}/approve`);
