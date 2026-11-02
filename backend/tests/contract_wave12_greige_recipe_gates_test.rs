@@ -171,6 +171,26 @@ async fn seed_greige_fabric(
     .unwrap();
 }
 
+/// 把一行坯布的在架数量清成零，用来表达「已全部出库」这一库存事实。
+///
+/// 调用方是 greige_delete_owner_200_and_is_deleted。入参 db 是测试库连接、id 是该坯布行主键。
+/// 传给谁 写回 greige_fabric 同一行，供删除腿的在架实物判据读取。
+/// 存什么 weight_kg 与 length_m 与 quantity_kg 与 quantity_meters 四列都落 0。
+/// 存哪里 greige_fabric 表该主键行，不改 status 也不改 is_deleted。
+async fn empty_shelf_stock(db: &sea_orm::DatabaseConnection, id: i32) {
+    let row = greige_fabric::Entity::find_by_id(id)
+        .one(db)
+        .await
+        .unwrap()
+        .unwrap();
+    let mut active: greige_fabric::ActiveModel = row.into();
+    active.weight_kg = Set(Some(Decimal::ZERO));
+    active.length_m = Set(Some(Decimal::ZERO));
+    active.quantity_kg = Set(Some(Decimal::ZERO));
+    active.quantity_meters = Set(Some(Decimal::ZERO));
+    active.update(db).await.unwrap();
+}
+
 async fn seed_warehouse(db: &sea_orm::DatabaseConnection, id: i32) {
     warehouse::ActiveModel {
         id: Set(id),
@@ -344,8 +364,9 @@ async fn greige_update_non_owner_403_and_zero_drift() {
 #[tokio::test]
 async fn greige_delete_owner_200_and_is_deleted() {
     let db = test_common::setup_test_db().await;
-    // 状态设为已出库才允许删除
+    // 可删态要由库存事实表达：建档后把在架四列清零，等价于这批已全部出库
     seed_greige_fabric(&db, 1, Some(100), "已出库", dec("10.00")).await;
+    empty_shelf_stock(&db, 1).await;
 
     let app = build_greige_app(db.clone(), make_auth(100, Some("self")));
     let (status, _v) = call(&app, Method::DELETE, "/greige-fabrics/1", None).await;
