@@ -27,6 +27,7 @@
 | D-15 | 证书与商检 | 两个 handler 绕过 ApiResponse 信封直出模型，且不收 AuthContext | backend/src/handlers/certificate_of_origin_handler.rs:11-35；handlers/export_inspection_handler.rs:22 | 自述 | 信封统一 加 源码修 | 236 把两处信封漂移点名进交接 |
 | D-16 | 库存细码 | 盘点/批次改写腿未见 NOT NULL 与范围门之外的入口校验（0 与负数量可入库） | backend/src/services/inventory_stock_service.rs 与 services/inv/batch.rs | 自述 | 词表收口 | 218、248 侧记录 |
 | D-17 | 坏账核销打印 | 归属列其实存在，被"永久豁免"口径一刀切：清单头称这些表"不存在 created_by 或等效归属用户列因此永久豁免行级门"，但 `bad_debt_writeoff` 自己的条目注释写着归属语义由 `applicant_user_id` 承载、待裁定是否建等效门——同一清单里既有事实又有例外，按注释读会把可修的一条当成不可修 | backend/src/services/print_service.rs:161 起（清单头 158-160 与 bad_debt_writeoff 条目注释） | 亲验 | 口径裁定（定 applicant 序列是否算行级归属），裁定后转 源码修 | 尚无断言钉住 |
+| D-18 | 验布打卷门 | 拒绝原因对操作员不可见：打卷前置门用 `AppError::business` 造错，出参 message 被脱敏成固定常量，操作员只知"失败"不知"须先评级才能打卷"；同族的库存不足类门走 `bad_request` 会逐字外显，两族口径不一致 | backend/src/services/fabric_inspection_service.rs 的 `validate_roll_preconditions`；对照 utils/messages.rs 的 `BUSINESS_PUBLIC` 与 utils/error.rs 的通道分族 | 亲验（主干红取证时逐字读过构造点） | 口径裁定后转 源码修（换可外显错误族）。**改前必须清点谁在钉"该门返回脱敏常量"**——211 已把常量本身钉成断言，换通道即打红 | 211 的判据形状已按当前契约钉住（随 #1154 提交） |
 
 ## 与推送次序绑定的两条依赖
 
