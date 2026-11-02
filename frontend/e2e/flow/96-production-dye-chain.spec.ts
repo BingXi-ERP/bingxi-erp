@@ -838,10 +838,7 @@ test.describe('96 生产链深度契约：BOM 用量 / 排程确认 / 验布跨�
     // 中文结论原样落库（禁止被转写为英文码）
     const recC = await mkRecord('RC', '不合格', '60');
     const recCId = requireId(recC, '建 C 级质检记录');
-    CLEANUP.push({
-      path: `/production/quality-inspection/records/${recCId}`,
-      label: `quality_inspection_record#${recCId}`,
-    });
+    // 通用质检记录域没有删除路由，靠 mkRecord 的 genCode 唯一 inspection_no 隔离，本用例只按 id 回读。
     const recCReadBack = await apiCallRaw<Record<string, unknown>>(
       page,
       'GET',
@@ -902,10 +899,7 @@ test.describe('96 生产链深度契约：BOM 用量 / 排程确认 / 验布跨�
 
     const recA = await mkRecord('RA', '合格', '100');
     const recAId = requireId(recA, '建 A 级质检记录');
-    CLEANUP.push({
-      path: `/production/quality-inspection/records/${recAId}`,
-      label: `quality_inspection_record#${recAId}`,
-    });
+    // 通用质检记录域没有删除路由，靠 mkRecord 的 genCode 唯一 inspection_no 隔离，本用例只按 id 回读。
     const aGradeFail = await apiCallExpectFail(
       page,
       'POST',
@@ -1073,10 +1067,7 @@ test.describe('96 生产链深度契约：BOM 用量 / 排程确认 / 验布跨�
     // 非报废处理方式不得进报废审批流
     const recC2 = await mkRecord('RB', '不合格', '70');
     const recC2Id = requireId(recC2, '建第二张 C 级记录');
-    CLEANUP.push({
-      path: `/production/quality-inspection/records/${recC2Id}`,
-      label: `quality_inspection_record#${recC2Id}`,
-    });
+    // 通用质检记录域没有删除路由，靠 mkRecord 的 genCode 唯一 inspection_no 隔离，本用例只按 id 回读。
     const rework = await apiCallRaw<Record<string, unknown>>(
       page,
       'POST',

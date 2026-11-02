@@ -316,8 +316,10 @@ test.describe.serial('44e 扩展状态机负例（9 状态机）', () => {
     expect(r.status, `不存在配方删除应 404 not found，实际=${r.status}`).toBe(404);
   });
 
-  test('44e-6 打样通知单：仅 pending 可删除（lab_dip_service.rs:91-99）', async ({ page }) => {
-    const r = await apiCallExpectFail(page, 'DELETE', '/production/lab-dips/99999999');
+  test('44e-6 打样通知单：删除路由按 lab-dip/requests 在册面探（不存在即 404）', async ({ page }) => {
+    // 打样通知单的删除路由挂在 lab-dip/requests 下，写成 lab-dips 会命中不存在的资源段，
+    // 那种路径由路由未注册直接回 404，断言会被"路由缺失"喂绿而验不到服务层删除门
+    const r = await apiCallExpectFail(page, 'DELETE', '/production/lab-dip/requests/99999999');
     expect(r.status, `不存在打样单删除应 404 not found，实际=${r.status}`).toBe(404);
   });
 
