@@ -434,9 +434,9 @@ const handleEditPermission = async (row: DataPermissionRow) => {
   isEdit.value = true;
   let source: DataPermissionRole = row;
   try {
-    // 编辑前按主键回源最新权限配置（by-id 端点，可见性过滤后可能为 null，保留行数据兜显）
+    // 编辑前按主键回源最新权限配置；不可见与缺行都是 404，reject 后落到 catch 用列表行数据回显
     const res = await getDataPermission(row.id);
-    if (res.data) source = res.data;
+    source = res.data;
   } catch (error) {
     logger.error(t('dataPermission.index.messageDetailFailed'), error);
   }
