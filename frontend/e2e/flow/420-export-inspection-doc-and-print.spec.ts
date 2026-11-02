@@ -188,15 +188,15 @@ test.describe.serial('420 出口商检建单、单证通道与打印链', () => 
     const tag = uniq('');
     const created = await seedInspection(page, tag);
     const id = Number(created.id);
-    expect(Number.isInteger(id) && id > 0, `建单必须回真实主键，实际 ${JSON.stringify(created)}`).toBe(
-      true
-    );
+    expect(
+      Number.isInteger(id) && id > 0,
+      `建单必须回真实主键，实际 ${JSON.stringify(created)}`
+    ).toBe(true);
 
     // 写接口回显即服务端派生值：结论恒落词表 pending，证书三列未补录为 NULL，建单人取会话。
-    expect(
-      created.result,
-      `建单结论必须逐字符落词表 pending，实际 ${String(created.result)}`
-    ).toBe('pending');
+    expect(created.result, `建单结论必须逐字符落词表 pending，实际 ${String(created.result)}`).toBe(
+      'pending'
+    );
     expect(created.report_url, '建单 report_url 必须为 NULL').toBeNull();
     expect(created.certificate_no, '建单 certificate_no 必须为 NULL').toBeNull();
     expect(created.certificate_expiry, '建单 certificate_expiry 必须为 NULL').toBeNull();
@@ -207,7 +207,9 @@ test.describe.serial('420 出口商检建单、单证通道与打印链', () => 
 
     // 独立通道按主键读回，逐列比对提交值，证明落库而非仅写接口回显。
     const got = await apiCallRaw<InspectionRow>(page, 'GET', `/export-inspections/${id}`);
-    expect(Number(got.id), `按主键读回的 id 必须等于建单主键 ${id}，实际 ${String(got.id)}`).toBe(id);
+    expect(Number(got.id), `按主键读回的 id 必须等于建单主键 ${id}，实际 ${String(got.id)}`).toBe(
+      id
+    );
     expect(got.inspection_no, '商检单号必须原样读回').toBe(`E2E420EI${tag}`);
     expect(
       got.sales_order_id,
@@ -222,10 +224,9 @@ test.describe.serial('420 出口商检建单、单证通道与打印链', () => 
     expect(got.inspection_agency, `商检机构必须原样读回，实际 ${got.inspection_agency}`).toBe(
       'E2E 商检机构'
     );
-    expect(
-      got.inspection_date,
-      `商检日期必须读回提交值，实际 ${String(got.inspection_date)}`
-    ).toBe('2026-09-15');
+    expect(got.inspection_date, `商检日期必须读回提交值，实际 ${String(got.inspection_date)}`).toBe(
+      '2026-09-15'
+    );
     expect(got.result, `按主键读回结论仍须是 pending，实际 ${got.result}`).toBe('pending');
     expect(got.remarks, `备注必须原样读回，实际 ${String(got.remarks)}`).toBe(
       `420 建单备注 ${tag}`
@@ -241,16 +242,15 @@ test.describe.serial('420 出口商检建单、单证通道与打印链', () => 
       'GET',
       `/export-inspections?inspection_no=${encodeURIComponent(`E2E420EI${tag}`)}&page=1&page_size=20`
     );
-    expect(Array.isArray(page1.items), `列表 data.items 必须是数组，实际 ${JSON.stringify(page1)}`).toBe(
-      true
-    );
     expect(
-      page1.items.length,
-      `本行必须被单号过滤命中，实际命中 ${page1.items.length} 行`
-    ).toBe(1);
-    expect(page1.items[0].id, `列表命中行的主键必须等于建单主键，实际 ${String(page1.items[0].id)}`).toBe(
-      id
-    );
+      Array.isArray(page1.items),
+      `列表 data.items 必须是数组，实际 ${JSON.stringify(page1)}`
+    ).toBe(true);
+    expect(page1.items.length, `本行必须被单号过滤命中，实际命中 ${page1.items.length} 行`).toBe(1);
+    expect(
+      page1.items[0].id,
+      `列表命中行的主键必须等于建单主键，实际 ${String(page1.items[0].id)}`
+    ).toBe(id);
     expect(
       page1.items[0].inspection_no.includes(`E2E420EI${tag}`),
       `单号过滤必须是包含匹配语义，实际 ${page1.items[0].inspection_no}`
@@ -270,10 +270,9 @@ test.describe.serial('420 出口商检建单、单证通道与打印链', () => 
     const certListResp = await page.request.get(
       printUrl(`/export-inspections/${id}/certificates?page=1&page_size=20`)
     );
-    expect(
-      certListResp.status(),
-      `本单产地证列表通道必须 200，实际 ${certListResp.status()}`
-    ).toBe(200);
+    expect(certListResp.status(), `本单产地证列表通道必须 200，实际 ${certListResp.status()}`).toBe(
+      200
+    );
     const certList = (await certListResp.json()) as CertificateListBody & { code?: unknown };
     expect(
       'code' in certList === false,
@@ -281,9 +280,10 @@ test.describe.serial('420 出口商检建单、单证通道与打印链', () => 
         certList
       )}`
     ).toBe(true);
-    expect(Array.isArray(certList.items), `产地证 items 必须是数组，实际 ${typeof certList.items}`).toBe(
-      true
-    );
+    expect(
+      Array.isArray(certList.items),
+      `产地证 items 必须是数组，实际 ${typeof certList.items}`
+    ).toBe(true);
     expect(
       typeof certList.total === 'number',
       `产地证 total 必须是数字，实际 ${typeof certList.total}`
@@ -294,8 +294,14 @@ test.describe.serial('420 出口商检建单、单证通道与打印链', () => 
     ).toBe(true);
 
     // 产地证详情与打印通道对不存在主键必须按统一信封拒绝（路由已挂载且取数段落真实执行）。
-    const absentCert = await apiCallExpectFail(page, 'GET', `/export-inspections/certificates/${ABSENT_PROBE_ID}`);
-    expect(absentCert.status, `不存在的产地证按 id 取详情必须 404，实际 ${absentCert.status}`).toBe(404);
+    const absentCert = await apiCallExpectFail(
+      page,
+      'GET',
+      `/export-inspections/certificates/${ABSENT_PROBE_ID}`
+    );
+    expect(absentCert.status, `不存在的产地证按 id 取详情必须 404，实际 ${absentCert.status}`).toBe(
+      404
+    );
     expect(failureCode(absentCert), `不存在产地证的机器码必须是 NOT_FOUND`).toBe(
       APP_ERROR_CODES.NOT_FOUND
     );
@@ -415,7 +421,9 @@ test.describe.serial('420 出口商检建单、单证通道与打印链', () => 
 
     // A 岗（建单会话）按主键可读，先固定"该行确实存在且可读"这一前提。
     const ownerRead = await apiCallRaw<InspectionRow>(page, 'GET', `/export-inspections/${id}`);
-    expect(Number(ownerRead.id), `A 岗按 id 读回必须命中本行，实际 ${String(ownerRead.id)}`).toBe(id);
+    expect(Number(ownerRead.id), `A 岗按 id 读回必须命中本行，实际 ${String(ownerRead.id)}`).toBe(
+      id
+    );
     expect(ownerRead.inspection_no, 'A 岗读回的单号必须是本行提交值').toBe(`E2E420EI${tag}`);
 
     // B 岗（无 export-inspections 任何动作键）直取同一主键：必须被后端权限门拒绝，
@@ -423,7 +431,9 @@ test.describe.serial('420 出口商检建单、单证通道与打印链', () => 
     await loginAsRole(page, 'customer_service');
     const foreignGet = await apiCallExpectFail(page, 'GET', `/export-inspections/${id}`);
     expectDenied(foreignGet, `B 岗按 A 岗主键 ${id} 直取商检详情必须被拒`);
-    expect(foreignGet.status, '跨岗直取详情必须是 403 而不是 404（拒绝来自权限门而非取数）').toBe(403);
+    expect(foreignGet.status, '跨岗直取详情必须是 403 而不是 404（拒绝来自权限门而非取数）').toBe(
+      403
+    );
     assertFailureEnvelope(foreignGet, '跨岗直取详情的拒绝必须走统一失败信封');
 
     const foreignCertList = await apiCallExpectFail(
