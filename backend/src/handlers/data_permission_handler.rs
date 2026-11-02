@@ -265,20 +265,22 @@ pub const RESOURCE_TYPES: &[&str] = &[
 pub async fn get_data_permission(
     Path(id): Path<i32>,
     State(state): State<AppState>,
-) -> Result<Json<ApiResponse<Option<DataPermissionResponse>>>, AppError> {
+) -> Result<Json<ApiResponse<DataPermissionResponse>>, AppError> {
     let record = data_permission::Entity::find_by_id(id)
         .one(&*state.db)
         .await?
         .ok_or_else(|| AppError::not_found("数据权限不存在"))?;
 
-    // 可见性判定：记录所属角色非 admin 且被禁用时不可见（与既有 service 过滤语义对齐）
+    // 可见性判定：记录所属角色非 admin 且被禁用时不可见（与既有 service 过滤语义对齐）。
+    // 不可见按 404 出而不是 200+data=null：缺行与"被软删后不可见"是同一种调用侧语义
+    // （这条记录你拿不到），两种形状会让读取处分不出二者，也使删除回读取不到硬删证据。
     let role_is_admin = is_admin_role(&state.db, record.role_id).await;
     if !role_is_admin && !record.is_enabled {
-        return Ok(Json(ApiResponse::success(None)));
+        return Err(AppError::not_found("数据权限不存在"));
     }
 
     // 直接用记录本身字段回显，不经 get_role_data_permission（该方法对 admin 角色短路返回固定值会抹掉真值）
-    Ok(Json(ApiResponse::success(Some(DataPermissionResponse {
+    Ok(Json(ApiResponse::success(DataPermissionResponse {
         id: record.id,
         role_id: record.role_id,
         resource_type: record.resource_type,
@@ -289,7 +291,7 @@ pub async fn get_data_permission(
         is_enabled: record.is_enabled,
         role_name: None,
         created_at: record.created_at,
-    }))))
+    })))
 }
 
 /// 数据范围类型列表
