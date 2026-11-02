@@ -331,7 +331,20 @@ impl UserService {
             user.department_id = Set(Some(department_id_val));
         }
         if let Some(status_val) = status {
-            let becoming_active = status_val == master_data::ACTIVE;
+            // 词表外的 status 过去会被静默当成"停用"落库（只与 ACTIVE 比相等），
+            // 传错值既改不掉状态还留下一次不可见的账号停用，故按校验拒绝。
+            let becoming_active = if status_val == master_data::ACTIVE {
+                true
+            } else if status_val == master_data::INACTIVE {
+                false
+            } else {
+                return Err(AppError::validation_displayable(format!(
+                    "用户状态只接受 {} 或 {}，实际为 {}",
+                    master_data::ACTIVE,
+                    master_data::INACTIVE,
+                    status_val
+                )));
+            };
             user.is_active = Set(becoming_active);
             self.handle_user_status_change(user_id, becoming_active)
                 .await;

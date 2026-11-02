@@ -980,6 +980,17 @@ impl InventoryStockService {
         use sea_orm::TransactionTrait;
 
         let _ = from_warehouse_id; // 源仓库以批次记录自身 warehouse_id 为准
+
+        // 调拨量必须为正：负数既过不了"库存充足"判定（负量恒小于可用量），又会把
+        // 源批次的减法变成加量；零量则留下一条不改库存的调拨流水。
+        // 取反的 `>` 与 `>=` 形式同时把 NaN 挡在门外（NaN 与任何数比较都为 false）。
+        if !(quantity_meters > 0.0) {
+            return Err(AppError::bad_request("调拨米数必须大于 0"));
+        }
+        if !(quantity_kg >= 0.0) {
+            return Err(AppError::bad_request("调拨公斤数不能为负"));
+        }
+
         let txn = (*self.db)
             .begin()
             .await
