@@ -190,15 +190,15 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
       critical_threshold: baseCritical,
       severe_threshold: baseSevere,
     });
-    const restored = await apiCallRaw<ThresholdConfig>(
-      page,
-      'GET',
-      '/material-shortage/threshold'
-    );
+    const restored = await apiCallRaw<ThresholdConfig>(page, 'GET', '/material-shortage/threshold');
     expect(Number(restored.critical_threshold), '454-01 基线回写 critical').toBe(baseCritical);
     expect(Number(restored.severe_threshold), '454-01 基线回写 severe').toBe(baseSevere);
 
-    const list = await apiCall<RulePage>(page, 'GET', '/material-shortage/alerts?page=1&page_size=5');
+    const list = await apiCall<RulePage>(
+      page,
+      'GET',
+      '/material-shortage/alerts?page=1&page_size=5'
+    );
     const rows = requireItems(list.data, '454-01 /material-shortage/alerts');
     const total = list.data.total;
     if (typeof total !== 'number') {
@@ -324,7 +324,8 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
 
   test('454-03 审批超时提醒门控生效且不自动拒他人单据', async ({ page }) => {
     test.setTimeout(180_000);
-    const loose = '/bulk-color-approvals/reminders/pending-configurable?reminder_days=0&reject_days=0';
+    const loose =
+      '/bulk-color-approvals/reminders/pending-configurable?reminder_days=0&reject_days=0';
     const strictQ =
       '/bulk-color-approvals/reminders/pending-configurable?reminder_days=99999&reject_days=99999';
 
@@ -343,9 +344,10 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
       await apiCallRaw(page, 'POST', `${timeoutPath}?reminder_days=99999&reject_days=99999`),
       '454-03 check-timeouts'
     );
-    expect(rejected.length, `454-03 极大 reject_days 不应自动拒单，实际 ${rejected.length} 条`).toBe(
-      0
-    );
+    expect(
+      rejected.length,
+      `454-03 极大 reject_days 不应自动拒单，实际 ${rejected.length} 条`
+    ).toBe(0);
     const after = requireArray(await apiCallRaw(page, 'GET', loose), '454-03 执行后');
     expect(after.length, '454-03 立即执行后待确认集合条数不应变化').toBe(before.length);
 
@@ -362,7 +364,11 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     test.setTimeout(240_000);
     const tag = uniq();
 
-    const custs = await apiCall<{ items?: CustRow[] }>(page, 'GET', '/crm/customers?page=1&page_size=50');
+    const custs = await apiCall<{ items?: CustRow[] }>(
+      page,
+      'GET',
+      '/crm/customers?page=1&page_size=50'
+    );
     const custList = requireItems(custs.data, '454-04 /crm/customers');
     if (custList.length === 0) {
       throw new Error('454-04 前置不成立：客户主数据为空，无法构造真实逾期应收单');
@@ -403,7 +409,9 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
       alert_type: 'ar_overdue',
     });
     requireArray(scan.created, '454-04 created');
-    expect(scan.created_count, '454-04 created_count 应等于 created 条数').toBe(scan.created.length);
+    expect(scan.created_count, '454-04 created_count 应等于 created 条数').toBe(
+      scan.created.length
+    );
     const mine = scan.created.filter(a => isForCustomer(a, customer.id));
     if (mine.length === 0) {
       throw new Error(
@@ -485,7 +493,11 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     const tag = uniq();
 
     // 自己造一份逾期事实，保证目标客户与预警条数可判
-    const custs = await apiCall<{ items?: CustRow[] }>(page, 'GET', '/crm/customers?page=1&page_size=50');
+    const custs = await apiCall<{ items?: CustRow[] }>(
+      page,
+      'GET',
+      '/crm/customers?page=1&page_size=50'
+    );
     const customer = requireItems(custs.data, '454-05 /crm/customers')[0];
     const custName = `${customer.customer_name}-454dup${tag}`;
     const invoice = await apiCallRaw<{ id: number }>(page, 'POST', '/ar/invoices', {
@@ -539,9 +551,14 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     const stillActive = await apiCallRaw<AlertRow>(page, 'GET', `/finance-alerts/${target.id}`);
     expect(stillActive.status, '454-05 被拒后状态应仍为 active').toBe('active');
 
-    const ack = await apiCallRaw<AlertRow>(page, 'POST', `/finance-alerts/${target.id}/acknowledge`, {
-      remark: '454-05 已核实',
-    });
+    const ack = await apiCallRaw<AlertRow>(
+      page,
+      'POST',
+      `/finance-alerts/${target.id}/acknowledge`,
+      {
+        remark: '454-05 已核实',
+      }
+    );
     expect(ack.status, '454-05 确认后状态应为 acknowledged').toBe('acknowledged');
     expect(ack.acknowledged_at, '454-05 确认时间应回填').not.toBeNull();
 
@@ -565,9 +582,10 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
       '/finance-alerts?alert_type=ar_overdue&status=active&page=1&page_size=200'
     );
     const rows2 = requireItems(ledger2.data, '454-05 终结后 active 台账');
-    expect(rows2.some(r => r.id === target.id), '454-05 已 resolved 的条不应残留 active 集合').toBe(
-      false
-    );
+    expect(
+      rows2.some(r => r.id === target.id),
+      '454-05 已 resolved 的条不应残留 active 集合'
+    ).toBe(false);
     const stale = rows2.filter(r => r.target_id === customer.id);
     const born3 = scan3.created.filter(a => isForCustomer(a, customer.id));
     // 幂等窗口只对未处理态生效：出窗后允许重建，但同目标未处理态最多 1 条，绝不翻倍
@@ -599,7 +617,11 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     test.setTimeout(240_000);
     const tag = uniq();
 
-    const custs = await apiCall<{ items?: CustRow[] }>(page, 'GET', '/crm/customers?page=1&page_size=50');
+    const custs = await apiCall<{ items?: CustRow[] }>(
+      page,
+      'GET',
+      '/crm/customers?page=1&page_size=50'
+    );
     const cust = requireItems(custs.data, '454-06 /crm/customers')[0];
     const custName = `${cust.customer_name}-454ui${tag}`;
     const invoice = await apiCallRaw<{ id: number }>(page, 'POST', '/ar/invoices', {
@@ -676,9 +698,10 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     });
     expect(created.status, '454-07 手工建预警应落 active').toBe('active');
     expect(created.alert_level).toBe('critical');
-    expect(created.alert_no.startsWith('FA-'), `454-07 单号应带 FA- 前缀：${created.alert_no}`).toBe(
-      true
-    );
+    expect(
+      created.alert_no.startsWith('FA-'),
+      `454-07 单号应带 FA- 前缀：${created.alert_no}`
+    ).toBe(true);
     expect(
       created.notification_id,
       `454-07 手工建预警不带触发人上下文，不应产生站内信：${String(created.notification_id)}`
