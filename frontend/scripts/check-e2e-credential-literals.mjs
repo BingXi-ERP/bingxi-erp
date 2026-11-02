@@ -66,7 +66,7 @@ function selfTest() {
   fs.writeFileSync(
     clean,
     "const a = { username: 'u1', password: testPassword() };\n" +
-      "const b = { newPassword: process.env.E2E_TEST_PASSWORD };\n" +
+      'const b = { newPassword: process.env.E2E_TEST_PASSWORD };\n' +
       'const c = { password: `pw${RUN_TS}` };\n'
   );
   const byFile = new Map();
@@ -97,7 +97,7 @@ if (files.length === 0) {
 const sites = scan(files, FE_ROOT);
 
 if (args.includes('--emit-baseline')) {
-  console.log(JSON.stringify(sites.map((s) => s.key).sort(), null, 2));
+  console.log(JSON.stringify(sites.map(s => s.key).sort(), null, 2));
   console.log('CREDLIT_BASELINE_EMIT sites=' + sites.length);
   process.exit(0);
 }
@@ -106,9 +106,9 @@ let baseline = [];
 if (fs.existsSync(BASELINE_PATH)) {
   baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
 }
-const allowed = new Set(baseline.map((e) => (typeof e === 'string' ? e : e.key)));
-const offenders = sites.filter((s) => !allowed.has(s.key));
-const stale = baseline.filter((k) => !sites.some((s) => s.key === (typeof k === 'string' ? k : k.key)));
+const allowed = new Set(baseline.map(e => (typeof e === 'string' ? e : e.key)));
+const offenders = sites.filter(s => !allowed.has(s.key));
+const stale = baseline.filter(k => !sites.some(s => s.key === (typeof k === 'string' ? k : k.key)));
 
 for (const s of offenders) {
   console.log(
@@ -129,7 +129,9 @@ console.log(
     baseline.length
 );
 if (offenders.length > 0) {
-  console.log('CREDLIT_RED 建号与登录口令必须取 helpers 的 env 同源口，禁止在 public 仓源码里落字面量');
+  console.log(
+    'CREDLIT_RED 建号与登录口令必须取 helpers 的 env 同源口，禁止在 public 仓源码里落字面量'
+  );
   process.exit(1);
 }
 console.log('CREDLIT_GREEN');
