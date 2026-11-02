@@ -2,7 +2,7 @@
  * 功能：把色号阶梯价（按量分档计价）的档位命中、档边界、档间空洞、改档即时重算与非法区间拒绝，
  * 以及供应商资质附件的「上传—列表回读—受鉴权下载—删除」闭环钉成真实落库与真实字节回读链。
  * 调用方：Playwright 分片 e2e（CI 的 frontend-e2e 分片按 flow 目录收集本文件）；请求面依次落到
- * backend/src/routes/color_price.rs:52-59 注册的 list_tiers/create_tier 与 :57-59 的 delete_tier、
+ * backend/src/routes/color_price.rs 注册的 list_tiers/create_tier 与 :57-59 的 delete_tier、
  * :46-49 的 calculate_color_price，以及 backend/src/routes 下 purchase 分组的 supplier_handler
  * 资质四条腿（create_supplier_qualification / upload_supplier_qualification_attachment /
  * list_supplier_qualifications / get_supplier_qualification_attachment / delete_supplier_qualification）。
@@ -10,10 +10,10 @@
  * 字段名与可空性，customer_level 一律写 null 表通用档）；附件字节由本用例在内存生成的真实 PDF
  *  magic 头构成；会话账号只取 ./helpers 的 testPassword() / testUsername() 与 loginAsRole 的岗位名，
  * 源码内不出现任何口令字面量。
- * 传给谁：档位命中判定交 backend/src/utils/price_calculator.rs:276-316 的 find_tier_price
+ * 传给谁：档位命中判定交 backend/src/utils/price_calculator.rs 的 find_tier_price
  * （min_quantity <= qty 且 max_quantity >= qty 或 max_quantity IS NULL，按 sequence 升序取单行），
  * 出参交 PriceCalcResult（tier_price/final_price/applied_rule/breakdown）；附件字节交
- * handlers/supplier_handler.rs:1154 起的受鉴权读取腿，上传腿只回服务端生成的 attachment_path。
+ * handlers/supplier_handler.rs 起的受鉴权读取腿，上传腿只回服务端生成的 attachment_path。
  * 存什么：档位落 color_price_tier 的 product_color_price_id/min_quantity/max_quantity/tier_price/
  * customer_level/sequence/created_at/updated_at；max_quantity 与 customer_level 的"无上限/通用"写 NULL，
  * 不写 0 也不写空串；资质落 supplier_qualification 行，附件只回写 attachment_path 单列。
@@ -25,7 +25,7 @@
  * {supplier_id}_{qualification_id}.{ext}，落库 URL 前缀 /uploads/qualifications/。
  *
  * 金额口径。base_price 与 tier_price 在本域模型（backend/src/models/product_color_price.rs、
- * color_price_tier.rs）与 DTO（color_price_tier_dto.rs:18-46）里都没有含税列与税率列，
+ * color_price_tier.rs）与 DTO（color_price_tier_dto.rs）里都没有含税列与税率列，
  * 系统未定义"阶梯价含税"这一事实，故本文件不引入 净额×(1+税率) 或 含税÷(1+税率) 的任何算式，
  * 也不把 tier_price 当含税价；所有金额判据只用 Number(String(出参)) 读回原值比对，测试内不再造一次舍入。
  * 同理，本域无克重列（gram_weight 属 products 面料域），"超大克重"负例不在本文件的端点面内，不自造字段。
@@ -36,22 +36,22 @@
  *   映射 AppError::database（500 DATABASE_ERROR），后端没有"重复档/重叠档"的创建期校验门。
  *   该缺口按源码缺陷登记（见回报），本文件不把"重叠档被创建成功"写成正向期望，
  *   也不构造重叠数据去打 500，避免用一条红用例掩盖缺门事实。
- * - 创建期唯一的真实校验门（services/color_price_tier_service.rs:60-66）：max_quantity 有值时
- *   min_quantity >= max_quantity 即 TierError::Validation → tier_err（handlers/color_price_handler.rs:78）
+ * - 创建期唯一的真实校验门（services/color_price_tier_service.rs）：max_quantity 有值时
+ *   min_quantity >= max_quantity 即 TierError::Validation → tier_err（handlers/color_price_handler.rs）
  *   → AppError::validation，HTTP 400 与机器码 VALIDATION_ERROR（文案被脱敏，不断言原文）。
- * - 取价腿的数量是 String 再 Decimal::from_str（handlers/color_price_handler.rs:314-315），
+ * - 取价腿的数量是 String 再 Decimal::from_str（handlers/color_price_handler.rs），
  *   非数字即 AppError::validation_displayable → 400 VALIDATION_ERROR。
  * - 删除不存在的档位：AuditLogService::delete_with_audit_i64 的 NotFound → TierError::NotFound
  *   → AppError::not_found → 404 NOT_FOUND。
- * - list_tiers 有行级归属门（handlers/color_price_handler.rs:368-370）：非 admin 数据范围且
+ * - list_tiers 有行级归属门（handlers/color_price_handler.rs）：非 admin 数据范围且
  *   parent.created_by 不在其成员范围 → AppError::permission_denied 403 FORBIDDEN。
  * - create_tier 无行级归属门，只吃 permission 中间件由 URL 段推导的 color-prices 权限键
- *   （middleware/permission.rs:259 取 /api/v1/erp/{seg3}/{seg4}），写权限缺失岗位一律 403 FORBIDDEN。
+ *   （middleware/permission.rs 取 /api/v1/erp/{seg3}/{seg4}），写权限缺失岗位一律 403 FORBIDDEN。
  * - 附件门：上传必须是合法 multipart（缺 boundary → 400 VALIDATION_ERROR）；扩展名白名单
- *   pdf/jpg/jpeg/png（supplier_handler.rs:749），非白名单 → 拒绝；声明扩展名与实际 magic 不符
+ *   pdf/jpg/jpeg/png（supplier_handler.rs），非白名单 → 拒绝；声明扩展名与实际 magic 不符
  *   → 400 VALIDATION_ERROR；未上传前读取 → 404 NOT_FOUND（attachment_path 为 NULL）；
  *   删除资质行后该双键路径整体不存在 → 404。
- * - 脱敏分面（utils/field_mask.rs:63-84 + handlers/product_handler.rs:360-370 与 :435-445）：
+ * - 脱敏分面（utils/field_mask.rs + handlers/product_handler.rs 与 :435-445）：
  *   非 admin 只把 cost_price 键置 null，standard_price/name/code/unit 等同族键原样下发，
  *   列表腿与详情腿同源掩码；因此本文件按"只剔成本价、不剔全部价格"这一分面写断言，不做一刀切断言。
  *
@@ -270,7 +270,7 @@ async function createTier(
  * 功能：读回某价格宿主下的全部档位并按 sequence 定位一行，定位不到即判红。
  * 调用方：451-01 与 451-02 的写后回读与删除后回读。
  * 入参：page 为已登录页，priceId 为宿主主键，sequence 为目标档序位。
- * 传给谁：GET /color-prices/tiers/{price_id} 的出参 `{items,total}`（handlers/color_price_handler.rs:375-377）。
+ * 传给谁：GET /color-prices/tiers/{price_id} 的出参 `{items,total}`（handlers/color_price_handler.rs）。
  * 存什么：只读不落，返回行的 min_quantity、max_quantity、tier_price、sequence 四列供断言。
  * 存哪里：不写存储位置；数据源为 color_price_tier。
  */
