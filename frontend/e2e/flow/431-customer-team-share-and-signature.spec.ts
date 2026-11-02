@@ -1,5 +1,5 @@
-// [法#3 范围锁定] 目标：glob='frontend/e2e/flow/430-customer-team-share-and-signature.spec.ts'
-// 客户团队共享与合同签署的数据范围隔离链 E2E — 430
+// [法#3 范围锁定] 目标：glob='frontend/e2e/flow/431-customer-team-share-and-signature.spec.ts'
+// 客户团队共享与合同签署的数据范围隔离链 E2E — 431
 //
 // 功能：把"共享/团队成员按主体回读、成员与权限判定、过期批量清理、合同电子签署留痕、
 // 无权限岗位拒绝"这五段数据范围隔离链钉成真实契约，验证共享与团队成员两张表
@@ -155,7 +155,7 @@ const FAKE_NAME_PATTERN = /^(用户\d+|客户\s*#\d+)$/;
 
 /** 分步显式日志：任一腿的执行与判定结果都必须外显，不留黑盒 */
 function log(caseNo: string, step: string, detail: unknown): void {
-  console.log(`[430-${caseNo}] ${step}: ${JSON.stringify(detail)}`);
+  console.log(`[431-${caseNo}] ${step}: ${JSON.stringify(detail)}`);
 }
 
 /**
@@ -197,7 +197,7 @@ async function createOwnedCustomer(
   label: string,
   operatorId: number
 ): Promise<{ id: number; ownerId: number }> {
-  const code = genCode(`430${label}`);
+  const code = genCode(`431${label}`);
   const created = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
     customer_name: `E2E 共享载体 ${code}`,
   });
@@ -274,12 +274,12 @@ function assertUnifiedForbiddenEnvelope(
   ).toBe(true);
 }
 
-test.describe.serial('430 客户团队共享与合同签署数据范围隔离链', () => {
+test.describe.serial('431 客户团队共享与合同签署数据范围隔离链', () => {
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
   });
 
-  test('430-01 by-user 通道只回读本人行，两个主体各自建的共享与团队行交叉互查不可见', async ({
+  test('431-01 by-user 通道只回读本人行，两个主体各自建的共享与团队行交叉互查不可见', async ({
     page,
   }) => {
     const me = await apiCallRaw<{ id: number; username: string }>(page, 'GET', '/auth/me');
@@ -445,7 +445,7 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     for (const shareId of [shareA.id, shareB.id]) {
       await apiCall(page, 'POST', '/customer-shares/revoke', {
         share_id: shareId,
-        revoke_reason: 'E2E 430 收口',
+        revoke_reason: 'E2E 431 收口',
       });
     }
     await tryCleanup(page, 'DELETE', `/customer-team-members/${memberA.id}`, 'team_member_A');
@@ -454,7 +454,7 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     await tryCleanup(page, 'DELETE', `/crm/customers/${custB.id}`, 'customer_B');
   });
 
-  test('430-02 判定通道正反两例，成员与共享权限各判是判否，软删与撤销后必须转判否', async ({
+  test('431-02 判定通道正反两例，成员与共享权限各判是判否，软删与撤销后必须转判否', async ({
     page,
   }) => {
     const me = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
@@ -563,7 +563,7 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     await tryCleanup(page, 'DELETE', `/crm/customers/${cust.id}`, 'customer_C');
   });
 
-  test('430-03 过期批量处理只动已过期 active 行，复跑幂等且二次调用不产生新行不二次写入', async ({
+  test('431-03 过期批量处理只动已过期 active 行，复跑幂等且二次调用不产生新行不二次写入', async ({
     page,
   }) => {
     const me = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
@@ -672,12 +672,12 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
 
     await apiCall(page, 'POST', '/customer-shares/revoke', {
       share_id: stillActive.id,
-      revoke_reason: 'E2E 430 收口',
+      revoke_reason: 'E2E 431 收口',
     });
     await tryCleanup(page, 'DELETE', `/crm/customers/${cust.id}`, 'customer_D');
   });
 
-  test('430-04 签署腿留痕列真实落库，验证通道哈希自洽，重复签署被状态门拒绝且无二次跃迁', async ({
+  test('431-04 签署腿留痕列真实落库，验证通道哈希自洽，重复签署被状态门拒绝且无二次跃迁', async ({
     page,
   }) => {
     const me = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
@@ -686,7 +686,7 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
 
     // total_amount 是 Decimal，入参按字符串提交（出参同为字符串，见 rust_decimal serde 口径）
     const contract = await apiCallRaw<ContractRow>(page, 'POST', '/sales/sales-contracts', {
-      contract_name: `E2E 签署载体 ${genCode('430F')}`,
+      contract_name: `E2E 签署载体 ${genCode('431F')}`,
       customer_id: cust.id,
       total_amount: '1250.00',
     });
@@ -699,8 +699,8 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     expect(contract.signature_hash, '未签署合同的 signature_hash 必须写 NULL').toBeNull();
     expect(contract.signed_by_user_id, '未签署合同的 signed_by_user_id 必须写 NULL').toBeNull();
 
-    const signatureImageUrl = 'https://e2e.invalid/430/signature.png';
-    const signatureCertificate = 'E2E-430-PEM-MARKER';
+    const signatureImageUrl = 'https://e2e.invalid/431/signature.png';
+    const signatureCertificate = 'E2E-431-PEM-MARKER';
     const signed = await apiCallRaw<ContractRow>(page, 'POST', '/contract-signatures/sign', {
       contract_id: contract.id,
       signed_by_user_id: signerId,
@@ -760,7 +760,7 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
       contract_id: contract.id,
       signed_by_user_id: me.id,
       signature_image_url: signatureImageUrl,
-      signature_certificate: 'E2E-430-SECOND',
+      signature_certificate: 'E2E-431-SECOND',
     });
     expectStateGateRejection(repeatSign, '已签署合同重复签署应被状态门拒绝');
     log('04', '重复签署被拒绝', repeatSign);
@@ -780,7 +780,7 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     await tryCleanup(page, 'DELETE', `/crm/customers/${cust.id}`, 'customer_E');
   });
 
-  test('430-05 非法词表取值与重复提交一律被拒，拒绝后库中不留脏行', async ({ page }) => {
+  test('431-05 非法词表取值与重复提交一律被拒，拒绝后库中不留脏行', async ({ page }) => {
     const me = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
     const [subjectA] = await pickActiveUserIds(page, [me.id], 1);
     const cust = await createOwnedCustomer(page, '05', 'G', me.id);
@@ -853,12 +853,12 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
 
     await apiCall(page, 'POST', '/customer-shares/revoke', {
       share_id: first.id,
-      revoke_reason: 'E2E 430 收口',
+      revoke_reason: 'E2E 431 收口',
     });
     await tryCleanup(page, 'DELETE', `/crm/customers/${cust.id}`, 'customer_G');
   });
 
-  test('430-06 无权限岗位调用五条腿均被后端拒，失败体是统一四键信封且 code 为字符串机器码', async ({
+  test('431-06 无权限岗位调用五条腿均被后端拒，失败体是统一四键信封且 code 为字符串机器码', async ({
     page,
     browser,
   }) => {
@@ -873,7 +873,7 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     const [subjectA] = await pickActiveUserIds(page, [adminMe.id], 1);
     const cust = await createOwnedCustomer(page, '06', 'H', adminMe.id);
     const contract = await apiCallRaw<ContractRow>(page, 'POST', '/sales/sales-contracts', {
-      contract_name: `E2E 越权靶 ${genCode('430I')}`,
+      contract_name: `E2E 越权靶 ${genCode('431I')}`,
       customer_id: cust.id,
       total_amount: '100.00',
     });
@@ -904,8 +904,8 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
       const signFail = await apiCallExpectFail(session.page, 'POST', '/contract-signatures/sign', {
         contract_id: contract.id,
         signed_by_user_id: subjectA,
-        signature_image_url: 'https://e2e.invalid/430/forbidden.png',
-        signature_certificate: 'E2E-430-FORBIDDEN',
+        signature_image_url: 'https://e2e.invalid/431/forbidden.png',
+        signature_certificate: 'E2E-431-FORBIDDEN',
       });
       expectDenied(signFail, `签署腿（岗位 ${cred.username}）应被权限门拒绝`);
       log('06', '签署腿越权被拒', signFail);
@@ -939,7 +939,7 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
       page,
       'DELETE',
       `/sales/sales-contracts/${contract.id}`,
-      'sales_contract_430_06'
+      'sales_contract_431_06'
     );
     await tryCleanup(page, 'DELETE', `/crm/customers/${cust.id}`, 'customer_H');
   });
