@@ -188,3 +188,56 @@ CI e2e 分片矩阵 45 片（flow 20 + smoke 5 + traversal 5 + extras 15），�
 **纺织品安全检验：GB 18401-2010《国家纺织产品基本安全技术规范》**，强制性国标，2011-08-01 实施，适用于境内生产销售的服用、装饰用、家用纺织产品，出口按合同。按最终用途三分：婴幼儿（A 类）、直接接触皮肤（B 类）、非直接接触皮肤（C 类）。限值：甲醛 ≤20／≤75／≤300 mg/kg；水萃取液 pH 4.0～7.5／4.0～8.5／4.0～9.0（后续必须湿处理的非最终产品可放宽到 4.0～10.5）；染色牢度（级）耐水与耐酸耐碱汗渍 A ≥3-4、B 与 C ≥3，耐干摩擦 A ≥4、B 与 C ≥3，耐唾液仅考核 A ≥4；异味三类均"无"；可分解致癌芳香胺染料三类均禁用，限量 ≤20 mg/kg，测定按 GB/T 17592 与 GB/T 23344（后者单测 4-氨基偶氮苯，这也是外部资料里"23 种"与"24 种"说法不一致的原因，判据一律以标准附录 C 清单为准，不引用二手计数）。婴幼儿产品另有 GB 31701-2015 加严要求（含可萃取重金属）。
 
 仓内落点与一致性：`backend/src/models/status/textile_safety.rs` 是该子域全部取值型列的唯一权威来源，落库用带前缀稳定码 `GB18401_A/B/C`（裸 A/B/C 在本仓已被质量分级、库存等级、产品等级三套语义占用，禁止互抄），展示文本" A类"一类只由 `display_label` 换算且永不入库；限值判定器 `backend/src/services/textile_safety_limit_judge.rs` 按类别行取限值，法定"不考核"是第三态（`comparator=na`），不得折算成合格，`forbidden` 与 `lte 20` 同层并存时取合取。据此两条硬要求：在途的纺织品安全用例（号段 230-234）期望值必须引用上述常量与限值行，不许在 spec 里重写数字；任何"类别降档仍判合格"或"不考核当合格"的断言形态直接判为用例错而非源码对。
+
+## 12. 主干红面定责（run 41326285558，event=workflow_dispatch，主干顶点 f9385ce9）
+
+**盘面**：86 个 job，78 绿、4 skip、4 红。四枚红只有两枚是本支缺陷，另两枚是随动——
+`🚨 E2E 真实性门禁`（步骤"动态校验——全部 E2E job 必须真实执行成功"随 ci-e2e 结论）与
+`🧹 收尾清理`（if always 的聚合器，红不代表它自己发现问题）。真红两枚：
+`🎭 E2E: flow: e2e/flow(7/20)` 与 `e2e/flow(12/20)`，即 0 基分片号 6 与 11。
+这一条把上一轮的悬案结掉：三支互不相关的 PR 都撞在同两枚分片上，是主干自己红，不是它们的改动带出来的。
+
+**取证口径**（复现路径，下次别再绕）：日志末尾汇总行给出 `1 failed` 的用例名与文件行号，
+制品 `e2e-report-shard-<0基号>-<run>` 里有 `ui-failures.md`（只统计 UI 操作失败，不含断言原文）
+与 `playwright-output.txt`（断言原文在失败块里，要先剔掉 `pw:api` 噪声行才能看清）；
+`e2e-exit-code.txt` 单列为 1 才说明红来自用例而不是某个后置步骤。
+
+### 红一：验布打卷状态门的拒因被脱敏吞掉（flow 7/20）
+
+`frontend/e2e/flow/211-fabric-roll-detail.spec.ts:556` 断言第二卷的拒绝文案必须点名状态门，
+实际收到 `message="业务处理失败"`。判责：**源码缺陷**。真因文案在
+`backend/src/services/fabric_inspection_service.rs:664`（"仅已评级(graded)状态可打卷入库，当前状态: X"），
+但走的是 `AppError::business`，出参按 `backend/src/utils/messages.rs:43` 的
+`BUSINESS_PUBLIC` 脱敏成"业务处理失败"——用户点"打卷"被拒却看不出为什么被拒。
+本仓已把这个口径写死在四处注释里（`handlers/color_card/error_map.rs`、
+`services/outsourcing_ops/order.rs`、`services/po/order_ops/crud.rs`、
+`services/supplier_qualification_gate.rs`）：不含内部 ID 与数量的拒绝理由必须走
+`*_displayable` 外显通道。修复在车道 `wt-main-red-fix`（分支 `fix/roll-gate-reason-displayable`，
+提交 `8661ce0c`，七处 `business` 改 `business_displayable`），用例不动。
+
+### 红二：数据权限详情路由给 200 空壳（flow 12/20）
+
+`frontend/e2e/flow/31b-deletion-matrix.spec.ts:310`（用例本体在 1258）判负，消息里
+`postStatus=200, getApi="/data-permissions/1", marker=null`。判责：**源码缺陷**。
+`backend/src/handlers/data_permission_handler.rs` 的 `get_data_permission` 对
+"记录所属角色非 admin 且 `is_enabled=false`"（删除即软删，见
+`backend/src/services/role_permission_service.rs:420`）返回 `ApiResponse::success(None)`，
+即 HTTP 200 而 `data` 为空——与真正缺行用的 404 是同一种调用侧语义却给两种形状，
+前端只能判 null（`frontend/src/api/data-permission.ts` 旧注释），删除回读也拿不到硬删证据。
+用例的判定本身是对的（要么 404，要么 200 带软删标记），不动。修复在车道 `wt-dp-404`
+（分支 `fix/data-permission-detail-404`，提交 `f6784713`）：不可见与缺行统一 `AppError::not_found`，
+出参去掉 `Option`，同批收掉 `frontend/src/views/data-permission/index.vue` 里恒真的 null 分支。
+本地面：`rustfmt_repo_check.sh` 全仓 1878 文件 FMT_REPO_OK；
+`check-api-envelope.mjs`、`check-contract.mjs`（14 组 198 字段 0 错）、`check-api-paths.mjs`、
+`check-api-request.mjs`、`vue-tsc -b --force` 全 rc=0；注释门命中 0。
+prettier 对 `data-permission.ts` 与 `index.vue` 报 warn，控制组（主干未改副本）同样报 warn，
+且把格式化结果与本轮文件逐行比对为空——属本机 CRLF 伪影，不据此跑 `--write` 制造行尾 churn。
+
+### 未结的观测面（不是本轮红因，但别当没看见）
+
+两枚分片的 `ui-failures.md` 各自记了大量 `[waitListResponse]` 超时（7/20 片 132 处、
+12/20 片 30 处），命中端点恒为同一族：`GET /api/v1/erp/production/dye-batches`、
+`GET /api/v1/erp/custom-orders`、`GET /api/v1/erp/color-cards`，三枚都在 `route-snapshot.txt`
+里真实存在（23/313/77 行附近）。超时含义是"浏览器压根没发这个请求"，与断言失败不同性质，
+所以它们没把 job 判红，但会让"点了按钮以为在跑"的用例 silently 空转。下一批动这三族页面前，
+先查是路由守卫把导航吞了、还是等待器挂晚了，别靠调大超时把它糊过去。
