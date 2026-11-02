@@ -358,13 +358,31 @@ async fn greige_update_non_owner_403_and_zero_drift() {
 }
 
 // ============================================================
-// C) greige_fabric delete 归属门
+// C) greige_fabric delete 归属门与可撤回性门
 // ============================================================
+
+/// 把一行坯布的当前库存两列同时归零，构造"未流转档案"。
+///
+/// 调用方是本节的可撤回用例；入参是已播种的主键；只回写 `weight_kg` 与 `length_m`
+/// 两列，累计入库口径 `quantity_kg` 与 `quantity_meters` 不参与删除判定故不动。
+/// 播种器把 `length_m` 固定写成 100.00，归零态必须显式改写才取到。
+async fn clear_remaining_stock(db: &sea_orm::DatabaseConnection, id: i32) {
+    let row = greige_fabric::Entity::find_by_id(id)
+        .one(db)
+        .await
+        .unwrap()
+        .unwrap();
+    let mut active: greige_fabric::ActiveModel = row.into();
+    active.weight_kg = Set(Some(dec("0.00")));
+    active.length_m = Set(Some(dec("0.00")));
+    active.update(db).await.unwrap();
+}
 
 #[tokio::test]
 async fn greige_delete_owner_200_and_is_deleted() {
     let db = test_common::setup_test_db().await;
     // 可删态要由库存事实表达：建档后把在架四列清零，等价于这批已全部出库
+    // 可撤回性判据是零在架实物且无活单据引用，与状态词无关
     seed_greige_fabric(&db, 1, Some(100), "已出库", dec("10.00")).await;
     empty_shelf_stock(&db, 1).await;
 
@@ -378,6 +396,28 @@ async fn greige_delete_owner_200_and_is_deleted() {
         .unwrap()
         .unwrap();
     assert_eq!(row.is_deleted, Some(true));
+}
+
+#[tokio::test]
+async fn greige_delete_remaining_stock_400_and_zero_drift() {
+    let db = test_common::setup_test_db().await;
+    seed_greige_fabric(&db, 1, Some(100), "已出库", dec("10.00")).await;
+
+    let app = build_greige_app(db.clone(), make_auth(100, Some("self")));
+    let (status, v) = call(&app, Method::DELETE, "/greige-fabrics/1", None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    // 拒因可外显且点名数量与单位，文案与 remaining_stock_rejection 逐字同源
+    assert_eq!(
+        v["message"].as_str().unwrap(),
+        "坯布 GF-TEST-0001 仍有在架库存 10.00 公斤 与 100.00 米，请先完成出库再删除"
+    );
+
+    let row = greige_fabric::Entity::find_by_id(1)
+        .one(&db)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(row.is_deleted, Some(false));
 }
 
 #[tokio::test]
