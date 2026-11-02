@@ -115,7 +115,7 @@ async function seedRoll(
     shelf_no: opts.shelfNo,
     layer_no: opts.layerNo,
   });
-  console.log(`443 seedRoll 录入细码行 batch=${d.batchNo} meters=${opts.quantityMeters}`);
+  console.warn(`443 seedRoll 录入细码行 batch=${d.batchNo} meters=${opts.quantityMeters}`);
 }
 
 /** 按本专用四维回读库存行，未命中立即抛错，调用方拿到的一定是真实落库行。 */
@@ -211,7 +211,9 @@ async function readTransferItem(
 ): Promise<Record<string, unknown>> {
   const data = await apiCallRaw<unknown>(page, 'GET', `/inventory/transfers/${transferId}/items`);
   if (!Array.isArray(data)) {
-    throw new Error(`${label} 调拨明细端点 data 应为数组，实际片段=${JSON.stringify(data).slice(0, 200)}`);
+    throw new Error(
+      `${label} 调拨明细端点 data 应为数组，实际片段=${JSON.stringify(data).slice(0, 200)}`
+    );
   }
   const rows = data as Array<Record<string, unknown>>;
   const row = rows.find(it => String(it.batch_no) === batchNo);
@@ -307,7 +309,7 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
         `详情侧 ${key} 应等于录入值`
       );
     }
-    console.log(`443-T1 细码录入两侧回读通过 stockId=${stockId}`);
+    console.warn(`443-T1 细码录入两侧回读通过 stockId=${stockId}`);
   });
 
   test('零头余码与整卷同仓并存，两行米数可区分且零头不被抹平', async ({ page }) => {
@@ -365,8 +367,12 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
     expect(oddMeters, '零头行米数不得被抹平成整卷').not.toBe(fullMeters);
     expect(oddMeters, '零头行米数不得被清零').toBeGreaterThan(0);
     // 在库量同样按行独立，零头行不被并进整卷行的 on_hand
-    expectQuantity(readNumber(oddRow, 'quantity_on_hand', '零头行在库量'), 12.34, '零头行在库量应独立');
-    console.log(`443-T2 零头与整卷两行区分通过 full=${fullMeters} odd=${oddMeters}`);
+    expectQuantity(
+      readNumber(oddRow, 'quantity_on_hand', '零头行在库量'),
+      12.34,
+      '零头行在库量应独立'
+    );
+    console.warn(`443-T2 零头与整卷两行区分通过 full=${fullMeters} odd=${oddMeters}`);
   });
 
   test('计量字段按录入事实分列存储，米数公斤数克重门幅互不折算覆盖', async ({ page }) => {
@@ -393,15 +399,22 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
     const row = await rereadRoll(page, productId!, warehouseId!, tag);
     const detail = await readStockDetail(page, readNumber(row, 'id', '换算钉桩库存行'));
     expectQuantity(readNumber(detail, 'quantity_meters', '米数列'), 50.25, '米数应原样落库');
-    expectQuantity(readNumber(detail, 'quantity_kg', '公斤数列'), 999.99, '公斤数应原样落库不被折算覆盖');
+    expectQuantity(
+      readNumber(detail, 'quantity_kg', '公斤数列'),
+      999.99,
+      '公斤数应原样落库不被折算覆盖'
+    );
     expectQuantity(readNumber(detail, 'gram_weight', '克重列'), 200, '克重应原样落库');
     expectQuantity(readNumber(detail, 'width', '门幅列'), 90, '门幅应原样落库');
     // 米与公斤是两个独立存储事实，米数不得被公斤列反向改写
     expect(
-      Math.abs(readNumber(detail, 'quantity_kg', '公斤数列') - readNumber(detail, 'quantity_meters', '米数列')) > 1,
+      Math.abs(
+        readNumber(detail, 'quantity_kg', '公斤数列') -
+          readNumber(detail, 'quantity_meters', '米数列')
+      ) > 1,
       `米与公斤必须分列出值且不相等（kg=999.99 vs m=50.25），实际 kg=${String(detail.quantity_kg)} m=${String(detail.quantity_meters)}`
     ).toBe(true);
-    console.log(`443-T3 计量字段分列存储通过 kg=${String(detail.quantity_kg)}`);
+    console.warn(`443-T3 计量字段分列存储通过 kg=${String(detail.quantity_kg)}`);
   });
 
   test('按细码出库，本批次行余量减少且同仓其它批次行不动', async ({ page }) => {
@@ -433,13 +446,18 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
     const rowABefore = await readStockByBatch(page, productId!, fromWarehouse!, batchA);
     const rowBBefore = await readStockByBatch(page, productId!, fromWarehouse!, batchB);
 
-    const created = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/inventory/transfers', {
-      from_warehouse_id: fromWarehouse,
-      to_warehouse_id: toWarehouse,
-      transfer_date: new Date().toISOString(),
-      notes: `E2E 细码出库 ${tagA}`,
-      items: [{ product_id: productId, quantity: '15', color_no: '', batch_no: batchA }],
-    });
+    const created = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      '/inventory/transfers',
+      {
+        from_warehouse_id: fromWarehouse,
+        to_warehouse_id: toWarehouse,
+        transfer_date: new Date().toISOString(),
+        notes: `E2E 细码出库 ${tagA}`,
+        items: [{ product_id: productId, quantity: '15', batch_no: batchA }],
+      }
+    );
     const transferId = readNumber(created, 'id', '调拨建单');
     // 建单初始状态逐字符等于词表值 pending（小写，models/status/purchase_inventory.rs）
     expect(String((await readTransferDetail(page, transferId)).status)).toBe('pending');
@@ -492,7 +510,9 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
       readNumber(rowBBefore, 'quantity_meters', '邻批次出库前米数'),
       '邻批次米数必须分毫不动'
     );
-    console.log(`443-T4 细码出库通过 transfer=${transferId} A行 ${onHandBefore}→${readNumber(rowAAfter, 'quantity_on_hand', '出库后在库量')}`);
+    console.warn(
+      `443-T4 细码出库通过 transfer=${transferId} A行 ${onHandBefore}→${readNumber(rowAAfter, 'quantity_on_hand', '出库后在库量')}`
+    );
   });
 
   test('盘点同单两腿，盘盈为正盘亏为负分别落库，过账后两行精确到实盘量', async ({ page }) => {
@@ -575,11 +595,27 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
     // 两腿分别落账：盘盈行升到实盘量，盘亏行降到实盘量，在库与可用两列同改
     const gainRowAfter = await rereadRoll(page, productId!, warehouseId!, tagGain);
     const lossRowAfter = await rereadRoll(page, productId!, warehouseId!, tagLoss);
-    expectQuantity(readNumber(gainRowAfter, 'quantity_on_hand', '盘盈过账后在库量'), 120, '盘盈过账后在库量应升到 120');
-    expectQuantity(readNumber(gainRowAfter, 'quantity_available', '盘盈过账后可用量'), 120, '盘盈过账后可用量应升到 120');
-    expectQuantity(readNumber(lossRowAfter, 'quantity_on_hand', '盘亏过账后在库量'), 45, '盘亏过账后在库量应降到 45');
-    expectQuantity(readNumber(lossRowAfter, 'quantity_available', '盘亏过账后可用量'), 45, '盘亏过账后可用量应降到 45');
-    console.log(`443-T5 盘点两腿过账通过 count=${countId} 盈差=${gainDiff} 亏差=${lossDiff}`);
+    expectQuantity(
+      readNumber(gainRowAfter, 'quantity_on_hand', '盘盈过账后在库量'),
+      120,
+      '盘盈过账后在库量应升到 120'
+    );
+    expectQuantity(
+      readNumber(gainRowAfter, 'quantity_available', '盘盈过账后可用量'),
+      120,
+      '盘盈过账后可用量应升到 120'
+    );
+    expectQuantity(
+      readNumber(lossRowAfter, 'quantity_on_hand', '盘亏过账后在库量'),
+      45,
+      '盘亏过账后在库量应降到 45'
+    );
+    expectQuantity(
+      readNumber(lossRowAfter, 'quantity_available', '盘亏过账后可用量'),
+      45,
+      '盘亏过账后可用量应降到 45'
+    );
+    console.warn(`443-T5 盘点两腿过账通过 count=${countId} 盈差=${gainDiff} 亏差=${lossDiff}`);
   });
 
   test('反向防呆，超可用量出库被 400 业务码拒绝且无半成品状态', async ({ page }) => {
@@ -601,17 +637,26 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
       quantityMeters: '40',
     });
     const before = await readStockByBatch(page, productId!, fromWarehouse!, batchNo);
-    const created = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/inventory/transfers', {
-      from_warehouse_id: fromWarehouse,
-      to_warehouse_id: toWarehouse,
-      transfer_date: new Date().toISOString(),
-      notes: `E2E 超量出库防呆 ${tag}`,
-      items: [{ product_id: productId, quantity: '45', color_no: '', batch_no: batchNo }],
-    });
+    const created = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      '/inventory/transfers',
+      {
+        from_warehouse_id: fromWarehouse,
+        to_warehouse_id: toWarehouse,
+        transfer_date: new Date().toISOString(),
+        notes: `E2E 超量出库防呆 ${tag}`,
+        items: [{ product_id: productId, quantity: '45', batch_no: batchNo }],
+      }
+    );
     const transferId = readNumber(created, 'id', '超量调拨建单');
     await apiCall(page, 'POST', `/inventory/transfers/${transferId}/approve`, { approved: true });
 
-    const rejected = await apiCallExpectFail(page, 'POST', `/inventory/transfers/${transferId}/ship`);
+    const rejected = await apiCallExpectFail(
+      page,
+      'POST',
+      `/inventory/transfers/${transferId}/ship`
+    );
     expectBusinessRejection(rejected, `超可用量出库应被业务拒绝，批次 ${batchNo}`);
     const code = failureCode(rejected);
     expect(
@@ -645,8 +690,13 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
     expect(String(detail.status), '被拒后单据应停在 approved，不得半推进 shipped').toBe('approved');
     const item = await readTransferItem(page, transferId, batchNo, '被拒后明细');
     expectQuantity(readNumber(item, 'shipped_quantity', '被拒后已发量'), 0, '被拒后已发量应为 0');
-    tryCleanup(page, 'DELETE', `/inventory/transfers/${transferId}`, `443 超量调拨单 ${transferId}`);
-    console.log(`443-T6 超量出库防呆通过 拒码=${code}`);
+    tryCleanup(
+      page,
+      'DELETE',
+      `/inventory/transfers/${transferId}`,
+      `443 超量调拨单 ${transferId}`
+    );
+    console.warn(`443-T6 超量出库防呆通过 拒码=${code}`);
   });
 
   test('权限门，销售岗直连库存与盘点端点全部 403 且拿不到任何数据行', async ({ page, browser }) => {
@@ -710,7 +760,7 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
           `403 失败体不应携带任何数据行载荷，实际键=${Object.keys(denied).join(',')}`
         ).toBe(true);
       }
-      console.log(`443-T7 库存端点权限门通过 身份=${cred.username} 三通道均 403`);
+      console.warn(`443-T7 库存端点权限门通过 身份=${cred.username} 三通道均 403`);
     } finally {
       await session.close();
     }
