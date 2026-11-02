@@ -272,16 +272,21 @@ prettier 对 `data-permission.ts` 与 `index.vue` 报 warn，控制组（主干�
 
 ### 13.3 一处我自己写错的判据，当场更正
 
-先前本节写的是"#1144 的 extras 失败没有任何报告制品，属取证盲区"。**这句不实**：制品确实缺（run 级 94 件里无 extras 命名、job 级制品端点 404），但 **job 日志本身带断言原文**——日志里有成对的 `E2E-ASSERT-BEGIN <test-results 目录>/error-context.md` 与 `E2E-ASSERT-END` 块，两条失败原文就在其中：
+先前本节写的是"#1144 的 extras 失败没有任何报告制品，属取证盲区"。**这句不实，且我上一版的"更正"也只对了一半**（它仍说"制品确实缺"）。逐件核实 run 41309252987 的全部 94 枚制品后：分片 0 到 44 **每一片都有** `e2e-report-shard-<N>-<run>`，失败片另有 `e2e-diag-shard-<N>-<run>`（本轮 6、11、44 三片有 diag，44 就是那枚 extras: fullflow 5/5，12.5 MB，内含 error-context.md 全套）。根本不存在 extras 族的制品缺口，也没有需要补的工装步。
+
+我连错两次的成因都在方法上，不是 CI：
+
+- **按 label grep 制品名恒零命中**：`e2e-report-shard-44-…` 这类名字里只有分片号，`matrix.label`（"extras: fullflow 5/5（按实测时长分组）"）从不进制品名。用 label 关键词过滤必然得到空集，再把空集读成"没制品"。
+- **job 级制品端点 404 不等于无制品**：`/repositories/<id>/actions/jobs/<job>/artifacts` 这轮实测返回 `HTTP/1.1 404 Not Found`（`curl_rc=0`，是真 404 不是断网），而 run 级端点同刻能取到该 job 的制品。制品清单只认 run 级端点。
+
+正确归属法：跑测步之后的取证步会打一行 `E2E-FORENSICS-MAP shard0based=<0 基号> label=<矩阵标签> reportArtifact=e2e-report-shard-<号> diagArtifact=e2e-diag-shard-<号>`，label 与制品的对应只从这行取。断言原文有两处来源，先用 job 日志里成对的 `E2E-ASSERT-BEGIN <test-results 目录>/error-context.md` 与 `E2E-ASSERT-END` 块（快，无需下载），要截图与 trace 再下 diag 制品（zip 套 tar.gz 两层）。本轮 44 号片的诊断制品里取到的两条失败原文与日志块逐字一致：
 
 - `frontend/e2e/fullflow/40-quotation-role-journey.spec.ts` 的 40-01：`Error: 报价头税额：键 tax_amount 期望 26000 实际 0 原始 "0"`
-- 同文件 40-02：`TimeoutError: locator.waitFor: Timeout 15000ms exceeded. waiting for locator('.actions .el-button').filter({ hasText: '返回' }).first() to be visible`
+- 同文件 40-02：`Error: locator.waitFor: Timeout 15000ms exceeded. locator('.actions .el-button').filter({ hasText: '返回' }).first() to be visible`
 
-更正后的口径：**extras 族红的取证顺序是"先取 job 日志的 E2E-ASSERT 块，其次才找制品"**，不能因为 job 级制品端点 404 就宣布取不到。真正待补的工装缺口只剩一条——extras 分片失败时不上传 `e2e-report-*` 报告制品（断言原文虽在日志里，但截图与 trace 仍缺）。
+40-01 定责（已定，落在用例侧）：后端把 `tax_inclusive` 读作"单价已含税"，`calc.rs:24-31` 据此把小计当含税额、`tax_amount` 记 `Decimal::ZERO`；明细腿 `crud.rs:160-189` 只写 `amount` 与 `amount_with_tax` 两列，压根没有行税额列。旧用例却写 `tax_inclusive: true` 又把净额送进 `unit_price`，再按"净额乘税率"断头税额 26000 —— 前提与断言两头都对着源码不成立。修向是提交口径改成不含税（净额与含税单价两个事实都由调用方给且互相钩稽），行税额按 `amount_with_tax - amount` 导出，并加两条头行钩稽断言把"明细和合计无分差"钉成可失败判定（`ce038be3`）。遗留的源码侧不对称如实记着：`tax_inclusive` 为真时头 `tax_amount` 恒 0，而明细侧存在含税与净额两列，同一张单的头与行对"税额"给的不是同一个口径，要不要统一到差额口径属产品裁定，不在测试面动。
 
-40-01 的判责线索：`backend/src/services/quotation_ops/calc.rs:25-31` 在 `tax_inclusive` 为真时把 `tax_amount` 直接写 `Decimal::ZERO`（注释"小计已含税，差额为 0"），而明细腿走的是另一套口径（`quotation_convert_service.rs:227` `tax_amount = amount_with_tax - amount`），头与明细不同源。按本项目"含税是录入事实、净额用除法反算、税额取差额且必须钩稽"的既有裁定，头写 0 属源码侧疑点；改源码前必须先清点谁在钉"含税时税额为 0"（取证进行中）。
-
-40-02 未定责：需先证明驳回态那个 `.actions` 区里到底渲染哪些按钮、"返回"这个文案是否在该状态出现，不能把用例改成"任一按钮"来凑绿。
+40-02 的处置（不定根因，先把归因分开）：动作区整块在 `v-if="quotation"` 内，详情读失败时连"返回"都不渲染，原先那枚 15s 超时同时替"读面被行级数据范围门挡"和"按钮缺失"两种根因背锅。改法是进页面前先等那次详情 GET 并点名状态码，等不到响应与非 200 各出独立结论，批准与拒绝各须恰一枚的计数断言不放宽。真实根因等 `ce038be3` 的 run 出结果再定，不预先写进结论。
 
 
 ### 13.4 本轮推送与 PR 形态
