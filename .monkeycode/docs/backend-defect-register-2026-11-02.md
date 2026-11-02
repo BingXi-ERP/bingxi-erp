@@ -47,6 +47,16 @@
    `🚨 E2E 真实性门禁` 与 `🧹 收尾清理` 两枚不是独立缺陷——前者的 env 实证
    `CI_E2E_RESULT=failure`、`SETUP_WIZARD_RESULT=success`、`ROLE_MATRIX_RESULT=success`，属上游 ci-e2e
    的 needs 随动红，后者是聚合器，红面数到分片为止。
+4. 两枚非源码类红的实证归位，避免被当成待修缺陷反复追。其一，#1154 的 `🧪 Rust 测试 (1/10)`
+   （job 125114469827）输出只有 `❌ 分片 1 进程异常退出（EXIT_CODE=96）`，全日志零 FAILED、
+   零 panicked、零磁盘错误字样，而该支改动面只有两枚 e2e spec，不碰 Rust，判为进程异常类红，
+   处置是重放当前 head 而不是改代码，且当前主干流水线仍在 queued，重放要等队列松开。
+   其二，`AUDIT_SECRET_KEY` 的字面量硬编在 ci-cd.yml 三处、coverage.yml 一处、e2e-batch.yml 一处，
+   另有 e2e 专用变体两处，并随 job 日志的 env 段进入公开记录（仓库是 public）。
+   这不是生产密钥泄漏，`config/settings.rs` 的强度校验与弱密钥黑名单会拒绝生产环境用这类模式值，
+   `omni_audit_service.rs` 在未设置时只允许测试与开发环境回退默认值，生产直接 Err；
+   但 CI 与 e2e 数据集的审计链 HMAC 密钥对外可读，意味着这两套数据里的审计条目可被任何人生成，
+   排期时应把它当"测试面审计链不作为不可篡改证据"的口径记录，而不是当密钥泄漏去轮换生产值。
 
 ## D-08 的证伪过程与由此得出的排期口径
 
