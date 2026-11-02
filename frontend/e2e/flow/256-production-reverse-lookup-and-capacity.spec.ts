@@ -21,7 +21,7 @@ import {
 } from './helpers';
 
 /**
- * 256 W1-E production 族 按色号与供应商与工人反查 与 产能汇总趋势 的真实契约配对
+ * 256 production 族按色号与供应商与工人反查与产能汇总趋势的真实契约配对
  *
  * 覆盖端点（全部相对 baseURL=/api/v1/erp 书写）
  * GET  /production/dye-batches/by-color/{color_no} 按色号反查染缸批次

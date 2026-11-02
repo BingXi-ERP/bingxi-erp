@@ -19,7 +19,7 @@ import {
 } from './helpers';
 
 /**
- * 255 大货处方加料单状态机与配方计算契约（production 族 W1-E 的 UI 有、e2e 无配对腿）
+ * 255 大货处方加料单状态机与配方计算契约（production 族，前端有界面入口而 e2e 此前无配对腿）
  *
  * 覆盖端点（挂载前缀 /api/v1/erp/production 取自 backend/src/routes/production.rs 的
  * production_recipe_router，路由登记同文件 180-219 行；前端 baseURL 只写到 /api/v1/erp，
