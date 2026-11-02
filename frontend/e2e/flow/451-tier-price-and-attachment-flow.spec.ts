@@ -173,7 +173,9 @@ async function uploadQualificationAttachment(
   try {
     body = JSON.parse(text);
   } catch {
-    throw new Error(`附件腿非 JSON 响应 status=${resp.status()}，body 前 200 字符：${text.slice(0, 200)}`);
+    throw new Error(
+      `附件腿非 JSON 响应 status=${resp.status()}，body 前 200 字符：${text.slice(0, 200)}`
+    );
   }
   return { status: resp.status(), body: requireRow(body, `附件腿 status=${resp.status()}`) };
 }
@@ -374,10 +376,9 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
       await apiCallRaw<unknown>(page, 'DELETE', `/color-prices/tiers/item/${str(deletedTier.id)}`),
       '删除第二档出参'
     );
-    expect(
-      toNum(delResp.deleted, '删除档位回显 id'),
-      '删除腿必须回显被删档位主键'
-    ).toBe(toNum(deletedTier.id, '第二档主键'));
+    expect(toNum(delResp.deleted, '删除档位回显 id'), '删除腿必须回显被删档位主键').toBe(
+      toNum(deletedTier.id, '第二档主键')
+    );
 
     const afterDelete = requireRow(
       await apiCallRaw<unknown>(page, 'GET', `/color-prices/tiers/${priceId}`),
@@ -490,15 +491,14 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
       `三笔被拒请求不得落库，档位必须仍为 ${beforeTotal} 档，实际 ${str(after.total)}`
     ).toBe(beforeTotal);
     expect(
-      JSON.stringify(requireArray(after.items, '负例后 items').map(r => requireRow(r, '行').min_quantity)),
+      JSON.stringify(
+        requireArray(after.items, '负例后 items').map(r => requireRow(r, '行').min_quantity)
+      ),
       '被拒的 100 与 99 起量档不得出现在列表里'
     ).not.toContain('"100"');
 
     const hole = await calcPrice(page, productId, colorId, '100');
-    expect(
-      str(hole.applied_rule),
-      '补档前数量 100 落在空洞里，必须仍是 base 档'
-    ).toBe('base');
+    expect(str(hole.applied_rule), '补档前数量 100 落在空洞里，必须仍是 base 档').toBe('base');
 
     await createTier(page, priceId, '100', '150', '22.22', 2);
     const filled = await calcPrice(page, productId, colorId, '100');
@@ -508,7 +508,10 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
       `补档后必须取到新档单价 22.22，实际 ${str(filled.tier_price)}`
     ).toBe(22.22);
     expect(
-      toNum((await calcPrice(page, productId, colorId, '151')).final_price, '补档区间外 final_price'),
+      toNum(
+        (await calcPrice(page, productId, colorId, '151')).final_price,
+        '补档区间外 final_price'
+      ),
       '151 超出新档上限 150，必须退回基础价 100.00'
     ).toBe(100);
 
@@ -635,7 +638,11 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
       `下载内容必须是真实 PDF 字节而非空壳，实际前 5 字节 ${got.subarray(0, 5).toString('utf-8')}`
     ).toBe('%PDF-');
 
-    await apiCallRaw<unknown>(page, 'DELETE', `/purchase/suppliers/${supplierId}/qualifications/${qid}`);
+    await apiCallRaw<unknown>(
+      page,
+      'DELETE',
+      `/purchase/suppliers/${supplierId}/qualifications/${qid}`
+    );
 
     const listedAfter = requireArray(
       await apiCallRaw<unknown>(page, 'GET', `/purchase/suppliers/${supplierId}/qualifications`),
