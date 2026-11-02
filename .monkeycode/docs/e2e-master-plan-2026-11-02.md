@@ -270,9 +270,19 @@ prettier 对 `data-permission.ts` 与 `index.vue` 报 warn，控制组（主干�
 
 `Rust 测试 (3/10)` 分片失败 1 例：`contract_wave12_greige_recipe_gates_test.rs:352` 断 `left == right` failed，left 400 / right 200。本支把坯布删除门从读 `status` 改成按可撤回性判（零在架实物 + 无活单据引用，见 `greige_fabric_handler.rs` 的 `remaining_stock_rejection` 与 `find_greige_reference_rejection`），而旧用例仍按"状态设成已出库就可删"播种 weight 10.00。处置按"断言随功能口径同步"：归零两列走可撤回路径仍断 200，另加一条真有在架库存的 400 拒因腿（断言与源码文案逐字同源 + 回读 `is_deleted` 仍 false）。
 
-### 13.3 一处取证盲区（工装待补）
+### 13.3 一处我自己写错的判据，当场更正
 
-PR #1144 的 `🎭 E2E: extras: fullflow 5/5`（job 124864738796）失败时**没有任何报告制品**：run 41309252987 的 94 件制品里没有 extras 命名，job 级制品端点返回 404。因此该红只能定位到 job 与步一级，断言原文取不到。按"0 基分片号"硬猜 shard-44 属无证据推断，不采纳。这一条另开一车补失败上传。
+先前本节写的是"#1144 的 extras 失败没有任何报告制品，属取证盲区"。**这句不实**：制品确实缺（run 级 94 件里无 extras 命名、job 级制品端点 404），但 **job 日志本身带断言原文**——日志里有成对的 `E2E-ASSERT-BEGIN <test-results 目录>/error-context.md` 与 `E2E-ASSERT-END` 块，两条失败原文就在其中：
+
+- `frontend/e2e/fullflow/40-quotation-role-journey.spec.ts` 的 40-01：`Error: 报价头税额：键 tax_amount 期望 26000 实际 0 原始 "0"`
+- 同文件 40-02：`TimeoutError: locator.waitFor: Timeout 15000ms exceeded. waiting for locator('.actions .el-button').filter({ hasText: '返回' }).first() to be visible`
+
+更正后的口径：**extras 族红的取证顺序是"先取 job 日志的 E2E-ASSERT 块，其次才找制品"**，不能因为 job 级制品端点 404 就宣布取不到。真正待补的工装缺口只剩一条——extras 分片失败时不上传 `e2e-report-*` 报告制品（断言原文虽在日志里，但截图与 trace 仍缺）。
+
+40-01 的判责线索：`backend/src/services/quotation_ops/calc.rs:25-31` 在 `tax_inclusive` 为真时把 `tax_amount` 直接写 `Decimal::ZERO`（注释"小计已含税，差额为 0"），而明细腿走的是另一套口径（`quotation_convert_service.rs:227` `tax_amount = amount_with_tax - amount`），头与明细不同源。按本项目"含税是录入事实、净额用除法反算、税额取差额且必须钩稽"的既有裁定，头写 0 属源码侧疑点；改源码前必须先清点谁在钉"含税时税额为 0"（取证进行中）。
+
+40-02 未定责：需先证明驳回态那个 `.actions` 区里到底渲染哪些按钮、"返回"这个文案是否在该状态出现，不能把用例改成"任一按钮"来凑绿。
+
 
 ### 13.4 本轮推送与 PR 形态
 
