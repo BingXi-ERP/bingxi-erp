@@ -698,7 +698,14 @@ test.describe('色卡与样品打样主链', () => {
     expect(readNum(itemPage, 'total', '色号分页'), '色号分页总数应为 1').toBe(1);
     expect(readNum(itemPage, 'page', '色号分页')).toBe(1);
     expect(readNum(itemPage, 'page_size', '色号分页')).toBe(20);
-    expect(readNum(asRow(itemPage['items'][0], '色号分页首行'), 'id', '色号分页首行')).toBe(itemId);
+    expect(
+      readNum(
+        asRow(asRows(itemPage['items'], '色号分页 items')[0], '色号分页首行'),
+        'id',
+        '色号分页首行'
+      ),
+      '色号分页首行应是刚建的那条色号'
+    ).toBe(itemId);
 
     const list = asRow(
       await apiCallRaw<unknown>(
@@ -1526,7 +1533,11 @@ test.describe('色卡与样品打样主链', () => {
       '归档后总色号数应保持不变'
     ).toBe(1);
     expect(
-      readNum(asRow(asRows(afterArchive['items'])[0], '归档后色号行'), 'id', '归档后色号行'),
+      readNum(
+        asRow(asRows(afterArchive['items'], '归档后色卡明细')[0], '归档后色号行'),
+        'id',
+        '归档后色号行'
+      ),
       '留下的应是归档前那一条'
     ).toBe(archivedItemId);
   });
