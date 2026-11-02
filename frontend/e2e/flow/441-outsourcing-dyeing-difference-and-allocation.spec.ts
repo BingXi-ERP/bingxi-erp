@@ -1589,11 +1589,15 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
       original_status: 'inspecting',
     });
     expect(badType.status, '越界回修类型必须 400').toBe(400);
-    expect(failureCode(badType), '回修类型越界属可外显校验族').toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+    expect(failureCode(badType), '回修类型越界属可外显校验族').toBe(
+      APP_ERROR_CODES.VALIDATION_ERROR
+    );
     expect(
       String(badType.message ?? ''),
       '越界类型的可外显文案必须逐字列出取值域（把疵点域写法 color_diff 当回修类型提交必被点名）'
-    ).toContain('缸号回修类型必须是 color_difference/defect/specification_unqualified/re_dye/replenish_dye/other');
+    ).toContain(
+      '缸号回修类型必须是 color_difference/defect/specification_unqualified/re_dye/replenish_dye/other'
+    );
     const badPre = await apiCallExpectFail(page, 'POST', '/production/dye-batch-reworks', {
       original_batch_id: dyeBatchId,
       original_batch_no: String(dyeBatch.batch_no),
@@ -1744,6 +1748,7 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
       warehouseId: wh.greigeId,
       pieceCount: 1,
       lengthPerPiece: '180.25',
+      totalQuantity: '180.25',
       tag,
     });
     const dyeLotNo = genDyeLotNo();
@@ -1794,9 +1799,10 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
     });
     // 判定这一写动作交给质检岗会话完成（跨角色协同面）：管理会话此刻只推进到"草稿收回单待判定"
     const draftReceipt = await readReceipt(page, receiptNo);
-    expect(String(draftReceipt.quality_status), '未给结论时写入方落 pending（不得默认成已判定）').toBe(
-      'pending'
-    );
+    expect(
+      String(draftReceipt.quality_status),
+      '未给结论时写入方落 pending（不得默认成已判定）'
+    ).toBe('pending');
     expect(String(draftReceipt.status), '待判定阶段收回单为草稿').toBe('draft');
     expect(String((await readOrder(page, fixture.orderNo)).status), '跟单侧已推进到加工中').toBe(
       'processing'
@@ -1823,7 +1829,7 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
         { resource_type: 'notifications', action: 'read' },
         ...grants,
       ].map(g => ({ resource_type: g.resource_type, action: g.action, allowed: true }));
-      await apiCall(page, 'PUT', `/roles/${roleId}/permissions`, grantBody as unknown as ApiBody);
+      await apiCall(page, 'PUT', `/roles/${roleId}/permissions`, grantBody);
       // 行级数据范围放开到 all：断言"他人写入的事实可见"，而不是被 self 过滤后假绿成空列表
       const scoped = await apiCallRaw<Record<string, unknown>>(
         page,
@@ -1887,9 +1893,10 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
       '质检岗读到的发出数量必须与跟单提交值逐分对平（十进制字符串线格式）'
     );
 
-    // 质检岗没有写权：建委外单被 403 精确拒绝，且库里零写入（按单号读 404 证明）
+    // 质检岗没有写权：建委外单被 403 精确拒绝，且库里零写入（按同一提交单号读 404 证明）
+    const qcAttemptedOrderNo = genCode('E441QCX');
     const qcCreateFail = await apiCallExpectFail(page, 'POST', '/production/outsourcing-orders', {
-      order_no: genCode('E441QCX'),
+      order_no: qcAttemptedOrderNo,
       order_type: 'dyeing',
       supplier_id: ctx.supplierId,
       issue_date: todayStr(),
@@ -1899,6 +1906,14 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
     });
     expect(qcCreateFail.status, '质检岗无 outsourcing-orders:create，写单必须 403').toBe(403);
     expect(failureCode(qcCreateFail), '质检岗写单机器码').toBe(APP_ERROR_CODES.FORBIDDEN);
+    // 越权写必须零落库：本岗有单据读权，按刚提交的单号回读必须 404
+    const qcGhost = await apiCallExpectFail(
+      page,
+      'GET',
+      `/production/outsourcing-orders/by-no/${encodeURIComponent(qcAttemptedOrderNo)}`
+    );
+    expect(qcGhost.status, '质检岗越权写未落库（按提交单号回读 404）').toBe(404);
+    expect(failureCode(qcGhost), '越权写零落库的读回机器码').toBe(APP_ERROR_CODES.NOT_FOUND);
     const qcConfirmFail = await apiCallExpectFail(
       page,
       'POST',
@@ -1943,12 +1958,19 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
       );
     }
     expect(String(autoRecord.inspection_result), '让步接收的质检结论（中文词表）').toBe('合格');
-    expectDecEqualsEachOther(autoRecord.qualified_qty, adminReceipt.return_quantity, '合格量=收回数量');
+    expectDecEqualsEachOther(
+      autoRecord.qualified_qty,
+      adminReceipt.return_quantity,
+      '合格量=收回数量'
+    );
 
-    // 财务岗：只授凭证读，能看到成本归集结果；读收回单必须被 403（最小授权面真实生效）
+    // 财务岗：授凭证读与单据读（成本归集口径），能对上成本；读收回单必须被 403（最小授权面真实生效）
     const fin = await makeRole(
       'FIN',
-      [{ resource_type: 'outsourcing-vouchers', action: 'read' }],
+      [
+        { resource_type: 'outsourcing-vouchers', action: 'read' },
+        { resource_type: 'outsourcing-orders', action: 'read' },
+      ],
       '财务'
     );
     await loginViaUI(page, fin.username, fin.password, true);
@@ -2024,6 +2046,7 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
       warehouseId: wh.greigeId,
       pieceCount: 1,
       lengthPerPiece: '100',
+      totalQuantity: '100',
       tag,
     });
     const dyeLotNo = genDyeLotNo();
@@ -2318,7 +2341,9 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
     expect(failureCode(noQConfirm), '未判定结论机器码').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
     const noQReceipt = await readReceipt(page, noQ.receiptNo);
     expect(String(noQReceipt.status), '未判定结论的收回单仍为草稿，成本不得落地').toBe('draft');
-    expect(String(noQReceipt.quality_status), '未给结论必须落 pending（不得默认成已判定）').toBe('pending');
+    expect(String(noQReceipt.quality_status), '未给结论必须落 pending（不得默认成已判定）').toBe(
+      'pending'
+    );
     expectDecEquals(
       noQReceipt.total_cost,
       decLiteral('0', '建单初值'),
@@ -2434,9 +2459,6 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
     ).toBe(1);
   });
 });
-
-/** 请求体别名：PUT /roles/{id}/permissions 的出参是裸数组，helpers 的 body 类型只收对象/数组 */
-type ApiBody = unknown[];
 
 /**
  * 单头总成本 = 材料成本 + 加工费 + 运费 − 非正常损耗（十进制定标减法，杜绝浮点误差）。
