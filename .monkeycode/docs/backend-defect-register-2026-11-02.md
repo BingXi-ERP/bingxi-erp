@@ -30,6 +30,7 @@
 | D-18 | 验布打卷门 | 拒绝原因对操作员不可见：打卷前置门用 `AppError::business` 造错，出参 message 被脱敏成固定常量，操作员只知"失败"不知"须先评级才能打卷"；同族的库存不足类门走 `bad_request` 会逐字外显，两族口径不一致 | backend/src/services/fabric_inspection_service.rs 的 `validate_roll_preconditions`；对照 utils/messages.rs 的 `BUSINESS_PUBLIC` 与 utils/error.rs 的通道分族 | 亲验（主干红取证时逐字读过构造点） | 口径裁定后转 源码修（换可外显错误族）。**改前必须清点谁在钉"该门返回脱敏常量"**——211 已把常量本身钉成断言，换通道即打红 | 211 的判据形状已按当前契约钉住（随 #1154 提交） |
 | D-19 | 报价单入口 | 展示面与鉴权面口径不一致（水平越权暴露面）：报价路由五处 `meta.permission` 写粗域键 `sales:read`，而报价端点挂在 `/api/v1/erp/quotations` 下、后端派生鉴权键是 `quotations` 加动作；`sales:` 粗域在前端守卫里展开到 14 枚细资源（orders 加 quotations 加 sales-returns 加 sales-contracts 加 sales-prices 加 sales-analysis 加 custom-orders 加 fabric-orders 加 customers 加 color-cards 加 color-prices 加 export-inspections 加 pieces 加 reports，实量自 router 的展开表），只持其中 `pieces` 读权的仓储岗因此在侧栏看得见"报价单管理"入口，点进去被后端判 403——入口对无权限岗位可供而动作必然失败 | frontend/src/router/index.ts 的 quotations 五条路由；对照 middleware/permission.rs 的键派生、services/init_service_ops/permission.rs 的 warehouse_keeper 授权组（不含 quotations） | 亲验（四处交叉：路由表 加 守卫展开表 加 鉴权键推导 加 授权种子） | 源码修（`sales:read` 改 `quotations:read`，与既有细资源键写法同构） | 已修在 #1155；权限快照与角色矩阵遍历用例（traversal/permission-model.ts 与 44-role-matrix.spec.ts）若因此转红属随动改判，须同支登记。**实证（2026-11-02 从 #1144 的 extras fullflow 制品取到断言原文）：`e2e/fullflow/40-quotation-role-journey.spec.ts` 早就把这条钉成断言"仓储棒侧栏不应存在菜单项 报价单"，实测 `Expected: 0 / Received: 1` 判红——被测侧正确、源码侧错，#1155 的细资源键改法正是这条红的解**。**改判的随动面（2026-11-02 实量）：角色矩阵遍历确实转红，且只有业务员岗判负——该岗是 e2e 补建角色（后端 init 只建 sales_rep，不建 salesperson），权限完全来自 global-setup 的手写镜像清单，而清单从未列 quotations:read；后端同名分组 sales_rep 本就持该键，故按同口径回补一枚读键、写面不扩，遍历基线里业务员的两条报价可达路由保持不变。反之 sales_manager 由后端 init 建角，镜像里那行对它不生效，权限取后端授权面** |
 | D-20 | 报价详情页 | 操作员可被困在空白页且无提示：整张卡片（含唯一无条件渲染的"返回"按钮）被 `v-if="quotation"` 门住，取数失败或取到空壳时 `quotation` 为 null，动作区连同返回入口一起消失，页面上只剩空白。实测会话 sales_manager 进 `/quotations/{id}`，该页自身发的 GET 已回 200，但 15 秒内动作区始终未出现，判据 `locator('.actions .el-button', { hasText: '返回' })` 超时。后端详情腿确认走 `ApiResponse::success(dto)` 带信封，前端读 `res.data` 两侧同形，所以红点不在信封漂移，而在"取数成功但数据为空"时前端没有任何空态或错误出口 | frontend/src/views/quotations/detail.vue（`v-if="quotation"` 的卡片与卡内 actions、`loadData` 的 catch 分支）；对照 handlers/quotation_handler.rs 的 `get_quotation` 出参形状 | 亲验（制品断言原文 加 三处源码交叉；data 为空的具体上游分支还等证据在取诊断快照） | 前端修（把返回入口与空态提示移出 `v-if="quotation"` 之外，任何取数结果都留一条出口），后端侧是否存在"200 空壳"另案登记 | 40-quotation-role-journey 的 40-01 与 40-02 已把该出口钉成判据（随 #1144 提交） |
+| D-21 | 错误外显族（D-18 的族面） | 把脱敏常量钉成契约的判据不止打卷门一处，主干实量为六枚文件十处：labor-contracts-readback 四处、data-import-lifecycle-readback 两处、44e-state-machines-extended、161-ap-request-schedule-reconcile-chain、160-ap-invoice-balance-aging-report-chain、crm/04-status-readback 各一处。这类点位等于用测试面把"操作员看不出被哪条门拒"合法化，与 utils/error.rs 里"何时允许 business_displayable"的硬规则相冲，后续任何把门改走可外显通道的源码修都会打红这些点 | frontend/e2e/enhanced/labor-contracts-readback.spec.ts、flow/126-data-import-lifecycle-readback.spec.ts、flow/44e-state-machines-extended.spec.ts、flow/161-ap-request-schedule-reconcile-chain.spec.ts、flow/160-ap-invoice-balance-aging-report-chain.spec.ts、crm/04-status-readback.spec.ts | 亲验（git grep 实量计数，六枚文件十处） | 逐枚判责后排期：状态门与删除门的拒因属操作员必须可见，改源码走可外显通道并同步判据；内部错误与第三方原文回显类维持脱敏，判据保留不动 | 计数可复现：对 `frontend/e2e` 取 `toBe('业务处理失败')` 得十处、六枚文件。**同批随动记录：#1154 一度把 211 的第二卷拒绝判据由点名状态门翻成该常量，并给 31b 详情通道加第三条 200 加 data 为 null 的通过形状，两处均已撤回——该支只保留卷号与卷序号按写入方算式实量推导那一半，31b 回到 404 或 200 加软删标记两态** |
 
 ## 与推送次序绑定的两条依赖
 
@@ -37,6 +38,12 @@
    它必须晚于测试面 bundle 合入，并在同一支里带上 216 第 9 段的随动改判（改成断 400 拒绝且 `is_active`
    不变，属只加严）。顺序反了就会由我亲手写出一枚新红。
 2. D-01 补齐后要在 218 追加"零量""负量"两条拒绝腿，拒因文案与 `bad_request` 源码文案逐字同源。
+3. 主干 run 41326285558 的两枚实红只能由源码修解，次序固定为 #1151 先合、#1154 后合：#1151 把打卷等
+   七处状态门改走 `business_displayable` 并把数据权限详情按 404 出，#1154 只带 211 的卷号与卷序号实量
+   推导。若先合 #1154，其判据仍断言逐字点名状态门，而源码侧仍脱敏，分片照旧红；反之先合 #1151，主干
+   两枚红当场转绿。`🚨 E2E 真实性门禁` 与 `🧹 收尾清理` 两枚不是独立缺陷——前者的 env 实证
+   `CI_E2E_RESULT=failure`、`SETUP_WIZARD_RESULT=success`、`ROLE_MATRIX_RESULT=success`，属上游 ci-e2e
+   的 needs 随动红，后者是聚合器，红面数到分片为止。
 
 ## D-08 的证伪过程与由此得出的排期口径
 
