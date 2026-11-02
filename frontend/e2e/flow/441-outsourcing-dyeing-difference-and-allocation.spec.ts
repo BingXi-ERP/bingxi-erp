@@ -1815,7 +1815,7 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
       grants: Array<{ resource_type: string; action: string }>,
       label: string
     ): Promise<{ roleId: number; username: string; password: string }> => {
-      const password = 'E2e@441Pass!x';
+      const password = testPassword();
       const role = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/roles', {
         name: `E2E委外染整${label}${genCode(codeSuffix)}`,
         code: `${codeSuffix.toLowerCase()}${Date.now().toString().slice(-6)}`,
