@@ -187,19 +187,25 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
   });
 
   test('445-02 同批次多笔归集，批次分析侧与单据侧逐分一致', async ({ page }) => {
-    expect(docA, '445-02 依赖 445-01 的单据句柄').toBeDefined();
-    docB = await createCostDoc(page, {
+    if (!docA) {
+      throw new Error(
+        '445-02 前置不成立：445-01 未落库成本归集单，取不到单据 A 句柄，批次对平无从谈起'
+      );
+    }
+    const a = docA;
+    const b = await createCostDoc(page, {
       direct_material: '500.06',
       direct_labor: '50.07',
       manufacturing_overhead: '60.08',
       processing_fee: '0.00',
       dyeing_fee: '120.12',
     });
+    docB = b;
 
     const analysis = await apiCallRaw<Row[]>(
       page,
       'GET',
-      `/production/cost-collections/analysis/by-batch?batch_no=${docA?.batchNo}`
+      `/production/cost-collections/analysis/by-batch?batch_no=${a.batchNo}`
     );
     expect(Array.isArray(analysis), '批次分析端点 data 应为 BatchCostAnalysis 数组').toBe(true);
     expect(analysis.length, `同批次应归集到 2 行，实际 ${analysis.length}`).toBe(2);
@@ -208,16 +214,17 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
     for (const row of analysis) {
       const cents = assertLineReconciled(row, `批次分析行 ${row.collection_no}`);
       batchSumCents += cents;
-      const handle = row.collection_no === docA?.collectionNo ? docA : docB;
+      const handle = row.collection_no === a.collectionNo ? a : b;
       expect(cents, `批次分析行 ${row.collection_no} 的 total_cost 应与单据侧逐分一致`).toBe(
-        (handle as DocHandle).totalCents
+        handle.totalCents
       );
       expect(row.status, '批次分析行应回显草稿状态 draft').toBe('draft');
     }
+    const bothDocsCents = a.totalCents + b.totalCents;
     expect(
       batchSumCents,
-      `批次归集两笔合计 ${batchSumCents} 应与两侧单据总额分之和 ${docA?.totalCents + (docB as DocHandle).totalCents} 对平`
-    ).toBe(docA?.totalCents + (docB as DocHandle).totalCents);
+      `批次归集两笔合计 ${batchSumCents} 应与两侧单据总额分之和 ${bothDocsCents} 对平`
+    ).toBe(bothDocsCents);
   });
 
   test('445-03 审核状态门，draft 到 approved 逐字符回读且拒绝重复审核', async ({ page }) => {
