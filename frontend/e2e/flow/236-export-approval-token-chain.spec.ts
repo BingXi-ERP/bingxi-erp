@@ -371,7 +371,7 @@ test.describe('P236 导出审批令牌链与商检记录/产地证出参形状',
 
     // 证书集合腿：handler 只回 {items,total}，与全站分页信封不一致（发现项，钉成断言）
     const inspectionId = list.items.length > 0 ? list.items[0].id : 1;
-    const certList = await getJson<{ items?: unknown[]; total?: number; page?: unknown; page_size?: unknown }>(
+    const certList = await getJson<{ items?: unknown[]; total?: number; page?: unknown; page_size?: unknown; code?: unknown; message?: string }>(
       page,
       `/export-inspections/${inspectionId}/certificates?page=1&page_size=10`
     );
