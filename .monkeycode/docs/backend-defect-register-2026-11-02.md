@@ -28,6 +28,7 @@
 | D-16 | 库存细码 | 盘点/批次改写腿未见 NOT NULL 与范围门之外的入口校验（0 与负数量可入库） | backend/src/services/inventory_stock_service.rs 与 services/inv/batch.rs | 自述 | 词表收口 | 218、248 侧记录 |
 | D-17 | 坏账核销打印 | 归属列其实存在，被"永久豁免"口径一刀切：清单头称这些表"不存在 created_by 或等效归属用户列因此永久豁免行级门"，但 `bad_debt_writeoff` 自己的条目注释写着归属语义由 `applicant_user_id` 承载、待裁定是否建等效门——同一清单里既有事实又有例外，按注释读会把可修的一条当成不可修 | backend/src/services/print_service.rs:161 起（清单头 158-160 与 bad_debt_writeoff 条目注释） | 亲验 | 口径裁定（定 applicant 序列是否算行级归属），裁定后转 源码修 | 尚无断言钉住 |
 | D-18 | 验布打卷门 | 拒绝原因对操作员不可见：打卷前置门用 `AppError::business` 造错，出参 message 被脱敏成固定常量，操作员只知"失败"不知"须先评级才能打卷"；同族的库存不足类门走 `bad_request` 会逐字外显，两族口径不一致 | backend/src/services/fabric_inspection_service.rs 的 `validate_roll_preconditions`；对照 utils/messages.rs 的 `BUSINESS_PUBLIC` 与 utils/error.rs 的通道分族 | 亲验（主干红取证时逐字读过构造点） | 口径裁定后转 源码修（换可外显错误族）。**改前必须清点谁在钉"该门返回脱敏常量"**——211 已把常量本身钉成断言，换通道即打红 | 211 的判据形状已按当前契约钉住（随 #1154 提交） |
+| D-19 | 报价单入口 | 展示面与鉴权面口径不一致（水平越权暴露面）：报价路由五处 `meta.permission` 写粗域键 `sales:read`，而报价端点挂在 `/api/v1/erp/quotations` 下、后端派生鉴权键是 `quotations` 加动作；`sales:` 粗域在前端守卫里展开到 `pieces` 与 `reports`，只持这两枚读权的仓储岗因此在侧栏看得见"报价单管理"入口，点进去被后端判 403——入口对无权限岗位可供而动作必然失败 | frontend/src/router/index.ts 的 quotations 五条路由；对照 middleware/permission.rs 的键派生、services/init_service_ops/permission.rs 的 warehouse_keeper 授权组（不含 quotations） | 亲验（四处交叉：路由表 加 守卫展开表 加 鉴权键推导 加 授权种子） | 源码修（`sales:read` 改 `quotations:read`，与既有细资源键写法同构） | 已修在 #1155；权限快照与角色矩阵遍历用例（traversal/permission-model.ts 与 44-role-matrix.spec.ts）若因此转红属随动改判，须同支登记 |
 
 ## 与推送次序绑定的两条依赖
 
