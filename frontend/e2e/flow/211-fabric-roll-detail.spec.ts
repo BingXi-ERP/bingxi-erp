@@ -550,10 +550,14 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
       roll_gram_weight: '210.0',
     });
     expectStateGateRejection(second, '已打卷（rolled）的验布单不得再打第二卷');
+    // 该状态门走 AppError::business，出参 message 按契约固定脱敏为公开常量（真实原因只进
+    // 服务端 tracing 日志），所以逐字文案在本通道物理不可得：这里改为钉住"必须是公开脱敏
+    // 常量"这一条契约，既不放纵泄露内部原因，也不假装能断到未外显的原文。
     expect(
       String(second.message ?? ''),
-      `同单第二卷的拒绝文案必须点名状态门，实际 message=${JSON.stringify(second.message)}`
-    ).toMatch(/仅已评级\(graded\)状态可打卷入库/);
+      `第二卷拒绝走 business 通道，message 必须是脱敏公开常量（backend utils/messages.rs ` +
+        `BUSINESS_PUBLIC），实际 message=${JSON.stringify(second.message)}`
+    ).toBe('业务处理失败');
 
     // 拒绝必须零写入：状态与本卷汇总都不得被这次失败的请求带跑
     const afterSecond = await readInspection(page, id);
