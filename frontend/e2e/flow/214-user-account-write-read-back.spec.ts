@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from '../diagnose-fixture';
 import { apiCall, loginAsRole, loginViaUI, testPassword } from './helpers';
+import { openSelectDropdownItems } from './ui-helpers';
 
 /**
  * 用户档案「写后回读 + 软删除」链 E2E（一枚 test，六段链路）
@@ -114,8 +115,7 @@ async function fillDialogEdit(page: Page): Promise<void> {
 async function selectRole(page: Page, itemIndex: number, expectName: string | null): Promise<string> {
   const select = dialogItem(page, itemIndex).locator('.el-select');
   await expect(select, '角色下拉控件不可见').toBeVisible();
-  await select.click();
-  const options = page.locator('.el-select-dropdown__item:visible');
+  const options = await openSelectDropdownItems(page, select);
   const count = await options.count();
   if (count === 0) {
     throw new Error(`角色下拉展开后零个可见选项（select=${await select.innerText()}）`);
@@ -296,19 +296,17 @@ test.describe('用户档案 写后回读与删除链', () => {
 
     await page.goto(`${process.env.BASE_URL ?? 'http://localhost:3000'}/users`);
     await keywordInput(page).fill(USERNAME);
-    await page
+    const statusSelect = page
       .locator('.el-card')
       .first()
       .locator('.el-form-item')
       .nth(1)
-      .locator('input')
-      .first()
-      .click();
-    await page
-      .locator('.el-select-dropdown__item:visible')
-      .filter({ hasText: /^/ })
-      .first()
-      .click();
+      .locator('.el-select');
+    const statusOptions = await openSelectDropdownItems(page, statusSelect);
+    await expect
+      .poll(async () => statusOptions.count(), { timeout: 15_000 })
+      .toBeGreaterThan(0);
+    await statusOptions.first().click();
     await searchButton(page).click();
     await expect
       .poll(async () => usersTable(page).locator('.el-table__body tr').count(), { timeout: 20_000 })
