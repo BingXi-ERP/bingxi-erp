@@ -20,9 +20,9 @@ import {
  * →结算→会计凭证→过账）把数量、损耗、实测值与过账标记写进库里再读回。
  * 调用方：Playwright 分片 e2e（frontend/e2e/flow），serial 模式，前序句柄供后序复用。
  * 入参：口令与会话只经 helpers 的 loginAsRole/testUsername/testPassword 取得；单号用 genCode()
- * 生成唯一值（委外订单号在未删除行内唯一，见 outsourcing_ops/order.rs:184 validate_order_no_unique）；
- * 委外类型取状态词表常量值 dyeing（models/status/wage_energy_chemical_business.rs:250），
- * 返工类型取 models/dye_batch_rework.rs:26 列出的 color_difference。
+ * 生成唯一值（委外订单号在未删除行内唯一，见 outsourcing_ops/order.rs validate_order_no_unique）；
+ * 委外类型取状态词表常量值 dyeing（models/status/wage_energy_chemical_business.rs），
+ * 返工类型取 models/dye_batch_rework.rs 列出的 color_difference。
  * 传给谁：backend/src/handlers/dye_batch_state_machine_handler.rs（create_rework / approve_rework /
  * start_rework / complete_rework / cancel_rework）与 outsourcing_handler.rs
  * （create_outsourcing_order / issue / processing / create_outsourcing_receipt /
@@ -34,10 +34,10 @@ import {
  * return_quantity/loss_quantity 与实测 weight/width/gram_weight；outsourcing_voucher 的
  * voucher_type/debit_account/credit_account/amount/is_posted。未回填的时间与实测列断言为
  * null（表示未补录），绝不断言成 0。
- * 存哪里：表 dye_batch_rework（backend/src/models/dye_batch_rework.rs:13）、
+ * 存哪里：表 dye_batch_rework（backend/src/models/dye_batch_rework.rs）、
  * outsourcing_order、outsourcing_receipt、outsourcing_voucher
- * （字段口径见 backend/src/services/outsourcing_ops/types.rs:29/211/309）；
- * 状态词表见 backend/src/models/status/wage_energy_chemical_business.rs:262 与 quality_dyeing.rs:280。
+ * （字段口径见 backend/src/services/outsourcing_ops/types.rs）；
+ * 状态词表见 backend/src/models/status/wage_energy_chemical_business.rs 与 quality_dyeing.rs。
  */
 
 const REWORK_STATUS_DRAFT = 'draft';
@@ -75,7 +75,7 @@ test.describe('449 委外染整返工与缸差登记', () => {
     // rework_type=color_difference、original_status=该批次当前状态词、同缸回修时 rework_batch_id 等于原缸。
     // 传给谁：services/dye_batch_state_machine_ops/rework.rs（validate_rework_type + 回修资格校验）。
     // 存什么：status 与 approved_by/approved_at/started_at/completed_at；未到达的级保持 null。
-    // 存哪里：表 dye_batch_rework（backend/src/models/dye_batch_rework.rs:13）。
+    // 存哪里：表 dye_batch_rework（backend/src/models/dye_batch_rework.rs）。
     const batches = await safeGetList<Record<string, unknown>>(
       page,
       '/production/dye-batches?page=1&page_size=50'
@@ -317,12 +317,12 @@ test.describe('449 委外染整返工与缸差登记', () => {
     // 功能：建委外染整订单 → 读回全部写入值 → 发料 → 加工 → 结算，每跳重读校验状态词与金额字段。
     // 调用方：outsourcing_handler::create_outsourcing_order / issue_outsourcing_order /
     // record_processing / settle_outsourcing_order。
-    // 入参 order_type=dyeing（词表 wage_energy_chemical_business.rs:250）；supplier_id 与
+    // 入参 order_type=dyeing（词表 wage_energy_chemical_business.rs）；supplier_id 与
     // product_id/warehouse_id 取库内真实主数据；issue_date 为业务日期字面量。
     // 传给谁：services/outsourcing_ops/order.rs（单号查重、成本计算、状态流转）。
     // 存什么：outsourcing_order 的 order_no/order_type/supplier_id/issue_quantity/issue_unit/
     // material_cost/processing_fee/freight_fee/tax_amount/status。
-    // 存哪里：表 outsourcing_order（字段见 services/outsourcing_ops/types.rs:29）。
+    // 存哪里：表 outsourcing_order（字段见 services/outsourcing_ops/types.rs）。
     const orders = await safeGetList<Record<string, unknown>>(
       page,
       '/production/outsourcing-orders?page=1&page_size=10'
@@ -396,7 +396,7 @@ test.describe('449 委外染整返工与缸差登记', () => {
       OUTSOURCING_STATUS_DRAFT
     );
 
-    // 单号唯一门：同码重复建单必须被拒（order.rs:184 validate_order_no_unique）。
+    // 单号唯一门：同码重复建单必须被拒（order.rs validate_order_no_unique）。
     const dup = await apiCallExpectFail(page, 'POST', '/production/outsourcing-orders', {
       order_no: orderNo,
       order_type: OUTSOURCING_ORDER_TYPE_DYEING,
@@ -414,7 +414,7 @@ test.describe('449 委外染整返工与缸差登记', () => {
       `重复单号应被拒绝，实际 status=${dup.status} code=${failureCode(dup)}`
     ).toBeGreaterThanOrEqual(400);
 
-    // 非法跃迁：draft 未发料直接结算应被状态门拒绝（order.rs:665 只有 received 可结算）。
+    // 非法跃迁：draft 未发料直接结算应被状态门拒绝（order.rs 只有 received 可结算）。
     const settleTooEarly = await apiCallExpectFail(
       page,
       'POST',
@@ -480,10 +480,10 @@ test.describe('449 委外染整返工与缸差登记', () => {
     // 断言三列保持 NULL（未补录）而不是 0。
     // 调用方：outsourcing_handler::create_outsourcing_receipt / confirm_outsourcing_receipt。
     // 入参 outsourcing_order_id 用上一笔真实订单；return_quantity/loss_quantity 为业务数量；
-    // weight/width/gram_weight 三列按 types.rs:228-233 的可空口径分别构造有值与缺席。
+    // weight/width/gram_weight 三列按 types.rs 的可空口径分别构造有值与缺席。
     // 传给谁：services/outsourcing_ops/receipt.rs（validate_measured_value 取值域门）。
     // 存什么：return_quantity/loss_quantity/weight/width/gram_weight/quality_status/grade/status。
-    // 存哪里：表 outsourcing_receipt（字段见 services/outsourcing_ops/types.rs:211）。
+    // 存哪里：表 outsourcing_receipt（字段见 services/outsourcing_ops/types.rs）。
     if (!outsourcingOrderId || !outsourcingProductId || !outsourcingWarehouseId) {
       throw new Error('前置不成立：委外订单或主数据句柄未建立，收回腿会退化成空跑');
     }
@@ -609,7 +609,7 @@ test.describe('449 委外染整返工与缸差登记', () => {
       RECEIPT_STATUS_CONFIRMED
     );
 
-    // 收回确认必须把订单推到 received（settle 的唯一合法前置，order.rs:665）。
+    // 收回确认必须把订单推到 received（settle 的唯一合法前置，order.rs）。
     const orderAfterConfirm = await apiCall<Record<string, unknown>>(
       page,
       'GET',
@@ -635,12 +635,12 @@ test.describe('449 委外染整返工与缸差登记', () => {
     // 被拒后 is_posted 不漂。
     // 调用方：outsourcing_handler::settle_outsourcing_order / create_outsourcing_voucher /
     // post_outsourcing_voucher。
-    // 入参 voucher_type=fee（词表 wage_energy_chemical_business.rs:344）；amount 取加工费同额；
+    // 入参 voucher_type=fee（词表 wage_energy_chemical_business.rs）；amount 取加工费同额；
     // debit_account/credit_account 为科目编码字面量。
     // 传给谁：services/outsourcing_ops/voucher.rs（建凭证、过账写 is_posted）。
     // 存什么：outsourcing_order.status=settled；outsourcing_voucher 的 voucher_no/voucher_type/
     // amount/is_posted 与过账时间。
-    // 存哪里：表 outsourcing_order、outsourcing_voucher（字段见 services/outsourcing_ops/types.rs:309）。
+    // 存哪里：表 outsourcing_order、outsourcing_voucher（字段见 services/outsourcing_ops/types.rs）。
     if (!outsourcingOrderId || !receiptId || !outsourcingOrderNo) {
       throw new Error('前置不成立：委外订单或收回单句柄未建立，结算与凭证腿无法定位真实单据');
     }
@@ -747,9 +747,9 @@ test.describe('449 委外染整返工与缸差登记', () => {
   test('无权限岗位调用返工审批与委外发料被拦，主管岗位同端点可达', async ({ page }) => {
     // 功能：垂直越权防护——只读岗位调用写端点必须被权限门拒绝（HTTP 403 + FORBIDDEN），
     // 同端点在主管岗位会话下可达，证明 403 来自 RBAC 而不是路由缺失或 CSRF 竞败。
-    // 调用方：loginAsRole + apiCallExpectFail + expectDenied（helpers.ts:3794）。
+    // 调用方：loginAsRole + apiCallExpectFail + expectDenied（helpers.ts）。
     // 入参：岗位名 report_viewer（只读报表岗）与 production_manager（染整主管岗）；权限键由
-    // URL 段 /api/v1/erp/{seg3}/{seg4} 推导（middleware/permission.rs:259），
+    // URL 段 /api/v1/erp/{seg3}/{seg4} 推导（middleware/permission.rs），
     // 即 production/dye-batch-reworks 与 production/outsourcing-orders 两族键。
     // 传给谁：权限中间件，被拒时不触达 service。
     // 存什么：被拒时零写入——回修单状态与委外订单状态均不得漂移。
