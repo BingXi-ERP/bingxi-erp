@@ -980,8 +980,13 @@ export async function readFirstEntityId(
   listKey: ListShapeKey = 'items'
 ): Promise<number | undefined> {
   try {
+    // 等待器必须先于导航注册：async 函数体在首个 await 之前同步执行，这里不 await 就等于
+    // 先把 waitForResponse 挂上、再由 goto 触发页面挂载发的那一次列表 GET。反过来（先
+    // goto 再注册）恒漏接——列表请求只在挂载时发一次，错过就只能等满超时，而本函数把
+    // 超时 catch 成 console.warn 返回空集，UI 腿静默空转不判红，每处白烧满 20s。
+    const pendingItems = waitListResponse(page, listApiPath, listKey, 20000);
     await safeGoto(page, route);
-    const items = await waitListResponse(page, listApiPath, listKey, 20000);
+    const items = await pendingItems;
     const id = firstId(items);
     if (id !== undefined) return id;
   } catch (e) {
