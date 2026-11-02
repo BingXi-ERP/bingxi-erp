@@ -1,14 +1,21 @@
 <!--
   报价单详情页
-  - 顶部按钮：返回 / 编辑 / 提交 / 批准 / 拒绝 / 转订单 / 取消（按状态显示）
+  - 常驻退出条：返回列表（与详情卡片同级，任何取数结果都渲染，操作员始终有出口）
+  - 详情卡片按钮：编辑 / 提交 / 批准 / 拒绝 / 转订单 / 取消（按状态显示）
   - 描述列表：客户/日期/价格条款/币种/含税/客户等级/MOQ/交期/状态
   - 报价明细表
   - 贸易条款 Tab
   - 金额合计
+  - 取数异常三态：标识非法、取数失败（可重试）、无单据内容，各有一块可见状态
 -->
 <template>
   <div v-loading="loading" class="quotation-detail">
-    <el-card v-if="quotation">
+    <div class="detail-exit">
+      <el-button :icon="ArrowLeft" @click="goBackToList">{{
+        t('quotations.detail.back')
+      }}</el-button>
+    </div>
+    <el-card v-if="loadState === 'ready' && quotation">
       <template #header>
         <div class="card-header">
           <span class="title">
@@ -16,7 +23,6 @@
             <span class="quotation-no">{{ quotation.quotation_no }}</span>
           </span>
           <div class="actions">
-            <el-button @click="$router.back()">{{ t('quotations.detail.back') }}</el-button>
             <el-button v-if="canEdit" @click="$router.push(`/quotations/${quotation.id}/edit`)">
               {{ t('quotations.detail.edit') }}
             </el-button>
@@ -195,8 +201,31 @@
         <span>{{ t('quotations.detail.updatedAt') }}{{ quotation.updated_at }}</span>
       </div>
     </el-card>
-
-    <el-empty v-else-if="!loading" :description="t('quotations.detail.notExist')" />
+    <div v-else-if="!loading" class="detail-state">
+      <!-- 取数失败给错误态与重试入口；标识非法与无单据内容各给一条空态说明，退出入口常驻在顶部 -->
+      <template v-if="loadState === 'load-failed'">
+        <el-alert
+          :title="t('quotations.detail.loadFailed')"
+          :description="t('quotations.detail.stateLoadFailedHint')"
+          type="error"
+          show-icon
+          :closable="false"
+        />
+        <el-button class="state-retry" @click="loadData">
+          {{ t('quotations.detail.retry') }}
+        </el-button>
+      </template>
+      <el-empty
+        v-else-if="loadState === 'invalid-id'"
+        :description="t('quotations.detail.stateInvalidId')"
+      />
+      <el-empty
+        v-else-if="loadState === 'empty-result'"
+        :description="t('quotations.detail.notExist')"
+      >
+        <p class="state-hint">{{ t('quotations.detail.stateNotFoundHint') }}</p>
+      </el-empty>
+    </div>
   </div>
 </template>
 
@@ -205,7 +234,10 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { ArrowLeft } from '@element-plus/icons-vue';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
+import { msg } from '@/utils/message';
+import { logger } from '@/utils/logger';
 import { promptApprovalReason, promptRejectReason } from '@/composables/useActionPrompts';
 import { formatDecimalAmount } from '@/utils/money';
 import { useUserStore } from '@/store/user';
@@ -236,25 +268,57 @@ const { t } = useI18n({ useScope: 'global' });
 const route = useRoute();
 const router = useRouter();
 const userStore = useUserStore();
-const loading = ref(false);
-const quotation = ref<QuotationResponseDto | null>(null);
+/** 取数结果态：ready 渲染详情卡片，其余三种各渲染一块可见状态 */
+type LoadState = 'invalid-id' | 'load-failed' | 'empty-result' | 'ready';
 
-/** 加载详情 */
+const loading = ref(true);
+const quotation = ref<QuotationResponseDto | null>(null);
+/** 尚未取数时按无单据内容对待，首帧由 loading 遮蔽 */
+const loadState = ref<LoadState>('empty-result');
+
+/** 加载详情：标识非法、取数失败、无单据内容三条异常路径分别落态并留痕，取数成功也留痕 */
 async function loadData() {
-  const id = Number(route.params.id);
-  if (!id) return;
   loading.value = true;
   try {
+    const rawId = route.params.id;
+    const id = Number(rawId);
+    if (!Number.isInteger(id) || id <= 0) {
+      quotation.value = null;
+      loadState.value = 'invalid-id';
+      logger.warn('报价单详情标识非法，不发起取数', rawId);
+      msg.warning('invalidRecordId');
+      return;
+    }
+    logger.info('报价单详情开始取数', id);
     const res = await getQuotation(id);
-    quotation.value = res.data as QuotationResponseDto;
-  } catch (e: unknown) {
-    ElMessage.error(
-      (e instanceof Error ? e.message : String(e)) || t('quotations.detail.loadFailed')
-    );
+    const data = res.data as QuotationResponseDto | null;
+    if (!data || !data.id || !data.quotation_no) {
+      quotation.value = null;
+      loadState.value = 'empty-result';
+      logger.warn('报价单详情未返回单据内容，无法渲染', { id, data });
+      msg.warning('recordNotFound');
+      return;
+    }
+    quotation.value = data;
+    loadState.value = 'ready';
+    logger.info('报价单详情取数成功', { id, quotationNo: data.quotation_no });
+  } catch (error: unknown) {
     quotation.value = null;
+    loadState.value = 'load-failed';
+    logger.error('报价单详情取数失败', {
+      id: route.params.id,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    msg.error('loadFailed');
   } finally {
     loading.value = false;
   }
+}
+
+/** 退出详情：落点固定为报价单列表，取数成功与否都走得通 */
+function goBackToList() {
+  logger.info('报价单详情返回列表');
+  router.push('/quotations');
 }
 
 /** 按钮可见性（状态门与权限键同判）：权限码与路由守卫同源判定，后端仍以同一键二次鉴权 */
@@ -401,6 +465,20 @@ onMounted(loadData);
 <style scoped>
 .quotation-detail {
   padding: 16px;
+}
+.detail-exit {
+  margin-bottom: 12px;
+}
+.detail-state {
+  padding: 24px 0;
+}
+.state-retry {
+  margin-top: 16px;
+}
+.state-hint {
+  margin: 0;
+  font-size: 13px;
+  color: #909399;
 }
 .card-header {
   display: flex;
