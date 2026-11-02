@@ -45,8 +45,11 @@
 // 5 事件类型入参校验存在且可外显。logistics_service.rs:97-103 用
 //   AppError::validation_displayable 直出逐字文案，本文件按词表原文断言整串。
 // 6 打印模板与行级归属门。logistics_waybill 在 print_service.rs:170 登记为"无归属用户列"，
-//   即任何过 RBAC 的登录用户都能取到任意运单的 docx，本轮不覆盖该水平面缺口；
-//   打印腿断的是解包后的业务列成员，不是只看状态码。
+//   归属门函数对非 PRINT_SCOPE_GATED 的类型直接放行（同文件 269-277 的注释自陈 PENDING 与
+//   NO_OWNER 同样放行），所以本腿没有行级归属判定，传进去的 DataScopeContext 在这里是死参数。
+//   但按第 7 条，本族派生键没有任何角色持有，当前只有 admin 旁路走得通这条腿，因此该缺口是
+//   补授即开面的潜伏态，不是现网可控越权；本轮不覆盖该水平面。打印腿断的是解包后的业务列
+//   成员，不是只看状态码。
 // 7 权限键由 URL 段推导（middleware/permission.rs:259 起），本族 seg3 是
 //   "logistics-tracking"（utils/path_utils.rs:416 登记），派生键为
 //   logistics-tracking 加 read/create/print；种子授权只给了 ("logistics", ...)
