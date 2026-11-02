@@ -37,32 +37,32 @@ import {
  * - POST `/export-approvals`、GET `/export-approvals`、GET `/export-approvals/{id}/token-once`、
  *   GET `/export-approvals/verify-token`、POST `/export-approvals/{id}/cancel`。
  *
- * 打印腿的出参与判据来源：`render_print_docx`（backend/src/handlers/print_handler.rs:39-56）先装配打印
+ * 打印腿的出参与判据来源：`render_print_docx`（backend/src/handlers/print_handler.rs）先装配打印
  * 数据再解析模板布局，无可用默认模板行时 `resolve_print_docx_layout`
- * （backend/src/handlers/print_task_handler.rs:253-259）不外显 200，成功出参是
+ * （backend/src/handlers/print_task_handler.rs）不外显 200，成功出参是
  * `docx_response` 的 docx 字节流，`content-disposition` 文件名格式为 `{doc_type}_{doc_id}.docx`。
  * 因此本文件对打印腿一律 JSZip 解 `word/document.xml` 后断言真实业务标识（打样申请号/定制订单号），
  * 不接受只判 200 或只判字节长度。
  *
  * 脱敏分面的事实来源（不是设想，是写入方代码）：
- * - `utils/field_mask.rs:120-152` `mask_contact_fields_for_role`：`is_admin=true` 原样返回；
+ * - `utils/field_mask.rs` 的 `mask_contact_fields_for_role`：`is_admin=true` 原样返回；
  *   非 admin 对 phone_keys（contact_phone/phone/mobile/mobile_phone/tel_phone/telephone/driver_phone/
  *   contact_mobile）逐个替换成 `mask_phone` 形态（前 3 + `****` + 后 4，键保留），
  *   email_keys（contact_email/email/email_address）替换成 `mask_email` 形态（首字母 + `***@` + 域名）。
- * - `services/crm/cust.rs:98-109` `mask_customer_pii_defaults`：在上述基础上，非 admin 另把 `address`
+ * - `services/crm/cust.rs` 的 `mask_customer_pii_defaults`：在上述基础上，非 admin 另把 `address`
  *   整键移除（掩码列保留、地址列剔除，两者形态不同，断言不能一刀切）。
- * - `handlers/crm_customer_handler.rs:98-130` `apply_customer_field_permission` 是客户域读写出口的唯一实现，
- *   列表（`/crm/customers/enhanced`）、详情与 `handlers/crm_customer_handler.rs:405-419` 的
- *   `list_contacts`（`/crm/customers/{id}/contacts`）都走它，故 contacts 子端点与客户列表同一分面；
+ * - `handlers/crm_customer_handler.rs` 的 `apply_customer_field_permission` 是客户域读写出口的唯一实现，
+ *   列表（`/crm/customers/enhanced`）、详情与同文件的 `list_contacts`
+ *   （`/crm/customers/{id}/contacts`）都走它，故 contacts 子端点与客户列表同一分面；
  *   若实测 contacts 出原文即为旁路缺陷，由本文件的断言直接判红暴露，不做放宽。
- * - `services/color_card_issue_service.rs:828-843` `mask_cost_amount`：`handlers/color_card/issue.rs:417`
+ * - `services/color_card_issue_service.rs` 的 `mask_cost_amount`：`handlers/color_card/issue.rs`
  *   在 `can_view_cost` 为假时把 `compensation_amount` 置 None（成本列剔除而非掩码，与 PII 列又是第三种形态）。
  *
- * 一次性令牌的事实来源：`handlers/export_approval_handler.rs:195-215` `view_token_once` 首次回
+ * 一次性令牌的事实来源：`handlers/export_approval_handler.rs` 的 `view_token_once` 首次回
  * `{available:true,token:<明文>}`，之后只回 `{available:false,fingerprint,message}` 且不再携带明文；
- * `services/export_approval_service.rs:730-775` `verify_download_token` 走
+ * `services/export_approval_service.rs` 的 `verify_download_token` 走
  * `assert_token_consumable`，状态非 APPROVED 或已消费一律 `AppError::permission_denied`（HTTP 403 +
- * 机器码 FORBIDDEN）；`services/export_approval_service.rs:1316-1325` `masked_json` 把列表与详情的
+ * 机器码 FORBIDDEN）；同文件的 `masked_json` 把列表与详情的
  * `download_token`、`token_hash` 恒置 null。
  *
  * 失败信封断言一律钉 HTTP 码 + 字符串机器码 + trace_id/timestamp 在场（utils/error.rs 单一形状），
@@ -488,7 +488,7 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       }
       expect(
         'address' in spRow,
-        `业务员侧 address 键必须被 mask_customer_pii_defaults 整键剔除（cust.rs:98-109），实际仍在外显`
+        `业务员侧 address 键必须被 mask_customer_pii_defaults 整键剔除（cust.rs），实际仍在外显`
       ).toBe(false);
     }
 
@@ -501,7 +501,7 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
         const p = str(r.contact_phone ?? r.phone);
         return p.length === 0 || /^\d{3}\*{4}\d{4}$/.test(p);
       }),
-      `业务员侧 contacts 子端点必须与列表同分面出掩码（crm_customer_handler.rs:405-419 与客户列表共用 apply_customer_field_permission），实际 ${JSON.stringify(spContacts.slice(0, 2))}——出原文即读出口旁路`
+      `业务员侧 contacts 子端点必须与列表同分面出掩码（crm_customer_handler.rs 与客户列表共用 apply_customer_field_permission），实际 ${JSON.stringify(spContacts.slice(0, 2))}——出原文即读出口旁路`
     ).toBe(true);
 
     const spIssues = rowsOf(
@@ -511,7 +511,7 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     if (spIssues.length > 0) {
       expect(
         spIssues.every(r => r.compensation_amount === null || r.compensation_amount === undefined),
-        `业务员侧 compensation_amount 必须按 issue.rs:417 置 None（成本列剔除），实际存在非空值`
+        `业务员侧 compensation_amount 必须按 issue.rs 置 None（成本列剔除），实际存在非空值`
       ).toBe(true);
     }
 
