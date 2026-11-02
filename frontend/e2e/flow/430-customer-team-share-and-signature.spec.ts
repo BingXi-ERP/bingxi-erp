@@ -171,9 +171,10 @@ async function pickActiveUserIds(page: Page, exclude: number[], count: number): 
     'GET',
     '/users?page=1&page_size=100'
   );
-  expect(Array.isArray(res.users), `GET /users 响应缺 data.users 数组：${JSON.stringify(res)}`).toBe(
-    true
-  );
+  expect(
+    Array.isArray(res.users),
+    `GET /users 响应缺 data.users 数组：${JSON.stringify(res)}`
+  ).toBe(true);
   const ids = res.users.filter(u => u.is_active && !exclude.includes(u.id)).map(u => u.id);
   if (ids.length < count) {
     throw new Error(
@@ -221,7 +222,10 @@ async function createOwnedCustomer(
  * apiCallExpectFail 只回传 status/code/message，承载不了 trace_id 与 timestamp，
  * 故失败信封形状用本函数取证（GET 不消费 CSRF，无需带令牌）。
  */
-async function fetchEnvelope(page: Page, path: string): Promise<{ status: number; body: Record<string, unknown> }> {
+async function fetchEnvelope(
+  page: Page,
+  path: string
+): Promise<{ status: number; body: Record<string, unknown> }> {
   const res = await page.request.fetch(`${API_BASE}${API_PREFIX}${path}`, {
     method: 'GET',
     headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -247,10 +251,13 @@ function assertUnifiedForbiddenEnvelope(
 ): void {
   expect(env.status, `${context}：实际 status=${env.status}`).toBe(403);
   const code = env.body.code;
-  expect(typeof code, `${context}：失败信封 code 必须是字符串机器码，实际 ${JSON.stringify(code)}`).toBe(
-    'string'
+  expect(
+    typeof code,
+    `${context}：失败信封 code 必须是字符串机器码，实际 ${JSON.stringify(code)}`
+  ).toBe('string');
+  expect(code, `${context}：code 应为 ${APP_ERROR_CODES.FORBIDDEN}`).toBe(
+    APP_ERROR_CODES.FORBIDDEN
   );
-  expect(code, `${context}：code 应为 ${APP_ERROR_CODES.FORBIDDEN}`).toBe(APP_ERROR_CODES.FORBIDDEN);
   expect(typeof env.body.message, `${context}：message 必须存在且为字符串`).toBe('string');
   const traceId = env.body.trace_id;
   expect(typeof traceId, `${context}：trace_id 必须为字符串`).toBe('string');
@@ -306,7 +313,10 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
       'shared_by_user_name 必须落真实登录名（AuthContext.username），不得为自造名'
     ).toBe(me.username);
     expect(shareA.shared_to_user_id, 'shared_to_user_id 应等于提交主体甲').toBe(subjectA);
-    expect(shareA.expire_at, '30 天时效共享的 expire_at 不得为 NULL（NULL 即永久共享）').not.toBeNull();
+    expect(
+      shareA.expire_at,
+      '30 天时效共享的 expire_at 不得为 NULL（NULL 即永久共享）'
+    ).not.toBeNull();
     expect(shareA.revoked_at, '未撤销共享的 revoked_at 必须写 NULL，不得写空串或时间').toBeNull();
     expect(shareA.revoked_by, '未撤销共享的 revoked_by 必须写 NULL，不得写 0').toBeNull();
     expect(
@@ -372,7 +382,10 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
         `by-user?user_id=${subjectB} 回读到非本人行（shared_to_user_id=${row.shared_to_user_id}）`
       ).toBe(subjectB);
     }
-    expect(sharesOfB.some(r => r.id === shareB.id), '主体乙应能回读到自己的共享行').toBe(true);
+    expect(
+      sharesOfB.some(r => r.id === shareB.id),
+      '主体乙应能回读到自己的共享行'
+    ).toBe(true);
     expect(
       sharesOfB.some(r => r.id === shareA.id),
       `主体甲的共享行 ${shareA.id} 出现在主体乙的 by-user 通道——数据范围隔离失效`
@@ -391,7 +404,10 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
         `by-user 团队通道回读到非本人行（user_id=${row.user_id}）——通道未过滤主体`
       ).toBe(subjectA);
     }
-    expect(teamsOfA.some(r => r.id === memberA.id), '主体甲应能回读到自己的团队行').toBe(true);
+    expect(
+      teamsOfA.some(r => r.id === memberA.id),
+      '主体甲应能回读到自己的团队行'
+    ).toBe(true);
     expect(
       teamsOfA.some(r => r.id === memberB.id),
       `主体乙的团队行 ${memberB.id} 出现在主体甲的 by-user 团队通道——数据范围隔离失效`
@@ -406,8 +422,14 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     for (const row of teamsOfB) {
       expect(row.user_id, `by-user 团队通道混入非本人行 user_id=${row.user_id}`).toBe(subjectB);
     }
-    expect(teamsOfB.some(r => r.id === memberB.id), '主体乙应能回读到自己的团队行').toBe(true);
-    expect(teamsOfB.some(r => r.id === memberA.id), '主体甲的团队行不应出现在主体乙通道').toBe(false);
+    expect(
+      teamsOfB.some(r => r.id === memberB.id),
+      '主体乙应能回读到自己的团队行'
+    ).toBe(true);
+    expect(
+      teamsOfB.some(r => r.id === memberA.id),
+      '主体甲的团队行不应出现在主体乙通道'
+    ).toBe(false);
 
     // active_only=false 只放宽 is_active 过滤，不得放宽主体过滤
     const teamsOfAAll = await apiCallRaw<MemberRow[]>(
@@ -492,7 +514,10 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
       'GET',
       `/customer-shares/check?customer_id=${cust.id}&user_id=${subjectB}`
     );
-    expect(permNegative, `无共享的主体必须判 null，实际 ${JSON.stringify(permNegative)}`).toBeNull();
+    expect(
+      permNegative,
+      `无共享的主体必须判 null，实际 ${JSON.stringify(permNegative)}`
+    ).toBeNull();
 
     // 移除成员（软删 is_active=false）后判定通道必须转判否，证明判定腿真的读活跃标记
     await apiCall(page, 'DELETE', `/customer-team-members/${member.id}`);
@@ -578,10 +603,9 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     expect(typeof firstRun.expired_count, 'expired_count 应为数值（服务层 ExpireResult）').toBe(
       'number'
     );
-    expect(
-      firstRun.expired_count,
-      '本次至少应处理掉用例自建的那条已过期行'
-    ).toBeGreaterThanOrEqual(1);
+    expect(firstRun.expired_count, '本次至少应处理掉用例自建的那条已过期行').toBeGreaterThanOrEqual(
+      1
+    );
 
     const afterFirst = await apiCallRaw<ShareRow[]>(
       page,
@@ -592,19 +616,10 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     const firstOverdue = afterFirst.find(r => r.id === overdue.id)!;
     const firstStillActive = afterFirst.find(r => r.id === stillActive.id)!;
     expect(firstOverdue.status, '已过期行应被批量腿置为词表 expired').toBe(SHARE_STATUS_EXPIRED);
-    expect(
-      firstOverdue.revoked_at,
-      '自动过期不是主动撤销，revoked_at 必须保持 NULL'
-    ).toBeNull();
+    expect(firstOverdue.revoked_at, '自动过期不是主动撤销，revoked_at 必须保持 NULL').toBeNull();
     expect(firstOverdue.revoked_by, '自动过期不得写 revoked_by').toBeNull();
-    expect(
-      firstOverdue.revoke_reason,
-      '自动过期不得写 revoke_reason'
-    ).toBeNull();
-    expect(
-      firstStillActive.status,
-      '未到期的对照行不得被批量腿误动'
-    ).toBe(SHARE_STATUS_ACTIVE);
+    expect(firstOverdue.revoke_reason, '自动过期不得写 revoke_reason').toBeNull();
+    expect(firstStillActive.status, '未到期的对照行不得被批量腿误动').toBe(SHARE_STATUS_ACTIVE);
     const stampAfterFirst = firstOverdue.updated_at;
     expect(stampAfterFirst, '批量腿应刷新被处理行的 updated_at').not.toBe(overdue.updated_at);
 
@@ -676,10 +691,9 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
       total_amount: '1250.00',
     });
     expect(contract.id, '建销售合同应返回主键').toBeTypeOf('number');
-    expect(
-      contract.status,
-      '新建合同的 status 应由写入方落词表 draft，不得自造'
-    ).toBe(CONTRACT_STATUS_DRAFT);
+    expect(contract.status, '新建合同的 status 应由写入方落词表 draft，不得自造').toBe(
+      CONTRACT_STATUS_DRAFT
+    );
     // 前置自证：未签署态的留痕列必须是 NULL，否则"签署产生跃迁"这条断言不成立
     expect(contract.signed_at, '未签署合同的 signed_at 必须写 NULL').toBeNull();
     expect(contract.signature_hash, '未签署合同的 signature_hash 必须写 NULL').toBeNull();
@@ -704,10 +718,9 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     expect(signed.signature_certificate, 'signature_certificate 应原样落库').toBe(
       signatureCertificate
     );
-    expect(
-      signed.status,
-      'sign_contract 不推进合同状态，status 应仍为词表 draft'
-    ).toBe(CONTRACT_STATUS_DRAFT);
+    expect(signed.status, 'sign_contract 不推进合同状态，status 应仍为词表 draft').toBe(
+      CONTRACT_STATUS_DRAFT
+    );
 
     // 详情通道回读：证明签署留痕真的落库，不是只在响应里现造
     const readback = await apiCallRaw<ContractRow>(
@@ -716,7 +729,9 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
       `/sales/sales-contracts/${contract.id}`
     );
     expect(readback.contract_no, '详情回读的 contract_no 应与出参一致').toBe(contract.contract_no);
-    expect(readback.signed_at, '详情回读的 signed_at 应与签署出参逐字符相同').toBe(signed.signed_at);
+    expect(readback.signed_at, '详情回读的 signed_at 应与签署出参逐字符相同').toBe(
+      signed.signed_at
+    );
     expect(readback.signature_hash, '详情回读的摘要应与签署出参相同').toBe(signed.signature_hash);
     expect(readback.signed_by_user_id, '详情回读的签署人应与签署出参相同').toBe(signerId);
     expect(readback.status, '详情回读的合同状态仍应是 draft').toBe(CONTRACT_STATUS_DRAFT);
@@ -731,7 +746,9 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
     expect(verify.contract_id, '验证通道应回读同一合同 id').toBe(contract.id);
     expect(verify.contract_no, '验证通道应回读同一合同编号').toBe(contract.contract_no);
     expect(verify.is_valid, '未篡改合同的签名验证应为 true').toBe(true);
-    expect(verify.stored_hash, '验证通道的 stored_hash 应与落库摘要相同').toBe(signed.signature_hash);
+    expect(verify.stored_hash, '验证通道的 stored_hash 应与落库摘要相同').toBe(
+      signed.signature_hash
+    );
     expect(verify.computed_hash, '验证通道重算的摘要应与落库摘要相同').toBe(
       signed.signature_hash as string
     );
@@ -876,7 +893,11 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
       }
 
       // 两条 POST 腿：走 apiCallExpectFail 以获得 CSRF 轮换处理，再断权限门归因
-      const expireFail = await apiCallExpectFail(session.page, 'POST', '/customer-shares/expire-overdue');
+      const expireFail = await apiCallExpectFail(
+        session.page,
+        'POST',
+        '/customer-shares/expire-overdue'
+      );
       expectDenied(expireFail, `过期批量处理腿（岗位 ${cred.username}）应被权限门拒绝`);
       log('06', '过期腿越权被拒', expireFail);
 
@@ -914,7 +935,12 @@ test.describe.serial('430 客户团队共享与合同签署数据范围隔离链
       await session.close();
     }
 
-    await tryCleanup(page, 'DELETE', `/sales/sales-contracts/${contract.id}`, 'sales_contract_430_06');
+    await tryCleanup(
+      page,
+      'DELETE',
+      `/sales/sales-contracts/${contract.id}`,
+      'sales_contract_430_06'
+    );
     await tryCleanup(page, 'DELETE', `/crm/customers/${cust.id}`, 'customer_H');
   });
 });
