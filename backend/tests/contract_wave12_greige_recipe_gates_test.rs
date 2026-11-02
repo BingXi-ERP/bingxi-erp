@@ -361,23 +361,6 @@ async fn greige_update_non_owner_403_and_zero_drift() {
 // C) greige_fabric delete 归属门与可撤回性门
 // ============================================================
 
-/// 把一行坯布的当前库存两列同时归零，构造"未流转档案"。
-///
-/// 调用方是本节的可撤回用例；入参是已播种的主键；只回写 `weight_kg` 与 `length_m`
-/// 两列，累计入库口径 `quantity_kg` 与 `quantity_meters` 不参与删除判定故不动。
-/// 播种器把 `length_m` 固定写成 100.00，归零态必须显式改写才取到。
-async fn clear_remaining_stock(db: &sea_orm::DatabaseConnection, id: i32) {
-    let row = greige_fabric::Entity::find_by_id(id)
-        .one(db)
-        .await
-        .unwrap()
-        .unwrap();
-    let mut active: greige_fabric::ActiveModel = row.into();
-    active.weight_kg = Set(Some(dec("0.00")));
-    active.length_m = Set(Some(dec("0.00")));
-    active.update(db).await.unwrap();
-}
-
 #[tokio::test]
 async fn greige_delete_owner_200_and_is_deleted() {
     let db = test_common::setup_test_db().await;
