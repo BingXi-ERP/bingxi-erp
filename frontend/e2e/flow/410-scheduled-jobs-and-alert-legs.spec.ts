@@ -80,7 +80,7 @@ type ShortageSummary = {
 type ShortageAlertPage = {
   items: Array<{
     material_id: number;
-    alert_id: string | null;
+    alert_id: number | null;
     material_code: string;
     shortage_quantity: string;
     level: string;
@@ -117,7 +117,7 @@ type FinanceAlert = {
   title: string;
   content: string;
   target_module: string | null;
-  target_id: string | null;
+  target_id: number | null;
   status: string;
   acknowledged_at: string | null;
   acknowledged_by: number | null;
@@ -141,7 +141,7 @@ type NotificationListPage = {
     title: string;
     status: string;
     business_type: string | null;
-    business_id: string | null;
+    business_id: number | null;
   }>;
   total: number;
   page: number;
@@ -192,15 +192,8 @@ function uniqTag(): string {
 }
 
 test.describe.serial('410 定时任务与后台作业的可断腿', () => {
-  let pageSessionReady = false;
-
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
-    pageSessionReady = true;
-  });
-
-  test.afterEach(async () => {
-    expect(pageSessionReady, '每条用例都必须先完成真实登录再发请求').toBe(true);
   });
 
   // ======================================================================
@@ -467,9 +460,12 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
   test('账期逾期扫描触发幂等且推送腿通知可回读', async ({ page }) => {
     const unreadBefore = await apiCallRaw<number>(page, 'GET', '/notifications/unread-count');
 
-    const first = await apiCallRaw<TriggerScanResult>(page, 'POST', '/finance-alerts/trigger-scan', {
-      alert_type: 'ar_overdue',
-    });
+    const first = await apiCallRaw<TriggerScanResult>(
+      page,
+      'POST',
+      '/finance-alerts/trigger-scan',
+      { alert_type: 'ar_overdue' }
+    );
     expect(first.created.length, 'created_count 必须等于实际写入行数').toBe(first.created_count);
     for (const alert of first.created) {
       expect(alert.alert_type, '按类型过滤扫描出的行必须是该类型').toBe('ar_overdue');
@@ -512,7 +508,7 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
     );
     for (const alert of first.created) {
       const matched = inbox.list.filter(
-        n => n.business_type === 'finance_alert' && Number(n.business_id) === alert.id
+        n => n.business_type === 'finance_alert' && n.business_id === alert.id
       );
       expect(
         matched.length,
@@ -534,7 +530,7 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
       title: `410 账期预警探针 ${tag}`,
       content: `探针内容 ${tag}`,
       target_module: 'ar_invoice',
-      target_id: 941000 + (Number(tag.slice(0, 4)) % 800),
+      target_id: 9410,
       threshold_value: '30',
       actual_value: '95',
       value_unit: 'days',
@@ -546,9 +542,12 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
       '手动创建通道不生成通知，notification_id 必须是 null'
     ).toBeNull();
 
-    const resolveFirst = await apiCallExpectFail(page, 'POST', `/finance-alerts/${created.id}/resolve`, {
-      resolve_note: '越级解决探针',
-    });
+    const resolveFirst = await apiCallExpectFail(
+      page,
+      'POST',
+      `/finance-alerts/${created.id}/resolve`,
+      { resolve_note: '越级解决探针' }
+    );
     expect(
       failureCode(resolveFirst),
       `active 直接解决必须被状态机拒绝，失败体 ${JSON.stringify(resolveFirst)}`
@@ -575,16 +574,22 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
       `重复确认必须报状态机拒绝，失败体 ${JSON.stringify(acknowledgeAgain)}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
 
-    const resolved = await apiCallRaw<FinanceAlert>(page, 'POST', `/finance-alerts/${created.id}/resolve`, {
-      resolve_note: `410 解决说明 ${tag}`,
-    });
+    const resolved = await apiCallRaw<FinanceAlert>(
+      page,
+      'POST',
+      `/finance-alerts/${created.id}/resolve`,
+      { resolve_note: `410 解决说明 ${tag}` }
+    );
     expect(resolved.status, 'acknowledged 之后解决必须落 resolved').toBe('resolved');
     expect(resolved.resolve_note, '解决说明必须落库并读回').toBe(`410 解决说明 ${tag}`);
     expect(resolved.resolved_at, '解决时间必须落库').toBeTruthy();
 
-    const resolveAgain = await apiCallExpectFail(page, 'POST', `/finance-alerts/${created.id}/resolve`, {
-      resolve_note: '重复解决探针',
-    });
+    const resolveAgain = await apiCallExpectFail(
+      page,
+      'POST',
+      `/finance-alerts/${created.id}/resolve`,
+      { resolve_note: '重复解决探针' }
+    );
     expect(
       failureCode(resolveAgain),
       `重复解决必须被状态机拒绝，失败体 ${JSON.stringify(resolveAgain)}`
@@ -610,7 +615,11 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
   // ======================================================================
 
   test('批色待提醒列表的时间阈值真正进入取数条件', async ({ page }) => {
-    const all = await apiCallRaw<ReminderPage>(page, 'GET', '/bulk-color-approvals/reminders/pending?threshold_hours=0');
+    const all = await apiCallRaw<ReminderPage>(
+      page,
+      'GET',
+      '/bulk-color-approvals/reminders/pending?threshold_hours=0'
+    );
     expect(all.page, '该端点自述 page 恒为 1').toBe(1);
     expect(all.page_size, '该端点自述 page_size 为 total 与 1 的较大值').toBe(
       Math.max(all.total, 1)
