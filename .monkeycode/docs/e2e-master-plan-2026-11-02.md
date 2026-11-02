@@ -256,3 +256,32 @@ prettier 对 `data-permission.ts` 与 `index.vue` 报 warn，控制组（主干�
 静态门（types/shard-coverage/select-ratchet/worker-account）与 eslint 全绿、注释门 0 命中。
 **行为面只能由 CI 证**：等待器改对之后，原本静默空转的 UI 腿会开始真拿响应，
 若某端点形状与声明不符会首次暴露成红——那是把既有漂移暴露出来，不是新增缺陷，判责时按此认。
+
+## 13. 在途 PR 红面定责与本轮推送（2026-11-02 01:10）
+
+### 13.1 Rust 分片红有一类是磁盘，不是代码
+
+判据（实测，可复现）：`test-report-partition-<m>` 制品体积。正常分片 26-33KB，**1627 字节＝归档解包失败**。
+
+- PR #1150（head `12fe63c4`，run 41320387994）`Rust 测试 (9/10)` 与 PR #1146（head `cdad064b`，run 41294816393）`Rust 测试 (2/10)` 两份制品逐字节只差临时目录名，正文末行都是 `No space left on device (os error 28)`，卡在解包 `target/debug/deps/contract_wave2_supplier_qualification_attachment_test-…`。nextest 把约 4GB 归档解到临时区，临时区与 runner 根分区同盘。
+- 这两枚此前被记成"本支待查的代码红"，实际一条断言都没跑起来。修向是工装：解包前腾空间 + 把磁盘不足点名成独立结论，不放宽判定（仍判负）。
+
+### 13.2 #1146 的另一枚红是本支真红，属断言没跟功能口径
+
+`Rust 测试 (3/10)` 分片失败 1 例：`contract_wave12_greige_recipe_gates_test.rs:352` 断 `left == right` failed，left 400 / right 200。本支把坯布删除门从读 `status` 改成按可撤回性判（零在架实物 + 无活单据引用，见 `greige_fabric_handler.rs` 的 `remaining_stock_rejection` 与 `find_greige_reference_rejection`），而旧用例仍按"状态设成已出库就可删"播种 weight 10.00。处置按"断言随功能口径同步"：归零两列走可撤回路径仍断 200，另加一条真有在架库存的 400 拒因腿（断言与源码文案逐字同源 + 回读 `is_deleted` 仍 false）。
+
+### 13.3 一处取证盲区（工装待补）
+
+PR #1144 的 `🎭 E2E: extras: fullflow 5/5`（job 124864738796）失败时**没有任何报告制品**：run 41309252987 的 94 件制品里没有 extras 命名，job 级制品端点返回 404。因此该红只能定位到 job 与步一级，断言原文取不到。按"0 基分片号"硬猜 shard-44 属无证据推断，不采纳。这一条另开一车补失败上传。
+
+### 13.4 本轮推送与 PR 形态
+
+| 载体 | 内容 | PR |
+| --- | --- | --- |
+| `fix/main-e2e-reds-roll-gate-and-dp-404` | 打卷状态门拒因改可外显通道 + 数据权限详情按 404 出（两笔，cherry-pick 到同基点新支并 `-x` 记来源） | #1151 |
+| `carrier/fn-batch-1101` | 追加坯布删除门断言同步（fast-forward，非 force） | #1146 更新 |
+| `ci/nextest-archive-disk-guard` | Rust 分片磁盘工装修面（只动分片步，不新增 job，`ci-cleanup-retry` 的 needs 不变） | #1152 |
+
+推前门：rustfmt backend 全作用面 1878 文件 offender 0；`check-api-envelope/contract/api-paths/api-request` 四道 rc=0；注释门命中 0；#1152 另有 actionlint 原生面零发现、`bash -n`、判定器检测力自证（拿真制品正文命中 os error 28）。远端回读：`833057d7`／`f16b1293`／`b2c439d9` 与本地 HEAD 一致。
+
+测试面车道（214、waitfix、217、235、252 已落盘，215/218/236/253 在写）**未推**，等全部落盘后合成一枚测试面 PR——本仓规矩：测试文件变更一律单独 PR，绝不与功能面混。
