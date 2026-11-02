@@ -101,12 +101,14 @@ function eqAmount(actual: unknown, expectedCents: bigint, label: string): void {
 
 function requireNum(v: unknown, label: string): number {
   const n = Number(v);
-  if (!Number.isFinite(n) || n <= 0) throw new Error(`${label}：无有效数值，raw=${JSON.stringify(v)}`);
+  if (!Number.isFinite(n) || n <= 0)
+    throw new Error(`${label}：无有效数值，raw=${JSON.stringify(v)}`);
   return n;
 }
 
 function requireStr(v: unknown, label: string): string {
-  if (typeof v !== 'string' || v === '') throw new Error(`${label}：出参非非空字符串，raw=${JSON.stringify(v)}`);
+  if (typeof v !== 'string' || v === '')
+    throw new Error(`${label}：出参非非空字符串，raw=${JSON.stringify(v)}`);
   return v;
 }
 
@@ -157,10 +159,12 @@ async function generateRecon(
     end_date: periodEnd(),
     notes,
   });
-  const id = requireNum(body.id, `生成对账单 ${notes}`);
-  expect(requireStr(body.reconciliation_no, '对账单号'), '对账单号必须由后端生成且带 RC 前缀').toMatch(
-    /^RC/
-  );
+  // 主键必须真实落库为正整数：调用方拿不到合法 id 时后续整条腿都是空跑，先在这里点名
+  requireNum(body.id, `生成对账单 ${notes}`);
+  expect(
+    requireStr(body.reconciliation_no, '对账单号'),
+    '对账单号必须由后端生成且带 RC 前缀'
+  ).toMatch(/^RC/);
   expect(body.reconciliation_status, '新生成对账单初始状态小写 draft').toBe('draft');
   return body;
 }
@@ -213,9 +217,7 @@ async function readInvoice(page: import('@playwright/test').Page, id: number): P
 function expectHeadMatchesDetails(head: Row, details: Row[], label: string): void {
   const invoiceRows = details.filter(d => d.item_type === 'INVOICE');
   const receiptRows = details.filter(d => d.item_type === 'RECEIPT');
-  const otherRows = details.filter(
-    d => d.item_type !== 'INVOICE' && d.item_type !== 'RECEIPT'
-  );
+  const otherRows = details.filter(d => d.item_type !== 'INVOICE' && d.item_type !== 'RECEIPT');
   expect(otherRows.length, `${label}：明细出现 INVOICE/RECEIPT 之外的未预期 item_type`).toBe(0);
   const sumInvoice = invoiceRows.reduce(
     (acc, r) => acc + toScaled(r.amount, 2, `${label} INVOICE 行金额`),
@@ -225,7 +227,11 @@ function expectHeadMatchesDetails(head: Row, details: Row[], label: string): voi
     (acc, r) => acc + toScaled(r.amount, 2, `${label} RECEIPT 行金额`),
     0n
   );
-  eqAmount(head.total_invoices, sumInvoice, `${label}：单头 total_invoices 必须等于 INVOICE 明细合计`);
+  eqAmount(
+    head.total_invoices,
+    sumInvoice,
+    `${label}：单头 total_invoices 必须等于 INVOICE 明细合计`
+  );
   eqAmount(
     head.total_collections,
     -sumReceipt,
@@ -259,9 +265,13 @@ function expectNoCostLeakKeys(obj: Row, surface: string): void {
     'purchase_order_no',
   ];
   const keys = Object.keys(obj);
-  expect(keys.length, `${surface}：出参键集合不得为空（空集合会让脱敏断言恒真）`).toBeGreaterThan(0);
+  expect(keys.length, `${surface}：出参键集合不得为空（空集合会让脱敏断言恒真）`).toBeGreaterThan(
+    0
+  );
   const hit = keys.filter(k => forbidden.includes(k));
-  expect(hit, `${surface}：财务对账出参泄漏成本/进价/供应商侧键 ${JSON.stringify(hit)}`).toEqual([]);
+  expect(hit, `${surface}：财务对账出参泄漏成本/进价/供应商侧键 ${JSON.stringify(hit)}`).toEqual(
+    []
+  );
 }
 
 test.describe('442 对账确认与红冲联动', () => {
@@ -297,7 +307,9 @@ test.describe('442 对账确认与红冲联动', () => {
     const first = await readReconDetails(page, reconId);
     const invRow = first.details.find(r => Number(r.document_id) === inv.id);
     expect(invRow, `对账明细必须含发票 ${inv.invoice_no} 行`).toBeTruthy();
-    expect(String(invRow!.document_no), 'INVOICE 行 document_no 必须等于发票号').toBe(inv.invoice_no);
+    expect(String(invRow!.document_no), 'INVOICE 行 document_no 必须等于发票号').toBe(
+      inv.invoice_no
+    );
     eqAmount(invRow!.amount, cents('1500.00'), 'INVOICE 行金额=发票 invoice_amount');
     const payRow = first.details.find(r => Number(r.document_id) === pay.id);
     expect(payRow, `对账明细必须含收款 ${pay.collection_no} 行`).toBeTruthy();
@@ -322,9 +334,7 @@ test.describe('442 对账确认与红冲联动', () => {
       'closing_balance',
       'reconciliation_status',
     ] as const) {
-      expect(String(again.head[key]), `二次读回 ${key} 与首次不一致`).toBe(
-        String(first.head[key])
-      );
+      expect(String(again.head[key]), `二次读回 ${key} 与首次不一致`).toBe(String(first.head[key]));
     }
 
     // 发送腿：draft → sent
@@ -522,7 +532,9 @@ test.describe('442 对账确认与红冲联动', () => {
         status: bad,
       });
       expect(fBad.status, `白名单外状态 "${bad}" 应 400`).toBe(400);
-      expect(failureCode(fBad), `白名单外状态 "${bad}" 机器码`).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+      expect(failureCode(fBad), `白名单外状态 "${bad}" 机器码`).toBe(
+        APP_ERROR_CODES.BUSINESS_ERROR
+      );
       const afterBad = await readRecon(page, id);
       expect(afterBad.reconciliation_status, `"${bad}" 被拒后状态不得变化`).toBe('draft');
     }
@@ -582,9 +594,14 @@ test.describe('442 对账确认与红冲联动', () => {
     expect(String(hits[0].reconciliation_status), '列表侧确认状态与详情一致').toBe('confirmed');
 
     // 别名确认腿（POST /confirmations 走同一 customer_confirm 门）对已 confirmed 行必 400
-    const fAlias = await apiCallExpectFail(page, 'POST', '/ar-reconciliations-enhanced/confirmations', {
-      reconciliation_id: id,
-    });
+    const fAlias = await apiCallExpectFail(
+      page,
+      'POST',
+      '/ar-reconciliations-enhanced/confirmations',
+      {
+        reconciliation_id: id,
+      }
+    );
     expect(fAlias.status, '别名确认腿对 confirmed 行应 400').toBe(400);
     expect(failureCode(fAlias), '别名确认腿机器码').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
 
@@ -677,7 +694,9 @@ test.describe('442 对账确认与红冲联动', () => {
 
     // 财务侧（本 worker 管理员会话）红冲可达并真实落库
     const invFinance = await createApprovedInvoice(page, ctx.customerId, '120.00');
-    await apiCall(page, 'POST', `/ar/invoices/${invFinance.id}/cancel`, { reason: `E2E-${tag}-财务` });
+    await apiCall(page, 'POST', `/ar/invoices/${invFinance.id}/cancel`, {
+      reason: `E2E-${tag}-财务`,
+    });
     const invCancelled = await readInvoice(page, invFinance.id);
     expect(invCancelled.status, '财务岗红冲回读 CANCELLED').toBe('CANCELLED');
 
@@ -779,10 +798,9 @@ test.describe('442 对账确认与红冲联动', () => {
       effective_date: today(),
     });
     const rateId = requireNum(created.id, '新建汇率');
-    expect(
-      toScaled(created.rate, 4, '创建响应汇率'),
-      '创建汇率必须按 4 位标度落 7.3400'
-    ).toBe(RATE_SCALED);
+    expect(toScaled(created.rate, 4, '创建响应汇率'), '创建汇率必须按 4 位标度落 7.3400').toBe(
+      RATE_SCALED
+    );
     const queried = await apiCallRaw<Row>(
       page,
       'GET',
@@ -791,9 +809,11 @@ test.describe('442 对账确认与红冲联动', () => {
     expect(String(queried.rate), '查询腿汇率必须与创建腿逐字符一致').toBe(String(created.rate));
     expect(String(queried.from_currency), '查询腿币种对方向一致').toBe(quoteCode);
     expect(String(queried.to_currency), '查询腿目标币种一致').toBe(baseCode);
-    const rateList = (await apiCallRaw<Row[]>(page, 'GET', '/exchange-rates?page=1&page_size=100')) as
-      | Row[]
-      | unknown;
+    const rateList = (await apiCallRaw<Row[]>(
+      page,
+      'GET',
+      '/exchange-rates?page=1&page_size=100'
+    )) as Row[] | unknown;
     expect(Array.isArray(rateList), '汇率列表出参必须是裸数组（非 PaginatedResponse）').toBe(true);
     const mine = (rateList as Row[]).filter(r => Number(r.id) === rateId);
     expect(mine.length, '汇率列表必须恰命中新建这条').toBe(1);
@@ -807,7 +827,9 @@ test.describe('442 对账确认与红冲联动', () => {
       effective_date: today(),
     });
     expect(fZeroRate.status, '0 汇率应 400').toBe(400);
-    expect(failureCode(fZeroRate), '0 汇率机器码 BUSINESS_ERROR').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    expect(failureCode(fZeroRate), '0 汇率机器码 BUSINESS_ERROR').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
     expect(String(fZeroRate.message ?? ''), '0 汇率拒绝应点名「大于0」').toContain('大于0');
     const fLegacyRate = await apiCallExpectFail(page, 'POST', '/exchange-rates', {
       from_currency: quoteCode,
@@ -816,7 +838,9 @@ test.describe('442 对账确认与红冲联动', () => {
       effective_date: today(),
     });
     expect(fLegacyRate.status, '历史缺陷值 0.01 应 400').toBe(400);
-    expect(failureCode(fLegacyRate), '0.01 机器码 BUSINESS_ERROR').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    expect(failureCode(fLegacyRate), '0.01 机器码 BUSINESS_ERROR').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
     const rateAfterRejects = await apiCallRaw<Row>(
       page,
       'GET',
@@ -879,7 +903,11 @@ test.describe('442 对账确认与红冲联动', () => {
     const incl = await apiCallRaw<Row>(page, 'POST', '/quotations', quoteBody(true));
     const inclId = requireNum(incl.id, '含税报价单');
     eqAmount(incl.subtotal, cents('200.00'), '含税态净额=数量×净单价（200.00）');
-    eqAmount(incl.total_amount, cents('226.00'), '含税态总额取行腿含税事实聚合（226.00），非乘法造出');
+    eqAmount(
+      incl.total_amount,
+      cents('226.00'),
+      '含税态总额取行腿含税事实聚合（226.00），非乘法造出'
+    );
     eqAmount(incl.tax_amount, cents('26.00'), '含税态税额=含税总额−净额（差额口径 26.00）');
     expect(
       toScaled(incl.total_amount, 2, '含税总额') ===
@@ -920,9 +948,7 @@ test.describe('442 对账确认与红冲联动', () => {
     expect(String(exclRead.quotation_no), '两张报价单单号必须不同（重复口径不得覆盖）').not.toBe(
       String(inclRead.quotation_no)
     );
-    expect(String(exclRead.customer_id), '不含税单归属同一客户').toBe(
-      String(inclRead.customer_id)
-    );
+    expect(String(exclRead.customer_id), '不含税单归属同一客户').toBe(String(inclRead.customer_id));
 
     // 非法税基：明细为空必须点名「至少 1 条」而不是 500 或空成功
     const fEmptyItems = await apiCallExpectFail(page, 'POST', '/quotations', {
@@ -1023,11 +1049,14 @@ test.describe('442 对账确认与红冲联动', () => {
 
     await loginViaUI(page, testUsername(), testPassword(), true);
     const session2 = await readRecon(page, moneyId);
-    expect(String(session2.reconciliation_status), '会话 2 必须看到会话 1 的写入（非会话缓存）').toBe(
-      'sent'
-    );
+    expect(
+      String(session2.reconciliation_status),
+      '会话 2 必须看到会话 1 的写入（非会话缓存）'
+    ).toBe('sent');
     for (const key of cmpKeys) {
-      expect(String(session2[key]), `会话 2 读回 ${key} 与会话 1 一致`).toBe(String(afterSend[key]));
+      expect(String(session2[key]), `会话 2 读回 ${key} 与会话 1 一致`).toBe(
+        String(afterSend[key])
+      );
     }
     await apiCall(page, 'POST', `/ar-reconciliations/${moneyId}/confirm`);
 
@@ -1040,19 +1069,12 @@ test.describe('442 对账确认与红冲联动', () => {
       '状态流转不得改动期末余额（会话间金额一致）'
     );
     const session1Details = await readReconDetails(page, moneyId);
-    expect(
-      String(session1Details.head.confirmed_by_customer),
-      '客户确认标记跨面可读'
-    ).toBe('true');
+    expect(String(session1Details.head.confirmed_by_customer), '客户确认标记跨面可读').toBe('true');
     expect(session1Details.head.reconciliation_status, '跨面状态一致').toBe('confirmed');
 
     // 另一角色的 token 在同一行上必须被归属门拒掉，而不是读到部分字段（与 442-04 同判据的写侧延伸）
     await loginAsRole(page, 'finance_manager');
-    const fForeign = await apiCallExpectFail(
-      page,
-      'POST',
-      `/ar-reconciliations/${moneyId}/send`
-    );
+    const fForeign = await apiCallExpectFail(page, 'POST', `/ar-reconciliations/${moneyId}/send`);
     expect(fForeign.status, '他人客户的对账单不得被外岗会话写入').toBe(403);
     expect(failureCode(fForeign), '外岗写腿机器码 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
     const fForeignList = await apiCallRaw<Row>(
