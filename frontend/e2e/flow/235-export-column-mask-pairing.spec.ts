@@ -1,5 +1,5 @@
 import { test, expect } from '../diagnose-fixture';
-import { inflateRawSync } from 'node:zlib';
+import { inflateRawSync } from 'zlib';
 import { loginViaUI, loginAsRole, apiCall, apiCallRaw, apiCallExpectFail, API_BASE, API_PREFIX } from './helpers';
 
 /**

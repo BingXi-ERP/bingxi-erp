@@ -90,10 +90,16 @@ declare module 'fs' {
  * 形参标注）由同名类型别名给出，别名指向同一窄形状，不伪造 Node 的完整 Buffer API。
  */
 interface NodeBufferLike extends Uint8Array {
-  toString(encoding?: string): string;
+  toString(encoding?: string, begin?: number, end?: number): string;
   subarray(begin?: number, end?: number): Buffer;
   writeBigUInt64LE(value: bigint, offset?: number): number;
   writeBigUInt64BE(value: bigint, offset?: number): number;
+  /**
+   * 定长小端读：flow/235-export-column-mask-pairing.spec.ts 的 zip 容器解析站点
+   * （EOCD/中央目录签名、压缩方法、条目长度与偏移全部按 zip 规范的固定小端布局读取）。
+   */
+  readUInt16LE(offset: number): number;
+  readUInt32LE(offset: number): number;
 }
 
 type Buffer = NodeBufferLike;
@@ -102,3 +108,14 @@ declare const Buffer: {
   from(data: string | Uint8Array | ArrayBuffer | readonly number[], encoding?: string): Buffer;
   alloc(size: number): Buffer;
 };
+
+/**
+ * zlib 最小面声明（同上既定流程：e2e 用 Node API 必须在此显式补声明）。
+ * 只声明用到的成员：
+ * - flow/235-export-column-mask-pairing.spec.ts 解 xlsx（zip 容器，rust_xlsxwriter 按 deflate
+ *   存储条目）后，对线索导出做 PII 掩码值的成员判定。压缩字节流上直接 grep 恒零命中，
+ *   所以必须先解压再断言；解压失败或非 0/8 两种方法一律抛错，不静默返回空文本。
+ */
+declare module 'zlib' {
+  export function inflateRawSync(data: Uint8Array): Buffer;
+}
