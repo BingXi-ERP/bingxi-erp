@@ -93,7 +93,13 @@ function requireRow(value: unknown, label: string): Row {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error(`${label}：期望 JSON 对象，实际 ${JSON.stringify(value)}`);
   }
-  return value;
+  // 按 own enumerable 键浅拷贝成带索引签名的行：不用 as 断言把 object 硬掰成 Row，
+  // 拷贝后仍保留全部键值，取不到的键继续由调用方判红。
+  const row: Row = {};
+  for (const [key, entry] of Object.entries(value)) {
+    row[key] = entry;
+  }
+  return row;
 }
 
 function requireArray(value: unknown, label: string): unknown[] {
