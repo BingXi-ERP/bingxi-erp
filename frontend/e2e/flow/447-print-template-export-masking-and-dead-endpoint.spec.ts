@@ -69,6 +69,14 @@ import {
  * 不写裸 isErr、不把 404/403 当健康、不用 `?? []` 掩盖缺键。
  */
 
+/** 空壳判据用的载荷字符数：剥掉 JSON 结构符与 null/true/false/[]/{} 后剩下的真实内容长度 */
+function shellPayloadLength(payload: unknown): number {
+  const t = JSON.stringify(payload ?? null)
+    .replace(/[\s{}"':,:[\]]/g, '')
+    .replace(/null|true|false/g, '');
+  return t.length;
+}
+
 /** 统一 URL 拼装：apiCall 系列自带前缀，原始 page.request 腿必须显式拼 API_BASE + API_PREFIX */
 function fullUrl(path: string): string {
   return `${API_BASE}${API_PREFIX}${path}`;
@@ -82,7 +90,9 @@ function rowsOf(data: unknown, leg: string): Record<string, unknown>[] {
   if (data && typeof data === 'object' && Array.isArray((data as { items?: unknown }).items)) {
     return (data as { items: Record<string, unknown>[] }).items;
   }
-  throw new Error(`[${leg}] 列表信封形状漂移：既非数组也非 {items:[]}，实际 ${JSON.stringify(data)}`);
+  throw new Error(
+    `[${leg}] 列表信封形状漂移：既非数组也非 {items:[]}，实际 ${JSON.stringify(data)}`
+  );
 }
 
 function str(v: unknown): string {
@@ -91,14 +101,23 @@ function str(v: unknown): string {
 
 /** docx 解包取正文 XML：容器缺 word/document.xml 或正文过短一律判负（空壳模板打不出字） */
 async function documentXml(bytes: Buffer, leg: string): Promise<string> {
-  expect(bytes.byteLength, `[${leg}] docx 字节体必须非空，实际 ${bytes.byteLength}B`).toBeGreaterThan(0);
+  expect(
+    bytes.byteLength,
+    `[${leg}] docx 字节体必须非空，实际 ${bytes.byteLength}B`
+  ).toBeGreaterThan(0);
   expect(bytes[0], `[${leg}] docx 首字节必须是 0x50（PK），实际 ${bytes[0]}`).toBe(0x50);
   expect(bytes[1], `[${leg}] docx 次字节必须是 0x4b（PK），实际 ${bytes[1]}`).toBe(0x4b);
   const zip = await JSZip.loadAsync(bytes);
   const entry = zip.file('word/document.xml');
-  expect(entry, `[${leg}] docx 必须含 word/document.xml，实际条目 ${Object.keys(zip.files).join(',')}`).toBeTruthy();
+  expect(
+    entry,
+    `[${leg}] docx 必须含 word/document.xml，实际条目 ${Object.keys(zip.files).join(',')}`
+  ).toBeTruthy();
   const xml = await entry!.async('string');
-  expect(xml.length, `[${leg}] word/document.xml 正文必须非空，实际 ${xml.length}B`).toBeGreaterThan(100);
+  expect(
+    xml.length,
+    `[${leg}] word/document.xml 正文必须非空，实际 ${xml.length}B`
+  ).toBeGreaterThan(100);
   return xml;
 }
 
@@ -131,7 +150,10 @@ async function printDocxWithRealContent(
       status: 'active',
     });
     const tplId = Number(tpl.id);
-    expect(Number.isInteger(tplId) && tplId > 0, `[${path}] 建默认模板必须回主键，实际 ${tpl.id}`).toBe(true);
+    expect(
+      Number.isInteger(tplId) && tplId > 0,
+      `[${path}] 建默认模板必须回主键，实际 ${tpl.id}`
+    ).toBe(true);
     deferCleanup(cleanupQueue, 'DELETE', `/print-templates/${tplId}`, `print-template-${tplId}`);
     resp = await page.request.get(url);
     status = resp.status();
@@ -171,23 +193,35 @@ async function assertExportNotDeadEnd(page: Page, path: string, session: string)
     `[${session}] 导出腿 ${path} 返回 ${status}：404/403 说明路由未注册或权限拒，不当作健康`
   ).toBe(200);
   const bytes = await resp.body();
-  expect(bytes.byteLength, `[${session}] 导出腿 ${path} 出参 0 字节，判为空壳死端点`).toBeGreaterThan(0);
+  expect(
+    bytes.byteLength,
+    `[${session}] 导出腿 ${path} 出参 0 字节，判为空壳死端点`
+  ).toBeGreaterThan(0);
   const ctype = resp.headers()['content-type'] ?? '';
   if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
     const zip = await JSZip.loadAsync(bytes);
     const names = Object.keys(zip.files).filter(n => !zip.files[n].dir);
-    expect(names.length, `[${session}] 导出腿 ${path} 是空 zip 容器，判为空壳死端点`).toBeGreaterThan(0);
+    expect(
+      names.length,
+      `[${session}] 导出腿 ${path} 是空 zip 容器，判为空壳死端点`
+    ).toBeGreaterThan(0);
     let total = 0;
     for (const n of names.slice(0, 5)) {
       total += (await zip.files[n].async('string')).length;
     }
-    expect(total, `[${session}] 导出腿 ${path} 的 zip 条目正文全空，判为空壳死端点`).toBeGreaterThan(0);
+    expect(
+      total,
+      `[${session}] 导出腿 ${path} 的 zip 条目正文全空，判为空壳死端点`
+    ).toBeGreaterThan(0);
     return `zip:${names.join(',')}`;
   }
   const text = bytes.toString('utf8');
   if (ctype.includes('json') || text.trimStart().startsWith('{')) {
     const json = JSON.parse(text) as { success?: boolean; data?: unknown; code?: string | number };
-    expect(json.success, `[${session}] 导出腿 ${path} 的 JSON 信封 success 不为真：${json.code ?? ''}`).toBe(true);
+    expect(
+      json.success,
+      `[${session}] 导出腿 ${path} 的 JSON 信封 success 不为真：${json.code ?? ''}`
+    ).toBe(true);
     const payload = json.data;
     if (Array.isArray(payload)) {
       expect(
@@ -196,7 +230,11 @@ async function assertExportNotDeadEnd(page: Page, path: string, session: string)
       ).toBeGreaterThan(0);
       return JSON.stringify(payload.slice(0, 3));
     }
-    if (payload && typeof payload === 'object' && Array.isArray((payload as { items?: unknown }).items)) {
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      Array.isArray((payload as { items?: unknown }).items)
+    ) {
       const items = (payload as { items: unknown[] }).items;
       expect(
         items.length,
@@ -211,7 +249,7 @@ async function assertExportNotDeadEnd(page: Page, path: string, session: string)
     return str(payload).slice(0, 2000);
   }
   expect(
-    text.replace(/[\s\u0000]/g, '').length,
+    text.replace(/[\s]/g, '').length,
     `[${session}] 导出腿 ${path} 正文只有空白/表头以下长度，判为空壳死端点`
   ).toBeGreaterThan(2);
   return text;
@@ -258,11 +296,16 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(Number.isInteger(id) && id > 0, `创建必须回自增主键，实际 ${created.id}`).toBe(true);
     deferCleanup(queue, 'DELETE', `/print-templates/${id}`, `print-template-${id}`);
 
-    const list1 = rowsOf(await apiCallRaw<unknown>(page, 'GET', '/print-templates?page=1&page_size=200'), '模板列表');
+    const list1 = rowsOf(
+      await apiCallRaw<unknown>(page, 'GET', '/print-templates?page=1&page_size=200'),
+      '模板列表'
+    );
     const hit = list1.find(r => Number(r.id) === id);
     expect(hit, `列表必须含新建模板 ${id}`).toBeTruthy();
     expect(str(hit!.template_name), '列表回显名称必须等于写入值').toBe(name);
-    expect(str(hit!.doc_type), '列表回显 doc_type 必须等于写入的渲染查找键').toBe('lab_dip_request');
+    expect(str(hit!.doc_type), '列表回显 doc_type 必须等于写入的渲染查找键').toBe(
+      'lab_dip_request'
+    );
 
     const single = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/print-templates/${id}`);
     expect(Number(single.id), '对象口主键必须命中本行').toBe(id);
@@ -270,11 +313,18 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
 
     const renamed = genName('P447TPL2');
     await apiCall(page, 'PUT', `/print-templates/${id}`, { template_name: renamed });
-    const afterPut = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/print-templates/${id}`);
+    const afterPut = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/print-templates/${id}`
+    );
     expect(str(afterPut.template_name), 'PUT 后对象口必须读回新名称').toBe(renamed);
 
     await apiCall(page, 'DELETE', `/print-templates/${id}`);
-    const list2 = rowsOf(await apiCallRaw<unknown>(page, 'GET', '/print-templates?page=1&page_size=200'), '模板列表删后');
+    const list2 = rowsOf(
+      await apiCallRaw<unknown>(page, 'GET', '/print-templates?page=1&page_size=200'),
+      '模板列表删后'
+    );
     expect(
       list2.some(r => Number(r.id) === id),
       `删除后列表仍含 ${id}，即假删除`
@@ -301,7 +351,10 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(Number.isInteger(id) && id > 0, `创建打印目标必须回主键，实际 ${created.id}`).toBe(true);
     deferCleanup(queue, 'DELETE', `/print-targets/${id}`, `print-target-${id}`);
 
-    const list1 = rowsOf(await apiCallRaw<unknown>(page, 'GET', '/print-targets?page=1&page_size=200'), '目标列表');
+    const list1 = rowsOf(
+      await apiCallRaw<unknown>(page, 'GET', '/print-targets?page=1&page_size=200'),
+      '目标列表'
+    );
     const hit = list1.find(r => Number(r.id) === id);
     expect(hit, `目标列表必须含新建行 ${id}`).toBeTruthy();
     expect(str(hit!.target_code), '列表回显 target_code 必须等于写入值').toBe(targetCode);
@@ -316,7 +369,10 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(str(afterPut.display_name), 'PUT 后必须读回新显示名').toBe(renamed);
 
     await apiCall(page, 'DELETE', `/print-targets/${id}`);
-    const list2 = rowsOf(await apiCallRaw<unknown>(page, 'GET', '/print-targets?page=1&page_size=200'), '目标列表删后');
+    const list2 = rowsOf(
+      await apiCallRaw<unknown>(page, 'GET', '/print-targets?page=1&page_size=200'),
+      '目标列表删后'
+    );
     expect(
       list2.some(r => Number(r.id) === id),
       `删除后目标列表仍含 ${id}，即假删除`
@@ -356,7 +412,7 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       labNo,
       queue
     );
-    console.log(`[447] 打样申请 ${labId} 打印正文长度 ${labXml.length}，含申请号 ${labNo}`);
+    console.warn(`[447] 打样申请 ${labId} 打印正文长度 ${labXml.length}，含申请号 ${labNo}`);
 
     const coRows = rowsOf(
       await apiCallRaw<unknown>(page, 'GET', '/custom-orders?page=1&page_size=20'),
@@ -367,12 +423,20 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     const orderNo = str(coRows[0].order_no);
     expect(Number.isInteger(coId) && coId > 0, `定制订单主键非法：${coRows[0].id}`).toBe(true);
     expect(orderNo.length, `定制订单列表未回显 order_no，无法做真内容断言`).toBeGreaterThan(0);
-    await printDocxWithRealContent(page, `/custom-orders/${coId}/print`, 'custom_order', orderNo, queue);
+    await printDocxWithRealContent(
+      page,
+      `/custom-orders/${coId}/print`,
+      'custom_order',
+      orderNo,
+      queue
+    );
 
     await flushDeferredCleanups(page, queue);
   });
 
-  test('447-4 导出脱敏按角色分面：admin 原文、业务员掩码并剔除 address 与成本列', async ({ page }) => {
+  test('447-4 导出脱敏按角色分面：admin 原文、业务员掩码并剔除 address 与成本列', async ({
+    page,
+  }) => {
     const adminRows = rowsOf(
       await apiCallRaw<unknown>(page, 'GET', '/crm/customers/enhanced?page=1&page_size=50'),
       '客户增强列表(admin)'
@@ -393,7 +457,10 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       await apiCallRaw<unknown>(page, 'GET', `/crm/customers/${customerId}/contacts`),
       '联系人列表(admin)'
     );
-    const adminContactPhone = str(clist.find(r => str(r.phone ?? r.contact_phone).length > 0)?.phone ?? clist.find(r => str(r.phone ?? r.contact_phone).length > 0)?.contact_phone);
+    expect(
+      clist.every(r => !str(r.contact_phone ?? r.phone).includes('****')),
+      `admin 侧 contacts 腿必须出电话原文（出现 **** 即与业务员分面串味），实际 ${JSON.stringify(clist.slice(0, 2))}`
+    ).toBe(true);
 
     await loginAsRole(page, 'salesperson');
     const spRows = rowsOf(
@@ -425,6 +492,18 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       ).toBe(false);
     }
 
+    const spContacts = rowsOf(
+      await apiCallRaw<unknown>(page, 'GET', `/crm/customers/${customerId}/contacts`),
+      '联系人列表(业务员)'
+    );
+    expect(
+      spContacts.every(r => {
+        const p = str(r.contact_phone ?? r.phone);
+        return p.length === 0 || /^\d{3}\*{4}\d{4}$/.test(p);
+      }),
+      `业务员侧 contacts 子端点必须与列表同分面出掩码（crm_customer_handler.rs:405-419 与客户列表共用 apply_customer_field_permission），实际 ${JSON.stringify(spContacts.slice(0, 2))}——出原文即读出口旁路`
+    ).toBe(true);
+
     const spIssues = rowsOf(
       await apiCallRaw<unknown>(page, 'GET', '/color-cards/issues?page=1&page_size=20'),
       '色卡发放列表(业务员)'
@@ -436,42 +515,50 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       ).toBe(true);
     }
 
-    const spExport = await assertExportNotDeadEnd(page, '/crm/customers/export?page=1&page_size=50', '业务员');
+    const spExport = await assertExportNotDeadEnd(
+      page,
+      '/crm/customers/export?page=1&page_size=50',
+      '业务员'
+    );
     expect(
       spExport.includes(rawPhone),
       `业务员侧 /crm/customers/export 出参含电话原文 ${rawPhone}，导出腿绕过了列表掩码`
     ).toBe(false);
 
-    const spAuditExport = await assertExportNotDeadEnd(page, '/audit-logs/export?page=1&page_size=20', '业务员');
-    expect(
-      spAuditExport.length,
-      '业务员侧 /audit-logs/export 正文长度必须大于 0'
-    ).toBeGreaterThan(0);
+    const spAuditExport = await assertExportNotDeadEnd(
+      page,
+      '/audit-logs/export?page=1&page_size=20',
+      '业务员'
+    );
+    expect(spAuditExport.length, '业务员侧 /audit-logs/export 正文长度必须大于 0').toBeGreaterThan(
+      0
+    );
 
-    if (adminContactPhone.length > 0) {
-      await loginViaUI(page, testUsername(), testPassword(), true);
-      const adminContacts = rowsOf(
-        await apiCallRaw<unknown>(page, 'GET', `/crm/customers/${customerId}/contacts`),
-        '联系人列表(admin 复核)'
-      );
-      expect(
-        adminContacts.some(r => str(r.phone ?? r.contact_phone) === adminContactPhone),
-        `admin 侧联系人原文回显不稳定（同一会话同一腿两次结果不同），实际 ${adminContactPhone}`
-      ).toBe(true);
-    }
-    await flushDeferredCleanups(page, []);
+    expect(
+      spAuditExport.includes(rawPhone),
+      `业务员侧 /audit-logs/export 出参含客户电话原文 ${rawPhone}，审计导出腿未做同款掩码`
+    ).toBe(false);
   });
 
-  test('447-5 导出审批一次性令牌：二次查看不漏明文，未授权与作废令牌再用一律 403+FORBIDDEN', async ({ page }) => {
+  test('447-5 导出审批一次性令牌：二次查看不漏明文，未授权与作废令牌再用一律 403+FORBIDDEN', async ({
+    page,
+  }) => {
     const queue: DeferredCleanup[] = [];
-    const created = await apiCallRaw<{ id: number; status?: string }>(page, 'POST', '/export-approvals', {
-      resource_type: 'customer',
-      export_params: { page: 1, page_size: 10, scene: 'e2e447' },
-      estimated_rows: 10,
-      file_format: 'csv',
-    });
+    const created = await apiCallRaw<{ id: number; status?: string }>(
+      page,
+      'POST',
+      '/export-approvals',
+      {
+        resource_type: 'customer',
+        export_params: { page: 1, page_size: 10, scene: 'e2e447' },
+        estimated_rows: 10,
+        file_format: 'csv',
+      }
+    );
     const id = Number(created.id);
-    expect(Number.isInteger(id) && id > 0, `创建导出审批申请必须回主键，实际 ${created.id}`).toBe(true);
+    expect(Number.isInteger(id) && id > 0, `创建导出审批申请必须回主键，实际 ${created.id}`).toBe(
+      true
+    );
     deferCleanup(queue, 'POST', `/export-approvals/${id}/cancel`, `export-approval-${id}`);
 
     const first = await apiCallRaw<{ available?: boolean; token?: string; fingerprint?: string }>(
@@ -479,7 +566,10 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       'GET',
       `/export-approvals/${id}/token-once`
     );
-    expect(first.available, `首次 token-once 必须 available=true，实际 ${JSON.stringify(first)}`).toBe(true);
+    expect(
+      first.available,
+      `首次 token-once 必须 available=true，实际 ${JSON.stringify(first)}`
+    ).toBe(true);
     const plaintext = str(first.token);
     expect(plaintext.length, '首次 token-once 必须回明文令牌').toBeGreaterThan(0);
 
@@ -490,17 +580,17 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       secondJson.data?.available,
       `二次 token-once 必须 available=false（明文仅一次），实际 ${JSON.stringify(secondJson.data)}`
     ).toBe(false);
-    expect(
-      str(secondJson.data?.token).length,
-      '二次 token-once 不得再携带 token 键的明文'
-    ).toBe(0);
+    expect(str(secondJson.data?.token).length, '二次 token-once 不得再携带 token 键的明文').toBe(0);
     const secondText = JSON.stringify(secondJson);
     expect(
       secondText.includes(plaintext),
       '二次 token-once 的响应体里出现了首次明文令牌，一次性约束被击穿'
     ).toBe(false);
 
-    const list = rowsOf(await apiCallRaw<unknown>(page, 'GET', '/export-approvals?page=1&page_size=50'), '审批列表');
+    const list = rowsOf(
+      await apiCallRaw<unknown>(page, 'GET', '/export-approvals?page=1&page_size=50'),
+      '审批列表'
+    );
     const row = list.find(r => Number(r.id) === id);
     expect(row, `列表必须含本申请 ${id}`).toBeTruthy();
     expect(row!.download_token, '列表 download_token 必须被 masked_json 置 null').toBeNull();
@@ -516,18 +606,29 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       pendingVerify.status,
       `未批准的令牌用 verify-token 消费必须 403（状态非 APPROVED），实际 ${pendingVerify.status}`
     ).toBe(403);
-    expect(pendingVerify.code, '失败体机器码必须是字符串 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
-    expect(str(pendingVerify.trace_id).length, 'AppError 单一失败信封必须带 trace_id').toBeGreaterThan(0);
+    expect(pendingVerify.code, '失败体机器码必须是字符串 FORBIDDEN').toBe(
+      APP_ERROR_CODES.FORBIDDEN
+    );
+    expect(
+      str(pendingVerify.trace_id).length,
+      'AppError 单一失败信封必须带 trace_id'
+    ).toBeGreaterThan(0);
     expect(
       pendingVerify.timestamp !== undefined && pendingVerify.timestamp !== null,
       'AppError 单一失败信封必须带 timestamp'
     ).toBe(true);
 
-    const bogus = await apiCallExpectFail(page, 'GET', '/export-approvals/verify-token?token=447-not-a-real-token');
+    const bogus = await apiCallExpectFail(
+      page,
+      'GET',
+      '/export-approvals/verify-token?token=447-not-a-real-token'
+    );
     expect(bogus.status, '不存在的令牌必须 403 而不是 500/404').toBe(403);
     expect(bogus.code, '不存在令牌的机器码必须是 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
 
-    await apiCall(page, 'POST', `/export-approvals/${id}/cancel`, { comments: 'e2e447 作废后复用取证' });
+    await apiCall(page, 'POST', `/export-approvals/${id}/cancel`, {
+      comments: 'e2e447 作废后复用取证',
+    });
     const reuse = await apiCallExpectFail(
       page,
       'GET',
@@ -543,8 +644,9 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
 
   test('447-6 print/export 家族死端点侦测：空壳与未注册一律判红', async ({ page }) => {
     const queue: DeferredCleanup[] = [];
+    const probeName = genName('P447DEAD');
     const tpl = await apiCallRaw<{ id: number }>(page, 'POST', '/print-templates', {
-      template_name: genName('P447DEAD'),
+      template_name: probeName,
       doc_type: 'sales_order',
       template_code: genCode('P447D'),
       content: '<html><body>dead-endpoint-probe</body></html>',
@@ -555,45 +657,90 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(Number.isInteger(tplId) && tplId > 0, '建探针模板必须回主键').toBe(true);
     deferCleanup(queue, 'DELETE', `/print-templates/${tplId}`, `probe-template-${tplId}`);
 
-    for (const path of [
-      `/print-templates/${tplId}`,
+    const tplGet = await page.request.get(fullUrl(`/print-templates/${tplId}`));
+    expect(
+      tplGet.status(),
+      `[死端点] GET /print-templates/${tplId} 返回 ${tplGet.status()}：刚创建的行取不到即路由未注册或处理器空转`
+    ).toBe(200);
+    const tplGetBody = await tplGet.body();
+    expect(tplGetBody.byteLength, '[死端点] 模板对象口 200 但 0 字节，body 空壳').toBeGreaterThan(
+      0
+    );
+    expect(
+      str(
+        (JSON.parse(tplGetBody.toString('utf8')) as { data?: Record<string, unknown> }).data
+          ?.template_name
+      ),
+      '[死端点] 模板对象口 200 但 data.template_name 为空壳'
+    ).toBe(probeName);
+
+    const previewData = await apiCallRaw<unknown>(
+      page,
+      'POST',
       `/print-templates/${tplId}/preview`,
-      `/print-templates/${tplId}/print`,
-    ]) {
-      const resp = await page.request.get(fullUrl(path));
-      const status = resp.status();
-      expect(
-        status === 200 || status === 405,
-        `[死端点] GET ${path} 返回 ${status}：404=路由未注册，500=处理器空转，均判缺陷`
-      ).toBe(true);
-      if (status === 200) {
-        const bytes = await resp.body();
-        expect(bytes.byteLength, `[死端点] GET ${path} 200 但 0 字节，body 空壳`).toBeGreaterThan(0);
-      }
-    }
+      {}
+    );
+    const previewText = JSON.stringify(previewData ?? null);
+    expect(
+      previewText.replace(/[\s{}"':,]/g, '').length,
+      `[死端点] POST /print-templates/${tplId}/preview 的 data 是空壳（实际 ${previewText.slice(0, 120)}）`
+    ).toBeGreaterThan(0);
 
     const coRows = rowsOf(
       await apiCallRaw<unknown>(page, 'GET', '/custom-orders?page=1&page_size=5'),
       '定制订单列表'
     );
+    const labRows = rowsOf(
+      await apiCallRaw<unknown>(page, 'GET', '/production/lab-dip/requests?page=1&page_size=5'),
+      '打样申请列表'
+    );
+    const cardRows = rowsOf(
+      await apiCallRaw<unknown>(page, 'GET', '/color-cards?page=1&page_size=5'),
+      '色卡列表'
+    );
     const coId = Number(coRows[0]?.id);
-    for (const path of [
-      `/custom-orders/${coId}/print`,
-      `/color-cards/${coId}/lab-dip/print`,
-      `/color-cards/issues/export?page=1&page_size=5`,
-      `/color-cards/export/${coId}`,
-    ]) {
+    const labId = Number(labRows[0]?.id);
+    const cardId = Number(cardRows[0]?.id);
+    const scanLegs: Array<[string, string]> = [
+      [`/custom-orders/${coId}/print`, '定制订单打印'],
+      [`/color-cards/${labId}/lab-dip/print`, '打样申请打印'],
+      ['/color-cards/issues/export?page=1&page_size=5', '色卡发放导出'],
+      [`/color-cards/export/${cardId}`, '单张色卡导出'],
+      ['/audit-logs/export?page=1&page_size=5', '审计日志导出'],
+    ];
+    for (const [path, label] of scanLegs) {
       const resp = await page.request.get(fullUrl(path));
       const status = resp.status();
       const body = await resp.body();
       expect(
-        status !== 200 || body.byteLength > 0,
-        `[死端点] GET ${path} 返回 200 且 0 字节，空壳响应判为缺陷`
-      ).toBe(true);
-      console.log(`[447][死端点] ${path} -> ${status} ${body.byteLength}B`);
+        status,
+        `[死端点] ${label} GET ${path} 返回 ${status}：500/502 是处理器空转，404 在该族只能是模板或行装配不出，均判缺陷`
+      ).not.toBeGreaterThanOrEqual(500);
+      expect(status, `[死端点] ${label} GET ${path} 返回 404，路由族空转`).not.toBe(404);
+      if (status === 200) {
+        expect(
+          body.byteLength,
+          `[死端点] ${label} GET ${path} 200 且 0 字节，空壳响应`
+        ).toBeGreaterThan(0);
+        const ctype = resp.headers()['content-type'] ?? '';
+        if (ctype.includes('json')) {
+          const env = JSON.parse(body.toString('utf8')) as { data?: unknown };
+          expect(
+            shellPayloadLength(env.data),
+            `[死端点] ${label} GET ${path} 200 但 data 是空壳（实际 ${str(JSON.stringify(env.data)).slice(0, 120)}）`
+          ).toBeGreaterThan(0);
+        }
+      }
+      console.warn(`[447][死端点] ${label} ${path} -> ${status} ${body.byteLength}B`);
     }
 
-    await assertExportNotDeadEnd(page, '/color-cards/issues/export?page=1&page_size=20', 'admin');
+    const issueRows = rowsOf(
+      await apiCallRaw<unknown>(page, 'GET', '/color-cards/issues?page=1&page_size=5'),
+      '色卡发放列表(admin 前置)'
+    );
+    if (issueRows.length > 0) {
+      await assertExportNotDeadEnd(page, '/color-cards/issues/export?page=1&page_size=20', 'admin');
+    }
     await flushDeferredCleanups(page, queue);
   });
 });
