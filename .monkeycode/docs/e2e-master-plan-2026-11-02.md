@@ -233,11 +233,26 @@ CI e2e 分片矩阵 45 片（flow 20 + smoke 5 + traversal 5 + extras 15），�
 prettier 对 `data-permission.ts` 与 `index.vue` 报 warn，控制组（主干未改副本）同样报 warn，
 且把格式化结果与本轮文件逐行比对为空——属本机 CRLF 伪影，不据此跑 `--write` 制造行尾 churn。
 
-### 未结的观测面（不是本轮红因，但别当没看见）
+### 已定责的观测面：waitListResponse 恒超时（判测试面，非前端缺陷）
 
 两枚分片的 `ui-failures.md` 各自记了大量 `[waitListResponse]` 超时（7/20 片 132 处、
-12/20 片 30 处），命中端点恒为同一族：`GET /api/v1/erp/production/dye-batches`、
+12/20 片 30 处），命中端点恒为三族：`GET /api/v1/erp/production/dye-batches`、
 `GET /api/v1/erp/custom-orders`、`GET /api/v1/erp/color-cards`，三枚都在 `route-snapshot.txt`
-里真实存在（23/313/77 行附近）。超时含义是"浏览器压根没发这个请求"，与断言失败不同性质，
-所以它们没把 job 判红，但会让"点了按钮以为在跑"的用例 silently 空转。下一批动这三族页面前，
-先查是路由守卫把导航吞了、还是等待器挂晚了，别靠调大超时把它糊过去。
+里真实存在。超时含义是"浏览器压根没发这个请求"，与断言失败不同性质，所以不判红，
+但每枚 `ensureTestEntities` 白烧 3×20s 种子预算（`playwright.config.ts` 里 `retries: 0`，
+132 与 30 都是 3 的整数倍，即三处各满 20s，非重试重复计数）。两条根因：
+
+1. `frontend/e2e/flow/ui-helpers.ts` 的 `readFirstEntityId` 先 `safeGoto` 再注册
+   `waitForResponse`，而 `custom-orders` 与 `color-cards` 两页的列表 GET 由 `useTableApi`
+   在构造时自动发一次，错过挂载那一刻就恒等满超时。仓内早已认证过该范式：
+   `frontend/e2e/color-card.spec.ts` 文件头明写"waitForResponse 必须注册在导航前"。
+2. `frontend/e2e/flow/helpers.ts` 种子第 11 把 dye-batches 导航到 `/production`
+   （生产总览页，挂载只刷新本页数据源，全文无 dye 引用），而批次列表页是 `/dye-batch`
+   （`src/router/index.ts` 的 path 与权限键 `dye-batches:read`，`views/dye-batch/index.vue`
+   的 useTableApi 构造即初始加载）。落点写错页 ⇒ 该腿恒超时。
+
+修面在车道 `wt-e2e-waitfix`（分支 `test/e2e-wait-response-before-nav`，提交 `c6cbb3ba`，
+两文件 9 增 2 删）：等待器改为先挂后导航，导航落点改到真正发请求的页面。本地四道 e2e
+静态门（types/shard-coverage/select-ratchet/worker-account）与 eslint 全绿、注释门 0 命中。
+**行为面只能由 CI 证**：等待器改对之后，原本静默空转的 UI 腿会开始真拿响应，
+若某端点形状与声明不符会首次暴露成红——那是把既有漂移暴露出来，不是新增缺陷，判责时按此认。
