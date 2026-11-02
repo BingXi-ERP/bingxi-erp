@@ -75,9 +75,6 @@ interface DelCase {
  * - status === 'INACTIVE'（大写）：报表模板（report_template_service delete 写
  *   "INACTIVE"）与工作中心（capacity_service delete_work_center 写 "INACTIVE"）。
  * - status === 'inactive' / 'deleted' / 'cancelled'：其余资源的小写状态词表。
- * - is_enabled === false：数据权限的软删（data_permission_service delete_data_permission
- *   置 is_enabled=false，handler 的 delete_data_permission 注释同口径），详情通道对该行
- *   另有一种外显形状（HTTP 200 加 data 为 null），见 createThenApiDelete 详情分支。
  * 消费方：createThenApiDelete 的详情回读通道与列表回读通道共用本判定，避免两处词表漂移。
  * 入参：详情 data 对象或列表命中行（可空）；出参：布尔，字段缺失/值不符一律 false。
  */
@@ -86,7 +83,6 @@ function isSoftDeletedRecord(d: Record<string, unknown> | null | undefined): boo
     d != null &&
     (d.is_deleted === true ||
       d.is_active === false ||
-      d.is_enabled === false ||
       d.status === 'inactive' ||
       d.status === 'INACTIVE' ||
       d.status === 'deleted' ||
@@ -296,61 +292,21 @@ async function createThenApiDelete(
   if (channel === 'detail') {
     let marker: Record<string, unknown> | null = null;
     let verified = postStatus === 404;
-    // 详情通道存在第三种后端真实形状：handler 把"行仍在但对当前主体不可见"编码成
-    // HTTP 200 加 data 为 null（见 data_permission_handler 的 get_data_permission 对
-    // 非 admin 角色且 is_enabled=false 的行返回 ApiResponse::success(None)）。
-    // 该形状单独不可作删除证据——任何"不可见"都长这样——因此改走列表侧独立回读交叉验证，
-    // 不在详情分支放宽判据。
-    let invisibleNull = false;
     if (postStatus === 200) {
       try {
         const body = (await chk.json()) as { data?: unknown };
         const d = body?.data;
-        if (d === null) {
-          invisibleNull = true;
-        } else {
-          marker = d != null && typeof d === 'object' ? (d as Record<string, unknown>) : null;
-          verified = detailHitsId(d, id) && isSoftDeletedRecord(marker);
-        }
+        marker = d != null && typeof d === 'object' ? (d as Record<string, unknown>) : null;
+        verified = detailHitsId(d, id) && isSoftDeletedRecord(marker);
       } catch (e) {
         console.warn(`[31b-${c.label}] 删除后回读 200 响应解析失败（判负）: ${(e as Error).message}`);
       }
     }
-    let nullCrossStatus: number | undefined;
-    let nullCrossFound: boolean | undefined;
-    let nullCrossError: string | null | undefined;
-    if (invisibleNull) {
-      const cross = await probeListById(
-        page,
-        listQuery,
-        listKey,
-        id,
-        `31b-${c.label} 详情 null 后的列表交叉验证`
-      );
-      nullCrossStatus = cross.status;
-      nullCrossFound = cross.found;
-      nullCrossError = cross.error;
-      verified =
-        cross.found === false ||
-        (cross.found === true && cross.hitRow != null && isSoftDeletedRecord(cross.hitRow));
-      console.log(
-        `[31b-${c.label}] 详情 200+data:null，改用列表交叉证据 ${listQuery} → HTTP ${cross.status} found=${String(cross.found ?? null)} 判定 verified=${verified}`
-      );
-    }
     // postStatus 为非 200/404（500/403 等）或 200 但记录仍活跃/无标记：verified 保持 false 判负。
     expect(
       verified,
-      `[31b-${c.label}] 删除后详情回读须为 404（预检已证明路由在用，404 才可作硬删证据）或 200+软删标记` +
-        `或 200+data:null 且列表侧独立回读找不到该 id / 命中行带非活跃标记: ` +
-        `actual=${JSON.stringify({
-          postStatus,
-          getApi,
-          invisibleNull,
-          marker: softDeleteMarkerSummary(marker),
-          crossListStatus: nullCrossStatus ?? null,
-          crossListFound: nullCrossFound ?? null,
-          crossListError: nullCrossError ?? null,
-        })}`
+      `[31b-${c.label}] 删除后详情回读须为 404（预检已证明路由在用，404 才可作硬删证据）或 200+软删标记: ` +
+        `actual=${JSON.stringify({ postStatus, getApi, marker: softDeleteMarkerSummary(marker) })}`
     ).toBe(true);
     console.log(`[31b-${c.label}] ✅ 详情证据通道通过（删除后 HTTP ${postStatus}）`);
   } else {
