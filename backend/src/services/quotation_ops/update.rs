@@ -247,6 +247,13 @@ impl QuotationService {
     }
 
     /// 重算 subtotal/tax/total 并更新主表（在 txn 内查询和 update，保证原子性）
+    ///
+    /// 调用方：本文件 update（更新报价单主流程，在 replace_items 之后执行）。
+    /// 入参：已锁定的单头模型 updated；金额来源是同事务内已落库的 sales_quotation_item
+    /// 行腿列 amount（净额）与 amount_with_tax（含税），直接聚合不重新乘。
+    /// 含税态：总额取含税行腿聚合，税额取含税总额减净额小计的差额，与行腿钩稽无分差；
+    /// 不含税态：维持小计乘税率加计的既有口径。
+    /// 结果写入 sales_quotations 的 subtotal / tax_amount / total_amount / updated_at。
     pub(crate) async fn recalculate_totals_and_update(
         txn: &sea_orm::DatabaseTransaction,
         updated: &sales_quotation::Model,
@@ -256,12 +263,13 @@ impl QuotationService {
             .all(txn)
             .await?;
         let subtotal: Decimal = recalc_items.iter().map(|i| i.amount).sum();
-        let tax_amount = if updated.tax_inclusive {
-            Decimal::ZERO
+        let (tax_amount, total_amount) = if updated.tax_inclusive {
+            let total_with_tax: Decimal = recalc_items.iter().map(|i| i.amount_with_tax).sum();
+            (total_with_tax - subtotal, total_with_tax)
         } else {
-            subtotal * updated.tax_rate / Decimal::from(100)
+            let tax = subtotal * updated.tax_rate / Decimal::from(100);
+            (tax, subtotal + tax)
         };
-        let total_amount = subtotal + tax_amount;
 
         let mut re_active: QuotationActive = updated.clone().into();
         re_active.subtotal = Set(subtotal);
