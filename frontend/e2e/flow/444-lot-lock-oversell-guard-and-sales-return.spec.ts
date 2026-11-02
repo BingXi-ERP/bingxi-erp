@@ -16,13 +16,16 @@ import {
 } from './helpers';
 
 /**
- * 444 订单锁缸防超卖与销售退货反向腿（六枚 test 串行链）
+ * 444 订单锁缸防超卖与销售退货反向腿（八枚 test 串行链）
  *
  * 功能。覆盖同一缸号从建档到退货回补的四条腿。预留建单与锁定动作的状态机门与
  * 拒绝后零漂移（T2），预留面对超额需求的真实契约与库存零写入不变量（T3），
  * 预留动作序列的串行拒绝与删除门（T2 T3 T4），取消释放回读（T4），
  * 销售退货全链 DRAFT 到 SUBMITTED 到 APPROVED 到 COMPLETED，审批即库存回补，
- * 回补量与账面恒等（T5），非销售岗直连预留与退货写端点被后端权限门拒绝（T6）。
+ * 回补量与账面恒等（T5），非销售岗直连预留与退货写端点被后端权限门拒绝（T6），
+ * 释放后同一缸号重新锁定成功并逐分对平"可用量加锁定量等于在库量"守恒恒等、
+ * 出库面订单状态门拒绝后三列零漂移（T7），销售退货拒绝分支 SUBMITTED 到 REJECTED
+ * 与拒绝动作零回补及被拒后状态不回跳（T8）。
  *
  * 调用方。Playwright E2E 串行链，flow 分片矩阵注册后由 CI 实跑，T6 拒绝腿走
  * loginAsRole 切 report_viewer 会话，放行面由 T2 T5 的管理员会话反向证明。
@@ -37,8 +40,11 @@ import {
  * GET /inventory/reservations 按产品与状态回读、DELETE /inventory/reservations/{id}
  * 走删除门，退货腿 POST /sales/sales-returns 建草稿并关联销售订单、
  * POST /sales/sales-returns/{id}/items 录明细、submit 与 approve 与 execute 推进
- * 状态机，GET /sales/sales-returns/{id} 与 /items 回读，回补对账用
- * GET /inventory/stock 聚合恒等。全部路径逐条对 frontend/scripts/route-snapshot.txt 在册。
+ * 状态机、reject 走拒绝分支并落 rejected_reason 专列，GET /sales/sales-returns/{id}
+ * 与 /items 回读，回补对账用 GET /inventory/stock 聚合恒等，出库腿
+ * POST /sales/orders/{id}/deliveries 与 GET /sales/orders/{id}/deliveries 过订单
+ * 状态门（ship.rs 仅放行 approved 与 partial_shipped）。
+ * 全部路径逐条对 frontend/scripts/route-snapshot.txt 在册。
  *
  * 存什么。inventory_stocks 行的 quantity_on_hand 与 quantity_available 与
  * quantity_reserved 三列，inventory_reservations 行的 quantity 与 status 与
@@ -117,13 +123,10 @@ const bag: {
  * 存什么与存哪里，读回 inventory_stocks 行原样 JSON，查不到当场红并点名步骤。
  */
 async function readLotRow(page: Page, label: string): Promise<Row> {
-  const row = await verifyStockFourDim(
-    page,
-    bag.productId as number,
-    bag.colorNo,
-    bag.dyeLotNo,
-    { batchNo: bag.batchNo, warehouseId: bag.warehouseId }
-  );
+  const row = await verifyStockFourDim(page, bag.productId as number, bag.colorNo, bag.dyeLotNo, {
+    batchNo: bag.batchNo,
+    warehouseId: bag.warehouseId,
+  });
   expect(row, `${label} 必须按四维命中库存行，实际为 null`).not.toBeNull();
   return row as Row;
 }
@@ -185,11 +188,7 @@ async function createDemandOrder(page: Page, demandMeters: string, tag: string):
  * 传给谁 POST /inventory/reservations 与 POST /inventory/reservations/{id}/lock。
  * 存什么与存哪里，inventory_reservations 行（quantity 与 status），返回建单响应体。
  */
-async function createReservation(
-  page: Page,
-  quantity: string,
-  notes: string
-): Promise<Row> {
+async function createReservation(page: Page, quantity: string, notes: string): Promise<Row> {
   const res = await apiCallRaw<Row>(page, 'POST', '/inventory/reservations', {
     order_id: bag.orderId,
     product_id: bag.productId,
@@ -375,11 +374,7 @@ test.describe.serial('444 订单锁缸防超卖与销售退货反向腿', () => 
     await readReservation(page, lockedId, 'locked', 'T3 删除被拒后回读');
 
     // 删除门正例 pending 行删除成功（出参信封 data 为 message 提示）且 pending 过滤读回不存在
-    const delPending = await apiCallRaw<Row>(
-      page,
-      'DELETE',
-      `/inventory/reservations/${overId}`
-    );
+    const delPending = await apiCallRaw<Row>(page, 'DELETE', `/inventory/reservations/${overId}`);
     expect(String(delPending.message), 'pending 删除成功的后端提示必须为原文').toBe('预留已删除');
     const listPending = await apiCallRaw<Row>(
       page,
@@ -407,11 +402,7 @@ test.describe.serial('444 订单锁缸防超卖与销售退货反向腿', () => 
     expect(num(hit.quantity), '释放不许改数量列').toBe(15);
 
     // 释放后再锁 撞锁定状态门 拒因外显可读 状态不回跳
-    const relock = await apiCallExpectFail(
-      page,
-      'POST',
-      `/inventory/reservations/${freshId}/lock`
-    );
+    const relock = await apiCallExpectFail(page, 'POST', `/inventory/reservations/${freshId}/lock`);
     expect(relock.status, `released 行再锁必须 400，实际 ${relock.status}`).toBe(400);
     expect(
       failureCode(relock),
@@ -446,9 +437,10 @@ test.describe.serial('444 订单锁缸防超卖与销售退货反向腿', () => 
 
     // 取消释放的库存侧对账 该缸可用量恒等播种值（预留面从未扣减，与 T3 同缺口口径）
     const stockRow = await readLotRow(page, 'T4 释放后可用量');
-    expect(num(stockRow.quantity_available), '释放后可用量必须恒等于账面 100（预留面从未扣减）').toBe(
-      100
-    );
+    expect(
+      num(stockRow.quantity_available),
+      '释放后可用量必须恒等于账面 100（预留面从未扣减）'
+    ).toBe(100);
     console.log(`[444 T4] 取消释放链完成 reservation=${freshId}`);
   });
 
@@ -467,9 +459,10 @@ test.describe.serial('444 订单锁缸防超卖与销售退货反向腿', () => 
       notes: `444退货${tag}`,
     });
     const returnId = num(ret.id);
-    expect(Number.isInteger(returnId) && returnId > 0, `建退货单失败，实际 ${JSON.stringify(ret)}`).toBe(
-      true
-    );
+    expect(
+      Number.isInteger(returnId) && returnId > 0,
+      `建退货单失败，实际 ${JSON.stringify(ret)}`
+    ).toBe(true);
     expect(String(ret.status), '退货单初值状态必须为大写 DRAFT').toBe('DRAFT');
     expect(
       /^SR\d{11}$/.test(String(ret.return_no)),
@@ -526,10 +519,9 @@ test.describe.serial('444 订单锁缸防超卖与销售退货反向腿', () => 
       `/sales/sales-returns/${returnId}/approve`
     );
     expect(String(approved.status), '审批后状态必须为大写 APPROVED').toBe('APPROVED');
-    expect(
-      /^SR\d{11}$/.test(String(approved.return_no)),
-      '审批响应必须回显同一单号形态'
-    ).toBe(true);
+    expect(/^SR\d{11}$/.test(String(approved.return_no)), '审批响应必须回显同一单号形态').toBe(
+      true
+    );
     expect(
       num(approved.total_amount),
       `主表 total_amount 必须按 数量乘单价逐行求和 口径为 306（不含税，与行含税 345.78 两口径差如实钉）`
@@ -654,24 +646,214 @@ test.describe.serial('444 订单锁缸防超卖与销售退货反向腿', () => 
       )}`
     ).toBe(num(baseRet.total));
     console.log('[444 T6] 越权双腿拒绝且零建行');
+  });
 
-    // 清理腿（tryCleanup 尽力而为）：pending 预留已在 T3 删除门删除、locked 与
-    // released 预留受删除状态门约束无法 HTTP 删除，与 COMPLETED 退货单一起按
-    // 专属标记留存隔离，可删的订单与库存行在此删净。
-    if (bag.orderId !== undefined) {
-      await tryCleanup(
-        page,
-        'DELETE',
-        `/sales/orders/${bag.orderId}`,
-        `[444] 订单 ${bag.orderId}`
+  test('T7 释放后同缸重新锁成功 逐分对平守恒 出库面订单状态门拒绝零漂移', async ({ page }) => {
+    if (bag.orderId === undefined || bag.stockId === undefined || bag.warehouseId === undefined) {
+      throw new Error(
+        `T1 夹具前置不成立，orderId=${String(bag.orderId)} stockId=${String(bag.stockId)} warehouseId=${String(bag.warehouseId)}`
       );
     }
+    const orderId = bag.orderId;
+    const warehouseId = bag.warehouseId;
+
+    /**
+     * 释放后重新锁同一缸号。功能。证明 T2 与 T4 的 400 是预留行自身状态门而不是端点坏。
+     * 调用方 T7。入参 关联 T1 订单与本缸产品仓库，数量 30（DECIMAL 字符串）。
+     * 传给谁 POST /inventory/reservations 与 POST /inventory/reservations/{id}/lock。
+     * 存什么与存哪里 inventory_reservations 行 status 由 pending 翻到 locked。
+     */
+    const relockRes = await createReservation(page, '30.00', `444重锁${genCode('444H')}`);
+    const relockId = num(relockRes.id);
+    const relocked = await apiCallRaw<Row>(
+      page,
+      'POST',
+      `/inventory/reservations/${relockId}/lock`
+    );
+    expect(String(relocked.status), '释放后同一缸号重新锁定必须成功且状态 locked').toBe('locked');
+    const relockRow = await readReservation(page, relockId, 'locked', 'T7 重新锁定回读');
+    expect(num(relockRow.quantity), '重新锁定行数量必须为 30').toBe(30);
+
+    // 逐分对平守恒 同一库存行三列自算恒等 零容差（预留面从未扣减库存三列，锁定量恒 0）
+    const row = await readLotRow(page, 'T7 守恒回读');
+    const onHand = num(row.quantity_on_hand);
+    const available = num(row.quantity_available);
+    const reserved = num(row.quantity_reserved);
+    expect(
+      available + reserved,
+      `守恒恒等必须成立，实得 可用 ${available} + 锁定 ${reserved}`
+    ).toBe(onHand);
+    expect(onHand, '在库量必须等于播种 100').toBe(100);
+
+    /**
+     * 出库面订单状态门。功能。未审批（pending）销售订单不得生成发货出库。
+     * 调用方 T7。入参 本用例订单主键与退货仓库。
+     * 传给谁 POST /sales/orders/{id}/deliveries（handlers/sales_order_handler.rs create_delivery
+     * → services/so/delivery_ops/ship.rs 状态门，仅 approved 与 partial_shipped 可出库）。
+     * 存什么与存哪里 被拒不落 sales_deliveries 行，且不动 inventory_stocks 三列。
+     */
+    const denShip = await apiCallExpectFail(page, 'POST', `/sales/orders/${orderId}/deliveries`, {
+      warehouse_id: warehouseId,
+    });
+    expect(denShip.status, `未审批订单出库必须 400，实际 ${denShip.status}`).toBe(400);
+    expect(
+      failureCode(denShip),
+      `出库状态门必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(denShip.code)}`
+    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+
+    // 出库被拒后重新读回再算一次守恒 三列逐值不动
+    const after = await readLotRow(page, 'T7 出库被拒后守恒重算');
+    const afterOnHand = num(after.quantity_on_hand);
+    const afterAvailable = num(after.quantity_available);
+    const afterReserved = num(after.quantity_reserved);
+    expect(
+      afterAvailable + afterReserved,
+      `出库被拒后守恒恒等必须仍成立，实得 ${afterAvailable} + ${afterReserved}`
+    ).toBe(afterOnHand);
+    expect(afterOnHand, '出库被拒不许改在库量列').toBe(onHand);
+    expect(afterAvailable, '出库被拒不许改可用量列').toBe(available);
+    expect(afterReserved, '出库被拒不许改锁定量列').toBe(reserved);
+    const dlvList = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${orderId}/deliveries`);
+    expect(
+      (dlvList.list as Row[]).length,
+      `被拒的出库不许落发货单，实际 ${JSON.stringify(dlvList.list)}`
+    ).toBe(0);
+    console.log(`[444 T7] 重新锁定与守恒完成 reservation=${relockId}`);
+  });
+
+  test('T8 销售退货拒绝分支 SUBMITTED 到 REJECTED 与拒绝零回补 末腿清理', async ({ page }) => {
+    if (bag.orderId === undefined || bag.warehouseId === undefined || bag.productId === undefined) {
+      throw new Error(
+        `T1 夹具前置不成立，orderId=${String(bag.orderId)} warehouseId=${String(bag.warehouseId)}`
+      );
+    }
+    const orderId = bag.orderId;
+    const warehouseId = bag.warehouseId;
+    const productId = bag.productId;
+    const tag = genCode('444I');
+
+    // 第二张退货草稿 词表初值大写 DRAFT
+    const ret = await apiCallRaw<Row>(page, 'POST', '/sales/sales-returns', {
+      order_id: orderId,
+      customer_id: getCtx().customerId,
+      return_date: new Date().toISOString().slice(0, 10),
+      warehouse_id: warehouseId,
+      reason_type: `拒绝分支${tag}`,
+      reason_detail: `缸内色差${tag}`,
+      notes: `444拒绝${tag}`,
+    });
+    const returnId = num(ret.id);
+    expect(String(ret.status), '退货单初值必须为大写 DRAFT').toBe('DRAFT');
+
+    /**
+     * DRAFT 直接拒绝被状态门拒。功能。拒绝动作只放行 SUBMITTED（源 services/sales_return_service.rs
+     * reject_return 的 sr_status::SUBMITTED 门）。
+     * 调用方 T8。入参 主键与拒绝理由。传给谁 POST /sales/sales-returns/{id}/reject。
+     * 存什么与存哪里 被拒不写 status 也不写 rejected_reason。
+     */
+    const denDraftReject = await apiCallExpectFail(
+      page,
+      'POST',
+      `/sales/sales-returns/${returnId}/reject`,
+      { reason: `草稿态拒绝${tag}` }
+    );
+    expect(denDraftReject.status, `DRAFT 单拒绝必须 400，实际 ${denDraftReject.status}`).toBe(400);
+    expect(
+      failureCode(denDraftReject),
+      `DRAFT 拒绝门必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(denDraftReject.code)}`
+    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    const headAfterDeny = await apiCallRaw<Row>(page, 'GET', `/sales/sales-returns/${returnId}`);
+    expect(String(headAfterDeny.status), '被拒的拒绝动作不许推进状态').toBe('DRAFT');
+    expect(
+      headAfterDeny.rejected_reason,
+      `被拒的拒绝动作不许写理由列，实际 ${JSON.stringify(headAfterDeny.rejected_reason)}`
+    ).toBeNull();
+
+    // 录明细并提交 进入可拒绝源态 SUBMITTED
+    const item = await apiCallRaw<Row>(page, 'POST', `/sales/sales-returns/${returnId}/items`, {
+      product_id: productId,
+      quantity: '8.00',
+      unit_price: '20.00',
+      tax_percent: '0.00',
+      reason: `色差退货${tag}`,
+    });
+    expect(num(item.quantity), '退货行数量落库必须为 8').toBe(8);
+    const submitted = await apiCallRaw<Row>(
+      page,
+      'POST',
+      `/sales/sales-returns/${returnId}/submit`
+    );
+    expect(String(submitted.status), '提交后必须为大写 SUBMITTED').toBe('SUBMITTED');
+
+    // 回补基准 拒绝前的产品加仓库库存合计
+    const before = await sumStockCols(page);
+
+    // 拒绝 SUBMITTED 到 REJECTED 理由逐字落 rejected_reason 专列
+    const rejected = await apiCallRaw<Row>(
+      page,
+      'POST',
+      `/sales/sales-returns/${returnId}/reject`,
+      {
+        reason: `缸内色差${tag}`,
+      }
+    );
+    expect(String(rejected.status), '拒绝后状态必须为大写 REJECTED（词表逐字符）').toBe('REJECTED');
+    expect(
+      String(rejected.rejected_reason),
+      `拒绝理由必须逐字落 rejected_reason 列，实际 ${JSON.stringify(rejected.rejected_reason)}`
+    ).toBe(`缸内色差${tag}`);
+    const headRejected = await apiCallRaw<Row>(page, 'GET', `/sales/sales-returns/${returnId}`);
+    expect(String(headRejected.status), '拒绝必须真落库').toBe('REJECTED');
+
+    // 拒绝零回补 库存两列合计与拒绝前逐值相同（只有 approve 事务动库存）
+    const after = await sumStockCols(page);
+    expect(
+      after.onHand,
+      `拒绝不许回补现存量，必须保持 ${before.onHand}，实际 ${after.onHand}`
+    ).toBe(before.onHand);
+    expect(
+      after.available,
+      `拒绝不许回补可用量，必须保持 ${before.available}，实际 ${after.available}`
+    ).toBe(before.available);
+
+    // REJECTED 终态再审批被状态门拒 且状态不回跳
+    const denApprove = await apiCallExpectFail(
+      page,
+      'POST',
+      `/sales/sales-returns/${returnId}/approve`
+    );
+    expect(denApprove.status, `REJECTED 单审批必须 400，实际 ${denApprove.status}`).toBe(400);
+    expect(
+      failureCode(denApprove),
+      `REJECTED 审批门必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(denApprove.code)}`
+    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    const finalHead = await apiCallRaw<Row>(page, 'GET', `/sales/sales-returns/${returnId}`);
+    expect(String(finalHead.status), '被拒的审批不许把 REJECTED 回跳').toBe('REJECTED');
+    const items = await apiCallRaw<Row[]>(page, 'GET', `/sales/sales-returns/${returnId}/items`);
+    expect(items.length, `明细必须恰 1 行，实际 ${JSON.stringify(items)}`).toBe(1);
+    expect(num(items[0].quantity), '明细读回数量必须为 8').toBe(8);
+
+    // 缸行守恒终检 拒绝分支不动库存三列
+    const lotRow = await readLotRow(page, 'T8 拒绝分支后守恒');
+    const lotOnHand = num(lotRow.quantity_on_hand);
+    const lotAvailable = num(lotRow.quantity_available);
+    const lotReserved = num(lotRow.quantity_reserved);
+    expect(
+      lotAvailable + lotReserved,
+      `拒绝分支后守恒恒等必须成立，实得 ${lotAvailable} + ${lotReserved} vs ${lotOnHand}`
+    ).toBe(lotOnHand);
+    console.log(`[444 T8] 退货拒绝分支完成 return=${returnId}`);
+
+    // 清理腿（tryCleanup 尽力而为）：pending 预留已在 T3 删除门删除、locked 与
+    // released 与重新锁定后的预留受删除状态门约束无法 HTTP 删除，与 COMPLETED 与
+    // REJECTED 退货单一起按专属标记留存隔离，可删的订单与库存行在此删净。
+    await tryCleanup(page, 'DELETE', `/sales/orders/${orderId}`, `[444] 订单 ${orderId}`);
     if (bag.stockId !== undefined) {
       await tryCleanup(
         page,
         'DELETE',
         `/inventory/stock/${bag.stockId}`,
-        `[444] 库存行 ${bag.stockId}`
+        `[444] 库存行 ${String(bag.stockId)}`
       );
     }
   });
