@@ -212,6 +212,7 @@ test.describe.serial('库位全周期写后回读与扫码族契约配对', () =
             expect(
               listAfter.items.some(r => Number(r.id) === locationId)
             ).toBe(false)
+            return { artifacts: [] }
           },
         },
         {
@@ -222,19 +223,20 @@ test.describe.serial('库位全周期写后回读与扫码族契约配对', () =
 
             // scan-statistics：五列均数值，total_count 为非负整数且覆盖各分项（归属关系）
             const stats = await apiCallRaw<Row>(page, 'GET', '/scanner/scan-statistics')
-            const parts = [
-              stats.available_count,
-              stats.shipped_count,
-              stats.defect_count,
-              stats.reserved_count,
-            ]
-            for (const v of parts) {
-              expect(typeof v).toBe('number')
+            const partKeys = [
+              'available_count',
+              'shipped_count',
+              'defect_count',
+              'reserved_count',
+            ] as const
+            for (const key of partKeys) {
+              expect(typeof stats[key]).toBe('number')
             }
             expect(typeof stats.total_count).toBe('number')
-            expect(stats.total_count).toBeGreaterThanOrEqual(0)
-            for (const v of parts) {
-              expect(stats.total_count).toBeGreaterThanOrEqual(v)
+            const totalCount = stats.total_count as number
+            expect(totalCount).toBeGreaterThanOrEqual(0)
+            for (const key of partKeys) {
+              expect(totalCount).toBeGreaterThanOrEqual(stats[key] as number)
             }
 
             // scan-to-ship GET 无 barcode：空分页信封形状 + 回显请求的分页参数
@@ -292,6 +294,7 @@ test.describe.serial('库位全周期写后回读与扫码族契约配对', () =
             )
             expect(postFail.status).toBe(404)
             expect(postFail.message).toBe(MSG_BARCODE_NOT_FOUND)
+            return { artifacts: [] }
           },
         },
       ])
