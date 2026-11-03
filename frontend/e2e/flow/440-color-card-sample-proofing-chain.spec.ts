@@ -894,6 +894,8 @@ test.describe('色卡与样品打样主链', () => {
       );
       expectPermissionGateRejection(outsiderWrite, '业务员岗（无化验室打样授权键）建打样通知单');
 
+      // 建单即 pending，后端只允许 sampling 状态挂小样，先推 pending → sampling 再建样。
+      await apiCallRaw<unknown>(sampler.page, 'POST', `${LD}/requests/${requestId}/start-sampling`);
       await createLabDipSample(sampler.page, requestId, {
         recipe_no: genCode('R440A'),
         formula: '活性红 3BS 2%(o.w.f)',
