@@ -107,8 +107,8 @@ BEGIN
       WHERE table_schema = current_schema() AND table_name = 'audit_logs'
         AND column_name = 'role_code';
     IF has_col = 0 THEN
-        ALTER TABLE "audit_logs" ADD COLUMN "role_code" VARCHAR(50) NULL;
-        RAISE NOTICE 'm_audit_terminal_context_columns 已新增列 role_code（VARCHAR(50)，与 roles.code 同宽）。';
+        ALTER TABLE "audit_logs" ADD COLUMN "role_code" VARCHAR(255) NULL;
+        RAISE NOTICE 'm_audit_terminal_context_columns 已新增列 role_code（VARCHAR(255)）。';
     ELSE
         RAISE NOTICE 'm_audit_terminal_context_columns 列 role_code 已存在，跳过 DDL（幂等重放路径）。';
     END IF;
