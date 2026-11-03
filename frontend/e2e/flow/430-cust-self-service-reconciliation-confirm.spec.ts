@@ -623,7 +623,6 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
   test('430-06 删除腿只放草稿：非草稿删除被拒且行仍在，草稿删除成功且按主键读回 404，收尾清理不留悬挂行', async ({
     page,
   }) => {
-    expect(recDraft, '前置更新腿未产出草稿行 id，本条无法归因').toBeGreaterThan(0);
     expect(recMain, '前置主链行缺失，本条无法归因').toBeGreaterThan(0);
 
     // 删除门：closed 行不可删
@@ -645,10 +644,33 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       `被拒删除后状态漂移：${describeRow('回读', stillThere)}`
     ).toBe('closed');
 
+    // 草稿行由本用例自建自删，不借用更新腿那行：同一分片内有按列表首行开单的 UI 腿，
+    // 会把别处刚建的草稿推成非草稿，借行会让本条的拒绝归因落到旁观动作上。
+    const ownDraft = await apiCallRaw<ReconRow>(page, 'POST', '/ar-reconciliations', {
+      reconciliation_no: `AR430-${tag}-DEL06`,
+      customer_id: customerId,
+      customer_name: customerName,
+      period_start: PERIOD_START,
+      period_end: PERIOD_END,
+      opening_balance: 1.5,
+      total_invoices: 1.0,
+      total_collections: 0.5,
+    });
+    const ownDraftId = Number(ownDraft.id);
+    expect(ownDraftId, `自建草稿行未返回主键：${describeRow('建草稿', ownDraft)}`).toBeGreaterThan(0);
+    const draftGate = await apiCallRaw<ReconRow>(page, 'GET', `/ar-reconciliations/${ownDraftId}`);
+    expect(
+      draftGate.reconciliation_status,
+      `删除腿的前置必须是草稿行，非草稿即说明有旁路动作改写了本用例的行：${describeRow(
+        '删前',
+        draftGate
+      )}`
+    ).toBe('draft');
+
     // 草稿行可删，删后按主键读回必须 404（真删，不是软标记）
-    const deleted = await apiCall(page, 'DELETE', `/ar-reconciliations/${recDraft}`);
+    const deleted = await apiCall(page, 'DELETE', `/ar-reconciliations/${ownDraftId}`);
     expect(deleted.code, `草稿行删除未成功：实际 code=${deleted.code}`).toBe(200);
-    const gone = await apiCallExpectFail(page, 'GET', `/ar-reconciliations/${recDraft}`);
+    const gone = await apiCallExpectFail(page, 'GET', `/ar-reconciliations/${ownDraftId}`);
     expect(gone.status, `删除后按主键读回未判 404：实际 status=${gone.status}`).toBe(404);
     expect(failureCode(gone), `删除后读回的机器码非 NOT_FOUND：实际 code=${gone.code}`).toBe(
       APP_ERROR_CODES.NOT_FOUND
@@ -663,6 +685,8 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       'reconciliation_disputed'
     );
     await tryCleanup(page, 'DELETE', `/ar-reconciliations/${recMain}`, 'reconciliation_closed');
+    // 更新腿留下的草稿行本条不再借用，收尾按删除门放行回收，不悬挂 draft 行
+    await tryCleanup(page, 'DELETE', `/ar-reconciliations/${recDraft}`, 'reconciliation_draft');
     await tryCleanup(page, 'DELETE', `/crm/customers/${customerId}`, 'carrier_customer');
   });
 });
