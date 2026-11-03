@@ -74,3 +74,14 @@ error[E0063]: missing fields `layer_no` and `shelf_no` in initializer of `StockR
 
 整改：三行注释记法改为 --，扩位逻辑一字未动，修复在载体提交 944fb46c0。同一谓词已扫全棵迁移树：解析每枚 .rs 的 r#" 与 "# 配对，只在串内状态为真时统计行首 //，正向对照用修复前的 m0128 副本命中 3 处，全树扫描命中 0 处，这一类在当前仓内已闭合。把它做成常驻门是下一批候选（需按新门三件套走：默认只报告加棘轮基线加工具故障归 unverified 加内置正向对照），本轮不新开 .github 面，避免与在跑载体撞门体文件。
 
+## D-44 审计定位六维里三维结构性恒空：setter 有定义无调用点
+
+取证面：feat/audit-terminal-context-fields 支给审计表补了定位维度（terminal_type、operation_page、doc_no、change_reason、risk_flag，加本轮在补的 role_code），读取侧出参与等值筛选已通。逐枚核写入面得到不对称结论：
+
+- 会真落值的三维：terminal_type 由 middleware/audit_context.rs 的 detect_terminal_type 从请求头判；operation_page 由 detect_operation_page 从同源 Referer 取；risk_flag 在 audit_log_service.rs:540 有一条 DELETE 兜底派生（req_ctx.risk_flag 为空时落 RISK_DELETE）。
+- 恒空的三维：doc_no 与 change_reason 在三处写入点（audit_log_service.rs 约 444 与 570 与 639 到 673 行）全部读 req_ctx 的同名字段，而唯一能写这两个字段的 set_audit_doc_no 与 set_audit_change_reason（audit_context.rs 约 118 与 123 行）在 backend/src 生产侧调用点为零（排除 middleware 自身与 tests 目录后 grep 无命中）；mark_audit_high_risk（约 128 行）同样零调用，使 risk_flag 的 REVERSE 与 VOID 两档永远打不上。
+
+危害形态是假能力而不是崩溃：列在、索引在、筛选参数在、出参键在，前端与用例都能把这一维当可用能力写，但库侧永远 NULL。目标口径「支持缸号 / 订单 / 客户追溯」现实上不成立，且这种缺失不会以任何一条红暴露自己，所有门禁都绿。同族先例是单据号展示端点全为死端点与导入模板空转。
+
+处置分两步：一是在持有单号的业务写入点接上 setter，候选面是销售订单流转、报价审批、委外收回、销售退货、盘点差异、财务红冲与作废这些已存在审计跃迁的 handler，红冲与作废端点同时接 mark_audit_high_risk 的 REVERSE 与 VOID；二是在接线的同一支里把 462 号段那枚用例从「断 NULL 的落值形态」升回「按真实单号等值筛命中本链」，该用例已留了单号等值与 keyword 模糊的语义对照腿防恒过，接线后把降级腿换回正向命中腿。本轮先如实登记，不在载体在跑时并行改这批 handler，避免与主干解锁支撞面。
+
