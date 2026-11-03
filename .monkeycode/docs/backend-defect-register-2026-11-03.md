@@ -100,3 +100,23 @@ error[E0063]: missing fields `layer_no` and `shelf_no` in initializer of `StockR
 
 处置分两步：一是在持有单号的业务写入点接上 setter，候选面是销售订单流转、报价审批、委外收回、销售退货、盘点差异、财务红冲与作废这些已存在审计跃迁的 handler，红冲与作废端点同时接 mark_audit_high_risk 的 REVERSE 与 VOID；二是在接线的同一支里把 462 号段那枚用例从「断 NULL 的落值形态」升回「按真实单号等值筛命中本链」，该用例已留了单号等值与 keyword 模糊的语义对照腿防恒过，接线后把降级腿换回正向命中腿。本轮先如实登记，不在载体在跑时并行改这批 handler，避免与主干解锁支撞面。
 
+## D-46 审计角色码存证列宽度窄于源列且注释声称同宽
+
+取证面：复核 `feat/audit-terminal-context-fields` 那八笔角色维提交时逐列对宽度。存证列写作 `audit_logs.role_code VARCHAR(50)`，而列注释与迁移内的 RAISE NOTICE 都称"与 roles.code 同宽"。这条声称是假的：`backend/migration/src/domain/finance/mod.rs` 用 `ALTER TABLE "roles" ADD COLUMN IF NOT EXISTS "code" VARCHAR(255)` 建过该列，而 `VARCHAR(50)` 那种写法在本仓属于 `products.code` 等其它表（`system/m0001_initial_schema.rs` 与 `business/m0014` 的 CREATE TABLE 段），逐条核过后确认 roles 表根本没有 CREATE TABLE 语句（角色由 init 侧建，不由迁移建），迁移侧唯一一处 roles.code 定义就是 255。
+
+危害方向与普通宽度不一致不同：PG 对超长值不截断而是报 22001，写审计的那条 INSERT 直接失败。审计写入点与业务写在同一请求链上，一旦角色码超 50 字符，表面看是"某单保存报错"，实际断的是存证腿——与 D-44 那类"列在建、值恒空"一样，都不会被 Rust 侧编译或格式门抓到，只有真发一条长码才暴露。
+
+整改：存证列改为 VARCHAR(255)，同时删掉那句不实的"同宽"措辞（载体 `25ec370ac`）。宽度取值口径按源列较宽的一档，不是按当前数据实测最大值——当前所有角色码都远短于 50，按实测取宽等于把缺陷压到下一次改名。
+
+## D-47 操作页面维度取自请求头与 Referer 但无长度上界
+
+取证面：`backend/src/middleware/audit_context.rs` 的 `detect_operation_page` 依次取 `x-page-path` 与 `Referer`，两者长度都由客户端决定，解析后原样返回，存证列 `operation_page VARCHAR(500)`。这条腿的取值面比 D-46 更宽：请求头内容由调用方直接控制，不参与签名，任何一条带长头的请求都能命中 22001，无需业务侧配合。
+
+同族核过一遍，其余四维不构成同类：`terminal_type VARCHAR(16)` 存的是四枚常量（PC 与 H5 与 MINIPROGRAM 与 UNKNOWN，最长 11 字符，由服务端判定不给外部输入开门）；`risk_flag VARCHAR(32)` 同理三枚常量；`doc_no VARCHAR(64)` 与业务表单据编号列同宽（本仓该列一律 64）；`user_agent` 是 TEXT，不存在定宽溢出。
+
+整改：在边界处按存证列宽度判空并打 WARN（载体 `5d91bc4d3`），不做截断——截断会存下一个不存在的页面标识，等于造假存证；判空并在日志里给出实际字符数与上限，读的人能看出这条腿被丢过。这符合"只在系统边界校验输入"与"不许兜底掩盖"两条口径的交点。
+
+## 附带一条工具口径（不算缺陷，会造成本地支假红）
+
+本地 `rustfmt 1.8.0-stable` 对 `use axum::http::{Request, header}` 报"应改成 `{header, Request}`"，而这一行与 `origin/main` 逐字节相同且主干该 job 绿。CI 钉的是旧 toolchain，导入排序规则不同。**判法**：本地格式门点名时先 `git show origin/main:<path>` 比同一段，主干同一写法就不要"顺手修"——按本地版重排会把 CI 根本不要求的改动混进为消红那一笔，制造无关 churn。
+
