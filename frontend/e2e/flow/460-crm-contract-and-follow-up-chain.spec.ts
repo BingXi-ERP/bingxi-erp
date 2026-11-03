@@ -48,9 +48,8 @@
 //    与 sales-contracts:create（运行时键由 URL 段派生：crm→opportunities 消歧为
 //    crm-opportunities，sales→sales-contracts 保留原名，middleware/permission.rs +
 //    utils/path_utils.rs RESOURCE_NAME_MAP）；真实登录打这两个写端点必 403 FORBIDDEN，
-//    拒绝体是统一失败信封四键（utils/error.rs ErrorResponse：code 字符串、message、
-//    trace_id、timestamp 数值），message 为固定文案不带记录 ID；被拒后库内零变更用
-//    持键会话回读证明。
+//    拒绝文案为固定字面量（middleware/permission.rs「权限不足，无法访问该资源」）；
+//    被拒不得半改目标数据（用持键会话回读证明零标记行）。
 //
 // 失败信封唯一形状：{code,message,trace_id,timestamp}；
 //   ValidationError/可外显校验错 → HTTP 400 code VALIDATION_ERROR；
