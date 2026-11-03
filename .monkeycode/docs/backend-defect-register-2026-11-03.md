@@ -64,3 +64,13 @@ error[E0063]: missing fields `layer_no` and `shelf_no` in initializer of `StockR
 
 因此次序固定为：1171 先全绿并由用户合入主干，随后 1169 并基（448 取两侧意图并集，helpers.ts 以载体已收窄的失败信封透传为准），再 1168 并基（400 与 448 同理），1146 与 1165 与 1167 与 1164 无冲突可随时并基重推。1164 是主干验证载体，一次性目的已达成，其红面与主干共享红同源，收口动作待用户对合并次序裁定。
 
+## D-43 迁移里 plpgsql 体用了 // 注释记法，建库阶段抛 42601 把整条迁移链打断
+
+取证面：PR #1171 第二轮 head d4f78bd57 出两枚红，🔐 角色权限矩阵的 sales 组（job 126025273552）与 production 组（job 126025273467）。两枚日志里矩阵断言一行都没有，失败点全在更早的一步：日志打出"开始执行数据库迁移..."七秒后即 Error: Exec(SqlxError(Database(PgDatabaseError { code: "42601", message: "syntax error at or near \"//\"", position: Some(Original(381)), file: Some("pl_scanner.c"), routine: Some("plpgsql_yyerror") })))，job 直接判负。
+
+根因是本支新增的 backend/migration/src/domain/piece_length_scale_widen/m0128_widen_inventory_piece_length_scale.rs。它的 DO 块写在 r#"..."# 原始串里，串内三行说明按 Rust 习惯写成 // 开头。Rust 侧看不出问题（// 在字符串里没有语法含义，编译与 rustfmt 都过），但这三行是发给 PG 的 SQL 正文，plpgsql 词法器只认 -- 与 /* */，遇 // 即 42601。position 381 落在 BEGIN 之后第一段说明处。
+
+这类形态的危险在于面纱方向与编译错相反：cargo test --no-run 抓不到，因为串内文本对 Rust 是透明的；只有真的连库执行才暴露，于是所有 needs 建库的作业（角色权限矩阵六档、e2e 各分片、真实性门禁与收尾清理两枚聚合器）一起红，而单看 Rust 面一切正常。判某枚红是不是这一类，看日志里 42601 与 pl_scanner.c 这对签名即可，不必逐枚读断言。
+
+整改：三行注释记法改为 --，扩位逻辑一字未动，修复在载体提交 944fb46c0。同一谓词已扫全棵迁移树：解析每枚 .rs 的 r#" 与 "# 配对，只在串内状态为真时统计行首 //，正向对照用修复前的 m0128 副本命中 3 处，全树扫描命中 0 处，这一类在当前仓内已闭合。把它做成常驻门是下一批候选（需按新门三件套走：默认只报告加棘轮基线加工具故障归 unverified 加内置正向对照），本轮不新开 .github 面，避免与在跑载体撞门体文件。
+
