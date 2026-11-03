@@ -9,7 +9,7 @@ use crate::models::{
 };
 // 行级数据权限工具
 use crate::utils::data_scope::{
-    apply_data_scope, check_resource_owner_by_member_scope, DataScopeContext,
+    DataScopeContext, apply_data_scope, check_resource_owner_by_member_scope,
 };
 use crate::utils::error::AppError;
 use crate::utils::pagination::paginate_with_total;
