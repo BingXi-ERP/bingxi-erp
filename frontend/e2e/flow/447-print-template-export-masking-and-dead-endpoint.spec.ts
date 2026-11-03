@@ -9,6 +9,7 @@ import {
   apiCallRaw,
   apiCallExpectFail,
   deferCleanup,
+  failureCode,
   flushDeferredCleanups,
   loginAsRole,
   loginViaUI,
@@ -339,10 +340,12 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     const queue: DeferredCleanup[] = [];
     const targetCode = genCode('P447TGT');
     const displayName = genName('P447TGT');
+    // kind 必须落 models/status/print.rs 的 print_target_kind 词表（cups/ipp/network/system_command），
+    // 且非池行要带该 kind 必需的连接字段：cups 要 queue_name（handlers/print_target_handler.rs 校验）。
     const created = await apiCallRaw<{ id: number }>(page, 'POST', '/print-targets', {
       target_code: targetCode,
       display_name: displayName,
-      kind: 'file',
+      kind: 'cups',
       queue_name: 'print447',
       enabled: true,
       default_copies: 1,
@@ -361,7 +364,7 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(str(hit!.display_name), '列表回显 display_name 必须等于写入值').toBe(displayName);
 
     const single = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/print-targets/${id}`);
-    expect(str(single.kind), '对象口 kind 必须回显写入值').toBe('file');
+    expect(str(single.kind), '对象口 kind 必须回显写入值').toBe('cups');
 
     const renamed = genName('P447TGT2');
     await apiCall(page, 'PUT', `/print-targets/${id}`, { display_name: renamed });
@@ -378,14 +381,24 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       `删除后目标列表仍含 ${id}，即假删除`
     ).toBe(false);
 
+    // 负例载荷必须与正例同样合法（cups + queue_name），否则它会因"缺连接字段"被拒，
+    // 把唯一性断言变成对不上判据对象的假绿。
     const dup = await apiCallExpectFail(page, 'POST', '/print-targets', {
       target_code: targetCode,
       display_name: displayName,
-      kind: 'file',
+      kind: 'cups',
+      queue_name: 'print447',
     });
     expect(
       [400, 409].includes(dup.status),
       `同 target_code 重建必须被唯一性拒绝（本用例刚删同一行，若 200 说明删除只软删未释放唯一键），实际 ${dup.status}`
+    ).toBe(true);
+    expect(failureCode(dup), `唯一性拒绝的机器码应为 BAD_REQUEST，实际 ${dup.code}`).toBe(
+      APP_ERROR_CODES.BAD_REQUEST
+    );
+    expect(
+      str(dup.message).includes('目标编码已存在'),
+      `拒绝原因必须是编码唯一性而不是缺连接字段，实际文案 ${str(dup.message)}`
     ).toBe(true);
     await flushDeferredCleanups(page, queue);
   });
