@@ -167,11 +167,25 @@ function pickQuotationItem(detail: Row, productId: number): Row {
 }
 
 /**
+ * 从审计快照取状态位。快照缺失、快照不是对象、快照里没有 status 键三种情况各返回可点名的文本，
+ * 不折成空串——折成空串会把"读面结构不对"冒充成"跃迁不存在"，判红时看不出是哪一种。
+ */
+function snapshotStatus(raw: unknown): string {
+  if (raw === null || raw === undefined) return '无快照';
+  if (typeof raw !== 'object') return `非对象:${typeof raw}`;
+  const status = (raw as Row).status;
+  if (status === undefined || status === null) return '快照缺status键';
+  return String(status);
+}
+
+/**
  * 审计跃迁定位（admin 读面）。
- * 入参：admin 会话 page 与筛选口径。传给谁：GET /audit-logs（handler 现实要求 admin 角色）。
- * 判据：resource_type 等于报价单实体体表名且 resource_id 恰等于报价 id（读取侧的 resource_id
- * 是等值契约，不用 keyword 模糊——keyword=5 会命中 resource_id 为 15 的行），
- * 再按 old_value 与 new_value 快照里的 status 对精确匹配一次跃迁，命中必须恰好一行。
+ * 入参：admin 会话 page 与筛选口径。传给谁：先 GET /audit-logs 按资源键取候选行主键，
+ * 再逐行 GET /audit-logs/{id} 取详情。
+ * 判据：变更前后两列只在详情出参（AuditLogDetailResponse 的 before_snapshot 与 after_snapshot），
+ * 列表出参（AuditLogListItem）没有这两列，因此在列表上判跃迁恒得 0 命中；
+ * 资源侧仍按 resource_type 与 resource_id 等值筛（keyword=5 会命中 resource_id 为 15 的行，不用模糊），
+ * 再取详情快照里的 status 对精确匹配一次跃迁，命中必须恰好一行。
  * 审计现实缺 description 与 request_path（均 NULL），因此跃迁语义只能由快照状态对判定，
  * 这一档与文件头"审计面现实核到的字段清单"一致。
  */
@@ -188,35 +202,31 @@ async function findAuditTransition(
     `/audit-logs?resource_type=${AUDIT_RESOURCE_TYPE}&resource_id=${quotationId}&page=1&page_size=100`
   );
   const rows = pickListArray<Row>(list, 'items', `${context}审计列表`);
-  // 判红时必须把实际读到的行自证出来：只报行数会把"资源键不同源""快照缺状态键"
+  // 判红时必须把逐行读到的跃迁自证出来：只报行数会把"资源键不同源""详情读面被门挡"
   // "跃迁被别的动作抢先"三种成因混成同一条红，下一轮仍要重新取证。
-  const observed = rows
-    .slice(0, 8)
-    .map(r => {
-      const before = (r.old_value ?? null) as Row | null;
-      const after = (r.new_value ?? null) as Row | null;
-      return `rt=${String(r.resource_type ?? '无')} rid=${String(r.resource_id ?? '无')} op=${String(
-        r.operation_type ?? '无'
-      )} from=${before && typeof before === 'object' ? String(before.status ?? '无') : '非对象'} to=${
-        after && typeof after === 'object' ? String(after.status ?? '无') : '非对象'
-      }`;
-    })
-    .join(' | ');
-  const hits = rows.filter(r => {
-    if (String(r.resource_type ?? '') !== AUDIT_RESOURCE_TYPE) return false;
-    if (String(r.resource_id ?? '') !== String(quotationId)) return false;
-    const beforeRaw = r.old_value;
-    const afterRaw = r.new_value;
-    if (!beforeRaw || typeof beforeRaw !== 'object') return false;
-    if (!afterRaw || typeof afterRaw !== 'object') return false;
-    const before = beforeRaw as Row;
-    const after = afterRaw as Row;
-    return String(before.status ?? '') === fromStatus && String(after.status ?? '') === toStatus;
-  });
+  const observed: string[] = [];
+  const hits: Row[] = [];
+  for (const row of rows) {
+    const auditId = Number(row.id);
+    if (!Number.isInteger(auditId) || auditId <= 0) {
+      throw new Error(
+        `${context}：审计列表行的 id 应为正整数主键，实际=${String(row.id)}，行键=${Object.keys(row).join(',')}`
+      );
+    }
+    const detail = await apiCallRaw<Row>(page, 'GET', `/audit-logs/${auditId}`);
+    const before = snapshotStatus(detail.before_snapshot);
+    const after = snapshotStatus(detail.after_snapshot);
+    observed.push(
+      `id=${auditId} rt=${String(detail.resource_type ?? '无')} rid=${String(
+        detail.resource_id ?? '无'
+      )} op=${String(detail.operation_type ?? '无')} from=${before} to=${after}`
+    );
+    if (before === fromStatus && after === toStatus) hits.push(detail);
+  }
   expect(
     hits.length,
     `${context}：审计中应恰好一行 ${fromStatus} 到 ${toStatus} 的跃迁（报价 ${quotationId}），` +
-      `实际 ${hits.length} 行，本页共 ${rows.length} 行；读到的行=${observed || '空'}`
+      `实际 ${hits.length} 行，候选 ${rows.length} 行；逐行详情读到的跃迁=${observed.join(' | ') || '空'}`
   ).toBe(1);
   const row = hits[0];
   // 每行跃迁都必须同时交出操作人与时间，缺一即审计留痕不完整
