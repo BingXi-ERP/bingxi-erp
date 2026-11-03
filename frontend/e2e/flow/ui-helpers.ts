@@ -1112,6 +1112,30 @@ export async function uiDeleteRow(
     const deleteBtn = await findRowAction(page, rowIdentifier.value, row =>
       row.locator('button.el-button--danger, button:has-text("删除")')
     );
+    const listApi = options?.listApiPath;
+    const listKey = options?.listKey ?? 'items';
+    // 刷新响应由点击触发，等待器必须在点击之前挂上；后挂只能空等到超时。
+    // 形状判定与原来一致：命中响应后仍按声明的 listKey 校验，失配只记告警，
+    // 行是否真消失由后面 findTableRow 的 UI 断言兜底。
+    const refreshed = listApi
+      ? page
+          .waitForResponse(r => r.url().includes(listApi) && r.request().method() === 'GET', {
+            timeout: 15000,
+          })
+          .then(r =>
+            r.json().catch(e => {
+              console.warn(`[uiDeleteRow] GET ${listApi} 响应非 JSON:`, (e as Error).message);
+              return {};
+            })
+          )
+          .then(json =>
+            pickListArray((json as { data?: unknown }).data, listKey, `uiDeleteRow ${listApi}`)
+          )
+          .catch(e => {
+            console.warn(`[uiDeleteRow] 列表刷新响应等待失败: ${(e as Error).message}`);
+            return [] as unknown[];
+          })
+      : undefined;
     await deleteBtn.click();
     console.log(`[uiDeleteRow] 已点击删除按钮（${rowIdentifier.column}=${rowIdentifier.value}）`);
 
@@ -1128,15 +1152,7 @@ export async function uiDeleteRow(
       console.log(`[uiDeleteRow] 已确认删除`);
     }
 
-    // 等待列表刷新
-    await page.waitForTimeout(2000);
-    if (options?.listApiPath) {
-      await waitListResponse(page, options.listApiPath, options.listKey ?? 'items', 15000).catch(
-        e => {
-          console.warn(`[uiDeleteRow] 列表刷新响应等待失败:`, (e as Error).message);
-        }
-      );
-    }
+    await refreshed;
 
     // 验证行消失
     const stillExists = await findTableRow(page, rowIdentifier.value);
