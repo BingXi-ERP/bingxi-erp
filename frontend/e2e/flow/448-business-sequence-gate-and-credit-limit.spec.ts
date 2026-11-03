@@ -105,6 +105,11 @@ async function readQuotation(page: import('@playwright/test').Page, id: number):
  * 入参：客户 id、业务员用户 id、报价专用产品 id 与其落库单位、含税标志与税率、行数量与单价。
  * 传给谁：后端 handlers/quotation_handler.rs create_quotation，落 sales_quotations 主表与明细。
  * 存什么：状态初始 draft，金额由服务端计算后落 total_amount（DECIMAL(10,2)）。
+ * 金额口径：含税态（tax_inclusive=true）下含税单价是录入事实，单头总额取行腿含税事实的聚合，
+ * 净单价与之成对录入（净额＝含税 ÷ (1+税率)），禁止把两个单价塞同一个数——那会让税额列
+ * 恒为 0 并把净额反算带偏。unitPriceWithTax 缺省即与 unitPrice 同值，只适用于零税率腿。
+ * 审批档位：total_amount 决定提交后走哪一档（services/quotation_approval_service.rs 的
+ * ApproverRole::from_amount，阈值 10 万与 50 万），需要停在待审批的腿必须把金额做到 10 万以上。
  */
 async function seedQuotation(
   page: import('@playwright/test').Page,
@@ -116,6 +121,7 @@ async function seedQuotation(
     taxRate: string;
     quantity: string;
     unitPrice: string;
+    unitPriceWithTax?: string;
   }
 ): Promise<{ id: number; status: string }> {
   const created = await apiCall<Row>(page, 'POST', '/quotations', {
@@ -135,7 +141,7 @@ async function seedQuotation(
         unit: args.productUnit,
         quantity: args.quantity,
         unit_price: args.unitPrice,
-        unit_price_with_tax: args.unitPrice,
+        unit_price_with_tax: args.unitPriceWithTax ?? args.unitPrice,
       },
     ],
     notes: `E2E-SEQ-${genCode('Q')}`,
