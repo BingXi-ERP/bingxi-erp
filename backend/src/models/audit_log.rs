@@ -138,7 +138,7 @@ pub struct Model {
     pub export_approval_token: Option<String>,
     /// 导出文件水印中的用户名，二次泄露追溯
     pub export_watermark_user: Option<String>,
-    // ============ 审计定位列（终端类型 操作页面 单据编号 变更原因 风险标记）============
+    // ============ 审计定位列（终端类型 操作页面 单据编号 变更原因 风险标记 操作角色）============
     /// 操作终端类型（PC / H5 / MINIPROGRAM / UNKNOWN），由服务端按请求头与 UA 判定，取不到记 UNKNOWN，不默认 PC
     pub terminal_type: Option<String>,
     /// 操作页面标识（优先 X-Page-Path 头，回退 Referer 路径），取不到为 None
@@ -149,6 +149,8 @@ pub struct Model {
     pub change_reason: Option<String>,
     /// 高风险操作标记（DELETE / REVERSE / VOID 等），普通操作为 None
     pub risk_flag: Option<String>,
+    /// 操作人角色码（roles.code 稳定标识，非中文展示名），由认证链路已加载的角色行带出，未认证或角色行缺失为 None
+    pub role_code: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
