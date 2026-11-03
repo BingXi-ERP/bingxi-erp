@@ -9,7 +9,7 @@ use crate::models::{
 };
 // 行级数据权限工具
 use crate::utils::data_scope::{
-    DataScopeContext, apply_data_scope, check_resource_owner_by_member_scope,
+    apply_data_scope, check_resource_owner_by_member_scope, DataScopeContext,
 };
 use crate::utils::error::AppError;
 use crate::utils::pagination::paginate_with_total;
@@ -939,7 +939,30 @@ impl SalesReturnService {
             quantity_on_hand: Set(item.quantity),
             quantity_available: Set(item.quantity),
             quantity_reserved: Set(Decimal::ZERO),
+            // 主/辅计量两列与退货行同源：quantity 是主计量（米），quantity_alt 是辅计量（公斤）
+            quantity_meters: Set(item.quantity),
+            quantity_kg: Set(item.quantity_alt),
+            // 本行由退货入库新建，尚未发生发货、在途与预留之外的动账，累计量一律从 0 起算；
+            // 这三列与订货点三列都是 NOT NULL 无库端默认，整列省略会让插入语句缺列而被判为
+            // Missing value，故与建库存主路径同一写法显式赋值。
+            quantity_shipped: Set(Decimal::ZERO),
+            quantity_incoming: Set(Decimal::ZERO),
+            reorder_point: Set(Decimal::ZERO),
+            max_stock_point: Set(Decimal::ZERO),
+            reorder_quantity: Set(Decimal::ZERO),
+            // 状态两列取值来自写入方词表；可用量与可出库筛选按"合格"过滤，
+            // 写其它值会让本行对所有可用性查询永久不可见
+            stock_status: Set(
+                crate::models::status::purchase_inventory::inventory_stock_status::NORMAL
+                    .to_string(),
+            ),
+            quality_status: Set(
+                crate::models::status::purchase_inventory::inventory_stock_quality_status::PASS
+                    .to_string(),
+            ),
             version: Set(0),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
             ..Default::default()
         };
         new_stock.insert(txn).await?;
