@@ -41,9 +41,9 @@ BEGIN
         RETURN;
     END IF;
 
-    // 列的定标口径取 information_schema.columns.numeric_scale——pg_attribute 里没有这一列
-    // （它只有 atttypmod，需 ((atttypmod - 4) & 65535) 反解），按 pg_attribute 直选 numeric_scale
-    // 会在运行期报 42703 column "numeric_scale" does not exist 并把整条迁移链打断。
+    -- 列的定标口径取 information_schema.columns.numeric_scale——pg_attribute 里没有这一列
+    -- （它只有 atttypmod，需 ((atttypmod - 4) & 65535) 反解），按 pg_attribute 直选 numeric_scale
+    -- 会在运行期报 42703 column "numeric_scale" does not exist 并把整条迁移链打断。
     SELECT numeric_scale INTO v_numeric_scale
     FROM information_schema.columns
     WHERE table_name = 'inventory_piece'
