@@ -9,8 +9,10 @@ import {
   apiCallRaw,
   apiCallExpectFail,
   deferCleanup,
+  ensureTestEntities,
   failureCode,
   flushDeferredCleanups,
+  getCtx,
   loginAsRole,
   loginViaUI,
   genCode,
@@ -427,15 +429,45 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     );
     console.warn(`[447] 打样申请 ${labId} 打印正文长度 ${labXml.length}，含申请号 ${labNo}`);
 
-    const coRows = rowsOf(
-      await apiCallRaw<unknown>(page, 'GET', '/custom-orders?page=1&page_size=20'),
-      '定制订单列表'
-    );
-    expect(coRows.length, '测试库必须至少有一条定制订单，否则打印腿无从取证').toBeGreaterThan(0);
-    const coId = Number(coRows[0].id);
-    const orderNo = str(coRows[0].order_no);
-    expect(Number.isInteger(coId) && coId > 0, `定制订单主键非法：${coRows[0].id}`).toBe(true);
-    expect(orderNo.length, `定制订单列表未回显 order_no，无法做真内容断言`).toBeGreaterThan(0);
+    // 打印腿的取证对象由本用例自建：库内是否恰好存在定制订单不是可信前置。
+    // 外键取 ensureTestEntities 备好的真实客户与产品（custom_orders 两列都是 NOT NULL 外键），
+    // order_no 由服务端取号（CreateCustomOrderDto 无该字段），断言只认响应回显的真实单号。
+    await ensureTestEntities(page);
+    const ctx = getCtx();
+    if (!ctx.customerId || !ctx.productIds[0]) {
+      throw new Error(
+        `447-3 前置不成立：ensureTestEntities 未产出客户/产品外键（${JSON.stringify({
+          customerId: ctx.customerId,
+          productIds: ctx.productIds,
+        })}），自建定制订单无从落库`
+      );
+    }
+    const co = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/custom-orders', {
+      customer_id: ctx.customerId,
+      product_id: ctx.productIds[0],
+      color_id: ctx.productColorIds[0],
+      spec: 'E2E 447 打印腿规格 40S 133x72 150cm',
+      quantity: 300,
+      unit: '米',
+      notes: `E2E 447 打印腿自建单 ${genCode('P447CO')}`,
+    });
+    const coId = Number(co.id);
+    expect(
+      Number.isInteger(coId) && coId > 0,
+      `自建定制订单必须回主键，实际 ${JSON.stringify(co)}`
+    ).toBe(true);
+    const orderNo = str(co.order_no);
+    // 本用例不留清理动作：定制订单的终结腿是 DELETE /custom-orders/{id}，实为 cancel_custom_order
+    // 且必须携带 reason 请求体，与本文件的延迟清理（无体）形状不兼容；行以唯一备注隔离，
+    // 取消腿本身的契约归 custom-order 域用例覆盖。
+    expect(
+      orderNo.length,
+      `建单响应必须回显服务端取号结果 order_no，实际 ${JSON.stringify(co)}`
+    ).toBeGreaterThan(0);
+    expect(
+      str(co.status),
+      '定制订单起点词值应为小写 draft（models/status/sales.rs 的 custom_order）'
+    ).toBe('draft');
     await printDocxWithRealContent(
       page,
       `/custom-orders/${coId}/print`,
