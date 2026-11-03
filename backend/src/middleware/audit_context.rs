@@ -5,6 +5,8 @@
 //! 2. 提取客户端 IP（X-Real-IP / X-Forwarded-For / `ConnectInfo<SocketAddr>` 三级降级）
 //! 3. 提取 `User-Agent` header
 //! 4. 把结果打包成 `AuditContext` 写入 `Request::extensions()`，供 audit_log_service 异步落库
+//! 5. 从会话扩展取 auth 已加载的操作人角色码（`SessionRoleCode`），随同一枚上下文交给审计
+//!    写入单点；本中间件挂在 auth 内层，扩展对内层可见，角色维度不产生任何额外查询
 //!
 //! 与 `trace_context` 的关系：
 //! - `trace_context` 在最外层生成 W3C `traceparent`，设置 `TraceContext`
@@ -21,6 +23,7 @@ use axum::{
 use std::net::SocketAddr;
 use uuid::Uuid;
 
+use crate::middleware::auth_context::SessionRoleCode;
 use crate::observability::trace_context::TraceContext;
 
 /// 写入 `Request::extensions()` 的审计上下文（service 直接读取）
@@ -42,6 +45,9 @@ pub struct AuditContext {
     pub change_reason: Option<String>,
     /// 高风险操作标记，业务侧经 mark_audit_high_risk 登记；删除由写入单点自动补 DELETE
     pub risk_flag: Option<String>,
+    /// 操作人角色码（roles.code，非中文展示名），由 auth 中间件按会话已加载的角色行注入
+    /// SessionRoleCode 扩展带出；未认证（公开路径）或角色行缺失为 None，绝不兜底成占位值
+    pub role_code: Option<String>,
 }
 
 /// 终端类型取值（读取侧过滤与写入判定共用同一词表，避免三端漂移）
@@ -72,6 +78,7 @@ impl AuditContext {
             doc_no: None,
             change_reason: None,
             risk_flag: None,
+            role_code: None,
         }
     }
 }
@@ -89,7 +96,7 @@ tokio::task_local! {
     pub static AUDIT_REQUEST_CTX: std::cell::RefCell<AuditContext>;
 }
 
-/// 读取当前请求的审计上下文快照（含业务侧已登记的单号与原因与风险）。
+/// 读取当前请求的审计上下文快照（含业务侧已登记的单号与原因与风险与会话角色码）。
 /// 未绑定（后台任务 / spawn 旁路 / 位于 audit_context 中间件外层）返回 None，
 /// 由调用方按 UNKNOWN 终端如实落库，绝不臆造。
 pub fn current_audit_request_ctx() -> Option<AuditContext> {
@@ -100,7 +107,7 @@ pub fn current_audit_request_ctx() -> Option<AuditContext> {
 
 impl AuditContext {
     /// 同步写入单点（update_with_audit 与 delete_with_audit 的构造器不接收 ctx 入参）取当前
-    /// 请求作用域的活上下文。请求作用域内返回含终端与页面与单号与原因与风险的实时快照；
+    /// 请求作用域的活上下文。请求作用域内返回含终端与页面与单号与原因与风险与角色码的实时快照；
     /// 不在请求作用域（后台维护任务）时返回 UNKNOWN 终端与空维度的兜底，绝不默认 PC。
     pub fn current_for_sync_write() -> Self {
         current_audit_request_ctx().unwrap_or_else(AuditContext::empty)
@@ -312,6 +319,23 @@ pub async fn audit_context_middleware(mut request: Request<Body>, next: Next) ->
     let user_agent = extract_user_agent(&request);
     let terminal_type = detect_terminal_type(request.headers()).to_string();
     let operation_page = detect_operation_page(request.headers());
+    // 角色维度只消费 auth 已查出的角色行（SessionRoleCode 扩展由 auth 中间件注入，本中间件
+    // 挂在其内层，扩展随请求流向内可见），本层不查库。取不到如实记 None：公开路径未认证、
+    // 用户未分配角色、角色行缺失或查询失败都落 NULL，不写空串也不写占位角色冒充有值。
+    let role_code = request
+        .extensions()
+        .get::<SessionRoleCode>()
+        .map(|role| role.code.clone());
+    match &role_code {
+        Some(code) => {
+            tracing::debug!(role_code = %code, "审计上下文已带操作人角色维度")
+        }
+        None => {
+            tracing::debug!(
+                "审计上下文未带操作人角色维度（本路径未认证或会话角色行缺失），角色列按 NULL 落库"
+            )
+        }
+    }
 
     let audit_ctx = AuditContext {
         request_id,
@@ -322,6 +346,7 @@ pub async fn audit_context_middleware(mut request: Request<Body>, next: Next) ->
         doc_no: None,
         change_reason: None,
         risk_flag: None,
+        role_code,
     };
 
     // 活上下文交给 task-local，供同步写入单点（update_with_audit 等不接收 ctx 的调用）与
