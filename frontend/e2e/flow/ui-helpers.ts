@@ -980,8 +980,31 @@ export async function readFirstEntityId(
   listKey: ListShapeKey = 'items'
 ): Promise<number | undefined> {
   try {
+    // 列表 GET 由导航自身触发，等待器必须在 goto 之前挂上；后挂会错过已完成的响应，
+    // 每次都白等满 20s，把整片分片拖到作业级超时。
+    const armed = page
+      .waitForResponse(r => r.url().includes(listApiPath) && r.request().method() === 'GET', {
+        timeout: 20000,
+      })
+      .then(r =>
+        r.json().catch(e => {
+          console.warn(`[readFirstEntityId] GET ${listApiPath} 响应非 JSON:`, (e as Error).message);
+          return {};
+        })
+      )
+      .then(json =>
+        pickListArray(
+          (json as { data?: unknown }).data,
+          listKey,
+          `readFirstEntityId ${listApiPath}`
+        )
+      )
+      .catch(e => {
+        console.warn(`[readFirstEntityId] 等待 GET ${listApiPath} 失败: ${(e as Error).message}`);
+        return [] as unknown[];
+      });
     await safeGoto(page, route);
-    const items = await waitListResponse(page, listApiPath, listKey, 20000);
+    const items = await armed;
     const id = firstId(items);
     if (id !== undefined) return id;
   } catch (e) {
