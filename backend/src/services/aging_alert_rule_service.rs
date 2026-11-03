@@ -4,6 +4,7 @@
 
 use crate::models::aging_alert_rule;
 use crate::utils::error::AppError;
+use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Order, PaginatorTrait,
     QueryFilter, QueryOrder, QuerySelect, Set,
@@ -68,6 +69,7 @@ impl AgingAlertRuleService {
     ) -> Result<aging_alert_rule::Model, AppError> {
         info!("用户 {} 正在创建账龄预警规则：{}", user_id, req.rule_name);
 
+        let now = Utc::now();
         let active = aging_alert_rule::ActiveModel {
             rule_name: Set(req.rule_name),
             rule_code: Set(req.rule_code),
@@ -76,9 +78,11 @@ impl AgingAlertRuleService {
             threshold_amount: Set(req.threshold_amount),
             alert_level: Set(req.alert_level),
             notify_method: Set(req.notify_method),
-            notify_roles: Set(req.notify_roles),
+            notify_roles: Set(req.notify_roles.map(aging_alert_rule::NotifyRoles)),
             is_active: Set(req.is_active.unwrap_or(true)),
             remarks: Set(req.remarks),
+            created_at: Set(now),
+            updated_at: Set(now),
             ..Default::default()
         };
 
@@ -154,7 +158,7 @@ impl AgingAlertRuleService {
             active.notify_method = Set(v);
         }
         if let Some(v) = req.notify_roles {
-            active.notify_roles = Set(v);
+            active.notify_roles = Set(v.map(aging_alert_rule::NotifyRoles));
         }
         if let Some(v) = req.is_active {
             active.is_active = Set(v);
@@ -162,6 +166,7 @@ impl AgingAlertRuleService {
         if let Some(v) = req.remarks {
             active.remarks = Set(v);
         }
+        active.updated_at = Set(Utc::now());
 
         let updated = active.update(&*self.db).await?;
         Ok(updated)
