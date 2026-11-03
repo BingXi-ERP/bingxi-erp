@@ -401,31 +401,6 @@ export function pickListArray<T = Record<string, unknown>>(
   return arr;
 }
 
-async function waitListResponse(
-  page: Page,
-  apiPath: string,
-  listKey: ListShapeKey,
-  timeout = 20000
-): Promise<unknown[]> {
-  try {
-    const resp = await page.waitForResponse(
-      r => r.url().includes(apiPath) && r.request().method() === 'GET',
-      { timeout }
-    );
-    const json = await resp.json().catch(e => {
-      console.warn(`[waitListResponse] GET ${apiPath} 响应非 JSON:`, (e as Error).message);
-      return {};
-    });
-    // 单一形状直读（listKey 由调用方声明）；形状漂移即抛错，由本函数外层 catch 记为告警。
-    // 注意：这里捕获抛错仅用于「UI 页未命中响应」的降级路径——真正判定形状的权威路径
-    // 是 readFirstEntityId 随后的 API 直查（那里不吞异常，形状不符会让用例失败）。
-    return pickListArray(json?.data, listKey, `waitListResponse ${apiPath}`);
-  } catch (e) {
-    console.warn(`[waitListResponse] 等待 GET ${apiPath} 失败: ${(e as Error).message}`);
-    return [];
-  }
-}
-
 function firstId(items: unknown[]): number | undefined {
   const item = items[0] as Record<string, unknown> | undefined;
   return item?.id as number | undefined;
