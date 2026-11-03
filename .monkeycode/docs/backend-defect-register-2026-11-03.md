@@ -64,6 +64,8 @@ error[E0063]: missing fields `layer_no` and `shelf_no` in initializer of `StockR
 
 因此次序固定为：1171 先全绿并由用户合入主干，随后 1169 并基（448 取两侧意图并集，helpers.ts 以载体已收窄的失败信封透传为准），再 1168 并基（400 与 448 同理），1146 与 1165 与 1167 与 1164 无冲突可随时并基重推。1164 是主干验证载体，一次性目的已达成，其红面与主干共享红同源，收口动作待用户对合并次序裁定。
 
+另记一条与审计支的撞面：feat/audit-terminal-context-fields（补终端与页面与单号与原因与风险与角色六维那条）与载体 1171 的文件面交集实测恰为两枚注册文件，backend/migration/src/domain/mod.rs 与 backend/migration/src/lib.rs —— 两支各往迁移链登记一枚域。这两枚是 hub 文件，只允许主编排在合并后串行改，解法是两侧条目都留（载体那条 m0128 与审计那条 m0126 互不冲突，只是同一段清单相邻追加）。审计支的角色列宽口径已复核为与 roles.code 同宽，system 域 m0001 建表处 code 列是 VARCHAR(50) NOT NULL UNIQUE。
+
 ## D-43 迁移里 plpgsql 体用了 // 注释记法，建库阶段抛 42601 把整条迁移链打断
 
 取证面：PR #1171 第二轮 head d4f78bd57 出两枚红，🔐 角色权限矩阵的 sales 组（job 126025273552）与 production 组（job 126025273467）。两枚日志里矩阵断言一行都没有，失败点全在更早的一步：日志打出"开始执行数据库迁移..."七秒后即 Error: Exec(SqlxError(Database(PgDatabaseError { code: "42601", message: "syntax error at or near \"//\"", position: Some(Original(381)), file: Some("pl_scanner.c"), routine: Some("plpgsql_yyerror") })))，job 直接判负。
