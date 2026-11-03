@@ -13,8 +13,8 @@ use crate::utils::dual_unit_converter::DualUnitConverter;
 use crate::utils::error::AppError;
 use crate::utils::response::ApiResponse;
 use axum::{
-    Json,
     extract::{Query, State},
+    Json,
 };
 use rust_decimal::Decimal;
 use validator::Validate;
@@ -90,12 +90,10 @@ pub async fn create_stock_fabric(
     let quantity_kg = match payload.quantity_kg {
         Some(quantity_kg) => quantity_kg,
         None => match (payload.gram_weight, payload.width) {
-            (Some(gram_weight), Some(width)) => DualUnitConverter::meters_to_kg(
-                payload.quantity_meters,
-                gram_weight,
-                width,
-            )
-            .map_err(|e| AppError::validation(format!("双计量单位换算失败：{}", e)))?,
+            (Some(gram_weight), Some(width)) => {
+                DualUnitConverter::meters_to_kg(payload.quantity_meters, gram_weight, width)
+                    .map_err(|e| AppError::validation(format!("双计量单位换算失败：{}", e)))?
+            }
             _ => Decimal::ZERO,
         },
     };
