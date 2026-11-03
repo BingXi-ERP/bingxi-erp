@@ -3,7 +3,7 @@
 //! inventory_piece.length 建表时是 DECIMAL(12,2)；production 域随后以
 //! `ADD COLUMN IF NOT EXISTS "length" DECIMAL(18,4)` 想把它对齐计量口径，但该语句对
 //! 已存在的列恒为 no-op，列型仍是 (12,2)。收回确认腿把收回数量原值送进本列
-//! （outsourcing_ops/receipt.rs:524 透传 return_quantity → piece_domain_service.rs:642
+//! （outsourcing_ops/receipt.rs 透传 return_quantity → piece_domain_service.rs 的
 //! length: Set(length_m)），两位列在库侧把 190.475 舍成 190.48，与收回单
 //! outsourcing_receipt.return_quantity（DECIMAL(14,4)，存 190.4750）逐分对不上。
 //!
