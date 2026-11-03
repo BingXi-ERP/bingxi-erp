@@ -119,7 +119,9 @@ impl QuotationConvertService {
         C: sea_orm::ConnectionTrait,
     {
         if quotation.status != "approved" {
-            return Err(AppError::business(format!(
+            // 转单腿状态门：唯一合法前置是 approved，拒绝文案点名该前置与行自身当前态；
+            // 公开状态词表、不含标识，走可外显通道，机器码仍是 BUSINESS_ERROR
+            return Err(AppError::business_displayable(format!(
                 "报价单状态不允许转订单：{}（仅 approved 状态可转换）",
                 quotation.status
             )));
