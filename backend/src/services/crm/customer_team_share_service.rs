@@ -85,6 +85,8 @@ pub struct TeamMemberDto {
     pub joined_at: DateTime<Utc>,
     pub left_at: Option<DateTime<Utc>>,
     pub notes: Option<String>,
+    /// 操作人——添加该成员的用户 id，写入侧来自 AuthContext，出参漏键会让归属判定悬空
+    pub created_by: Option<i32>,
 }
 
 impl From<customer_team_member::Model> for TeamMemberDto {
@@ -99,6 +101,7 @@ impl From<customer_team_member::Model> for TeamMemberDto {
             joined_at: m.joined_at,
             left_at: m.left_at,
             notes: m.notes,
+            created_by: m.created_by,
         }
     }
 }
