@@ -188,6 +188,20 @@ async function findAuditTransition(
     `/audit-logs?resource_type=${AUDIT_RESOURCE_TYPE}&resource_id=${quotationId}&page=1&page_size=100`
   );
   const rows = pickListArray<Row>(list, 'items', `${context}审计列表`);
+  // 判红时必须把实际读到的行自证出来：只报行数会把"资源键不同源""快照缺状态键"
+  // "跃迁被别的动作抢先"三种成因混成同一条红，下一轮仍要重新取证。
+  const observed = rows
+    .slice(0, 8)
+    .map(r => {
+      const before = (r.old_value ?? null) as Row | null;
+      const after = (r.new_value ?? null) as Row | null;
+      return `rt=${String(r.resource_type ?? '无')} rid=${String(r.resource_id ?? '无')} op=${String(
+        r.operation_type ?? '无'
+      )} from=${before && typeof before === 'object' ? String(before.status ?? '无') : '非对象'} to=${
+        after && typeof after === 'object' ? String(after.status ?? '无') : '非对象'
+      }`;
+    })
+    .join(' | ');
   const hits = rows.filter(r => {
     if (String(r.resource_type ?? '') !== AUDIT_RESOURCE_TYPE) return false;
     if (String(r.resource_id ?? '') !== String(quotationId)) return false;
@@ -202,7 +216,7 @@ async function findAuditTransition(
   expect(
     hits.length,
     `${context}：审计中应恰好一行 ${fromStatus} 到 ${toStatus} 的跃迁（报价 ${quotationId}），` +
-      `实际 ${hits.length} 行，本页共 ${rows.length} 行`
+      `实际 ${hits.length} 行，本页共 ${rows.length} 行；读到的行=${observed || '空'}`
   ).toBe(1);
   const row = hits[0];
   // 每行跃迁都必须同时交出操作人与时间，缺一即审计留痕不完整
