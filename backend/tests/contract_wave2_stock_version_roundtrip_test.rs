@@ -41,6 +41,8 @@ fn make_stock_response(version: i32) -> StockResponse {
         reorder_point: dec("20.00"),
         max_stock_point: dec("500.00"),
         bin_location: Some("A-01-01".to_string()),
+        shelf_no: None,
+        layer_no: None,
         batch_no: "B001".to_string(),
         color_no: "C001".to_string(),
         dye_lot_no: Some("DL001".to_string()),
