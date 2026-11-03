@@ -7,8 +7,11 @@ import {
   expectStateGateRejection,
   failureCode,
   genCode,
+  genDyeLotNo,
   loginAsRole,
   safeGetList,
+  seedColorCardArchive,
+  tryCleanup,
 } from './helpers';
 
 /**
@@ -71,24 +74,39 @@ test.describe('449 委外染整返工与缸差登记', () => {
   test('缸差返工按状态机逐级推进且每级时间戳落库可读回', async ({ page }) => {
     // 功能：在一个真实处于 inspecting/stored 的染整批次上发起同缸色差回修，逐级推进状态机。
     // 调用方：本用例 → POST /production/dye-batch-reworks（dye_batch_state_machine_handler::create_rework）。
-    // 入参 original_batch_id/original_batch_no 取自 GET /production/dye-batches 的真实行；
+    // 入参 original_batch_id/original_batch_no 取自本用例自建的染整缸号行；
+    // 建档端点采信入参 status（先按缸号生命周期 14 态校验，缺省才落 pending_schedule），
+    // 因此直接落一枚 inspecting 的缸，不赌共享库里恰好存在可回修的行。
     // rework_type=color_difference、original_status=该批次当前状态词、同缸回修时 rework_batch_id 等于原缸。
     // 传给谁：services/dye_batch_state_machine_ops/rework.rs（validate_rework_type + 回修资格校验）。
     // 存什么：status 与 approved_by/approved_at/started_at/completed_at；未到达的级保持 null。
     // 存哪里：表 dye_batch_rework（backend/src/models/dye_batch_rework.rs）。
-    const batches = await safeGetList<Record<string, unknown>>(
+    const archive = await seedColorCardArchive(page, { context: '449 缸差回修前置建缸' });
+    const batchRow = await apiCallRaw<Record<string, unknown>>(
       page,
-      '/production/dye-batches?page=1&page_size=50'
+      'POST',
+      '/production/dye-batches',
+      {
+        // batch_no 不手工传入：缺省缸号由后端取号器在事务内生成并对唯一冲突重试，
+        // 手写时间戳号跨分片同秒撞 UNIQUE 的概率非零。
+        color_no: archive.colorCode,
+        dye_lot_no: genDyeLotNo(),
+        planned_quantity: 100,
+        dye_date: new Date().toISOString().slice(0, 10),
+        status: REWORK_ELIGIBLE_STATUSES[0],
+      }
     );
-    const eligible = batches.find(r => REWORK_ELIGIBLE_STATUSES.includes(String(r['status'])));
-    if (!eligible) {
-      throw new Error(
-        `前置不成立：${REWORK_ELIGIBLE_STATUSES.join('/')} 状态的染整缸号为 0 条（共取到 ${batches.length} 条），无法发起缸差回修`
-      );
-    }
-    const batchId = Number(eligible['id']);
-    const batchNo = String(eligible['batch_no']);
-    const eligibleStatus = String(eligible['status']);
+    const batchId = Number(batchRow['id']);
+    const batchNo = String(batchRow['batch_no']);
+    const eligibleStatus = String(batchRow['status']);
+    expect(
+      Number.isInteger(batchId) && batchId > 0,
+      `自建缸号建档必须返回整数主键，实际 ${JSON.stringify(batchRow['id'])}`
+    ).toBe(true);
+    expect(
+      REWORK_ELIGIBLE_STATUSES.includes(eligibleStatus),
+      `建档后缸号状态必须落在可回修词表 ${REWORK_ELIGIBLE_STATUSES.join('/')} 内，实际 ${eligibleStatus}`
+    ).toBe(true);
     reworkOriginalBatchNo = batchNo;
 
     const created = await apiCallRaw<Record<string, unknown>>(
@@ -248,6 +266,14 @@ test.describe('449 委外染整返工与缸差登记', () => {
     );
     expect(String(afterCancel.data['status']), '取消被拒后终态仍应为 completed').toBe(
       REWORK_STATUS_COMPLETED
+    );
+
+    // 收尾：本用例自建的缸号按删除端点回收；缸号已被回修单引用时后端可正当拒绝，tryCleanup 只登记不判负。
+    await tryCleanup(
+      page,
+      'DELETE',
+      `/production/dye-batches/${batchId}`,
+      `449 自建缸号 ${batchNo}`
     );
   });
 
