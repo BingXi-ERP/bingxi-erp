@@ -299,8 +299,11 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
       productId: ctx.quotationProductId,
       productUnit: ctx.quotationProductUnit,
       taxRate: '0',
+      // 审批档位由 total_amount 决定（ApproverRole::from_amount，阈值 10 万与 50 万）：
+      // 1 元落在免审批档，提交即 approved，本条"已待审批不得再次提交"的判据就无从成立。
+      // 金额取 12 万，停在中档待审批；税率 0 使含税与不含税同值，不影响档位判定。
       quantity: '1',
-      unitPrice: '1',
+      unitPrice: '120000',
     });
     const first = await apiCallRaw<Row>(page, 'POST', `/quotations/${q.id}/submit`);
     expect(String(first.status), '首次提交进入 pending_approval').toBe('pending_approval');
