@@ -25,3 +25,42 @@
 ## 尚未闭环的第三类
 
 同一批红里另有五处不像工装问题的形态，按"源码错改源码"处理，逐处需要活库与编译证据，交 CI 验：销售退货审批端点返回 DATABASE_ERROR；盘盈差异流水按缸号与批次追溯命中 0 条；公斤数 999.99 落库后被折算覆盖成 9.05；匹行米数 190.48 与收回单出参 190.4750 存在分差不对平；超 0.5% 允差阈值的判定结果与阈值口径不符。这五处已在任务看板第 18 号挂账。
+
+## D-40 一枚 E0063 造出 55 枚连带红，面纱是 Rust 测试预编译
+
+取证面：载体支 1171 第二轮之前的整轮红面是 failing=55/79，smoke 五档、traversal 五档、flow 多档、extras 全族、角色权限矩阵六组、Setup 向导真实链路一起红。逐枚去拉断言原文会白做几十次，真正的第一手证据只有一行：
+
+```
+error[E0063]: missing fields `layer_no` and `shelf_no` in initializer of `StockResponse`
+  --> tests/contract_wave2_stock_version_roundtrip_test.rs:34:5
+##[error]Process completed with exit code 101.
+```
+
+根因在测试侧构造点。本支给 handlers/inventory_stock_handler_dto.rs 的 StockResponse 加了货架号与层位两枚真实列直映，同一支里的契约测试夹具没跟着补齐，cargo test --no-run 就构不出测试二进制，📦 Rust 测试预编译判红；所有需要后端执行体的作业随之成片红，红面看起来像几十个缺陷，实际是一枚类型错。同一份日志只报这一枚 error，库与 bin 都编译通过，说明 inventory_stocks 上确有这两列，正解是补构造点而不是改列。夹具判据是乐观锁版本号回环，库位两列不参与，取 None。
+
+工序教训：大面积红先数一下有没有共同前置作业红（预编译、镜像构建、二进制产物这类），先消它再看剩下的红面，否则会把一枚类型错拆成几十次取证。
+
+## D-41 审计跃迁判定打在列表出参上，而列表出参不承载变更前后两列
+
+取证面：fullflow 40 号段的提交跃迁与批准跃迁两枚断言恒得 0 命中，消息形如"审计中应恰好一行 draft 到 pending_approval 的跃迁（报价 6），实际 0 行，本页共 2 行"。候选 2 行说明服务端按资源键筛是命中的，跃迁却判不出来。
+
+根因在读面选错。models/audit_log.rs 的实体列是 old_value 与 new_value，写入侧 handlers/audit_log_handler.rs 的列表项结构体 AuditLogListItem 只交资源键、操作人、时间与严重度，不交前后快照；快照只在详情结构体 AuditLogDetailResponse 里以 before_snapshot 与 after_snapshot 承载，old_value 与 new_value 是同一详情的兼容别名。于是任何在列表响应上按快照判跃迁的写法都恒假，把"审计确实没写"与"读面结构不对"两种成因压成同一条红。
+
+整改：判定改为列表按 resource_type 与 resource_id 等值筛拿候选行主键，再逐行 GET /audit-logs/{id} 读详情，用 before_snapshot.status 与 after_snapshot.status 精确匹配一次跃迁，主键非正整数直接抛错不静默跳过，判红时把每行详情读到的前后状态逐条点名。修复在载体支提交 d4f78bd5。
+
+## D-42 内联 import 类型带泛型实参让 semgrep 只部分解析，挂住每一条从主干切出的支
+
+取证面：主干 c6f0e61a 的每日漏洞扫描作业红，日志逐字给 errors=1 与 PartialParsing 的路径列区间，落在 flow/448-business-sequence-gate-and-credit-limit.spec.ts 第 90 行第 35 列到第 76 列，正是 res: import('./helpers').ApiResponse<string> 这一段。门体 .github/actions/vuln-scan/action.yml 按 errors 计数 fail-closed，凡未从主干改过这一行的支都同点红（实测四条支红、两条支绿）。
+
+判据要收窄：同树里大量 page: import('@playwright/test').Page 形态不带泛型实参，semgrep 全部解析通过，所以不能把内联 import 写法一概判为风险形态，只有带尖括号实参的那一档会炸。修法是把该处改成具名导入后的 ApiResponse<string>，与树内通行写法一致，已随载体支 1171 一并落地，不另开支争同一行。配套加了只读静态门 ts_semgrep_parse_risk_check.sh，谓词是 import('...').标识符<泛型>，内置正向对照（同一个谓词必须抓到已知风险行）防恒零命中假绿。
+
+## 在途支的文件面交集与合并次序
+
+按各支相对 base c6f0e61a 的改动文件集合两两求交（实取 15:31）：
+
+- 与载体支 1171 零交集：1146、1164、1165、1167。这四支的红全是共享主干红与 needs 随动，本支改动面不相撞，载体合并后并基重推即可。
+- 与载体支 1171 各撞两枚文件：1169 撞 448 与 flow/helpers.ts，1168 撞 400 与 448。
+- 1168 与 1169 之间还撞 448，形成三处争同一枚测试文件。
+
+因此次序固定为：1171 先全绿并由用户合入主干，随后 1169 并基（448 取两侧意图并集，helpers.ts 以载体已收窄的失败信封透传为准），再 1168 并基（400 与 448 同理），1146 与 1165 与 1167 与 1164 无冲突可随时并基重推。1164 是主干验证载体，一次性目的已达成，其红面与主干共享红同源，收口动作待用户对合并次序裁定。
+
