@@ -60,6 +60,14 @@ pub struct StockResponse {
     /// 库存上限（v11 批次 144 P1-4：新增，支持 OverStock 告警阈值展示）
     pub max_stock_point: Decimal,
     pub bin_location: Option<String>,
+    // ===== 库位事实（录入面 POST /inventory/stock/fabric 提交 shelf_no 与 layer_no）=====
+    // 这两列是"这一卷在哪个架子的哪一层"的唯一记录：写入方把它们落库，投影若不携带，
+    // 列表与详情（同走 StockResponse）就永远看不见录入值，编辑回显也取不到原值。
+    // DB 可空列按 Option 出参，未录入即 null。
+    /// 货架号（inventory_stocks.shelf_no 真实列直映）
+    pub shelf_no: Option<String>,
+    /// 层号（inventory_stocks.layer_no 真实列直映）
+    pub layer_no: Option<String>,
     // ===== 面料行业四维库存维度（产品→批次/匹号→色号→缸号）=====
     // 库存行按这组维度唯一区分，响应缺它们时前端四维列表与四维查询都无法成立
     /// 批次号（面料匹号/批次）
@@ -253,6 +261,10 @@ pub struct StockFabricResponse {
     pub gram_weight: Option<Decimal>,
     pub width: Option<Decimal>,
     pub bin_location: Option<String>,
+    /// 货架号（inventory_stocks.shelf_no 真实列直映，录入面 CreateStockFabricRequest 提交）
+    pub shelf_no: Option<String>,
+    /// 层号（inventory_stocks.layer_no 真实列直映，录入面 CreateStockFabricRequest 提交）
+    pub layer_no: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }

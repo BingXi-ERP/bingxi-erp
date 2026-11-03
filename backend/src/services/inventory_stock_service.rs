@@ -4,7 +4,6 @@ use crate::models::status::purchase_inventory::inventory_stock_grade;
 use crate::models::status::purchase_inventory::inventory_stock_quality_status as quality_status;
 use crate::models::status::purchase_inventory::inventory_stock_status;
 use crate::services::event_bus::{BusinessEvent, EVENT_BUS};
-use crate::utils::dual_unit_converter::DualUnitConverter;
 use crate::utils::error::AppError;
 use crate::utils::pagination::paginate_with_total;
 use crate::utils::sql_escape::safe_like_pattern;
@@ -535,30 +534,12 @@ impl InventoryStockService {
         query.all(&*self.db).await.map_err(AppError::from)
     }
 
-    // ========== 双计量单位自动计算辅助方法 ==========
-
-    /// 自动计算公斤数（如果提供了克重和幅宽）
-    pub fn calculate_quantity_kg(
-        quantity_meters: Decimal,
-        gram_weight: Option<Decimal>,
-        width: Option<Decimal>,
-        fallback_quantity_kg: Decimal,
-    ) -> Decimal {
-        if let Some(gram_weight) = gram_weight {
-            if let Some(width) = width {
-                // 使用双计量单位转换器进行精确计算
-                match DualUnitConverter::meters_to_kg(quantity_meters, gram_weight, width) {
-                    Ok(kg) => return kg,
-                    Err(e) => {
-                        // 如果计算失败，回退到直接传入的公斤数
-                        tracing::warn!("双计量单位换算失败: {:?}，使用原始公斤数", e);
-                        return fallback_quantity_kg;
-                    }
-                }
-            }
-        }
-        fallback_quantity_kg
-    }
+    // ========== 双计量单位说明 ==========
+    // 米↔公斤的换算补齐只发生在调用方未提交公斤数时，落点在 handler 入口
+    // `handlers::inventory_stock_handler_fabric::create_stock_fabric`（唯一读 CreateStockFabricRequest
+    // 的地方，知道"公斤数有没有被提交"）。本 service 不做二次反算：一旦在这里按
+    // 米×克重×门幅重算，实测公斤数就会被理论值覆盖，两条建库路径（本函数与
+    // `inventory_stock_txn::create_stock_fabric_txn`）也会算出不同结果。
 
     /// 创建库存（面料行业版）（批次 338 v10 复审 P3 修复：签名从 13 参数改为单一参数对象 `CreateStockFabricArgs`，；消除 `clippy::too_many_arguments` 警告。）
     pub async fn create_stock_fabric(
@@ -584,10 +565,10 @@ impl InventoryStockService {
         // P2 5-23 修复：service 层校验仓库/产品存在性，外键完整性不再仅依赖数据库
         Self::validate_stock_references(&*self.db, warehouse_id, product_id).await?;
 
-        // 自动计算公斤数（如果提供了克重和幅宽）
-        let final_quantity_kg =
-            Self::calculate_quantity_kg(quantity_meters, gram_weight, width, quantity_kg);
-
+        // 公斤数按调用方提交的事实原样落库，不在这里按 米×克重×门幅 反算覆盖：
+        // 反算得到的是理论重量，实测重量与之不等是常态（回潮、零头、绕卷松紧），
+        // 覆盖会把录入事实抹掉。换算补齐只在调用方未提交公斤数时发生（见 handler 入口），
+        // 与事务版 `inventory_stock_txn::create_stock_fabric_txn` 的落库口径保持一致。
         let active_stock = Self::build_stock_fabric_active(StockFabricFields {
             warehouse_id,
             product_id,
@@ -596,7 +577,7 @@ impl InventoryStockService {
             dye_lot_no,
             grade,
             quantity_meters,
-            final_quantity_kg,
+            final_quantity_kg: quantity_kg,
             gram_weight,
             width,
             location_id,

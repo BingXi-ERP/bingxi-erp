@@ -426,6 +426,10 @@ export interface StockResponse {
   reorder_point: string;
   max_stock_point: string;
   bin_location?: string;
+  /** 货架号：inventory_stocks.shelf_no 可空列（细码录入面提交），未录入为 null */
+  shelf_no?: string | null;
+  /** 层号：inventory_stocks.layer_no 可空列（细码录入面提交），未录入为 null */
+  layer_no?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -449,6 +453,10 @@ export interface StockFabricResponse {
   gram_weight?: string | null;
   width?: string | null;
   bin_location?: string;
+  /** 货架号：inventory_stocks.shelf_no 可空列（录入面 CreateStockRequest 提交），未录入为 null */
+  shelf_no?: string | null;
+  /** 层号：inventory_stocks.layer_no 可空列（录入面 CreateStockRequest 提交），未录入为 null */
+  layer_no?: string | null;
   created_at: string;
   updated_at: string;
 }
