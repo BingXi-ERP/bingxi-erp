@@ -1,4 +1,4 @@
-//! 审计定位五维契约锁 终端类型与操作页面与单据编号与变更原因与风险标记
+//! 审计定位维度契约锁 终端类型与操作页面与单据编号与变更原因与风险标记与操作角色
 //!
 //! 锁定的真实行为
 //! 一 三端各自发起同一写操作 审计行的终端类型与操作页面与单据编号与变更原因都如实落库
@@ -8,6 +8,9 @@
 //!    红冲与作废经 mark_audit_high_risk 登记 读取侧按 risk_flag 过滤只回高风险行
 //! 三 按单据编号能追溯回同一张单的全链路操作且顺序正确 读取侧 doc_no 精确过滤
 //!    结果按 created_at 倒序 最近一次操作排在最前
+//! 四 操作人角色码来自会话已加载的角色行 经生产 audit_context 中间件带进审计上下文并如实
+//!    落库 读取侧出参带该键且 role_code 过滤走等值（前缀不命中即不是 LIKE）
+//!    会话没带角色行时该列落 NULL 不兜底
 //!
 //! 反向钉 无终端头且无可用 UA 时 终端记 UNKNOWN 而不是猜成 PC
 //!
@@ -31,7 +34,7 @@ use bingxi_backend::middleware::audit_context::{
     RISK_DELETE, RISK_VOID, TERMINAL_H5, TERMINAL_MINIPROGRAM, TERMINAL_PC, TERMINAL_UNKNOWN,
     audit_context_middleware, mark_audit_high_risk, set_audit_change_reason, set_audit_doc_no,
 };
-use bingxi_backend::middleware::auth_context::AuthContext;
+use bingxi_backend::middleware::auth_context::{AuthContext, SessionRoleCode};
 use bingxi_backend::models::audit_log::{OperationType, Severity};
 use bingxi_backend::models::{audit_log, role, warehouse};
 use bingxi_backend::services::audit_log_service::{AuditEvent, AuditLogService, flush};
@@ -168,6 +171,48 @@ fn build_app(db: sea_orm::DatabaseConnection, role_id: i32) -> Router {
         .with_state(state)
         .layer(from_fn_with_state(auth_for(role_id), inject_auth))
         .layer(from_fn(audit_context_middleware))
+}
+
+/// 会话角色码注入腿：复刻生产里 auth 把已加载角色行的 roles.code 作为 SessionRoleCode
+/// 扩展注入请求的这一步。传 None 时不注入，对应未认证与角色行缺失的真实情形。
+async fn inject_session_role(
+    State(role_code): State<Option<String>>,
+    mut request: Request<Body>,
+    next: Next,
+) -> Response {
+    if let Some(code) = role_code {
+        request.extensions_mut().insert(SessionRoleCode::new(code));
+    }
+    next.run(request).await
+}
+
+/// 只多挂会话角色码一路的路由，其余端点与 `build_app` 一致。
+/// 层序按 axum 语义「后注册者在更外层」排：`inject_session_role` 必须比
+/// `audit_context_middleware` 更外，扩展才对内层构造的审计上下文可见（与生产
+/// auth 在 audit_context 外层注入同一可见性）；`inject_auth` 只服务 list 端点的
+/// admin 角色门，与角色码取值无关。
+fn build_app_with_session_role(
+    db: sea_orm::DatabaseConnection,
+    role_id: i32,
+    session_role_code: Option<&str>,
+) -> Router {
+    let state = AppState {
+        db: Arc::new(db),
+        ..Default::default()
+    };
+    Router::new()
+        .route("/term-write", axum::routing::post(write_event_handler))
+        .route(
+            "/audit-logs",
+            axum::routing::get(audit_log_handler::list_audit_logs),
+        )
+        .with_state(state)
+        .layer(from_fn_with_state(auth_for(role_id), inject_auth))
+        .layer(from_fn(audit_context_middleware))
+        .layer(from_fn_with_state(
+            session_role_code.map(|s| s.to_string()),
+            inject_session_role,
+        ))
 }
 
 async fn call(
@@ -655,4 +700,192 @@ async fn trace_by_doc_no_returns_full_chain_in_time_order() {
             w[1]
         );
     }
+}
+
+// ============================================================
+// 四枚 操作人角色码来自会话已加载的角色行 如实落库且读取侧按等值可筛
+// ============================================================
+
+/// 按角色码取 roles 表种子行的 id（admin 由初始 schema 种入，供角色门与断言互校）
+async fn role_id_by_code(db: &sea_orm::DatabaseConnection, code: &str) -> i32 {
+    role::Entity::find()
+        .filter(role::Column::Code.eq(code))
+        .one(db)
+        .await
+        .expect("读取角色行失败")
+        .unwrap_or_else(|| panic!("迁移应已种入 {code} 角色"))
+        .id
+}
+
+#[tokio::test]
+async fn session_role_code_lands_in_audit_row_and_filters_by_equality() {
+    let db = setup_test_db().await;
+    let admin_id = admin_role_id(&db).await;
+    assert_eq!(
+        role_id_by_code(&db, "admin").await,
+        admin_id,
+        "种子角色 admin 应可按 code 取回"
+    );
+    // list 端点的角色门读 AuthContext.role_id，落库的角色码读会话注入的 SessionRoleCode，
+    // 二者各走各的：operator 那行的 role_id 仍是 admin，只有注入的角色码是 operator。
+    // 这样才钉住「该列取自会话已加载的角色行的 code」，不是由 role_id 反推或写死。
+    let ua_pc = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120";
+
+    // 两个不同角色的会话各写一行 外加一行会话取不到角色
+    let app_admin = build_app_with_session_role(db.clone(), admin_id, Some("admin"));
+    let (s_admin, v_admin) = call(
+        &app_admin,
+        Method::POST,
+        "/term-write",
+        &[("user-agent", ua_pc)],
+        Some(json!({"operation": "UPDATE", "resource_id": "ROLE-ADMIN"})),
+    )
+    .await;
+    assert_eq!(
+        s_admin,
+        StatusCode::OK,
+        "admin 会话写请求应 200 实际 {v_admin}"
+    );
+
+    let app_operator = build_app_with_session_role(db.clone(), admin_id, Some("operator"));
+    let (s_op, v_op) = call(
+        &app_operator,
+        Method::POST,
+        "/term-write",
+        &[("user-agent", ua_pc)],
+        Some(json!({"operation": "UPDATE", "resource_id": "ROLE-OPERATOR"})),
+    )
+    .await;
+    assert_eq!(
+        s_op,
+        StatusCode::OK,
+        "operator 会话写请求应 200 实际 {v_op}"
+    );
+
+    let app_no_role = build_app_with_session_role(db.clone(), admin_id, None);
+    let (s_none, v_none) = call(
+        &app_no_role,
+        Method::POST,
+        "/term-write",
+        &[("user-agent", ua_pc)],
+        Some(json!({"operation": "UPDATE", "resource_id": "ROLE-ABSENT"})),
+    )
+    .await;
+    assert_eq!(
+        s_none,
+        StatusCode::OK,
+        "无角色码会话写请求应仍 200 实际 {v_none}"
+    );
+
+    drain_bus().await;
+
+    // 一 写入单点确实把会话角色码传到该列 两个角色各落各的
+    let admin_row = audit_log::Entity::find()
+        .filter(audit_log::Column::ResourceId.eq("ROLE-ADMIN"))
+        .one(&db)
+        .await
+        .unwrap()
+        .expect("admin 会话审计行应落库");
+    assert_eq!(
+        admin_row.role_code.as_deref(),
+        Some("admin"),
+        "会话角色码是 admin 时该列必须落 admin 实际 {:?}",
+        admin_row.role_code
+    );
+
+    let op_row = audit_log::Entity::find()
+        .filter(audit_log::Column::ResourceId.eq("ROLE-OPERATOR"))
+        .one(&db)
+        .await
+        .unwrap()
+        .expect("operator 会话审计行应落库");
+    assert_eq!(
+        op_row.role_code.as_deref(),
+        Some("operator"),
+        "会话角色码是 operator 时该列必须落 operator 而不是上一行的 admin 实际 {:?}",
+        op_row.role_code
+    );
+
+    // 二 会话取不到角色行时落 NULL 不写空串也不写占位角色
+    let absent_row = audit_log::Entity::find()
+        .filter(audit_log::Column::ResourceId.eq("ROLE-ABSENT"))
+        .one(&db)
+        .await
+        .unwrap()
+        .expect("无角色码会话的审计行应落库");
+    assert_eq!(
+        absent_row.role_code, None,
+        "会话无角色码时该列必须是 NULL 不得兜底 实际 {:?}",
+        absent_row.role_code
+    );
+
+    // 三 列表出参带 role_code 键且与库内同源
+    let (s_list, v) = call(
+        &app_admin,
+        Method::GET,
+        "/audit-logs?role_code=admin",
+        &[("user-agent", ua_pc)],
+        None,
+    )
+    .await;
+    assert_eq!(s_list, StatusCode::OK, "按角色码筛应 200 实际 {v}");
+    let items = v["data"]["items"].as_array().cloned().unwrap_or_default();
+    assert!(
+        !items.is_empty(),
+        "按 admin 筛应命中本用例写入的 admin 行 实际 {v}"
+    );
+    let admin_item = items
+        .iter()
+        .find(|it| it["resource_id"].as_str() == Some("ROLE-ADMIN"))
+        .expect("结果里应有 ROLE-ADMIN 行");
+    assert!(
+        admin_item.get("role_code").is_some(),
+        "列表出参必须带 role_code 键 实际 {admin_item}"
+    );
+    assert_eq!(
+        admin_item["role_code"].as_str(),
+        Some("admin"),
+        "出参角色码应与库内同源 实际 {admin_item}"
+    );
+
+    // 四 等值筛选 另一角色行不得被带出
+    for it in &items {
+        assert_eq!(
+            it["role_code"].as_str(),
+            Some("admin"),
+            "按 admin 筛出的每一行角色码都应是 admin 实际 {it}"
+        );
+    }
+    let ids: Vec<&str> = items
+        .iter()
+        .filter_map(|it| it["resource_id"].as_str())
+        .collect();
+    assert!(
+        !ids.contains(&"ROLE-OPERATOR"),
+        "按 admin 等值筛不得带出 operator 行 实际 {ids:?}"
+    );
+    assert!(
+        !ids.contains(&"ROLE-ABSENT"),
+        "按 admin 等值筛不得带出角色缺失行 实际 {ids:?}"
+    );
+
+    // 五 前缀不命中 钉住该筛选走等值而不是 LIKE 或前缀匹配
+    let (s_prefix, v_prefix) = call(
+        &app_admin,
+        Method::GET,
+        "/audit-logs?role_code=admi",
+        &[("user-agent", ua_pc)],
+        None,
+    )
+    .await;
+    assert_eq!(
+        s_prefix,
+        StatusCode::OK,
+        "前缀筛选请求本身应仍 200 实际 {v_prefix}"
+    );
+    assert_eq!(
+        v_prefix["data"]["total"].as_u64(),
+        Some(0),
+        "role_code=admi 不得命中任何行 一旦改成模糊匹配本断言必红 实际 {v_prefix}"
+    );
 }
