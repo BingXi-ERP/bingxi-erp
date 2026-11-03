@@ -66,6 +66,19 @@ error[E0063]: missing fields `layer_no` and `shelf_no` in initializer of `StockR
 
 另记一条与审计支的撞面：feat/audit-terminal-context-fields（补终端与页面与单号与原因与风险与角色六维那条）与载体 1171 的文件面交集实测恰为两枚注册文件，backend/migration/src/domain/mod.rs 与 backend/migration/src/lib.rs —— 两支各往迁移链登记一枚域。这两枚是 hub 文件，只允许主编排在合并后串行改，解法是两侧条目都留（载体那条 m0128 与审计那条 m0126 互不冲突，只是同一段清单相邻追加）。审计支的角色列宽口径已复核为与 roles.code 同宽，system 域 m0001 建表处 code 列是 VARCHAR(50) NOT NULL UNIQUE。
 
+## D-45 交货允差是假能力：列在、表单可填、范围有校验，收货时无人消费
+
+起因是「尚未闭环的第三类」里那条「超 0.5% 允差阈值的判定结果与阈值口径不符」的候选后端缺陷。静态核完的结论不是阈值写错，而是这个判定门根本不存在，原先那条红的成因要改写。
+
+两条互不依赖的口径：
+
+- 全仓 grep quantity_tolerance_pct 共 55 处命中，比较类命中为零（判据：行内含 > >= < <= abs( .cmp 的行数）。命中面只有三类：purchase_order_item.rs 与 sales_order_item.rs 与 sales_contract_item.rs 的列声明，po/mod.rs 与 sales_contract_handler.rs 的 0 到 100 区间校验（validate_quantity_tolerance_pct，文案点名列名），以及 ap_invoice_ops/receipt.rs 与 po/order_ops/crud.rs 与 sales_contract_handler.rs 的字段拷贝。
+- 收货侧真身文件（purchase_receipt_service.rs、purchase_receipt_ops 目录、po/receipt.rs）里没有任何按数量阈值判定的语句，也没有超量语义（over_receipt、超量、超收、exceed）的命中。
+
+因此业务链路现实是：合同行与订单行允许录入交货允差百分比并做了合法域校验，但收货、开票、应付登记三条腿都不会因为超出允差而拦截或转审批。目标 4.1 R 与 4.3 那两节要求的「按行允差判定超量」属功能缺失，不是缺陷修复。
+
+同时给用例侧一条纠正：把允差当成全局 0.5 常量是双重口径错——真值来源是行上的列（每行可不同，且为空时该判定的缺省口径本身待产品定），且当前根本无判定点。补这枚门时的验收要按行取列、显式定义 NULL 语义（禁止用 ?? 兜底掩盖），错误出参走可外显的业务错误并把行号与允差值与实际量一起点名。
+
 ## D-43 迁移里 plpgsql 体用了 // 注释记法，建库阶段抛 42601 把整条迁移链打断
 
 取证面：PR #1171 第二轮 head d4f78bd57 出两枚红，🔐 角色权限矩阵的 sales 组（job 126025273552）与 production 组（job 126025273467）。两枚日志里矩阵断言一行都没有，失败点全在更早的一步：日志打出"开始执行数据库迁移..."七秒后即 Error: Exec(SqlxError(Database(PgDatabaseError { code: "42601", message: "syntax error at or near \"//\"", position: Some(Original(381)), file: Some("pl_scanner.c"), routine: Some("plpgsql_yyerror") })))，job 直接判负。
