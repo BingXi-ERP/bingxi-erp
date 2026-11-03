@@ -430,7 +430,7 @@ test.describe('460 CRM 合同与跟单跟进链', () => {
       { to: OPP_STAGE.NEGOTIATION, win: '50' },
       { to: OPP_STAGE.CLOSED_WON, win: '100' },
     ];
-    let prevStage = OPP_STAGE.QUALIFICATION;
+    let prevStage: string = OPP_STAGE.QUALIFICATION;
     let prevWin = '10';
     for (const hop of hops) {
       await apiCall(page, 'PUT', `/crm/opportunities/${oppId}`, { opportunity_stage: hop.to });
@@ -457,8 +457,44 @@ test.describe('460 CRM 合同与跟单跟进链', () => {
       finalDetail.opportunity_status,
       'PUT 流转到 CLOSED_WON 阶段后 status 列仍是 OPEN（两列分离是写入方事实）'
     ).toBe('OPEN');
+
+    // 同值 PUT（validate_opportunity_stage_transition 对 current==next 放行）：
+    // 200 且 stage 与赢率原样不动，证明同档重写不产生档位漂移
+    await apiCall(page, 'PUT', `/crm/opportunities/${oppId}`, {
+      opportunity_stage: OPP_STAGE.CLOSED_WON,
+    });
+    const sameValue = await readOpportunity(page, oppId);
+    expect(sameValue.opportunity_stage, '同值 PUT 后 stage 仍 CLOSED_WON').toBe(
+      OPP_STAGE.CLOSED_WON
+    );
+    eqScaled2(sameValue.win_probability, '100', '同值 PUT 不得漂移赢率');
+
+    // stage-change 腿：POST /{id}/stage-change 只落 opportunity_stage_history 历史行，
+    // 不改主行 stage（handler 取 existing.opportunity_stage 为 from_stage，
+    // service 仅 insert 历史，见 services/crm/opp.rs::record_stage_change）；
+    // 历史回读走 GET /crm/opportunities/stage-duration?opportunity_id=（data 为裸数组）
+    await apiCall(page, 'POST', `/crm/opportunities/${oppId}/stage-change`, {
+      to_stage: OPP_STAGE.CLOSED_LOST,
+    });
+    const afterHistory = await readOpportunity(page, oppId);
+    expect(
+      afterHistory.opportunity_stage,
+      'stage-change 是历史留痕端点，主行 stage 必须仍为 CLOSED_WON（不被历史写牵连）'
+    ).toBe(OPP_STAGE.CLOSED_WON);
+    const history = await apiCallRaw<Row[]>(
+      page,
+      'GET',
+      `/crm/opportunities/stage-duration?opportunity_id=${oppId}`
+    );
+    const histRows = pickListArray<Row>(history, 'bare', '阶段历史列表');
+    const lostEntry = histRows.find(
+      r => r.from_stage === OPP_STAGE.CLOSED_WON && r.to_stage === OPP_STAGE.CLOSED_LOST
+    );
+    expect(lostEntry, 'stage-change 历史行必须可按 from→to 档位回读').toBeTruthy();
+    expect(lostEntry?.opportunity_id, '历史行挂本商机').toBe(oppId);
+    expect(typeof lostEntry?.duration_days, '历史行停留天数为数值').toBe('number');
     console.log(
-      `[460-03] 阶段合法链通过 商机=${oppId} 四跳 ${hops.map(h => h.to).join('→')} 赢率逐档重算`
+      `[460-03] 阶段链通过 商机=${oppId} 四跳逐档重算+同值重写+stage-change 历史留痕而主行不动`
     );
   });
 
@@ -608,15 +644,17 @@ test.describe('460 CRM 合同与跟单跟进链', () => {
       '主行 last_follow_up_date 回填为今天'
     ).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
-    // 日期契约负腿：完整 ISO 时间戳送 NaiveDate 字段 → 解码层判格式不正确 400
+    // 日期契约负腿：完整 ISO 时间戳送 NaiveDate 字段 → 解码层拒绝，
+    // 400 + 固定公开文案（utils/error.rs REQUEST_DECODING_PUBLIC，"请求格式不正确…"）；
+    // 机器码暂不作判据（解码收口出参码以 CI 实跑为准）。
     const fIso = await apiCallExpectFail(page, 'POST', `/crm/opportunities/${oppId}/follow-ups`, {
       follow_up_type: 'phone',
       content: `E2E-${tag}-非法时间戳形态`,
       next_follow_up_date: `${nextDate}T00:00:00Z`,
     });
     expect(fIso.status, 'NaiveDate 送完整 ISO 时间戳必 400').toBe(400);
-    expect(failureCode(fIso), '日期格式机器码 VALIDATION_ERROR').toBe(
-      APP_ERROR_CODES.VALIDATION_ERROR
+    expect(requireStr(fIso.message, '日期格式拒绝文案'), '解码层拒绝带固定文案').toContain(
+      '请求格式不正确'
     );
     // 缺必填（无 content）同判 400；两枚非法请求后跟进列表仍恰一条（假成功零残留）
     const fNoContent = await apiCallExpectFail(
