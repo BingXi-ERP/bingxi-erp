@@ -726,12 +726,12 @@ async fn session_role_code_lands_in_audit_row_and_filters_by_equality() {
         admin_id,
         "种子角色 admin 应可按 code 取回"
     );
-    // list 端点的角色门读 AuthContext.role_id，落库的角色码读会话注入的 SessionRoleCode，
-    // 二者各走各的：operator 那行的 role_id 仍是 admin，只有注入的角色码是 operator。
-    // 这样才钉住「该列取自会话已加载的角色行的 code」，不是由 role_id 反推或写死。
+    // list 端点的角色门读 AuthContext.role_id（恒为 admin），落库的角色码读会话注入的
+    // SessionRoleCode，二者各走各的：operator 那行的 role_id 仍是 admin，只有注入的角色码
+    // 是 operator。这样钉住「该列取自会话已加载的角色行的 code」，不是由 role_id 反推或写死。
     let ua_pc = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120";
 
-    // 两个不同角色的会话各写一行 外加一行会话取不到角色
+    // 两个不同角色的会话各写一行，外加一行会话取不到角色
     let app_admin = build_app_with_session_role(db.clone(), admin_id, Some("admin"));
     let (s_admin, v_admin) = call(
         &app_admin,
