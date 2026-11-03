@@ -321,9 +321,7 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       gram_weight: GRAM,
       width_cm: WIDTH_CM,
     });
-    expect(within.is_valid === true, `0.5% 阈值内必须判一致，实际 ${JSON.stringify(within)}`).toBe(
-      true
-    );
+    expect(within.is_valid, `0.5% 阈值内必须判一致，实际 ${JSON.stringify(within)}`).toBe(true);
     expect(
       toNum(within.calculated_kg),
       `基准公斤必须由米数折出 30，实际 ${str(within.calculated_kg)}`
@@ -344,10 +342,9 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       gram_weight: GRAM,
       width_cm: WIDTH_CM,
     });
-    expect(
-      beyond.is_valid === false,
-      `超 0.5% 阈值必须判不一致，实际 ${JSON.stringify(beyond)}`
-    ).toBe(false);
+    // 判据对象就是出参布尔本身：is_valid 为 false 即"超阈值判不一致"成立，
+    // 不再在断言里二次求值（那会把期望值写成表达式取反后的形状）。
+    expect(beyond.is_valid, `超 0.5% 阈值必须判不一致，实际 ${JSON.stringify(beyond)}`).toBe(false);
     expect(
       toNum(beyond.difference),
       `阈值外差异必须为 1，实际 ${str(beyond.difference)}`

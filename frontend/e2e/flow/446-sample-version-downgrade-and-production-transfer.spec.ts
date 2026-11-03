@@ -11,6 +11,7 @@ import {
   getEntityField,
   loginAsRole,
   safeGetList,
+  tryCleanup,
 } from './helpers';
 
 /**
@@ -117,17 +118,24 @@ test.describe('面料样品打样版本链与降等转大货', () => {
     // 调用方：contract_template_handler.rs revise_template（无请求体）。
     // 入参：模板 id；version 由 contract_template_service.rs revise 自行计算。
     // 传给谁：contract_template_service.revise → contract_templates 表新增行。
-    // 存什么：新行的 version / status（改版后回到 DRAFT）；旧行的 version 保持原值。
+    // 存什么：新行的 version / status（改版后回到草稿态 draft）；旧行的 version 保持原值。
     // 存哪里：backend/src/models/contract_template.rs。
-    const templates = await safeGetList<Record<string, unknown>>(
-      page,
-      '/contract-templates?page=1&page_size=5'
-    );
-    if (templates.length === 0) {
-      throw new Error('前置不成立：库内无合同模板，无法验证 revise 的版本递增语义');
-    }
-    const source = templates[0];
+    // 前置由本用例自建：测试库不播种合同模板，"库里恰好有一行"不是可信前置。
+    // create 侧固定写 version=1 与 status=draft（services/contract_template_service.rs create），
+    // contract_type 与 party_side 一律取 models/status/contract_template.rs 词表原值。
+    const templateCode = genCode('E446TPL');
+    const source = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/contract-templates', {
+      template_code: templateCode,
+      title: `E2E 446 版本链模板 ${templateCode}`,
+      contract_type: 'domestic_sales',
+      party_side: 'seller',
+    });
     const srcId = Number(source['id']);
+    expect(Number.isInteger(srcId) && srcId > 0, `自建模板必须返回主键，实际 ${source['id']}`).toBe(
+      true
+    );
+    expect(Number(source['version']), 'create 应固定写第 1 版').toBe(1);
+    expect(source['status'], 'create 应落 draft（改版后也回到 draft）').toBe('draft');
     templateId = srcId;
     templateVersion = Number(source['version']);
 
@@ -151,6 +159,10 @@ test.describe('面料样品打样版本链与降等转大货', () => {
     expect(revisedReadBack.data['template_code'], '改版行应继承原模板号（同一版本链）').toBe(
       source['template_code']
     );
+    expect(
+      revisedReadBack.data['status'],
+      '改版行应回到草稿态 draft（词表见 models/status/contract_template.rs）'
+    ).toBe('draft');
 
     const legacyReadBack = await apiCall<Record<string, unknown>>(
       page,
@@ -160,6 +172,10 @@ test.describe('面料样品打样版本链与降等转大货', () => {
     expect(Number(legacyReadBack.data['version']), '旧版本行必须保持可追溯且不被改写').toBe(
       templateVersion
     );
+
+    // 自建数据收尾：两行都仍是草稿且未被合同条款快照引用，删除端点允许回收。
+    await tryCleanup(page, 'DELETE', `/contract-templates/${newId}`, `清理改版模板 ${newId}`);
+    await tryCleanup(page, 'DELETE', `/contract-templates/${srcId}`, `清理源模板 ${srcId}`);
   });
 
   test('实测结果与实测等级回写落库可读回', async ({ page }) => {
