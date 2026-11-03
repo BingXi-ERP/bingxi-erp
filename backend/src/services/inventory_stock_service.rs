@@ -4,6 +4,7 @@ use crate::models::status::purchase_inventory::inventory_stock_grade;
 use crate::models::status::purchase_inventory::inventory_stock_quality_status as quality_status;
 use crate::models::status::purchase_inventory::inventory_stock_status;
 use crate::services::event_bus::{BusinessEvent, EVENT_BUS};
+use crate::utils::dual_unit_converter::DualUnitConverter;
 use crate::utils::error::AppError;
 use crate::utils::pagination::paginate_with_total;
 use crate::utils::sql_escape::safe_like_pattern;
@@ -534,12 +535,45 @@ impl InventoryStockService {
         query.all(&*self.db).await.map_err(AppError::from)
     }
 
-    // ========== 双计量单位说明 ==========
-    // 米↔公斤的换算补齐只发生在调用方未提交公斤数时，落点在 handler 入口
-    // `handlers::inventory_stock_handler_fabric::create_stock_fabric`（唯一读 CreateStockFabricRequest
-    // 的地方，知道"公斤数有没有被提交"）。本 service 不做二次反算：一旦在这里按
-    // 米×克重×门幅重算，实测公斤数就会被理论值覆盖，两条建库路径（本函数与
-    // `inventory_stock_txn::create_stock_fabric_txn`）也会算出不同结果。
+    // ========== 双计量单位口径 ==========
+
+    /// 决定一条面料库存记录落库的公斤数。
+    ///
+    /// 谁调它：直建端点入口 `handlers::inventory_stock_handler_fabric::create_stock_fabric`
+    /// （唯一知道"公斤数有没有被提交"的地方）。传给谁：结果作为 `CreateStockFabricArgs` 的
+    /// `quantity_kg` 交给 `create_stock_fabric` 落库；事务版
+    /// `inventory_stock_txn::create_stock_fabric_txn` 只消费上游算好的值，不重复判定。
+    /// 存哪里：`inventory_stocks.quantity_kg`。
+    ///
+    /// 入参：`submitted_kg` 提交的公斤数（None=未提交）、`quantity_meters` 米数、
+    /// `gram_weight` 克重(g/m²)、`width` 幅宽(cm，与 [`DualUnitConverter::meters_to_kg`] 同单位口径)。
+    ///
+    /// 三条口径：
+    /// 1. 提交过就原样用，绝不重算覆盖——公斤数是仓管实测录入的独立事实，实测与理论本就
+    ///    允许不等（回潮、零头、绕卷松紧），按 米×克重×门幅 重算等于销毁录入事实，
+    ///    并使按公斤口径的成本分摊与对账失真。
+    /// 2. 未提交且克重与幅宽齐备：走换算器补算，补算失败如实上报（`Err` 携带换算器原因），
+    ///    由调用方翻成校验错误；不咽掉失败回退成别的值。
+    /// 3. 未提交且克重或幅宽缺任一：不可算，记 `Decimal::ZERO`。0 是"未称量"的显式表达，
+    ///    任何由半套参数推出来的数都会被下游当成实测事实参与分摊，因此宁缺不猜。
+    ///
+    /// 建库写入方法自身不再做任何反算，两条建库路径因此对同一入参必然算出同一个值。
+    pub fn resolve_quantity_kg(
+        submitted_kg: Option<Decimal>,
+        quantity_meters: Decimal,
+        gram_weight: Option<Decimal>,
+        width: Option<Decimal>,
+    ) -> Result<Decimal, String> {
+        if let Some(submitted_kg) = submitted_kg {
+            return Ok(submitted_kg);
+        }
+        match (gram_weight, width) {
+            (Some(gram_weight), Some(width)) => {
+                DualUnitConverter::meters_to_kg(quantity_meters, gram_weight, width)
+            }
+            (None, _) | (_, None) => Ok(Decimal::ZERO),
+        }
+    }
 
     /// 创建库存（面料行业版）（批次 338 v10 复审 P3 修复：签名从 13 参数改为单一参数对象 `CreateStockFabricArgs`，；消除 `clippy::too_many_arguments` 警告。）
     pub async fn create_stock_fabric(
@@ -567,7 +601,8 @@ impl InventoryStockService {
 
         // 公斤数按调用方提交的事实原样落库，不在这里按 米×克重×门幅 反算覆盖：
         // 反算得到的是理论重量，实测重量与之不等是常态（回潮、零头、绕卷松紧），
-        // 覆盖会把录入事实抹掉。换算补齐只在调用方未提交公斤数时发生（见 handler 入口），
+        // 覆盖会把录入事实抹掉。换算补齐只在调用方未提交公斤数时发生，口径统一在
+        // `Self::resolve_quantity_kg`（由直建端点入口调用，本方法只消费其结果），
         // 与事务版 `inventory_stock_txn::create_stock_fabric_txn` 的落库口径保持一致。
         let active_stock = Self::build_stock_fabric_active(StockFabricFields {
             warehouse_id,
