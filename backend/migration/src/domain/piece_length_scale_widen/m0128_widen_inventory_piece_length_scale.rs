@@ -41,15 +41,14 @@ BEGIN
         RETURN;
     END IF;
 
+    // 列的定标口径取 information_schema.columns.numeric_scale——pg_attribute 里没有这一列
+    // （它只有 atttypmod，需 ((atttypmod - 4) & 65535) 反解），按 pg_attribute 直选 numeric_scale
+    // 会在运行期报 42703 column "numeric_scale" does not exist 并把整条迁移链打断。
     SELECT numeric_scale INTO v_numeric_scale
-    FROM pg_attribute a
-    JOIN pg_class c ON c.oid = a.attrelid
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    JOIN pg_type t ON t.oid = a.atttypid
-    WHERE n.nspname = current_schema()
-      AND c.relname = 'inventory_piece'
-      AND a.attname = 'length'
-      AND t.typname = 'numeric';
+    FROM information_schema.columns
+    WHERE table_name = 'inventory_piece'
+      AND column_name = 'length'
+      AND data_type = 'numeric';
 
     IF v_numeric_scale IS NOT NULL AND v_numeric_scale >= 4 THEN
         RAISE NOTICE 'm0128 跳过：inventory_piece.length 已是 % 位小数，无需扩到 4 位', v_numeric_scale;
