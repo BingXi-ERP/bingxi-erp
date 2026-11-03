@@ -222,6 +222,26 @@ pub fn detect_operation_page(headers: &header::HeaderMap) -> Option<String> {
     }
 }
 
+/// 存证列 operation_page 的字符上限，与迁移 m0126 里该列的 VARCHAR(500) 同值。
+const OPERATION_PAGE_MAX_CHARS: usize = 500;
+
+/// 页面标识取自请求头 X-Page-Path 与 Referer，长度由客户端决定。超过存证列宽度会让这条
+/// 审计写入直接报 22001 并打断被审计的业务写，所以在边界处按长度判空，而不是截断存半成品。
+/// 入参是 detect_operation_page 的取值，产出交给 audit_context_middleware 写进上下文。
+fn bound_operation_page(page: Option<String>) -> Option<String> {
+    match page {
+        Some(raw) if raw.chars().count() > OPERATION_PAGE_MAX_CHARS => {
+            tracing::warn!(
+                page_chars = raw.chars().count(),
+                limit = OPERATION_PAGE_MAX_CHARS,
+                "操作页面标识超出存证列宽度，本条审计的页面维度记空"
+            );
+            None
+        }
+        other => other,
+    }
+}
+
 /// 无法解析客户端 IP 时的占位值（不是可用的客户端标识，禁止当作真实 IP 参与任何判定）
 pub const CLIENT_IP_UNRESOLVED: &str = "unknown";
 
@@ -318,7 +338,7 @@ pub async fn audit_context_middleware(mut request: Request<Body>, next: Next) ->
     let ip_address = extract_client_ip(&request);
     let user_agent = extract_user_agent(&request);
     let terminal_type = detect_terminal_type(request.headers()).to_string();
-    let operation_page = detect_operation_page(request.headers());
+    let operation_page = bound_operation_page(detect_operation_page(request.headers()));
     // 角色维度只消费 auth 已查出的角色行（SessionRoleCode 扩展由 auth 中间件注入，本中间件
     // 挂在其内层，扩展随请求流向内可见），本层不查库。取不到如实记 None：公开路径未认证、
     // 用户未分配角色、角色行缺失或查询失败都落 NULL，不写空串也不写占位角色冒充有值。
