@@ -138,7 +138,10 @@ pub async fn get_exchange_rate(
         Some(model) => Ok(Json(ApiResponse::success(ExchangeRateResponse::from(
             model,
         )))),
-        None => Err(AppError::not_found(format!(
+        // 文案只点名调用方自己在查询串里提交的两个 ISO 4217 币码，不含记录 ID、表名、
+        // SQL 与他人数据，满足 utils/error.rs 模块文档对 not_found_displayable 的安全边界；
+        // 用户据此能直接判断是换币对还是先补录汇率，故外显真实原因而非脱敏常量。
+        None => Err(AppError::not_found_displayable(format!(
             "未找到 {} -> {} 的汇率记录",
             query.from_currency, query.to_currency
         ))),
