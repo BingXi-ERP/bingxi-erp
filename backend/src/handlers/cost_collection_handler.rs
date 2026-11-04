@@ -163,6 +163,7 @@ pub async fn create_collection(
         "用户 {} 创建成本归集成功：{}",
         auth.username, collection.collection_no
     );
+    record_collection_create_audit(&state, &auth, &collection);
 
     Ok(Json(ApiResponse::success_with_message(
         collection,
@@ -391,6 +392,56 @@ fn build_collections_table(collections_json: &[serde_json::Value]) -> XlsxTable 
         headers: collections_export_headers(),
         rows: collections_json.iter().map(build_collection_row).collect(),
     }
+}
+
+/// 记录成本归集建单（CREATE）审计事件
+///
+/// 调用方：create_collection 在 service.create 落库成功之后、组装响应之前调用一次。
+/// 入参：state 提供审计库连接，auth 提供操作人 user_id 与 username，collection 为刚落库的整行模型。
+/// 传给谁：AuditEvent 交给 AuditLogService::record_async 的进程级消费者 task 落库，不阻塞响应，
+/// 与本文件的导出审计同一条写路径。
+/// 存什么：operation_type 为 CREATE、resource_type 为 cost_collection（与 delete_with_audit
+/// 与本文件导出审计共用同一写入方字面量，不自造新 token）、resource_id 为归集单主键字符串、
+/// resource_name 为归集单号，before_snapshot 为空（创建无前镜像），after_snapshot 存五费用列、
+/// total_cost、status、批次与缸号，使建单留痕可按单号与缸号回溯。
+/// 存哪里：audit_logs 表的 user_id/username/operation_type/resource_type/resource_id/
+/// resource_name/description/request_method/request_path/after_snapshot/severity/created_at 列。
+fn record_collection_create_audit(
+    state: &AppState,
+    auth: &AuthContext,
+    collection: &cost_collection::Model,
+) {
+    let svc = Arc::new(AuditLogService::new(state.db.clone()));
+    let event = AuditEvent {
+        user_id: Some(auth.user_id),
+        username: Some(auth.username.clone()),
+        operation_type: OperationType::Create,
+        severity: Severity::Info,
+        resource_type: Some("cost_collection".to_string()),
+        resource_id: Some(collection.id.to_string()),
+        resource_name: Some(collection.collection_no.clone()),
+        description: Some(format!(
+            "用户 {} 创建成本归集 {}（批次 {:?}，缸号 {:?}）",
+            auth.username, collection.collection_no, collection.batch_no, collection.dye_lot_no
+        )),
+        request_method: Some("POST".to_string()),
+        request_path: Some("/api/v1/erp/production/cost-collections".to_string()),
+        before_snapshot: None,
+        after_snapshot: Some(serde_json::json!({
+            "id": collection.id,
+            "collection_no": collection.collection_no,
+            "batch_no": collection.batch_no,
+            "dye_lot_no": collection.dye_lot_no,
+            "direct_material": collection.direct_material,
+            "direct_labor": collection.direct_labor,
+            "manufacturing_overhead": collection.manufacturing_overhead,
+            "processing_fee": collection.processing_fee,
+            "dyeing_fee": collection.dyeing_fee,
+            "total_cost": collection.total_cost,
+            "status": collection.status,
+        })),
+    };
+    svc.record_async(event, None);
 }
 
 /// 异步记录成本归集导出操作（审计自身，best-effort 不阻塞响应）
