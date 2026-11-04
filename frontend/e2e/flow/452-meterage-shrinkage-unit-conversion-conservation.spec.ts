@@ -671,15 +671,22 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
     if (stockRow === undefined) {
       throw new Error('452-03 前置不成立：出库后按四维读不到库存行');
     }
+    // 口径（以写入方为准）：出库扣减只写库存行 quantity_available 并累计 quantity_shipped
+    // （services/so/delivery_ops/inventory.rs 的 reduce_inventory_four_dim），
+    // 流水行的 quantity_before_meters/quantity_after_meters 由同一笔扣减的扣前/扣后**可用量**
+    // 落库（StockReduction 三字段，services/so/delivery_ops/ship.rs 写 inventory_transactions）；
+    // models/inventory_stock.rs 的 quantity_meters 是入库时记的主计量总米数，出库与撤销均不写该列。
+    // 因此账实守恒只能拿被扣的同一列 quantity_available 与流水前后对照，
+    // 用 quantity_meters 比流水扣后量属于两个口径相减（左恒为入库总量、右为扣后余量）。
     sameDec(
-      decField(stockRow, 'quantity_meters', '452-03 库存行扣后主计量'),
+      decField(stockRow, 'quantity_available', '452-03 库存行扣后可用量'),
       decField(txn, 'quantity_after_meters', '452-03 流水扣后量'),
-      '452-03 库存行扣后量 vs 流水扣后量'
+      '452-03 库存行扣后可用量 vs 流水扣后量'
     );
     sameDec(
-      decField(bundle.stockRow, 'quantity_meters', '452-03 出库前库存行主计量'),
+      decField(bundle.stockRow, 'quantity_available', '452-03 出库前库存行可用量'),
       decField(txn, 'quantity_before_meters', '452-03 流水扣前量'),
-      '452-03 出库前库存行量 vs 流水扣前量'
+      '452-03 出库前库存行可用量 vs 流水扣前量'
     );
 
     // 8) 母卷出库后离开可用态；零头余码仍可单独查到且长度逐位不变
@@ -951,7 +958,13 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
     if (stockBefore === undefined) {
       throw new Error('452-05 前置不成立：出库前按四维读不到库存行');
     }
-    const stockMetersBefore = decField(stockBefore, 'quantity_meters', '452-05 出库前库存行主计量');
+    // 基线列口径同 452-03 步骤 7 的注释：出库扣与撤销补都写 quantity_available，
+    // quantity_meters 由入库录入且出库/撤销不改，拿它当扣前扣后读数会把真实扣减看成零变化。
+    const stockAvailableBefore = decField(
+      stockBefore,
+      'quantity_available',
+      '452-05 出库前库存行可用量'
+    );
     const lineBefore = orderLineOf(
       await apiCallRaw<Row>(page, 'GET', `/sales/orders/${order.id}`),
       productId,
@@ -1012,8 +1025,8 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       throw new Error('452-05 前置不成立：出库后按四维读不到库存行');
     }
     sameDecDiff(
-      stockMetersBefore,
-      decField(stockMid, 'quantity_meters', '452-05 出库后库存行主计量'),
+      stockAvailableBefore,
+      decField(stockMid, 'quantity_available', '452-05 出库后库存行可用量'),
       shipQty,
       '452-05 出库确实扣减：扣前 − 扣后 = 出库量'
     );
@@ -1038,9 +1051,9 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       throw new Error('452-05 撤销后按四维必须仍能读到库存行');
     }
     sameDec(
-      decField(stockAfterCancel, 'quantity_meters', '452-05 撤销后库存行主计量'),
-      stockMetersBefore,
-      '452-05 撤销后库存行主计量 vs 出库前基线'
+      decField(stockAfterCancel, 'quantity_available', '452-05 撤销后库存行可用量'),
+      stockAvailableBefore,
+      '452-05 撤销后库存行可用量 vs 出库前基线'
     );
     const lineAfterCancel = orderLineOf(
       await apiCallRaw<Row>(page, 'GET', `/sales/orders/${order.id}`),
