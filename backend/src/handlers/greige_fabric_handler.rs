@@ -182,7 +182,7 @@ fn stock_decimal(value: f64, field: &str) -> Result<Decimal, AppError> {
             "{field}不能为负数"
         )));
     }
-    Decimal::from_f64_rounded(value)
+    crate::utils::decimal::from_f64(value)
         .ok_or_else(|| AppError::validation_displayable(format!("{field}超出可保存的数值范围")))
 }
 

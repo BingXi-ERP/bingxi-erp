@@ -354,7 +354,7 @@ impl CurrencyService {
                 AppError::business(format!("未找到汇率: {} -> {}", from_currency, to_currency))
             })?;
 
-        let decimal_rate = Decimal::from_f64_rounded(rate).unwrap_or(Decimal::ZERO);
+        let decimal_rate = crate::utils::decimal::from_f64(rate).unwrap_or(Decimal::ZERO);
 
         Ok(ExternalRateResponse {
             from_currency: from_currency.to_string(),
