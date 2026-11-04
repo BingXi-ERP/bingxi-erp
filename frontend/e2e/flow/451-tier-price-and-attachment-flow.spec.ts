@@ -776,4 +776,134 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
     await apiCallRaw<unknown>(page, 'DELETE', `/products/${hostProductId}`);
     await apiCallRaw<unknown>(page, 'DELETE', `/color-prices/${priceId}`);
   });
+
+  /**
+   * 功能：把"被下游引用的产品档案禁止硬删、且拒绝必须点名是哪一面挡的"钉成真实链路。
+   * 本用例新增覆盖的端点腿：DELETE /products/{id}（handler 为 backend/src/routes 下 product
+   * 分组的 delete_product，前置引用面枚举与拒绝在 services/product_ops/crud.rs）。
+   * 入参：引用面用本文件既有主数据形态搭——新建宿主产品 + 复用作弊夹具的色号建一条
+   * 色号阶梯价（product_color_prices.product_id 对 products(id) 有外键）；宿主两主键先声明
+   * 供 finally 收尾。
+   * 传给谁：拒绝出参交本用例断言（HTTP 400 + BUSINESS_ERROR + message 点名阻塞面与行数），
+   * 产品行回读交 GET /products/{id}，收尾交 page.request 的删除腿按状态码分路。
+   * 存什么：products 一行、product_color_prices 一行（product_id 指宿主）、
+   * color_price_tier 不参与本用例（外键指向色号价而非产品，加了只会稀释归因）。
+   * 存哪里：products 与 product_color_prices；用例结束时两行都必须消失。
+   */
+  test('451-05 被色号阶梯价引用的产品禁止硬删且拒绝点名阻塞面与行数', async ({ page }) => {
+    const ctx = getCtx();
+    const colorId = ctx.quotationProductColorId;
+    if (colorId === undefined) {
+      throw new Error('ensureTestEntities 未产出报价专用色号，色号阶梯价引用前置不成立');
+    }
+    const tag = genCode('451E');
+    let hostProductId = 0;
+    let hostPriceId = 0;
+
+    try {
+      const product = requireRow(
+        await apiCallRaw<unknown>(page, 'POST', '/products', {
+          name: genName('被引用宿主产品'),
+          code: `451E${tag}`,
+          unit: 'm',
+          product_type: PRODUCT_TYPE.auxiliary,
+          standard_price: '44.44',
+        }),
+        '删除门宿主建品出参'
+      );
+      hostProductId = toNum(product.id, '删除门宿主建品主键');
+      expect(hostProductId > 0, `建品必须返回真实主键，实际 ${JSON.stringify(product)}`).toBe(true);
+
+      const price = requireRow(
+        await apiCallRaw<unknown>(page, 'POST', '/color-prices', {
+          product_id: hostProductId,
+          color_id: colorId,
+          currency: 'CNY',
+          base_price: '120.00',
+          effective_from: ymd(0),
+          notes: `删除门引用宿主${tag}`,
+        }),
+        '删除门引用建色号阶梯价出参'
+      );
+      hostPriceId = toNum(price.id, '色号阶梯价主键');
+      expect(hostPriceId > 0, `色号阶梯价必须返回真实主键，实际 ${JSON.stringify(price)}`).toBe(
+        true
+      );
+
+      const blocked = await apiCallExpectFail(page, 'DELETE', `/products/${hostProductId}`);
+      expect(
+        blocked.status,
+        `被色号阶梯价引用的产品删除必须被 400 业务拒绝，而不是收敛成泛化文案的 500，实际 ${blocked.status}`
+      ).toBe(400);
+      expect(
+        failureCode(blocked),
+        `引用守门的机器码必须是 BUSINESS_ERROR，实际 ${JSON.stringify(blocked.code)}`
+      ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+      expect(
+        typeof blocked.message === 'string' && blocked.message.includes('色号阶梯价'),
+        `拒绝文案必须点名阻塞面"色号阶梯价"，实际 ${JSON.stringify(blocked.message)}`
+      ).toBe(true);
+      expect(
+        typeof blocked.message === 'string' && blocked.message.includes('1 条'),
+        `拒绝文案必须带出挡住的行数，不能只给泛化说法，实际 ${JSON.stringify(blocked.message)}`
+      ).toBe(true);
+      expect(
+        typeof blocked.trace_id === 'string' && blocked.trace_id.length > 0,
+        `统一失败信封必须携带 trace_id，实际 ${JSON.stringify(blocked)}`
+      ).toBe(true);
+      expect(
+        typeof blocked.message === 'string' && !blocked.message.includes('product_color_prices'),
+        `拒绝文案不得泄出物理表名，实际 ${JSON.stringify(blocked.message)}`
+      ).toBe(true);
+
+      // 被拒不等于删成功：宿主行必须仍能按主键读回，且引用行仍在原位。
+      const stillThere = requireRow(
+        await apiCallRaw<unknown>(page, 'GET', `/products/${hostProductId}`),
+        '删除被拒后宿主产品回读出参'
+      );
+      expect(
+        toNum(stillThere.id, '删除被拒后宿主回读主键'),
+        `删除被拒后宿主产品行必须仍在，实际 ${JSON.stringify(stillThere)}`
+      ).toBe(hostProductId);
+
+      // 门由引用造成，不是永久锁死：撤掉唯一引用面后删除门必须放行并真删。
+      await apiCallRaw<unknown>(page, 'DELETE', `/color-prices/${hostPriceId}`);
+      hostPriceId = 0;
+      await apiCallRaw<unknown>(page, 'DELETE', `/products/${hostProductId}`);
+      const gone = await apiCallExpectFail(page, 'GET', `/products/${hostProductId}`);
+      expect(
+        gone.status,
+        `撤掉引用后删除门必须放行，宿主产品按主键读回必须 404，实际 ${gone.status}`
+      ).toBe(404);
+      expect(failureCode(gone)).toBe(APP_ERROR_CODES.NOT_FOUND);
+      hostProductId = 0;
+    } finally {
+      // 清理腿按删除门状态分路：先撤引用再删宿主，400 表示仍有引用面挡住，
+      // 此时点名出参原文而不判负（守门自身的判据写在用例正文里，不由清理腿兜绿）。
+      if (hostPriceId > 0) {
+        const unref = await page.request.delete(
+          `${API_BASE}${API_PREFIX}/color-prices/${hostPriceId}`,
+          { headers: { 'X-CSRF-Token': await csrfOf(page), 'X-Requested-With': 'XMLHttpRequest' } }
+        );
+        console.log(
+          `[451-cleanup] 撤引用 DELETE /color-prices/${hostPriceId} => status=${unref.status()}`
+        );
+      }
+      if (hostProductId > 0) {
+        const del = await page.request.delete(
+          `${API_BASE}${API_PREFIX}/products/${hostProductId}`,
+          { headers: { 'X-CSRF-Token': await csrfOf(page), 'X-Requested-With': 'XMLHttpRequest' } }
+        );
+        if (del.status() === 400) {
+          console.warn(
+            `[451-cleanup] 宿主产品仍被引用守门挡住 status=400，出参原文：${await del.text()}`
+          );
+        } else {
+          console.log(
+            `[451-cleanup] 宿主产品 DELETE /products/${hostProductId} => status=${del.status()}`
+          );
+        }
+      }
+    }
+  });
 });
