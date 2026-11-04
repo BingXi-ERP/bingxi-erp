@@ -551,7 +551,10 @@ async function seedApprovedOrder(
     orderNo.length > 0 && orderNo !== 'undefined',
     `建 PO 未返回 order_no，实际键=${Object.keys(created).join(',')}`
   ).toBe(true);
-  expect(String(created.status), '新建采购订单初始态（大写词表）').toBe(PO_STATUS_DRAFT);
+  // 建单出参走 purchase_order::Model 直接序列化（handler 未套 DTO），状态键为列名 order_status；
+  // 仅详情/列表出口的 PurchaseOrderDto 才把 order_status 重命名为 status。此处读建单响应，
+  // 必须用 Model 侧键名 order_status，读 .status 会恒 undefined 而掩盖真实初值。
+  expect(String(created.order_status), '新建采购订单初始态（大写词表）').toBe(PO_STATUS_DRAFT);
 
   await apiCall(page, 'POST', `/purchase/orders/${poId}/submit`);
   await apiCall(page, 'POST', `/purchase/orders/${poId}/approve`);
