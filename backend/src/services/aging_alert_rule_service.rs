@@ -3,6 +3,7 @@
 //! 提供预警规则的 CRUD 和查询功能
 
 use crate::models::aging_alert_rule;
+use crate::models::status::{aging_alert_bucket, aging_alert_level, aging_notify_method};
 use crate::utils::error::AppError;
 use chrono::Utc;
 use sea_orm::{
@@ -61,6 +62,31 @@ impl AgingAlertRuleService {
         Self { db }
     }
 
+    /// 校验受控词表列的提交值：键缺席（None）跳过，越界值一律拒绝
+    ///
+    /// 调用方：create 与 update 两条写腿，入参 aging_bucket / alert_level / notify_method 三列。
+    /// 入参：field 是要点名的列名、value 是本次提交值（None 表示本列未提交，更新腿保持原值）、
+    /// allowed 是该列在 status 侧登记的词表全集。
+    /// 传给谁：越界值产出 AppError（HTTP 400、code=VALIDATION_ERROR）沿请求链上抛，文案点名
+    /// 列名、提交值与合法取值范围，不含记录 ID；合法值原样返回 Ok 交给写腿落库，本函数不改值。
+    /// 存什么/存哪里：本函数不写库；三列在库侧均无 CHECK 约束，这里是非法值入库前的唯一准入门。
+    fn ensure_token_allowed(
+        field: &str,
+        value: Option<&str>,
+        allowed: &[&str],
+    ) -> Result<(), AppError> {
+        match value {
+            Some(v) if allowed.contains(&v) => Ok(()),
+            Some(v) => Err(AppError::validation_displayable(format!(
+                "非法 {}: {}，合法值：{}",
+                field,
+                v,
+                allowed.join("/")
+            ))),
+            None => Ok(()),
+        }
+    }
+
     /// 创建预警规则
     pub async fn create(
         &self,
@@ -68,6 +94,22 @@ impl AgingAlertRuleService {
         user_id: i32,
     ) -> Result<aging_alert_rule::Model, AppError> {
         info!("用户 {} 正在创建账龄预警规则：{}", user_id, req.rule_name);
+
+        Self::ensure_token_allowed(
+            "aging_bucket",
+            Some(req.aging_bucket.as_str()),
+            aging_alert_bucket::ALL,
+        )?;
+        Self::ensure_token_allowed(
+            "alert_level",
+            Some(req.alert_level.as_str()),
+            aging_alert_level::ALL,
+        )?;
+        Self::ensure_token_allowed(
+            "notify_method",
+            Some(req.notify_method.as_str()),
+            aging_notify_method::ALL,
+        )?;
 
         let now = Utc::now();
         let active = aging_alert_rule::ActiveModel {
@@ -135,6 +177,22 @@ impl AgingAlertRuleService {
         id: i32,
         req: UpdateAlertRuleRequest,
     ) -> Result<aging_alert_rule::Model, AppError> {
+        Self::ensure_token_allowed(
+            "aging_bucket",
+            req.aging_bucket.as_deref(),
+            aging_alert_bucket::ALL,
+        )?;
+        Self::ensure_token_allowed(
+            "alert_level",
+            req.alert_level.as_deref(),
+            aging_alert_level::ALL,
+        )?;
+        Self::ensure_token_allowed(
+            "notify_method",
+            req.notify_method.as_deref(),
+            aging_notify_method::ALL,
+        )?;
+
         let rule = self.get_by_id(id).await?;
 
         let mut active: aging_alert_rule::ActiveModel = rule.into();
