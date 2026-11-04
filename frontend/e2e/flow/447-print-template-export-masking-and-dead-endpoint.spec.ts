@@ -602,7 +602,7 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
         resource_type: 'customer',
         export_params: { page: 1, page_size: 10, scene: 'e2e447' },
         estimated_rows: 10,
-        file_format: 'csv',
+        file_format: 'xlsx',
       }
     );
     const id = Number(created.id);
