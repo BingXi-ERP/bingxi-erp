@@ -13,16 +13,19 @@ use crate::utils::error::AppError;
 use sea_orm::{EntityTrait, QuerySelect, Set, TransactionTrait};
 
 impl SalesService {
-    /// 拒绝销售订单
+    /// 拒绝销售订单（PENDING→REJECTED），事务内释放已占用的信用额度。
+    ///
+    /// 功能：行锁读单→状态门（仅 PENDING）→释放库存预留→释放信用→写 REJECTED→commit→发事件。
+    /// 调用方：handlers/sales_order_handler.rs reject 端点。
+    /// 入参：order_id——待拒绝订单；reason——拒绝理由；user_id——操作人。
+    /// 传给谁：失败经 AppError 透传给出参；成功后发布 SalesOrderRejected 事件。
+    /// 存什么·存哪里：sales_orders.status→rejected + rejected_reason；customer_credit_ratings 归还占用。
     pub async fn reject_order(
         &self,
         order_id: i32,
         reason: String,
         user_id: i32,
     ) -> Result<(), AppError> {
-        // P1-13 修复（批次 79 v1 复审）：状态门 + 客户校验移入单一事务，加 lock_exclusive 串行化
-        // 原实现状态门用 self.db 裸查询、客户校验也用 self.db，txn 只包裹 release + update，
-        // 并发场景下可能在状态检查通过后、update 前发生状态变更（如已 approve），导致已审批单被拒绝。
         let txn = (*self.db).begin().await?;
 
         let order = sales_order::Entity::find_by_id(order_id)
@@ -38,34 +41,39 @@ impl SalesService {
             )));
         }
 
-        // 校验客户存在（保持与原业务一致，在事务内执行）
         let _customer = customer::Entity::find_by_id(order.customer_id)
             .one(&txn)
             .await?
             .ok_or_else(|| AppError::not_found("客户不存在"))?;
 
-        // 释放库存预留
         self.release_reservations(order_id, &txn).await?;
+
+        let total_amount = order
+            .total_amount
+            .to_string()
+            .parse::<rust_decimal::Decimal>()
+            .unwrap_or_else(|_| rust_decimal::Decimal::from(0));
+        let credit_service =
+            crate::services::customer_credit_service::CustomerCreditService::new(self.db.clone());
+        credit_service
+            .release_credit_txn(&txn, order.customer_id, total_amount, user_id)
+            .await?;
 
         let customer_id_for_event = order.customer_id;
         let mut order_update: sales_order::ActiveModel = order.into();
         order_update.status = Set(so_status::REJECTED.to_string());
-        // 拒绝理由落 rejected_reason 专列（m0079）；notes 回归订单备注语义，
-        // 此前 reject 覆盖写 notes 属挪用毁数，存量不回填（无标记无法定性）。
         order_update.rejected_reason = Set(Some(reason));
         order_update.updated_at = Set(chrono::Utc::now());
         crate::services::audit_log_service::AuditLogService::update_with_audit(
             &txn,
             "auto_audit",
             order_update,
-            // P1 1-1 修复（批次 59b）：原 Some(0) 占位符改为真实操作人 user_id
             Some(user_id),
         )
         .await?;
 
         txn.commit().await?;
 
-        // B-P1-4 修复（批次 361 v13 复审）：commit 后发布 SalesOrderRejected 事件
         crate::services::event_bus::EVENT_BUS.publish(
             crate::services::event_bus::BusinessEvent::SalesOrderRejected {
                 order_id,
