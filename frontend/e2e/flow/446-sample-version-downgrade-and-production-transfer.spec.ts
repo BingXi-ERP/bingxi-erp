@@ -4,10 +4,12 @@ import {
   apiCall,
   apiCallRaw,
   apiCallExpectFail,
+  ensureTestEntities,
   expectDenied,
   expectStateGateRejection,
   failureCode,
   genCode,
+  getCtx,
   getEntityField,
   loginAsRole,
   safeGetList,
@@ -186,23 +188,42 @@ test.describe('面料样品打样版本链与降等转大货', () => {
     // 传给谁：ai_extend_service.record_actual_quality_result / record_actual_result。
     // 存什么：actual_* 回填列与 actual_recorded_at / claim_recorded_at 时间戳。
     // 存哪里：ai_quality_predictions（backend/src/models/ai_quality_prediction.rs）。
-    const predictions = await safeGetList<Record<string, unknown>>(
-      page,
-      '/ai/quality-predictions?page=1&page_size=5'
-    );
-    if (predictions.length === 0) {
-      throw new Error('前置不成立：库内无质量预测记录，无法验证实测回填链');
+    // 前置自造：ai_quality_predictions 的写入口是 POST /ai/quality-predictions
+    // （ai_extend_handler::create_quality_prediction，入参 { request: { product_id, window_days } }），
+    // 本用例自己建一行再回写，不借库里恰好存在的他域记录。product_id 取本 worker 夹具
+    // （ensureTestEntities）建出的产品，保证是真实主键。
+    await ensureTestEntities(page);
+    const ctx = getCtx();
+    const productId = ctx.productIds[0];
+    if (!productId) {
+      throw new Error('前置不成立：本 worker 夹具未建出产品，质量预测无法挂真实 product_id');
     }
-    const prediction = predictions[0];
-    const predId = Number(prediction['id']);
-    predictionId = predId;
-    const riskLevel = String(prediction['risk_level']);
-    const gradeToken = '一等品';
-
+    const created = await apiCallRaw<{ id: number }>(page, 'POST', '/ai/quality-predictions', {
+      request: { product_id: productId, window_days: 90 },
+    });
+    const predId = Number(created['id']);
     expect(
-      prediction['actual_risk_level'],
-      '回写前 actual_risk_level 应未被预置或为上次回填值（读回口径以此行为基线）'
-    ).toBeDefined();
+      Number.isInteger(predId) && predId > 0,
+      `自建质量预测必须返回整数主键，实际 ${JSON.stringify(created['id'])}`
+    ).toBe(true);
+    predictionId = predId;
+
+    const prediction = await apiCall<Record<string, unknown>>(
+      page,
+      'GET',
+      `/ai/quality-predictions/${predId}`
+    );
+    // 回填基线：新建行的实测列未采集，必须读回 null（不是 0、不是空串）。
+    expect(
+      prediction.data['actual_risk_level'],
+      '自建预测行回写前 actual_risk_level 应为 null（未回填）'
+    ).toBeNull();
+    const riskLevel = String(prediction.data['risk_level']);
+    expect(
+      riskLevel.length > 0 && riskLevel !== 'undefined',
+      `回写用的 actual_risk_level 必须取自本行落库的真实 risk_level，实际 ${riskLevel}`
+    ).toBe(true);
+    const gradeToken = '一等品';
 
     const afterResult = await apiCallRaw<Record<string, unknown>>(
       page,
@@ -446,5 +467,14 @@ test.describe('面料样品打样版本链与降等转大货', () => {
       'approval_status'
     );
     expect(String(fieldProbe), '跨会话读回的批色状态应一致').toBe(APPROVAL_STATUS_PENDING);
+
+    // 收尾：回收本文件自建的质量预测行（实测腿建档那枚），它是本文件最后一处消费该句柄的位点。
+    // 删除面在册（route-snapshot.txt:5 ai_extend_handler::delete_quality_prediction）。
+    await tryCleanup(
+      page,
+      'DELETE',
+      `/ai/quality-predictions/${predictionId}`,
+      `清理自建质量预测 ${predictionId}`
+    );
   });
 });
