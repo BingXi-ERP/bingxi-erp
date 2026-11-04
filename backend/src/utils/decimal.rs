@@ -19,7 +19,7 @@ const MAX_BUSINESS_SCALE: u32 = 8;
 /// 调用方原有的"坏值不外传成 0"分支不受影响；`Some` 里的小数位不超过
 /// [`MAX_BUSINESS_SCALE`]，且 `0` 保持为 `0`（不把 `0.0` 折成 `0.00000000`）。
 pub fn from_f64(value: f64) -> Option<Decimal> {
-    Decimal::from_f64_retain(value).map(|decimal| decimal.round(MAX_BUSINESS_SCALE).normalize())
+    Decimal::from_f64_retain(value).map(|decimal| decimal.round_dp(MAX_BUSINESS_SCALE).normalize())
 }
 
 #[cfg(test)]
@@ -34,7 +34,8 @@ mod tests {
         let mantissa_diff = "retain 的尾数应被舍掉，否则换算单点没有意义";
         assert_ne!(raw, converted, mantissa_diff);
         assert_eq!(converted, Decimal::from_parts(128, 0, 0, false, 1));
-        let scaled = converted.round(2);
+        // 从未舍入的尾数版按 2 位折一次，走的是真正的截断分支
+        let scaled = raw.round_dp(2);
         let expected = Decimal::from_parts(1280, 0, 0, false, 2);
         assert_eq!(scaled, expected);
     }
