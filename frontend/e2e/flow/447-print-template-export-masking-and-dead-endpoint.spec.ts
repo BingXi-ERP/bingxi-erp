@@ -279,6 +279,8 @@ interface ContactRow {
   phone?: string | null;
   email?: string | null;
   address?: string | null;
+  mobile_phone?: string | null;
+  tel_phone?: string | null;
   [key: string]: unknown;
 }
 
@@ -522,21 +524,47 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
   test('447-4 导出脱敏按角色分面：admin 原文、业务员掩码并剔除 address 与成本列', async ({
     page,
   }) => {
+    const queue: DeferredCleanup[] = [];
+    // 前置由本用例自建：增强列表的行来自线索域（list_customers → list_leads → crm_lead::Model），
+    // 电话键是 mobile_phone/tel_phone、邮箱键是 email，不是 customers/customer_contacts 的
+    // contact_phone/contact_email；建单入参按 CreateLeadRequest 的契约字段名给（lead_source/lead_no
+    // 由服务端取号与缺省补齐），库里是否恰好有带电话的行不是可信前置。
+    const company = genName('P447CUST');
+    const createdCust = await apiCallRaw<ContactRow>(page, 'POST', '/crm/customers', {
+      company_name: company,
+      contact_name: `${company}联系人`,
+      mobile_phone: '13800001234',
+      tel_phone: '057488889999',
+      email: 'e2e447pick@example.com',
+      address: `${company}地址`,
+    });
+    const customerId = Number(createdCust.id);
+    expect(
+      Number.isInteger(customerId) && customerId > 0,
+      `自建带电话客户必须返回整数主键，实际 ${JSON.stringify(createdCust['id'])}`
+    ).toBe(true);
+    // 按 keyword 定位自建行：LeadQuery.keyword 由服务下推到 company_name/contact_name/
+    // mobile_phone/email 四列模糊匹配，用它才能与分页排序解耦地取到刚建的那一行。
     const adminRows = rowsOf(
-      await apiCallRaw<unknown>(page, 'GET', '/crm/customers/enhanced?page=1&page_size=50'),
+      await apiCallRaw<unknown>(
+        page,
+        'GET',
+        `/crm/customers/enhanced?page=1&page_size=50&keyword=${company}`
+      ),
       '客户增强列表(admin)'
     );
-    const withPhone = adminRows.find(
-      r => str(r.contact_phone).length > 0 || str(r.phone).length > 0
-    ) as ContactRow | undefined;
-    expect(withPhone, '测试库必须有带电话的客户行，否则脱敏分面无从取证').toBeTruthy();
-    const customerId = Number(withPhone!.id);
-    const rawPhone = str(withPhone!.contact_phone ?? withPhone!.phone);
+    const withPhone = adminRows.find(r => Number(r.id) === customerId);
+    expect(
+      withPhone,
+      `自建的带电话客户 ${customerId} 必须能在增强列表读回，否则脱敏分面无从取证`
+    ).toBeTruthy();
+    const rawPhone = str(withPhone!.mobile_phone);
+    expect(rawPhone, `admin 侧 mobile_phone 必须是建单原文，实际 ${rawPhone}`).toBe('13800001234');
     expect(
       rawPhone.includes('****'),
       `admin 侧客户列表必须出电话原文，实际被掩码为 ${rawPhone}`
     ).toBe(false);
-    const rawEmail = str(withPhone!.contact_email ?? withPhone!.email);
+    const rawEmail = str(withPhone!.email);
 
     const clist = rowsOf(
       await apiCallRaw<unknown>(page, 'GET', `/crm/customers/${customerId}/contacts`),
@@ -549,7 +577,11 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
 
     await loginAsRole(page, 'salesperson');
     const spRows = rowsOf(
-      await apiCallRaw<unknown>(page, 'GET', '/crm/customers/enhanced?page=1&page_size=50'),
+      await apiCallRaw<unknown>(
+        page,
+        'GET',
+        `/crm/customers/enhanced?page=1&page_size=50&keyword=${company}`
+      ),
       '客户增强列表(业务员)'
     );
     const spRow = spRows.find(r => Number(r.id) === customerId);
@@ -558,14 +590,14 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       description: `业务员数据范围可能不含客户 ${customerId}；不可见时改断言列表整体不含该行（越权可见才是缺陷）`,
     });
     if (spRow) {
-      const maskedPhone = str(spRow.contact_phone ?? spRow.phone);
+      const maskedPhone = str(spRow.mobile_phone);
       expect(
         /^\d{3}\*{4}\d{4}$/.test(maskedPhone),
-        `业务员侧 contact_phone 必须是 field_mask.rs 的前3+****+后4 形态，实际 ${maskedPhone}`
+        `业务员侧 mobile_phone 必须是 field_mask.rs 的前3+****+后4 形态，实际 ${maskedPhone}`
       ).toBe(true);
       expect(maskedPhone === rawPhone, '业务员侧不得等于 admin 原文').toBe(false);
       if (rawEmail.length > 0) {
-        const maskedEmail = str(spRow.contact_email ?? spRow.email);
+        const maskedEmail = str(spRow.email);
         expect(
           /^[^*]+\*{3}@.+$/.test(maskedEmail),
           `业务员侧 email 必须是 field_mask.rs 的首字母+***@域名 形态，实际 ${maskedEmail}`
@@ -623,6 +655,16 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       spAuditExport.includes(rawPhone),
       `业务员侧 /audit-logs/export 出参含客户电话原文 ${rawPhone}，审计导出腿未做同款掩码`
     ).toBe(false);
+
+    // 收尾：回收本用例自建的带电话客户行（增强路由的删除腿与建单腿同域），
+    // 全部脱敏分面断言已消费完该句柄，晚于此处不再有读取点。
+    deferCleanup(
+      queue,
+      'DELETE',
+      `/crm/customers/enhanced/${customerId}`,
+      `447 自建客户 ${customerId}`
+    );
+    await flushDeferredCleanups(page, queue);
   });
 
   test('447-5 导出审批令牌腿：pending 不可取令牌，批准后明文仅一次，换发与消费后复用一律 403', async ({
