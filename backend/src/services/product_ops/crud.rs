@@ -16,8 +16,8 @@
 
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, NotSet, Order, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, NotSet, Order,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 
 use crate::models::product::{self, Entity as ProductEntity};
@@ -612,15 +612,19 @@ impl ProductService {
     /// 存什么：不落库，只按外键列等值计数；等值比较用整型，不引入字符串隐式
     /// 转换而让索引失效。
     /// 存哪里：不写存储位置；行数取自入参 column 所属的表。
-    async fn record_product_ref<E, C>(
+    /// 约束：`Select<E>` 的 `count` 来自 SeaORM 对 `PaginatorTrait` 的实现，该实现
+    /// 额外要求 `E::Model` 满足 `FromQueryResult + Send + Sync + 'db`；缺这三条时
+    /// 方法解析会退到 `Iterator::count` 并报 E0599。
+    async fn record_product_ref<'db, E, C>(
         blockers: &mut Vec<(&'static str, u64)>,
-        db: &C,
+        db: &'db C,
         column: E::Column,
         label: &'static str,
         id: i32,
     ) -> Result<(), AppError>
     where
         E: EntityTrait,
+        E::Model: FromQueryResult + Send + Sync + 'db,
         C: ConnectionTrait,
     {
         let count = E::find().filter(column.eq(id)).count(db).await?;
