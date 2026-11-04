@@ -41,6 +41,10 @@ const THRESHOLD_MIN: Decimal = Decimal::ZERO;
 /// `(lo=100, mid=0, hi=0, negative=false, scale=0)` 与其内存表示逐位等价。
 const THRESHOLD_MAX: Decimal = Decimal::from_parts(100, 0, 0, false, 0);
 
+/// 阈值列刻度：与列型 DECIMAL(5,2) 的小数位一致（写入侧据此拒绝超精度入参，
+/// 不接受被数据库静默舍入的值，保证出参与落库值逐字相同）
+const THRESHOLD_SCALE: u32 = 2;
+
 /// 一版折扣判定结果：阈值、实际最大行折扣率（均为百分点）、是否超阈
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DiscountVerdict {
@@ -77,10 +81,7 @@ impl QuotationDiscountService {
     /// 配置行缺席时 fail-closed：记 error 点名表与缺行事实，返回可外显的业务拒绝，
     /// 引导先到阈值配置面配置；绝不回落任何代码内默认阈值（阈值属管理侧政策参数，
     /// 用代码常量兜底等于把政策从配置面偷回代码里）。
-    pub async fn load_threshold<C: ConnectionTrait>(
-        &self,
-        conn: &C,
-    ) -> Result<Decimal, AppError> {
+    pub async fn load_threshold<C: ConnectionTrait>(&self, conn: &C) -> Result<Decimal, AppError> {
         let config = ConfigEntity::find_by_id(SINGLE_ROW_ID)
             .one(conn)
             .await?
@@ -192,8 +193,10 @@ impl QuotationDiscountService {
 
     /// 写阈值（配置面 PUT 用），经审计单点落 before/after 快照。
     ///
-    /// 入参 threshold_pct：新阈值（百分点，取值域 0~100，与 DB CHECK 同源，越界在本方法
-    /// 内点名拒绝，不让它裸撞到约束变成 500）；user_id：操作人（进审计行）。
+    /// 入参 threshold_pct：新阈值（百分点，取值域 0~100 与 DB CHECK 同源，且最多两位小数
+    /// 与列型 DECIMAL(5,2) 同源）；越界或超精度在本方法内点名拒绝，不让它裸撞到约束变成
+    /// 500，也不接受被数据库悄悄舍入的入参（出参必须与落库值逐字相同）。
+    /// user_id：操作人（进审计行）。
     /// 传给谁：`AuditLogService::update_with_audit` 写 `audit_logs`；结果回给 handler 出参。
     /// 存什么：单行的 `over_discount_threshold_pct` 与 `updated_at`。
     /// 存哪里：`quotation_discount_approval_configs`（id=1 单行）。
@@ -215,22 +218,21 @@ impl QuotationDiscountService {
                 THRESHOLD_MIN, THRESHOLD_MAX
             )));
         }
+        if threshold_pct != threshold_pct.round_dp(THRESHOLD_SCALE) {
+            tracing::warn!(
+                requested_threshold_pct = %threshold_pct,
+                allowed_scale = THRESHOLD_SCALE,
+                operator_user_id = user_id,
+                "超折扣阈值写入被拒：超出列刻度（两位小数），未改动配置行、未做任何静默舍入"
+            );
+            return Err(AppError::validation_displayable(format!(
+                "超折扣阈值最多保留 {} 位小数",
+                THRESHOLD_SCALE
+            )));
+        }
 
-        let current = self.load_threshold(&*self.db).await?;
-        let row = ConfigEntity::find_by_id(SINGLE_ROW_ID)
-            .one(&*self.db)
-            .await?
-            .ok_or_else(|| {
-                // load_threshold 已点名并拒绝过缺行；此处是不可达的理论分支，仍不留静默兜底
-                tracing::error!(
-                    table = "quotation_discount_approval_configs",
-                    config_id = SINGLE_ROW_ID,
-                    "超折扣阈值写入：按单行主键取配置行失败"
-                );
-                AppError::business_displayable(
-                    "超折扣审批阈值尚未配置，请先初始化阈值配置".to_string(),
-                )
-            })?;
+        let row = self.get_config().await?;
+        let before = row.over_discount_threshold_pct;
         let mut active: ConfigActive = row.into();
         active.over_discount_threshold_pct = Set(threshold_pct);
         active.updated_at = Set(chrono::Utc::now());
@@ -243,7 +245,7 @@ impl QuotationDiscountService {
         )
         .await?;
         tracing::info!(
-            threshold_pct_before = %current,
+            threshold_pct_before = %before,
             threshold_pct_after = %updated.over_discount_threshold_pct,
             operator_user_id = user_id,
             "超折扣审批阈值已更新（审计行含 before/after 快照）"
