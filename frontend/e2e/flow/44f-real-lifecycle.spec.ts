@@ -13,6 +13,7 @@ import {
   BASE_URL,
   seedInspectionPass,
   failureCode,
+  genCode,
   APP_ERROR_CODES,
   type ApiFailureResult,
 } from './helpers';
