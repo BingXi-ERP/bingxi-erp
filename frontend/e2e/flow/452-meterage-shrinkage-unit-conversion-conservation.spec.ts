@@ -48,9 +48,10 @@ import { pickListArray } from './ui-helpers';
  * 公斤→米（kg_to_meters）：米 = 公斤 × 1000 ÷ 克重 ÷ 幅宽(m)，保留两位小数。
  * 换算率（calculate_conversion_rate）：1 公斤对应米数 = 1000 ÷ (克重 × 幅宽m)，保留四位小数。
  * 自洽校验（validate_dual_unit）：以米数折出的公斤为基准，差异 ≤ 基准×误差率（默认 0.5%）判为一致。
- * 端点边界：convert 的 from_unit 只接受 meters 与 kg 两个小写词，其余（含 yards 码）走 bad_request
- * 即 400 加 BAD_REQUEST；克重≤0 与幅宽≤0 让 meters_to_kg 返回 Err，同样经 bad_request 外显原文；
- * validate 的入参经 meters_to_kg，幅宽≤0 亦 400 加 BAD_REQUEST。
+ * 端点边界：convert 的 from_unit 只接受 meters 与 kg 两个小写词，其余（含 yards 码）走
+ * validation_displayable 即 400 加 VALIDATION_ERROR 并外显「无效的单位，必须是 'meters' 或 'kg'」；
+ * 克重≤0 与幅宽≤0 让 meters_to_kg 返回 Err，同样经 validation_displayable 外显真实原因；
+ * validate 的入参经 validate_dual_unit，幅宽≤0 亦 400 加 VALIDATION_ERROR。
  * 入库换算（create_stock_fabric）：仅当克重与幅宽同时非空才触发自动折算，否则回落提交公斤数；
  * 列表口 GET /inventory/stock/fabric 的 data 是裸数组（handler 返回 ApiResponse 包 Vec，非分页信封）。
  *
@@ -69,7 +70,7 @@ import { pickListArray } from './ui-helpers';
  *
  * 假绿防线。换算守恒一律以固定无歧义参数断后端出参本身，不自造舍入；自洽校验钉阈值内与阈值外两条独立分支；
  * 入库换算既断建单出参 quantity_kg，又按唯一批次从列表口读回再断一次，证明真实落库；
- * 边界一律钉 HTTP 400 与机器码 BAD_REQUEST 并外显拒绝原文；
+ * 边界一律钉 HTTP 400 与机器码 VALIDATION_ERROR 并外显真实拒绝原因；
  * 全程不用 ?? 或 || 兜底，后端必出的键缺失即形漂判红；前置不成立当场抛错点名步骤。
  */
 
@@ -378,7 +379,7 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       `克重非法必须外显真实拒绝文案，实际 ${str(badGram.message)}`
     ).toBe(true);
 
-    // 8) 边界 幅宽非正走自洽校验入参：validate 内部 meters_to_kg Err 经 bad_request
+    // 8) 边界 幅宽非正走自洽校验入参：validate_dual_unit 自身返回 Err 经 validation_displayable
     const badWidth = await apiCallExpectFail(page, 'POST', '/validate', {
       quantity_meters: METERS,
       quantity_kg: KG,
