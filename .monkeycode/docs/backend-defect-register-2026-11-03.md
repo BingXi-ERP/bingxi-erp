@@ -250,6 +250,14 @@ grep 目标符号是否存在，不能凭对上游 API 的记忆动手；`cargo 
 把 commit sha 当第二参传进去会让 `for(i<NaN)` 一轮不跑、输出文件 0 字节却退 0——
 判定器零检测能力时的退出码不可信，读结论前先确认真的产出了行。
 
+同族第三条（本轮实测，方向与既有记载相反）：本地 `rustfmt_repo_check.sh` 报 `FMT_REPO_OK`
+而 CI 的 🔧 Rust 格式检查 仍红。原因不是本地比 CI 新，而是**本地比 CI 旧**——CI 按
+`rust-toolchain.toml` 用 1.94 自带 rustfmt，本地是 1.8.0-stable，两者对多参数宏
+（`assert_ne!` / `assert_eq!`）的折行判定不同：新版会把能并的实参并到一行、把超
+`fn_call_width` 的调用竖排，旧版对同一文件零输出。**判法**：新写 Rust 文件里的断言与调用
+不要卡在宽度边界，先把长实参 `let` 绑定成短名再单行断言，这样两版判定一致；
+本地格式门绿**不能**当作 CI 格式门绿的凭据。
+
 ## 附带一条工具口径（不算缺陷，会造成本地支假红）
 
 本地 `rustfmt 1.8.0-stable` 对 `use axum::http::{Request, header}` 报"应改成 `{header, Request}`"，而这一行与 `origin/main` 逐字节相同且主干该 job 绿。CI 钉的是旧 toolchain，导入排序规则不同。**判法**：本地格式门点名时先 `git show origin/main:<path>` 比同一段，主干同一写法就不要"顺手修"——按本地版重排会把 CI 根本不要求的改动混进为消红那一笔，制造无关 churn。
