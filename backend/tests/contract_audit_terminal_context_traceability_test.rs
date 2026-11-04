@@ -11,6 +11,12 @@
 //! 四 操作人角色码来自会话已加载的角色行 经生产 audit_context 中间件带进审计上下文并如实
 //!    落库 读取侧出参带该键且 role_code 过滤走等值（前缀不命中即不是 LIKE）
 //!    会话没带角色行时该列落 NULL 不兜底
+//! 五 生产业务端点自己把定位维度写进审计行（不借道测试自造的写端点）
+//!    作废腿 真打 POST /sales/orders/:id/cancel 单据编号取 sales_orders.order_no 原值
+//!    风险标记落 VOID；该端点请求体不承载原因 故 change_reason 断言仍为 NULL
+//!    红冲腿 真打 POST /sales/orders/:id/deliveries/:delivery_id/cancel 单据编号取
+//!    sales_delivery.delivery_no 原值 风险标记落 REVERSE 原因取请求体原样落库
+//!    两腿都再经生产列表端点按真实单号回读 出参键与库内同源
 //!
 //! 反向钉 无终端头且无可用 UA 时 终端记 UNKNOWN 而不是猜成 PC
 //!
@@ -28,18 +34,23 @@ use axum::{
     middleware::{Next, from_fn, from_fn_with_state},
     response::{IntoResponse, Response},
 };
+use bingxi_backend::constants::customer_type;
 use bingxi_backend::container::AppState;
-use bingxi_backend::handlers::audit_log_handler;
+use bingxi_backend::handlers::{audit_log_handler, sales_order_handler};
 use bingxi_backend::middleware::audit_context::{
-    RISK_DELETE, RISK_VOID, TERMINAL_H5, TERMINAL_MINIPROGRAM, TERMINAL_PC, TERMINAL_UNKNOWN,
-    audit_context_middleware, mark_audit_high_risk, set_audit_change_reason, set_audit_doc_no,
+    RISK_DELETE, RISK_REVERSE, RISK_VOID, TERMINAL_H5, TERMINAL_MINIPROGRAM, TERMINAL_PC,
+    TERMINAL_UNKNOWN, audit_context_middleware, mark_audit_high_risk, set_audit_change_reason,
+    set_audit_doc_no,
 };
 use bingxi_backend::middleware::auth_context::{AuthContext, SessionRoleCode};
 use bingxi_backend::models::audit_log::{OperationType, Severity};
-use bingxi_backend::models::{audit_log, role, warehouse};
+use bingxi_backend::models::status::sales_delivery as delivery_status;
+use bingxi_backend::models::status::sales_order as so_status;
+use bingxi_backend::models::{audit_log, customer, role, sales_delivery, sales_order, warehouse};
 use bingxi_backend::services::audit_log_service::{AuditEvent, AuditLogService, flush};
 use bingxi_backend::utils::error::AppError;
-use chrono::Utc;
+use chrono::{NaiveDate, Utc};
+use rust_decimal::Decimal;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -888,4 +899,353 @@ async fn session_role_code_lands_in_audit_row_and_filters_by_equality() {
         Some(0),
         "role_code=admi 不得命中任何行 一旦改成模糊匹配本断言必红 实际 {v_prefix}"
     );
+}
+
+// ============================================================
+// 五枚 生产业务端点自己把定位维度写进审计行（不借道测试自造的写端点）
+//
+// 路由直接挂生产 handler：作废腿 sales_order_handler::cancel_order，红冲腿
+// sales_order_handler::cancel_delivery；外层套生产 audit_context_middleware 绑定 task-local
+// 活上下文，落库走生产 service 内的 update_with_audit 单点，再直读 audit_logs 表并经生产
+// 列表端点回读。
+//
+// 检测力（写腿被拿掉即红的点位）：
+// - 删掉 service 里的 set_audit_doc_no → doc_no 落 NULL 本枚等值断言当场红；
+// - 把单号改写成按主键拼的号（format!("SO#{id}") 之类）→ 与真实单号字面量不等 红；
+//   末尾的反向钉（拿拼出来的号去筛必零命中）同时红；
+// - 删掉或写错 mark_audit_high_risk → risk_flag 等值断言（逐字符 VOID / REVERSE）红；
+// - 给无原因入参的腿硬塞一句默认文案 → change_reason IS NULL 断言红。
+// ============================================================
+
+/// 桌面 UA（本枚只关心单据维度，终端取值由上面几枚钉）
+const LEG_UA_PC: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120";
+/// 本枚自有 id 段（夹具每用例 RESTART IDENTITY，显式 id 让审计行的 resource_id 可预期）
+const LEG_CUSTOMER_ID: i32 = 9401;
+const LEG_ORDER_ID: i32 = 9402;
+const LEG_DELIVERY_ID: i32 = 9403;
+const LEG_WAREHOUSE_ID: i32 = 9404;
+
+/// 挂生产业务端点的路由：作废腿一条、红冲腿一条，另挂生产列表端点做读侧回读。
+/// 层序与 build_app 一致：audit_context_middleware 在外层绑定 task-local 活上下文，
+/// inject_auth 在内层给 handler 提供会话（与真实权限中间件同走 extensions 注入）。
+fn build_business_app(db: sea_orm::DatabaseConnection, role_id: i32) -> Router {
+    let state = AppState {
+        db: Arc::new(db),
+        ..Default::default()
+    };
+    Router::new()
+        .route(
+            "/sales/orders/{id}/cancel",
+            axum::routing::post(sales_order_handler::cancel_order),
+        )
+        .route(
+            "/sales/orders/{order_id}/deliveries/{delivery_id}/cancel",
+            axum::routing::post(sales_order_handler::cancel_delivery),
+        )
+        .route(
+            "/audit-logs",
+            axum::routing::get(audit_log_handler::list_audit_logs),
+        )
+        .with_state(state)
+        .layer(from_fn_with_state(auth_for(role_id), inject_auth))
+        .layer(from_fn(audit_context_middleware))
+}
+
+/// 种一条最小客户行：sales_orders.customer_id 与 sales_delivery.customer_id 都有真外键
+/// 指向 customers，没有父行则种子直接被拒。owner_id 取 0（本仓公海客户的既有取值）。
+async fn seed_leg_customer(db: &sea_orm::DatabaseConnection) -> i32 {
+    let ts = Utc::now().timestamp_nanos_opt().expect("nanos");
+    let row = customer::ActiveModel {
+        customer_code: Set(format!("CUST-LEG-{ts}")),
+        customer_name: Set("审计写腿契约客户".to_string()),
+        credit_limit: Set(Decimal::ZERO),
+        payment_terms: Set(30),
+        status: Set("active".to_string()),
+        customer_type: Set(customer_type::OTHER.to_string()),
+        owner_id: Set(0),
+        created_by: Set(Some(100)),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .expect("种子 customers 失败");
+    row.id
+}
+
+/// 种一张销售订单（状态由调用方给权威词表常量，本函数不自己造取值）
+async fn seed_leg_order(
+    db: &sea_orm::DatabaseConnection,
+    customer_id: i32,
+    order_no: &str,
+    status: &str,
+) -> i32 {
+    let row = sales_order::ActiveModel {
+        order_no: Set(order_no.to_string()),
+        customer_id: Set(customer_id),
+        order_date: Set(Utc::now()),
+        status: Set(status.to_string()),
+        subtotal: Set(Decimal::ZERO),
+        tax_amount: Set(Decimal::ZERO),
+        discount_amount: Set(Decimal::ZERO),
+        shipping_cost: Set(Decimal::ZERO),
+        total_amount: Set(Decimal::ZERO),
+        paid_amount: Set(Decimal::ZERO),
+        balance_amount: Set(Decimal::ZERO),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .unwrap_or_else(|e| panic!("种子 sales_orders({order_no}) 失败: {e}"));
+    row.id
+}
+
+/// 种一张已发货的发货单：状态取权威词表 sales_delivery::SHIPPED（取消门按该值逐字符比较）。
+/// sales_delivery 的 ActiveModel 无缺省实现（模型未派生 Default），列全 13 个字段。
+async fn seed_leg_delivery(
+    db: &sea_orm::DatabaseConnection,
+    order_id: i32,
+    customer_id: i32,
+    warehouse_id: i32,
+    delivery_no: &str,
+) -> i32 {
+    let row = sales_delivery::ActiveModel {
+        id: NotSet,
+        delivery_no: Set(delivery_no.to_string()),
+        order_id: Set(order_id),
+        customer_id: Set(customer_id),
+        warehouse_id: Set(warehouse_id),
+        delivery_date: Set(Utc::now().date_naive()),
+        status: Set(delivery_status::SHIPPED.to_string()),
+        total_quantity: Set(Decimal::ZERO),
+        total_amount: Set(Decimal::ZERO),
+        remarks: Set(Some("审计写腿契约发货".to_string())),
+        created_by: Set(100),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+    }
+    .insert(db)
+    .await
+    .unwrap_or_else(|e| panic!("种子 sales_delivery({delivery_no}) 失败: {e}"));
+    row.id
+}
+
+/// 作废腿：真打生产端点 POST /sales/orders/:id/cancel
+#[tokio::test]
+async fn production_void_endpoint_writes_real_doc_no_and_void_risk() {
+    let db = setup_test_db().await;
+    let role_id = admin_role_id(&db).await;
+    let app = build_business_app(db.clone(), role_id);
+
+    let customer_id = seed_leg_customer(&db).await;
+    // 真实单号：与主键拼出的任何字符串都不同，等值断言因此能区分「取的是编号列」
+    let order_no = "SO-LEG-VOID-20261104-0007";
+    let order_id = seed_leg_order(&db, customer_id, order_no, so_status::APPROVED).await;
+
+    let (s, v) = call(
+        &app,
+        Method::POST,
+        &format!("/sales/orders/{order_id}/cancel"),
+        &[
+            ("user-agent", LEG_UA_PC),
+            ("x-page-path", "/sales/orders/detail"),
+        ],
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "生产作废端点应 200 实际 {v}");
+
+    // 业务效果先证真：请求不是空跑，状态确实被写进作废终态
+    let order = sales_order::Entity::find_by_id(order_id)
+        .one(&db)
+        .await
+        .unwrap()
+        .expect("订单应仍在库");
+    assert_eq!(
+        order.status,
+        so_status::CANCELLED,
+        "作废应把订单写进 cancelled 终态 实际 {:?}",
+        order.status
+    );
+
+    let rows = audit_log::Entity::find()
+        .filter(audit_log::Column::ResourceId.eq(order_id.to_string()))
+        .all(&db)
+        .await
+        .unwrap();
+    assert_eq!(rows.len(), 1, "作废应恰好落一条审计行 实际 {}", rows.len());
+    let row = &rows[0];
+    assert_eq!(
+        row.doc_no.as_deref(),
+        Some(order_no),
+        "doc_no 必须是 sales_orders.order_no 原值 实际 {:?}",
+        row.doc_no
+    );
+    assert_eq!(
+        row.risk_flag.as_deref(),
+        Some(RISK_VOID),
+        "作废腿 risk_flag 必须逐字符等于 VOID 实际 {:?}",
+        row.risk_flag
+    );
+    assert_eq!(
+        row.change_reason, None,
+        "本端点请求体不承载原因 该列必须如实 NULL 而不是兜底文案 实际 {:?}",
+        row.change_reason
+    );
+
+    // 读侧：按真实单号筛得到，且出参键与库内同源
+    let (s_list, v_list) = call(
+        &app,
+        Method::GET,
+        &format!("/audit-logs?doc_no={order_no}&risk_flag=VOID"),
+        &[("user-agent", LEG_UA_PC)],
+        None,
+    )
+    .await;
+    assert_eq!(s_list, StatusCode::OK, "按真实单号筛应 200 实际 {v_list}");
+    let items = v_list["data"]["items"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    assert_eq!(
+        items.len(),
+        1,
+        "按本单真实单号加 VOID 精筛应命中那一行 实际 {v_list}"
+    );
+    assert_eq!(items[0]["doc_no"].as_str(), Some(order_no));
+    assert_eq!(items[0]["risk_flag"].as_str(), Some(RISK_VOID));
+    assert!(
+        items[0].get("change_reason").is_some(),
+        "列表出参必须带 change_reason 键（NULL 也要显式在场）实际 {}",
+        items[0]
+    );
+    assert_eq!(items[0]["change_reason"], Value::Null);
+
+    // 反向钉：拿按主键拼号这类写法产生的键去筛必零命中——库里落的真是编号列而不是 id
+    let fabricated = format!("SO#{order_id}");
+    let (s_fake, v_fake) = call(
+        &app,
+        Method::GET,
+        &format!("/audit-logs?doc_no={fabricated}"),
+        &[("user-agent", LEG_UA_PC)],
+        None,
+    )
+    .await;
+    assert_eq!(s_fake, StatusCode::OK);
+    assert_eq!(
+        v_fake["data"]["total"].as_u64(),
+        Some(0),
+        "拼出来的号不得命中 一旦写腿改成用 id 造号本断言即失去判据 实际 {v_fake}"
+    );
+}
+
+/// 红冲腿：真打生产端点 POST /sales/orders/:id/deliveries/:delivery_id/cancel（取消发货）
+#[tokio::test]
+async fn production_reverse_endpoint_writes_real_delivery_no_and_reason() {
+    let db = setup_test_db().await;
+    let role_id = admin_role_id(&db).await;
+    let app = build_business_app(db.clone(), role_id);
+
+    let customer_id = seed_leg_customer(&db).await;
+    let order_no = "SO-LEG-REV-20261104-0008";
+    // 订单停在 approved：本用例只钉发货单那一行的维度，避免订单状态回退行掺进来
+    let order_id = seed_leg_order(&db, customer_id, order_no, so_status::APPROVED).await;
+    seed_warehouse(&db, 9).await;
+    let delivery_no = "DL-LEG-REV-20261104-0008";
+    let delivery_id = seed_leg_delivery(&db, order_id, customer_id, 9, delivery_no).await;
+
+    let reason = "客户要求整批改期 先冲销本批发货";
+    let (s, v) = call(
+        &app,
+        Method::POST,
+        &format!("/sales/orders/{order_id}/deliveries/{delivery_id}/cancel"),
+        &[
+            ("user-agent", LEG_UA_PC),
+            ("x-page-path", "/sales/delivery/detail"),
+        ],
+        Some(json!({"reason": reason})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "生产红冲端点应 200 实际 {v}");
+
+    let delivery = sales_delivery::Entity::find_by_id(delivery_id)
+        .one(&db)
+        .await
+        .unwrap()
+        .expect("发货单应仍在库");
+    assert_eq!(
+        delivery.status,
+        delivery_status::CANCELLED,
+        "红冲应把发货单写进 cancelled 终态 实际 {:?}",
+        delivery.status
+    );
+
+    let row = audit_log::Entity::find()
+        .filter(audit_log::Column::ResourceId.eq(delivery_id.to_string()))
+        .one(&db)
+        .await
+        .unwrap()
+        .expect("红冲应落发货单审计行");
+    assert_eq!(
+        row.doc_no.as_deref(),
+        Some(delivery_no),
+        "doc_no 必须是被冲销发货单的 delivery_no 而不是父订单号也不是拼号 实际 {:?}",
+        row.doc_no
+    );
+    assert_ne!(
+        row.doc_no.as_deref(),
+        Some(order_no),
+        "红冲腿登记的是本次真正操作的那张单 不得错填父订单号"
+    );
+    assert_eq!(
+        row.risk_flag.as_deref(),
+        Some(RISK_REVERSE),
+        "反向冲销腿 risk_flag 必须逐字符等于 REVERSE 实际 {:?}",
+        row.risk_flag
+    );
+    assert_eq!(
+        row.change_reason.as_deref(),
+        Some(reason),
+        "请求体带原因的腿要原样落库 不改写不截断 实际 {:?}",
+        row.change_reason
+    );
+
+    // 读侧：按 REVERSE 精筛只回高风险行，且每行标记逐字符等于 REVERSE
+    let (s_list, v_list) = call(
+        &app,
+        Method::GET,
+        "/audit-logs?risk_flag=REVERSE",
+        &[("user-agent", LEG_UA_PC)],
+        None,
+    )
+    .await;
+    assert_eq!(
+        s_list,
+        StatusCode::OK,
+        "按 REVERSE 精筛应 200 实际 {v_list}"
+    );
+    let items = v_list["data"]["items"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        !items.is_empty(),
+        "按 REVERSE 精筛应命中本用例的红冲行 实际 {v_list}"
+    );
+    for it in &items {
+        assert_eq!(
+            it["risk_flag"].as_str(),
+            Some(RISK_REVERSE),
+            "精筛 REVERSE 的每行标记都应等于 REVERSE 实际 {it}"
+        );
+    }
+    let leg = items
+        .iter()
+        .find(|it| it["resource_id"].as_str() == Some(delivery_id.to_string().as_str()))
+        .expect("结果里应有本次红冲行");
+    assert_eq!(leg["doc_no"].as_str(), Some(delivery_no));
+    assert_eq!(leg["change_reason"].as_str(), Some(reason));
 }
