@@ -705,9 +705,15 @@ const SEED_ROLE_EXTRA_PERMISSIONS: Record<string, string[]> = {
     'crm-leads:create',
     'crm-leads:update',
     'crm-leads:delete',
+    // 客户档案读面（GET /crm/customers 与 GET /crm/customers/enhanced 运行时同派生为
+    // customers:read；后端矩阵 sales_rep 在册持 ("customers","read")，见
+    // init_service_ops/permission.rs:657，前端 /customer 与 /crm-enhanced 路由门控同键）。
+    // salesperson 是 e2e 侧 CI 镜像岗（traversal/permission-model.ts::CI_MIRRORED_ROLES），
+    // 后端既无建角也无授权分组，其权限码闭合等于 SHELL + 本清单，故必须在此逐键对齐
+    // sales_rep 的读面，缺键即 RBAC 403，不会由后端同名角色矩阵带入。
+    'customers:read',
     // PII 按需揭示（POST /crm/customers/{id}/pii/reveal 运行时键 customers:reveal，
-    // 与后端 init 矩阵 sales_rep/crm_rep 及 m0086 存量补授三通道同口径；
-    // salesperson 为 sales_rep 的 CI/部署别名码，同 pieces:read 在册别名）
+    // 与后端 init 矩阵 sales_rep/crm_rep 及 m0086 存量补授三通道同口径）
     'customers:reveal',
     // 发货对话框第四维匹号候选来自 GET /inventory/pieces（与后端 permission.rs 的
     // sales_rep ("pieces","read") 同口径；只读，不授打印）
