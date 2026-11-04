@@ -40,7 +40,9 @@ pub async fn convert_dual_unit(
     // 验证单位参数
     let from_unit = req.from_unit.to_lowercase();
     if from_unit != "meters" && from_unit != "kg" {
-        return Err(AppError::validation_displayable("无效的单位，必须是 'meters' 或 'kg'"));
+        return Err(AppError::validation_displayable(
+            "无效的单位，必须是 'meters' 或 'kg'",
+        ));
     }
 
     // 执行换算
@@ -89,7 +91,11 @@ pub async fn convert_dual_unit(
         }
         // 分支穷尽兜底：单位已在入口校验，未知值只可能来自后续重构，
         // 此处不 panic，返回参数校验错误并外显原因。
-        _ => return Err(AppError::validation_displayable("无效的单位，必须是 'meters' 或 'kg'")),
+        _ => {
+            return Err(AppError::validation_displayable(
+                "无效的单位，必须是 'meters' 或 'kg'",
+            ));
+        }
     };
 
     Ok(Json(ApiResponse::success(result)))
