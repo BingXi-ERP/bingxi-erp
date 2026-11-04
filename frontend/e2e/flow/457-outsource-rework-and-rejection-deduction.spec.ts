@@ -54,6 +54,8 @@ import {
   expectDenied,
   expectStateGateRejection,
 } from './helpers';
+// 列表信封取数组的统一读法（回读生产匹与仓库列表用），与生产报工链同口径。
+import { pickListArray } from './ui-helpers';
 // 产品类型单源常量（与后端 product_type 词表同源）：建品夹具取值必须经成员引用。
 import { PRODUCT_TYPE } from '../../src/constants/product-type';
 
@@ -273,6 +275,7 @@ interface DraftOrder {
   orderNo: string;
   dyeLotNo: string;
   colorNo: string;
+  issueQuantity: string;
 }
 
 /**
@@ -345,7 +348,7 @@ async function createDraftOrder(
   );
   expectDecEquals(asDraft.processing_fee, decLiteral(opts.processingFee, '染费'), '染费落库回读');
   expect(Number(asDraft.supplier_id), '加工厂回读等于 ctx.supplierId').toBe(supplierId);
-  return { orderId, orderNo, dyeLotNo, colorNo };
+  return { orderId, orderNo, dyeLotNo, colorNo, issueQuantity: opts.issueQuantity };
 }
 
 /**
@@ -353,7 +356,125 @@ async function createDraftOrder(
  * 传给谁：outsourcing_handler::issue_outsourcing_order / record_processing →
  * services/outsourcing_ops/order.rs（仅 draft 可发料；发料落 OVIS 凭证）。
  */
+/**
+ * 选一个可放生产匹的非成品仓（发料门控要求明细引用 AVAILABLE 生产匹，
+ * 而生产匹按 validate_warehouse_for_piece_type 不得入成品仓）。
+ * 入参 page；传给谁 GET /warehouses 出参；存什么 不持久化，仅回读仓库列表取首个非成品仓 id。
+ */
+async function pickGreigeWarehouse(page: Page): Promise<number> {
+  const res = await apiCallRaw<unknown>(page, 'GET', '/warehouses?page=1&page_size=200');
+  const rows = pickListArray<Record<string, unknown>>(res, 'items', '生产匹入仓候选 /warehouses');
+  const row = rows.find(r => r.warehouse_type !== 'finished');
+  if (!row) {
+    throw new Error(
+      '[457] 无非成品仓可承载生产匹（发料前置），validate_warehouse_for_piece_type 会拒成品入胚布，链断显式判红'
+    );
+  }
+  return Number(row.id);
+}
+
+/**
+ * 自建一笔 AVAILABLE 生产匹，作为委外染整发料的真实前置（发料必须精确到匹）。
+ * 链路与生产报工写入方同源：生产订单 → 流转卡（schedule→备布→完成备布）→ 工序启动 → 报工逐匹入非成品仓，
+ * 再 GET /inventory/pieces 回读该匹确认为 AVAILABLE，取不到即判红（不兜底放行空明细）。
+ * 入参：productId 本用例自建产品、warehouseId 非成品仓、tag 归因、totalQuantity 单匹米数（等于订单发出量）。
+ * 传给谁：handlers 的生产订单/流转卡/工序报工与 GET /inventory/pieces；存哪里：production_orders、
+ *        flow_cards、inventory_piece（生产匹）。
+ */
+async function seedGreigePieceForIssue(
+  page: Page,
+  opts: { productId: number; warehouseId: number; tag: string; totalQuantity: string }
+): Promise<string> {
+  const { productId, warehouseId, tag, totalQuantity } = opts;
+  const productionOrderNo = genCode(`E457${tag}PO`);
+  const po = await apiCallRaw<Record<string, unknown>>(
+    page,
+    'POST',
+    '/production/production-orders/orders',
+    { order_no: productionOrderNo, product_id: productId, planned_quantity: totalQuantity }
+  );
+  const poId = requireId(po, `${tag} 生产订单`);
+
+  const card = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/production/flow-cards', {
+    production_order_id: poId,
+    product_id: productId,
+    product_name: `E2E委外返工${tag}胚布`,
+    planned_fabric_weight: totalQuantity,
+  });
+  const cardId = requireId(card, `${tag} 流转卡`);
+  await apiCall(page, 'POST', `/production/flow-cards/${cardId}/schedule`, {});
+  await apiCall(page, 'POST', `/production/flow-cards/${cardId}/start-preparing`);
+  await apiCall(page, 'POST', `/production/flow-cards/${cardId}/complete-preparing`, {
+    actual_fabric_weight: totalQuantity,
+  });
+
+  const step = await apiCallRaw<Record<string, unknown>>(
+    page,
+    'POST',
+    '/production/flow-cards/steps/start',
+    { flow_card_id: cardId }
+  );
+  const stepId = requireId(step, `${tag} 工序启动`);
+  const pieceNo = `GR-${genCode(`E457${tag}P`)}-001`;
+  await apiCall(page, 'POST', `/production/flow-cards/steps/${stepId}/complete`, {
+    actual_quantity: totalQuantity,
+    qualified_quantity: totalQuantity,
+    pieces: [
+      {
+        piece_no: pieceNo,
+        machine_no: `M-E457-${tag}`,
+        machine_operator: `E457开机人${tag}`,
+        length: totalQuantity,
+        weight: '50.25',
+        warehouse_id: warehouseId,
+      },
+    ],
+  });
+
+  const res = await apiCallRaw<unknown>(
+    page,
+    'GET',
+    `/inventory/pieces?piece_no=${encodeURIComponent(pieceNo)}&product_id=${productId}&warehouse_id=${warehouseId}&page=1&page_size=20`
+  );
+  const rows = pickListArray<Record<string, unknown>>(res, 'items', `${tag} 生产匹回读`);
+  const hit = rows.find(r => String(r.piece_no) === pieceNo);
+  if (!hit) {
+    throw new Error(
+      `[457] 报工逐匹后 GET /inventory/pieces 未命中生产匹 ${pieceNo}（实际匹号集=${
+        rows.map(r => r.piece_no).join(',') || '(空)'
+      }）——发料前置的匹不存在，链断，显式判红`
+    );
+  }
+  expect(String(hit.status), `生产匹 ${pieceNo} 入仓后状态应为 AVAILABLE`).toBe('AVAILABLE');
+  return pieceNo;
+}
+
 async function advanceToProcessing(page: Page, order: DraftOrder): Promise<void> {
+  // 发料前真实前置：自建一笔 AVAILABLE 生产匹并登记一条引用它的发料明细——
+  // 委外染整发料门控要求明细精确到匹且匹可用，空明细会被显式拒绝（防"空单也能推进 issued
+  // 并生成发料凭证"的静默数据完整性漏洞）。明细数量与单头发出量同源，逐字段取真实落库值。
+  const issueProduct = await ownProduct(page, `${order.orderNo.slice(-3)}I`);
+  const greigeWhId = await pickGreigeWarehouse(page);
+  const pieceNo = await seedGreigePieceForIssue(page, {
+    productId: issueProduct.id,
+    warehouseId: greigeWhId,
+    tag: order.orderNo.slice(-3),
+    totalQuantity: order.issueQuantity,
+  });
+  await apiCall(page, 'POST', '/production/outsourcing-orders/items', {
+    outsourcing_order_id: order.orderId,
+    product_id: issueProduct.id,
+    color_no: order.colorNo,
+    dye_lot_no: order.dyeLotNo,
+    batch_no: `B-${order.dyeLotNo}`,
+    warehouse_id: greigeWhId,
+    quantity: order.issueQuantity,
+    unit: '米',
+    unit_cost: '10',
+    piece_no: pieceNo,
+    remarks: `E2E-457 发料明细 ${order.orderNo}`,
+  });
+
   const issued = await apiCallRaw<Record<string, unknown>>(
     page,
     'POST',

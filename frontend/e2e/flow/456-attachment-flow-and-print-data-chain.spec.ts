@@ -9,6 +9,7 @@ import {
   apiCallRaw,
   apiCallExpectFail,
   deferCleanup,
+  ensureTestEntities,
   flushDeferredCleanups,
   loginViaUI,
   loginAsRole,
@@ -271,6 +272,9 @@ test.describe.serial('456 attachment flow and print data chain', () => {
   test.beforeEach(async ({ page }) => {
     test.setTimeout(180_000);
     await loginViaUI(page);
+    // 打印腿需按 ctx 的仓库/产品/加工厂建采购单，这些基础实体由 ensureTestEntities 自建或复用，
+    // 缺这一步则 ctx.warehouseIds/productIds/supplierId 为空，建单前置直接判红。
+    await ensureTestEntities(page);
   });
 
   // ─── 456-01 附件上传→回读→下载→删除→确认消失 ────────────────────────────
