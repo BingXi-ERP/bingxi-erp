@@ -350,7 +350,7 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       `阈值外差异必须为 1，实际 ${str(beyond.difference)}`
     ).toBeCloseTo(1, 6);
 
-    // 6) 边界 码单位在本换算端点不可达：from_unit=yards 走 bad_request 400 加 BAD_REQUEST
+    // 6) 边界 码单位在本换算端点不可达：from_unit=yards 走 validation_displayable 400 加 VALIDATION_ERROR
     const yardReject = await apiCallExpectFail(page, 'POST', '/convert', {
       value: 100,
       from_unit: 'yards',
@@ -358,13 +358,13 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       width_cm: WIDTH_CM,
     });
     expect(yardReject.status, `码换算在本端点必须 400，实际 ${yardReject.status}`).toBe(400);
-    expect(failureCode(yardReject)).toBe(APP_ERROR_CODES.BAD_REQUEST);
+    expect(failureCode(yardReject)).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
     expect(
       str(yardReject.message).includes('无效的单位'),
       `码拒绝必须外显单位原文，实际 ${str(yardReject.message)}`
     ).toBe(true);
 
-    // 7) 边界 克重非正：meters_to_kg 返回 Err 经 bad_request 外显
+    // 7) 边界 克重非正：meters_to_kg 返回 Err 经参数校验外显真实原因
     const badGram = await apiCallExpectFail(page, 'POST', '/convert', {
       value: METERS,
       from_unit: 'meters',
@@ -372,7 +372,7 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       width_cm: WIDTH_CM,
     });
     expect(badGram.status, `克重为 0 必须 400，实际 ${badGram.status}`).toBe(400);
-    expect(failureCode(badGram)).toBe(APP_ERROR_CODES.BAD_REQUEST);
+    expect(failureCode(badGram)).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
     expect(
       str(badGram.message).includes('克重必须大于 0'),
       `克重非法必须外显真实拒绝文案，实际 ${str(badGram.message)}`
@@ -386,7 +386,7 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       width_cm: 0,
     });
     expect(badWidth.status, `幅宽为 0 的自洽校验必须 400，实际 ${badWidth.status}`).toBe(400);
-    expect(failureCode(badWidth)).toBe(APP_ERROR_CODES.BAD_REQUEST);
+    expect(failureCode(badWidth)).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
     console.log('[452-01] 米↔公斤 双向换算守恒 + 阈值内外 + 单位/参数边界 全部回读通过');
   });
 
