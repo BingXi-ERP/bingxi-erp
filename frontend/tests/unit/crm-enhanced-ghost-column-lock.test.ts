@@ -103,9 +103,9 @@ const frontendKeys = tsInterfaceKeys(CRM_ENHANCED_SRC, 'CustomerWithTags');
 
 describe('增强客户列表幽灵聚合键形状锁（后端载体 ↔ 前端声明 ↔ 视图绑定）', () => {
   it('后端事实基准：端点行载荷 = crm_lead::Model 整行直序列化，出口不补键', () => {
-    // 服务层：分页元素是模型本体，信封 data 键直接装 Vec<crm_lead::Model>
+    // 服务层：分页元素是模型本体，PaginatedResponse 的 items 键直接装 Vec<crm_lead::Model>
     expect(LEAD_SERVICE_SRC).toContain('let items: Vec<crm_lead::Model> = paginator');
-    expect(LEAD_SERVICE_SRC).toMatch(/"data": items,/);
+    expect(LEAD_SERVICE_SRC).toMatch(/"items": items,/);
     // 路由处理层：增强列表复用同一 list_leads，之后仅套字段级掩码（只删键/改值，不补键）
     expect(ENHANCED_HANDLER_SRC).toContain('service.list_leads(query, Some(&data_scope_ctx))');
     expect(ENHANCED_HANDLER_SRC).toContain('apply_customer_field_permission');
