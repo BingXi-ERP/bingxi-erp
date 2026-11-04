@@ -1246,16 +1246,8 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
       .map(r => decFromRaw(r.freight_fee, '明细运费'))
       .reduce((acc, d) => decAdd(acc, d), decLiteral('0', '累加初值'));
     const orderHead = await readOrder(page, fixture.orderNo);
-    expectDecEquals(
-      orderHead.processing_fee,
-      sumItemFee,
-      '明细分摊加工费合计=单头'
-    );
-    expectDecEquals(
-      orderHead.freight_fee,
-      sumItemFreight,
-      '明细分摊运费合计=单头'
-    );
+    expectDecEquals(orderHead.processing_fee, sumItemFee, '明细分摊加工费合计=单头');
+    expectDecEquals(orderHead.freight_fee, sumItemFreight, '明细分摊运费合计=单头');
     // 四位小数分摊额本身的线格式：不得被截到两位（截了就会让上面的合计差在分位）
     for (const r of items) {
       expectDecScaleAtMost(r.processing_fee, 4, `明细 ${r.piece_no} 加工费(14,4)`);
@@ -2006,6 +1998,10 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
     );
     expect(finReceiptFail.status, '财务岗未授收回单读权必须 403').toBe(403);
     expect(failureCode(finReceiptFail), '财务岗越权读机器码').toBe(APP_ERROR_CODES.FORBIDDEN);
+
+    // 回到管理会话建岗：建岗要 roles 的 create 动作，而财务岗自建面只有读键，
+    // 留在财务岗会话里建岗会被权限中间件按无权限拒绝，与本用例既有的"建岗一律在管理会话"口径同构
+    await loginViaUI(page, testUsername(), testPassword(), true);
 
     // 仓管岗：按四维读回同一卷细码，米数与收回单同一事实（跨角色看到的是同一个数）
     const whRole = await makeRole(
