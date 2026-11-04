@@ -238,17 +238,31 @@ rust_decimal::Decimal` 15 处点名，另 24 条是在其结果上做推断的�
 annotations needed`（🏗️ Rust 后端构建与 📦 Rust 测试预编译同红）。
 
 落地的修法：新建 `backend/src/utils/decimal.rs::from_f64`，内部
-`Decimal::from_f64_retain(value).map(|d| d.round(8).normalize())`，刻度取 8 位（全仓最宽的
+`Decimal::from_f64_retain(value).map(|d| d.round_dp(8).normalize())`，刻度取 8 位（全仓最宽的
 业务 DECIMAL 是 `currencies.rate DECIMAL(20,8)`，比它更宽的小数位只可能是二进制尾数）；
 `normalize` 只剥尾零、scale 停在 0 就停，不会把 100.00 折成科学计数法，因此不破坏出参线格式。
 37 处站点（含 4 处 `and_then(Decimal::from_f64_rounded)` 函数引用形态与 1 处注释指涉）改为调它，
 非有限值仍返回 `None`，不改调用方原有的坏值分支。
 
+**这一版第一稿还错了一次**：写的是 `d.round(8)`，而 1.42.1 的 `round(&self)` 不收参数
+（它折到整数位），收位宽的是 `round_dp(dp)`——财务多处金额归一用的正是 `round_dp(2)`，
+仓内既有写法本可直接对照。CI 报 `error[E0061] this method takes 0 arguments but 1
+argument was supplied` 一处，🏗️ Rust 后端构建与 📦 Rust 测试预编译两枚 job 同源同红。
+
 **工具口径教训（同属"会造成本地支假红/假绿"一族）**：批量替换前必须先在**钉住的版本源码**里
 grep 目标符号是否存在，不能凭对上游 API 的记忆动手；`cargo fmt --check` 只解析不类型检查，
-这种错本地全绿、只有 CI 编译才暴露。另：等待器 `wait_pr.mjs` 参数是 `<pr> [max_polls] [interval_sec]`，
+这种错本地全绿、只有 CI 编译才暴露。核的时候**不能只核符号名存在，要核实参个数与返回值**——
+同一份 registry 源码里 `round` 与 `round_dp` 都存在，只 grep 名字会双双通过，而 `round(&self)`
+不收位宽；正解是把签名整行连同参数表一起读出来。仓内既有调用点也是免费的对照证据：
+`round_dp(2)` 在财务多处已在使用，替换前先 grep 一遍用法就能对上。
+另：等待器 `wait_pr.mjs` 参数是 `<pr> [max_polls] [interval_sec]`，
 把 commit sha 当第二参传进去会让 `for(i<NaN)` 一轮不跑、输出文件 0 字节却退 0——
 判定器零检测能力时的退出码不可信，读结论前先确认真的产出了行。
+
+同族第四条（判据作用面，本轮实测）：`rustfmt_repo_check.sh` 的第一参是**车道绝对路径**，
+缺省时回落 `lane_env` 的 `REPO_ROOT`。在车道目录里 `cd` 后不带参数执行，它检查的是主干根
+而不是车道，打印的 `root=` 会自曝这一点——`FMT_REPO_OK files=1882` 完全可能是在替别的树担保。
+**判法**：读门输出先核 `root=` 与文件数是否等于本车道，或直接把车道绝对路径作为第一参传进去。
 
 同族第三条（本轮实测，方向与既有记载相反）：本地 `rustfmt_repo_check.sh` 报 `FMT_REPO_OK`
 而 CI 的 🔧 Rust 格式检查 仍红。原因不是本地比 CI 新，而是**本地比 CI 旧**——CI 按
