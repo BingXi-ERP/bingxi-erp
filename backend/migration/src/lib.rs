@@ -23,6 +23,8 @@
 //!   → product_grade_vocab_check
 //!   → scan_receipt_grant
 //!   → piece_inventory_status_drop
+//!   → quotation_discount_gate
+//!   → quotation_discount_config_grant
 //!
 //! 迁移名: m_system_domain / m_business_domain / m_sales_crm_domain /
 //!         m_production_domain / m_finance_domain / m_v15_domain / m_rls_dept_domain /
@@ -211,6 +213,21 @@
 //! 36. piece_inventory_status_drop: 库存匹冗余库存状态列的探测式下线域（m0127），同 28 的
 //!    先后口径；该列是真相列 status 的照抄副本且全仓零读取方，探测到非空且与 status 不等的
 //!    行即 RAISE EXCEPTION 点名中止，不 UPDATE 不 DELETE，down 只回空壳不回填
+//! 37. quotation_discount_gate: 报价超折扣审批门数据地基域（m0129）——单行阈值配置表
+//!    quotation_discount_approval_configs（id 恒 1 + CHECK，建表即播种默认阈值，
+//!    ON CONFLICT DO NOTHING 使重跑只补行缺席、绝不把已配置值打回默认）与
+//!    sales_quotations.submitted_by 可空列（自审拦截的唯一可靠判据，域内不回填历史行、
+//!    绝不 UPDATE 造值）。依赖 sales_crm 建的 sales_quotations 与 system 建的 users，
+//!    置于链尾为新的顶层条目，复用库上也必然执行；down 撤本域新建的表与列，不触碰业务数据
+//! 38. quotation_discount_config_grant: 报价超折扣阈值配置面 quotation-discount-config 的
+//!    存量库补授通道（m0130）——读面四岗（sales_rep / sales_manager / gm / system_admin）补
+//!    read、写面两岗（gm / system_admin）补 update，与 init 矩阵授予面、
+//!    init_service.rs::PERMISSION_RESOURCES 的资源名登记、utils/path_utils.rs 的
+//!    ("quotations","discount-config") 消歧映射四通道逐字符同源（该键由
+//!    GET|PUT /api/v1/erp/quotations/discount-config 的模块前缀下第四段派生后消歧而得）。
+//!    按 roles.code 反查 id、NOT EXISTS 幂等、命中 0 角色以 NOTICE 点名不静默通过，
+//!    down 只按本域角色码与键配对回收；新建顶层域而不并入已应用域（复用库上整域跳过会让
+//!    补授永不执行），置于链尾必然执行且晚于承载它的 quotation_discount_gate
 
 pub use sea_orm_migration::prelude::*;
 
@@ -278,6 +295,11 @@ impl MigratorTrait for Migrator {
             Box::new(domain::scan_receipt_grant::Migration),
             // 库存匹冗余库存状态列探测式下线，同上一条口径：本支已摘除该列全部读写与实体字段
             Box::new(domain::piece_inventory_status_drop::Migration),
+            // 报价超折扣审批门数据地基：单行阈值配置表（建表即播种）+ 报价主表提交人列。
+            // 独立顶层域（并入已应用域会在复用库被整域跳过，建表与加列永不落地）
+            Box::new(domain::quotation_discount_gate::Migration),
+            // 报价超折扣阈值配置面的存量库补授通道（读面四岗、写面两岗），晚于上一域
+            Box::new(domain::quotation_discount_config_grant::Migration),
         ]
     }
 }
