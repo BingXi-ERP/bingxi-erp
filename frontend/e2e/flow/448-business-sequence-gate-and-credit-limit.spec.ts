@@ -270,9 +270,11 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
       productId: ctx.quotationProductId,
       productUnit: ctx.quotationProductUnit,
       taxRate: '0',
-      quantity: '1',
-      unitPrice: '1',
+      quantity: '2',
+      unitPrice: '75000.00',
     });
+    // 金额落在销售经理档（10 万到 50 万），提交必走 BPM 分支落 pending_approval；
+    // 低于 10 万由小额自批短路直接落 approved，与 40 报价全链走同一档位口径。
     const submitted = await apiCallRaw<Row>(page, 'POST', `/quotations/${good.id}/submit`);
     expect(String(submitted.status), '提交后进入待审批 pending_approval').toBe('pending_approval');
     const approved = await apiCallRaw<Row>(page, 'POST', `/quotations/${good.id}/approve`, {
@@ -639,7 +641,7 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
     expect(typeof qDetail.total_amount, '报价单 total_amount 出参必须是 string').toBe('string');
     const qGross = moneyScaled2(qDetail.total_amount, 'sales_quotations.total_amount');
     expect(qGross > 0n, '报价含税总额非零').toBe(true);
-    // 同一净额口径在报价与订单两条腿上必须算式一致：200.00（2×100 净额）
-    expect(divRound(qGross * 100n, 113n), '报价净额由除法反算，与订单腿同一口径').toBe(20000n);
+    // 报价头按含税口径录入（tax_inclusive 为真），净额只由除法反算：200.00 ÷ 1.13 = 176.99
+    expect(divRound(qGross * 100n, 113n), '报价净额由除法反算，与订单腿同一口径').toBe(17699n);
   });
 });
