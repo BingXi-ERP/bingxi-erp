@@ -88,6 +88,19 @@ async function createUserAndSeedLead(
   return { context, page, userId: me.id, leadId: created.data.id, leadNo };
 }
 
+/**
+ * 线索分页出参的列表数组定位：唯一信封 PaginatedResponse{items,total,page,page_size}
+ * （backend/src/services/crm/lead.rs 的 list_leads 产出）。取不到 items 数组就点名载荷
+ * 判红——兜底成空数组会把契约漂移伪装成"该行不可见"，让隔离与可见断言同时失去检测力。
+ */
+function leadRows<T extends { id: number }>(payload: { items: T[] }, who: string): T[] {
+  expect(
+    Array.isArray(payload.items),
+    `${who} 的 /crm/leads 出参缺 items 数组键，实际载荷 ${JSON.stringify(payload)}`
+  ).toBe(true);
+  return payload.items;
+}
+
 test.describe('数据范围行级隔离（self scope）', () => {
   test('self-01 不同 self 用户互不可见私有行', async ({ browser }) => {
     // User A: salesperson（data_scope=self，由 ensureRoleUsers 建角色默认 self）
@@ -103,12 +116,12 @@ test.describe('数据范围行级隔离（self scope）', () => {
       ).not.toBe(userB.userId);
 
       // User B 列表：不应看到 User A 的线索
-      const listB = await apiCallRaw<{ data?: Array<{ id: number; lead_no: string }> }>(
+      const listB = await apiCallRaw<{ items: Array<{ id: number; lead_no: string }> }>(
         userB.page,
         'GET',
         '/crm/leads?page=1&page_size=100'
       );
-      const itemsB = listB?.data ?? [];
+      const itemsB = leadRows(listB, 'User B');
       const aLeadInBList = itemsB.find(l => l.id === userA.leadId);
       expect(
         aLeadInBList,
@@ -116,12 +129,12 @@ test.describe('数据范围行级隔离（self scope）', () => {
       ).toBeUndefined();
 
       // User A 列表：应看到自己的线索
-      const listA = await apiCallRaw<{ data?: Array<{ id: number; lead_no: string }> }>(
+      const listA = await apiCallRaw<{ items: Array<{ id: number; lead_no: string }> }>(
         userA.page,
         'GET',
         '/crm/leads?page=1&page_size=100'
       );
-      const itemsA = listA?.data ?? [];
+      const itemsA = leadRows(listA, 'User A');
       const ownLeadInAList = itemsA.find(l => l.id === userA.leadId);
       expect(
         ownLeadInAList,
@@ -190,12 +203,12 @@ test.describe('数据范围行级隔离（self scope）', () => {
       expect(lead.owner_id).toBe(userA.userId);
 
       // 列表搜索也能看到（keyword 匹配 company_name 含前缀）
-      const list = await apiCallRaw<{ data?: Array<{ id: number }> }>(
+      const list = await apiCallRaw<{ items: Array<{ id: number }> }>(
         page,
         'GET',
         `/crm/leads?keyword=${encodeURIComponent('E2E-ADMIN-VIEW')}&page=1&page_size=50`
       );
-      const items = list?.data ?? [];
+      const items = leadRows(list, 'admin');
       const found = items.find(l => l.id === userA.leadId);
       expect(found, 'admin(all scope) 列表应包含 User A 的行').toBeDefined();
     } finally {

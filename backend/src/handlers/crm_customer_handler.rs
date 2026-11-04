@@ -186,15 +186,12 @@ pub async fn list_customers(
 
     // V15 P0-S01：提取行级数据权限上下文
     let data_scope_ctx = auth.to_data_scope_context();
-    let result = service.list_leads(query, Some(&data_scope_ctx)).await?;
-    // 增强页列表整行原文直出 = 同一份线索行在标准入口打码、本入口出原文的旁路，
-    // 收口到本文件客户侧唯一实现（裁定口径：增强页出参一致性优先——同页
-    // GET/:id、PUT、contacts 三形状统一走 resource_type=customer 权限行 +
-    // mask_customer_pii_defaults 默认掩码，不引用线索域 crm_lead 行配置，两域
-    // 权限判定语义不同不强行统一；掩码列集合仍全仓唯一 = utils/field_mask）。
-    let mut value = serde_json::to_value(result)?;
-    if let Some(list) = crate::handlers::crm_handler::paginated_list_array_mut(&mut value) {
-        apply_customer_field_permission(&state, auth.role_id, list).await;
+    // list_leads 的返回已是 serde_json::Value，直接取所有权（不做 to_value 序列化往返），
+    // 其分页信封为 PaginatedResponse{items,total,page,page_size}（utils/response.rs）
+    let mut value = service.list_leads(query, Some(&data_scope_ctx)).await?;
+    // 字段级权限：与线索列表/详情/公海出口复用同一个数组定位实现，本处不另写键名分支
+    if let Some(rows) = crate::handlers::crm_handler::paginated_list_array_mut(&mut value) {
+        apply_customer_field_permission(&state, auth.role_id, rows).await;
     }
     Ok(Json(ApiResponse::success(value)))
 }

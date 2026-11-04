@@ -12,8 +12,11 @@
 // 与可用量减少，同仓其它批次行分毫不动。
 // 五、盘点盘盈盘亏同单两腿。一张盘点单同时覆盖一行盘盈一行盘亏，差异一正一负分别落库，
 // 过账后两行库存分别精确落到实盘量，状态逐字符走 pending、in_review、completed 词表。
-// 六、反向防呆。出库量超过该批次行在架可用量必须被后端以 400 业务码拒绝且拒绝原因外显，
-// 被拒后库存数值与调拨单状态、明细已发量都不得出现半成品状态。
+// 六、反向防呆两腿。出库量超过该批次行在架可用量必须在建单期四维预检即被 400 业务码整笔拒掉
+// （预检只读不占用，失败回信封、无单据载荷、库存三列不动）；同批次两笔各按全额建单成功后，
+// 可用量被先发那笔占尽，后发那笔必须在发运事务内的扣减规划被拒，且被拒后调拨单状态、
+// 明细已发量与库存三列都不得出现半成品。两处库存不足拒绝均走 AppError::business 脱敏站点，
+// 出参文案钉固定常量、不断言外显差额（与本仓其它脱敏站点用例同一口径）。
 // 七、权限门。销售岗直连库存细码列表、详情、录入与盘点端点全部被 RBAC 拒绝，
 // 统一失败信封含机器码 FORBIDDEN，无权身份拿不到任何数据行，成本类字段随不可达行天然不外泄。
 //
@@ -60,6 +63,15 @@ function dims443(tag: string) {
     batchNo: `E2E-443-B${tag}`,
   };
 }
+
+/**
+ * AppError::business 脱敏站点的固定出参文案（backend/src/utils/messages.rs 的
+ * err_msg::BUSINESS_PUBLIC；真实拒绝原因只进后端日志，不外显给调用方）。
+ * 库存调拨的建单预检与出库扣减两处库存不足拒绝都走该站点（services/inv/stock.rs 的
+ * match_single_item_against_stocks 与 services/inv/batch.rs 的 insufficient_error），
+ * 因此本文件按固定常量钉住，不断言外显差额文案——与本仓其它脱敏站点用例同一口径。
+ */
+const SANITIZED_BUSINESS_MESSAGE = '业务处理失败';
 
 /** 读回响应里的一个键并转成数字，键缺席或非有限值直接抛错并点名主语，不用 ?? 0 掩盖缺键。 */
 function readNumber(obj: Record<string, unknown>, key: string, label: string): number {
@@ -618,7 +630,9 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
     console.warn(`443-T5 盘点两腿过账通过 count=${countId} 盈差=${gainDiff} 亏差=${lossDiff}`);
   });
 
-  test('反向防呆，超可用量出库被 400 业务码拒绝且无半成品状态', async ({ page }) => {
+  test('反向防呆，超可用量在建单预检即拒；出库期可用量被占尽同样被拒且无半成品', async ({
+    page,
+  }) => {
     const ctx = getCtx();
     const productId = ctx.productIds[0];
     const fromWarehouse = ctx.warehouseIds[0];
@@ -627,17 +641,62 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
     expect(fromWarehouse, '前置调出仓缺失').toBeTruthy();
     expect(toWarehouse, '前置第二个仓库缺失').toBeTruthy();
 
-    // 白坯行在架 40，出库开 45，超过可用量必须整笔被拒（白坯无跨缸回退通路）
-    const tag = genCode('R06');
-    const batchNo = `E2E-443-GB${tag}`;
+    // 腿一：建单期四维预检。白坯行在架 40，出库开 45 必须在 POST /inventory/transfers
+    // 这一笔即被整笔拒——预检由 services/inv/stock.rs 的 check_from_warehouse_inventory
+    // 在建单事务内、commit 之前调用（move::create_transfer），超量根本进不到审批与出库。
+    const overTag = genCode('R06A');
+    const overBatch = `E2E-443-GB${overTag}`;
     await seedGreigeStockIn(page, {
       productId: productId!,
       warehouseId: fromWarehouse!,
-      batchNo,
+      batchNo: overBatch,
       quantityMeters: '40',
     });
-    const before = await readStockByBatch(page, productId!, fromWarehouse!, batchNo);
-    const created = await apiCallRaw<Record<string, unknown>>(
+    const before = await readStockByBatch(page, productId!, fromWarehouse!, overBatch);
+    const rejectedCreate = await apiCallExpectFail(page, 'POST', '/inventory/transfers', {
+      from_warehouse_id: fromWarehouse,
+      to_warehouse_id: toWarehouse,
+      transfer_date: new Date().toISOString(),
+      notes: `E2E 超量出库防呆 ${overTag}`,
+      items: [{ product_id: productId, quantity: '45', batch_no: overBatch }],
+    });
+    expectBusinessRejection(rejectedCreate, `超可用量建单应被业务拒绝，批次 ${overBatch}`);
+    const createCode = failureCode(rejectedCreate);
+    expect(
+      createCode === APP_ERROR_CODES.BUSINESS_ERROR,
+      `库存不足拒绝的机器码应为 BUSINESS_ERROR，实际 code=${createCode ?? '(non-string)'} message=${rejectedCreate.message ?? '(none)'}`
+    ).toBe(true);
+    expect(
+      rejectedCreate.message,
+      `库存不足拒绝走脱敏站点，出参文案必须是固定常量，实际 message=${JSON.stringify(rejectedCreate.message)}`
+    ).toBe(SANITIZED_BUSINESS_MESSAGE);
+    // 失败信封不携带任何单据载荷：建单被拒即没有可继续流转的单据存在
+    expect(
+      rejectedCreate.data === undefined || rejectedCreate.data === null,
+      `被拒建单不得返回单据载荷，实际片段=${JSON.stringify(rejectedCreate).slice(0, 200)}`
+    ).toBe(true);
+    // 被拒后库存三个米/公斤口径列分毫不动（预检只读，拒绝整笔回滚）
+    const afterOver = await readStockByBatch(page, productId!, fromWarehouse!, overBatch);
+    for (const key of ['quantity_on_hand', 'quantity_available', 'quantity_meters']) {
+      expectQuantity(
+        readNumber(afterOver, key, '超量建单被拒后库存列'),
+        readNumber(before, key, '超量建单拒绝前库存列'),
+        `超量建单被拒不应改动 ${key}`
+      );
+    }
+
+    // 腿二：出库期可用量竞态（TOCTOU）。同批次两笔各按全额 40 建单都能过预检（预检只读、
+    // 不占用），先把乙单出尽，再发甲单就必须由发运事务内的扣减规划拒掉
+    // （services/inv/batch.rs 的 apply_ship_item_deduction 行锁 + plan_deduction），整笔回滚。
+    const raceTag = genCode('R06B');
+    const raceBatch = `E2E-443-GB${raceTag}`;
+    await seedGreigeStockIn(page, {
+      productId: productId!,
+      warehouseId: fromWarehouse!,
+      batchNo: raceBatch,
+      quantityMeters: '40',
+    });
+    const createdA = await apiCallRaw<Record<string, unknown>>(
       page,
       'POST',
       '/inventory/transfers',
@@ -645,58 +704,85 @@ test.describe('库存细码与卷号链、盘点反向腿', () => {
         from_warehouse_id: fromWarehouse,
         to_warehouse_id: toWarehouse,
         transfer_date: new Date().toISOString(),
-        notes: `E2E 超量出库防呆 ${tag}`,
-        items: [{ product_id: productId, quantity: '45', batch_no: batchNo }],
+        notes: `E2E 出库竞态甲单 ${raceTag}`,
+        items: [{ product_id: productId, quantity: '40', batch_no: raceBatch }],
       }
     );
-    const transferId = readNumber(created, 'id', '超量调拨建单');
-    await apiCall(page, 'POST', `/inventory/transfers/${transferId}/approve`, { approved: true });
-
-    const rejected = await apiCallExpectFail(
+    const transferAId = readNumber(createdA, 'id', '竞态甲单建单回显');
+    await apiCall(page, 'POST', `/inventory/transfers/${transferAId}/approve`, { approved: true });
+    const createdB = await apiCallRaw<Record<string, unknown>>(
       page,
       'POST',
-      `/inventory/transfers/${transferId}/ship`
+      '/inventory/transfers',
+      {
+        from_warehouse_id: fromWarehouse,
+        to_warehouse_id: toWarehouse,
+        transfer_date: new Date().toISOString(),
+        notes: `E2E 出库竞态乙单 ${raceTag}`,
+        items: [{ product_id: productId, quantity: '40', batch_no: raceBatch }],
+      }
     );
-    expectBusinessRejection(rejected, `超可用量出库应被业务拒绝，批次 ${batchNo}`);
-    const code = failureCode(rejected);
-    expect(
-      code === APP_ERROR_CODES.BUSINESS_ERROR,
-      `库存不足拒绝的机器码应为 BUSINESS_ERROR，实际 code=${code ?? '(non-string)'} message=${rejected.message ?? '(none)'}`
-    ).toBe(true);
-    // 拒因必须可读且外显（business_displayable 通道），点名出库量与可用量对比
-    expect(
-      String(rejected.message ?? '').includes('出库'),
-      `拒绝文案应外显出库对比，实际 message=${rejected.message ?? '(none)'}`
-    ).toBe(true);
+    const transferBId = readNumber(createdB, 'id', '竞态乙单建单回显');
+    await apiCall(page, 'POST', `/inventory/transfers/${transferBId}/approve`, { approved: true });
+    await apiCall(page, 'POST', `/inventory/transfers/${transferBId}/ship`);
+    const drained = await readStockByBatch(page, productId!, fromWarehouse!, raceBatch);
+    expectQuantity(
+      readNumber(drained, 'quantity_available', '乙单出库后可用量'),
+      0,
+      '乙单应把该批次可用量出尽，作为竞态前置'
+    );
 
-    // 被拒后无任何半成品：库存数值不动，单据停在 approved，明细已发量为 0
-    const after = await readStockByBatch(page, productId!, fromWarehouse!, batchNo);
-    expectQuantity(
-      readNumber(after, 'quantity_on_hand', '被拒后在库量'),
-      readNumber(before, 'quantity_on_hand', '被拒前在库量'),
-      '被拒出库不应改动在库量'
+    const rejectedShip = await apiCallExpectFail(
+      page,
+      'POST',
+      `/inventory/transfers/${transferAId}/ship`
     );
-    expectQuantity(
-      readNumber(after, 'quantity_available', '被拒后可用量'),
-      readNumber(before, 'quantity_available', '被拒前可用量'),
-      '被拒出库不应改动可用量'
+    expectBusinessRejection(
+      rejectedShip,
+      `可用量被竞态占尽后再次出库应被业务拒绝，批次 ${raceBatch}`
     );
-    expectQuantity(
-      readNumber(after, 'quantity_meters', '被拒后米数'),
-      readNumber(before, 'quantity_meters', '被拒前米数'),
-      '被拒出库不应改动米数'
+    const shipCode = failureCode(rejectedShip);
+    expect(
+      shipCode === APP_ERROR_CODES.BUSINESS_ERROR,
+      `出库期库存不足拒绝的机器码应为 BUSINESS_ERROR，实际 code=${shipCode ?? '(non-string)'} message=${rejectedShip.message ?? '(none)'}`
+    ).toBe(true);
+    expect(
+      rejectedShip.message,
+      `出库期库存不足拒绝同走脱敏站点，出参文案必须是固定常量，实际 message=${JSON.stringify(rejectedShip.message)}`
+    ).toBe(SANITIZED_BUSINESS_MESSAGE);
+
+    // 被拒后无任何半成品：库存三个米/公斤口径列停在竞态后的值，甲单停在 approved，明细已发量为 0
+    const afterRace = await readStockByBatch(page, productId!, fromWarehouse!, raceBatch);
+    for (const key of ['quantity_on_hand', 'quantity_available', 'quantity_meters']) {
+      expectQuantity(
+        readNumber(afterRace, key, '甲单被拒后库存列'),
+        readNumber(drained, key, '甲单被拒前库存列'),
+        `被拒出库不应改动 ${key}`
+      );
+    }
+    const detailA = await readTransferDetail(page, transferAId);
+    expect(String(detailA.status), '被拒后甲单应停在 approved，不得半推进 shipped').toBe(
+      'approved'
     );
-    const detail = await readTransferDetail(page, transferId);
-    expect(String(detail.status), '被拒后单据应停在 approved，不得半推进 shipped').toBe('approved');
-    const item = await readTransferItem(page, transferId, batchNo, '被拒后明细');
-    expectQuantity(readNumber(item, 'shipped_quantity', '被拒后已发量'), 0, '被拒后已发量应为 0');
+    const itemA = await readTransferItem(page, transferAId, raceBatch, '被拒后甲单明细');
+    expectQuantity(
+      readNumber(itemA, 'shipped_quantity', '被拒后甲单已发量'),
+      0,
+      '被拒后甲单已发量应为 0'
+    );
     tryCleanup(
       page,
       'DELETE',
-      `/inventory/transfers/${transferId}`,
-      `443 超量调拨单 ${transferId}`
+      `/inventory/transfers/${transferAId}`,
+      `443 竞态甲单 ${transferAId}`
     );
-    console.warn(`443-T6 超量出库防呆通过 拒码=${code}`);
+    tryCleanup(
+      page,
+      'DELETE',
+      `/inventory/transfers/${transferBId}`,
+      `443 竞态乙单 ${transferBId}`
+    );
+    console.warn(`443-T6 反向防呆两腿通过 建单拒码=${createCode} 出库拒码=${shipCode}`);
   });
 
   test('权限门，销售岗直连库存与盘点端点全部 403 且拿不到任何数据行', async ({ page, browser }) => {
