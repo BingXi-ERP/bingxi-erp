@@ -9,7 +9,10 @@ import {
   apiCallRaw,
   apiCallExpectFail,
   deferCleanup,
+  ensureTestEntities,
+  failureCode,
   flushDeferredCleanups,
+  getCtx,
   loginAsRole,
   loginViaUI,
   genCode,
@@ -34,8 +37,10 @@ import {
  * - GET `/crm/customers`、GET `/crm/customers/enhanced`、GET `/crm/customers/{id}/contacts`、
  *   GET `/crm/customers/export`、GET `/color-cards/issues`、GET `/color-cards/issues/export`、
  *   GET `/audit-logs/export`；
- * - POST `/export-approvals`、GET `/export-approvals`、GET `/export-approvals/{id}/token-once`、
- *   GET `/export-approvals/verify-token`、POST `/export-approvals/{id}/cancel`。
+ * - POST `/export-approvals`、GET `/export-approvals`、GET `/export-approvals/{id}`、
+ *   GET `/export-approvals/{id}/token-once`、GET `/export-approvals/verify-token`、
+ *   POST `/export-approvals/{id}/approve`、POST `/export-approvals/{id}/rotate-token`、
+ *   POST `/export-approvals/{id}/cancel`。
  *
  * 打印腿的出参与判据来源：`render_print_docx`（backend/src/handlers/print_handler.rs）先装配打印
  * 数据再解析模板布局，无可用默认模板行时 `resolve_print_docx_layout`
@@ -55,14 +60,25 @@ import {
  *   列表（`/crm/customers/enhanced`）、详情与同文件的 `list_contacts`
  *   （`/crm/customers/{id}/contacts`）都走它，故 contacts 子端点与客户列表同一分面；
  *   若实测 contacts 出原文即为旁路缺陷，由本文件的断言直接判红暴露，不做放宽。
+ * - 增强列表的行来自线索域（`create_customer` → `services/crm/lead.rs::create_lead`），
+ *   PII 列键因此是 `models/crm_lead.rs` 的 `mobile_phone`/`tel_phone`/`email`/`address`，
+ *   不是 `customers`/`customer_contacts` 的 `contact_phone`/`contact_email`；读错键等于按钮恒不可达级
+ *   的空断言。`/crm/customers/enhanced` 的出参是手写分页壳 `{items,total,page,page_size}`
+ *   （`list_leads`），承载键由 `crm-enhanced.ts` 的 `CustomerPage` 与 `check-api-envelope.mjs` 共同确认。
  * - `services/color_card_issue_service.rs` 的 `mask_cost_amount`：`handlers/color_card/issue.rs`
  *   在 `can_view_cost` 为假时把 `compensation_amount` 置 None（成本列剔除而非掩码，与 PII 列又是第三种形态）。
  *
- * 一次性令牌的事实来源：`handlers/export_approval_handler.rs` 的 `view_token_once` 首次回
- * `{available:true,token:<明文>}`，之后只回 `{available:false,fingerprint,message}` 且不再携带明文；
- * `services/export_approval_service.rs` 的 `verify_download_token` 走
- * `assert_token_consumable`，状态非 APPROVED 或已消费一律 `AppError::permission_denied`（HTTP 403 +
- * 机器码 FORBIDDEN）；同文件的 `masked_json` 把列表与详情的
+ * 一次性令牌的事实来源：`handlers/export_approval_handler.rs` 的 `view_token_once` 先过状态门——
+ * `services/export_approval_service.rs` 的 `view_token_once` 对非 approved 状态回
+ * `AppError::business_displayable`（HTTP 400 + 机器码 BUSINESS_ERROR，文案点名当前状态），
+ * 通过后首次回 `{available:true,token:<明文>}`，之后只回 `{available:false,fingerprint,message}`
+ * 且不再携带明文；`verify_download_token` 走 `assert_token_consumable`，只判定可消费性、不消费凭据，
+ * 令牌明文找不到或状态非 APPROVED 或已消费一律 `AppError::permission_denied`（HTTP 403 +
+ * 机器码 FORBIDDEN）；真正的一次性消费由导出腿的 `record_download` 落 consumed 终态
+ * （`build_export_approval_active` 把 max_downloads 签发即为 1）；`rotate_token` 换发即替换哈希列，
+ * 旧明文既不匹配哈希也不匹配明文回退分支；`cancel` 仅对 pending/pending_l2 放行（`is_pending_any`），
+ * 已批准或已消费的申请取消被 `AppError::business` 拒（出参脱敏，故只钉状态与机器码）；
+ * 同文件的 `masked_json` 把列表与详情的
  * `download_token`、`token_hash` 恒置 null。
  *
  * 失败信封断言一律钉 HTTP 码 + 字符串机器码 + trace_id/timestamp 在场（utils/error.rs 单一形状），
@@ -263,6 +279,8 @@ interface ContactRow {
   phone?: string | null;
   email?: string | null;
   address?: string | null;
+  mobile_phone?: string | null;
+  tel_phone?: string | null;
   [key: string]: unknown;
 }
 
@@ -339,10 +357,12 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     const queue: DeferredCleanup[] = [];
     const targetCode = genCode('P447TGT');
     const displayName = genName('P447TGT');
+    // kind 必须落 models/status/print.rs 的 print_target_kind 词表（cups/ipp/network/system_command），
+    // 且非池行要带该 kind 必需的连接字段：cups 要 queue_name（handlers/print_target_handler.rs 校验）。
     const created = await apiCallRaw<{ id: number }>(page, 'POST', '/print-targets', {
       target_code: targetCode,
       display_name: displayName,
-      kind: 'file',
+      kind: 'cups',
       queue_name: 'print447',
       enabled: true,
       default_copies: 1,
@@ -361,8 +381,27 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(str(hit!.display_name), '列表回显 display_name 必须等于写入值').toBe(displayName);
 
     const single = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/print-targets/${id}`);
-    expect(str(single.kind), '对象口 kind 必须回显写入值').toBe('file');
+    expect(str(single.kind), '对象口 kind 必须回显写入值').toBe('cups');
 
+    // 唯一性门的判据对象必须是「还在册的行」：载荷与正例同样合法（cups 加
+    // queue_name），否则它会因缺连接字段被拒，断言就打不到唯一性这条判据上。
+    const dup = await apiCallExpectFail(page, 'POST', '/print-targets', {
+      target_code: targetCode,
+      display_name: displayName,
+      kind: 'cups',
+      queue_name: 'print447',
+    });
+    expect(
+      [400, 409].includes(dup.status),
+      `在册行的同 target_code 重复建单必须被拒，实际 ${dup.status}`
+    ).toBe(true);
+    expect(failureCode(dup), `重复编码的机器码应为 VALIDATION_ERROR，实际 ${dup.code}`).toBe(
+      APP_ERROR_CODES.VALIDATION_ERROR
+    );
+    expect(
+      str(dup.message).includes('目标编码已存在'),
+      `拒绝原因必须是编码唯一性而不是缺连接字段，实际文案 ${str(dup.message)}`
+    ).toBe(true);
     const renamed = genName('P447TGT2');
     await apiCall(page, 'PUT', `/print-targets/${id}`, { display_name: renamed });
     const afterPut = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/print-targets/${id}`);
@@ -378,15 +417,33 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       `删除后目标列表仍含 ${id}，即假删除`
     ).toBe(false);
 
-    const dup = await apiCallExpectFail(page, 'POST', '/print-targets', {
+    // 删除腿是硬删（print_targets 无软删列），唯一键随行释放：同一 target_code
+    // 删后必须能重建并回读，且落在新主键上。这一条同时钉住两种失效形态——
+    // 「删除只置状态不释放唯一键」与「删除根本没写库」。
+    const rebuilt = await apiCallRaw<{ id: number }>(page, 'POST', '/print-targets', {
       target_code: targetCode,
       display_name: displayName,
-      kind: 'file',
+      kind: 'cups',
+      queue_name: 'print447',
     });
+    const rebuiltId = Number(rebuilt.id);
     expect(
-      [400, 409].includes(dup.status),
-      `同 target_code 重建必须被唯一性拒绝（本用例刚删同一行，若 200 说明删除只软删未释放唯一键），实际 ${dup.status}`
+      Number.isInteger(rebuiltId) && rebuiltId > 0,
+      `删后同 target_code 重建必须成功并回主键，实际 ${rebuilt.id}`
     ).toBe(true);
+    expect(rebuiltId, '重建行必须是新主键，不能复用已删行的 id').not.toBe(id);
+    deferCleanup(
+      queue,
+      'DELETE',
+      `/print-targets/${rebuiltId}`,
+      `print-target-rebuild-${rebuiltId}`
+    );
+    const afterRebuild = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/print-targets/${rebuiltId}`
+    );
+    expect(str(afterRebuild.target_code), '重建行必须可按新主键回读同一编码').toBe(targetCode);
     await flushDeferredCleanups(page, queue);
   });
 
@@ -414,15 +471,45 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     );
     console.warn(`[447] 打样申请 ${labId} 打印正文长度 ${labXml.length}，含申请号 ${labNo}`);
 
-    const coRows = rowsOf(
-      await apiCallRaw<unknown>(page, 'GET', '/custom-orders?page=1&page_size=20'),
-      '定制订单列表'
-    );
-    expect(coRows.length, '测试库必须至少有一条定制订单，否则打印腿无从取证').toBeGreaterThan(0);
-    const coId = Number(coRows[0].id);
-    const orderNo = str(coRows[0].order_no);
-    expect(Number.isInteger(coId) && coId > 0, `定制订单主键非法：${coRows[0].id}`).toBe(true);
-    expect(orderNo.length, `定制订单列表未回显 order_no，无法做真内容断言`).toBeGreaterThan(0);
+    // 打印腿的取证对象由本用例自建：库内是否恰好存在定制订单不是可信前置。
+    // 外键取 ensureTestEntities 备好的真实客户与产品（custom_orders 两列都是 NOT NULL 外键），
+    // order_no 由服务端取号（CreateCustomOrderDto 无该字段），断言只认响应回显的真实单号。
+    await ensureTestEntities(page);
+    const ctx = getCtx();
+    if (!ctx.customerId || !ctx.productIds[0]) {
+      throw new Error(
+        `447-3 前置不成立：ensureTestEntities 未产出客户/产品外键（${JSON.stringify({
+          customerId: ctx.customerId,
+          productIds: ctx.productIds,
+        })}），自建定制订单无从落库`
+      );
+    }
+    const co = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/custom-orders', {
+      customer_id: ctx.customerId,
+      product_id: ctx.productIds[0],
+      color_id: ctx.productColorIds[0],
+      spec: 'E2E 447 打印腿规格 40S 133x72 150cm',
+      quantity: 300,
+      unit: '米',
+      notes: `E2E 447 打印腿自建单 ${genCode('P447CO')}`,
+    });
+    const coId = Number(co.id);
+    expect(
+      Number.isInteger(coId) && coId > 0,
+      `自建定制订单必须回主键，实际 ${JSON.stringify(co)}`
+    ).toBe(true);
+    const orderNo = str(co.order_no);
+    // 本用例不留清理动作：定制订单的终结腿是 DELETE /custom-orders/{id}，实为 cancel_custom_order
+    // 且必须携带 reason 请求体，与本文件的延迟清理（无体）形状不兼容；行以唯一备注隔离，
+    // 取消腿本身的契约归 custom-order 域用例覆盖。
+    expect(
+      orderNo.length,
+      `建单响应必须回显服务端取号结果 order_no，实际 ${JSON.stringify(co)}`
+    ).toBeGreaterThan(0);
+    expect(
+      str(co.status),
+      '定制订单起点词值应为小写 draft（models/status/sales.rs 的 custom_order）'
+    ).toBe('draft');
     await printDocxWithRealContent(
       page,
       `/custom-orders/${coId}/print`,
@@ -437,21 +524,47 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
   test('447-4 导出脱敏按角色分面：admin 原文、业务员掩码并剔除 address 与成本列', async ({
     page,
   }) => {
+    const queue: DeferredCleanup[] = [];
+    // 前置由本用例自建：增强列表的行来自线索域（list_customers → list_leads → crm_lead::Model），
+    // 电话键是 mobile_phone/tel_phone、邮箱键是 email，不是 customers/customer_contacts 的
+    // contact_phone/contact_email；建单入参按 CreateLeadRequest 的契约字段名给（lead_source/lead_no
+    // 由服务端取号与缺省补齐），库里是否恰好有带电话的行不是可信前置。
+    const company = genName('P447CUST');
+    const createdCust = await apiCallRaw<ContactRow>(page, 'POST', '/crm/customers', {
+      company_name: company,
+      contact_name: `${company}联系人`,
+      mobile_phone: '13800001234',
+      tel_phone: '057488889999',
+      email: 'e2e447pick@example.com',
+      address: `${company}地址`,
+    });
+    const customerId = Number(createdCust.id);
+    expect(
+      Number.isInteger(customerId) && customerId > 0,
+      `自建带电话客户必须返回整数主键，实际 ${JSON.stringify(createdCust['id'])}`
+    ).toBe(true);
+    // 按 keyword 定位自建行：LeadQuery.keyword 由服务下推到 company_name/contact_name/
+    // mobile_phone/email 四列模糊匹配，用它才能与分页排序解耦地取到刚建的那一行。
     const adminRows = rowsOf(
-      await apiCallRaw<unknown>(page, 'GET', '/crm/customers/enhanced?page=1&page_size=50'),
+      await apiCallRaw<unknown>(
+        page,
+        'GET',
+        `/crm/customers/enhanced?page=1&page_size=50&keyword=${company}`
+      ),
       '客户增强列表(admin)'
     );
-    const withPhone = adminRows.find(
-      r => str(r.contact_phone).length > 0 || str(r.phone).length > 0
-    ) as ContactRow | undefined;
-    expect(withPhone, '测试库必须有带电话的客户行，否则脱敏分面无从取证').toBeTruthy();
-    const customerId = Number(withPhone!.id);
-    const rawPhone = str(withPhone!.contact_phone ?? withPhone!.phone);
+    const withPhone = adminRows.find(r => Number(r.id) === customerId);
+    expect(
+      withPhone,
+      `自建的带电话客户 ${customerId} 必须能在增强列表读回，否则脱敏分面无从取证`
+    ).toBeTruthy();
+    const rawPhone = str(withPhone!.mobile_phone);
+    expect(rawPhone, `admin 侧 mobile_phone 必须是建单原文，实际 ${rawPhone}`).toBe('13800001234');
     expect(
       rawPhone.includes('****'),
       `admin 侧客户列表必须出电话原文，实际被掩码为 ${rawPhone}`
     ).toBe(false);
-    const rawEmail = str(withPhone!.contact_email ?? withPhone!.email);
+    const rawEmail = str(withPhone!.email);
 
     const clist = rowsOf(
       await apiCallRaw<unknown>(page, 'GET', `/crm/customers/${customerId}/contacts`),
@@ -464,7 +577,11 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
 
     await loginAsRole(page, 'salesperson');
     const spRows = rowsOf(
-      await apiCallRaw<unknown>(page, 'GET', '/crm/customers/enhanced?page=1&page_size=50'),
+      await apiCallRaw<unknown>(
+        page,
+        'GET',
+        `/crm/customers/enhanced?page=1&page_size=50&keyword=${company}`
+      ),
       '客户增强列表(业务员)'
     );
     const spRow = spRows.find(r => Number(r.id) === customerId);
@@ -473,14 +590,14 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       description: `业务员数据范围可能不含客户 ${customerId}；不可见时改断言列表整体不含该行（越权可见才是缺陷）`,
     });
     if (spRow) {
-      const maskedPhone = str(spRow.contact_phone ?? spRow.phone);
+      const maskedPhone = str(spRow.mobile_phone);
       expect(
         /^\d{3}\*{4}\d{4}$/.test(maskedPhone),
-        `业务员侧 contact_phone 必须是 field_mask.rs 的前3+****+后4 形态，实际 ${maskedPhone}`
+        `业务员侧 mobile_phone 必须是 field_mask.rs 的前3+****+后4 形态，实际 ${maskedPhone}`
       ).toBe(true);
       expect(maskedPhone === rawPhone, '业务员侧不得等于 admin 原文').toBe(false);
       if (rawEmail.length > 0) {
-        const maskedEmail = str(spRow.contact_email ?? spRow.email);
+        const maskedEmail = str(spRow.email);
         expect(
           /^[^*]+\*{3}@.+$/.test(maskedEmail),
           `业务员侧 email 必须是 field_mask.rs 的首字母+***@域名 形态，实际 ${maskedEmail}`
@@ -538,28 +655,77 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       spAuditExport.includes(rawPhone),
       `业务员侧 /audit-logs/export 出参含客户电话原文 ${rawPhone}，审计导出腿未做同款掩码`
     ).toBe(false);
+
+    // 收尾：回收本用例自建的带电话客户行（增强路由的删除腿与建单腿同域），
+    // 全部脱敏分面断言已消费完该句柄，晚于此处不再有读取点。
+    deferCleanup(
+      queue,
+      'DELETE',
+      `/crm/customers/enhanced/${customerId}`,
+      `447 自建客户 ${customerId}`
+    );
+    await flushDeferredCleanups(page, queue);
   });
 
-  test('447-5 导出审批一次性令牌：二次查看不漏明文，未授权与作废令牌再用一律 403+FORBIDDEN', async ({
+  test('447-5 导出审批令牌腿：pending 不可取令牌，批准后明文仅一次，换发与消费后复用一律 403', async ({
     page,
   }) => {
     const queue: DeferredCleanup[] = [];
+    // estimated_rows=10 → 低风险 → 一级审批（assess_risk_level），一次 approve 即终审完成并签发令牌。
+    // export_params 取空对象：客户导出腿实际读取的维度只有 keyword/customer_type/status，本用例下载
+    // 不带任何筛选项，受理门把批准集合与请求集合逐维比对，批准侧多写一维即成差集。
     const created = await apiCallRaw<{ id: number; status?: string }>(
       page,
       'POST',
       '/export-approvals',
       {
         resource_type: 'customer',
-        export_params: { page: 1, page_size: 10, scene: 'e2e447' },
+        export_params: {},
         estimated_rows: 10,
-        file_format: 'csv',
+        file_format: 'xlsx',
       }
     );
     const id = Number(created.id);
     expect(Number.isInteger(id) && id > 0, `创建导出审批申请必须回主键，实际 ${created.id}`).toBe(
       true
     );
+    expect(str(created.status), '新建申请初始必须是 pending').toBe('pending');
     deferCleanup(queue, 'POST', `/export-approvals/${id}/cancel`, `export-approval-${id}`);
+
+    // 状态门：pending 时令牌尚未签发，查看令牌必须被拒且点名当前状态，拒绝不得产生状态跃迁
+    const pendingView = await apiCallExpectFail(page, 'GET', `/export-approvals/${id}/token-once`);
+    expect(pendingView.status, 'pending 状态查看令牌必须 400').toBe(400);
+    expect(pendingView.code, '状态门拒绝的机器码必须是 BUSINESS_ERROR').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
+    const pendingMsg = str(pendingView.message);
+    expect(pendingMsg.includes('仅已批准'), '拒绝原因必须点名仅已批准这道门').toBe(true);
+    expect(pendingMsg.includes('pending'), '拒绝原因必须点名当前状态').toBe(true);
+    expect(
+      str(pendingView.trace_id).length,
+      'AppError 单一失败信封必须带 trace_id'
+    ).toBeGreaterThan(0);
+    expect(
+      pendingView.timestamp !== undefined && pendingView.timestamp !== null,
+      'AppError 单一失败信封必须带 timestamp'
+    ).toBe(true);
+    const afterPendingView = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/export-approvals/${id}`
+    );
+    expect(str(afterPendingView.status), '取令牌被拒不产生状态跃迁').toBe('pending');
+
+    // 一级审批通过：approve 代理到 BPM 待办任务，低风险流程在此即终审完成并签发令牌
+    const approved = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      `/export-approvals/${id}/approve`,
+      { comments: 'e2e447 一级审批通过' }
+    );
+    expect(str(approved.status), '一级审批通过后必须进入 approved').toBe('approved');
+    expect(approved.download_token, '审批出参不得回显令牌明文').toBeNull();
+    expect(approved.token_hash, '审批出参不得回显令牌哈希').toBeNull();
 
     const first = await apiCallRaw<{ available?: boolean; token?: string; fingerprint?: string }>(
       page,
@@ -581,6 +747,10 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       `二次 token-once 必须 available=false（明文仅一次），实际 ${JSON.stringify(secondJson.data)}`
     ).toBe(false);
     expect(str(secondJson.data?.token).length, '二次 token-once 不得再携带 token 键的明文').toBe(0);
+    const secondData = secondJson.data;
+    expect(secondData, '二次 token-once 必须回 data 位').toBeTruthy();
+    const hasTokenKey = Object.prototype.hasOwnProperty.call(secondData!, 'token');
+    expect(hasTokenKey, '已查看分支不得再带 token 键').toBe(false);
     const secondText = JSON.stringify(secondJson);
     expect(
       secondText.includes(plaintext),
@@ -597,26 +767,65 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(row!.token_hash, '列表 token_hash 必须被 masked_json 置 null').toBeNull();
     expect(JSON.stringify(row).includes(plaintext), '列表行里不得出现明文令牌').toBe(false);
 
-    const pendingVerify = await apiCallExpectFail(
+    // 校验门只判定可消费性、不消费凭据：已批准且未消费的明文在此必须放行
+    const checked = await apiCallRaw<Record<string, unknown>>(
       page,
       'GET',
       `/export-approvals/verify-token?token=${encodeURIComponent(plaintext)}`
     );
-    expect(
-      pendingVerify.status,
-      `未批准的令牌用 verify-token 消费必须 403（状态非 APPROVED），实际 ${pendingVerify.status}`
-    ).toBe(403);
-    expect(pendingVerify.code, '失败体机器码必须是字符串 FORBIDDEN').toBe(
+    expect(str(checked.status), '已批准未消费的令牌在校验门必须放行').toBe('approved');
+    expect(checked.download_token, '校验门出参不得回显明文').toBeNull();
+    expect(checked.token_hash, '校验门出参不得回显哈希').toBeNull();
+
+    // 换发即作废旧明文：哈希列被整列替换，旧明文既不匹配哈希也不匹配明文回退分支
+    const rotated = await apiCallRaw<{ available?: boolean; token?: string }>(
+      page,
+      'POST',
+      `/export-approvals/${id}/rotate-token`
+    );
+    expect(rotated.available, '申请人本人重发令牌必须 available=true').toBe(true);
+    const rotatedToken = str(rotated.token);
+    expect(rotatedToken.length, '重发必须下发新的非空明文').toBeGreaterThan(0);
+    expect(rotatedToken === plaintext, '重发必须换发新明文，旧明文不得沿用').toBe(false);
+    const revoked = await apiCallExpectFail(
+      page,
+      'GET',
+      `/export-approvals/verify-token?token=${encodeURIComponent(plaintext)}`
+    );
+    expect(revoked.status, '被换发作废的旧明文再用必须 403').toBe(403);
+    expect(revoked.code, '作废令牌再用的机器码必须是 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
+
+    // 一次性消费由导出腿的 record_download 落终态（max_downloads 签发即为 1）
+    await assertExportNotDeadEnd(
+      page,
+      `/crm/customers/export?download_token=${encodeURIComponent(rotatedToken)}`,
+      '申请人本人持已批准令牌'
+    );
+    const readBack = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/export-approvals/${id}`
+    );
+    expect(str(readBack.status), '导出成功后申请必须落 consumed 终态').toBe('consumed');
+    expect(readBack.token_consumed, '导出成功后消费标记必须已置真').toBe(true);
+
+    // 消费成功后明文列与哈希列被清空，同一明文再也匹配不上任何一行——禁复用在此落地
+    const consumedReuse = await apiCallExpectFail(
+      page,
+      'GET',
+      `/export-approvals/verify-token?token=${encodeURIComponent(rotatedToken)}`
+    );
+    expect(consumedReuse.status, '消费后同一明文再用校验门必须 403').toBe(403);
+    expect(consumedReuse.code, '消费后复用的机器码必须是 FORBIDDEN').toBe(
       APP_ERROR_CODES.FORBIDDEN
     );
-    expect(
-      str(pendingVerify.trace_id).length,
-      'AppError 单一失败信封必须带 trace_id'
-    ).toBeGreaterThan(0);
-    expect(
-      pendingVerify.timestamp !== undefined && pendingVerify.timestamp !== null,
-      'AppError 单一失败信封必须带 timestamp'
-    ).toBe(true);
+    const secondExport = await apiCallExpectFail(
+      page,
+      'GET',
+      `/crm/customers/export?download_token=${encodeURIComponent(rotatedToken)}`
+    );
+    expect(secondExport.status, '消费后再次导出必须 403').toBe(403);
+    expect(secondExport.code, '再次导出的机器码必须是 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
 
     const bogus = await apiCallExpectFail(
       page,
@@ -626,19 +835,47 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(bogus.status, '不存在的令牌必须 403 而不是 500/404').toBe(403);
     expect(bogus.code, '不存在令牌的机器码必须是 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
 
-    await apiCall(page, 'POST', `/export-approvals/${id}/cancel`, {
-      comments: 'e2e447 作废后复用取证',
-    });
-    const reuse = await apiCallExpectFail(
+    // 一次性终态不可回退：已消费的申请取消被拒（该拒绝走脱敏 business，故只钉状态与机器码）
+    const cancelReject = await apiCallExpectFail(page, 'POST', `/export-approvals/${id}/cancel`);
+    expect(cancelReject.status, 'consumed 终态不可被取消改回在途').toBe(400);
+    expect(cancelReject.code, '取消被拒的机器码必须是 BUSINESS_ERROR').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
+    const afterCancel = await apiCallRaw<Record<string, unknown>>(
       page,
       'GET',
-      `/export-approvals/verify-token?token=${encodeURIComponent(plaintext)}`
+      `/export-approvals/${id}`
     );
-    expect(
-      reuse.status,
-      `已作废申请的同一令牌再用必须被拒（403），实际 ${reuse.status}——200 即一次性约束失守`
-    ).toBe(403);
-    expect(reuse.code, '作废后复用失败的机器码必须是 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
+    expect(str(afterCancel.status), '取消被拒不得改状态').toBe('consumed');
+
+    // 取消只对在途申请放行；作废后的申请永远取不到令牌——这是状态机里「作废」的真实形态
+    const secondReq = await apiCallRaw<{ id: number; status?: string }>(
+      page,
+      'POST',
+      '/export-approvals',
+      {
+        resource_type: 'customer',
+        export_params: {},
+        estimated_rows: 10,
+        file_format: 'xlsx',
+      }
+    );
+    const secondId = Number(secondReq.id);
+    expect(Number.isInteger(secondId) && secondId > 0, '第二枚申请必须回主键').toBe(true);
+    deferCleanup(queue, 'POST', `/export-approvals/${secondId}/cancel`, `approval-${secondId}`);
+    const cancelled = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      `/export-approvals/${secondId}/cancel`
+    );
+    expect(str(cancelled.status), '在途申请取消后必须落 cancelled').toBe('cancelled');
+    const cancelledView = await apiCallExpectFail(
+      page,
+      'GET',
+      `/export-approvals/${secondId}/token-once`
+    );
+    expect(cancelledView.status, '已作废申请查看令牌必须 400').toBe(400);
+    expect(cancelledView.code, '已作废申请取不到令牌').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
     await flushDeferredCleanups(page, queue);
   });
 

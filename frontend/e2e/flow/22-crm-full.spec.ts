@@ -26,7 +26,7 @@ import {
 } from './helpers';
 
 /**
- * 隔离会话的**原始**鉴权请求：返回完整响应体（非 apiCallExpectFail 的 {status,code,message} 窄形状），
+ * 隔离会话的**原始**鉴权请求：返回服务端原样响应体（与 apiCallExpectFail 一样不收窄），
  * 以便钉死统一失败信封的四键形状 {code,message,trace_id,timestamp}（utils/error.rs ErrorResponse）。
  * 写方法必须携带存活 CSRF token（后端 csrf.rs 一次性消费）；本函数在竞败时以有界重试复读
  * cookie 轮换后的新 token 重放一次——与 helpers 的 CSRF_RECOVERY 同策略。若重试后仍是 CSRF 中间件

@@ -151,23 +151,21 @@ impl AiExtendService {
             color_name: Set(dto.request.color_name.clone()),
             fabric_type: Set(dto.request.fabric_type.clone()),
             dye_type: Set(dto.request.dye_type.clone()),
-            recommended_temperature: Set(rust_decimal::Decimal::from_f64_retain(
+            recommended_temperature: Set(crate::utils::decimal::from_f64(
                 resp.recommended_params.temperature,
             )
             .unwrap_or_default()),
             recommended_time_minutes: Set(resp.recommended_params.time_minutes),
-            recommended_ph_value: Set(rust_decimal::Decimal::from_f64_retain(
+            recommended_ph_value: Set(crate::utils::decimal::from_f64(
                 resp.recommended_params.ph_value,
             )
             .unwrap_or_default()),
-            recommended_liquor_ratio: Set(rust_decimal::Decimal::from_f64_retain(
+            recommended_liquor_ratio: Set(crate::utils::decimal::from_f64(
                 resp.recommended_params.liquor_ratio,
             )
             .unwrap_or_default()),
             similar_cases: Set(resp.similar_cases as i32),
-            confidence: Set(
-                rust_decimal::Decimal::from_f64_retain(resp.confidence).unwrap_or_default()
-            ),
+            confidence: Set(crate::utils::decimal::from_f64(resp.confidence).unwrap_or_default()),
             source: Set(resp.source.clone()),
             reason: Set(Some(resp.reason.clone())),
             candidates_json: Set(Some(candidates_json)),
@@ -213,22 +211,22 @@ impl AiExtendService {
                 color_name: Set(dto.request.color_name.clone()),
                 fabric_type: Set(dto.request.fabric_type.clone()),
                 dye_type: Set(dto.request.dye_type.clone()),
-                recommended_temperature: Set(rust_decimal::Decimal::from_f64_retain(
+                recommended_temperature: Set(crate::utils::decimal::from_f64(
                     resp.recommended_params.temperature,
                 )
                 .unwrap_or_default()),
                 recommended_time_minutes: Set(resp.recommended_params.time_minutes),
-                recommended_ph_value: Set(rust_decimal::Decimal::from_f64_retain(
+                recommended_ph_value: Set(crate::utils::decimal::from_f64(
                     resp.recommended_params.ph_value,
                 )
                 .unwrap_or_default()),
-                recommended_liquor_ratio: Set(rust_decimal::Decimal::from_f64_retain(
+                recommended_liquor_ratio: Set(crate::utils::decimal::from_f64(
                     resp.recommended_params.liquor_ratio,
                 )
                 .unwrap_or_default()),
                 similar_cases: Set(resp.similar_cases as i32),
                 confidence: Set(
-                    rust_decimal::Decimal::from_f64_retain(resp.confidence).unwrap_or_default()
+                    crate::utils::decimal::from_f64(resp.confidence).unwrap_or_default()
                 ),
                 source: Set(resp.source.clone()),
                 reason: Set(Some(resp.reason.clone())),
@@ -471,19 +469,15 @@ impl AiExtendService {
             inspection_type: Set(resp.inspection_type.clone()),
             window_days: Set(resp.window_days),
             total_inspections: Set(resp.total_inspections),
-            avg_qualification_rate: Set(rust_decimal::Decimal::from_f64_retain(
+            avg_qualification_rate: Set(crate::utils::decimal::from_f64(
                 resp.avg_qualification_rate,
             )
             .unwrap_or_default()),
             trend: Set(trend_label.to_string()),
-            trend_rate: Set(
-                rust_decimal::Decimal::from_f64_retain(resp.trend_rate).unwrap_or_default()
-            ),
+            trend_rate: Set(crate::utils::decimal::from_f64(resp.trend_rate).unwrap_or_default()),
             risk_score: Set(resp.risk_score as i16),
             risk_level: Set(risk_label.to_string()),
-            confidence: Set(
-                rust_decimal::Decimal::from_f64_retain(resp.confidence).unwrap_or_default()
-            ),
+            confidence: Set(crate::utils::decimal::from_f64(resp.confidence).unwrap_or_default()),
             top_issues_json: Set(Some(top_issues_json)),
             recommendations_json: Set(Some(recommendations_json)),
             period_breakdown_json: Set(Some(period_breakdown_json)),

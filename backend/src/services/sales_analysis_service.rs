@@ -322,7 +322,7 @@ impl SalesAnalysisService {
     /// 口径（"实际额无法判定"，调用方出参渲染 null，禁止 0 兜底掩盖）；
     /// 稀疏桶缺失由 `sales_by_time` 语义决定，插 0 前已确认窗口覆盖该键。
     /// 金额线格式：复用点 Decimal 已固化为 f64（`dec_to_f64` 无损十进制字符串往返），
-    /// 此处以 `from_f64_retain` 还原后再按成交列 DECIMAL(14,2) 刻度定点，
+    /// 此处经 `utils::decimal::from_f64` 还原后再按成交列 DECIMAL(14,2) 刻度定点，
     /// 保持出参字符串线格式与库侧刻度一致。
     async fn fetch_actual_amounts(
         &self,
@@ -357,7 +357,7 @@ impl SalesAnalysisService {
                 .collect();
             for key in keys {
                 let amount = bucket_amounts.get(key.as_str()).copied().unwrap_or(0.0);
-                match Decimal::from_f64_retain(amount) {
+                match crate::utils::decimal::from_f64(amount) {
                     Some(d) => {
                         result.insert(key.clone(), d.round_dp(2));
                     }
@@ -602,7 +602,7 @@ impl SalesAnalysisService {
         // 本桶缺失 = 当月真无成交：真 0，不是"无法判定"
         let month_orders = cur.map(|p| p.order_count).unwrap_or(0);
         let month_amount = match cur {
-            Some(p) => match Decimal::from_f64_retain(p.total_amount) {
+            Some(p) => match crate::utils::decimal::from_f64(p.total_amount) {
                 Some(d) => d.round_dp(2),
                 // 仅非有限值（inf/nan 级数据损坏）可达：留痕后按 0 处理，
                 // 同桶成交额 0 ⇒ 毛利率走 None，处置与 fetch_actual_amounts 先例同法
@@ -622,8 +622,8 @@ impl SalesAnalysisService {
         let gross_profit_rate = match cur {
             Some(p) if p.total_amount > 0.0 => {
                 match (
-                    Decimal::from_f64_retain(p.profit_amount),
-                    Decimal::from_f64_retain(p.total_amount),
+                    crate::utils::decimal::from_f64(p.profit_amount),
+                    crate::utils::decimal::from_f64(p.total_amount),
                 ) {
                     (Some(profit), Some(amount)) => {
                         Some((profit / amount * Decimal::from(100)).round_dp(2))

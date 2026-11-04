@@ -389,7 +389,10 @@ function deepKeys(value: unknown, out: Set<string> = new Set()): string[] {
   return [...out];
 }
 
-/** 成本与进价类键名清单：本文件用它点名"读面不该带出的东西"，取值逐字符照后端列名 */
+/**
+ * 金额类键名清单：本文件用它点名"读面不该带出的东西"，取值逐字符照后端列名。
+ * 只收列本身携带金额的列名；指向价格记录的外键 ID 列不含任何金额，不入此列。
+ */
 const COST_KEYS = [
   'dye_cost',
   'auxiliary_cost',
@@ -397,7 +400,6 @@ const COST_KEYS = [
   'base_price',
   'cost_price',
   'purchase_price',
-  'product_color_price_id',
 ] as const;
 
 /**
@@ -894,6 +896,8 @@ test.describe('色卡与样品打样主链', () => {
       );
       expectPermissionGateRejection(outsiderWrite, '业务员岗（无化验室打样授权键）建打样通知单');
 
+      // 建单即 pending，后端只允许 sampling 状态挂小样，先推 pending → sampling 再建样。
+      await apiCallRaw<unknown>(sampler.page, 'POST', `${LD}/requests/${requestId}/start-sampling`);
       await createLabDipSample(sampler.page, requestId, {
         recipe_no: genCode('R440A'),
         formula: '活性红 3BS 2%(o.w.f)',
@@ -1196,7 +1200,7 @@ test.describe('色卡与样品打样主链', () => {
       for (const key of COST_KEYS) {
         expect(
           detailKeys,
-          `色卡与色号读面的响应体不应携带成本或价格列 ${key}（色卡读面不涉价）`
+          `色卡详情读面的响应体不应携带金额列 ${key}（色卡读面不出金额）`
         ).not.toContain(key);
       }
 
@@ -1228,6 +1232,7 @@ test.describe('色卡与样品打样主链', () => {
     }
 
     await tryCleanup(page, 'DELETE', `${CC}/${cardId}`, '归档本次新建色卡（跨角色腿）');
+    // 已知缺口：按色号扫码面的出参 ScanResult.price_summary.base_price 确实带金额（后端 models/color_card_response_dto.rs 的 PriceSummary），本用例对它零断言，需另开专项钉扫码读面的金额可见性口径。
   });
 
   test('440-05 时序门控：无小样不可送确认、版数与版本标识受限、未确认不可复样、未通过不可开卡，且拒绝零写入', async ({

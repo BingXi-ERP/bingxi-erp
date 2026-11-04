@@ -1738,7 +1738,9 @@ export async function apiCallExpectFail(
     await syncCsrfFromResponse(page, response, url);
   }
 
-  return { status: response.status(), code: json.code, message: json.message };
+  // 失败体原样回传：统一信封的 code/message/trace_id/timestamp 四键都要能被调用方读到，
+  // 在此按三键收窄会让信封形状判据永不成立。
+  return { status: response.status(), ...json };
 }
 
 const LOGGED_IN = { done: false };

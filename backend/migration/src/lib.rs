@@ -23,6 +23,7 @@
 //!   → product_grade_vocab_check
 //!   → scan_receipt_grant
 //!   → piece_inventory_status_drop
+//!   → piece_length_scale_widen
 //!
 //! 迁移名: m_system_domain / m_business_domain / m_sales_crm_domain /
 //!         m_production_domain / m_finance_domain / m_v15_domain / m_rls_dept_domain /
@@ -211,6 +212,14 @@
 //! 36. piece_inventory_status_drop: 库存匹冗余库存状态列的探测式下线域（m0127），同 28 的
 //!    先后口径；该列是真相列 status 的照抄副本且全仓零读取方，探测到非空且与 status 不等的
 //!    行即 RAISE EXCEPTION 点名中止，不 UPDATE 不 DELETE，down 只回空壳不回填
+//! 37. piece_length_scale_widen: 库存匹米数列扩位域（m0128）——inventory_piece.length 建表为
+//!    DECIMAL(12,2)，production 域以 `ADD COLUMN IF NOT EXISTS "length" DECIMAL(18,4)` 意图对齐
+//!    计量口径但对已存在列恒为 no-op，从未生效；收回确认把 return_quantity（DECIMAL(14,4)）
+//!    原值写入本列，两位列库侧把 190.475 舍成 190.48，与收回单收回数量逐分对不平。本域把列型
+//!    真正扩到 DECIMAL(18,4)（无损不改存量值），两腿出参同为四位小数；已是 ≥4 位或列不存在时
+//!    NOTICE 跳过可重跑，down 探测小数位多于两位的行命中即 RAISE EXCEPTION 不截断，域内绝不
+//!    UPDATE/DELETE。置于链尾为新的顶层条目（并入已应用域会被台账整体跳过、扩位永不执行），
+//!    依赖 business 建表与 production 补列早于本域
 
 pub use sea_orm_migration::prelude::*;
 
@@ -278,6 +287,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::scan_receipt_grant::Migration),
             // 库存匹冗余库存状态列探测式下线，同上一条口径：本支已摘除该列全部读写与实体字段
             Box::new(domain::piece_inventory_status_drop::Migration),
+            // 库存匹米数列扩位到 DECIMAL(18,4)，链尾独立域（建表与加列均早于本域，复用库上必然执行）
+            Box::new(domain::piece_length_scale_widen::Migration),
         ]
     }
 }

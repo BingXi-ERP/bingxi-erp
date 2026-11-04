@@ -562,7 +562,7 @@ impl AiQualityReconciliationService {
                 let p_f = p.to_f64().unwrap_or(0.0);
                 let r_f = r.to_f64().unwrap_or(0.0);
                 if p_f + r_f > 0.0 {
-                    Decimal::from_f64_retain(2.0 * p_f * r_f / (p_f + r_f))
+                    crate::utils::decimal::from_f64(2.0 * p_f * r_f / (p_f + r_f))
                 } else {
                     None
                 }

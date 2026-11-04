@@ -72,7 +72,7 @@ import { pickListArray } from './ui-helpers';
 
 type Row = Record<string, unknown>;
 
-/** DECIMAL 线格式（字符串/数字）折成整数分位；超出 scale 且非零尾数即判红，不做静默截断 */
+/** DECIMAL 线格式（字符串/数字）折成整数分位；宽于 scale 的尾数必须全为零才截，出现非零即判红，不静默丢精度 */
 function toScaled(v: unknown, scale: number, label: string): bigint {
   const s = typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '';
   if (s === '') throw new Error(`${label}：Decimal 出参非 string|number，raw=${JSON.stringify(v)}`);
@@ -82,7 +82,7 @@ function toScaled(v: unknown, scale: number, label: string): bigint {
   if (frac.length > scale && frac.slice(scale).replace(/0+$/, '') !== '') {
     throw new Error(`${label}：出参标度超出分位精度且非零，raw="${s}"`);
   }
-  const padded = (intPart + frac).padEnd(intPart.length + scale, '0');
+  const padded = (intPart + frac.slice(0, scale)).padEnd(intPart.length + scale, '0');
   const value = BigInt(padded);
   return sign === '-' ? -value : value;
 }
