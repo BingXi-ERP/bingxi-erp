@@ -227,6 +227,29 @@ development（`.github/workflows/ci-cd.yml` 的 1929／3128／3601／3915 行与
 同族一条已修：448 建报价把 `quotation_date` 发成完整 ISO 时间戳被 `NaiveDate` 拒为缺必填字段
 （与 D-39 同因，属新增用例回潮）。
 
+## D-54 补记：首版修法是虚构 API，落地的修法换了
+
+登记 D-54 时给的修法是"把 `Decimal::from_f64_retain` 机械换成 `Decimal::from_f64_rounded`，
+两者签名同为 `Option<Decimal>`"。这个前提是**错的**：`Cargo.lock` 钉的是 rust_decimal 1.42.1，
+本地 registry 源码 `src/decimal.rs` 里只有 `from_f64_retain`（1900 行）与 `round`（1462 行），
+**没有 `from_f64_rounded`**。按那条口径改完 36 处，主干构建 job 当场报 39 条错——
+`error[E0599] no function or associated item named 'from_f64_rounded' found for struct
+rust_decimal::Decimal` 15 处点名，另 24 条是在其结果上做推断的站点级联 `E0282 type
+annotations needed`（🏗️ Rust 后端构建与 📦 Rust 测试预编译同红）。
+
+落地的修法：新建 `backend/src/utils/decimal.rs::from_f64`，内部
+`Decimal::from_f64_retain(value).map(|d| d.round(8).normalize())`，刻度取 8 位（全仓最宽的
+业务 DECIMAL 是 `currencies.rate DECIMAL(20,8)`，比它更宽的小数位只可能是二进制尾数）；
+`normalize` 只剥尾零、scale 停在 0 就停，不会把 100.00 折成科学计数法，因此不破坏出参线格式。
+37 处站点（含 4 处 `and_then(Decimal::from_f64_rounded)` 函数引用形态与 1 处注释指涉）改为调它，
+非有限值仍返回 `None`，不改调用方原有的坏值分支。
+
+**工具口径教训（同属"会造成本地支假红/假绿"一族）**：批量替换前必须先在**钉住的版本源码**里
+grep 目标符号是否存在，不能凭对上游 API 的记忆动手；`cargo fmt --check` 只解析不类型检查，
+这种错本地全绿、只有 CI 编译才暴露。另：等待器 `wait_pr.mjs` 参数是 `<pr> [max_polls] [interval_sec]`，
+把 commit sha 当第二参传进去会让 `for(i<NaN)` 一轮不跑、输出文件 0 字节却退 0——
+判定器零检测能力时的退出码不可信，读结论前先确认真的产出了行。
+
 ## 附带一条工具口径（不算缺陷，会造成本地支假红）
 
 本地 `rustfmt 1.8.0-stable` 对 `use axum::http::{Request, header}` 报"应改成 `{header, Request}`"，而这一行与 `origin/main` 逐字节相同且主干该 job 绿。CI 钉的是旧 toolchain，导入排序规则不同。**判法**：本地格式门点名时先 `git show origin/main:<path>` 比同一段，主干同一写法就不要"顺手修"——按本地版重排会把 CI 根本不要求的改动混进为消红那一笔，制造无关 churn。
