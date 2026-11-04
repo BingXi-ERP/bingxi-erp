@@ -950,6 +950,10 @@ impl SalesReturnService {
             reorder_point: Set(Decimal::ZERO),
             max_stock_point: Set(Decimal::ZERO),
             reorder_quantity: Set(Decimal::ZERO),
+            // 补货策略是 NOT NULL 且 SeaORM 插入不回填库端默认，取值与建库存主路径同为订货点法
+            replenishment_strategy: Set(
+                crate::models::inventory_stock::REPLENISHMENT_REORDER_POINT.to_string(),
+            ),
             // 状态两列取值来自写入方词表；可用量与可出库筛选按"合格"过滤，
             // 写其它值会让本行对所有可用性查询永久不可见
             stock_status: Set(
