@@ -62,6 +62,7 @@ import {
   apiCall,
   apiCallRaw,
   apiCallExpectFail,
+  API_PREFIX,
   ensureTestEntities,
   failureCode,
   genCode,
@@ -768,8 +769,19 @@ test.describe('40 报价单多角色审批流转', () => {
             // 连返回按钮都不会渲染（views/quotations/detail.vue 的 loadData 失败分支）。
             // 因此先显式等这次报价详情 GET 并点名状态码，把"读面被行级数据范围门挡"
             // 与"按钮本身缺失"两种红分开，而不是让 15s 超时替两者一起背锅。
+            // 等待判据必须按 pathname 精确等于 API 详情路径：同一次导航里浏览器文档请求
+            // /quotations/{id} 也回 200，宽松子串匹配会被它抢先命中，后续按钮定位就只能超时；
+            // 精确等式同时排除 /quotations/{id}/terms 等子路径，非 200 不跳过、原样交给下方断言点名。
+            const detailPathname = `${API_PREFIX}/quotations/${quotationId}`;
             const detailRead = session.page.waitForResponse(
-              r => r.request().method() === 'GET' && r.url().includes(`/quotations/${quotationId}`),
+              r => {
+                if (r.request().method() !== 'GET') return false;
+                try {
+                  return new URL(r.url()).pathname === detailPathname;
+                } catch {
+                  return false;
+                }
+              },
               { timeout: 15000 }
             );
             await safeGoto(session.page, `/quotations/${quotationId}`);
