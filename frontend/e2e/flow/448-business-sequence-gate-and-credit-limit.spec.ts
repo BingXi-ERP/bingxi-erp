@@ -127,7 +127,7 @@ async function seedQuotation(
   const created = await apiCall<Row>(page, 'POST', '/quotations', {
     customer_id: args.customerId,
     sales_user_id: args.salesUserId,
-    quotation_date: new Date().toISOString(),
+    quotation_date: new Date().toISOString().split('T')[0],
     valid_until: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
     currency: 'CNY',
     exchange_rate: '1',
