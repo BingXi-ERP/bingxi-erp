@@ -131,8 +131,16 @@ async function tryCleanup(
   path: string,
   label: string
 ): Promise<void> {
-  const res = await apiCall(page, method, path);
-  console.log(`[430-cleanup] ${label} ${method} ${path} => status=${res.code}`);
+  try {
+    const res = await apiCall(page, method, path);
+    console.log(`[430-cleanup] ${label} ${method} ${path} => status=${res.code}`);
+  } catch (e) {
+    // apiCall 对非 2xx 抛错。清理腿的失败在这里点名原文，不静默、也不改成判负：
+    // 删除门与引用守门本身的判据写在用例正文里，不由这条腿兜绿。
+    console.warn(
+      `[430-cleanup] ${label} ${method} ${path} => 清理未成功，登记原文：${(e as Error).message}`
+    );
+  }
 }
 
 /** 金额列是 DECIMAL 线格式（出参字符串），判据按数值等值比对，不做四舍五入也不放宽阈值 */
@@ -623,7 +631,6 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
   test('430-06 删除腿只放草稿：非草稿删除被拒且行仍在，草稿删除成功且按主键读回 404，收尾清理不留悬挂行', async ({
     page,
   }) => {
-    expect(recDraft, '前置更新腿未产出草稿行 id，本条无法归因').toBeGreaterThan(0);
     expect(recMain, '前置主链行缺失，本条无法归因').toBeGreaterThan(0);
 
     // 删除门：closed 行不可删
@@ -645,24 +652,74 @@ test.describe.serial('430 应收对账单自助确认与状态门全链回读', 
       `被拒删除后状态漂移：${describeRow('回读', stillThere)}`
     ).toBe('closed');
 
+    // 草稿行由本用例自建自删，不借用更新腿那行：同一分片内有按列表首行开单的 UI 腿，
+    // 会把别处刚建的草稿推成非草稿，借行会让本条的拒绝归因落到旁观动作上。
+    const ownDraft = await apiCallRaw<ReconRow>(page, 'POST', '/ar-reconciliations', {
+      reconciliation_no: `AR430-${tag}-DEL06`,
+      customer_id: customerId,
+      customer_name: customerName,
+      period_start: PERIOD_START,
+      period_end: PERIOD_END,
+      opening_balance: 1.5,
+      total_invoices: 1.0,
+      total_collections: 0.5,
+    });
+    const ownDraftId = Number(ownDraft.id);
+    expect(ownDraftId, `自建草稿行未返回主键：${describeRow('建草稿', ownDraft)}`).toBeGreaterThan(
+      0
+    );
+    const draftGate = await apiCallRaw<ReconRow>(page, 'GET', `/ar-reconciliations/${ownDraftId}`);
+    expect(
+      draftGate.reconciliation_status,
+      `删除腿的前置必须是草稿行，非草稿即说明有旁路动作改写了本用例的行：${describeRow(
+        '删前',
+        draftGate
+      )}`
+    ).toBe('draft');
+
     // 草稿行可删，删后按主键读回必须 404（真删，不是软标记）
-    const deleted = await apiCall(page, 'DELETE', `/ar-reconciliations/${recDraft}`);
+    const deleted = await apiCall(page, 'DELETE', `/ar-reconciliations/${ownDraftId}`);
     expect(deleted.code, `草稿行删除未成功：实际 code=${deleted.code}`).toBe(200);
-    const gone = await apiCallExpectFail(page, 'GET', `/ar-reconciliations/${recDraft}`);
+    const gone = await apiCallExpectFail(page, 'GET', `/ar-reconciliations/${ownDraftId}`);
     expect(gone.status, `删除后按主键读回未判 404：实际 status=${gone.status}`).toBe(404);
     expect(failureCode(gone), `删除后读回的机器码非 NOT_FOUND：实际 code=${gone.code}`).toBe(
       APP_ERROR_CODES.NOT_FOUND
     );
 
-    // 终态收敛：争议行取消后留在 cancelled，主链行留在 closed，两条均无删除端点可用（删除门只放草稿），
-    // 因此不悬挂 draft/sent/confirmed；载体客户 best-effort 删除，失败只登记不判负。
-    await tryCleanup(
-      page,
-      'DELETE',
-      `/ar-reconciliations/${recDispute}`,
-      'reconciliation_disputed'
-    );
-    await tryCleanup(page, 'DELETE', `/ar-reconciliations/${recMain}`, 'reconciliation_closed');
+    // 收尾按状态分路：该域唯一的删除面是 DELETE /ar-reconciliations/{id}
+    // （route-snapshot.txt:9 delete_reconciliation），受"只有草稿可删"的状态门约束——这条门已由
+    // 本用例上半段钉成判据，所以非草稿行一律不发起 DELETE，改核它确实停在本域合法终止面上。
+    // 争议行经 disputed→cancelled（PUT /{id}/status 白名单）落在 cancelled，主链行走完
+    // send→confirm→close 落在 closed：两者都是该域在册的终态，不悬挂 draft/sent/confirmed/disputed
+    // 这些还能被继续操作的中间态。该域对非草稿行没有 cancel/void/红冲 之外的删除面，
+    // 终态行按业务留档，不产出会被误当活单的残行。
+    if (!recDispute) {
+      throw new Error('前置不成立：争议腿未产出争议行，收尾无法核对终止面');
+    }
+    const disputeFinal = await apiRawStatus(page, `/ar-reconciliations/${recDispute}`);
+    expect(
+      disputeFinal,
+      `争议行收尾前应落在该域合法终止面 cancelled（非草稿不发起删除），实际 ${disputeFinal}`
+    ).toBe('cancelled');
+    const mainFinal = await apiRawStatus(page, `/ar-reconciliations/${recMain}`);
+    expect(
+      mainFinal,
+      `主链行收尾前应落在该域合法终止面 closed（非草稿不发起删除），实际 ${mainFinal}`
+    ).toBe('closed');
+
+    // 更新腿留下的草稿行按当前状态分路：同分片内有把草稿推离草稿态的旁路动作，
+    // 仍是草稿才回收，被推走则点名状态并跳过，绝不把删除门的 400 当成清理成功。
+    const draftFinal = await apiRawStatus(page, `/ar-reconciliations/${recDraft}`);
+    if (draftFinal === 'draft') {
+      await tryCleanup(page, 'DELETE', `/ar-reconciliations/${recDraft}`, 'reconciliation_draft');
+    } else {
+      console.log(
+        `[430-cleanup] reconciliation_draft ${recDraft} 当前状态=${draftFinal}，` +
+          '已被旁路动作推离草稿，删除门不放行，故本收尾不发起 DELETE'
+      );
+    }
+    // 载体客户 best-effort：上面的终态对账单行仍引用它，引用守门会拒（route-snapshot 同族门），
+    // 属预期失败，由 tryCleanup 登记原文不判负。
     await tryCleanup(page, 'DELETE', `/crm/customers/${customerId}`, 'carrier_customer');
   });
 });

@@ -150,7 +150,7 @@ impl CurrencyService {
         validate_currency_code(&from_currency)?;
         validate_currency_code(&to_currency)?;
         if rate <= Decimal::ZERO {
-            return Err(AppError::business("汇率必须大于0"));
+            return Err(AppError::business_displayable("汇率必须大于0"));
         }
         // P0-1 历史缺陷值防护（与 ap_invoice_service.rs:92-95 同语义）：
         // 0.01 曾导致本位币换算被缩小 100 倍，任何入口都不得写入
@@ -354,7 +354,7 @@ impl CurrencyService {
                 AppError::business(format!("未找到汇率: {} -> {}", from_currency, to_currency))
             })?;
 
-        let decimal_rate = Decimal::from_f64_retain(rate).unwrap_or(Decimal::ZERO);
+        let decimal_rate = crate::utils::decimal::from_f64(rate).unwrap_or(Decimal::ZERO);
 
         Ok(ExternalRateResponse {
             from_currency: from_currency.to_string(),
