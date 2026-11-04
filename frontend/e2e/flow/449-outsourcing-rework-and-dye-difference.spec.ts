@@ -3,11 +3,13 @@ import {
   apiCall,
   apiCallRaw,
   apiCallExpectFail,
+  ensureTestEntities,
   expectDenied,
   expectStateGateRejection,
   failureCode,
   genCode,
   genDyeLotNo,
+  getCtx,
   loginAsRole,
   safeGetList,
   seedColorCardArchive,
@@ -343,18 +345,17 @@ test.describe('449 委外染整返工与缸差登记', () => {
     // 功能：建委外染整订单 → 读回全部写入值 → 发料 → 加工 → 结算，每跳重读校验状态词与金额字段。
     // 调用方：outsourcing_handler::create_outsourcing_order / issue_outsourcing_order /
     // record_processing / settle_outsourcing_order。
-    // 入参 order_type=dyeing（词表 wage_energy_chemical_business.rs）；supplier_id 与
-    // product_id/warehouse_id 取库内真实主数据；issue_date 为业务日期字面量。
+    // 入参 order_type=dyeing（词表 wage_energy_chemical_business.rs）；supplier_id 取本 worker
+    // 夹具（ensureTestEntities 无条件自建的专属供应商）的 id，product_id/warehouse_id 取库内真实
+    // 主数据；issue_date 为业务日期字面量。
     // 传给谁：services/outsourcing_ops/order.rs（单号查重、成本计算、状态流转）。
     // 存什么：outsourcing_order 的 order_no/order_type/supplier_id/issue_quantity/issue_unit/
     // material_cost/processing_fee/freight_fee/tax_amount/status。
     // 存哪里：表 outsourcing_order（字段见 services/outsourcing_ops/types.rs）。
-    const orders = await safeGetList<Record<string, unknown>>(
-      page,
-      '/production/outsourcing-orders?page=1&page_size=10'
-    );
-    if (orders.length === 0) {
-      throw new Error('前置不成立：库内无委外订单，无法取到真实 supplier_id 建单');
+    await ensureTestEntities(page);
+    const ctx = getCtx();
+    if (!ctx.supplierId) {
+      throw new Error('前置不成立：本 worker 专属供应商未建立，无法取到真实 supplier_id 建单');
     }
     const products = await safeGetList<Record<string, unknown>>(
       page,
@@ -370,7 +371,7 @@ test.describe('449 委外染整返工与缸差登记', () => {
     if (warehouses.length === 0) {
       throw new Error('前置不成立：库内无仓库主数据，收回单无法挂真实 warehouse_id');
     }
-    outsourcingSupplierId = Number(orders[0]['supplier_id']);
+    outsourcingSupplierId = ctx.supplierId;
     outsourcingProductId = Number(products[0]['id']);
     outsourcingWarehouseId = Number(warehouses[0]['id']);
     const orderNo = genCode('WO449');
