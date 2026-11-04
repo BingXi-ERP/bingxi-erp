@@ -469,8 +469,8 @@ impl AiAnalysisService {
                 .filter(crate::models::quality_inspection_record::Column::FabricSource.eq(src));
         }
         if let Some((lo, hi)) = params.temperature_range {
-            let lo_dec = rust_decimal::Decimal::from_f64_retain(lo).unwrap_or_default();
-            let hi_dec = rust_decimal::Decimal::from_f64_retain(hi).unwrap_or_default();
+            let lo_dec = rust_decimal::Decimal::from_f64_rounded(lo).unwrap_or_default();
+            let hi_dec = rust_decimal::Decimal::from_f64_rounded(hi).unwrap_or_default();
             select = select
                 .filter(crate::models::quality_inspection_record::Column::Temperature.gte(lo_dec))
                 .filter(crate::models::quality_inspection_record::Column::Temperature.lte(hi_dec));

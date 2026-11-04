@@ -835,8 +835,8 @@ impl InventoryStockService {
             production_date,
             expiry_date,
         } = args;
-        let meters = Decimal::from_f64_retain(quantity_meters).unwrap_or(Decimal::ZERO);
-        let kg = Decimal::from_f64_retain(quantity_kg).unwrap_or(Decimal::ZERO);
+        let meters = Decimal::from_f64_rounded(quantity_meters).unwrap_or(Decimal::ZERO);
+        let kg = Decimal::from_f64_rounded(quantity_kg).unwrap_or(Decimal::ZERO);
         let batch = inventory_stock::ActiveModel {
             // id 交由 SERIAL 序列生成；显式 Set(0) 会写入主键 0 并在第二次插入时主键冲突
             id: NotSet,
@@ -864,8 +864,8 @@ impl InventoryStockService {
             // 面料行业字段
             quantity_meters: Set(meters),
             quantity_kg: Set(kg),
-            gram_weight: Set(gram_weight.and_then(Decimal::from_f64_retain)),
-            width: Set(width.and_then(Decimal::from_f64_retain)),
+            gram_weight: Set(gram_weight.and_then(Decimal::from_f64_rounded)),
+            width: Set(width.and_then(Decimal::from_f64_rounded)),
             production_date: Set(production_date),
             expiry_date: Set(expiry_date),
             stock_status: Set(inventory_stock_status::NORMAL.to_string()),
@@ -887,7 +887,7 @@ impl InventoryStockService {
     /// f64 入参 → Decimal 落库值：转换失败（NaN/Inf/溢出）如实报校验错误，
     /// 不得 `unwrap_or(ZERO)` 硬造 0 假值落库（旧实现即静默兜底形态）。
     fn to_batch_decimal(v: f64) -> Result<Decimal, AppError> {
-        Decimal::from_f64_retain(v).ok_or_else(|| {
+        Decimal::from_f64_rounded(v).ok_or_else(|| {
             AppError::validation_displayable(format!("数值无法转换为十进制（NaN/Inf/溢出）：{v}"))
         })
     }
@@ -1001,8 +1001,8 @@ impl InventoryStockService {
             .await
             .map_err(|e| AppError::database(format!("开启事务失败：{}", e)))?;
 
-        let transfer_meters = Decimal::from_f64_retain(quantity_meters).unwrap_or(Decimal::ZERO);
-        let transfer_kg = Decimal::from_f64_retain(quantity_kg).unwrap_or(Decimal::ZERO);
+        let transfer_meters = Decimal::from_f64_rounded(quantity_meters).unwrap_or(Decimal::ZERO);
+        let transfer_kg = Decimal::from_f64_rounded(quantity_kg).unwrap_or(Decimal::ZERO);
 
         // 1. 校验源批次存在且库存充足
         let source = inventory_stock::Entity::find_by_id(id)
