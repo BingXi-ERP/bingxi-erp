@@ -68,15 +68,27 @@ interface Dec {
   s: number;
 }
 
+/**
+ * 失败消息里的值描述：入参取后端出参原值，出参应为字符串或数字。
+ * 用例内部的对平容器 Dec 含 bigint，直接 JSON.stringify 会抛
+ * "Do not know how to serialize a BigInt"，把真正的入参类型错误盖掉，故按类型分开呈现。
+ */
+function describeRaw(raw: unknown): string {
+  if (typeof raw === 'bigint') return `${raw.toString()}n`;
+  if (raw === null) return 'null';
+  if (typeof raw === 'object') return `非原始值:${Array.isArray(raw) ? 'array' : 'object'}`;
+  return JSON.stringify(raw);
+}
+
 function decFromRaw(raw: unknown, label: string): Dec {
   const text = typeof raw === 'string' ? raw.trim() : typeof raw === 'number' ? String(raw) : null;
   if (text === null) {
     throw new Error(
-      `${label}：后端 Decimal 出参必须是字符串，实际类型=${typeof raw} 值=${JSON.stringify(raw)}`
+      `${label}：后端 Decimal 出参必须是字符串，实际类型=${typeof raw} 值=${describeRaw(raw)}`
     );
   }
   const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(text);
-  if (!m) throw new Error(`${label}：无法按十进制解析，raw=${JSON.stringify(raw)}`);
+  if (!m) throw new Error(`${label}：无法按十进制解析，raw=${describeRaw(raw)}`);
   const sign = m[1] === '-' ? -1n : 1n;
   return { v: sign * BigInt(`${m[2]}${m[3] ?? ''}`), s: (m[3] ?? '').length };
 }
@@ -116,7 +128,7 @@ function expectDecEquals(actual: unknown, expected: Dec, label: string): void {
   const a = decFromRaw(actual, label);
   expect(
     decCmp(a, expected) === 0,
-    `${label}：十进制期望=${decText(expected)} 实际=${decText(a)}（raw=${JSON.stringify(actual)}）`
+    `${label}：十进制期望=${decText(expected)} 实际=${decText(a)}（raw=${describeRaw(actual)}）`
   ).toBe(true);
 }
 
@@ -126,7 +138,7 @@ function expectDecEqualsEachOther(left: unknown, right: unknown, label: string):
   const r = decFromRaw(right, `${label}（右）`);
   expect(
     decCmp(l, r) === 0,
-    `${label}：两侧出参必须逐分对平，左=${decText(l)}（raw=${JSON.stringify(left)}） 右=${decText(r)}（raw=${JSON.stringify(right)}）`
+    `${label}：两侧出参必须逐分对平，左=${decText(l)}（raw=${describeRaw(left)}） 右=${decText(r)}（raw=${describeRaw(right)}）`
   ).toBe(true);
 }
 
@@ -143,7 +155,7 @@ function expectDecGreaterThanEachOther(left: unknown, right: unknown, label: str
 function expectDecimalString(raw: unknown, label: string): Dec {
   expect(
     typeof raw,
-    `${label}：Decimal 出参应为 JSON 字符串，实际类型=${typeof raw} 值=${JSON.stringify(raw)}`
+    `${label}：Decimal 出参应为 JSON 字符串，实际类型=${typeof raw} 值=${describeRaw(raw)}`
   ).toBe('string');
   return decFromRaw(raw, label);
 }
@@ -153,7 +165,7 @@ function expectDecScaleAtMost(raw: unknown, maxScale: number, label: string): De
   const d = expectDecimalString(raw, label);
   expect(
     d.s <= maxScale,
-    `${label}：小数位数不得超过列定标 ${maxScale}，实际=${d.s}（raw=${JSON.stringify(raw)}）`
+    `${label}：小数位数不得超过列定标 ${maxScale}，实际=${d.s}（raw=${describeRaw(raw)}）`
   ).toBe(true);
   return d;
 }
@@ -1234,16 +1246,8 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
       .map(r => decFromRaw(r.freight_fee, '明细运费'))
       .reduce((acc, d) => decAdd(acc, d), decLiteral('0', '累加初值'));
     const orderHead = await readOrder(page, fixture.orderNo);
-    expectDecEquals(
-      sumItemFee,
-      decFromRaw(orderHead.processing_fee, '单头加工费'),
-      '明细分摊加工费合计=单头'
-    );
-    expectDecEquals(
-      sumItemFreight,
-      decFromRaw(orderHead.freight_fee, '单头运费'),
-      '明细分摊运费合计=单头'
-    );
+    expectDecEquals(orderHead.processing_fee, sumItemFee, '明细分摊加工费合计=单头');
+    expectDecEquals(orderHead.freight_fee, sumItemFreight, '明细分摊运费合计=单头');
     // 四位小数分摊额本身的线格式：不得被截到两位（截了就会让上面的合计差在分位）
     for (const r of items) {
       expectDecScaleAtMost(r.processing_fee, 4, `明细 ${r.piece_no} 加工费(14,4)`);
@@ -1994,6 +1998,10 @@ test.describe('441 委外染整链：缸号/批次持久化 · 缸差与缩率�
     );
     expect(finReceiptFail.status, '财务岗未授收回单读权必须 403').toBe(403);
     expect(failureCode(finReceiptFail), '财务岗越权读机器码').toBe(APP_ERROR_CODES.FORBIDDEN);
+
+    // 回到管理会话建岗：建岗要 roles 的 create 动作，而财务岗自建面只有读键，
+    // 留在财务岗会话里建岗会被权限中间件按无权限拒绝，与本用例既有的"建岗一律在管理会话"口径同构
+    await loginViaUI(page, testUsername(), testPassword(), true);
 
     // 仓管岗：按四维读回同一卷细码，米数与收回单同一事实（跨角色看到的是同一个数）
     const whRole = await makeRole(

@@ -157,6 +157,9 @@ const RESOURCE_NAME_MAP: &[(&str, &str, &str)] = &[
     ("crm", "leads", "crm-leads"),
     ("crm", "opportunities", "crm-opportunities"),
     ("crm", "rfm", "customers"),
+    // 色卡扫码面 GET/POST /color-cards/scan/… 与色卡列表、详情同属一张色卡的读面，
+    // 资源名对齐 init_service 注册的权威名 color-cards，供持色卡读面的岗位命中既有授权键
+    ("color-cards", "scan", "color-cards"),
     ("production", "orders", "production-orders"),
     ("production", "quality-inspection", "quality-inspections"),
     ("system-update", "update", "system-update-update"),

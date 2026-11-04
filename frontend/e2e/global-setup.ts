@@ -3118,6 +3118,12 @@ async function ensureGlobalBusinessSeed(
         'INSERT INTO currencies (code, name, symbol, "precision", is_base, is_active, is_deleted, created_at, updated_at)\n' +
         "SELECT 'CNY', '人民币', '¥', 2, true, true, false, now(), now()\n" +
         "WHERE NOT EXISTS (SELECT 1 FROM currencies WHERE code = 'CNY');\n" +
+        // 非本位币种子：多币种腿（flow 442-03 与 finance 面若干判据）的前置是"库里有一枚启用中的
+        // 非本位币"，币种同样无创建端点，直连 DB 是唯一写路径；USD 取 validate_currency_code
+        // 白名单内的真实 ISO 4217 码，is_base 恒 false，不参与本位币唯一约束。
+        'INSERT INTO currencies (code, name, symbol, "precision", is_base, is_active, is_deleted, created_at, updated_at)\n' +
+        "SELECT 'USD', '美元', '$', 2, false, true, false, now(), now()\n" +
+        "WHERE NOT EXISTS (SELECT 1 FROM currencies WHERE code = 'USD');\n" +
         'UPDATE currencies SET is_base = true, updated_at = now()\n' +
         "WHERE code = 'CNY'\n" +
         '  AND NOT EXISTS (SELECT 1 FROM currencies WHERE is_base = true);\n';
@@ -3141,6 +3147,24 @@ async function ensureGlobalBusinessSeed(
           recordSeedFailure('本位币种子回读', '写语句已执行但查无 is_base=true 行——种子未真实生效');
         } else {
           console.log(`[globalSeed] 本位币就绪：code=${baseCode}`);
+        }
+        // 非本位币回读：多币种腿的前置键，缺失即种子未生效，按同一口径计入台账而不是留给用例判红
+        const nonBaseCode = execSync(
+          `psql -d ${psqlTarget} -tAc "SELECT code FROM currencies WHERE is_base = false AND is_active = true AND is_deleted = false LIMIT 1"`,
+          {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            env: { ...process.env, PGCONNECT_TIMEOUT: '5' },
+          }
+        )
+          .toString()
+          .trim();
+        if (!nonBaseCode) {
+          recordSeedFailure(
+            '非本位币种子回读',
+            '写语句已执行但查无启用中的非本位币行——多币种腿前置未就绪'
+          );
+        } else {
+          console.log(`[globalSeed] 非本位币就绪：code=${nonBaseCode}`);
         }
       } catch (e) {
         const err = e as { stderr?: { toString(): string }; message?: string };
