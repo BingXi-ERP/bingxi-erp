@@ -12,7 +12,6 @@ import {
   getCtx,
   getEntityField,
   loginAsRole,
-  safeGetList,
   tryCleanup,
 } from './helpers';
 
@@ -374,14 +373,28 @@ test.describe('面料样品打样版本链与降等转大货', () => {
     if (!optimizationId || !createdColorNo) {
       throw new Error('前置不成立：工艺优化句柄未建立，跳过转大货腿只会掩盖断链');
     }
-    const recipes = await safeGetList<Record<string, unknown>>(
-      page,
-      '/production/production-recipes?page=1&page_size=5'
-    );
-    if (recipes.length === 0) {
-      throw new Error('前置不成立：库内无生产配方，无法验证 link-to-production 的真实关联');
+    // 前置由本用例自建：建一张真实处方取回主键，不依赖"库里恰好有一行生产配方"。
+    // 必填两键按 CreateProductionRecipeRequest（production_recipe_service.rs）——fabric_weight
+    // 与 liquor_ratio 非 Option；处方号由后端按单据号规则生成，不由调用方提交。
+    const recipe = await apiCall<{ id?: number }>(page, 'POST', '/production/production-recipes', {
+      color_no: genCode('446R'),
+      fabric_name: '446 转大货腿自建坯布',
+      fabric_weight: 100,
+      liquor_ratio: '1:6',
+    });
+    const recipeId = Number(recipe.data?.id);
+    if (!Number.isInteger(recipeId) || recipeId <= 0) {
+      throw new Error(`自建生产处方未返回真实主键：${JSON.stringify(recipe.data)}`);
     }
-    const recipeId = Number(recipes[0]['id']);
+    const recipeRow = await apiCall<Record<string, unknown>>(
+      page,
+      'GET',
+      `/production/production-recipes/${recipeId}`
+    );
+    expect(
+      Number(recipeRow.data['id']),
+      `自建处方 ${recipeId} 必须能按主键读回，否则关联判据不成立`
+    ).toBe(recipeId);
     const optId = optimizationId;
 
     const linked = await apiCallRaw<Record<string, unknown>>(
@@ -422,6 +435,14 @@ test.describe('面料样品打样版本链与降等转大货', () => {
         '非法关联被拒后不得把已有配方改写成 0'
       ).toBe(recipeId);
     }
+    // 收尾：回收自建处方（删除面 production_recipe_handler::delete 在路由快照在册）。
+    // 工艺优化行仍引用该处方时删除会被外键挡，tryCleanup 记录不判负。
+    await tryCleanup(
+      page,
+      'DELETE',
+      `/production/production-recipes/${recipeId}`,
+      `清理自建处方 ${recipeId}`
+    );
   });
 
   test('无权限岗位调用降等与实测回写被拦，主管岗位同端点可达', async ({ page }) => {
