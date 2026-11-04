@@ -186,15 +186,22 @@ pub async fn list_customers(
 
     // V15 P0-S01：提取行级数据权限上下文
     let data_scope_ctx = auth.to_data_scope_context();
-    let result = service.list_leads(query, Some(&data_scope_ctx)).await?;
-    // 增强页列表整行原文直出 = 同一份线索行在标准入口打码、本入口出原文的旁路，
-    // 收口到本文件客户侧唯一实现（裁定口径：增强页出参一致性优先——同页
-    // GET/:id、PUT、contacts 三形状统一走 resource_type=customer 权限行 +
-    // mask_customer_pii_defaults 默认掩码，不引用线索域 crm_lead 行配置，两域
-    // 权限判定语义不同不强行统一；掩码列集合仍全仓唯一 = utils/field_mask）。
-    let mut value = serde_json::to_value(result)?;
-    if let Some(list) = crate::handlers::crm_handler::paginated_list_array_mut(&mut value) {
-        apply_customer_field_permission(&state, auth.role_id, list).await;
+    // list_leads 的返回已是 serde_json::Value，直接取所有权（不做 to_value 序列化往返）
+    let mut value = service.list_leads(query, Some(&data_scope_ctx)).await?;
+    // 分页信封键纠正：仓内分页唯一形状 PaginatedResponse{items,total,page,page_size}
+    // （utils/response.rs）。list_leads 自造的 "data" 键改为 "items"，与 ApiResponse
+    // 外层 "data" 不再语义重叠；不保留 data 键做兼容双写（双写等于把契约违规合法化）。
+    if let Some(obj) = value.as_object_mut() {
+        if let Some(old) = obj.remove("data") {
+            obj.insert("items".to_string(), old);
+        }
+    }
+    // 字段级权限：列表现在在 "items" 键，直接取数组做掩码/删键
+    if let Some(rows) = value
+        .get_mut("items")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        apply_customer_field_permission(&state, auth.role_id, rows).await;
     }
     Ok(Json(ApiResponse::success(value)))
 }

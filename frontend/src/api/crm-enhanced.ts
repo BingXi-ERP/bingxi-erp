@@ -312,13 +312,12 @@ export interface AssignmentHistoryResult {
 }
 
 /**
- * GET /crm/customers/enhanced 真实响应载荷（唯一真相：handlers/crm_customer_handler.rs::list_customers
- * → services/crm/lead.rs::list_leads 第 155-160 行 `json!({"data": items, "total", "page", "page_size"})`）。
- * 承载列表的键是 `data`（不是 items/list）。元素形状由后端 crm_lead::Model 序列化决定，
- * 与前端 CustomerWithTags 存在字段级差异（见交付报告，本轮仅纠正信封键）。
+ * GET /crm/customers/enhanced 响应载荷（唯一真相：utils/response.rs 的 PaginatedResponse
+ * 分页信封 `{items, total, page, page_size}`，handler 侧对 list_leads 产出的自造 `"data"`
+ * 键做了纠正，不再保留旧键做兼容双写）。元素形状由后端 crm_lead::Model 序列化决定。
  */
 export interface CustomerPage {
-  data: CustomerWithTags[];
+  items: CustomerWithTags[];
   total: number;
   page: number;
   page_size: number;
