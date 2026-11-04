@@ -373,6 +373,25 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     const single = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/print-targets/${id}`);
     expect(str(single.kind), '对象口 kind 必须回显写入值').toBe('cups');
 
+    // 唯一性门的判据对象必须是「还在册的行」：载荷与正例同样合法（cups 加
+    // queue_name），否则它会因缺连接字段被拒，断言就打不到唯一性这条判据上。
+    const dup = await apiCallExpectFail(page, 'POST', '/print-targets', {
+      target_code: targetCode,
+      display_name: displayName,
+      kind: 'cups',
+      queue_name: 'print447',
+    });
+    expect(
+      [400, 409].includes(dup.status),
+      `在册行的同 target_code 重复建单必须被拒，实际 ${dup.status}`
+    ).toBe(true);
+    expect(failureCode(dup), `重复编码的机器码应为 VALIDATION_ERROR，实际 ${dup.code}`).toBe(
+      APP_ERROR_CODES.VALIDATION_ERROR
+    );
+    expect(
+      str(dup.message).includes('目标编码已存在'),
+      `拒绝原因必须是编码唯一性而不是缺连接字段，实际文案 ${str(dup.message)}`
+    ).toBe(true);
     const renamed = genName('P447TGT2');
     await apiCall(page, 'PUT', `/print-targets/${id}`, { display_name: renamed });
     const afterPut = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/print-targets/${id}`);
@@ -388,25 +407,33 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       `删除后目标列表仍含 ${id}，即假删除`
     ).toBe(false);
 
-    // 负例载荷必须与正例同样合法（cups + queue_name），否则它会因"缺连接字段"被拒，
-    // 把唯一性断言变成对不上判据对象的假绿。
-    const dup = await apiCallExpectFail(page, 'POST', '/print-targets', {
+    // 删除腿是硬删（print_targets 无软删列），唯一键随行释放：同一 target_code
+    // 删后必须能重建并回读，且落在新主键上。这一条同时钉住两种失效形态——
+    // 「删除只置状态不释放唯一键」与「删除根本没写库」。
+    const rebuilt = await apiCallRaw<{ id: number }>(page, 'POST', '/print-targets', {
       target_code: targetCode,
       display_name: displayName,
       kind: 'cups',
       queue_name: 'print447',
     });
+    const rebuiltId = Number(rebuilt.id);
     expect(
-      [400, 409].includes(dup.status),
-      `同 target_code 重建必须被唯一性拒绝（本用例刚删同一行，若 200 说明删除只软删未释放唯一键），实际 ${dup.status}`
+      Number.isInteger(rebuiltId) && rebuiltId > 0,
+      `删后同 target_code 重建必须成功并回主键，实际 ${rebuilt.id}`
     ).toBe(true);
-    expect(failureCode(dup), `唯一性拒绝的机器码应为 BAD_REQUEST，实际 ${dup.code}`).toBe(
-      APP_ERROR_CODES.BAD_REQUEST
+    expect(rebuiltId, '重建行必须是新主键，不能复用已删行的 id').not.toBe(id);
+    deferCleanup(
+      queue,
+      'DELETE',
+      `/print-targets/${rebuiltId}`,
+      `print-target-rebuild-${rebuiltId}`
     );
-    expect(
-      str(dup.message).includes('目标编码已存在'),
-      `拒绝原因必须是编码唯一性而不是缺连接字段，实际文案 ${str(dup.message)}`
-    ).toBe(true);
+    const afterRebuild = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/print-targets/${rebuiltId}`
+    );
+    expect(str(afterRebuild.target_code), '重建行必须可按新主键回读同一编码').toBe(targetCode);
     await flushDeferredCleanups(page, queue);
   });
 
