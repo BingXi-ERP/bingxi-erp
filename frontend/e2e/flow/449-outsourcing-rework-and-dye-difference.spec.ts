@@ -471,7 +471,7 @@ test.describe('449 委外染整返工与缸差登记', () => {
     const issueBundle = await seedDyedOutboundBundle(page, {
       productId: outsourcingProductId,
       warehouseId: issueTarget.id,
-      quantityMeters: '100',
+      quantityMeters: '1200',
       pieceCount: 1,
       context: '449-issue',
     });
