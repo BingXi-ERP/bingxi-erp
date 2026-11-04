@@ -16,6 +16,12 @@
 
 2 手工触发扫描时，收件人被降级成"谁点扫描按钮就发给谁"，预警规则自身的 notify_roles 配置在这条路径上完全没被消费。这违反目标 4.7 的"消息不推错人"。按行业口径，预警的投递对象应由规则的接收角色决定，与谁点击扫描无关。
 
-修法方向（待实现，需与账龄规则族同支收口）：attach_notification 的收件人集合改为按预警规则解析，规则无接收角色时按告警级别回落到该域默认岗位；定时扫描路径必须传规则而非 None；notify_roles 的取值面需要与既有词表对齐并补 CHECK 或仓内词表单点（当前该列全仓无词表也无约束，见 capability-gap-2026-11-03 的入参受控性缺口一族）。
+修法方向（待实现，需先定收件人策略）：attach_notification 的收件人不再取触发人。实现前有两个已核实的约束：
 
-验收判据：定时扫描产出的预警行 notification_id 非空，且站内信收件人等于规则配置的接收角色成员；手工扫描不得把收件人降级为点击者；454-06 的本角色可见与另一角色不可见两条断言各自成立且不靠放宽期望取得。
+约束一，finance_alert_scheduler.rs 第 40 行确实以 None 调 trigger_scan（另一处调用点是 handlers/finance_alert_handler.rs 第 136 行传 Some(auth.user_id)），所以定时链路恒不推站内信是活路径造成的既有事实，不是假想风险。
+
+约束二，models/finance_alert.rs 的 finance_alerts 列集合里既没有指向预警规则的列，也没有收件人或接收角色列（只有 alert_type、alert_level、target_module、target_id、triggered_by、status 与确认与解决四列）。账龄族另有 aging_alert_rule 表带 notify_roles 与 notify_method，但那是另一域的表，不能被本路径直接当规则源使用。
+
+因此修法必须二选一并先出决策：要么给 finance_alerts 增规则或接收角色列（配探测式迁移，遵守"先改代码再迁列"的仓内口径），要么在 attach_notification 内按告警级别解析该域默认岗位集合（复用既有按角色取用户的单点，不新造查询）。两种都要求把"一人一封"改成"按接收人集合扇出"，并保持 notification_id 语义（当前该列是单个 Option i32，扇出后要指明它代表哪一封）。
+
+验收判据：定时扫描产出的预警行 notification_id 非空，且站内信收件人等于策略解析出的接收人集合；手工触发扫描不得把收件人降级为点击者；454-06 的本角色可见与另一角色不可见两条断言各自成立且不靠放宽期望取得。
