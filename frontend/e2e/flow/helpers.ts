@@ -1738,7 +1738,16 @@ export async function apiCallExpectFail(
     await syncCsrfFromResponse(page, response, url);
   }
 
-  return { status: response.status(), code: json.code, message: json.message };
+  // 失败体是统一形状 {code,message,trace_id,timestamp}，透传 trace_id/timestamp 供调用方
+  // 断言拒绝体确实携带链路追踪 id（负例判据不止 code/message，缺透传会把后端真实存在的
+  // trace_id 读成 undefined，令契约断言无从验证）。
+  return {
+    status: response.status(),
+    code: json.code,
+    message: json.message,
+    trace_id: json.trace_id,
+    timestamp: json.timestamp,
+  };
 }
 
 const LOGGED_IN = { done: false };
