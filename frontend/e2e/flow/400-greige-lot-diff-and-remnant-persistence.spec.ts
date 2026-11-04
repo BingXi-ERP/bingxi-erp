@@ -78,7 +78,8 @@
  * 残留声明（按判红口径不造假清理）。
  * 零头子卷与母卷及委外染色链前置行无 DELETE 通道（route-snapshot.txt 中
  * inventory/pieces 仅有 GET 与 print，piece-split 仅有 POST），残留属已知不可回收面；
- * 坯布腿两卷在断言完成后经 stock_out 全额出库转已出库再 DELETE 软删，清理干净。
+ * 坯布腿两卷在断言完成后经 POST 出库端点（路径末段 stock-out 用连字符，handler
+ *    函数名才是 stock_out）全额出库转已出库，再 DELETE 软删，清理干净。
  */
 import { test, expect, type Page } from '../diagnose-fixture';
 import {
@@ -269,13 +270,13 @@ test.describe('面料缸差登记与零头余码持久化', () => {
     const outA = await apiCall<{ status?: string; length_m?: unknown; weight_kg?: unknown }>(
       page,
       'POST',
-      `/production/greige-fabrics/${idA}/stock_out`,
+      `/production/greige-fabrics/${idA}/stock-out`,
       { length_m: 50, weight_kg: 16 }
     );
     expect(String(outA.data?.status), `${tag} 甲出尽后状态应为中文词表已出库`).toBe('已出库');
     expect(dec(outA.data?.length_m), `${tag} 甲出尽后剩余米数`).toBe(0);
     expect(dec(outA.data?.weight_kg), `${tag} 甲出尽后剩余公斤数`).toBe(0);
-    await apiCall(page, 'POST', `/production/greige-fabrics/${idB}/stock_out`, {
+    await apiCall(page, 'POST', `/production/greige-fabrics/${idB}/stock-out`, {
       length_m: 40,
       weight_kg: 12.8,
     });

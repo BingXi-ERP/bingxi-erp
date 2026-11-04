@@ -161,11 +161,12 @@ async fn get_json(app: &Router, uri: &str) -> (StatusCode, Value) {
 }
 
 /// 信封锚点：ApiResponse::success → {code,data}；list_leads 的 data 内层再嵌
-/// {data:[...],total,page,page_size}（services/crm/lead.rs:163）。
+/// PaginatedResponse {items,total,page,page_size}（utils/response.rs 的唯一分页形状，
+/// 生产者 services/crm/lead.rs）。
 fn list_items(v: &Value) -> &Vec<Value> {
-    v["data"]["data"]
+    v["data"]["items"]
         .as_array()
-        .unwrap_or_else(|| panic!("分页列表形状漂移（期望 data.data 数组）: {v}"))
+        .unwrap_or_else(|| panic!("分页列表形状漂移（期望 data.items 数组）: {v}"))
 }
 
 // ---------------------------------------------------------------------------

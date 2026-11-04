@@ -182,13 +182,15 @@ fn stock_decimal(value: f64, field: &str) -> Result<Decimal, AppError> {
             "{field}不能为负数"
         )));
     }
-    Decimal::from_f64_retain(value)
+    crate::utils::decimal::from_f64(value)
         .ok_or_else(|| AppError::validation_displayable(format!("{field}超出可保存的数值范围")))
 }
 
 /// 可空数值列的落库：`None` 保持/不写，`Some(v)` 经 `stock_decimal` 校验后覆盖。
 /// 建单入参是裸 `Option<f64>`（无「保持原值」语义），直接复用本函数把坏值显式拒绝，
-/// 不再用 `and_then(Decimal::from_f64_retain)` 把 NaN 静默折成 NULL。
+/// 不再用 `and_then(...)` 把 NaN 静默折成 NULL。换算取四舍五入档：double 的二进制尾数
+/// 不该整段搬进 Decimal，否则 12.8 变成 12.8000000000000007105…，等额出库会被判成超量，
+/// 落库后标度也宽于列刻度。
 fn stock_optional(value: Option<f64>, field: &str) -> Result<Option<Decimal>, AppError> {
     value.map(|v| stock_decimal(v, field)).transpose()
 }
@@ -432,7 +434,7 @@ pub async fn create_greige_fabric(
             .ok_or_else(|| AppError::business("采购入库单不存在，请重新选择"))?;
     }
     // 数值入参一律走 stock_optional：非有限值与负值显式拒绝，不再用
-    // `and_then(Decimal::from_f64_retain)` 把坏值静默折成 NULL。
+    // `and_then(...)` 把坏值静默折成 NULL。
     let width = stock_optional(req.width, "门幅(m)")?;
     let gram_weight = stock_optional(req.gram_weight, "克重(g/m²)")?;
     let quantity_meters = stock_optional(req.quantity_meters, "累计米数(m)")?;

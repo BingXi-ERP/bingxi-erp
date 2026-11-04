@@ -73,8 +73,8 @@ function requireNum(v: unknown, label: string): number {
 }
 
 /**
- * 线索/商机列表恒出 {data,total,page,page_size}（services/crm/lead.rs:163-168、
- * services/crm/opp.rs:181-186 手搓 json!，非 PaginatedResponse 的 items 键）。
+ * 商机列表出 {data,total,page,page_size}（services/crm/opp.rs 手搓 json!，非 PaginatedResponse 的 items 键），
+ * 线索列表出 PaginatedResponse{items,total,page,page_size}（services/crm/lead.rs）。
  * 用 pickListArray 单形状直读，信封漂移当场红。
  */
 function listData(res: unknown, context: string): Record<string, unknown>[] {
