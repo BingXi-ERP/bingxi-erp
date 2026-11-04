@@ -37,8 +37,10 @@ import {
  * - GET `/crm/customers`、GET `/crm/customers/enhanced`、GET `/crm/customers/{id}/contacts`、
  *   GET `/crm/customers/export`、GET `/color-cards/issues`、GET `/color-cards/issues/export`、
  *   GET `/audit-logs/export`；
- * - POST `/export-approvals`、GET `/export-approvals`、GET `/export-approvals/{id}/token-once`、
- *   GET `/export-approvals/verify-token`、POST `/export-approvals/{id}/cancel`。
+ * - POST `/export-approvals`、GET `/export-approvals`、GET `/export-approvals/{id}`、
+ *   GET `/export-approvals/{id}/token-once`、GET `/export-approvals/verify-token`、
+ *   POST `/export-approvals/{id}/approve`、POST `/export-approvals/{id}/rotate-token`、
+ *   POST `/export-approvals/{id}/cancel`。
  *
  * 打印腿的出参与判据来源：`render_print_docx`（backend/src/handlers/print_handler.rs）先装配打印
  * 数据再解析模板布局，无可用默认模板行时 `resolve_print_docx_layout`
@@ -66,11 +68,17 @@ import {
  * - `services/color_card_issue_service.rs` 的 `mask_cost_amount`：`handlers/color_card/issue.rs`
  *   在 `can_view_cost` 为假时把 `compensation_amount` 置 None（成本列剔除而非掩码，与 PII 列又是第三种形态）。
  *
- * 一次性令牌的事实来源：`handlers/export_approval_handler.rs` 的 `view_token_once` 首次回
- * `{available:true,token:<明文>}`，之后只回 `{available:false,fingerprint,message}` 且不再携带明文；
- * `services/export_approval_service.rs` 的 `verify_download_token` 走
- * `assert_token_consumable`，状态非 APPROVED 或已消费一律 `AppError::permission_denied`（HTTP 403 +
- * 机器码 FORBIDDEN）；同文件的 `masked_json` 把列表与详情的
+ * 一次性令牌的事实来源：`handlers/export_approval_handler.rs` 的 `view_token_once` 先过状态门——
+ * `services/export_approval_service.rs` 的 `view_token_once` 对非 approved 状态回
+ * `AppError::business_displayable`（HTTP 400 + 机器码 BUSINESS_ERROR，文案点名当前状态），
+ * 通过后首次回 `{available:true,token:<明文>}`，之后只回 `{available:false,fingerprint,message}`
+ * 且不再携带明文；`verify_download_token` 走 `assert_token_consumable`，只判定可消费性、不消费凭据，
+ * 令牌明文找不到或状态非 APPROVED 或已消费一律 `AppError::permission_denied`（HTTP 403 +
+ * 机器码 FORBIDDEN）；真正的一次性消费由导出腿的 `record_download` 落 consumed 终态
+ * （`build_export_approval_active` 把 max_downloads 签发即为 1）；`rotate_token` 换发即替换哈希列，
+ * 旧明文既不匹配哈希也不匹配明文回退分支；`cancel` 仅对 pending/pending_l2 放行（`is_pending_any`），
+ * 已批准或已消费的申请取消被 `AppError::business` 拒（出参脱敏，故只钉状态与机器码）；
+ * 同文件的 `masked_json` 把列表与详情的
  * `download_token`、`token_hash` 恒置 null。
  *
  * 失败信封断言一律钉 HTTP 码 + 字符串机器码 + trace_id/timestamp 在场（utils/error.rs 单一形状），
@@ -617,17 +625,20 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     ).toBe(false);
   });
 
-  test('447-5 导出审批一次性令牌：二次查看不漏明文，未授权与作废令牌再用一律 403+FORBIDDEN', async ({
+  test('447-5 导出审批令牌腿：pending 不可取令牌，批准后明文仅一次，换发与消费后复用一律 403', async ({
     page,
   }) => {
     const queue: DeferredCleanup[] = [];
+    // estimated_rows=10 → 低风险 → 一级审批（assess_risk_level），一次 approve 即终审完成并签发令牌。
+    // export_params 取空对象：客户导出腿实际读取的维度只有 keyword/customer_type/status，本用例下载
+    // 不带任何筛选项，受理门把批准集合与请求集合逐维比对，批准侧多写一维即成差集。
     const created = await apiCallRaw<{ id: number; status?: string }>(
       page,
       'POST',
       '/export-approvals',
       {
         resource_type: 'customer',
-        export_params: { page: 1, page_size: 10, scene: 'e2e447' },
+        export_params: {},
         estimated_rows: 10,
         file_format: 'xlsx',
       }
@@ -636,7 +647,43 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(Number.isInteger(id) && id > 0, `创建导出审批申请必须回主键，实际 ${created.id}`).toBe(
       true
     );
+    expect(str(created.status), '新建申请初始必须是 pending').toBe('pending');
     deferCleanup(queue, 'POST', `/export-approvals/${id}/cancel`, `export-approval-${id}`);
+
+    // 状态门：pending 时令牌尚未签发，查看令牌必须被拒且点名当前状态，拒绝不得产生状态跃迁
+    const pendingView = await apiCallExpectFail(page, 'GET', `/export-approvals/${id}/token-once`);
+    expect(pendingView.status, 'pending 状态查看令牌必须 400').toBe(400);
+    expect(pendingView.code, '状态门拒绝的机器码必须是 BUSINESS_ERROR').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
+    const pendingMsg = str(pendingView.message);
+    expect(pendingMsg.includes('仅已批准'), '拒绝原因必须点名仅已批准这道门').toBe(true);
+    expect(pendingMsg.includes('pending'), '拒绝原因必须点名当前状态').toBe(true);
+    expect(
+      str(pendingView.trace_id).length,
+      'AppError 单一失败信封必须带 trace_id'
+    ).toBeGreaterThan(0);
+    expect(
+      pendingView.timestamp !== undefined && pendingView.timestamp !== null,
+      'AppError 单一失败信封必须带 timestamp'
+    ).toBe(true);
+    const afterPendingView = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/export-approvals/${id}`
+    );
+    expect(str(afterPendingView.status), '取令牌被拒不产生状态跃迁').toBe('pending');
+
+    // 一级审批通过：approve 代理到 BPM 待办任务，低风险流程在此即终审完成并签发令牌
+    const approved = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      `/export-approvals/${id}/approve`,
+      { comments: 'e2e447 一级审批通过' }
+    );
+    expect(str(approved.status), '一级审批通过后必须进入 approved').toBe('approved');
+    expect(approved.download_token, '审批出参不得回显令牌明文').toBeNull();
+    expect(approved.token_hash, '审批出参不得回显令牌哈希').toBeNull();
 
     const first = await apiCallRaw<{ available?: boolean; token?: string; fingerprint?: string }>(
       page,
@@ -658,6 +705,10 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       `二次 token-once 必须 available=false（明文仅一次），实际 ${JSON.stringify(secondJson.data)}`
     ).toBe(false);
     expect(str(secondJson.data?.token).length, '二次 token-once 不得再携带 token 键的明文').toBe(0);
+    const secondData = secondJson.data;
+    expect(secondData, '二次 token-once 必须回 data 位').toBeTruthy();
+    const hasTokenKey = Object.prototype.hasOwnProperty.call(secondData!, 'token');
+    expect(hasTokenKey, '已查看分支不得再带 token 键').toBe(false);
     const secondText = JSON.stringify(secondJson);
     expect(
       secondText.includes(plaintext),
@@ -674,26 +725,65 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(row!.token_hash, '列表 token_hash 必须被 masked_json 置 null').toBeNull();
     expect(JSON.stringify(row).includes(plaintext), '列表行里不得出现明文令牌').toBe(false);
 
-    const pendingVerify = await apiCallExpectFail(
+    // 校验门只判定可消费性、不消费凭据：已批准且未消费的明文在此必须放行
+    const checked = await apiCallRaw<Record<string, unknown>>(
       page,
       'GET',
       `/export-approvals/verify-token?token=${encodeURIComponent(plaintext)}`
     );
-    expect(
-      pendingVerify.status,
-      `未批准的令牌用 verify-token 消费必须 403（状态非 APPROVED），实际 ${pendingVerify.status}`
-    ).toBe(403);
-    expect(pendingVerify.code, '失败体机器码必须是字符串 FORBIDDEN').toBe(
+    expect(str(checked.status), '已批准未消费的令牌在校验门必须放行').toBe('approved');
+    expect(checked.download_token, '校验门出参不得回显明文').toBeNull();
+    expect(checked.token_hash, '校验门出参不得回显哈希').toBeNull();
+
+    // 换发即作废旧明文：哈希列被整列替换，旧明文既不匹配哈希也不匹配明文回退分支
+    const rotated = await apiCallRaw<{ available?: boolean; token?: string }>(
+      page,
+      'POST',
+      `/export-approvals/${id}/rotate-token`
+    );
+    expect(rotated.available, '申请人本人重发令牌必须 available=true').toBe(true);
+    const rotatedToken = str(rotated.token);
+    expect(rotatedToken.length, '重发必须下发新的非空明文').toBeGreaterThan(0);
+    expect(rotatedToken === plaintext, '重发必须换发新明文，旧明文不得沿用').toBe(false);
+    const revoked = await apiCallExpectFail(
+      page,
+      'GET',
+      `/export-approvals/verify-token?token=${encodeURIComponent(plaintext)}`
+    );
+    expect(revoked.status, '被换发作废的旧明文再用必须 403').toBe(403);
+    expect(revoked.code, '作废令牌再用的机器码必须是 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
+
+    // 一次性消费由导出腿的 record_download 落终态（max_downloads 签发即为 1）
+    await assertExportNotDeadEnd(
+      page,
+      `/crm/customers/export?download_token=${encodeURIComponent(rotatedToken)}`,
+      '申请人本人持已批准令牌'
+    );
+    const readBack = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/export-approvals/${id}`
+    );
+    expect(str(readBack.status), '导出成功后申请必须落 consumed 终态').toBe('consumed');
+    expect(readBack.token_consumed, '导出成功后消费标记必须已置真').toBe(true);
+
+    // 消费成功后明文列与哈希列被清空，同一明文再也匹配不上任何一行——禁复用在此落地
+    const consumedReuse = await apiCallExpectFail(
+      page,
+      'GET',
+      `/export-approvals/verify-token?token=${encodeURIComponent(rotatedToken)}`
+    );
+    expect(consumedReuse.status, '消费后同一明文再用校验门必须 403').toBe(403);
+    expect(consumedReuse.code, '消费后复用的机器码必须是 FORBIDDEN').toBe(
       APP_ERROR_CODES.FORBIDDEN
     );
-    expect(
-      str(pendingVerify.trace_id).length,
-      'AppError 单一失败信封必须带 trace_id'
-    ).toBeGreaterThan(0);
-    expect(
-      pendingVerify.timestamp !== undefined && pendingVerify.timestamp !== null,
-      'AppError 单一失败信封必须带 timestamp'
-    ).toBe(true);
+    const secondExport = await apiCallExpectFail(
+      page,
+      'GET',
+      `/crm/customers/export?download_token=${encodeURIComponent(rotatedToken)}`
+    );
+    expect(secondExport.status, '消费后再次导出必须 403').toBe(403);
+    expect(secondExport.code, '再次导出的机器码必须是 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
 
     const bogus = await apiCallExpectFail(
       page,
@@ -703,19 +793,47 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     expect(bogus.status, '不存在的令牌必须 403 而不是 500/404').toBe(403);
     expect(bogus.code, '不存在令牌的机器码必须是 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
 
-    await apiCall(page, 'POST', `/export-approvals/${id}/cancel`, {
-      comments: 'e2e447 作废后复用取证',
-    });
-    const reuse = await apiCallExpectFail(
+    // 一次性终态不可回退：已消费的申请取消被拒（该拒绝走脱敏 business，故只钉状态与机器码）
+    const cancelReject = await apiCallExpectFail(page, 'POST', `/export-approvals/${id}/cancel`);
+    expect(cancelReject.status, 'consumed 终态不可被取消改回在途').toBe(400);
+    expect(cancelReject.code, '取消被拒的机器码必须是 BUSINESS_ERROR').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
+    const afterCancel = await apiCallRaw<Record<string, unknown>>(
       page,
       'GET',
-      `/export-approvals/verify-token?token=${encodeURIComponent(plaintext)}`
+      `/export-approvals/${id}`
     );
-    expect(
-      reuse.status,
-      `已作废申请的同一令牌再用必须被拒（403），实际 ${reuse.status}——200 即一次性约束失守`
-    ).toBe(403);
-    expect(reuse.code, '作废后复用失败的机器码必须是 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
+    expect(str(afterCancel.status), '取消被拒不得改状态').toBe('consumed');
+
+    // 取消只对在途申请放行；作废后的申请永远取不到令牌——这是状态机里「作废」的真实形态
+    const secondReq = await apiCallRaw<{ id: number; status?: string }>(
+      page,
+      'POST',
+      '/export-approvals',
+      {
+        resource_type: 'customer',
+        export_params: {},
+        estimated_rows: 10,
+        file_format: 'xlsx',
+      }
+    );
+    const secondId = Number(secondReq.id);
+    expect(Number.isInteger(secondId) && secondId > 0, '第二枚申请必须回主键').toBe(true);
+    deferCleanup(queue, 'POST', `/export-approvals/${secondId}/cancel`, `approval-${secondId}`);
+    const cancelled = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      `/export-approvals/${secondId}/cancel`
+    );
+    expect(str(cancelled.status), '在途申请取消后必须落 cancelled').toBe('cancelled');
+    const cancelledView = await apiCallExpectFail(
+      page,
+      'GET',
+      `/export-approvals/${secondId}/token-once`
+    );
+    expect(cancelledView.status, '已作废申请查看令牌必须 400').toBe(400);
+    expect(cancelledView.code, '已作废申请取不到令牌').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
     await flushDeferredCleanups(page, queue);
   });
 
