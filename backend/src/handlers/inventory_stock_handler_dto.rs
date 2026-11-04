@@ -91,6 +91,14 @@ pub struct StockResponse {
     pub quantity_meters: Decimal,
     /// 数量（公斤，辅计量）
     pub quantity_kg: Decimal,
+    // ===== 面料物理规格（录入面 POST /inventory/stock/fabric 提交 gram_weight 与 width）=====
+    // 克重与幅宽是这一批面料的计量事实（米↔公斤换算与用量、缩水率核算都读这两列）：
+    // 写入方已落库，投影若不携带，列表与详情（同走 StockResponse）就永远读不回录入值，
+    // 编辑回显也取不到原值。DB 可空列按 Option 出参，未录入即 null；直映不换算。
+    /// 克重（inventory_stocks.gram_weight 真实列直映，单位 g/m²，口径同 models/inventory_stock.rs）
+    pub gram_weight: Option<Decimal>,
+    /// 幅宽（inventory_stocks.width 真实列直映，单位 cm，口径同 models/inventory_stock.rs）
+    pub width: Option<Decimal>,
     // ===== 主数据名称（库存表只存 ID，列表/详情/导出按名称展示）=====
     /// 产品编码
     pub product_code: Option<String>,

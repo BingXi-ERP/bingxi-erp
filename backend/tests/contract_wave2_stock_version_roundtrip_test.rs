@@ -53,6 +53,8 @@ fn make_stock_response(version: i32) -> StockResponse {
         quantity_incoming: Decimal::ZERO,
         quantity_meters: dec("100.00"),
         quantity_kg: dec("50.00"),
+        gram_weight: None,
+        width: None,
         product_code: None,
         product_name: None,
         warehouse_name: None,
