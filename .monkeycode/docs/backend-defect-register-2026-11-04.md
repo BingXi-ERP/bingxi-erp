@@ -2,7 +2,11 @@
 
 ## D-56 财务预警的站内信收件人被写死成触发人，定时扫描链路根本不推消息
 
-现象：e2e 454-06（站内信条目本角色可见且另一角色不可见）在 flow 分片判红，红位落在前置断言"预警未回填 notification_id"。
+现象（分两层，第一层是代码事实，第二层待 CI 断言原文确认）：
+
+第一层是读源码直接得到的结构性缺陷，与用例是否变红无关，见下面两条后果。
+
+第二层是用例面：454-06（站内信条目本角色可见且另一角色不可见）在前一轮 flow 分片判红，但本 head 的红位尚未取证。按代码事实反推，用例是在登录态手工触发扫描，triggered_by 有值，站内信会生成且 notification_id 回填，故"前置不成立"这条推论不成立，红位更可能在后面的可见性与越权对照断言。修正前一轮的记法，红位以本轮分片制品的断言原文为准。
 
 根因（源码面，非用例面）：backend/src/services/finance_alert_service.rs 的 attach_notification 只把 CreateNotificationRequest.user_id 取作 triggered_by，且 triggered_by 为 None 时直接原样返回 Model，notification_id 保持 None。handlers/finance_alert_handler.rs 的出参只是把 m.notification_id 透传，models/finance_alert.rs 的 notification_id 是 Option i32。
 
