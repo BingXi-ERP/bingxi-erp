@@ -31,8 +31,7 @@ mod tests {
         let converted = from_f64(12.8).expect("12.8 必须可换算");
         // 未换算的 retain 带着二进制尾数，规范化后与本函数的结果不再相等
         let raw = Decimal::from_f64_retain(12.8).expect("12.8 必须可换算");
-        let mantissa_diff = "retain 的尾数应被舍掉，否则换算单点没有意义";
-        assert_ne!(raw, converted, mantissa_diff);
+        assert_ne!(raw, converted, "尾数应被舍掉，否则换算单点没有意义");
         assert_eq!(converted, Decimal::from_parts(128, 0, 0, false, 1));
         // 从未舍入的尾数版按 2 位折一次，走的是真正的截断分支
         let scaled = raw.round_dp(2);
