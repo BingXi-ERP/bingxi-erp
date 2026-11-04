@@ -754,24 +754,26 @@ test.describe('40 报价单多角色审批流转', () => {
                 { key: 'rejQuotationId', value: quotationId },
                 { key: 'rejQuotationNo', value: quotationNo },
                 { key: 'rejRepUsername', value: session.username },
+                { key: 'rejCustomerId', value: customerId },
               ],
             };
           },
         },
         {
           role: 'sales_manager',
-          label: '拒绝报价并留痕（详情页按钮对照腿）',
-          run: async ({ session, require }) => {
+          label: '跨 owner 读面拒 自名下按钮对照 办理拒绝',
+          run: async ({ session, require, registerCleanup }) => {
             const quotationId = Number(require('rejQuotationId'));
-            // UI 对照：审批棒进详情页，批准与拒绝按钮应各自恰有一个可达
-            // （canApprove canReject computed 要求状态 pending_approval 且持对应键，二者都满足）
+            // 读面判据：报价的归属人列是 sales_user_id（quotation_ops/crud.rs 的
+            // ensure_visible_by_scope 按归属人判可见），本棒 data_scope=dept 而报价资源无部门维列，
+            // 部门成员集合为空使可见集退化为仅本人，因此跨 owner 读他人报价详情必被行级数据范围门
+            // fail-closed 拒成 403，与 e2e/flow/123 与 e2e/flow/94 在册判据同口径。
             // 动作区整块在详情卡的 v-if="quotation" 内：读面失败时 quotation 为 null，
-            // 连返回按钮都不会渲染（views/quotations/detail.vue 的 loadData 失败分支）。
-            // 因此先显式等这次报价详情 GET 并点名状态码，把"读面被行级数据范围门挡"
-            // 与"按钮本身缺失"两种红分开，而不是让 15s 超时替两者一起背锅。
+            // 连返回按钮都不会渲染（views/quotations/detail.vue 的 loadData 失败分支），
+            // 所以这条腿只钉读面状态码，不在这张他人行上做按钮对照。
             // 等待判据必须按 pathname 精确等于 API 详情路径：同一次导航里浏览器文档请求
-            // /quotations/{id} 也回 200，宽松子串匹配会被它抢先命中，后续按钮定位就只能超时；
-            // 精确等式同时排除 /quotations/{id}/terms 等子路径，非 200 不跳过、原样交给下方断言点名。
+            // /quotations/{id} 也回 200，宽松子串匹配会被它抢先命中，后续定位就只能超时；
+            // 精确等式同时排除 /quotations/{id}/terms 等子路径，非预期码不跳过、原样交给下方断言点名。
             const detailPathname = `${API_PREFIX}/quotations/${quotationId}`;
             const detailRead = session.page.waitForResponse(
               r => {
@@ -790,19 +792,82 @@ test.describe('40 报价单多角色审批流转', () => {
               detailStatus = (await detailRead).status();
             } catch (e) {
               throw new Error(
-                `审批棒进详情页后 15s 内没有拿到报价详情读响应，读面未发或被守卫吞掉：${
+                `审批棒进他人报价详情后 15s 内没有拿到详情读响应，读面未发或被守卫吞掉：${
                   (e as Error).message
                 }`
               );
             }
             expect(
               detailStatus,
-              `审批棒读报价详情应 200，实际 ${detailStatus}；非 200 时该会话被行级数据范围门挡在取数入口，动作区整块不会渲染`
-            ).toBe(200);
+              `跨 owner 读报价详情应 403（被行级数据范围门 fail-closed 拒绝，与 123 与 94 在册判据一致），实际 ${detailStatus}`
+            ).toBe(403);
             const guard = session.page.url();
             expect(guard, `审批棒进报价详情不应被守卫挡到无权限页，实际落在 ${guard}`).not.toMatch(
               /\/403(\?|#|$)/
             );
+
+            // 按钮对照搬到本棒名下的一张对照单：动作区只有在归属人自己读得通的那张单上才可能渲染。
+            // 本棒授权面无 quotations:create 与 submit，故建单与提交沿用本链既有建单棒会话
+            // （relay.sessions 按棒次顺序，第 2 棒持建单与提交面），归属人显式取本棒用户 id；
+            // 金额沿用 buildQuotationPayload 的净额 200000，落在 10 万到 50 万档，提交走 BPM 分支，
+            // 不会被小额自批短路直接落 approved。归属正确性由"本棒读这张单得 200"这条行为坐实。
+            const builder = relay.sessions[1];
+            const ctrlMarker = genCode('F40CT');
+            const ctrlCreated = await apiCallRaw<Row>(
+              builder.page,
+              'POST',
+              '/quotations',
+              buildQuotationPayload(
+                Number(require('rejCustomerId')),
+                session.userId,
+                Number(require('rejProductId')),
+                String(require('rejProductUnit')),
+                `E2E-F40CTRL-${ctrlMarker}`
+              )
+            );
+            const ctrlQuotationId = requireId(ctrlCreated.id, '自名下对照建单');
+            await apiCall(builder.page, 'POST', `/quotations/${ctrlQuotationId}/submit`);
+            const ctrlSubmitted = await readQuotationStatus(session.page, ctrlQuotationId);
+            expect(
+              String(ctrlSubmitted.status ?? ''),
+              `自名下对照单提交后应 pending_approval（10 万到 50 万档走 BPM 分支），实际=${JSON.stringify(
+                ctrlSubmitted.status
+              )}`
+            ).toBe('pending_approval');
+            // 报价族后端无 DELETE 端点，cancel 是它在册的终结面，按本文件清理范式登记收尾；
+            // 清理由本棒会话发起，未落终态时该单以唯一 notes 标记点名残留。
+            registerCleanup({
+              method: 'POST',
+              path: `/quotations/${ctrlQuotationId}/cancel`,
+              label: `对照报价#${ctrlQuotationId}`,
+            });
+            const ctrlPathname = `${API_PREFIX}/quotations/${ctrlQuotationId}`;
+            const ctrlRead = session.page.waitForResponse(
+              r => {
+                if (r.request().method() !== 'GET') return false;
+                try {
+                  return new URL(r.url()).pathname === ctrlPathname;
+                } catch {
+                  return false;
+                }
+              },
+              { timeout: 15000 }
+            );
+            await safeGoto(session.page, `/quotations/${ctrlQuotationId}`);
+            let ctrlStatus = 0;
+            try {
+              ctrlStatus = (await ctrlRead).status();
+            } catch (e) {
+              throw new Error(
+                `审批棒进自名下报价详情后 15s 内没有拿到详情读响应，读面未发或被守卫吞掉：${
+                  (e as Error).message
+                }`
+              );
+            }
+            expect(
+              ctrlStatus,
+              `审批棒读自己名下报价详情应 200（归属人在可见集内，动作区才可能渲染），实际 ${ctrlStatus}`
+            ).toBe(200);
             // 先等动作区渲染出来（返回按钮是那一块里唯一无条件渲染的），再数批准与拒绝
             await session.page
               .locator('.actions .el-button', { hasText: '返回' })
@@ -828,12 +893,18 @@ test.describe('40 报价单多角色审批流转', () => {
             expect(rejectButtons, `审批棒详情页应恰有 1 个拒绝按钮，实际 ${rejectButtons} 个`).toBe(
               1
             );
-            // 真实办理拒绝（reject 端点理由必填并落库，handler 现实收口 trim 非空）
+
+            // 真实办理拒绝仍打在原来那张他人行上：这条腿验的事实是 reject 端点不设归属门，
+            // 跨 owner 也能办理；与上方"跨 owner 读面被行级数据范围门拒成 403"是两条独立判据，不矛盾。
             await apiCall(session.page, 'POST', `/quotations/${quotationId}/reject`, {
               reason: 'E2E-F40 价格低于成本线驳回',
             });
             return {
-              artifacts: [{ key: 'rejManagerUsername', value: session.username }],
+              artifacts: [
+                { key: 'rejManagerUsername', value: session.username },
+                { key: 'ctrlQuotationId', value: ctrlQuotationId },
+                { key: 'ctrlQuotationMarker', value: ctrlMarker },
+              ],
             };
           },
         },
