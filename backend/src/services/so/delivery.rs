@@ -20,6 +20,7 @@
 //! - impl 块分散在 delivery_ops 子模块，Rust 允许同一 crate 多文件多 impl 块
 
 use crate::models::status::sales_delivery as delivery_status;
+use crate::models::status::sales_order as so_status;
 use crate::models::{sales_delivery, sales_order};
 use crate::utils::error::AppError;
 use rust_decimal::Decimal;
@@ -119,7 +120,17 @@ impl SalesService {
         Ok(deliveries)
     }
 
-    /// 创建发货单（手动创建）
+    /// 创建发货单（手动创建）。
+    /// 调用方 handlers/sales_order_handler.rs 的 create_delivery（POST /sales/orders/{id}/deliveries）。
+    /// 入参 order_id 销售订单主键、warehouse_id 出库仓库主键、user_id 建单人。
+    /// 出库状态门与 delivery_ops::ship 的 load_ship_order_context 同口径同词表：
+    /// 仅 sales_order 的 approved 与 partial_shipped 可出库——未审批单在此落发货单等于
+    /// 绕过审批链直接产生出库凭据，partial_shipped 必须放行否则补发被误拒。
+    /// 被拒只回可外显业务错（文案是本应告知用户的业务规则，不含状态实值与内部 ID），
+    /// 且不写 sales_deliveries 行、不动 inventory_stocks 三列。
+    /// 存什么与存哪里 sales_deliveries 一行：delivery_no（DN 单号）、order_id、
+    /// customer_id（取自订单本身）、warehouse_id、delivery_date、status=pending、
+    /// total_quantity/total_amount 置 0、created_by 与建单时间戳。
     pub async fn create_delivery(
         &self,
         order_id: i32,
@@ -134,6 +145,12 @@ impl SalesService {
             .one(&txn)
             .await?
             .ok_or_else(|| AppError::not_found("销售订单不存在"))?;
+        if order.status != so_status::APPROVED && order.status != so_status::PARTIAL_SHIPPED {
+            txn.rollback().await?;
+            return Err(AppError::business_displayable(
+                "仅已审批或部分发货的订单可出库，请确认订单状态后重试",
+            ));
+        }
         let delivery = sales_delivery::ActiveModel {
             id: Default::default(),
             // P1 3-8 修复（批次 60）：改用 DocumentNumberGenerator 保证并发唯一性

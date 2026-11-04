@@ -409,14 +409,26 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
       '空洞时 final_price 必须等于基础价 100.00'
     ).toBe(100);
 
-    expect(
-      str((await calcPrice(page, productId, colorId, '99')).tier_price),
-      '删第二档不应波及第一档'
-    ).toBe('88.88');
-    expect(
-      str((await calcPrice(page, productId, colorId, '500')).tier_price),
-      '删第二档不应波及第三档'
-    ).toBe('44.44');
+    // tier_price 列是 DECIMAL(18,6)（migration/src/domain/production/m0044_integrate_unreferenced_migrations.rs
+    // 建表段），PostgreSQL 按列 typmod 归一后序列化串恒带六位小数；取价腿
+    // （utils/price_calculator.rs::find_tier_price）原样回传列值，不做第二次舍入。
+    // 因此档位的业务语义只能按数值对平（与本文件其余 tier_price 断言同一纪律），
+    // 按字符串逐字符比会把列位宽误当成金额语义。applied_rule 同断，
+    // 保证"删第二档不得让邻档退回基础价"这条判据真实可达。
+    for (const probe of [
+      { qty: '99', want: 88.88, label: '第一档' },
+      { qty: '500', want: 44.44, label: '第三档' },
+    ]) {
+      const hit = await calcPrice(page, productId, colorId, probe.qty);
+      expect(
+        str(hit.applied_rule),
+        `删第二档后数量 ${probe.qty} 不得漂出阶梯档（应命中${probe.label}），实际 applied_rule=${str(hit.applied_rule)}`
+      ).toBe('tier');
+      expect(
+        toNum(hit.tier_price, `删第二档后数量 ${probe.qty} 的 tier_price`),
+        `删第二档不应波及${probe.label}，数量 ${probe.qty} 应仍取 ${probe.want}，实际 ${str(hit.tier_price)}`
+      ).toBe(probe.want);
+    }
 
     await apiCallRaw<unknown>(page, 'DELETE', `/color-prices/${priceId}`);
   });

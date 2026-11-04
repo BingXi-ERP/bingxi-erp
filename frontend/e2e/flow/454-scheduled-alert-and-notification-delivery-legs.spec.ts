@@ -23,8 +23,10 @@ import { safeGoto } from './ui-helpers';
  *
  * 1. 缺料预警阈值 handlers/material_shortage_handler.rs：
  *    POST /material-shortage/threshold 入参 safety_factor / critical_threshold / severe_threshold
- *    皆可选且只覆盖提交的键；GET 同名端点读回同一份配置；DECIMAL 出参是序列化字符串，
- *    比较一律经 Number() 归一（存储口径 DECIMAL(10,2) 已裁定，测试内不再二次舍入）。
+ *    皆可选且只覆盖提交的键；GET 同名端点读回同一份配置；DECIMAL 出参是序列化字符串。
+ *    存储口径为 migration/src/domain/v15/mod.rs 建表段的三列 DECIMAL(5,2)，
+ *    库侧串就是事实值：断言按读回串逐字符比，期望值由该串按整数分推导，
+ *    测试内既不再二次舍入，也不用浮点加法造值（浮点会造出列上根本不存在的 50.050000000000004）。
  *    GET /material-shortage/alerts 出参是 PaginatedResponse{items,total,page,page_size}。
  *
  * 2. 账期（账龄）预警规则 handlers/aging_alert_rule_handler.rs + models/aging_alert_rule.rs：
@@ -114,6 +116,31 @@ function uniq(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+/**
+ * 功能：把 DECIMAL 序列化串按整数分（两位小数）加量，产出提交值与期望值共用的十进制串。
+ * 调用方：454-01 的阈值写入入参与写后回读断言。
+ * 入参：serialized 是 GET /material-shortage/threshold 读回的列值
+ * （material_shortage_threshold_configs 三列均 DECIMAL(5,2)，见 migration/src/domain/v15/mod.rs 建表段，
+ * PostgreSQL 按列 typmod 归一后序列化串恒带两位小数）；cents 是要加的分数；label 用于点名是哪一列。
+ * 传给谁：apiCall 请求体（DECIMAL 入参按字符串十进制提交，与本仓其它金额入参同形）。
+ * 存什么/存哪里：不落库，只产出与库侧口径逐字符一致的字符串。
+ * 为什么不在测试里做浮点加法：基线 + 0.02 + 0.03 会产生 50.050000000000004，
+ * 该值在两位小数的列上根本不存在，拿它当期望值会把"读回成功"误判成"读不回"。
+ */
+function addCents(serialized: unknown, cents: number, label: string): string {
+  const s = String(serialized);
+  const m = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(s);
+  if (!m) {
+    throw new Error(`${label} 应为最多两位小数的 DECIMAL 序列化串，实际 ${s}`);
+  }
+  const totalCents = Number(m[2]) * 100 + Number((m[3] ?? '').padEnd(2, '0'));
+  const nextCents = totalCents + cents;
+  if (nextCents < 0) {
+    throw new Error(`${label} 按分加量后为负（${nextCents} 分），阈值列非负且业务上不允许负值`);
+  }
+  return `${Math.floor(nextCents / 100)}.${String(nextCents % 100).padStart(2, '0')}`;
+}
+
 /** 距今 days 天前的日期（后端候选判据用本地日历日） */
 function pastDate(days: number): string {
   const d = new Date();
@@ -158,30 +185,33 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
   test('454-01 缺料预警阈值写入回读一致且改值后旧值不残留', async ({ page }) => {
     test.setTimeout(180_000);
 
+    // 期望值只认库侧序列化串（两位小数），改量按整数分推导，测试内不做浮点加法
     const base = await apiCallRaw<ThresholdConfig>(page, 'GET', '/material-shortage/threshold');
-    const baseCritical = Number(base.critical_threshold);
-    const baseSevere = Number(base.severe_threshold);
-    if (!Number.isFinite(baseCritical) || !Number.isFinite(baseSevere)) {
-      throw new Error(`454-01 前置不成立：阈值基线缺键，实际=${JSON.stringify(base)}`);
+    const baseCritical = String(base.critical_threshold);
+    const baseSevere = String(base.severe_threshold);
+    if (!/^\d+\.\d{2}$/.test(baseCritical) || !/^\d+\.\d{2}$/.test(baseSevere)) {
+      throw new Error(
+        `454-01 前置不成立：阈值基线不是两位小数的 DECIMAL 序列化串，实际=${JSON.stringify(base)}`
+      );
     }
     console.log(`[454-01] 基线 critical=${baseCritical} severe=${baseSevere}`);
 
-    const newCritical = baseCritical + 0.01;
-    const newSevere = baseSevere + 0.02;
+    const newCritical = addCents(baseCritical, 1, '基线 critical');
+    const newSevere = addCents(baseSevere, 2, '基线 severe');
     await apiCall(page, 'POST', '/material-shortage/threshold', {
       critical_threshold: newCritical,
       severe_threshold: newSevere,
     });
     const after = await apiCallRaw<ThresholdConfig>(page, 'GET', '/material-shortage/threshold');
-    expect(Number(after.critical_threshold), '454-01 改后 critical 未读回新值').toBe(newCritical);
-    expect(Number(after.severe_threshold), '454-01 改后 severe 未读回新值').toBe(newSevere);
+    expect(String(after.critical_threshold), '454-01 改后 critical 未读回新值').toBe(newCritical);
+    expect(String(after.severe_threshold), '454-01 改后 severe 未读回新值').toBe(newSevere);
 
     // 只提交单键时另一键保持新值而非回落基线（部分覆盖，不是整表重置）
-    const keepSevere = newSevere + 0.03;
+    const keepSevere = addCents(newSevere, 3, '上一轮 severe');
     await apiCall(page, 'POST', '/material-shortage/threshold', { severe_threshold: keepSevere });
     const partial = await apiCallRaw<ThresholdConfig>(page, 'GET', '/material-shortage/threshold');
-    expect(Number(partial.severe_threshold), '454-01 单键更新 severe 未读回新值').toBe(keepSevere);
-    expect(Number(partial.critical_threshold), '454-01 未提交的 critical 不应被改').toBe(
+    expect(String(partial.severe_threshold), '454-01 单键更新 severe 未读回新值').toBe(keepSevere);
+    expect(String(partial.critical_threshold), '454-01 未提交的 critical 不应被改').toBe(
       newCritical
     );
 
@@ -191,8 +221,8 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
       severe_threshold: baseSevere,
     });
     const restored = await apiCallRaw<ThresholdConfig>(page, 'GET', '/material-shortage/threshold');
-    expect(Number(restored.critical_threshold), '454-01 基线回写 critical').toBe(baseCritical);
-    expect(Number(restored.severe_threshold), '454-01 基线回写 severe').toBe(baseSevere);
+    expect(String(restored.critical_threshold), '454-01 基线回写 critical').toBe(baseCritical);
+    expect(String(restored.severe_threshold), '454-01 基线回写 severe').toBe(baseSevere);
 
     const list = await apiCall<RulePage>(
       page,

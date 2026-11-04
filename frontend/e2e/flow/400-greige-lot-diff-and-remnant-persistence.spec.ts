@@ -78,7 +78,8 @@
  * 残留声明（按判红口径不造假清理）。
  * 零头子卷与母卷及委外染色链前置行无 DELETE 通道（route-snapshot.txt 中
  * inventory/pieces 仅有 GET 与 print，piece-split 仅有 POST），残留属已知不可回收面；
- * 坯布腿两卷在断言完成后经 stock-out 全额出库转已出库再 DELETE 软删，清理干净。
+ * 坯布腿两卷在断言完成后经 POST 出库端点（路径末段 stock-out 用连字符，handler
+ *    函数名才是 stock_out）全额出库转已出库，再 DELETE 软删，清理干净。
  */
 import { test, expect, type Page } from '../diagnose-fixture';
 import {

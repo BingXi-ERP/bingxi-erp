@@ -9,14 +9,12 @@ use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use crate::services::inv::fabric_class::{self, FabricTrace};
 use crate::services::inventory_stock_service::{CreateStockFabricArgs, InventoryStockService};
-use crate::utils::dual_unit_converter::DualUnitConverter;
 use crate::utils::error::AppError;
 use crate::utils::response::ApiResponse;
 use axum::{
     Json,
     extract::{Query, State},
 };
-use rust_decimal::Decimal;
 use validator::Validate;
 
 use super::inventory_stock_handler_dto::{
@@ -56,6 +54,8 @@ pub async fn list_stock_fabric(
             gram_weight: stock.gram_weight,
             width: stock.width,
             bin_location: stock.bin_location,
+            shelf_no: stock.shelf_no,
+            layer_no: stock.layer_no,
             created_at: stock.created_at,
             updated_at: stock.updated_at,
         })
@@ -81,15 +81,18 @@ pub async fn create_stock_fabric(
 
     let service = InventoryStockService::new(state.db.clone());
 
-    // 如果提供了克重和幅宽，自动计算公斤数
-    let quantity_kg = if let (Some(gram_weight), Some(width)) = (payload.gram_weight, payload.width)
-    {
-        DualUnitConverter::meters_to_kg(payload.quantity_meters, gram_weight, width)
-            .map_err(|e| AppError::validation(format!("双计量单位换算失败：{}", e)))?
-    } else {
-        // 如果没有提供克重和幅宽，使用传入的公斤数或默认为 0
-        payload.quantity_kg.unwrap_or(Decimal::ZERO)
-    };
+    // 公斤数是仓管实测/录入的独立事实：提交了就原样落库，绝不用 米×克重×门幅 的理论换算值
+    // 覆盖——实测与理论本就允许不等（含回潮、零头、绕卷松紧），覆盖等于销毁录入事实，
+    // 并使按公斤口径的成本分摊与对账失真。只有未提交公斤数时才补算（克重与门幅齐备才算，
+    // 缺任一即不可算、记 0，不猜值），三条口径的唯一定义处是
+    // `InventoryStockService::resolve_quantity_kg`，换算失败按校验错误外显给用户。
+    let quantity_kg = InventoryStockService::resolve_quantity_kg(
+        payload.quantity_kg,
+        payload.quantity_meters,
+        payload.gram_weight,
+        payload.width,
+    )
+    .map_err(|e| AppError::validation(format!("双计量单位换算失败：{}", e)))?;
 
     let stock = service
         .create_stock_fabric(CreateStockFabricArgs {
@@ -125,6 +128,8 @@ pub async fn create_stock_fabric(
         gram_weight: stock.gram_weight,
         width: stock.width,
         bin_location: stock.bin_location,
+        shelf_no: stock.shelf_no,
+        layer_no: stock.layer_no,
         created_at: stock.created_at,
         updated_at: stock.updated_at,
     })))

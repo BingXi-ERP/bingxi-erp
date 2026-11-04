@@ -329,9 +329,9 @@ async fn non_admin_enhanced_list_is_masked_not_raw() {
     );
     let (status, v) = get_json(&app, "/erp/crm/customers/enhanced?page=1&page_size=10").await;
     assert_eq!(status, StatusCode::OK, "self 用户看自己线索应成功: {v}");
-    let rows = v["data"]["data"]
+    let rows = v["data"]["items"]
         .as_array()
-        .expect("list_leads 分页出参 data 数组缺失");
+        .expect("list_leads 分页出参 items 数组缺失");
     assert!(!rows.is_empty(), "种子线索应对归属人可见");
     assert_lead_shape_masked(&rows[0], "GET /crm/customers/enhanced 列表行");
     assert_no_raw_pii(&v["data"], "GET /crm/customers/enhanced 整体响应");
@@ -345,7 +345,7 @@ async fn admin_enhanced_list_keeps_raw_pii() {
     );
     let (status, v) = get_json(&app, "/erp/crm/customers/enhanced?page=1&page_size=10").await;
     assert_eq!(status, StatusCode::OK, "admin 列表应成功: {v}");
-    let rows = v["data"]["data"].as_array().expect("data 数组缺失");
+    let rows = v["data"]["items"].as_array().expect("items 数组缺失");
     assert_lead_shape_raw(&rows[0], "admin GET /crm/customers/enhanced");
 }
 
