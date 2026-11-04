@@ -504,10 +504,17 @@ test.describe('449 委外染整返工与缸差登记', () => {
     outsourcingItemId = itemId;
 
     // 前置成立证明：按单回读发料明细必须看到刚登记的那条匹，否则发料门仍会拒。
-    const itemRows = await safeGetList<Record<string, unknown>>(
+    // list_outsourcing_items 的出参是 ApiResponse<Vec<Model>> 裸数组，不是分页信封，
+    // 读法按数组通道取 data 并先自证是数组。
+    const itemRows = await apiCallRaw<Record<string, unknown>[]>(
       page,
+      'GET',
       `/production/outsourcing-orders/items/by-order/${id}`
     );
+    expect(
+      Array.isArray(itemRows),
+      `按单读发料明细应返回数组，实际 ${JSON.stringify(itemRows)}`
+    ).toBe(true);
     expect(
       itemRows.some(r => Number(r['id']) === itemId),
       `发料明细 ${itemId} 必须能按单读回，实际 ${JSON.stringify(itemRows)}`
