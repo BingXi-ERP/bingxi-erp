@@ -124,6 +124,14 @@ pub struct CustomerShareDto {
     pub revoked_by: Option<i32>,
     pub revoke_reason: Option<String>,
     pub share_reason: Option<String>,
+    // ===== 时间戳（customer_shares.created_at / updated_at 真实列直映，均 NOT NULL）=====
+    // 共享链路的每次变更（撤销置 revoked_at、过期清理置 status=expired）都会刷新 updated_at，
+    // 时效与权限收回的判定依据就是这两列；投影不带，调用方就无从判断这条共享何时建立、
+    // 最后一次变更发生在何时，只能恒读 undefined。
+    /// 创建时间（共享记录落库时刻，写腿与 shared_at 同取一次 now）
+    pub created_at: DateTime<Utc>,
+    /// 更新时间（撤销/过期清理等状态变更的最后写入时刻，真实列直映）
+    pub updated_at: DateTime<Utc>,
 }
 
 impl From<customer_share::Model> for CustomerShareDto {
@@ -143,6 +151,8 @@ impl From<customer_share::Model> for CustomerShareDto {
             revoked_by: m.revoked_by,
             revoke_reason: m.revoke_reason,
             share_reason: m.share_reason,
+            created_at: m.created_at,
+            updated_at: m.updated_at,
         }
     }
 }
