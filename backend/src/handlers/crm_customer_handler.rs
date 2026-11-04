@@ -186,21 +186,11 @@ pub async fn list_customers(
 
     // V15 P0-S01：提取行级数据权限上下文
     let data_scope_ctx = auth.to_data_scope_context();
-    // list_leads 的返回已是 serde_json::Value，直接取所有权（不做 to_value 序列化往返）
+    // list_leads 的返回已是 serde_json::Value，直接取所有权（不做 to_value 序列化往返），
+    // 其分页信封为 PaginatedResponse{items,total,page,page_size}（utils/response.rs）
     let mut value = service.list_leads(query, Some(&data_scope_ctx)).await?;
-    // 分页信封键纠正：仓内分页唯一形状 PaginatedResponse{items,total,page,page_size}
-    // （utils/response.rs）。list_leads 自造的 "data" 键改为 "items"，与 ApiResponse
-    // 外层 "data" 不再语义重叠；不保留 data 键做兼容双写（双写等于把契约违规合法化）。
-    if let Some(obj) = value.as_object_mut() {
-        if let Some(old) = obj.remove("data") {
-            obj.insert("items".to_string(), old);
-        }
-    }
-    // 字段级权限：列表现在在 "items" 键，直接取数组做掩码/删键
-    if let Some(rows) = value
-        .get_mut("items")
-        .and_then(serde_json::Value::as_array_mut)
-    {
+    // 字段级权限：与线索列表/详情/公海出口复用同一个数组定位实现，本处不另写键名分支
+    if let Some(rows) = crate::handlers::crm_handler::paginated_list_array_mut(&mut value) {
         apply_customer_field_permission(&state, auth.role_id, rows).await;
     }
     Ok(Json(ApiResponse::success(value)))

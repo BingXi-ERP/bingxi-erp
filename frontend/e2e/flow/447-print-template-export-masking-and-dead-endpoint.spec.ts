@@ -63,7 +63,7 @@ import {
  * - 增强列表的行来自线索域（`create_customer` → `services/crm/lead.rs::create_lead`），
  *   PII 列键因此是 `models/crm_lead.rs` 的 `mobile_phone`/`tel_phone`/`email`/`address`，
  *   不是 `customers`/`customer_contacts` 的 `contact_phone`/`contact_email`；读错键等于按钮恒不可达级
- *   的空断言。`/crm/customers/enhanced` 的出参是手写分页壳 `{data,total,page,page_size}`
+ *   的空断言。`/crm/customers/enhanced` 的出参是手写分页壳 `{items,total,page,page_size}`
  *   （`list_leads`），承载键由 `crm-enhanced.ts` 的 `CustomerPage` 与 `check-api-envelope.mjs` 共同确认。
  * - `services/color_card_issue_service.rs` 的 `mask_cost_amount`：`handlers/color_card/issue.rs`
  *   在 `can_view_cost` 为假时把 `compensation_amount` 置 None（成本列剔除而非掩码，与 PII 列又是第三种形态）。

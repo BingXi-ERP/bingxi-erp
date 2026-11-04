@@ -313,8 +313,8 @@ export interface AssignmentHistoryResult {
 
 /**
  * GET /crm/customers/enhanced 响应载荷（唯一真相：utils/response.rs 的 PaginatedResponse
- * 分页信封 `{items, total, page, page_size}`，handler 侧对 list_leads 产出的自造 `"data"`
- * 键做了纠正，不再保留旧键做兼容双写）。元素形状由后端 crm_lead::Model 序列化决定。
+ * 分页信封 `{items, total, page, page_size}`，与 `services/crm/lead.rs::list_leads`
+ * 的产出键逐字符相同）。元素形状由后端 crm_lead::Model 序列化决定。
  */
 export interface CustomerPage {
   items: CustomerWithTags[];
