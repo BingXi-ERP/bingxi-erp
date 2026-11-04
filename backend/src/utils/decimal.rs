@@ -31,13 +31,12 @@ mod tests {
         let converted = from_f64(12.8).expect("12.8 必须可换算");
         // 未换算的 retain 带着二进制尾数，规范化后与本函数的结果不再相等
         let raw = Decimal::from_f64_retain(12.8).expect("12.8 必须可换算");
-        assert_ne!(
-            raw,
-            converted,
-            "retain 的尾数应被舍掉，否则换算单点没有意义"
-        );
+        let mantissa_diff = "retain 的尾数应被舍掉，否则换算单点没有意义";
+        assert_ne!(raw, converted, mantissa_diff);
         assert_eq!(converted, Decimal::from_parts(128, 0, 0, false, 1));
-        assert_eq!(converted.round(2), Decimal::from_parts(1280, 0, 0, false, 2));
+        let scaled = converted.round(2);
+        let expected = Decimal::from_parts(1280, 0, 0, false, 2);
+        assert_eq!(scaled, expected);
     }
 
     #[test]
