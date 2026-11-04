@@ -336,10 +336,18 @@ impl FinanceAlertService {
         txn: &sea_orm::DatabaseTransaction,
     ) -> Result<Vec<AlertCandidate>, FinanceAlertError> {
         let today = Utc::now().date_naive();
+        // 候选谓词：未收金额大于零 + 到期日已过（UTC 口径）+ 审批态 APPROVED，
+        // 并剔除已作废单。作废腿（services/ar_invoice_service.rs 的 cancel）只把 status
+        // 置 common::STATUS_CANCELLED，既不回退 approval_status 也不清零 unpaid_amount，
+        // 因此不加这一列过滤，作废单就永久留在逾期候选里：按客户聚合时会抬高
+        // max 逾期天数、虚增未收金额合计，并让定时扫描天天为作废单开催收通知。
+        // 比较值与写入方取同一常量（models/status 的 common::STATUS_CANCELLED），
+        // status 列非空，故 ne 不会因 NULL 把合法单一并排除。
         let invoices = ar_invoice::Entity::find()
             .filter(ar_invoice::Column::UnpaidAmount.gt(Decimal::ZERO))
             .filter(ar_invoice::Column::DueDate.lt(today))
             .filter(ar_invoice::Column::ApprovalStatus.eq(common::STATUS_APPROVED))
+            .filter(ar_invoice::Column::Status.ne(common::STATUS_CANCELLED))
             .all(txn)
             .await?;
 
