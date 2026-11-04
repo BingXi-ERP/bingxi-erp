@@ -278,16 +278,36 @@ test.describe('面料样品打样版本链与降等转大货', () => {
     // 传给谁：bulk_color_approval_service（状态流转 + 历史记录）。
     // 存什么：approval_status / sent_to_customer_at / reject_reason——被拒时三者都不得变化。
     // 存哪里：bulk_color_approvals（backend/src/models/bulk_color_approval.rs）。
-    const approvals = await safeGetList<Record<string, unknown>>(
-      page,
-      '/bulk-color-approvals?page=1&page_size=20'
-    );
-    const pending = approvals.find(r => String(r['approval_status']) === APPROVAL_STATUS_PENDING);
-    if (!pending) {
-      throw new Error('前置不成立：库内无 pending 批色单，无法验证未剪样/未确认的非法跃迁');
+    // 前置由本用例自建：读回证明新建批色单确实是 pending，不依赖"库里恰好有一行"。
+    // 必填三键取夹具真实主键（handlers/bulk_color_approval_handler.rs 的 CreateBulkColorApprovalDto
+    // 里 sales_order_id / dye_batch_id / customer_id 必填，sales_order_item_id 是 Option，
+    // 本腿不挂明细行）；初态 pending 由 services/bulk_color_approval_service.rs 建单写入。
+    await ensureTestEntities(page);
+    const ctx = getCtx();
+    if (!ctx.salesOrderId || !ctx.dyeBatchId || !ctx.customerId) {
+      throw new Error('前置不成立：夹具未产出销售订单/染色批次/客户主键，无法自建 pending 批色单');
     }
-    const id = Number(pending['id']);
+    const host = await apiCall<{ id?: number }>(page, 'POST', '/bulk-color-approvals', {
+      sales_order_id: ctx.salesOrderId,
+      dye_batch_id: ctx.dyeBatchId,
+      customer_id: ctx.customerId,
+      remark: `非法跃迁腿自建批色单 ${genCode('446P')}`,
+    });
+    const id = Number(host.data?.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error(`自建 pending 批色单未返回真实主键：${JSON.stringify(host.data)}`);
+    }
     approvalId = id;
+
+    const createdRow = await apiCall<Record<string, unknown>>(
+      page,
+      'GET',
+      `/bulk-color-approvals/${id}`
+    );
+    expect(
+      String(createdRow.data['approval_status']),
+      `自建批色单 ${id} 初态必须是 pending，非法跃迁判据才成立`
+    ).toBe(APPROVAL_STATUS_PENDING);
 
     const sendFail = await apiCallExpectFail(
       page,
@@ -475,6 +495,15 @@ test.describe('面料样品打样版本链与降等转大货', () => {
       'DELETE',
       `/ai/quality-predictions/${predictionId}`,
       `清理自建质量预测 ${predictionId}`
+    );
+    // 收尾：回收非法跃迁腿自建的 pending 批色单（本文件最后一处消费该句柄的位点是上面的
+    // fieldProbe）。删除面在 frontend/scripts/route-snapshot.txt 在册
+    //（bulk_color_approval_handler::delete_bulk_color_approval），不留残留行给后续分片。
+    await tryCleanup(
+      page,
+      'DELETE',
+      `/bulk-color-approvals/${approvalId}`,
+      `清理自建批色单 ${approvalId}`
     );
   });
 });
