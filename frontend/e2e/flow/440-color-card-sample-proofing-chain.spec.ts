@@ -1158,7 +1158,11 @@ test.describe('色卡与样品打样主链', () => {
     });
 
     const reader = await openRoleSession(browser, 'sales_manager');
-    const outsider = await openRoleSession(browser, 'salesperson');
+    // "无授权键的岗位"必须按后端矩阵实名选岗：init 矩阵把 ("color-cards","read") 明确授给
+    // sales_rep、("color-cards","*") 授给 sales_manager 与化验与染整两岗，业务员本来就持读键，
+    // 拿它当无键岗位只会把"岗位确实有权"读成"权限门被拒"。report_viewer 在矩阵与授权分组
+    // 都零色卡键，镜像建岗面闭合到 SHELL 两枚键，是被 RBAC 拒的真实无键岗位。
+    const outsider = await openRoleSession(browser, 'report_viewer');
     try {
       const listResp = await reader.page.request.fetch(
         `${API_BASE}${API_PREFIX}${CC}?keyword=${encodeURIComponent(cardName)}&page=1&page_size=20`
