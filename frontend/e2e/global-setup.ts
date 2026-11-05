@@ -712,6 +712,9 @@ const SEED_ROLE_EXTRA_PERMISSIONS: Record<string, string[]> = {
     // 后端既无建角也无授权分组，其权限码闭合等于 SHELL + 本清单，故必须在此逐键对齐
     // sales_rep 的读面，缺键即 RBAC 403，不会由后端同名角色矩阵带入。
     'customers:read',
+    // 色卡读面（GET /color-cards/… 运行时键 color-cards:read）：后端 init 矩阵把
+    // ("color-cards","read") 明确授给 sales_rep，镜像岗缺此键即被 RBAC 拒为 403。
+    'color-cards:read',
     // PII 按需揭示（POST /crm/customers/{id}/pii/reveal 运行时键 customers:reveal，
     // 与后端 init 矩阵 sales_rep/crm_rep 及 m0086 存量补授三通道同口径）
     'customers:reveal',
