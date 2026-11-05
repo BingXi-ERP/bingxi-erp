@@ -165,15 +165,11 @@ test.describe('越权 IDOR/data-scope — 销售订单与客户（self 角色）
       expect(adminRead.id, 'admin 应读到自己的客户').toBe(customerId);
       expect(adminRead.customer_name, '客户详情应回读到落库名称').toBe(customerName);
 
-      for (const role of ['salesperson', 'customer_service']) {
+      // 客服岗未持 customers:read，此处的 403 只能钉 RBAC 中间件层（message 透传原文），
+      // 不得冒充数据范围层；已持键的销售岗改由下方分支钉行级数据范围，两层互斥各自钉死。
+      for (const role of ['customer_service']) {
         const session = await openRoleSession(browser, role);
         intruders.push(session);
-
-        // 现状种子权限里不存在任何非 admin 角色的 customers:read
-        //（global-setup SEED_ROLE_EXTRA_PERMISSIONS 未授予；后端 permission.rs 的
-        // sales_rep/crm_rep 授码对应角色不在前端种子键内）——
-        // 因此此处的 403 只能钉 RBAC 中间件层（message 直出原文），**不得**冒充数据范围层；
-        // 数据范围层（crud.rs:88-94）对他人客户不可达，作为覆盖缺口如实交回编排方。
         const cross = await apiCallExpectFail(session.page, 'GET', `/crm/customers/${customerId}`);
         expectDenied(cross, `${role} 读他人客户应返回 403（RBAC 层，权限码缺失）`);
         expect(
@@ -192,6 +188,30 @@ test.describe('越权 IDOR/data-scope — 销售订单与客户（self 角色）
           '权限不足，无法访问该资源'
         );
       }
+      // 销售岗经种子补键已真实持有 customers:read（与后端 sales_rep 矩阵同键），RBAC 已过门，
+      // 因此它的 403 只能来自 handler 行级数据范围校验（脱敏文案），且列表按 self 范围
+      // 读不到 admin 管辖的这条客户。两条判据合起来才钉住"持键不等于可读他人行"。
+      const keyed = await openRoleSession(browser, 'salesperson');
+      intruders.push(keyed);
+      const keyedCross = await apiCallExpectFail(keyed.page, 'GET', `/crm/customers/${customerId}`);
+      expectDenied(keyedCross, 'salesperson 持 customers:read 后读他人客户应被行级数据范围拒');
+      expect(
+        String(keyedCross.message),
+        '该 403 的来源层应是数据范围校验脱敏文案，不是 RBAC 直出原文'
+      ).toBe('无权限');
+      const keyedList = await apiCallRaw<{ items?: Array<{ id: number }> }>(
+        keyed.page,
+        'GET',
+        '/crm/customers?page=1&page_size=20'
+      );
+      expect(
+        Array.isArray(keyedList.items),
+        `客户列表应回分页信封 items 数组，实际 ${JSON.stringify(keyedList)}`
+      ).toBe(true);
+      expect(
+        keyedList.items!.some(r => Number(r.id) === customerId),
+        'self 数据范围不应看到 admin 管辖的这条客户'
+      ).toBe(false);
     } finally {
       await tryCleanup(page, 'DELETE', `/crm/customers/${customerId}`, 'customer');
       for (const s of intruders) await s.close();
