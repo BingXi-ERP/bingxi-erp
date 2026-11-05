@@ -766,13 +766,7 @@ const SEED_ROLE_EXTRA_PERMISSIONS: Record<string, string[]> = {
   // "缺码即 RBAC 拦"的判据；也不授 export-approvals:approve——审批属 admin，授了会破坏
   // 双人分离前提（后端 SoD 同样拒绝同角色 create+approve 共存，role_permission_service.rs
   // ::validate_sod_create_approve）。
-  manager: [
-    'export-approvals:create',
-    // 大货批色单读面（GET /bulk-color-approvals/{id} 运行时键 bulk-color-approvals:read）：
-    // 与后端 init 矩阵 sales_manager 同口径补此键，写面（降等、发送客户）仍不授，
-    // 供越权用例钉"可读不可写"的键粒度。
-    'bulk-color-approvals:read',
-  ],
+  manager: ['export-approvals:create'],
   // 仓管/仓库经理：按四维选匹（发货/调拨）+ 打印成品布入库标签 + 坯布建档读写
   // 与 permission.rs 的 warehouse_keeper 及迁移 m0069/m0097 同口径（三通道锁）。
   warehouse_keeper: [

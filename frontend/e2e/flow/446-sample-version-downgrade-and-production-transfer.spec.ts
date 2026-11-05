@@ -501,11 +501,11 @@ test.describe('面料样品打样版本链与降等转大货', () => {
     );
     expectDenied(actualDenied, 'report_viewer 调用实测回写端点应被权限门拒绝');
 
-    // 主管岗的键粒度：sales_manager 与镜像岗 manager 现持 bulk-color-approvals:read，
-    // 因此读必须 200，而写面（降等）仍无授权、必须被 RBAC 拒——同会话一读一写同时成立，
-    // 才真正钉住"权限键按资源加动作精确匹配"，而不是靠岗位名义放行。
-    // 被拒后的状态零漂移复核同样由该读面承担（拒绝发生在 handler 之前，状态不得漂移）。
-    await loginAsRole(readonlyPage, 'manager');
+    // 主管岗的键粒度由后端建岗 sales_manager 承担：init 矩阵给它 ("bulk-color-approvals","read")
+    // 而不给任何写动作，因此读必须 200、降等必须仍被 RBAC 拒（403 加 FORBIDDEN）。
+    // 同会话一读一写同时成立，才真正钉住"权限键按资源加动作精确匹配"，不因岗位名义放行；
+    // 第二次的读同时承担"写被拒后状态零漂移"复核（拒绝发生在 handler 之前，状态不得漂移）。
+    await loginAsRole(readonlyPage, 'sales_manager');
     const managerRead = await apiCall<Record<string, unknown>>(
       readonlyPage,
       'GET',
