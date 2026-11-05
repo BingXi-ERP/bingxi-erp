@@ -758,15 +758,21 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
     }
     const target = await pickDyeableWarehouse(page);
     const batchNo = genCode('452C');
-    // 出库腿的可扣库存：白坯（色号空 ⇒ 服务端缸号归一 None），ShipOrderItemRequest 白坯分支免填匹号
+    // 出库腿的可扣库存：白坯（色号空 ⇒ 服务端缸号归一 None），ShipOrderItemRequest 白坯分支免填匹号。
+    // 量与下方报价行的米数合计同量级（9000 米），保持本腿「录入量 = 可扣量」的原设计关系。
     await seedGreigeStockIn(page, {
       productId,
       warehouseId: target.id,
       batchNo,
-      quantityMeters: '150',
+      quantityMeters: '9000',
     });
 
-    // 段一：报价明细按米录入（两行同产品，验转订单逐行落量与合计守恒）
+    // 段一：报价明细按米录入（两行同产品，验转订单逐行落量与合计守恒）。
+    // 米数合计必须落在 9000 米这一量级：报价审批档位由 quotation_approval_service.rs 的
+    // AMOUNT_THRESHOLD_SELF=100000 按 total_amount 判档，低于 10 万走销售员自批短路（submit
+    // 直接落 approved），/approve 的状态门 lock_and_validate_quotation_for_approval_txn 只放行
+    // pending_approval，本腿要的「提交→批准」两跳就无前置可行；12.5 单价 × 9000 米 = 112500
+    // 落在 10 万到 50 万的经理审批档，提交才真走 BPM 分支落小写 pending_approval。
     const noteTag = genCode('452Q');
     const q = await apiCall<{ id?: number }>(page, 'POST', '/quotations', {
       customer_id: ctx.customerId,
@@ -783,14 +789,14 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
         {
           product_id: productId,
           unit: '米',
-          quantity: '100',
+          quantity: '5000',
           unit_price: '12.5',
           unit_price_with_tax: '12.5',
         },
         {
           product_id: productId,
           unit: '米',
-          quantity: '50',
+          quantity: '4000',
           unit_price: '12.5',
           unit_price_with_tax: '12.5',
         },
@@ -814,8 +820,36 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       .map(it => decField(it, 'quantity', `452-04 报价行 标记 ${noteTag}`));
     expect(quoteMeterLines.length, '段一：按米录入的报价行必须恰 2 行').toBe(2);
 
+    // 提交腿与批准腿的合法前置（逐条读后端源，非推测）：
+    // 1 档位。ApproverRole::from_amount 以 AMOUNT_THRESHOLD_SELF=100000 判档，低于 10 万走销售员
+    //   自批短路（submit 内 self_approve 直接落小写 approved），批准端点的状态门
+    //   lock_and_validate_quotation_for_approval_txn 只放行小写 pending_approval，届时本腿的
+    //   「提交→批准」这一跳没有任何合法前置可行；9000 米 × 12.5 = 112500 落在 10 万到 50 万的
+    //   经理审批档，提交真走 BPM 分支落待审批。提交后先按出参自证档位，把「录入金额落在哪一档」
+    //   变成用例自己可证的判据，而不是事后猜。
+    // 2 理由。POST /quotations/{id}/approve 的请求体键逐字符取 handlers/quotation_handler.rs 的
+    //   ApproveQuotationRequest.approval_reason（Option<String>，经 trim 非空门，缺键即由 handler
+    //   收口成 400 VALIDATION_ERROR「审批通过理由不能为空」），理由落 sales_quotations.approval_reason 列。
     await apiCall(page, 'POST', `/quotations/${quotationId}/submit`);
-    await apiCall(page, 'POST', `/quotations/${quotationId}/approve`);
+    const submittedQ = await apiCallRaw<Row>(page, 'GET', `/quotations/${quotationId}`);
+    expect(
+      String(submittedQ.status ?? ''),
+      `段一前置：提交后应处于小写 pending_approval（models/status/sales.rs 报价模组）才可批准，实际=${JSON.stringify(
+        submittedQ.status
+      )}`
+    ).toBe('pending_approval');
+    await apiCall(page, 'POST', `/quotations/${quotationId}/approve`, {
+      approval_reason: 'E2E 452-04 按米报价审批通过',
+    });
+    const approvedQ = await apiCallRaw<Row>(page, 'GET', `/quotations/${quotationId}`);
+    expect(
+      String(approvedQ.status ?? ''),
+      `批准跃迁后应真落库小写 approved，实际=${JSON.stringify(approvedQ.status)}`
+    ).toBe('approved');
+    expect(
+      String(approvedQ.approval_reason ?? ''),
+      `审批通过理由应真实落列并可经详情出参回读，实际=${JSON.stringify(approvedQ.approval_reason)}`
+    ).toBe('E2E 452-04 按米报价审批通过');
 
     // 段二：转订单后回读订单行主计量
     const converted = await apiCallRaw<Row>(page, 'POST', `/quotations/${quotationId}/convert`);
