@@ -18,6 +18,7 @@ import {
   apiCall,
   apiCallRaw,
   apiCallExpectFail,
+  baseAdminPassword,
   failureCode,
   genCode,
   loginInIsolatedContext,
@@ -76,7 +77,11 @@ test.describe('06 分配负载 workload 契约', () => {
     // （transfer 与 claim 的目标取自全局活跃用户列表，auto_assign 从全局待分配池取数），
     // 共享会话用户上的差值断言不可确定。建线的 owner 由服务端写会话用户，且
     // UpdateLeadRequest 不含 owner_id 无法移交，故唯一可确定的做法是让会话与 owner 同源且独占。
-    const myRow = await apiCallRaw<{ id: number; role_id?: number | null }>(page, 'GET', '/users/me');
+    const myRow = await apiCallRaw<{ id: number; role_id?: number | null }>(
+      page,
+      'GET',
+      '/users/me'
+    );
     const seedRoleId = Number(myRow.role_id);
     if (!Number.isInteger(seedRoleId) || seedRoleId <= 0) {
       throw new Error(
@@ -84,7 +89,9 @@ test.describe('06 分配负载 workload 契约', () => {
       );
     }
     const username = `e2e_wl_${genCode('06X')}`.slice(0, 50);
-    const password = `E2eWl!${genCode('06P')}`;
+    // 口令走 env 约定 TEST_PASSWORD（baseAdminPassword 只读该变量，缺失即抛错点名，不给默认值），
+    // 与建号链路同口径，且必然过服务端强度校验；不在源码里自造口令字面量。
+    const password = baseAdminPassword();
     const createdUser = await apiCall<{ id?: number }>(page, 'POST', '/users', {
       username,
       password,
@@ -137,10 +144,7 @@ test.describe('06 分配负载 workload 契约', () => {
 
       await apiCall(session.page, 'DELETE', `/crm/leads/${leadId}`);
       const afterDelete = await workloadCount(page, exclusiveId);
-      expect(
-        afterDelete,
-        `删除线索后独占账号应回到基线 0（零漂移），实际 ${afterDelete}`
-      ).toBe(0);
+      expect(afterDelete, `删除线索后独占账号应回到基线 0（零漂移），实际 ${afterDelete}`).toBe(0);
     } finally {
       await session.close();
       // 回收顺序：线索已在上面删除，账号排在最后删（它被线索行引用时先删必被外键挡）。
