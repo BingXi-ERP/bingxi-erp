@@ -978,6 +978,12 @@ test.describe('442 对账确认与红冲联动', () => {
     });
     expect(fEmptyItems.status, '空明细报价应 400').toBe(400);
     expect(String(fEmptyItems.message ?? ''), '空明细拒绝应点名明细条数').toContain('明细');
+    // 文案逐字同源 backend/src/models/quotation_create_dto.rs 的明细长度校验 message。
+    // 渲染口径见 utils/error.rs：字段级错误优先取仓库自撰 message，多条以全分号连接。
+    expect(
+      String(fEmptyItems.message ?? ''),
+      '空明细拒绝必须外显明细条数规则文案，不得退化成字段名加校验代号'
+    ).toContain('报价明细条数必须在1到100条之间');
   });
 
   test('442-06 跨端一致性：同一对账单在 base/enhanced 两挂载面、列表/详情两读面与两个独立会话之间逐字段一致', async ({
