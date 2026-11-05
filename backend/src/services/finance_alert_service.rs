@@ -289,8 +289,6 @@ impl FinanceAlertService {
         model: finance_alert::Model,
         now: chrono::DateTime<Utc>,
     ) -> Result<finance_alert::Model, FinanceAlertError> {
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-
         let recipient_ids = Self::resolve_recipient_users(txn).await?;
         if recipient_ids.is_empty() {
             // 角色集为空或被通知服务整轮拒收：显式告警，主通知号保持为空。
