@@ -783,18 +783,20 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     const ruleGone = await apiCallExpectFail(page, 'GET', `/aging-alert-rules/${rule.id}`);
     expect(ruleGone.status, `454-06 规则回收后应 404，实际 ${ruleGone.status}`).toBe(404);
 
-    // 会计岗同样不在角色集内：不推错人（页面标题先可见，避免把"没渲染"当成"没推到"）
+    // 会计岗与角色集内岗位的判据走 API 而不是界面：通知中心路由的可见门挂在 users:read
+    // （router/index.ts 的 meta.permission），而 e2e 建岗面除通配超管外无人持这枚键，
+    // 用界面判 0 会把"进不去页面"当成"没推到"。两岗同机制，一读得到一个读不到，
+    // 既排除整个读面空转，也排除投递仍落在点击者身上。
     await loginAsRole(page, 'accountant');
-    await safeGoto(page, '/notification');
-    await expect(pageTitle, '454-06 accountant 侧未渲染通知中心页面标题').toBeVisible();
-    await expect(
-      page.locator('.item-title', { hasText: marker }),
-      `454-06 accountant 非收件人，不应看到 ${marker}`
-    ).toHaveCount(0);
+    const accountantInbox = await listNotifications(page, 'UNREAD');
+    expect(
+      accountantInbox.find(n => n.title === `[财务预警] ${alert.title}`),
+      `454-06 accountant 非收件人，收件箱不应含预警 id=${alert.id} 的站内信`
+    ).toBeUndefined();
 
-    // 角色集内岗位登录：投递必须真的读得到，这才是"按角色集投递"的正判据。
-    // 站内信删除权只属收件人（notification_service.rs::delete_notification 逐条比 user_id），
-    // 所以本腿的最后一段留在这个岗位，延迟回收队列在它之后才 flush。
+    // 角色集内岗位登录：站内信删除权只属收件人
+    // （notification_service.rs::delete_notification 逐条比 user_id），
+    // 所以本腿最后一段留在这个岗位，延迟回收队列在它之后才 flush。
     await loginAsRole(page, NOTIFY_ROLE);
     const inbox = await listNotifications(page, 'UNREAD');
     const got = inbox.find(n => n.title === `[财务预警] ${alert.title}`);
@@ -803,13 +805,12 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
       `454-06 角色集内岗位 ${NOTIFY_ROLE} 的未读列表应含预警 id=${alert.id} 的站内信，` +
         `实际 ${inbox.length} 行`
     ).toBeTruthy();
+    expect(
+      inbox.filter(n => n.title === `[财务预警] ${alert.title}`).length,
+      `454-06 同一预警对同一收件人只应投递一条，实际 ${inbox.length} 行里命中多条`
+    ).toBe(1);
     deferCleanup(cleanup, 'DELETE', `/notifications/${got!.id}`, `454-06 notif ${got!.id}`);
-    await safeGoto(page, '/notification');
-    await expect(pageTitle, `454-06 ${NOTIFY_ROLE} 侧未渲染通知中心页面标题`).toBeVisible();
-    await expect(
-      page.locator('.item-title', { hasText: marker }).first(),
-      `454-06 角色集内岗位 ${NOTIFY_ROLE} 的站内信列表应出现条目：${marker}`
-    ).toBeVisible();
+    expect(got!.content, '454-06 通知正文应等于预警正文').toBe(alert.content);
 
     console.log(
       `454-06 可见性腿通过：预警 id=${alert.id} 角色集=${NOTIFY_ROLE} ` +
