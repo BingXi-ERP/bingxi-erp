@@ -305,14 +305,27 @@ test.describe('442 对账确认与红冲联动', () => {
 
     // 生成腿逐字段落库回读：本次两张源单都必须进明细，且金额与源单逐字符同值
     const first = await readReconDetails(page, reconId);
-    const invRow = first.details.find(r => Number(r.document_id) === inv.id);
+    // 定位谓词必须「类型列 + document_id」双条件：document_id 是多态列（发票行存 ar_invoice.id、
+    // 收款行存 ar_collection.id），两张表各自主键独立编号，同客户期间内他人单据又被本单如实汇总进来，
+    // 单看 document_id 会命中数值相同的异类型行（跨表撞号），把别人的发票行冒充成本腿的收款行。
+    const invRow = first.details.find(
+      r => String(r.item_type) === 'INVOICE' && Number(r.document_id) === inv.id
+    );
     expect(invRow, `对账明细必须含发票 ${inv.invoice_no} 行`).toBeTruthy();
+    // 自建号双证：发票行的 document_no 必须等于本腿建的那张发票号，坐实定位到的就是本腿那一行
     expect(String(invRow!.document_no), 'INVOICE 行 document_no 必须等于发票号').toBe(
       inv.invoice_no
     );
     eqAmount(invRow!.amount, cents('1500.00'), 'INVOICE 行金额=发票 invoice_amount');
-    const payRow = first.details.find(r => Number(r.document_id) === pay.id);
+    const payRow = first.details.find(
+      r => String(r.item_type) === 'RECEIPT' && Number(r.document_id) === pay.id
+    );
     expect(payRow, `对账明细必须含收款 ${pay.collection_no} 行`).toBeTruthy();
+    // 自建号双证：收款行 document_no 由 vfy_ops/reconciliation.rs 的 insert_collection_items
+    // 写 coll.collection_no，与本腿建单出参逐字符相等才算定位到本腿那一行
+    expect(String(payRow!.document_no), 'RECEIPT 行 document_no 必须等于收款单号').toBe(
+      pay.collection_no
+    );
     expect(String(payRow!.item_type), '收款行 item_type 为大写 RECEIPT').toBe('RECEIPT');
     expect(String(payRow!.document_type), '收款行 document_type 为 COLLECTION').toBe('COLLECTION');
     expect(String(payRow!.match_status), '新生成收款行匹配态大写 UNMATCHED').toBe('UNMATCHED');
@@ -404,8 +417,16 @@ test.describe('442 对账确认与红冲联动', () => {
     const reconBefore = await generateRecon(page, ctx.customerId, `E2E-${tag}-BEFORE`);
     const idBefore = requireNum(reconBefore.id, '红冲前对账单');
     const before = await readReconDetails(page, idBefore);
-    const beforeInvRow = before.details.find(r => Number(r.document_id) === inv.id);
+    // 同 442-01 的定位口径：多态 document_id 必须与类型列成对，否则跨表撞号会把别人的
+    // 收款行当成本腿发票行来打金额判据。
+    const beforeInvRow = before.details.find(
+      r => String(r.item_type) === 'INVOICE' && Number(r.document_id) === inv.id
+    );
     expect(beforeInvRow, '红冲前发票必须在对账明细内').toBeTruthy();
+    expect(
+      String(beforeInvRow!.document_no),
+      '红冲前 INVOICE 行 document_no 必须等于本腿发票号'
+    ).toBe(inv.invoice_no);
     eqAmount(beforeInvRow!.amount, cents('888.88'), '红冲前明细按发票全额入汇总');
     expectHeadMatchesDetails(before.head, before.details, '红冲前');
 
