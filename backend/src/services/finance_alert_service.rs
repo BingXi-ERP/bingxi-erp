@@ -303,6 +303,7 @@ impl FinanceAlertService {
         }
 
         let notif_service = NotificationService::new(self.db.clone());
+        let recipient_count = recipient_ids.len();
         let mut primary_notif_id: Option<i32> = None;
         for user_id in recipient_ids {
             let req = CreateNotificationRequest {
@@ -337,7 +338,7 @@ impl FinanceAlertService {
             tracing::warn!(
                 alert_id = model.id,
                 "财务预警的{}个收件人全部投递失败，主通知号保持为空",
-                recipient_ids.len()
+                recipient_count
             );
             return Ok(model);
         };
