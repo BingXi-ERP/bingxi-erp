@@ -53,8 +53,12 @@ import { safeGoto } from './ui-helpers';
  *    状态机 active → acknowledged → resolved / expired。
  *    幂等窗口只对未处理态生效：同 alert_type + target_module + target_id 且状态属
  *    {active, acknowledged} 时不再新建，resolved 出窗。
- *    每条新建预警同时给"触发人"写一条站内信（标题前缀 [财务预警]、正文等于预警正文），
- *    并把通知 id 回填进预警行的 notification_id；notification_id 因此是收件人判据的落库锚点。
+ *    站内信按收件人角色集逐人投递（标题前缀 [财务预警]、正文等于预警正文）：角色集由启用中
+ *    账龄规则声明的 notify_roles 在唯一解析点决定（services/finance_alert_service.rs
+ *    ::resolve_recipient_users，角色码到角色 id 到在册且启用的用户 id，去重升序），
+ *    notification_id 存本轮第一条（主通知）号。角色集解析不到用户时显式不投递并保持为空，
+ *    手工触发不因"有人点了按钮"就降级成发给点击者本人。
+ *    因此本文件的接收侧判据一律在角色集内岗位的会话里读，触发人岗位反向判不可见。
  *    GET /finance-alerts 支持 alert_type / alert_level / status / target_module 过滤，
  *    status 与 alert_type 越界一律 400；预警行没有删除路由，终结只能靠 acknowledge + resolve。
  *
@@ -111,6 +115,16 @@ type AlertRow = {
 type AlertPage = { items?: AlertRow[]; total?: number };
 type ScanResult = { created: AlertRow[]; created_count: number };
 type CustRow = { id: number; customer_name: string };
+
+/**
+ * 功能：454-04 与 454-06 自建启用规则时声明的收件岗位码，同时是这两腿读站内信的登录岗位。
+ * 调用方：建账龄规则的 notify_roles 入参、loginAsRole 入参与断言消息里的岗位名。
+ * 入参：无（常量）。传给谁：aging_alert_rules.notify_roles（JSONB 数组列）与 e2e 建岗凭证。
+ * 存什么：一个在 e2e 建岗花名册在册、除本文件外没有任何规则把它写进 notify_roles 的岗位码，
+ * 使该岗位收件箱只承载本文件的投递，逐人投递与可见性判据都不被其它用例的投递量干扰。
+ * 存哪里：不落库，只保证"角色集声明"与"登录岗位"两处字面量同源。
+ */
+const NOTIFY_ROLE = 'cost_accountant';
 
 function uniq(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -390,9 +404,32 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     expect(badStatus.status, `454-03 大写 status 过滤应 400，实际 ${badStatus.status}`).toBe(400);
   });
 
-  test('454-04 应收逾期预警真实触发落库并给触发人投递站内信', async ({ page }) => {
+  test('454-04 应收逾期预警真实触发落库并按规则角色集投递站内信', async ({ page }) => {
     test.setTimeout(240_000);
     const tag = uniq();
+
+    // 收件人由启用中账龄规则的 notify_roles 在唯一解析点决定，所以本腿先自建一条启用规则、
+    // 把角色集显式声明为 NOTIFY_ROLE 并回读自证；不建规则就解析不到任何收件人，
+    // 预警行的 notification_id 会按"显式不投递"保持为空（不回落成点击者）。
+    const rule = await apiCallRaw<AlertRule>(page, 'POST', '/aging-alert-rules', {
+      rule_name: `E2E-454-04-AGE-${tag}`,
+      rule_code: `e2e454o4${tag}`.slice(0, 40),
+      aging_bucket: '30_days',
+      threshold_days: 30,
+      threshold_amount: 1000,
+      alert_level: 'warning',
+      notify_method: 'system',
+      notify_roles: [NOTIFY_ROLE],
+      is_active: true,
+      remarks: `454-04 收件人角色集 ${tag}`,
+    });
+    expect(
+      Number.isInteger(rule.id) && rule.id > 0,
+      `454-04 建收件人规则应返回正整数 id，实际 ${String(rule.id)}`
+    ).toBe(true);
+    const ruleRead = await apiCallRaw<AlertRule>(page, 'GET', `/aging-alert-rules/${rule.id}`);
+    expect(ruleRead.notify_roles, '454-04 收件人角色集应原样读回').toEqual([NOTIFY_ROLE]);
+    expect(ruleRead.is_active, '454-04 收件人规则必须为启用态').toBe(true);
 
     const custs = await apiCall<{ items?: CustRow[] }>(
       page,
@@ -488,18 +525,13 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     if (typeof notifId !== 'number') {
       throw new Error(`454-04 前置不成立：预警未回填 notification_id=${String(notifId)}`);
     }
-    const inbox = await listNotifications(page, 'UNREAD');
-    const got = inbox.find(n => n.id === notifId);
-    expect(got, `454-04 触发人未读列表应含通知 id=${notifId}`).toBeTruthy();
-    expect(got!.title, '454-04 通知标题应为前缀加预警标题').toBe(`[财务预警] ${alert.title}`);
-    expect(got!.content, '454-04 通知正文应等于预警正文').toBe(alert.content);
-    deferCleanup(cleanup, 'DELETE', `/notifications/${notifId}`, `454-04 notif ${notifId}`);
 
-    const unread = await apiCallRaw<number>(page, 'GET', '/notifications/unread-count');
-    expect(typeof unread === 'number' && unread > 0, `454-04 未读计数异常：${String(unread)}`).toBe(
-      true
-    );
-    console.log(`[454-04] 预警 id=${alert.id} no=${alert.alert_no} 通知 id=${notifId}`);
+    // 反向判据：触发人岗位（本分片会话）不在 notify_roles 内，其未读列表不得出现这条通知。
+    const triggerInbox = await listNotifications(page, 'UNREAD');
+    expect(
+      triggerInbox.find(n => n.id === notifId),
+      `454-04 触发人岗位不在角色集 ${NOTIFY_ROLE} 内，未读列表不应含通知 id=${notifId}`
+    ).toBeUndefined();
 
     // 越界类型不静默回落全量，而是 400
     const badType = await apiCallExpectFail(page, 'POST', '/finance-alerts/trigger-scan', {
@@ -516,6 +548,33 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     await apiCall(page, 'POST', `/ar/invoices/${invoiceId}/cancel`, {
       reason: '454 契约链用例回收',
     });
+    // 规则只在本腿扫描那一刻参与收件人解析，投递完成后当场回收并把 404 读回，
+    // 不把启用中的角色集留给同分片的后续用例；删除权属于建规则的岗位，故排在切岗之前。
+    await apiCall(page, 'DELETE', `/aging-alert-rules/${rule.id}`);
+    const ruleGone = await apiCallExpectFail(page, 'GET', `/aging-alert-rules/${rule.id}`);
+    expect(ruleGone.status, `454-04 规则回收后应 404，实际 ${ruleGone.status}`).toBe(404);
+
+    // 接收侧判据换到角色集内岗位的会话里读；站内信的删除权只属收件人
+    // （notification_service.rs::delete_notification 逐条比 user_id），回收也在这一段登记。
+    await loginAsRole(page, NOTIFY_ROLE);
+    const inbox = await listNotifications(page, 'UNREAD');
+    const got = inbox.find(n => n.title === `[财务预警] ${alert.title}`);
+    expect(
+      got,
+      `454-04 角色集内岗位 ${NOTIFY_ROLE} 的未读列表应含预警 id=${alert.id} 的站内信，` +
+        `实际 ${inbox.length} 行`
+    ).toBeTruthy();
+    deferCleanup(cleanup, 'DELETE', `/notifications/${got!.id}`, `454-04 notif ${got!.id}`);
+    expect(got!.content, '454-04 通知正文应等于预警正文').toBe(alert.content);
+    const unread = await apiCallRaw<number>(page, 'GET', '/notifications/unread-count');
+    expect(
+      typeof unread === 'number' && unread > 0,
+      `454-04 ${NOTIFY_ROLE} 收件后未读计数异常：${String(unread)}`
+    ).toBe(true);
+    console.log(
+      `[454-04] 预警 id=${alert.id} no=${alert.alert_no} 角色集=${NOTIFY_ROLE} ` +
+        `主通知 id=${notifId} 收件通知 id=${got!.id}`
+    );
   });
 
   test('454-05 二次触发不翻倍且终结后未处理集不残留该条', async ({ page }) => {
@@ -643,9 +702,26 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     ).toBe(true);
   });
 
-  test('454-06 站内信条目本角色可见且另一角色不可见', async ({ page }) => {
+  test('454-06 站内信按规则角色集投递，非角色集岗位不可见', async ({ page }) => {
     test.setTimeout(240_000);
     const tag = uniq();
+
+    // 收件人由规则声明的角色集决定（与 454-04 同一个解析点），本腿先自建启用规则并回读自证。
+    const rule = await apiCallRaw<AlertRule>(page, 'POST', '/aging-alert-rules', {
+      rule_name: `E2E-454-06-AGE-${tag}`,
+      rule_code: `e2e454o6${tag}`.slice(0, 40),
+      aging_bucket: '30_days',
+      threshold_days: 30,
+      threshold_amount: 1000,
+      alert_level: 'warning',
+      notify_method: 'system',
+      notify_roles: [NOTIFY_ROLE],
+      is_active: true,
+      remarks: `454-06 收件人角色集 ${tag}`,
+    });
+    const ruleRead = await apiCallRaw<AlertRule>(page, 'GET', `/aging-alert-rules/${rule.id}`);
+    expect(ruleRead.notify_roles, '454-06 收件人角色集应原样读回').toEqual([NOTIFY_ROLE]);
+    expect(ruleRead.is_active, '454-06 收件人规则必须为启用态').toBe(true);
 
     const custs = await apiCall<{ items?: CustRow[] }>(
       page,
@@ -680,27 +756,22 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
         `454-06 前置不成立：预警 id=${alert.id} 未回填 notification_id=${String(notifId)}`
       );
     }
-    deferCleanup(cleanup, 'DELETE', `/notifications/${notifId}`, `454-06 notif ${notifId}`);
 
     const marker = `[财务预警] ${custName}`;
-    await safeGoto(page, '/notification');
-    await expect(
-      page.locator('.notification .card-header').getByText('通知中心', { exact: true }),
-      '454-06 未渲染通知中心页面标题'
-    ).toBeVisible();
-    await expect(
-      page.locator('.item-title', { hasText: marker }).first(),
-      `454-06 触发人站内信列表应出现条目：${marker}`
-    ).toBeVisible();
+    const pageTitle = page.locator('.notification .card-header').getByText('通知中心', {
+      exact: true,
+    });
 
-    // 另一角色登录同一页面：不推错人
-    await loginAsRole(page, 'accountant');
+    // 触发人岗位（本分片会话）不在角色集内：先证页面真渲染，再判 0 才有意义。
     await safeGoto(page, '/notification');
+    await expect(pageTitle, '454-06 未渲染通知中心页面标题').toBeVisible();
     await expect(
       page.locator('.item-title', { hasText: marker }),
-      `454-06 accountant 非收件人，不应看到 ${marker}`
+      `454-06 触发人岗位不在角色集 ${NOTIFY_ROLE} 内，不应看到 ${marker}`
     ).toHaveCount(0);
 
+    // 写侧回收全部留在触发人岗位上做完：预警按状态机终结，规则只在本腿扫描那一刻参与收件人
+    // 解析，投递完成后当场回收并把 404 读回，不把启用中的角色集留给同分片的后续用例。
     await apiCall(page, 'POST', `/finance-alerts/${alert.id}/acknowledge`, { remark: '用例回收' });
     await apiCall(page, 'POST', `/finance-alerts/${alert.id}/resolve`, {
       resolve_note: '454 契约链用例回收',
@@ -708,7 +779,42 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     await apiCall(page, 'POST', `/ar/invoices/${invoice.id}/cancel`, {
       reason: '454 契约链用例回收',
     });
-    console.log(`454-06 可见性腿通过：预警 id=${alert.id} 通知 id=${notifId}`);
+    await apiCall(page, 'DELETE', `/aging-alert-rules/${rule.id}`);
+    const ruleGone = await apiCallExpectFail(page, 'GET', `/aging-alert-rules/${rule.id}`);
+    expect(ruleGone.status, `454-06 规则回收后应 404，实际 ${ruleGone.status}`).toBe(404);
+
+    // 会计岗同样不在角色集内：不推错人（页面标题先可见，避免把"没渲染"当成"没推到"）
+    await loginAsRole(page, 'accountant');
+    await safeGoto(page, '/notification');
+    await expect(pageTitle, '454-06 accountant 侧未渲染通知中心页面标题').toBeVisible();
+    await expect(
+      page.locator('.item-title', { hasText: marker }),
+      `454-06 accountant 非收件人，不应看到 ${marker}`
+    ).toHaveCount(0);
+
+    // 角色集内岗位登录：投递必须真的读得到，这才是"按角色集投递"的正判据。
+    // 站内信删除权只属收件人（notification_service.rs::delete_notification 逐条比 user_id），
+    // 所以本腿的最后一段留在这个岗位，延迟回收队列在它之后才 flush。
+    await loginAsRole(page, NOTIFY_ROLE);
+    const inbox = await listNotifications(page, 'UNREAD');
+    const got = inbox.find(n => n.title === `[财务预警] ${alert.title}`);
+    expect(
+      got,
+      `454-06 角色集内岗位 ${NOTIFY_ROLE} 的未读列表应含预警 id=${alert.id} 的站内信，` +
+        `实际 ${inbox.length} 行`
+    ).toBeTruthy();
+    deferCleanup(cleanup, 'DELETE', `/notifications/${got!.id}`, `454-06 notif ${got!.id}`);
+    await safeGoto(page, '/notification');
+    await expect(pageTitle, `454-06 ${NOTIFY_ROLE} 侧未渲染通知中心页面标题`).toBeVisible();
+    await expect(
+      page.locator('.item-title', { hasText: marker }).first(),
+      `454-06 角色集内岗位 ${NOTIFY_ROLE} 的站内信列表应出现条目：${marker}`
+    ).toBeVisible();
+
+    console.log(
+      `454-06 可见性腿通过：预警 id=${alert.id} 角色集=${NOTIFY_ROLE} ` +
+        `主通知 id=${notifId} 收件通知 id=${got!.id}`
+    );
   });
 
   test('454-07 手工建预警走同一状态词表且未知类型被拒', async ({ page }) => {
