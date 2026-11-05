@@ -806,11 +806,16 @@ test.describe('40 报价单多角色审批流转', () => {
               /\/403(\?|#|$)/
             );
 
-            // 按钮对照搬到本棒名下的一张对照单：动作区只有在归属人自己读得通的那张单上才可能渲染。
-            // 本棒授权面无 quotations:create 与 submit，故建单与提交沿用本链既有建单棒会话
-            // （relay.sessions 按棒次顺序，第 2 棒持建单与提交面），归属人显式取本棒用户 id；
-            // 金额沿用 buildQuotationPayload 的净额 200000，落在 10 万到 50 万档，提交走 BPM 分支，
-            // 不会被小额自批短路直接落 approved。归属正确性由"本棒读这张单得 200"这条行为坐实。
+            // 对照单的归属人必须与提交会话同源：POST /quotations/{id}/submit 的 handler 先过
+            // get_by_id_scoped 行级归属门（handlers/quotation_handler.rs 提交腿注释「提交是创建人
+            // 推进自身草稿的动作，必须先证归属」；门口径 services/quotation_ops/crud.rs 的
+            // ensure_visible_by_scope，DataScope::Self_ 要求归属人等于会话用户 id，fail-closed 拒 403），
+            // 而 sales_rep 的行级范围是 self，所以归属人写另一棒的 user_id 必被这道门拒——本轮真实红因，
+            // 门是正确契约，不是 RBAC 缺失。建单与提交都沿用建单棒会话（relay.sessions 按棒次顺序，
+            // 第 2 棒持 create 与 submit），sales_user_id 取该棒会话真实登录用户 id，与本文件头
+            // 「取本棒会话真实登录用户 id，不用上下文之外的 id」同口径；金额沿用
+            // buildQuotationPayload 的净额 200000，落在 10 万到 50 万档，提交走 BPM 分支，
+            // 不会被小额自批短路直接落 approved。
             const builder = relay.sessions[1];
             const ctrlMarker = genCode('F40CT');
             const ctrlCreated = await apiCallRaw<Row>(
@@ -819,30 +824,38 @@ test.describe('40 报价单多角色审批流转', () => {
               '/quotations',
               buildQuotationPayload(
                 Number(require('rejCustomerId')),
-                session.userId,
+                builder.userId,
                 Number(require('rejProductId')),
                 String(require('rejProductUnit')),
                 `E2E-F40CTRL-${ctrlMarker}`
               )
             );
-            const ctrlQuotationId = requireId(ctrlCreated.id, '自名下对照建单');
+            const ctrlQuotationId = requireId(ctrlCreated.id, '建单棒名下对照建单');
             await apiCall(builder.page, 'POST', `/quotations/${ctrlQuotationId}/submit`);
-            const ctrlSubmitted = await readQuotationStatus(session.page, ctrlQuotationId);
+            // 提交后的状态坐实由归属棒自己读回（它在这张单的可见集内；换棒读必被同一道门拒）
+            const ctrlSubmitted = await readQuotationStatus(builder.page, ctrlQuotationId);
             expect(
               String(ctrlSubmitted.status ?? ''),
-              `自名下对照单提交后应 pending_approval（10 万到 50 万档走 BPM 分支），实际=${JSON.stringify(
+              `建单棒名下对照单提交后应 pending_approval（10 万到 50 万档走 BPM 分支），实际=${JSON.stringify(
                 ctrlSubmitted.status
               )}`
             ).toBe('pending_approval');
             // 报价族后端无 DELETE 端点，cancel 是它在册的终结面，按本文件清理范式登记收尾；
-            // 清理由本棒会话发起，未落终态时该单以唯一 notes 标记点名残留。
+            // 本棒（审批棒）授权面只有 quotations 的读与批准拒绝四键，无 cancel 键，该清理腿预期
+            // 被权限门拒而残留，未落终态时该单以唯一 notes 标记点名残留（与本文件头登记的现实残留同口径）。
             registerCleanup({
               method: 'POST',
               path: `/quotations/${ctrlQuotationId}/cancel`,
               label: `对照报价#${ctrlQuotationId}`,
             });
+            // 详情页动作区对照搬到归属棒（建单棒）：动作区只有在归属人自己读得通的那张单上才渲染。
+            // 审批棒侧「读自己名下这张单得 200 并各出 1 枚批准与拒绝按钮」无法由用例自建合法前置——
+            // 对照单归审批棒时提交被行级归属门拒（本轮红因），归建单棒时审批棒读面被同一道门拒
+            // （即上方 403 判据），而审批棒按 SoD 不持 create 与 submit 键（init 矩阵 quotation 分组），
+            // 现实中不存在"自己名下且处于待审批"的报价行可造；批准面的 UI 可达由 40-01 的真实办理腿
+            // 与本链链尾的授权面互斥判据承载，本腿只钉建单棒这一侧的负向可达（缺口如实登记，见交付回报）。
             const ctrlPathname = `${API_PREFIX}/quotations/${ctrlQuotationId}`;
-            const ctrlRead = session.page.waitForResponse(
+            const ctrlRead = builder.page.waitForResponse(
               r => {
                 if (r.request().method() !== 'GET') return false;
                 try {
@@ -853,23 +866,23 @@ test.describe('40 报价单多角色审批流转', () => {
               },
               { timeout: 15000 }
             );
-            await safeGoto(session.page, `/quotations/${ctrlQuotationId}`);
+            await safeGoto(builder.page, `/quotations/${ctrlQuotationId}`);
             let ctrlStatus = 0;
             try {
               ctrlStatus = (await ctrlRead).status();
             } catch (e) {
               throw new Error(
-                `审批棒进自名下报价详情后 15s 内没有拿到详情读响应，读面未发或被守卫吞掉：${
+                `建单棒进自名下报价详情后 15s 内没有拿到详情读响应，读面未发或被守卫吞掉：${
                   (e as Error).message
                 }`
               );
             }
             expect(
               ctrlStatus,
-              `审批棒读自己名下报价详情应 200（归属人在可见集内，动作区才可能渲染），实际 ${ctrlStatus}`
+              `归属棒读自己名下待审报价详情应 200（归属人在自身可见集内，动作区才可能渲染），实际 ${ctrlStatus}`
             ).toBe(200);
             // 先等动作区渲染出来（返回按钮是那一块里唯一无条件渲染的），再数批准与拒绝
-            await session.page
+            await builder.page
               .locator('.actions .el-button', { hasText: '返回' })
               .first()
               .waitFor({ state: 'visible', timeout: 15000 });
@@ -877,22 +890,20 @@ test.describe('40 报价单多角色审批流转', () => {
             let rejectButtons = 0;
             await expect
               .poll(async () => {
-                approveButtons = await session.page
+                approveButtons = await builder.page
                   .locator('.actions .el-button', { hasText: '批准' })
                   .count();
-                rejectButtons = await session.page
+                rejectButtons = await builder.page
                   .locator('.actions .el-button', { hasText: '拒绝' })
                   .count();
                 return `${approveButtons}:${rejectButtons}`;
-              }, `审批棒详情页动作区应各出 1 枚批准与拒绝按钮`)
-              .toBe('1:1');
+              }, `建单棒（不持审批键）在待审单详情页动作区应既无批准也无拒绝`)
+              .toBe('0:0');
             expect(
               approveButtons,
-              `审批棒详情页应恰有 1 个批准按钮，实际 ${approveButtons} 个`
-            ).toBe(1);
-            expect(rejectButtons, `审批棒详情页应恰有 1 个拒绝按钮，实际 ${rejectButtons} 个`).toBe(
-              1
-            );
+              `建单棒详情页不应出现批准入口（SoD：持建单提交面无批准面），实际 ${approveButtons} 个`
+            ).toBe(0);
+            expect(rejectButtons, `建单棒详情页不应出现拒绝入口，实际 ${rejectButtons} 个`).toBe(0);
 
             // 真实办理拒绝仍打在原来那张他人行上：这条腿验的事实是 reject 端点不设归属门，
             // 跨 owner 也能办理；与上方"跨 owner 读面被行级数据范围门拒成 403"是两条独立判据，不矛盾。
