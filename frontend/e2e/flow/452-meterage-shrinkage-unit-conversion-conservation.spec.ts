@@ -867,6 +867,20 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
     expect(orderMeterLines.length, '段二：转订单必须按报价行逐行落订单行（2 行）').toBe(2);
     sameDecSum(quoteMeterLines, orderMeterLines, '452-04 报价明细折回主单位 vs 订单行主计量合计');
 
+    // 段三前置：转单写出的销售订单初态是 draft（services/quotation_convert_service.rs 的
+    // status 置值），而发货门只认已审批与部分发货，跳过 submit 与 approve 两跳就会在
+    // POST /sales/orders/{id}/ship 得到"仅已审批或部分发货的订单可发货"。
+    // 审批回读的状态词取写入方口径（models/status/sales_order.rs，小写 approved）。
+    await apiCall(page, 'POST', `/sales/orders/${orderId}/submit`);
+    await apiCall(page, 'POST', `/sales/orders/${orderId}/approve`);
+    const approvedOrder = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${orderId}`);
+    expect(
+      String(approvedOrder.status ?? ''),
+      `452-04 段三前置：转出的订单经提交与批准后应落小写 approved，实际 ${JSON.stringify(
+        approvedOrder.status
+      )}`
+    ).toBe('approved');
+
     // 段三：出库（录入量 = 订单行主计量合计，由后端出参补零求和后原样回传）
     const shipScale = decMaxScale(
       orderMeterLines.map(v => ({ v, label: `452-04 订单行主计量 订单 ${orderNo}` }))
