@@ -12,6 +12,9 @@ import {
   getCtx,
   getEntityField,
   loginAsRole,
+  loginViaUI,
+  testPassword,
+  testUsername,
   tryCleanup,
 } from './helpers';
 
@@ -447,12 +450,14 @@ test.describe('面料样品打样版本链与降等转大货', () => {
 
   test('无权限岗位调用降等与实测回写被拦，主管岗位同端点可达', async ({ page }) => {
     // 功能：垂直越权防护的三层对照——只读岗调用写端点必须被权限门拒（403 加 FORBIDDEN），
-    // 主管岗对同一资源必须可读（200 且状态为 pending）且写仍被拒，写被拒后状态零漂移。
+    // 主管岗对该资源可读（列表面出分页信封）且写仍被拒，写被拒后回属主会话复核状态零漂移。
     // 三者同时成立才证明 403 来自 RBAC 的键粒度，而不是路由缺失、岗位名义放行或 CSRF 竞败。
     // 可达性正向对照排在切岗之前：readonlyPage 与 page 是同一对象，一旦切岗，
     // 以 page 发起的读就会落在新会话上，对照即失真。
-    // 调用方：loginAsRole + apiCall + apiCallExpectFail + getEntityField + expectDenied。
-    // 入参：岗位名 report_viewer（只读报表岗）与 manager（销售主管镜像岗，持批色读键）。
+    // 调用方：loginAsRole + loginViaUI + apiCall + apiCallRaw + apiCallExpectFail +
+    // getEntityField + expectDenied。
+    // 入参：岗位名 report_viewer（只读报表岗）与 sales_manager（后端建岗，init 矩阵只给读键），
+    // 回切会话取本 worker 的 testUsername 与 testPassword。
     // 传给谁：权限中间件 → 被拒时不触达 service。
     // 存什么：被拒时零写入，断言状态与回填列均无漂移。
     // 存哪里：bulk_color_approvals / ai_quality_predictions。
@@ -502,21 +507,23 @@ test.describe('面料样品打样版本链与降等转大货', () => {
     expectDenied(actualDenied, 'report_viewer 调用实测回写端点应被权限门拒绝');
 
     // 主管岗的键粒度由后端建岗 sales_manager 承担：init 矩阵给它 ("bulk-color-approvals","read")
-    // 而不给任何写动作，因此读必须 200、降等必须仍被 RBAC 拒（403 加 FORBIDDEN）。
-    // 同会话一读一写同时成立，才真正钉住"权限键按资源加动作精确匹配"，不因岗位名义放行；
-    // 第二次的读同时承担"写被拒后状态零漂移"复核（拒绝发生在 handler 之前，状态不得漂移）。
+    // 而不给任何写动作，因此读必须可达、降等必须仍被 RBAC 拒（403 加 FORBIDDEN）。
+    // 可达性对照只用列表面：详情面按主键读要先过行级归属（本单由本 worker 会话建，
+    // sales_manager 的作用域是 dept，非属主行回 403），而权限门拒绝同样是 403 加 FORBIDDEN，
+    // 拿详情面当正对照会把"行级不可见"误读成"读键缺失"。列表面在 RBAC 放行后才按作用域过滤，
+    // 能取到分页信封即证读键在（被拒时请求根本到不了 handler）。
     await loginAsRole(readonlyPage, 'sales_manager');
-    const managerRead = await apiCall<Record<string, unknown>>(
+    const managerList = await apiCallRaw<{ items?: unknown[]; total?: number }>(
       readonlyPage,
       'GET',
-      `/bulk-color-approvals/${approvalId}`
+      '/bulk-color-approvals?page=1&page_size=20'
     );
     expect(
-      String(managerRead.data['approval_status']),
-      `主管岗读 ${approvalId} 应可达且为 pending，实际 ${JSON.stringify(
-        managerRead.data['approval_status']
+      Array.isArray(managerList.items),
+      `主管岗的批色列表面应可达并出 items 数组，实际键集=${JSON.stringify(
+        Object.keys(managerList)
       )}`
-    ).toBe(APPROVAL_STATUS_PENDING);
+    ).toBe(true);
 
     const managerDenied = await apiCallExpectFail(
       readonlyPage,
@@ -524,8 +531,14 @@ test.describe('面料样品打样版本链与降等转大货', () => {
       `/bulk-color-approvals/${approvalId}/downgrade`,
       { reject_reason: '主管岗仅持读键，降等应被拒绝' }
     );
-    expectDenied(managerDenied, 'manager 未持降等写键，调用降等端点应被权限门拒绝');
+    expectDenied(
+      managerDenied,
+      'sales_manager 未持降等写键，调用降等端点应被权限门拒绝（拒绝先于行级归属判定）'
+    );
 
+    // 写被拒后的零漂移复核回到属主会话读：主管岗对该行只有行级可达性问题，在它自己的会话里
+    // 得到的 403 既可能来自归属面也可能来自键面，判不出状态是否漂移。
+    await loginViaUI(readonlyPage, testUsername(), testPassword(), true);
     const afterManagerDenied = await apiCall<Record<string, unknown>>(
       readonlyPage,
       'GET',
