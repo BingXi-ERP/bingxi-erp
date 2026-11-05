@@ -446,15 +446,13 @@ test.describe('面料样品打样版本链与降等转大货', () => {
   });
 
   test('无权限岗位调用降等与实测回写被拦，主管岗位同端点可达', async ({ page }) => {
-    // 功能：垂直越权防护的两层对照——只读岗与无授权岗调用批色写端点都必须被权限门拒
-    // （HTTP 403 加 FORBIDDEN），同一资源在持键会话下必须可达（200 且跨会话读值一致），
-    // 以此证明 403 来自 RBAC 而不是路由缺失或 CSRF 竞败。
-    // 可达性对照改用持键会话并承担在切岗之前：后端授权矩阵里 bulk-color-approvals 这个
-    // 资源对任何非 admin 岗都没有授权条目，manager 镜像岗仅持 export-approvals:create，
-    // 故"主管岗位同端点可达"在当前矩阵下不成立；主管是否应可读批色单属产品口径，
-    // 另列待裁，不由本用例倒逼补键。
+    // 功能：垂直越权防护的三层对照——只读岗调用写端点必须被权限门拒（403 加 FORBIDDEN），
+    // 主管岗对同一资源必须可读（200 且状态为 pending）且写仍被拒，写被拒后状态零漂移。
+    // 三者同时成立才证明 403 来自 RBAC 的键粒度，而不是路由缺失、岗位名义放行或 CSRF 竞败。
+    // 可达性正向对照排在切岗之前：readonlyPage 与 page 是同一对象，一旦切岗，
+    // 以 page 发起的读就会落在新会话上，对照即失真。
     // 调用方：loginAsRole + apiCall + apiCallExpectFail + getEntityField + expectDenied。
-    // 入参：岗位名 report_viewer（只读报表岗）与 manager（裸主管镜像岗）。
+    // 入参：岗位名 report_viewer（只读报表岗）与 manager（销售主管镜像岗，持批色读键）。
     // 传给谁：权限中间件 → 被拒时不触达 service。
     // 存什么：被拒时零写入，断言状态与回填列均无漂移。
     // 存哪里：bulk_color_approvals / ai_quality_predictions。
@@ -503,21 +501,40 @@ test.describe('面料样品打样版本链与降等转大货', () => {
     );
     expectDenied(actualDenied, 'report_viewer 调用实测回写端点应被权限门拒绝');
 
-    // 无授权岗与只读岗同层：manager 镜像岗在该资源上没有任何授权键，调用降等端点应与只读岗
-    // 一样被 RBAC 拒（403 加 FORBIDDEN）。这条钉住权限键按资源加动作精确匹配，不因岗位名义
-    // 是主管就默认放行。被拒后的状态零漂移复核需要持键会话，而本用例主会话此时已切岗，
-    // 无法在不引入独立会话的前提下真做——该覆盖缺口如实登记，不用假读或放宽来充数。
+    // 主管岗的键粒度：sales_manager 与镜像岗 manager 现持 bulk-color-approvals:read，
+    // 因此读必须 200，而写面（降等）仍无授权、必须被 RBAC 拒——同会话一读一写同时成立，
+    // 才真正钉住"权限键按资源加动作精确匹配"，而不是靠岗位名义放行。
+    // 被拒后的状态零漂移复核同样由该读面承担（拒绝发生在 handler 之前，状态不得漂移）。
     await loginAsRole(readonlyPage, 'manager');
+    const managerRead = await apiCall<Record<string, unknown>>(
+      readonlyPage,
+      'GET',
+      `/bulk-color-approvals/${approvalId}`
+    );
+    expect(
+      String(managerRead.data['approval_status']),
+      `主管岗读 ${approvalId} 应可达且为 pending，实际 ${JSON.stringify(
+        managerRead.data['approval_status']
+      )}`
+    ).toBe(APPROVAL_STATUS_PENDING);
+
     const managerDenied = await apiCallExpectFail(
       readonlyPage,
       'POST',
       `/bulk-color-approvals/${approvalId}/downgrade`,
-      { reject_reason: '主管镜像岗未持该资源授权键' }
+      { reject_reason: '主管岗仅持读键，降等应被拒绝' }
     );
-    expectDenied(
-      managerDenied,
-      'manager 无 bulk-color-approvals 授权键，调用降等端点应被权限门拒绝'
+    expectDenied(managerDenied, 'manager 未持降等写键，调用降等端点应被权限门拒绝');
+
+    const afterManagerDenied = await apiCall<Record<string, unknown>>(
+      readonlyPage,
+      'GET',
+      `/bulk-color-approvals/${approvalId}`
     );
+    expect(
+      String(afterManagerDenied.data['approval_status']),
+      `写面被拒后批色状态不得漂移，实际 ${JSON.stringify(afterManagerDenied.data['approval_status'])}`
+    ).toBe(APPROVAL_STATUS_PENDING);
 
     // 收尾：回收本文件自建的质量预测行（实测腿建档那枚），它是本文件最后一处消费该句柄的位点。
     // 删除面在册（route-snapshot.txt:5 ai_extend_handler::delete_quality_prediction）。
