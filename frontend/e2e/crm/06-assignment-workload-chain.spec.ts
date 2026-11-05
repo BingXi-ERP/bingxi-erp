@@ -18,8 +18,10 @@ import {
   apiCall,
   apiCallRaw,
   apiCallExpectFail,
+  baseAdminPassword,
   failureCode,
   genCode,
+  loginInIsolatedContext,
   tryCleanup,
 } from '../flow/helpers';
 
@@ -35,19 +37,6 @@ test.afterEach(async ({ page }) => {
   for (const c of CLEANUP.reverse()) await tryCleanup(page, 'DELETE', c.path, c.label);
   CLEANUP.length = 0;
 });
-
-/** 取本会话用户 id 与用户名（auth/me 出参 UserInfo{id,username,...}，handler auth_handler_misc.rs get_current_user） */
-async function me(
-  page: import('@playwright/test').Page
-): Promise<{ id: number; username: string }> {
-  const info = await apiCallRaw<{ id: number; username: string; permissions: string[] }>(
-    page,
-    'GET',
-    '/auth/me'
-  );
-  expect(typeof info.id, `auth/me 应返回数字用户 id，实际 ${JSON.stringify(info)}`).toBe('number');
-  return { id: info.id, username: info.username };
-}
 
 /** workload 口按单个用户查询并取该用户行（行缺失即红，active 用户必入列） */
 async function workloadCount(
@@ -68,46 +57,99 @@ async function workloadCount(
   return Number(row!.assigned_count);
 }
 
-/** 建一条 new 状态线索（owner 由服务端写会话用户，见 services/crm/lead.rs create_lead），交 CLEANUP 兜底删除 */
-async function seedActiveLead(page: import('@playwright/test').Page): Promise<number> {
-  const leadNo = genCode('E2E-WL');
-  const created = await apiCall<{ id?: number }>(page, 'POST', '/crm/leads', {
-    lead_no: leadNo,
-    lead_status: 'new',
-    lead_source: 'WEBSITE',
-    company_name: `E2E 负载测试 ${leadNo}`,
-    contact_name: '测试联系人',
-    mobile_phone: '13800138001',
-    priority: 'MEDIUM',
-  });
-  if (!created.data?.id) throw new Error(`建线索失败：${JSON.stringify(created)}`);
-  CLEANUP.push({ path: `/crm/leads/${created.data.id}`, label: 'crm_lead' });
-  return created.data.id;
-}
-
 test.describe('06 分配负载 workload 契约', () => {
   test.beforeEach(async ({ page, context }) => {
     await applyAuthMocks(context);
     await page.goto('/');
   });
 
-  test('06-01 建线与删线使本用户 assigned_count 加一归位（零漂移回读）', async ({ page }) => {
-    const { id: userId } = await me(page);
-
-    const before = await workloadCount(page, userId);
-
-    const leadId = await seedActiveLead(page);
-    const afterCreate = await workloadCount(page, userId);
-    expect(
-      afterCreate,
-      `建一条 new 线索后 assigned_count 应为 ${before}+1=${before + 1}，实际 ${afterCreate}`
-    ).toBe(before + 1);
-
-    await apiCall(page, 'DELETE', `/crm/leads/${leadId}`);
-    const afterDelete = await workloadCount(page, userId);
-    expect(afterDelete, `删除线索后应回到基线 ${before}（零漂移），实际 ${afterDelete}`).toBe(
-      before
+  test('06-01 建线与删线使本用户 assigned_count 加一归位（零漂移回读）', async ({
+    page,
+    browser,
+  }) => {
+    // 功能：钉住 workload 的 assigned_count 随本账号线索增删一对一增减，且删除后零漂移。
+    // 调用方：crm_handler::list_workload（GET /crm/assignments/workload）。
+    // 入参：user_ids 取本腿独占账号 id；线索由该独占会话自己创建。
+    // 传给谁：services/crm/assign.rs 的按用户计数与 services/crm/lead.rs 的建线与删线。
+    // 存什么：crm_lead 的 owner_id 与 assigned_count 的对应关系。
+    // 存哪里：表 crm_lead，计数按 owner_id 聚合。
+    // 计数对象必须是本腿独占账号：workload 按 owner 聚合，而同库并发腿会改写线索归属
+    // （transfer 与 claim 的目标取自全局活跃用户列表，auto_assign 从全局待分配池取数），
+    // 共享会话用户上的差值断言不可确定。建线的 owner 由服务端写会话用户，且
+    // UpdateLeadRequest 不含 owner_id 无法移交，故唯一可确定的做法是让会话与 owner 同源且独占。
+    const myRow = await apiCallRaw<{ id: number; role_id?: number | null }>(
+      page,
+      'GET',
+      '/users/me'
     );
+    const seedRoleId = Number(myRow.role_id);
+    if (!Number.isInteger(seedRoleId) || seedRoleId <= 0) {
+      throw new Error(
+        `前置不成立：当前会话用户未挂角色（role_id=${myRow.role_id}），无法复制出可建线的独占账号`
+      );
+    }
+    const username = `e2e_wl_${genCode('06X')}`.slice(0, 50);
+    // 口令走 env 约定 TEST_PASSWORD（baseAdminPassword 只读该变量，缺失即抛错点名，不给默认值），
+    // 与建号链路同口径，且必然过服务端强度校验；不在源码里自造口令字面量。
+    const password = baseAdminPassword();
+    const createdUser = await apiCall<{ id?: number }>(page, 'POST', '/users', {
+      username,
+      password,
+      role_id: seedRoleId,
+    });
+    const exclusiveId = Number(createdUser.data?.id);
+    if (!Number.isInteger(exclusiveId) || exclusiveId <= 0) {
+      throw new Error(`独占账号建立失败，未返回真实主键：${JSON.stringify(createdUser.data)}`);
+    }
+
+    const session = await loginInIsolatedContext(browser, username, password);
+    try {
+      const before = await workloadCount(page, exclusiveId);
+      expect(
+        before,
+        `刚建的独占账号 ${exclusiveId} 的 assigned_count 基线必须是 0，实际 ${before}`
+      ).toBe(0);
+
+      const leadNo = genCode('E2E-WLX');
+      const createdLead = await apiCall<{ id?: number }>(session.page, 'POST', '/crm/leads', {
+        lead_no: leadNo,
+        lead_status: 'new',
+        lead_source: 'WEBSITE',
+        company_name: `E2E 独占负载 ${leadNo}`,
+        contact_name: '测试联系人',
+        mobile_phone: '13800138002',
+        priority: 'MEDIUM',
+      });
+      const leadId = Number(createdLead.data?.id);
+      if (!Number.isInteger(leadId) || leadId <= 0) {
+        throw new Error(`独占会话建线失败，未返回真实主键：${JSON.stringify(createdLead.data)}`);
+      }
+
+      // owner 同源自证：读回的 owner_id 必须等于独占账号 id，否则计数对象不是本腿账号。
+      const leadRow = await apiCall<Record<string, unknown>>(
+        session.page,
+        'GET',
+        `/crm/leads/${leadId}`
+      );
+      expect(
+        Number(leadRow.data['owner_id']),
+        `新建线索的 owner_id 必须是独占账号 ${exclusiveId}，实际 ${leadRow.data['owner_id']}`
+      ).toBe(exclusiveId);
+
+      const afterCreate = await workloadCount(page, exclusiveId);
+      expect(
+        afterCreate,
+        `独占账号建一条 new 线索后 assigned_count 应为 0+1=1，实际 ${afterCreate}`
+      ).toBe(1);
+
+      await apiCall(session.page, 'DELETE', `/crm/leads/${leadId}`);
+      const afterDelete = await workloadCount(page, exclusiveId);
+      expect(afterDelete, `删除线索后独占账号应回到基线 0（零漂移），实际 ${afterDelete}`).toBe(0);
+    } finally {
+      await session.close();
+      // 回收顺序：线索已在上面删除，账号排在最后删（它被线索行引用时先删必被外键挡）。
+      await tryCleanup(page, 'DELETE', `/users/${exclusiveId}`, `清理独占账号 ${exclusiveId}`);
+    }
   });
 
   test('06-02 列表含非法整数项整体拒绝，400 VALIDATION_ERROR 外显第几项', async ({ page }) => {

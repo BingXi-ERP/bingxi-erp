@@ -11,8 +11,10 @@ import {
   genDyeLotNo,
   getCtx,
   loginAsRole,
+  pickDyeableWarehouse,
   safeGetList,
   seedColorCardArchive,
+  seedDyedOutboundBundle,
   tryCleanup,
 } from './helpers';
 
@@ -64,6 +66,7 @@ const RECEIPT_STATUS_CONFIRMED = 'confirmed';
 let reworkId: number | undefined;
 let reworkOriginalBatchNo: string | undefined;
 let outsourcingOrderId: number | undefined;
+let outsourcingItemId: number | undefined;
 let outsourcingOrderNo: string | undefined;
 let outsourcingSupplierId: number | undefined;
 let outsourcingProductId: number | undefined;
@@ -457,6 +460,66 @@ test.describe('449 委外染整返工与缸差登记', () => {
       OUTSOURCING_STATUS_DRAFT
     );
 
+    // 发料前置（本轮红面）：门在 outsourcing_ops/order.rs::issue_order 内经
+    // piece_domain_service::validate_pieces_for_issue 逐条判定——空明细拒绝、缺匹号拒绝、
+    // 匹不存在或非可用拒绝、同单重复引用同一匹拒绝，染色外发的发料必须精确到生产匹。
+    // 红因是本腿未登记发料明细，属用例前置缺失而不是门错，故先造真实可用匹、再按匹登记明细。
+    if (!outsourcingProductId) {
+      throw new Error('前置不成立：产品句柄未建立，发料明细无法挂真实 product_id');
+    }
+    const issueTarget = await pickDyeableWarehouse(page);
+    const issueBundle = await seedDyedOutboundBundle(page, {
+      productId: outsourcingProductId,
+      warehouseId: issueTarget.id,
+      quantityMeters: '1200',
+      pieceCount: 1,
+      context: '449-issue',
+    });
+    // 入参按 services/outsourcing_ops/types.rs 的 CreateOutsourcingOrderItemRequest：
+    // outsourcing_order_id / product_id / quantity / unit_cost 必填，四维取自真实可用匹；
+    // 数量与建单的 issue_quantity 同值、单价按 material_cost÷数量，保证成本钩稽不被门拒。
+    const itemResp = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      '/production/outsourcing-orders/items',
+      {
+        outsourcing_order_id: id,
+        product_id: outsourcingProductId,
+        warehouse_id: issueTarget.id,
+        color_no: issueBundle.stockRow.color_no,
+        dye_lot_no: issueBundle.stockRow.dye_lot_no,
+        batch_no: issueBundle.stockRow.batch_no,
+        piece_no: issueBundle.pieces[0].piece_no,
+        quantity: 1200,
+        unit: '米',
+        unit_cost: 20,
+        remarks: 'e2e 委外发料明细（精确到匹）',
+      }
+    );
+    const itemId = Number(itemResp['id']);
+    expect(
+      Number.isInteger(itemId) && itemId > 0,
+      `登记发料明细应返回整数 id，实际 ${JSON.stringify(itemResp)}`
+    ).toBe(true);
+    outsourcingItemId = itemId;
+
+    // 前置成立证明：按单回读发料明细必须看到刚登记的那条匹，否则发料门仍会拒。
+    // list_outsourcing_items 的出参是 ApiResponse<Vec<Model>> 裸数组，不是分页信封，
+    // 读法按数组通道取 data 并先自证是数组。
+    const itemRows = await apiCallRaw<Record<string, unknown>[]>(
+      page,
+      'GET',
+      `/production/outsourcing-orders/items/by-order/${id}`
+    );
+    expect(
+      Array.isArray(itemRows),
+      `按单读发料明细应返回数组，实际 ${JSON.stringify(itemRows)}`
+    ).toBe(true);
+    expect(
+      itemRows.some(r => Number(r['id']) === itemId),
+      `发料明细 ${itemId} 必须能按单读回，实际 ${JSON.stringify(itemRows)}`
+    ).toBe(true);
+
     // 合法推进：draft → issued → processing。
     const issued = await apiCallRaw<Record<string, unknown>>(
       page,
@@ -499,6 +562,16 @@ test.describe('449 委外染整返工与缸差登记', () => {
     expectStateGateRejection(
       settleBeforeReceipt,
       `processing 委外订单 ${id} 未收回即结算应被状态门拒绝`
+    );
+
+    // 收尾：回收本腿自建的发料明细（删除面在 frontend/scripts/route-snapshot.txt 在册，
+    // outsourcing_handler::delete_outsourcing_item）。后续收回腿若仍引用该明细，
+    // tryCleanup 只登记原文不判负——发料门自身的判据写在本腿正文里，不由清理腿兜绿。
+    await tryCleanup(
+      page,
+      'DELETE',
+      `/production/outsourcing-orders/items/${outsourcingItemId}`,
+      `清理发料明细 ${outsourcingItemId}`
     );
   });
 
