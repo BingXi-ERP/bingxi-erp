@@ -529,8 +529,13 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     // 电话键是 mobile_phone/tel_phone、邮箱键是 email，不是 customers/customer_contacts 的
     // contact_phone/contact_email；建单入参按 CreateLeadRequest 的契约字段名给（lead_source/lead_no
     // 由服务端取号与缺省补齐），库里是否恰好有带电话的行不是可信前置。
+    // 写入腿必须与读回腿同域：/crm/customers 挂 customer_handler::create_customer
+    //（入参 CreateCustomerRequest，唯一非 Option 必填是 customer_name），按线索字段名提交
+    // company_name 会被判成缺必填而回 400 VALIDATION_ERROR；本腿读回走
+    // /crm/customers/enhanced（线索域，键 mobile_phone/email），故写入也走 enhanced 腿，
+    // 让返回的 lead id 与增强列表行 id 同源。
     const company = genName('P447CUST');
-    const createdCust = await apiCallRaw<ContactRow>(page, 'POST', '/crm/customers', {
+    const createdCust = await apiCallRaw<ContactRow>(page, 'POST', '/crm/customers/enhanced', {
       company_name: company,
       contact_name: `${company}联系人`,
       mobile_phone: '13800001234',
