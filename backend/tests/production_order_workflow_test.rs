@@ -214,9 +214,7 @@ async fn test_productionorderservice_approve_order_kdbfherr() {
 /// = 本轮 CI 红因原文）→ `validate_work_center_exists`（:76-88，work_centers 空表
 /// ⇒ ValidationError("工作中心ID 1 不存在")），故必须种 **products(1) 与
 /// work_centers(1)** 两父行。列形态按真表 DDL：products(code/name NOT NULL，
-/// 范式同 contract_wave5_receipt_return_three_state_test.rs:154）、
-/// work_centers(code UNIQUE NOT NULL / name NOT NULL，
-/// migration/src/domain/business/m0007_add_mrp_production_bom.rs:56-66）。
+/// 范式同 contract_wave5_receipt_return_three_state_test.rs:154）、work_centers(code UNIQUE NOT NULL / name NOT NULL）。
 /// 走 `setup_test_db()`（已迁移 PG + TRUNCATE + RESTART IDENTITY）使显式 id=1 与
 /// `sample_create_request()` 的引用恒对齐；ignored lane `--test-threads=1` 串行，
 /// 无同库竞态。

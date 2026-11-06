@@ -164,7 +164,7 @@ async fn seed_po(
     po.id
 }
 
-/// 种一行销售订单（无明细：approve 后置 MRP 循环空转，reject 释放预留空转；
+/// 种一行销售订单（无明细：approve 无行级副作用、reject 释放预留空转；
 /// notes 同 PO 作挪用防护锚点——SO reject 历史挪用 notes，m0079 起停写）
 async fn seed_so(db: &Arc<DatabaseConnection>, status: &str, customer_id: i32, tag: &str) -> i32 {
     let order = sales_order::ActiveModel {
