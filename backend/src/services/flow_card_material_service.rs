@@ -260,9 +260,8 @@ impl FlowCardMaterialService {
     /// 用单次 JOIN 取回（卡与行的归属关系以卡表为准，卡被软删的行不再参与扣料），
     /// 避免"先查卡再逐卡查行"的 N+1。返回行序稳定，按卡主键与行主键升序。
     pub async fn collect_for_order(
-        &self,
-        order_id: i32,
         txn: &sea_orm::DatabaseTransaction,
+        order_id: i32,
     ) -> Result<Vec<(CardModel, MaterialModel)>, AppError> {
         let cards = CardEntity::find()
             .filter(CardColumn::ProductionOrderId.eq(order_id))
