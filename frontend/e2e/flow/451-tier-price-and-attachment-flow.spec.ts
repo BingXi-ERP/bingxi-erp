@@ -65,6 +65,7 @@ import {
   API_BASE,
   API_PREFIX,
   APP_ERROR_CODES,
+  apiCall,
   apiCallRaw,
   apiCallExpectFail,
   ensureTestEntities,
@@ -773,7 +774,15 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
       ).toBe(true);
     }
 
-    await apiCallRaw<unknown>(page, 'DELETE', `/products/${hostProductId}`);
-    await apiCallRaw<unknown>(page, 'DELETE', `/color-prices/${priceId}`);
+    // 回收按引用面自上而下：先撤本腿留下的每一档，色价宿主才可能被放行，宿主产品与
+    // 夹具产品（ctx.quotationProductId）才会重新变成无引用可行。档位不撤时色价删除被
+    // 引用面拒掉，而咽掉失败的读法会把这条残留推到夹具回收腿上，红位落到别人头上。
+    // 逐条用会抛的 apiCall：回收失败要在本腿点名，不许静默。
+    for (const item of requireArray(afterDeny.items, '回收前档位 items')) {
+      const row = requireRow(item, '回收前档位行');
+      await apiCall(page, 'DELETE', `/color-prices/tiers/item/${str(row.id)}`);
+    }
+    await apiCall(page, 'DELETE', `/color-prices/${priceId}`);
+    await apiCall(page, 'DELETE', `/products/${hostProductId}`);
   });
 });
