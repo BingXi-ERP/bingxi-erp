@@ -114,7 +114,6 @@ export const NAV_TREE: NavNode[] = [
       S('plan', 'layout.section.plan', [
         L('/production', 'layout.menu.productionPlan'),
         L('/capacity', 'layout.menu.capacity'),
-        L('/material-shortage', 'layout.menu.materialShortage'),
         L('/scheduling', 'layout.menu.scheduling'),
         L('/scheduling/gantt', 'layout.menu.gantt'),
       ]),

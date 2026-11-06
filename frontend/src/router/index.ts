@@ -752,17 +752,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '产能分析', icon: 'Cpu', permission: ['capacity:read'], requiresAuth: true }, // 该入口要求下方 meta.permission 列出的模块读权限键
       },
       {
-        path: 'material-shortage',
-        name: 'MaterialShortage',
-        component: () => import('@/views/material-shortage/index.vue'),
-        meta: {
-          title: '缺料预警',
-          icon: 'Cpu',
-          permission: ['material-shortage:read'],
-          requiresAuth: true,
-        }, // 该入口要求下方 meta.permission 列出的模块读权限键
-      },
-      {
         path: 'cost',
         name: 'Cost',
         component: () => import('@/views/cost/index.vue'),
@@ -1739,7 +1728,6 @@ const COARSE_DOMAIN_RESOURCES: Record<string, string[]> = {
     'outsourcing-orders',
     'outsourcing-receipts',
     'outsourcing-vouchers',
-    'material-shortage',
     'business-modes',
     'chemicals',
     'chemical-lots',
