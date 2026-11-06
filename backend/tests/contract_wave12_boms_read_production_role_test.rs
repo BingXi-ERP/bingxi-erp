@@ -1,29 +1,32 @@
-//! 生产岗 `boms:read` 的三通道一致静态锁（不连库、不启服务）
+//! BOM/MRP 授权撤除的三通道一致静态锁（不连库、不启服务）
 //!
-//! 功能：钉死"物料清单读权限"这一枚键在三条通道上同源——① 新装库角色矩阵（走
-//!       `InitService::all_role_permission_definition_groups()` 这份权威定义，不抄副本）；
-//!       ② 存量库授权迁移 `business/m0092_grant_boms_read_production_manager.rs` 的角色常量；
-//!       ③ 前端路由门 `router/index.ts` 对 /bom 声明的 `boms:read`。任一处漂移即判红。
+//! 功能：BOM 与 MRP 整族功能下线后，钉死这两枚权限资源在三条通道上**都已缺席**、彼此同源——
+//!       ① 新装库角色矩阵（走 `InitService::all_role_permission_definition_groups()` 这份权威
+//!          定义，不抄副本）：不得再出现 boms 或 mrp 的任何 (角色×动作) 行；
+//!       ② 存量库撤权迁移 `bom_mrp_permission_withdrawal/m0133_withdraw_bom_mrp_permissions.rs`：
+//!          必须有一条按 `resource_type` 删除这两枚键授权行的语句（不按角色硬编码单行）；
+//!       ③ 前端路由门 `router/index.ts`：不得再声明 `boms:read`。
+//!       资源名另与 `PERMISSION_RESOURCES` 对拍（两枚键须已从注册表摘除）。任一处仍持有即判红。
 //! 调用方：集成测试 crate 的可执行用例，CI 里由测试运行器调用。
 //! 入参：无（三条通道都以 include_str! 读入真源文本，矩阵以生产函数取真值）。
-//! 传给谁：把解析出的集合交给相等断言；资源名另与 `PERMISSION_RESOURCES` 对拍。
-//! 存什么：不落库、不产文件，只把"该键授给哪些岗、前端按哪枚键门控"固化为回归断言。
+//! 传给谁：把解析出的集合交给缺席/包含断言；资源名与 `PERMISSION_RESOURCES` 对拍。
+//! 存什么：不落库、不产文件，只把"这两枚键已撤、三通道不得复现"固化为回归断言。
 //! 存哪里：仅本测试源文件一份，随源码进版本库。
 //!
-//! 为什么要这枚键：/bom 页的路由门与 `GET /boms` 的运行期派生键都是 `boms:read`，而生产域
-//! 此前没有任何 boms 授权 ⇒ 生产经理连自己工单的用料依据都查不到。只授读不授写：
-//! BOM 的建立/改版/审批属产品与工艺侧职责。
+//! 为什么反过来锁：BOM 与 MRP 下线后 `boms`/`mrp` 端点与其授权行都已成悬空对象，留着只会让
+//! 「看着已授权」掩盖端点已不存在；本锁与被测口径同步翻转，让"撤权"这件事本身有测试保护
+//! （源码/迁移先撤、测试跟着撤断言，不是放宽断言消红）。撤权的存量库通道是 m0133，历史授予
+//! 迁移 m0092 按其不可篡改原则原样保留、不再作为"当前有效授权"判据。
 
 use std::collections::BTreeSet;
 
 use bingxi_backend::services::init_service::{InitService, PERMISSION_RESOURCES};
 
-/// 被锁定的资源名与动作名（与运行期派生键 `boms:read` 同形）。
-const RESOURCE: &str = "boms";
-const ACTION: &str = "read";
-const KEY: &str = "boms:read";
+/// 被下线并撤权的两枚资源名（与运行期派生键同形）。
+const RES_BOMS: &str = "boms";
+const RES_MRP: &str = "mrp";
 
-/// 摊平生产矩阵为 (角色码, 资源码, 动作码) 三元组（同一份定义表，不抄副本）。
+/// 摊平矩阵为 (角色码, 资源码, 动作码) 三元组（同一份定义表，不抄副本）。
 fn matrix_rows() -> Vec<(&'static str, &'static str, &'static str)> {
     let mut rows = Vec::new();
     for definitions in InitService::all_role_permission_definition_groups() {
@@ -36,13 +39,15 @@ fn matrix_rows() -> Vec<(&'static str, &'static str, &'static str)> {
     rows
 }
 
-/// 通道② 真源（存量库授权迁移）。
-fn migration_src() -> String {
-    include_str!("../migration/src/domain/business/m0092_grant_boms_read_production_manager.rs")
-        .replace('\r', "")
+/// 通道② 真源（存量库撤权迁移）。
+fn revocation_src() -> String {
+    include_str!(
+        "../migration/src/domain/bom_mrp_permission_withdrawal/m0133_withdraw_bom_mrp_permissions.rs"
+    )
+    .replace('\r', "")
 }
 
-/// 只保留执行体：逐行剔除整行注释（注释里出现的角色/键名不是授予，计入即假判）。
+/// 只保留执行体：逐行剔除整行注释与文档注释（注释里出现的资源名不是删除动作，计入即假判）。
 fn code_only(src: &str) -> String {
     src.lines()
         .filter(|line| !line.trim_start().starts_with("//"))
@@ -50,127 +55,91 @@ fn code_only(src: &str) -> String {
         .join("\n")
 }
 
-/// 区间内全部成对双引号 token。
-fn quoted_tokens(seg: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut chars = seg.chars();
-    while let Some(c) = chars.next() {
-        if c == '"' {
-            let mut tok = String::new();
-            for n in chars.by_ref() {
-                if n == '"' {
-                    break;
-                }
-                tok.push(n);
-            }
-            out.push(tok);
-        }
-    }
-    out
+/// 撤权迁移是否含一条「按 resource_type 删除 role_permissions 里某枚资源全部授权行」的语句。
+/// 判据三件事同时成立：目标表是 role_permissions、是 DELETE、且以资源名（非角色）匹配该键。
+fn revocation_deletes_resource(code: &str, resource: &str) -> bool {
+    code.contains("DELETE FROM \"role_permissions\"")
+        && code.contains("resource_type")
+        && code.contains(&format!("'{resource}'"))
 }
 
-/// 通道②：迁移里 `const ROLE_CODES: &[&str] = &[...]` 的角色码清单（缺锚点即 panic，
-/// 绝不把"解析不到"当成"没有授予"）。
-fn migration_role_codes(code: &str) -> BTreeSet<String> {
-    let anchor = code
-        .find("const ROLE_CODES")
-        .unwrap_or_else(|| panic!("迁移里必须存在 const ROLE_CODES（通道集合判据的定位符）"));
-    let rest = &code[anchor..];
-    let assign = rest
-        .find("= &[")
-        .unwrap_or_else(|| panic!("const ROLE_CODES 应为 `: &[&str] = &[...]` 赋值形态"));
-    let body = &rest[assign + "= &[".len()..];
-    let close = body
-        .find(']')
-        .unwrap_or_else(|| panic!("const ROLE_CODES 的角色清单未闭合"));
-    quoted_tokens(&body[..close]).into_iter().collect()
+/// 资源名是否仍在注册表里（撤权后两枚都应缺席）。
+fn resource_registered(resource: &str) -> bool {
+    PERMISSION_RESOURCES.contains(&resource)
 }
 
-/// 资源名必须是注册表内的权威名（否则运行期查的是注册表外资源，前端与后端都对不上）。
+/// 通道①：矩阵里不得再出现 boms 或 mrp 的任何 (角色×动作) 行。
 #[test]
-fn boms_resource_is_registered_canonical_name() {
+fn matrix_has_no_boms_or_mrp_grant_rows() {
+    let rows = matrix_rows();
+    let offenders: BTreeSet<(String, String, String)> = rows
+        .iter()
+        .filter(|(_, res, _)| *res == RES_BOMS || *res == RES_MRP)
+        .map(|(r, res, act)| (r.to_string(), res.to_string(), act.to_string()))
+        .collect();
     assert!(
-        PERMISSION_RESOURCES.contains(&RESOURCE),
-        "{RESOURCE} 必须在 init_service::PERMISSION_RESOURCES 里在册，否则 boms:read 是注册表外键"
+        offenders.is_empty(),
+        "BOM/MRP 已下线，授权矩阵不得再出现 boms/mrp 任何行，实际残留：{offenders:?}"
     );
 }
 
-/// 通道①：矩阵侧只有生产经理持 `boms/read`，且不得出现 `boms/"*"`（通配会把写侧能力一并放出）。
+/// 资源名必须已从注册表摘除（否则运行期仍把这枚键当合法资源校验，等于假在册）。
 #[test]
-fn matrix_grants_boms_read_to_production_manager_only() {
-    let rows = matrix_rows();
-    let holders: BTreeSet<String> = rows
-        .iter()
-        .filter(|(_, res, act)| *res == RESOURCE && (*act == ACTION || *act == "*"))
-        .map(|(role, _, _)| role.to_string())
-        .collect();
-    assert_eq!(
-        holders,
-        ["production_manager".to_string()].into_iter().collect(),
-        "{KEY} 的持有岗位须恰为 production_manager 一岗（出现别的岗或通配都算越界扩大）"
+fn boms_and_mrp_removed_from_permission_resources_registry() {
+    assert!(
+        !resource_registered(RES_BOMS),
+        "{RES_BOMS} 必须已从 init_service::PERMISSION_RESOURCES 摘除，否则资源名仍在册"
     );
     assert!(
-        !rows
-            .iter()
-            .any(|(_, res, act)| *res == RESOURCE && *act == "*"),
-        "boms 资源不得以 \"*\" 通配授予：本岗只需读，通配会把建/改/删/审批一并放出"
+        !resource_registered(RES_MRP),
+        "{RES_MRP} 必须已从 init_service::PERMISSION_RESOURCES 摘除（mrp-history 是另一枚独立键、不在本次下线范围，故只断言裸 mrp 缺席）"
     );
 }
 
-/// 通道①↔②：新装矩阵与存量迁移的受授集合相等（改一处必须同步另一处）。
+/// 通道②：存量库撤权迁移必须按资源名删除这两枚键的历史授权行（覆盖所有岗位，不按角色硬编码单行）。
 #[test]
-fn matrix_and_migration_grantee_sets_agree() {
-    let rows = matrix_rows();
-    let from_matrix: BTreeSet<String> = rows
-        .iter()
-        .filter(|(_, res, act)| *res == RESOURCE && *act == ACTION)
-        .map(|(role, _, _)| role.to_string())
-        .collect();
-    let from_migration = migration_role_codes(&code_only(&migration_src()));
-    assert_eq!(
-        from_matrix, from_migration,
-        "矩阵与迁移对 {KEY} 的受授集合必须双向相等，否则新装库能进、存量库升级后仍 403"
+fn revocation_migration_deletes_boms_and_mrp_by_resource_type() {
+    let code = code_only(&revocation_src());
+    assert!(
+        revocation_deletes_resource(&code, RES_BOMS),
+        "撤权迁移必须含按 resource_type 删除 {RES_BOMS} 授权行的语句，否则存量库升级后仍持该键"
+    );
+    assert!(
+        revocation_deletes_resource(&code, RES_MRP),
+        "撤权迁移必须含按 resource_type 删除 {RES_MRP} 授权行的语句，否则存量库升级后仍持该键"
     );
 }
 
-/// 通道③：前端 /bom 路由门声明的就是这枚键（键名漂移会让持权岗位被守卫拦在门外）。
+/// 通道③：前端路由门不得再声明 boms:read（键已撤，前端留着只会指向不存在的端点）。
 #[test]
-fn frontend_route_gate_declares_the_same_key() {
+fn frontend_route_gate_no_longer_declares_boms_read() {
     let router = include_str!("../../frontend/src/router/index.ts").replace('\r', "");
     assert!(
-        router.contains(KEY),
-        "router/index.ts 必须按 {KEY} 门控物料清单页，与后端派生键同形"
-    );
-    // 检测力自证：同一段里键名是被数组包裹的权限声明，不是随手出现的字符串。
-    let anchored = router
-        .lines()
-        .any(|line| line.contains("permission:") && line.contains(KEY));
-    assert!(
-        anchored,
-        "{KEY} 必须出现在路由 meta 的 permission 声明里，仅以裸字符串出现在别处不算接通"
+        !router.contains("boms:read"),
+        "router/index.ts 不得再按 boms:read 门控任何路由——BOM 页与 boms 资源均已下线"
     );
 }
 
-/// 反空操作自证：证明上面几条相等/集合判据有判别力，而不是恒真。
+/// 反空操作自证：证明上面几条缺席/包含判据有判别力，而不是恒真。
 #[test]
-fn lock_detects_drift_instead_of_passing_silently() {
-    // 一、迁移解析器能检出受授面被扩大：合成两岗清单须解析出 2 个码。
-    let with_extra = "const ROLE_CODES: &[&str] = &[\"production_manager\", \"dyeing_master\"];";
-    assert_eq!(
-        migration_role_codes(with_extra).len(),
-        2,
-        "解析器须能检出受授清单被扩到两岗——扩清单却不被判红即为恒真假绿"
-    );
-    // 二、真实矩阵扫描非空：若定义表解析塌成空集，前面的相等断言会"两边都空"而假绿。
+fn lock_detects_revocation_drift_instead_of_passing_silently() {
+    // 一、矩阵解析非空：若定义表解析塌成空集，缺席断言会因"两边都空"而假绿。
     let rows = matrix_rows();
     assert!(
         rows.len() > 100,
-        "矩阵三元组总数异常偏低（实得 {}），定义表解析面失效，本锁无从比对",
+        "矩阵三元组总数异常偏低（实得 {}），定义表解析面失效，本锁无从判定缺席",
         rows.len()
     );
+    // 二、撤权删除判据有牙：真实迁移对两枚键都判真；把资源名替换掉后必须翻假
+    //    （证明"漏撤某枚键"会被抓到，不是恒真）。
+    let code = code_only(&revocation_src());
     assert!(
-        rows.iter()
-            .any(|(_, res, act)| *res == RESOURCE && *act == ACTION),
-        "真实矩阵必须含 ({RESOURCE}, {ACTION}) 行，否则通道① 缺席而通道② 在场＝半截授权"
+        revocation_deletes_resource(&code, RES_BOMS) && revocation_deletes_resource(&code, RES_MRP),
+        "真实撤权迁移必须先被判据认出覆盖两枚键（否则下面的反向自证无从谈起）"
+    );
+    let doctored = code.replace("'mrp'", "'other-resource'");
+    assert!(
+        !revocation_deletes_resource(&doctored, RES_MRP),
+        "撤权迁移若漏删 mrp（替换成别的资源名）必须被本判据翻假——漏撤却不被抓到即恒真假绿"
     );
 }
