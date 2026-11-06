@@ -10,6 +10,7 @@ import {
   apiCallExpectFail,
   deferCleanup,
   ensureTestEntities,
+  expectDenied,
   failureCode,
   flushDeferredCleanups,
   getCtx,
@@ -34,9 +35,13 @@ import {
  * - GET `/color-cards/{request_id}/lab-dip/print`（print_handler::lab_dip_request_print_docx，
  *   doc_type 恒为 `lab_dip_request`，路径参数是打样申请主键而非色卡主键）；
  * - GET `/custom-orders/{id}/print`（print_handler::custom_order_print_docx，doc_type `custom_order`）；
- * - GET `/crm/customers`、GET `/crm/customers/enhanced`、GET `/crm/customers/{id}/contacts`、
- *   GET `/crm/customers/export`、GET `/color-cards/issues`、GET `/color-cards/issues/export`、
+ * - GET/POST `/crm/customers`、GET `/crm/customers/enhanced`、GET `/crm/customers/{id}/contacts`、
+ *   GET `/crm/customers/export`、DELETE `/crm/customers/{id}`、DELETE `/crm/customers/enhanced/{id}`、
+ *   GET `/color-cards/issues`、GET `/color-cards/issues/{id}`、GET `/color-cards/issues/export`、
  *   GET `/audit-logs/export`；
+ * - 成本列分面的造数腿：POST `/color-cards`、GET `/color-cards/{id}`、PUT `/color-cards/{id}`、
+ *   DELETE `/color-cards/{id}`、POST `/color-cards/issues`、POST `/color-cards/issues/{id}/damaged`
+ *   （发放记录族只有 GET 与 POST 两类挂载，没有 DELETE 腿，见 447-4 的收尾说明）；
  * - POST `/export-approvals`、GET `/export-approvals`、GET `/export-approvals/{id}`、
  *   GET `/export-approvals/{id}/token-once`、GET `/export-approvals/verify-token`、
  *   POST `/export-approvals/{id}/approve`、POST `/export-approvals/{id}/rotate-token`、
@@ -67,6 +72,10 @@ import {
  *   （`list_leads`），承载键由 `crm-enhanced.ts` 的 `CustomerPage` 与 `check-api-envelope.mjs` 共同确认。
  * - `services/color_card_issue_service.rs` 的 `mask_cost_amount`：`handlers/color_card/issue.rs`
  *   在 `can_view_cost` 为假时把 `compensation_amount` 置 None（成本列剔除而非掩码，与 PII 列又是第三种形态）。
+ *   `can_view_cost` 与发放面第二道门都按权限注册表在册的资源名 `color-cards` 判定（动作分别为
+ *   `export` 与 `read`/`create`/`cancel`），与 URL 派生出的第一道门同键；第二道门用的判定器
+ *   容 `*` 通配授权行，口径与中间件的 `matches_permission` 一致，因此只持 `color-cards:read`
+ *   的岗位可读列表、看不到成本列，持 `color-cards:*` 或 `color-cards:export` 的岗位两者都看得到。
  *
  * 一次性令牌的事实来源：`handlers/export_approval_handler.rs` 的 `view_token_once` 先过状态门——
  * `services/export_approval_service.rs` 的 `view_token_once` 对非 approved 状态回
@@ -626,42 +635,248 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       `业务员侧 contacts 子端点必须与列表同分面出掩码（crm_customer_handler.rs 与客户列表共用 apply_customer_field_permission），实际 ${JSON.stringify(spContacts.slice(0, 2))}——出原文即读出口旁路`
     ).toBe(true);
 
-    const spIssues = rowsOf(
-      await apiCallRaw<unknown>(page, 'GET', '/color-cards/issues?page=1&page_size=20'),
-      '色卡发放列表(业务员)'
-    );
-    if (spIssues.length > 0) {
-      expect(
-        spIssues.every(r => r.compensation_amount === null || r.compensation_amount === undefined),
-        `业务员侧 compensation_amount 必须按 issue.rs 置 None（成本列剔除），实际存在非空值`
-      ).toBe(true);
-    }
+    // 成本列分面的真实前置。发放列表的行级可见性由行级作用域决定：非 all 范围一律按
+    // customers.owner_id = 操作人收敛（services/color_card_issue_service.rs 的
+    // build_scoped_issue_find），库里既有客户都不归属业务员，条件断言等于让掩码面恒零行空转。
+    // 所以归属客户必须由业务员自己建：归属列由服务端写成 created_by
+    // （services/customer_ops/update.rs 的 build_customer_active_model 落
+    // owner_id = args.created_by），业务员自建即本人归属，不需要再走认领或分配。
+    // 写入腿必须是 /crm/customers（customer_handler::create_customer 写 customers 表）：
+    // 上半段那枚 /crm/customers/enhanced 的 id 是线索实体 crm_lead 的主键，拿它当
+    // customer_id 去发放，服务层按 customers 主键取行必然 404。
+    const ownedCustomer = await apiCallRaw<{ id: unknown }>(page, 'POST', '/crm/customers', {
+      customer_name: genName('P447SPCUST'),
+      contact_person: '447业务员归属联系人',
+      customer_type: 'retail',
+      status: 'active',
+      // 发放闸门 3 要求 customers.credit_limit > 0；本入参是数值字符串，缺省落 0
+      credit_limit: '50000.00',
+    });
+    const ownedCustomerId = Number(ownedCustomer.id);
+    expect(
+      Number.isInteger(ownedCustomerId) && ownedCustomerId > 0,
+      `业务员自建归属客户必须返回整数主键，实际 ${JSON.stringify(ownedCustomer.id)}`
+    ).toBe(true);
 
-    const spExport = await assertExportNotDeadEnd(
+    // 切回本 worker 的 admin 会话：发放与改判登记都属写面，业务员岗不持写键；
+    // 靶卡与发放行由 admin 建，行级归属仍由上一段那枚客户的 owner_id 决定，与发放人无关。
+    await loginViaUI(page, testUsername(), testPassword(), true);
+    const issueTag = genName('P447ISSUE');
+    const issueCard = await apiCallRaw<{ id: unknown; status: unknown }>(
       page,
-      '/crm/customers/export?page=1&page_size=50',
-      '业务员'
+      'POST',
+      '/color-cards',
+      {
+        card_no: genCode('P447CC'),
+        card_name: issueTag,
+        card_type: 'CUSTOM',
+      }
+    );
+    const cardId = Number(issueCard.id);
+    expect(
+      Number.isInteger(cardId) && cardId > 0,
+      `发放靶卡必须返回整数主键，实际 ${JSON.stringify(issueCard)}`
+    ).toBe(true);
+    expect(
+      str(issueCard.status),
+      `新建靶卡必须是唯一可发放态 draft，实际 ${JSON.stringify(issueCard.status)}`
+    ).toBe('draft');
+
+    // 库存登记是发放闸门 2 的唯一入口（可用量口径 = stock_quantity - issued_quantity）；
+    // 成败不信任写请求出参，一律以详情回读为准。
+    await apiCall(page, 'PUT', `/color-cards/${cardId}`, { stock_quantity: 1 });
+    const cardWithStock = await apiCallRaw<{ stock_quantity: unknown; issued_quantity: unknown }>(
+      page,
+      'GET',
+      `/color-cards/${cardId}`
     );
     expect(
-      spExport.includes(rawPhone),
-      `业务员侧 /crm/customers/export 出参含电话原文 ${rawPhone}，导出腿绕过了列表掩码`
-    ).toBe(false);
+      Number(cardWithStock.stock_quantity),
+      `库存登记必须落库为 1，实际 ${JSON.stringify(cardWithStock.stock_quantity)}`
+    ).toBe(1);
+    expect(
+      Number(cardWithStock.issued_quantity),
+      `登记库存不该改动已发放量，实际 ${JSON.stringify(cardWithStock.issued_quantity)}`
+    ).toBe(0);
 
+    // 发放：purpose 与 remark 都写入本用例标记，用于在库里定位残留行（依据见文末清理说明）。
+    const issued = await apiCallRaw<{ id: unknown }>(page, 'POST', '/color-cards/issues', {
+      color_card_id: cardId,
+      customer_id: ownedCustomerId,
+      issue_qty: 1,
+      purpose: issueTag,
+      remark: issueTag,
+    });
+    const issueId = Number(issued.id);
+    expect(
+      Number.isInteger(issueId) && issueId > 0,
+      `登记库存后向归属客户发放应成功并回记录主键，实际 ${JSON.stringify(issued)}`
+    ).toBe(true);
+
+    // 成本值只有改判登记口会写。这里取损坏口而不是遗失口，依据是写入方的状态联动：
+    // services/color_card_issue_service.rs 的 mark_lost 会把色卡本身也推成终态 lost，
+    // 而色卡归档门对终态一律拒绝流转（color_card_crud_service.rs 的
+    // validate_color_card_status_transition），清理链就断了；mark_damaged 只扣已发放量、
+    // 不动色卡状态，靶卡仍可归档。两口都会把赔付额写进 compensation_amount。
+    // 赔付额取大于 0 的定值，用于证明掩码是把非空值改成 null，而不是本来就没有值。
+    const damagedRecord = await apiCallRaw<{ status: unknown; compensation_amount: unknown }>(
+      page,
+      'POST',
+      `/color-cards/issues/${issueId}/damaged`,
+      { compensation_amount: '8888.00', remark: issueTag }
+    );
+    expect(
+      str(damagedRecord.status),
+      `登记损坏后发放记录应进终态 damaged，实际 ${JSON.stringify(damagedRecord.status)}`
+    ).toBe('damaged');
+    expect(
+      str(damagedRecord.compensation_amount).startsWith('8888'),
+      `登记损坏的出参应带出赔付额原文（admin 旁路成本可见门），实际 ${JSON.stringify(
+        damagedRecord.compensation_amount
+      )}`
+    ).toBe(true);
+
+    // 原文面（admin 在两道门都短路、数据范围 all）必须看到非空成本。
+    // 按 customer_id 筛行：admin 看全表，靠分页取第一页会把自建行挤出窗口。
+    // 列表与详情是两条独立脱敏代码路径（list_issues 走 mask_cost_amount，
+    // get_issue 走单条置 None），两道都断，任一道被改成恒空或恒原样都能被抓。
+    const adminIssueRows = rowsOf(
+      await apiCallRaw<unknown>(
+        page,
+        'GET',
+        `/color-cards/issues?page=1&page_size=20&customer_id=${ownedCustomerId}`
+      ),
+      '色卡发放列表(admin)'
+    );
+    const adminIssueRow = adminIssueRows.find(r => Number(r.id) === issueId);
+    expect(
+      adminIssueRow,
+      `admin 必须能在发放列表看到自建记录 ${issueId}，否则成本原文面无从取证；实际行 ${JSON.stringify(
+        adminIssueRows.map(r => r.id)
+      )}`
+    ).toBeTruthy();
+    expect(
+      adminIssueRow!.compensation_amount !== null &&
+        adminIssueRow!.compensation_amount !== undefined,
+      `admin 侧列表的 compensation_amount 必须是登记后的原文（null 即成本列被误剔），实际 ${JSON.stringify(
+        adminIssueRow!.compensation_amount
+      )}`
+    ).toBe(true);
+    expect(
+      str(adminIssueRow!.compensation_amount).startsWith('8888'),
+      `admin 侧列表必须带出登记的赔付额，实际 ${JSON.stringify(adminIssueRow!.compensation_amount)}`
+    ).toBe(true);
+    const adminIssueDetail = await apiCallRaw<{ compensation_amount: unknown }>(
+      page,
+      'GET',
+      `/color-cards/issues/${issueId}`
+    );
+    expect(
+      str(adminIssueDetail.compensation_amount).startsWith('8888'),
+      `admin 侧详情口的 compensation_amount 必须是原文，实际 ${JSON.stringify(
+        adminIssueDetail.compensation_amount
+      )}`
+    ).toBe(true);
+
+    // 掩码面：业务员岗持 color-cards:read、不持任何 export 键，读面过门、成本列必须被剔除
+    await loginAsRole(page, 'salesperson');
+    const spIssues = rowsOf(
+      await apiCallRaw<unknown>(
+        page,
+        'GET',
+        `/color-cards/issues?page=1&page_size=20&customer_id=${ownedCustomerId}`
+      ),
+      '色卡发放列表(业务员)'
+    );
+    expect(
+      spIssues.some(r => Number(r.id) === issueId),
+      `业务员名下客户的发放行必须可见，否则掩码面未被证明；实际行 ${JSON.stringify(
+        spIssues.map(r => r.id)
+      )}`
+    ).toBe(true);
+    const spIssueRow = spIssues.find(r => Number(r.id) === issueId);
+    expect(
+      spIssueRow!.compensation_amount,
+      `业务员侧列表的 compensation_amount 必须按 mask_cost_amount 剔除为 null，实际 ${JSON.stringify(
+        spIssueRow!.compensation_amount
+      )}`
+    ).toBeNull();
+    const spIssueDetail = await apiCallRaw<{ compensation_amount: unknown }>(
+      page,
+      'GET',
+      `/color-cards/issues/${issueId}`
+    );
+    expect(
+      spIssueDetail.compensation_amount,
+      `业务员侧详情口的 compensation_amount 必须同样剔除为 null（与列表是两条脱敏代码路径），实际 ${JSON.stringify(
+        spIssueDetail.compensation_amount
+      )}`
+    ).toBeNull();
+
+    // 客户导出面：init 矩阵里 customers 的动作只有 read、create、reveal 三枚，除通配岗外
+    // 没有任何岗位持 customers:export，业务员本就打不开这个出口——原写法"业务员侧导出必须
+    // 出掩码"的会话前置为假，它一直排在前面那道 403 之后从未真正执行过。
+    // 这里先钉"导出面不是绕过权限门的旁路"：无键即 403 加 FORBIDDEN，拒绝不落任何出参。
+    // 导出正文与列表掩码引擎的一致性属已知缺口（要证它必须先有一岗持 export 而不持 reveal，
+    // 矩阵里不存在），不拿"能导出的岗位"凑这条判据。
+    const spExportDenied = await apiCallExpectFail(
+      page,
+      'GET',
+      '/crm/customers/export?page=1&page_size=50'
+    );
+    expectDenied(
+      spExportDenied,
+      '不持 customers:export 的业务员调用客户导出必须被权限门拒绝，导出面不得成为掩码旁路'
+    );
+
+    // 审计导出面：audit-logs 的键只在 system_admin 分组以通配在册（另两岗只有 read），
+    // 而 system_admin 分组零 customers 键 ⇒ 它不持有按需揭示 PII 的 entitlement，
+    // 审计导出若把客户电话原文带出来，就是绕过字段权限引擎的真旁路，这条判据的前置为真。
+    await loginAsRole(page, 'system_admin');
     const spAuditExport = await assertExportNotDeadEnd(
       page,
       '/audit-logs/export?page=1&page_size=20',
-      '业务员'
+      'system_admin'
     );
-    expect(spAuditExport.length, '业务员侧 /audit-logs/export 正文长度必须大于 0').toBeGreaterThan(
-      0
-    );
+    expect(
+      spAuditExport.length,
+      'system_admin 侧 /audit-logs/export 正文长度必须大于 0'
+    ).toBeGreaterThan(0);
 
     expect(
       spAuditExport.includes(rawPhone),
-      `业务员侧 /audit-logs/export 出参含客户电话原文 ${rawPhone}，审计导出腿未做同款掩码`
+      `system_admin 侧 /audit-logs/export 出参含客户电话原文 ${rawPhone}，审计导出腿未做同款掩码`
     ).toBe(false);
 
-    // 收尾：回收本用例自建的带电话客户行（增强路由的删除腿与建单腿同域），
+    // 收尾（诚实口径，不造假清理腿）。发放记录族没有删除端点：route-snapshot.txt 的
+    // color-cards 段里 issues 只有 GET 与 POST 两类挂载，service 侧的 is_deleted 只作读
+    // 过滤、没有任何 DELETE 腿；而 returned / lost / damaged / cancelled 都是终态，终态上
+    // 任何改判一律被状态门拒，所以 POST /issues/{id}/cancel 不能拿来清理本用例的损坏行。
+    // 本用例的发放行按设计残留，定位方式就是它的 purpose 与 remark 里的 issueTag。
+    // 清得动的只有靶卡与客户两族：色卡走归档腿（损坏口不动色卡状态，卡仍是 draft 可归档），
+    // 客户走各自的删除腿。
+    await loginViaUI(page, testUsername(), testPassword(), true);
+    await apiCall(page, 'DELETE', `/color-cards/${cardId}`, {
+      reason: `447 发放靶卡收尾 ${issueTag}`,
+    });
+    const archivedCard = await apiCallRaw<{ status: unknown }>(
+      page,
+      'GET',
+      `/color-cards/${cardId}`
+    );
+    expect(
+      str(archivedCard.status),
+      `靶卡归档必须落库为 archived，否则清理链残留可发放卡，实际 ${JSON.stringify(
+        archivedCard.status
+      )}`
+    ).toBe('archived');
+    deferCleanup(
+      queue,
+      'DELETE',
+      `/crm/customers/${ownedCustomerId}`,
+      `447 业务员归属客户 ${ownedCustomerId}`
+    );
+    // 回收本用例自建的带电话客户行（增强路由的删除腿与建单腿同域），
     // 全部脱敏分面断言已消费完该句柄，晚于此处不再有读取点。
     deferCleanup(
       queue,
