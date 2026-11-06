@@ -230,6 +230,20 @@
 //!    扣料的新数据来源（取代 boms/bom_items 的单耗展开）。置于链尾为新的顶层条目（并入已
 //!    应用域会被台账整体跳过、建表永不执行），依赖 v15 建的 production_flow_card 与 system
 //!    建的 products 早于本域
+//! 39. bom_mrp_table_drop: BOM 与 MRP 表下线域（m0132）——按 bom_items→boms→mrp_results 逐表
+//!    `DROP TABLE IF EXISTS`（三表入向外键实测仅 fk_bom_items_bom 一处，先删引用方再删被引用方，
+//!    无需也不许 CASCADE，以免静默带走将来新增的引用者）。纱批事实的承载位置是 flow_card_materials，
+//!    完工扣料已按投纱逐行扣减、不再依赖 BOM 多级展开；缺料预警两表保留、不在本域。down 只回
+//!    空表结构不回历史行，属刻意接受的不对称（回退仅紧急恢复 schema 形状，真实数据由 runbook 备份处置）。
+//!    置于链尾为新的顶层条目（并入 business 建表域会被台账整体跳过、DROP 永不执行），三表建表早于本域
+//! 40. bom_mrp_permission_withdrawal: BOM 与 MRP 撤权域（m0133）——按 resource_type IN ('boms','mrp')
+//!    删除 role_permissions 全岗位的这两枚键历史授权（不按角色硬编码单行，覆盖 init 矩阵与 m0092
+//!    及界面自配的全部来源），命中行数以 RAISE NOTICE 外显不静默。这是 BOM/MRP 授权面的存量库通道；
+//!    同批第二写点——初始化矩阵 init_service_ops/permission.rs 的 ("boms","read") 与 ("mrp","*") 两枚
+//!    授予项与 init_service.rs 资源名登记的摘除——由并发的代码面实例负责，两处须同源，由主编排确认
+//!    （否则复用库删了行、新装库矩阵又种回）。mrp-history 是另一枚独立键、属缺省占位路由族、不删。
+//!    down 只回基线持有人 production_manager 的两枚键（ON CONFLICT 命中真实唯一索引列集合，重复回退
+//!    等价），属不完全可逆。置于链尾为新的顶层条目，依赖 system 建表与 v15 建的权限唯一索引早于本域
 
 pub use sea_orm_migration::prelude::*;
 
@@ -301,6 +315,10 @@ impl MigratorTrait for Migrator {
             Box::new(domain::piece_length_scale_widen::Migration),
             // 流转卡投纱明细建表，链尾独立域（production_flow_card 与 products 建表均早于本域）
             Box::new(domain::flow_card_material_input::Migration),
+            // BOM/MRP 表下线，链尾独立域（三表由 business 域先建；DROP 次序 bom_items→boms→mrp_results，不用 CASCADE）
+            Box::new(domain::bom_mrp_table_drop::Migration),
+            // BOM/MRP 撤权，链尾独立域（boms/mrp 两枚资源的全岗位授权撤回；与 init 矩阵同源摘除待主编排对齐）
+            Box::new(domain::bom_mrp_permission_withdrawal::Migration),
         ]
     }
 }

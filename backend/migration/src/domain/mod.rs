@@ -178,3 +178,9 @@ pub mod piece_inventory_status_drop;
 pub mod piece_length_scale_widen;
 // 流转卡投纱明细建表域：为完工扣料换源提供落库表，链尾独立域（production_flow_card 与 products 建表均早于本域）。
 pub mod flow_card_material_input;
+// BOM/MRP 表下线域：DROP boms/bom_items/mrp_results 三表，链尾独立域（三表由 business 域先建；
+// 并入已应用域会被台账整体跳过、DROP 永不执行）。
+pub mod bom_mrp_table_drop;
+// BOM/MRP 撤权域：撤销 boms 与 mrp 两枚资源的全岗位历史授权，链尾独立域（与初始化矩阵的
+// 同源摘除为跨写点依赖；roles 与 role_permissions 及权限唯一索引均早于本域）。
+pub mod bom_mrp_permission_withdrawal;
