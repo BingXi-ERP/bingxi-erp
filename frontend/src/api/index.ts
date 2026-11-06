@@ -81,6 +81,7 @@ export * from './capacity';
 export * from './barcode-scanner';
 export * from './ar-reconciliation-enhanced';
 export * from './report-enhanced';
+export * from './material-shortage';
 // D14 Batch 5b：bpm-enhanced 与 bpm 存在同名导出（getBpmPendingTaskList），
 // 且无 caller 从 '@/api' 聚合入口导入，故不在此 re-export
 // export * from './bpm-enhanced'
