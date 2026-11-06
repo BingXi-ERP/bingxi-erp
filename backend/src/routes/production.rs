@@ -19,9 +19,9 @@ use axum::{
 use crate::handlers::{
     business_mode_handler, capacity_handler, cost_collection_handler, dye_batch_handler,
     dye_batch_state_machine_handler, dye_recipe_handler, energy_handler, fabric_inspection_handler,
-    flow_card_handler, greige_fabric_handler, lab_dip_handler, missing_handlers, mrp_handler,
-    outsourcing_handler, print_handler, production_order_handler, production_recipe_handler,
-    quality_inspection_handler, wage_handler,
+    flow_card_handler, flow_card_material_handler, greige_fabric_handler, lab_dip_handler,
+    missing_handlers, mrp_handler, outsourcing_handler, print_handler, production_order_handler,
+    production_recipe_handler, quality_inspection_handler, wage_handler,
 };
 
 /// 缸号管理路由（path 前缀 /dye-batches）
@@ -265,6 +265,27 @@ pub fn flow_cards() -> Router<AppState> {
         .route("/flow-cards/feedbacks/{id}/handle", post(flow_card_handler::handle_feedback))
         .route("/flow-cards/feedbacks/{id}/close", post(flow_card_handler::close_feedback))
         .route("/flow-cards/{flow_card_id}/feedbacks", get(flow_card_handler::list_feedbacks_by_card))
+        // ===== 流转卡投纱明细（完工扣料的落库来源） =====
+        .route(
+            "/flow-cards/{flow_card_id}/materials",
+            get(flow_card_material_handler::list_materials_by_card),
+        )
+        .route(
+            "/flow-cards/materials",
+            post(flow_card_material_handler::create_material),
+        )
+        .route(
+            "/flow-cards/materials/{id}",
+            get(flow_card_material_handler::get_material),
+        )
+        .route(
+            "/flow-cards/materials/{id}",
+            put(flow_card_material_handler::update_material),
+        )
+        .route(
+            "/flow-cards/materials/{id}",
+            delete(flow_card_material_handler::delete_material),
+        )
         .route(
             "/flow-cards/{id}/print",
             get(print_handler::production_flow_card_print_docx),

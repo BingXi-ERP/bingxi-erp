@@ -55,6 +55,8 @@ pub mod production_recipe_ops;
 pub mod flow_card_service;
 // 批次 491 D10-5 拆分：flow_card_service.rs facade 的业务实现子模块（route/card_crud/card_state/step/feedback）
 pub mod flow_card_ops;
+// 流转卡投纱明细：完工扣料的落库来源，读写面自成一个 service
+pub mod flow_card_material_service;
 // v14 批次 426：验布打卷流程贯通
 pub mod fabric_inspection_service;
 // v14 批次 427：产量工资核算贯通

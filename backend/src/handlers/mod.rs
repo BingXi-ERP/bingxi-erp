@@ -96,6 +96,7 @@ pub mod greige_fabric_handler;
 pub mod lab_dip_handler;
 // v14 批次 425：流转卡条码与车间工序流转
 pub mod flow_card_handler;
+pub mod flow_card_material_handler;
 // v14 批次 426：验布打卷流程贯通
 pub mod fabric_inspection_handler;
 // v14 批次 427：产量工资核算贯通
