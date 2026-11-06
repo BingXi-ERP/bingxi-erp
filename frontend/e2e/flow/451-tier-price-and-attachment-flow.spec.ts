@@ -65,6 +65,7 @@ import {
   API_BASE,
   API_PREFIX,
   APP_ERROR_CODES,
+  apiCall,
   apiCallRaw,
   apiCallExpectFail,
   ensureTestEntities,
@@ -73,6 +74,7 @@ import {
   genName,
   getCtx,
   loginAsRole,
+  tryCleanup,
 } from './helpers';
 // 产品类型单源常量（与后端 product_type 词表同源）：建品夹具取值必须经成员引用。
 import { PRODUCT_TYPE } from '../../src/constants/product-type';
@@ -773,8 +775,18 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
       ).toBe(true);
     }
 
-    await apiCallRaw<unknown>(page, 'DELETE', `/products/${hostProductId}`);
-    await apiCallRaw<unknown>(page, 'DELETE', `/color-prices/${priceId}`);
+    // 本腿真正拥有的回收义务只有两层：档位行与色价宿主。它们留在被引用面上会挡住
+    // 后续腿复用夹具，所以用会抛的 apiCall 点名在本腿，不许咽掉。
+    for (const item of requireArray(afterDeny.items, '回收前档位 items')) {
+      const row = requireRow(item, '回收前档位行');
+      await apiCall(page, 'DELETE', `/color-prices/tiers/item/${str(row.id)}`);
+    }
+    await apiCall(page, 'DELETE', `/color-prices/${priceId}`);
+
+    // 宿主产品按全仓同一约定回收：产品被任何业务行引用时后端按契约拒绝硬删（正是
+    // "有下游单据的档案禁止硬删"这条要求本身），而本腿全部断言都不依赖它被删掉，
+    // 因此用只告警不抛的回收通道，不把这条正确拒绝当成本腿失败。
+    await tryCleanup(page, 'DELETE', `/products/${hostProductId}`, '[451-04] 阶梯价宿主产品');
   });
 
   /**
