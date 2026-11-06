@@ -774,8 +774,22 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
     // pending_approval，本腿要的「提交→批准」两跳就无前置可行；12.5 单价 × 9000 米 = 112500
     // 落在 10 万到 50 万的经理审批档，提交才真走 BPM 分支落小写 pending_approval。
     const noteTag = genCode('452Q');
+    // 段一还差一户授信客户：夹具客户 ctx.customerId 的 credit_limit 落零，而订单提交面按
+    // 信用额度拦（信用门在销售订单 submit 上，112500 的订单额必被拒"信用额度不足，无法提交订单"）。
+    // 本腿自建一户足额授信客户，报价与由它转出的销售订单都挂这一户，不改夹具客户的额度
+    // （夹具客户被同分片其它腿共用，抬它的额度会把信用门的判据稀释成永真）。
+    const creditCust = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
+      customer_name: `E2E452授信客户${noteTag}`,
+      credit_limit: '1000000.00',
+    });
+    const creditCustomerId = creditCust.data?.id;
+    if (typeof creditCustomerId !== 'number') {
+      throw new Error(
+        `452-04 前置不成立：自建授信客户未返回数字 id，实际 ${JSON.stringify(creditCust)}`
+      );
+    }
     const q = await apiCall<{ id?: number }>(page, 'POST', '/quotations', {
-      customer_id: ctx.customerId,
+      customer_id: creditCustomerId,
       sales_user_id: ctx.userIds[0],
       quotation_date: new Date().toISOString().slice(0, 10),
       valid_until: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
