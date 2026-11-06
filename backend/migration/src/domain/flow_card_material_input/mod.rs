@@ -30,10 +30,14 @@ impl MigrationName for Migration {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        m0131_create_flow_card_materials::Migration.up(manager).await
+        m0131_create_flow_card_materials::Migration
+            .up(manager)
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        m0131_create_flow_card_materials::Migration.down(manager).await
+        m0131_create_flow_card_materials::Migration
+            .down(manager)
+            .await
     }
 }
