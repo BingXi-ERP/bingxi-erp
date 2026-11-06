@@ -829,24 +829,30 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       '不持 customers:export 的业务员调用客户导出必须被权限门拒绝，导出面不得成为掩码旁路'
     );
 
-    // 审计导出面：audit-logs 的键只在 system_admin 分组以通配在册（另两岗只有 read），
-    // 而 system_admin 分组零 customers 键 ⇒ 它不持有按需揭示 PII 的 entitlement，
-    // 审计导出若把客户电话原文带出来，就是绕过字段权限引擎的真旁路，这条判据的前置为真。
-    await loginAsRole(page, 'system_admin');
-    const spAuditExport = await assertExportNotDeadEnd(
+    // 审计导出族走的是导出受理门，不是可直接下载的活出口：
+    // export_approval_service.rs::enforce_export_download_secured 在 download_token 为空时
+    // 直接 permission_denied，与岗位持不持有 audit-logs 键无关。这里钉两层：
+    // 不持该域键的业务员被拒；持 audit-logs 通配行的 system_admin 无令牌同样被拒。
+    // 两条同时成立才证明这个出口确有门管着，也不把它误当免令牌即可导出的面。
+    const auditNoKey = await apiCallExpectFail(
       page,
-      '/audit-logs/export?page=1&page_size=20',
-      'system_admin'
+      'GET',
+      '/audit-logs/export?page=1&page_size=20'
     );
-    expect(
-      spAuditExport.length,
-      'system_admin 侧 /audit-logs/export 正文长度必须大于 0'
-    ).toBeGreaterThan(0);
+    expect(auditNoKey.status, '不持 audit-logs 键的业务员调用审计导出必须被拒').toBe(403);
+    expect(failureCode(auditNoKey), '不持键调用审计导出的机器码').toBe(APP_ERROR_CODES.FORBIDDEN);
 
-    expect(
-      spAuditExport.includes(rawPhone),
-      `system_admin 侧 /audit-logs/export 出参含客户电话原文 ${rawPhone}，审计导出腿未做同款掩码`
-    ).toBe(false);
+    await loginAsRole(page, 'system_admin');
+    const auditNoToken = await apiCallExpectFail(
+      page,
+      'GET',
+      '/audit-logs/export?page=1&page_size=20'
+    );
+    expect(auditNoToken.status, '持 audit-logs 通配键但无下载令牌同样必须被受理门拒').toBe(403);
+    expect(failureCode(auditNoToken), '导出受理门拒绝的机器码').toBe(APP_ERROR_CODES.FORBIDDEN);
+    // 已知缺口（另账登记，不在收红这一笔里凑判据）：走完令牌链路后的审计导出正文是否按 PII
+    // 掩码无成文契约——审计快照要取证完整性、字段权限面要最小可见，属产品取舍要先定口径；
+    // 令牌链路本身由本文件 447-5 在客户资源上覆盖，快照明文同族叙述见 crm_handler.rs。
 
     // 收尾（诚实口径，不造假清理腿）。发放记录族没有删除端点：route-snapshot.txt 的
     // color-cards 段里 issues 只有 GET 与 POST 两类挂载，service 侧的 is_deleted 只作读
