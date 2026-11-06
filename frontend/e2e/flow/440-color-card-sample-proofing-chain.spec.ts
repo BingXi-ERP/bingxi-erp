@@ -69,8 +69,12 @@ import {
  * 会话身份：本文件的正写腿用分片 worker 会话（admin 短路 RBAC），跨角色腿按角色码取账号。
  * 角色授权面依据 backend/src/services/init_service_ops/permission.rs 的角色分组：
  * lab_technician 与 dye_recipe_master 持 ("lab-dip","*") 与 ("color-cards","*")，
- * sales_manager 持 ("color-cards","*")，salesperson 属 e2e 镜像岗、只有应用外壳键与本文件涉及的
- * 资源键（color-cards / lab-dip）都不在其授权面内 —— 这既成立正例（三岗可写本链）也成立反例（业务员必被拒）。
+ * sales_manager 持 ("color-cards","*")，sales_rep（e2e 镜像岗 salesperson 的同名后端岗）持
+ * ("color-cards","read") —— 因此业务员对色卡读面是有键岗位，只能当"读得到"的正例，
+ * 不能当"被 RBAC 拒"的反例。反例取 report_viewer：该岗既不在 init 的角色分组里，
+ * 镜像建岗面又闭合到应用外壳两枚键（dashboard:read 与 notifications:read），
+ * 对本文件的色卡与化验资源零授权键，403 只能来自权限门。
+ * 化验室打样（lab-dip）面对业务员与 report_viewer 都不放行，两条反例同口径成立。
  *
  * 给谁看。色卡仓储与化验室打样两个域的实现者，以及后续要把这条链并入主流程回归的交付侧。
  */
