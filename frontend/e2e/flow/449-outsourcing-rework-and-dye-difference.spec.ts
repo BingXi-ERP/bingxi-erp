@@ -581,7 +581,11 @@ test.describe('449 委外染整返工与缸差登记', () => {
     // 调用方：outsourcing_handler::create_outsourcing_receipt / confirm_outsourcing_receipt。
     // 入参 outsourcing_order_id 用上一笔真实订单；return_quantity/loss_quantity 为业务数量；
     // weight/width/gram_weight 三列按 types.rs 的可空口径分别构造有值与缺席。
-    // 传给谁：services/outsourcing_ops/receipt.rs（validate_measured_value 取值域门）。
+    // 传给谁：services/outsourcing_ops/receipt.rs（validate_measured_value 取值域门与
+    // validate_receipt_quality_status 结论词门）。本列只认
+    // models/status/wage_energy_chemical_business.rs::outsourcing_receipt_quality_status 的
+    // 四态 pending/qualified/concession/unqualified；passed 与 failed 属染化料来料检验域、
+    // 中文合格与不合格属库存质量状态，写进本列会在入口处被业务拒。
     // 存什么：return_quantity/loss_quantity/weight/width/gram_weight/quality_status/grade/status。
     // 存哪里：表 outsourcing_receipt（字段见 services/outsourcing_ops/types.rs）。
     if (!outsourcingOrderId || !outsourcingProductId || !outsourcingWarehouseId) {
@@ -672,7 +676,7 @@ test.describe('449 委外染整返工与缸差登记', () => {
         warehouse_id: outsourcingWarehouseId,
         return_quantity: 1100,
         loss_quantity: 20,
-        quality_status: 'passed',
+        quality_status: 'qualified',
         grade: '一等品',
         weight: 250.5,
         width: 160,
@@ -691,6 +695,10 @@ test.describe('449 委外染整返工与缸差登记', () => {
     expect(Number(okRead.data['width']), '读回实测幅宽应等于写入值').toBe(160);
     expect(Number(okRead.data['gram_weight']), '读回实测克重应等于写入值').toBe(185);
     expect(String(okRead.data['grade']), '读回等级应按写入值逐字保留').toBe('一等品');
+    expect(
+      String(okRead.data['quality_status']),
+      '读回质检结论应与写入值逐字符相同（本列词表只有四态，别域写法进不来）'
+    ).toBe('qualified');
 
     const confirmed = await apiCallRaw<Record<string, unknown>>(
       page,
