@@ -82,9 +82,8 @@ pub struct Model {
 // P1 batch-18 缺陷 7.1：补货策略常量
 pub const REPLENISHMENT_REORDER_POINT: &str = "reorder_point";
 pub const REPLENISHMENT_EOQ: &str = "eoq";
-pub const REPLENISHMENT_MRP: &str = "mrp";
 
-/// P1 batch-18 缺陷 7.1：根据补货策略计算建议采购量（reorder_point 固定=reorder_quantity；eoq=√(2*年需求*订货成本/单位存储成本)；mrp 由 MRP 引擎 BOM 展开返回缺口量）
+/// 根据补货策略计算建议采购量。eoq 取 sqrt(2*年需求*订货成本/单位存储成本)，三项入参任一为零或策略为其余取值时取 reorder_quantity。
 pub fn compute_replenishment_qty(
     strategy: &str,
     reorder_quantity: Decimal,
@@ -106,7 +105,6 @@ pub fn compute_replenishment_qty(
             let result = sqrt_val.sqrt();
             Decimal::try_from(result).unwrap_or(reorder_quantity)
         }
-        REPLENISHMENT_MRP => reorder_quantity,
         _ => reorder_quantity,
     }
 }

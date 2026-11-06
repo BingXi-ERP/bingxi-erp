@@ -49,6 +49,7 @@ impl MigrationTrait for Migration {
 DROP TABLE IF EXISTS "bom_items";
 DROP TABLE IF EXISTS "boms";
 DROP TABLE IF EXISTS "mrp_results";
+COMMENT ON COLUMN "inventory_stocks"."replenishment_strategy" IS '补货策略：reorder_point/eoq';
 "#;
         manager.get_connection().execute_unprepared(sql).await?;
         Ok(())

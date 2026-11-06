@@ -9,6 +9,8 @@
 //! - 只 DROP 三张表，不动任何其它表；`material_shortage_alerts` 与
 //!   `material_shortage_threshold_configs`（缺料预警）保留，不在本域范围。
 //! - `DROP TABLE IF EXISTS`，重跑等价；不使用 CASCADE（详见子迁移头）。
+//! - 同批把 `inventory_stocks.replenishment_strategy` 的列注释收回到 reorder_point 与 eoq：
+//!   mrp 取值随 MRP 引擎一起摘除，注释若还列它就是误导后继读者的第二个事实来源。
 //! - down 只回空表结构、不回数据，属刻意接受的不对称（详见子迁移头）。
 //!
 //! ## 注册位置
