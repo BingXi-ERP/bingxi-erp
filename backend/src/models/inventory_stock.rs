@@ -74,7 +74,8 @@ pub struct Model {
     pub version: i32,
 
     // P1 batch-18 缺陷 7.1：补货策略字段
-    /// 补货策略：reorder_point（订货点法）/ eoq（经济订货量）/ mrp（物料需求计划）
+    /// 补货策略：reorder_point（订货点法）/ eoq（经济订货量）；
+    /// 历史数据中的 mrp（物料需求计划）取值为 MRP 功能下线后的历史留存值，不再由系统写入。
     #[sea_orm(default_value = "reorder_point")]
     pub replenishment_strategy: String,
 }
