@@ -160,6 +160,12 @@ const RESOURCE_NAME_MAP: &[(&str, &str, &str)] = &[
     // 色卡扫码面 GET/POST /color-cards/scan/… 与色卡列表、详情同属一张色卡的读面，
     // 资源名对齐 init_service 注册的权威名 color-cards，供持色卡读面的岗位命中既有授权键
     ("color-cards", "scan", "color-cards"),
+    // 色卡发放面 GET/POST /color-cards/issues 与 /color-cards/issues/{id} 与 issues/export：
+    // 处理器同在 color_card 模块（handlers/color_card/list_issues 等），登记的权威资源名只有
+    // color-cards 而没有 issues。不登记本条时第四段 issues 会被当成资源名，派生出 issues:read
+    // 这类注册表外、任何角色都授予不了的死键——通配超管照常可用，持色卡读面的岗位一律 403，
+    // 前端色卡发放页对非超管恒不可达。与 scan 同一判据对齐到 color-cards。
+    ("color-cards", "issues", "color-cards"),
     ("production", "orders", "production-orders"),
     ("production", "quality-inspection", "quality-inspections"),
     ("system-update", "update", "system-update-update"),

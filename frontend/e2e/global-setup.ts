@@ -712,6 +712,17 @@ const SEED_ROLE_EXTRA_PERMISSIONS: Record<string, string[]> = {
     // 后端既无建角也无授权分组，其权限码闭合等于 SHELL + 本清单，故必须在此逐键对齐
     // sales_rep 的读面，缺键即 RBAC 403，不会由后端同名角色矩阵带入。
     'customers:read',
+    // 客户建档写面（POST /crm/customers 运行时键 customers:create）：与后端 init 矩阵
+    // sales_rep 分组在册的 ("customers","create") 同口径（本镜像岗闭合等于 SHELL + 本清单，
+    // 后端同名岗的授权不会由 init 带进来，缺此键即 RBAC 403）。
+    // 本键也是"归属行"造数的唯一通路：customers.owner_id 由服务端写成 created_by
+    // （services/customer_ops/update.rs 的 build_customer_active_model），业务员自建即本人
+    // 归属；认领与分配两条改归属通路同样要求 customers:create，缺键即无法为按
+    // customers.owner_id 收敛的行级作用域用例准备真实归属行。
+    'customers:create',
+    // 色卡读面（GET /color-cards/… 运行时键 color-cards:read）：后端 init 矩阵把
+    // ("color-cards","read") 明确授给 sales_rep，镜像岗缺此键即被 RBAC 拒为 403。
+    'color-cards:read',
     // PII 按需揭示（POST /crm/customers/{id}/pii/reveal 运行时键 customers:reveal，
     // 与后端 init 矩阵 sales_rep/crm_rep 及 m0086 存量补授三通道同口径）
     'customers:reveal',

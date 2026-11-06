@@ -950,10 +950,20 @@ test.describe('40 报价单多角色审批流转', () => {
               failureCode(convFail),
               `rejected 转单机器码应 BUSINESS_ERROR，实际 code=${convFail.code ?? ''}`
             ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+            // 文案判据与被拒点原文逐字同源（quotation_convert_service.rs 的转单状态门），
+            // 并从"点名状态门"加严到点名允许态与本单实际态三条。
             expect(
               String(convFail.message ?? ''),
               `rejected 转单拒绝文案应点名状态门，实际=${JSON.stringify(convFail.message)}`
-            ).toMatch(/当前状态不允许/);
+            ).toContain('报价单状态不允许转订单');
+            expect(
+              String(convFail.message ?? ''),
+              `拒绝文案应点名允许态 approved，实际=${JSON.stringify(convFail.message)}`
+            ).toContain('仅 approved 状态可转换');
+            expect(
+              String(convFail.message ?? ''),
+              `拒绝文案应回显本单实际状态 rejected，实际=${JSON.stringify(convFail.message)}`
+            ).toContain('：rejected');
             const still = await readQuotationStatus(session.page, quotationId);
             expect(
               String(still.status ?? ''),
