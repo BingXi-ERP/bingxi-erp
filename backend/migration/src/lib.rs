@@ -24,6 +24,7 @@
 //!   → scan_receipt_grant
 //!   → piece_inventory_status_drop
 //!   → piece_length_scale_widen
+//!   → flow_card_material_input
 //!
 //! 迁移名: m_system_domain / m_business_domain / m_sales_crm_domain /
 //!         m_production_domain / m_finance_domain / m_v15_domain / m_rls_dept_domain /
@@ -220,6 +221,15 @@
 //!    NOTICE 跳过可重跑，down 探测小数位多于两位的行命中即 RAISE EXCEPTION 不截断，域内绝不
 //!    UPDATE/DELETE。置于链尾为新的顶层条目（并入已应用域会被台账整体跳过、扩位永不执行），
 //!    依赖 business 建表与 production 补列早于本域
+//! 38. flow_card_material_input: 流转卡投纱明细建表域（m0131）——新建 flow_card_materials
+//!    一张表（所属流转卡外键随卡删除级联、仓库与纱线产品两处外键被引用时拒绝删除、投入数量
+//!    DECIMAL(14,4) 带非负 CHECK 且不设默认值、计量单位受控 kg 与 m 两值、批次与色号与等级
+//!    非空且缸号可空，四维与 inventory_stock 同构以便按批次精确命中库存行）加 flow_card_id
+//!    与 (warehouse_id, material_id) 两条检索索引；只建表不动任何既有表，不回填不 UPDATE
+//!    不 DELETE。纱的编号不落副本，读侧按 material_id 回 products.code。本表是生产订单完工
+//!    扣料的新数据来源（取代 boms/bom_items 的单耗展开）。置于链尾为新的顶层条目（并入已
+//!    应用域会被台账整体跳过、建表永不执行），依赖 v15 建的 production_flow_card 与 system
+//!    建的 products 早于本域
 
 pub use sea_orm_migration::prelude::*;
 
@@ -289,6 +299,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::piece_inventory_status_drop::Migration),
             // 库存匹米数列扩位到 DECIMAL(18,4)，链尾独立域（建表与加列均早于本域，复用库上必然执行）
             Box::new(domain::piece_length_scale_widen::Migration),
+            // 流转卡投纱明细建表，链尾独立域（production_flow_card 与 products 建表均早于本域）
+            Box::new(domain::flow_card_material_input::Migration),
         ]
     }
 }

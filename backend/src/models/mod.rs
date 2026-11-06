@@ -190,6 +190,8 @@ pub mod process_route;
 pub mod process_step_record;
 pub mod process_quality_feedback;
 pub mod production_flow_card;
+// 流转卡投纱明细（一张卡实际投入的成品纱线：纱种/纱编号/纱批次/数量）
+pub mod flow_card_material;
 // v14 批次 426：验布打卷流程贯通（验布记录 + 疵点明细）
 pub mod fabric_inspection_record;
 pub mod fabric_defect_record;

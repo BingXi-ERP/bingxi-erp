@@ -176,3 +176,5 @@ pub mod scan_receipt_grant;
 pub mod piece_inventory_status_drop;
 // 库存匹米数列扩位域：把 length 列型对齐收回数量的计量口径，链尾独立域（建表与加列均早于本域）。
 pub mod piece_length_scale_widen;
+// 流转卡投纱明细建表域：为完工扣料换源提供落库表，链尾独立域（production_flow_card 与 products 建表均早于本域）。
+pub mod flow_card_material_input;
