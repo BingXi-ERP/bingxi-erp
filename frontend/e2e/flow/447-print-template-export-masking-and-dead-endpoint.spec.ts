@@ -862,6 +862,19 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     // 清得动的只有靶卡与客户两族：色卡走归档腿（损坏口不动色卡状态，卡仍是 draft 可归档），
     // 客户走各自的删除腿。
     await loginViaUI(page, testUsername(), testPassword(), true);
+    // 补钉客户导出面的第二层：该族同样走导出受理门
+    // （enforce_export_download_secured 对空令牌直接 permission_denied，无岗位旁路），
+    // 所以本分片会话这个持全键的管理员无令牌也拿不到 200。两条合起来才说明
+    // 拒绝既来自 RBAC 键面也来自受理门，而不是"该端点无人管、只是本用例岗位没权限"。
+    const adminExportNoToken = await apiCallExpectFail(
+      page,
+      'GET',
+      '/crm/customers/export?page=1&page_size=50'
+    );
+    expect(adminExportNoToken.status, '无下载令牌的客户导出必须被受理门拒').toBe(403);
+    expect(failureCode(adminExportNoToken), '客户导出受理门拒绝的机器码').toBe(
+      APP_ERROR_CODES.FORBIDDEN
+    );
     await apiCall(page, 'DELETE', `/color-cards/${cardId}`, {
       reason: `447 发放靶卡收尾 ${issueTag}`,
     });
