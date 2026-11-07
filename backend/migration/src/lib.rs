@@ -20,6 +20,10 @@
 //!   → product_spec_extension_columns → product_vocab_check → product_roll_column_drop
 //!   → contract_clause_snapshot_provenance → print_template_default_slot
 //!   → textile_safety → purchase_inspection_result_check → export_approval_lifecycle
+//!   → product_grade_vocab_check
+//!   → scan_receipt_grant
+//!   → piece_inventory_status_drop
+//!   → piece_length_scale_widen
 //!
 //! 迁移名: m_system_domain / m_business_domain / m_sales_crm_domain /
 //!         m_production_domain / m_finance_domain / m_v15_domain / m_rls_dept_domain /
@@ -196,6 +200,31 @@
 //!    老行按 token_expires_at 自然过期、校验侧对 token_hash IS NULL 回退明文比对。依赖 system
 //!    建的 bpm_process_instance 与 finance 建并 v15 扩展的
 //!    export_approval_request 全部早于本域；置于全链尾为新的顶层条目，复用库上必然执行。
+//! 35. scan_receipt_grant: 仓储两岗补授扫码入库细键的存量库通道（m0121）——按 roles.code
+//!    反查 id，为 warehouse_keeper 与 warehouse_manager 幂等补授 scan-receipt:create，与
+//!    init_service_ops/permission.rs 的矩阵授予面、init_service.rs::PERMISSION_RESOURCES 的
+//!    资源名登记三通道逐字符同源（该细键由 `POST /api/v1/erp/scanner/scan-receipt` 的模块前缀
+//!    下第四段派生，matches_permission 精确匹配，任何既有 inventory/pieces 授权都不覆盖它，
+//!    缺授权行即除通配超管外全员 403）。只授 create，不授永不命中的 read/update/delete；
+//!    NOT EXISTS 守卫使重跑等价，命中 0 角色以 NOTICE 点名不静默通过，down 只回收本域
+//!    角色码的该行。依赖 system 建的 roles 与 role_permissions 早于本域；新建顶层域而不
+//!    并入已应用域（复用库上整域跳过会让补授永不执行），置于链尾必然执行。
+//! 36. piece_inventory_status_drop: 库存匹冗余库存状态列的探测式下线域（m0127），同 28 的
+//!    先后口径；该列是真相列 status 的照抄副本且全仓零读取方，探测到非空且与 status 不等的
+//!    行即 RAISE EXCEPTION 点名中止，不 UPDATE 不 DELETE，down 只回空壳不回填
+//! 37. piece_length_scale_widen: 库存匹米数列扩位域（m0128）——inventory_piece.length 建表为
+//!    DECIMAL(12,2)，production 域以 `ADD COLUMN IF NOT EXISTS "length" DECIMAL(18,4)` 意图对齐
+//!    计量口径但对已存在列恒为 no-op，从未生效；收回确认把 return_quantity（DECIMAL(14,4)）
+//!    原值写入本列，两位列库侧把 190.475 舍成 190.48，与收回单收回数量逐分对不平。本域把列型
+//!    真正扩到 DECIMAL(18,4)（无损不改存量值），两腿出参同为四位小数；已是 ≥4 位或列不存在时
+//!    NOTICE 跳过可重跑，down 探测小数位多于两位的行命中即 RAISE EXCEPTION 不截断，域内绝不
+//!    UPDATE/DELETE。置于链尾为新的顶层条目（并入已应用域会被台账整体跳过、扩位永不执行），
+//!    依赖 business 建表与 production 补列早于本域
+//! 38. m0126_add_audit_terminal_context_columns: 审计日志定位维度域（m0126）——给 audit_logs
+//!    补终端类型 操作页面 单据编号 变更原因 风险标记与操作人角色码六个可空列及按单号与角色码
+//!    的追溯索引，写入单点落库、读取侧列表详情导出出参补维并加等值筛选；探测式幂等加列（列已在
+//!    即 NOTICE 跳过可重跑），down 只回空壳不回填。置于链尾为新的顶层条目（并入已应用域会被台账
+//!    整体跳过、补列永不执行），依赖 system 与 business 建 audit_logs 早于本域
 
 pub use sea_orm_migration::prelude::*;
 
@@ -257,6 +286,14 @@ impl MigratorTrait for Migrator {
             Box::new(domain::textile_safety::Migration),
             Box::new(domain::purchase_inspection_result_check::Migration),
             Box::new(domain::export_approval_lifecycle::Migration),
+            // 产品等级取值域收口，链尾独立域（先点名后收口，晚于 system 与 v15 两域的历史加列语句）
+            Box::new(domain::product_grade_vocab_check::Migration),
+            // 仓储两岗补授扫码入库细键，链尾独立域（roles 与 role_permissions 由 system 域先建）
+            Box::new(domain::scan_receipt_grant::Migration),
+            // 库存匹冗余库存状态列探测式下线，同上一条口径：本支已摘除该列全部读写与实体字段
+            Box::new(domain::piece_inventory_status_drop::Migration),
+            // 库存匹米数列扩位到 DECIMAL(18,4)，链尾独立域（建表与加列均早于本域，复用库上必然执行）
+            Box::new(domain::piece_length_scale_widen::Migration),
             // 审计定位列（终端类型 操作页面 单据编号 变更原因 风险标记）与追溯索引，链尾独立域
             Box::new(domain::m0126_add_audit_terminal_context_columns::Migration),
         ]

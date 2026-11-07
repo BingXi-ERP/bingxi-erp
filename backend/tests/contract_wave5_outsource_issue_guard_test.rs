@@ -217,7 +217,6 @@ async fn seed_piece(
         gram_weight: Set(None),
         production_date: Set(None),
         quality_status: Set(None),
-        inventory_status: Set(Some(piece_status::AVAILABLE.to_string())),
         supplier_piece_no: Set(None),
         position_no: Set(None),
         package_no: Set(None),

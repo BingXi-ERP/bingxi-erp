@@ -1,7 +1,7 @@
 //! 库存服务单元测试
 //!
 //! 覆盖目标：
-//! - calculate_quantity_kg 双计量单位换算 4 个分支（齐全/缺失/转换失败/None 回退）
+//! - resolve_quantity_kg 公斤数落库口径（齐参数补算 / 提交过不覆盖 / 缺参数记 0 / 换算失败上报）
 //! - 库存硬编码状态字符串常量值正确性
 //! - InventoryStockService 实例化
 //!
@@ -27,92 +27,118 @@ use bingxi_backend::utils::error::*;
 use rust_decimal::Decimal;
 use std::sync::Arc;
 
-/// 复现 calculate_quantity_kg 调用 DualUnitConverter::meters_to_kg 的换算逻辑
-/// 源码位置：calculate_quantity_kg 方法内。；公式：quantity_meters * gram_weight * (width_cm / 100) / 1000，保留 3 位小数
-fn calc_kg(
-    quantity_meters: Decimal,
-    gram_weight: Decimal,
-    width_cm: Decimal,
-) -> Result<Decimal, String> {
-    DualUnitConverter::meters_to_kg(quantity_meters, gram_weight, width_cm)
-}
-
-/// test_calculate_quantity_kg_kzhfkqqzzhq
-/// 场景：gram_weight=200g/m², width=150cm, quantity_meters=100m；期望：100 × 200 × (150/100) / 1000 = 3000.000 kg，返回转换器计算值
+/// test_resolve_quantity_kg_qqzouzhuanhuanqi
+/// 场景：未提交公斤数，米数=100、克重=200g/m²、幅宽=150cm 齐备。；
+/// 期望：按 米 × 克重 × 幅宽(m) ÷ 1000 补算得 30 公斤，且算式来源就是换算器本身。；
+/// 若改为不补算（记 0）或另写一份公式，本用例即红。
 #[test]
-fn test_calculate_quantity_kg_kzhfkqqzzhq() {
+fn test_resolve_quantity_kg_qqzouzhuanhuanqi() {
     let quantity_meters = Decimal::new(100, 0);
     let gram_weight = Some(Decimal::new(200, 0));
     let width = Some(Decimal::new(150, 0));
-    let fallback = Decimal::new(999, 0); // 不应被使用
 
-    let result =
-        InventoryStockService::calculate_quantity_kg(quantity_meters, gram_weight, width, fallback);
+    let kg = InventoryStockService::resolve_quantity_kg(None, quantity_meters, gram_weight, width)
+        .expect("齐参数必须补算成功，不得上报失败");
 
-    // 转换器计算：100 × 200 × 1.5 / 1000 = 30.000 kg（注意公式：米 × 克重 × 幅宽(m) ÷ 1000）
-    // 100 * 200 * (150/100) / 1000 = 100 * 200 * 1.5 / 1000 = 30000 / 1000 = 30.000
-    let expected = calc_kg(quantity_meters, Decimal::new(200, 0), Decimal::new(150, 0)).unwrap();
-    assert_eq!(result, expected);
-    assert_eq!(result, Decimal::new(30, 0));
-    assert_ne!(result, fallback, "不应回退到 fallback 值");
+    assert_eq!(
+        kg,
+        Decimal::new(30, 0),
+        "齐参数必须补算出 100 × 200 × 1.5 ÷ 1000 = 30 公斤"
+    );
+    assert_eq!(
+        kg,
+        DualUnitConverter::meters_to_kg(
+            quantity_meters,
+            Decimal::new(200, 0),
+            Decimal::new(150, 0)
+        )
+        .expect("夹具参数齐备且为正数，换算不应失败"),
+        "补算必须走 DualUnitConverter 唯一算式源，不得另写一份公式"
+    );
 }
 
-/// test_calculate_quantity_kg_kzwnonehtfallback（场景：gram_weight=None，即使 width 有值也应回退到 fallback）
+/// test_resolve_quantity_kg_tijiaoguobufugai（本轮行为修复的核心口径）
+/// 场景：提交了公斤数 250，同时克重与幅宽齐备（换算值 30 与提交值不同）。；
+/// 期望：原样返回 250，绝不被理论换算值覆盖。；
+/// 若有人把补算改成无条件重算，本用例即红。
 #[test]
-fn test_calculate_quantity_kg_kzwnonehtfallback() {
-    let quantity_meters = Decimal::new(100, 0);
-    let gram_weight = None;
-    let width = Some(Decimal::new(150, 0));
-    let fallback = Decimal::new(250, 0);
+fn test_resolve_quantity_kg_tijiaoguobufugai() {
+    let submitted = Decimal::new(250, 0);
 
-    let result =
-        InventoryStockService::calculate_quantity_kg(quantity_meters, gram_weight, width, fallback);
+    let kg = InventoryStockService::resolve_quantity_kg(
+        Some(submitted),
+        Decimal::new(100, 0),
+        Some(Decimal::new(200, 0)),
+        Some(Decimal::new(150, 0)),
+    )
+    .expect("提交值原样返回，不该失败");
 
-    assert_eq!(result, fallback, "gram_weight 为 None 时应回退到 fallback");
+    assert_eq!(kg, submitted, "提交过公斤数就必须原样落库");
+    assert_ne!(
+        kg,
+        Decimal::new(30, 0),
+        "30 是这组参数的换算值，相等说明实测录入值又被重算覆盖"
+    );
 }
 
-/// test_calculate_quantity_kg_fkwnonehtfallback（场景：gram_weight 有值但 width=None，应回退到 fallback）
+/// test_resolve_quantity_kg_quecanshuanji0（场景：未提交公斤数且克重或幅宽缺任一）
+/// 期望：记 0，不回退任何外部值、不猜值。；若改成用米数或半边参数造一个非零值，本用例即红。
 #[test]
-fn test_calculate_quantity_kg_fkwnonehtfallback() {
+fn test_resolve_quantity_kg_quecanshuanji0() {
     let quantity_meters = Decimal::new(100, 0);
-    let gram_weight = Some(Decimal::new(200, 0));
-    let width = None;
-    let fallback = Decimal::new(250, 0);
 
-    let result =
-        InventoryStockService::calculate_quantity_kg(quantity_meters, gram_weight, width, fallback);
+    let missing_gram = InventoryStockService::resolve_quantity_kg(
+        None,
+        quantity_meters,
+        None,
+        Some(Decimal::new(150, 0)),
+    )
+    .expect("缺克重属可判定分支，应记 0 而不是上报失败");
+    assert_eq!(missing_gram, Decimal::ZERO, "缺克重不可算，应记 0 而非猜值");
 
-    assert_eq!(result, fallback, "width 为 None 时应回退到 fallback");
+    let missing_width = InventoryStockService::resolve_quantity_kg(
+        None,
+        quantity_meters,
+        Some(Decimal::new(200, 0)),
+        None,
+    )
+    .expect("缺幅宽属可判定分支，应记 0 而不是上报失败");
+    assert_eq!(
+        missing_width,
+        Decimal::ZERO,
+        "缺幅宽不可算，应记 0 而非猜值"
+    );
 }
 
-/// test_calculate_quantity_kg_zhsbhtfallback（场景：gram_weight=0 或 width=0 导致转换器返回 Err，应回退到 fallback）
+/// test_resolve_quantity_kg_zhuanhuanshibaishangbao（场景：克重为 0 或幅宽为 0）
+/// 期望：换算失败如实上报（Err 携带非空原因），不再咽掉失败回退成别的值。；
+/// 若改成回退 0 或吞掉错误返回 Ok，本用例即红。
 #[test]
-fn test_calculate_quantity_kg_zhsbhtfallback() {
+fn test_resolve_quantity_kg_zhuanhuanshibaishangbao() {
     let quantity_meters = Decimal::new(100, 0);
-    let fallback = Decimal::new(250, 0);
 
-    // gram_weight = 0 触发转换器 Err（克重必须大于 0）
-    let result_zero_gram = InventoryStockService::calculate_quantity_kg(
+    let zero_gram = InventoryStockService::resolve_quantity_kg(
+        None,
         quantity_meters,
         Some(Decimal::ZERO),
         Some(Decimal::new(150, 0)),
-        fallback,
-    );
-    assert_eq!(
-        result_zero_gram, fallback,
-        "gram_weight=0 转换失败时应回退到 fallback"
+    )
+    .expect_err("克重为 0 必须上报换算失败，不得回退成任何数值");
+    assert!(
+        !zero_gram.trim().is_empty(),
+        "失败原因必须非空且可追踪，实际={zero_gram:?}"
     );
 
-    // width = 0 触发转换器 Err（幅宽必须大于 0）
-    let result_zero_width = InventoryStockService::calculate_quantity_kg(
+    let zero_width = InventoryStockService::resolve_quantity_kg(
+        None,
         quantity_meters,
         Some(Decimal::new(200, 0)),
         Some(Decimal::ZERO),
-        fallback,
-    );
-    assert_eq!(
-        result_zero_width, fallback,
-        "width=0 转换失败时应回退到 fallback"
+    )
+    .expect_err("幅宽为 0 必须上报换算失败，不得回退成任何数值");
+    assert!(
+        !zero_width.trim().is_empty(),
+        "失败原因必须非空且可追踪，实际={zero_width:?}"
     );
 }
 
@@ -298,26 +324,20 @@ async fn test_update_stock_grade_ffdjz() {
     }
 }
 
-/// test_calculate_quantity_kg_zchs_fhyqgjs（端到端验证 create_stock_fabric 内部使用的公斤自动计算公式：公式 = 米 × 克重 × 幅宽(m) ÷ 1000）
+/// test_resolve_quantity_kg_fumishushangbao（边界场景：未提交公斤数且米数为负）
+/// 期望：换算器拒负数，失败如实上报，既不记 0 也不回退任何外部值。；
+/// 若把失败分支改成兜底返回 Ok，本用例即红。
 #[test]
-fn test_calculate_quantity_kg_zchs_fhyqgjs() {
-    // 100m × 200g/m² × 1.5m ÷ 1000 = 30 kg
-    let meters = Decimal::new(100, 0);
-    let gram = Some(Decimal::new(200, 0));
-    let width = Some(Decimal::new(150, 0)); // 150cm = 1.5m
-    let fallback = Decimal::new(999, 0);
-    let kg = InventoryStockService::calculate_quantity_kg(meters, gram, width, fallback);
-    assert_eq!(kg, Decimal::new(30, 0));
-}
-
-/// test_calculate_quantity_kg_fsms_zhqfherrhtfallback（边界场景：负数米数应触发转换器 Err，回退到 fallback。）
-#[test]
-fn test_calculate_quantity_kg_fsms_zhqfherrhtfallback() {
-    let meters = Decimal::new(-100, 0);
-    let gram = Some(Decimal::new(200, 0));
-    let width = Some(Decimal::new(150, 0));
-    let fallback = Decimal::new(250, 0);
-    let kg = InventoryStockService::calculate_quantity_kg(meters, gram, width, fallback);
-    // 转换器对负数返回 Err，回退到 fallback
-    assert_eq!(kg, fallback);
+fn test_resolve_quantity_kg_fumishushangbao() {
+    let negative_meters = InventoryStockService::resolve_quantity_kg(
+        None,
+        Decimal::new(-100, 0),
+        Some(Decimal::new(200, 0)),
+        Some(Decimal::new(150, 0)),
+    )
+    .expect_err("负米数必须上报换算失败，不得记 0 或回退成任何数值");
+    assert!(
+        !negative_meters.trim().is_empty(),
+        "失败原因必须非空且可追踪，实际={negative_meters:?}"
+    );
 }

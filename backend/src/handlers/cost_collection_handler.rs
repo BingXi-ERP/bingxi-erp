@@ -89,6 +89,26 @@ pub async fn list_collections(
     Ok(Json(ApiResponse::success(collections)))
 }
 
+/// 校验单项成本分量或产量非负（HTTP 写腿准入门）
+///
+/// 调用方：create_collection 与 update_collection 两条写腿，在交给 service 落库之前逐列把关；
+/// 能耗分摊与工资归集等内部自动写腿不走本函数（其入参来自库内既有行累加，不是终端提交值）。
+/// 入参：label 是用户可读的列名、value 是本次提交值（更新腿只在键提交时调用）。
+/// 传给谁：负值产出 AppError（HTTP 400、code=VALIDATION_ERROR）沿请求链上抛，文案只点名列名与
+/// 规则，不含记录 ID；非负值原样返回 Ok，本函数不改写提交值。
+/// 存什么/存哪里：本函数不写库；cost_collections 五枚成本分量与两枚产量列在库侧均无非负 CHECK，
+/// 这里是负额落库前的唯一准入门。
+fn ensure_non_negative(label: &str, value: Decimal) -> Result<(), AppError> {
+    if value < Decimal::ZERO {
+        warn!("成本归集入参 {} 为负数，已拒绝", label);
+        return Err(AppError::validation_displayable(format!(
+            "{}不能为负数",
+            label
+        )));
+    }
+    Ok(())
+}
+
 /// 创建成本归集
 #[axum::debug_handler]
 pub async fn create_collection(
@@ -100,6 +120,18 @@ pub async fn create_collection(
         "用户 {} 创建成本归集，批次：{:?}",
         auth.username, req.batch_no
     );
+
+    ensure_non_negative("直接材料", req.direct_material)?;
+    ensure_non_negative("直接人工", req.direct_labor)?;
+    ensure_non_negative("制造费用", req.manufacturing_overhead)?;
+    ensure_non_negative("加工费", req.processing_fee)?;
+    ensure_non_negative("染费", req.dyeing_fee)?;
+    if let Some(qty) = req.output_quantity_meters {
+        ensure_non_negative("产量(米)", qty)?;
+    }
+    if let Some(qty) = req.output_quantity_kg {
+        ensure_non_negative("产量(公斤)", qty)?;
+    }
 
     let collection_date = req.collection_date.parse().map_err(|e| {
         warn!("用户 {} 成本日期格式错误：{}", auth.username, e);
@@ -131,6 +163,7 @@ pub async fn create_collection(
         "用户 {} 创建成本归集成功：{}",
         auth.username, collection.collection_no
     );
+    record_collection_create_audit(&state, &auth, &collection);
 
     Ok(Json(ApiResponse::success_with_message(
         collection,
@@ -164,6 +197,28 @@ pub async fn update_collection(
     auth: AuthContext,
     Json(req): Json<UpdateCostCollectionRequest>,
 ) -> Result<Json<ApiResponse<JsonValue>>, AppError> {
+    if let Some(amt) = req.direct_material {
+        ensure_non_negative("直接材料", amt)?;
+    }
+    if let Some(amt) = req.direct_labor {
+        ensure_non_negative("直接人工", amt)?;
+    }
+    if let Some(amt) = req.manufacturing_overhead {
+        ensure_non_negative("制造费用", amt)?;
+    }
+    if let Some(amt) = req.processing_fee {
+        ensure_non_negative("加工费", amt)?;
+    }
+    if let Some(amt) = req.dyeing_fee {
+        ensure_non_negative("染费", amt)?;
+    }
+    if let Some(qty) = req.output_quantity_meters {
+        ensure_non_negative("产量(米)", qty)?;
+    }
+    if let Some(qty) = req.output_quantity_kg {
+        ensure_non_negative("产量(公斤)", qty)?;
+    }
+
     let service = CostCollectionService::new(state.db.clone());
     let collection = service.update(id, req, auth.user_id).await?;
     Ok(Json(ApiResponse::success_with_message(
@@ -337,6 +392,56 @@ fn build_collections_table(collections_json: &[serde_json::Value]) -> XlsxTable 
         headers: collections_export_headers(),
         rows: collections_json.iter().map(build_collection_row).collect(),
     }
+}
+
+/// 记录成本归集建单（CREATE）审计事件
+///
+/// 调用方：create_collection 在 service.create 落库成功之后、组装响应之前调用一次。
+/// 入参：state 提供审计库连接，auth 提供操作人 user_id 与 username，collection 为刚落库的整行模型。
+/// 传给谁：AuditEvent 交给 AuditLogService::record_async 的进程级消费者 task 落库，不阻塞响应，
+/// 与本文件的导出审计同一条写路径。
+/// 存什么：operation_type 为 CREATE、resource_type 为 cost_collection（与 delete_with_audit
+/// 与本文件导出审计共用同一写入方字面量，不自造新 token）、resource_id 为归集单主键字符串、
+/// resource_name 为归集单号，before_snapshot 为空（创建无前镜像），after_snapshot 存五费用列、
+/// total_cost、status、批次与缸号，使建单留痕可按单号与缸号回溯。
+/// 存哪里：audit_logs 表的 user_id/username/operation_type/resource_type/resource_id/
+/// resource_name/description/request_method/request_path/after_snapshot/severity/created_at 列。
+fn record_collection_create_audit(
+    state: &AppState,
+    auth: &AuthContext,
+    collection: &cost_collection::Model,
+) {
+    let svc = Arc::new(AuditLogService::new(state.db.clone()));
+    let event = AuditEvent {
+        user_id: Some(auth.user_id),
+        username: Some(auth.username.clone()),
+        operation_type: OperationType::Create,
+        severity: Severity::Info,
+        resource_type: Some("cost_collection".to_string()),
+        resource_id: Some(collection.id.to_string()),
+        resource_name: Some(collection.collection_no.clone()),
+        description: Some(format!(
+            "用户 {} 创建成本归集 {}（批次 {:?}，缸号 {:?}）",
+            auth.username, collection.collection_no, collection.batch_no, collection.dye_lot_no
+        )),
+        request_method: Some("POST".to_string()),
+        request_path: Some("/api/v1/erp/production/cost-collections".to_string()),
+        before_snapshot: None,
+        after_snapshot: Some(serde_json::json!({
+            "id": collection.id,
+            "collection_no": collection.collection_no,
+            "batch_no": collection.batch_no,
+            "dye_lot_no": collection.dye_lot_no,
+            "direct_material": collection.direct_material,
+            "direct_labor": collection.direct_labor,
+            "manufacturing_overhead": collection.manufacturing_overhead,
+            "processing_fee": collection.processing_fee,
+            "dyeing_fee": collection.dyeing_fee,
+            "total_cost": collection.total_cost,
+            "status": collection.status,
+        })),
+    };
+    svc.record_async(event, None);
 }
 
 /// 异步记录成本归集导出操作（审计自身，best-effort 不阻塞响应）

@@ -17,6 +17,7 @@ pub struct ListItemsQuery {
 pub fn item_to_info(m: color_card_item::Model) -> ColorItemInfo {
     ColorItemInfo {
         id: m.id,
+        color_card_id: m.color_card_id,
         color_code: m.color_code,
         color_name: m.color_name,
         rgb_r: m.rgb_r,

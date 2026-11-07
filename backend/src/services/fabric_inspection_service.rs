@@ -10,7 +10,7 @@
 //! - 验布记录 CRUD + 状态机流转（pending→inspecting→graded→rolled→closed）
 //! - 疵点明细 CRUD + 四分制/十分制扣分自动计算
 //! - 等级判定（首级 first / 次级 second）+ 联动 A/B/C 分级
-//! - 打卷入库（生成匹号 + 创建 inventory_piece + 汇总打卷数据）
+//! - 打卷入库（一单一卷，多卷另开验布单；生成匹号 + 创建 inventory_piece + 记本单本卷汇总）
 
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -353,7 +353,7 @@ impl FabricInspectionService {
     ) -> Result<InspectionModel, AppError> {
         let model = self.get_by_id(id).await?;
         if model.status != inspection_status::PENDING {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅待验布(pending)状态可更新，当前状态: {}",
                 model.status
             )));
@@ -469,7 +469,7 @@ impl FabricInspectionService {
     pub async fn start_inspection(&self, id: i32) -> Result<InspectionModel, AppError> {
         let model = self.get_by_id(id).await?;
         if model.status != inspection_status::PENDING {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅待验布(pending)状态可开始验布，当前状态: {}",
                 model.status
             )));
@@ -489,7 +489,7 @@ impl FabricInspectionService {
     ) -> Result<InspectionModel, AppError> {
         let model = self.get_by_id(id).await?;
         if model.status != inspection_status::INSPECTING {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅验布中(inspecting)状态可评级，当前状态: {}",
                 model.status
             )));
@@ -612,7 +612,8 @@ impl FabricInspectionService {
         Ok(updated)
     }
 
-    /// 打卷入库（graded → rolled）（生成匹号 + 创建 inventory_piece + 汇总打卷数据）
+    /// 打卷入库（graded → rolled）（生成匹号 + 创建 inventory_piece + 记本单本卷汇总；
+    /// 一单一卷，打卷后单据即 rolled，多卷须另开验布单，跨卷匹号在同缸内 piece_seq 递增）
     pub async fn roll_fabric(
         &self,
         id: i32,
@@ -659,7 +660,7 @@ impl FabricInspectionService {
         req: &RollFabricRequest,
     ) -> Result<(), AppError> {
         if model.status != inspection_status::GRADED {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅已评级(graded)状态可打卷入库，当前状态: {}",
                 model.status
             )));
@@ -780,7 +781,6 @@ impl FabricInspectionService {
             production_date: Default::default(),
             shelf_life: Default::default(),
             quality_status: Set(Some(quality_status::PASS.to_string())),
-            inventory_status: Set(Some("available".to_string())),
             created_by: Default::default(),
             updated_by: Default::default(),
             color_no: match model.color_no.clone() {
@@ -798,23 +798,22 @@ impl FabricInspectionService {
     }
 
     /// 更新验布记录的打卷汇总并流转状态
+    /// 一单一卷口径：total_rolls 与 total_roll_length 与 total_roll_weight 记本单本卷
+    /// 汇总，打卷后单据即 rolled，多卷须另开验布单，故此处为一次性赋值而非累加。
     async fn apply_roll_summary(
         &self,
         model: InspectionModel,
         req: &RollFabricRequest,
     ) -> Result<InspectionModel, AppError> {
-        let new_total_rolls = model.total_rolls + 1;
-        let new_total_length = model.total_roll_length + req.roll_length;
         // 重量实测值必填（roll_fabric 入口已 validate）；此处仍显式拒绝而非
         // unwrap_or(ZERO) 兜底掩盖——缺值属调用方违约，必须报错不可静默加 0
         let roll_weight = req.roll_weight.ok_or_else(|| {
             AppError::validation_displayable("打卷入库必须填写重量(kg)，成品布标签重量取该实测值")
         })?;
-        let new_total_weight = model.total_roll_weight + roll_weight;
         let mut active: InspectionActiveModel = model.into();
-        active.total_rolls = Set(new_total_rolls);
-        active.total_roll_length = Set(new_total_length);
-        active.total_roll_weight = Set(new_total_weight);
+        active.total_rolls = Set(1);
+        active.total_roll_length = Set(req.roll_length);
+        active.total_roll_weight = Set(roll_weight);
         active.status = Set(inspection_status::ROLLED.to_string());
         active.updated_at = Set(crate::utils::date_utils::utc_now_fixed());
         let updated = active.update(&*self.db).await?;
@@ -826,7 +825,7 @@ impl FabricInspectionService {
     pub async fn close_inspection(&self, id: i32) -> Result<InspectionModel, AppError> {
         let model = self.get_by_id(id).await?;
         if model.status != inspection_status::GRADED && model.status != inspection_status::ROLLED {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅已评级(graded)或已打卷(rolled)状态可关闭归档，当前状态: {}",
                 model.status
             )));
@@ -905,7 +904,7 @@ impl FabricDefectService {
             .ok_or_else(|| AppError::not_found(format!("验布记录 {} 不存在", req.inspection_id)))?;
 
         if inspection.status != inspection_status::INSPECTING {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅验布中(inspecting)状态可添加疵点，当前状态: {}",
                 inspection.status
             )));
@@ -1095,7 +1094,7 @@ impl FabricPhysicalTestService {
         if inspection.status != inspection_status::INSPECTING
             && inspection.status != inspection_status::GRADED
         {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅验布中(inspecting)或已评级(graded)状态可录入物理指标，当前状态: {}",
                 inspection.status
             )));

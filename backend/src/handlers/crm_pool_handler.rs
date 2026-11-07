@@ -77,9 +77,9 @@ pub async fn list_pool(
     let data_scope_ctx = auth.to_data_scope_context();
     let result = service.list_leads(query, Some(&data_scope_ctx)).await?;
 
-    // 转换分页结果为列表
+    // 转换分页结果为列表（PaginatedResponse 规范键 items）
     let data = result
-        .get("data")
+        .get("items")
         .cloned()
         .unwrap_or(serde_json::Value::Null);
     let total = result

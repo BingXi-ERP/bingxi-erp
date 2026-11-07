@@ -17,7 +17,7 @@ import {
   openPageTable,
   rowByText,
   rowCellText,
-  rowCount,
+  expectPositiveRowCount,
 } from './table-column';
 
 // 审计日志页的表格是 V2Table 包装的 el-table-v2（虚拟表），列头节点是 header-cell、
@@ -339,9 +339,7 @@ test.describe('系统与分析模块全量：API 端点 + 真实 UI 交互', () 
 
     const table = page.locator('.el-table[aria-label="数据权限列表"]').first();
     await table.waitFor({ state: 'visible', timeout: 30_000 });
-    expect(await rowCount(table), '按角色视图列表应为正行（造数后仍空即取数缺陷）').toBeGreaterThan(
-      0
-    );
+    await expectPositiveRowCount(table, '按角色视图列表应为正行（造数后仍空即取数缺陷）');
 
     const resourceIdx = await columnIndex(table, '资源类型');
     const scopeIdx = await columnIndex(table, '权限范围');
@@ -516,7 +514,7 @@ test.describe('系统与分析模块全量：API 端点 + 真实 UI 交互', () 
 
     const table = logCard.locator('.el-table[aria-label="登录日志表"]').first();
     await table.waitFor({ state: 'visible', timeout: 30_000 });
-    expect(await rowCount(table), '按用户名筛选后登录日志为空行').toBeGreaterThan(0);
+    await expectPositiveRowCount(table, '按用户名筛选后登录日志为空行');
 
     const userIdx = await columnIndex(table, '用户名');
     const statusIdx = await columnIndex(table, '状态');
@@ -560,7 +558,7 @@ test.describe('系统与分析模块全量：API 端点 + 真实 UI 交互', () 
 
     try {
       const table = await openPageTable(page, '/print-templates', '打印模板管理', '打印模板列表');
-      expect(await rowCount(table), '打印模板列表为空行').toBeGreaterThan(0);
+      await expectPositiveRowCount(table, '打印模板列表为空行');
 
       const headers = await table
         .locator('.el-table__header-wrapper thead th.el-table__cell:not(.gutter)')

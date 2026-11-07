@@ -10,6 +10,7 @@ import {
   testStorageStatePath,
   tryCleanup,
 } from './helpers';
+import { testPassword } from './helpers';
 import { pickListArray, type ListShapeKey } from './ui-helpers';
 // 产品类型单源常量（与后端 product_type 词表同源）：建品夹具取值必须经成员引用。
 import { PRODUCT_TYPE } from '../../src/constants/product-type';
@@ -20,7 +21,10 @@ import { PRODUCT_TYPE } from '../../src/constants/product-type';
  * 覆盖策略（与 31-deletion-deactivation.spec.ts 的 UI 点击删除互补）：
  * - 31 spec：有 UI 列表入口的核心资源 → 真实 UI 点击删除
  * - 本 spec（31b）：其余全部有 DELETE 端点的资源 → API 创建（全字段：必填+非必填全填）
- *   → API 删除 → 详情回读 404 + 列表回读消失 双重验证
+ *   → API 删除 → 分通道回读验证：详情路由经删除前预检证明在用的，删除后须 404（硬删）
+ *   或 200+后端真实软删标记；详情路由不可用（预检 404/405 或非 200）的，唯一合法证据是
+ *   同一列表口径的删前命中与删后消失。删除后单发的 404 与"GET 详情路由本就未注册"不可
+ *   分辨，禁止在没有删前存在证据时把 404 单独当删除结论。
  *
  * 依赖链资源（疵点需检验、工资率需工艺路线、评估需指标、互斥需双角色）内联先建父资源。
  * 所有 payload 字段来自后端真实 Create*Request 结构体（必填+Option 全填）。
@@ -40,10 +44,12 @@ interface DelCase {
   /** 删除路径（默认 `${createApi}/${id}`） */
   deleteApi?: (id: number) => string;
   /**
-   * 列表端点（GET createApi）的显式形状，供"创建后列表回读"诊断按声明形状单一读取。
+   * 列表端点（GET createApi）的显式形状，供列表回读按声明形状单一读取。
    * 缺省 'items'（多数 CRUD handler 返回 PaginatedResponse）。裸数组端点须显式声明 'bare'。
    * 取代原 `body.data.items ?? body.data.roles ?? (Array.isArray(body.data)?body.data:[])`
    * 三重形状宽容探测——它会把端点改形静默吸收成空集。
+   * 详情路由不可用的矩阵条目，列表回读是其"删前存在、删后消失"的唯一证据通道，
+   * listKey 必须与后端列表 handler 实际返回形状一致，形状失配即显式判负。
    */
   listKey?: ListShapeKey;
   /** 删除前预处理（如固定资产需先 PUT status=inactive 才允许删除） */
@@ -60,7 +66,135 @@ interface DelCase {
   ) => Promise<void>;
 }
 
-/** 创建 → 删除 → 详情 404 + 列表消失 双验证 */
+/**
+ * 软删/非活跃标记词表：与各资源后端写入方落库的真实值逐字段等值匹配，
+ * 禁止放宽为大小写不敏感或"包含 inactive"式松判。写入方事实来源：
+ * - is_deleted === true：坯布删除走软删（greige_fabric_handler 删除置 is_deleted=true）。
+ * - is_active === false：用户软删（user_handler delete_user 把 is_active 标记为 false，
+ *   UserResponse.is_active 为布尔）与 Webhook（webhook_service delete_webhook 置
+ *   is_active=false）。
+ * - status === 'INACTIVE'（大写）：报表模板（report_template_service delete 写
+ *   "INACTIVE"）与工作中心（capacity_service delete_work_center 写 "INACTIVE"）。
+ * - status === 'inactive' / 'deleted' / 'cancelled'：其余资源的小写状态词表。
+ * 消费方：createThenApiDelete 的详情回读通道与列表回读通道共用本判定，避免两处词表漂移。
+ * 入参：详情 data 对象或列表命中行（可空）；出参：布尔，字段缺失/值不符一律 false。
+ */
+function isSoftDeletedRecord(d: Record<string, unknown> | null | undefined): boolean {
+  return (
+    d != null &&
+    (d.is_deleted === true ||
+      d.is_active === false ||
+      d.status === 'inactive' ||
+      d.status === 'INACTIVE' ||
+      d.status === 'deleted' ||
+      d.status === 'cancelled')
+  );
+}
+
+/**
+ * 详情回读响应体是否命中本条记录：data.id 相等，或裸数组体中任一行 id 相等。
+ * 用途：createThenApiDelete 的删除前预检与删除后 200 分支，命中才能把该响应
+ * 当作"这条记录（仍然）存在"的证据；详情 handler 正常返回单个 Model 对象（含 id）。
+ */
+function detailHitsId(d: unknown, id: number): boolean {
+  if (Array.isArray(d)) {
+    return d.some((x: { id?: number }) => x.id === id);
+  }
+  return d != null && typeof d === 'object' && (d as { id?: number }).id === id;
+}
+
+interface ListProbe {
+  /** 列表 GET 的实际 HTTP 状态（进判负消息，不凭转述） */
+  status: number;
+  /** 按 id 扫描结果；undefined = 列表不可证明存在性（非 2xx、非 JSON 或形状失配） */
+  found: boolean | undefined;
+  /** 列表行数；-1 表示未能取得数组 */
+  count: number;
+  /** 命中行原样（供判负消息序列化软删标记字段）；未命中为 null */
+  hitRow: ({ id?: number } & Record<string, unknown>) | null;
+  /** 不可用原因（HTTP 状态说明 / 非 JSON / pickListArray 契约失配原文） */
+  error: string | null;
+}
+
+/**
+ * 按声明形状对列表端点做一次只读探测并按 id 定位记录。
+ * 调用方：createThenApiDelete 的删前/删后列表回读。
+ * 入参：page、带查询串的列表路径（与 DelCase.createApi 同一口径）、listKey 声明形状、
+ * 待定位 id、契约失配消息上下文标签。
+ * 传给谁：仅回传给 createThenApiDelete 的 expect 判定，不落库、不发起写请求。
+ * 存什么/存哪里：不持久化；数据源为后端列表 GET 端点（PaginatedResponse{items} 或裸数组）。
+ * 失败语义：本函数不抛错、不判负，把非 2xx / 非 JSON / 形状失配统一收敛为
+ * found=undefined + error 原文，由调用方按证据通道显式判负。
+ */
+async function probeListById(
+  page: import('@playwright/test').Page,
+  listQuery: string,
+  listKey: ListShapeKey,
+  id: number,
+  context: string
+): Promise<ListProbe> {
+  const resp = await page.request.get(`${API_BASE}${API_PREFIX}${listQuery}`);
+  const status = resp.status();
+  if (!resp.ok()) {
+    return { status, found: undefined, count: -1, hitRow: null, error: `列表 HTTP ${status}` };
+  }
+  let body: unknown;
+  try {
+    body = await resp.json();
+  } catch (e) {
+    return {
+      status,
+      found: undefined,
+      count: -1,
+      hitRow: null,
+      error: `列表响应非 JSON: ${(e as Error).message}`,
+    };
+  }
+  try {
+    const items = pickListArray<{ id?: number } & Record<string, unknown>>(
+      (body as { data?: unknown }).data,
+      listKey,
+      context
+    );
+    const hit = items.find(i => i.id === id) ?? null;
+    return { status, found: hit !== null, count: items.length, hitRow: hit, error: null };
+  } catch (e) {
+    return { status, found: undefined, count: -1, hitRow: null, error: (e as Error).message };
+  }
+}
+
+/** 详情体/列表命中行的软删标记摘要（只摘判定相关四字段，序列化进判负消息） */
+function softDeleteMarkerSummary(
+  d: Record<string, unknown> | null
+): Record<string, unknown> | null {
+  if (d == null) {
+    return null;
+  }
+  return {
+    id: d.id ?? null,
+    is_deleted: d.is_deleted ?? null,
+    is_active: d.is_active ?? null,
+    status: d.status ?? null,
+  };
+}
+
+/**
+ * 矩阵单条目的完整证据链：创建 → 删前存在证据 → 删除 → 分通道回读判定期望。
+ * 调用方：本文件删除矩阵循环与各依赖链独立用例（凭证/用户/客户信用/供应商评估/疵点/
+ * 工资率/数据权限）。
+ * 入参 c：矩阵条目（创建端点与全字段 payload、列表形状 listKey、preCreate/preDelete 钩子、
+ * 可选 getApi/deleteApi 覆盖）。
+ * 发往：POST createApi、GET 详情（getApi，删除前后各一次）、GET 列表
+ * （createApi?page=1&page_size=200，删除前后各一次）、DELETE delPath；本函数不落库。
+ * 判定通道（删除前由预检定型，删除后不漂移）：
+ * - detail：预检 200 且命中本条 id → 详情路由在用，删除后必须 404（此时 404 才可信）
+ *   或 200+软删标记；记录仍活跃、200 无标记、非 200/404 状态一律判负（原只 warn 的状态现在判负）。
+ * - list：预检非 200（该实体没有可用 GET 详情路由）或 200 但未命中本条 id →
+ *   删除后的 404 不得作证据；唯一合法证据是同一列表口径：删前必须按 id 找到、
+ *   删后必须找不到（或命中行带后端真实写入的非活跃标记）；列表不可用（非 2xx/形状失配）
+ *   即该条目既无详情路由也无列表回读，显式判负。
+ * 预检 401/403/5xx 等异常状态：不能作为选通道依据，删除发生前即判负，不静默降级。
+ */
 async function createThenApiDelete(
   page: import('@playwright/test').Page,
   c: DelCase
@@ -80,80 +214,144 @@ async function createThenApiDelete(
   }
   console.log(`[31b-${c.label}] 创建成功 id=${id}`);
 
-  // 1) 列表回读确认存在（诊断，按 DelCase.listKey 声明的单一形状读取；不匹配则记明确契约告警）
-  const listResp = await page.request.get(
-    `${API_BASE}${API_PREFIX}${c.createApi}?page=1&page_size=200`
-  );
-  if (listResp.ok()) {
-    const body = await listResp.json();
+  const getApi = c.getApi ? c.getApi(id) : `${c.createApi}/${id}`;
+  const delPath = c.deleteApi ? c.deleteApi(id) : `${c.createApi}/${id}`;
+  const listQuery = `${c.createApi}?page=1&page_size=200`;
+  const listKey = c.listKey ?? 'items';
+
+  // 1) 删前存在证据 A：在删除后将回读的同一详情 URL 上先 GET 一次，
+  //    区分"删除导致 404"与"GET 详情路由本就未注册/拼错导致的 404"。
+  const pre = await page.request.get(`${API_BASE}${API_PREFIX}${getApi}`);
+  const preStatus = pre.status();
+  let preDetailHit = false;
+  if (preStatus === 200) {
     try {
-      const items = pickListArray<{ id?: number }>(
-        body?.data,
-        c.listKey ?? 'items',
-        `31b-${c.label} 列表回读`
-      );
-      const exists = items.some(i => i.id === id);
-      console.log(
-        `[31b-${c.label}] 列表回读（data.${(c.listKey ?? 'items') === 'bare' ? '(裸数组)' : c.listKey} ${items.length} 条）: ${exists ? '✅存在' : '⚠️未在列表找到（可能分页/过滤）'}`
-      );
+      const pb = (await pre.json()) as { data?: unknown };
+      preDetailHit = detailHitsId(pb?.data, id);
     } catch (e) {
-      // 声明形状与实际不符 → 契约漂移，明确记录（不再静默当空集）。删除结果仍由下方详情 404/软删校验。
-      console.error(`[31b-${c.label}] ❌ 列表契约不匹配：${(e as Error).message}`);
+      console.warn(
+        `[31b-${c.label}] 详情预检 200 响应解析失败（按未命中处理，降级列表证据）: ${(e as Error).message}`
+      );
     }
+    console.log(
+      `[31b-${c.label}] 详情预检 ${getApi} → HTTP 200 ${preDetailHit ? '命中本条 id' : '未命中本条 id（响应体无该记录）'}`
+    );
   } else {
-    console.warn(`[31b-${c.label}] 列表回读 HTTP ${listResp.status()}（记录不断言）`);
+    console.log(
+      `[31b-${c.label}] 详情预检 ${getApi} → HTTP ${preStatus}（无可用详情路由，存在证据降级到列表）`
+    );
   }
 
-  // 2) 删除前预处理（业务约束：如固定资产需先停用）
+  // 2) 预检异常状态（401/403/5xx 及 404/405 之外的非 200）：不是"路由缺失"而是
+  //    会话/权限/服务端故障，不能作选证据通道的依据，删除前即判负。
+  expect(
+    preStatus === 200 || preStatus === 404 || preStatus === 405,
+    `[31b-${c.label}] 详情预检异常状态，不能建立证据通道（须先排查会话/权限/服务端故障，禁止静默放行）: ` +
+      `actual=${JSON.stringify({ preStatus, getApi })}`
+  ).toBe(true);
+
+  // 3) 删前存在证据 B：列表回读（原"只 console 不判负"，详情路由不可用时提升为断言）
+  const beforeList = await probeListById(
+    page,
+    listQuery,
+    listKey,
+    id,
+    `31b-${c.label} 删前列表回读`
+  );
+
+  // 通道定型：预检 200 且命中本条 → detail；其余（404/405 路由缺失、200 未命中）→ list。
+  const channel: 'detail' | 'list' = preStatus === 200 && preDetailHit ? 'detail' : 'list';
+
+  if (channel === 'detail') {
+    console.log(
+      `[31b-${c.label}] 列表回读（data.${listKey === 'bare' ? '(裸数组)' : listKey} ${beforeList.count} 条）: ` +
+        `${beforeList.found === undefined ? `⚠️不可用（${beforeList.error}，详情证据通道下仅诊断）` : beforeList.found ? '✅存在' : '⚠️未在列表找到（可能分页/过滤）'}`
+    );
+  } else {
+    expect(
+      beforeList.found,
+      `[31b-${c.label}] 详情路由不可用（预检 HTTP ${preStatus} ${getApi}），删前存在证据只能靠列表回读: ` +
+        `actual=${JSON.stringify({
+          listStatus: beforeList.status,
+          listQuery,
+          found: beforeList.found ?? null,
+          count: beforeList.count,
+          id,
+          error: beforeList.error,
+        })}` +
+        (beforeList.found === undefined
+          ? ' ——该条目既无详情路由也无列表回读，删除未被验证'
+          : ' ——删前列表未找到该记录，无法证明删除前存在')
+    ).toBe(true);
+  }
+
+  // 4) 删除前预处理（业务约束：如固定资产需先处置、坯布需先出库）
   if (c.preDelete) {
     await c.preDelete(page, id);
     console.log(`[31b-${c.label}] 删除前预处理完成`);
   }
 
-  // 3) API 删除（真实后端 DELETE）
-  const delPath = c.deleteApi ? c.deleteApi(id) : `${c.createApi}/${id}`;
+  // 5) API 删除（真实后端 DELETE；非 2xx 由 apiCall 抛错判负）
   await apiCall(page, 'DELETE', delPath);
   console.log(`[31b-${c.label}] DELETE ${delPath} ✅成功`);
 
-  // 3) 详情回读验证 404
-  const getApi = c.getApi ? c.getApi(id) : `${c.createApi}/${id}`;
+  // 6) 删除后回读判定（按预定通道，全部落 expect；404 只允许出现在 detail 通道）
   const chk = await page.request.get(`${API_BASE}${API_PREFIX}${getApi}`);
-  console.log(`[31b-${c.label}] 删除后详情回读 ${getApi} → HTTP ${chk.status()}`);
-  if (chk.status() === 404) {
-    console.log(`[31b-${c.label}] ✅ 已确认真删除（404）`);
-  } else if (chk.status() === 200) {
-    const body = await chk.json();
-    const d = body?.data as Record<string, unknown> | undefined;
-    // 软删场景：记录仍返回 200 但已按各资源后端真实写入值标记为非活跃。
-    // 词表逐字符对齐写入方（状态词表唯一事实来源=写入方），大小写不混：
-    //   - users：user_handler.rs:562「软删除：将 is_active 标记为 false」→ UserResponse.is_active
-    //     （user_handler.rs:112 bool），GET /users/:id 详情返回 data.is_active === false（布尔，非 is_deleted）。
-    //   - report_template：report_template_service.rs:479 delete() 写 Set("INACTIVE".to_string())
-    //     （大写，models/report_template.rs:63 注释 ACTIVE/INACTIVE），详情回读 data.status === "INACTIVE"。
-    //   - 其余资源沿用各自小写 status 词表（inactive/deleted/cancelled）。
-    // 逐字段真实值匹配，禁止放宽为恒真（若字段缺失/值不符则判 stillActive，暴露真未收敛）。
-    const isSoftDeleted =
-      d != null &&
-      (d.is_deleted === true ||
-        d.is_active === false ||
-        d.status === 'inactive' ||
-        d.status === 'INACTIVE' ||
-        d.status === 'deleted' ||
-        d.status === 'cancelled');
-    const recordMatches =
-      d != null &&
-      (d.id === id || (Array.isArray(d) && d.some((x: { id?: number }) => x.id === id)));
-    const stillActive = recordMatches && !isSoftDeleted;
-    if (isSoftDeleted) {
-      console.log(`[31b-${c.label}] ✅ 软删生效（is_deleted/status 标记为非活跃）`);
-    } else if (stillActive) {
-      console.warn(`[31b-${c.label}] ⚠️ 记录仍处于活跃状态（删除未生效）`);
-    } else {
-      console.log(`[31b-${c.label}] ✅ 记录已不可见或已被移除`);
+  const postStatus = chk.status();
+  console.log(`[31b-${c.label}] 删除后详情回读 ${getApi} → HTTP ${postStatus}（通道：${channel}）`);
+
+  if (channel === 'detail') {
+    let marker: Record<string, unknown> | null = null;
+    let verified = postStatus === 404;
+    if (postStatus === 200) {
+      try {
+        const body = (await chk.json()) as { data?: unknown };
+        const d = body?.data;
+        marker = d != null && typeof d === 'object' ? (d as Record<string, unknown>) : null;
+        verified = detailHitsId(d, id) && isSoftDeletedRecord(marker);
+      } catch (e) {
+        console.warn(
+          `[31b-${c.label}] 删除后回读 200 响应解析失败（判负）: ${(e as Error).message}`
+        );
+      }
     }
-    expect(stillActive, `[31b-${c.label}] 删除后记录不应仍处于活跃状态`).toBeFalsy();
+    // postStatus 为非 200/404（500/403 等）或 200 但记录仍活跃/无标记：verified 保持 false 判负。
+    expect(
+      verified,
+      `[31b-${c.label}] 删除后详情回读须为 404（预检已证明路由在用，404 才可作硬删证据）或 200+软删标记: ` +
+        `actual=${JSON.stringify({ postStatus, getApi, marker: softDeleteMarkerSummary(marker) })}`
+    ).toBe(true);
+    console.log(`[31b-${c.label}] ✅ 详情证据通道通过（删除后 HTTP ${postStatus}）`);
   } else {
-    console.warn(`[31b-${c.label}] 详情回读 HTTP ${chk.status()}（非 200/404，记录）`);
+    const afterList = await probeListById(
+      page,
+      listQuery,
+      listKey,
+      id,
+      `31b-${c.label} 删后列表回读`
+    );
+    let verified = afterList.found === false;
+    let hitRow: Record<string, unknown> | null = null;
+    if (afterList.found === true && afterList.hitRow != null) {
+      hitRow = afterList.hitRow;
+      verified = isSoftDeletedRecord(afterList.hitRow);
+    }
+    expect(
+      verified,
+      `[31b-${c.label}] 删除后列表回读（同一口径 ${listQuery}）须找不到该 id、或命中行带后端真实写入的非活跃标记: ` +
+        `actual=${JSON.stringify({
+          listStatus: afterList.status,
+          found: afterList.found ?? null,
+          count: afterList.count,
+          id,
+          rowMarker: softDeleteMarkerSummary(hitRow),
+          error: afterList.error,
+        })}` +
+        (afterList.found === undefined ? ' ——该条目既无详情路由也无列表回读，删除未被验证' : '')
+    ).toBe(true);
+    console.log(
+      `[31b-${c.label}] ✅ 列表证据通道通过（${afterList.found === false ? '记录已从列表消失' : '命中行带非活跃标记'}）`
+    );
   }
 }
 
@@ -342,16 +540,28 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
     {
       label: 'CRM标签',
       createApi: '/crm/tags',
+      // crm_customer_handler::list_tags → ApiResponse<Vec<crm_tag::Model>> → data 裸数组；
+      // 该资源未注册 GET 详情路由（/crm/tags/* 仅 DELETE），删除证据只能走列表通道。
+      listKey: 'bare',
       payload: { name: `P0标签${TS}`, color: '#FF0000', category: 'P0类' },
     },
     {
       label: 'CRM回收规则',
       createApi: '/crm/recycle-rules',
+      // missing_handlers::get_recycle_rules → ApiResponse<Vec<RecycleRule>> → data 裸数组；
+      // /crm/recycle-rules/* 仅注册 DELETE,PUT，无 GET 详情路由，删除证据走列表通道。
+      listKey: 'bare',
       payload: { name: `P0回收规则${TS}`, days: 30, is_enabled: true },
     },
     {
       label: 'CRM池规则',
       createApi: '/crm/pool/rules',
+      // crm_pool_handler.rs::list_pool_rules → ApiResponse<Value>，值是
+      // crm/pool.rs::list_rules 的 Vec<customer_pool_rule::Model> 序列化，data 为裸数组；
+      // 详情路径 /pool/rules/{id} 在 routes/crm.rs 只挂 put 与 delete，GET 预检必得 405，
+      // 删前删后证据只能走列表通道。
+      // 删除腿：crm/pool.rs::delete_rule 是 delete_by_id 硬删，删后该 id 必从列表消失。
+      listKey: 'bare',
       payload: {
         name: `P0池规则${TS}`,
         // 后端 crm_pool_handler.rs::create_pool_rule 仅接受
@@ -492,6 +702,13 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
     {
       label: '工作中心',
       createApi: '/production/capacity/work-centers',
+      // capacity_handler.rs::list_work_centers → ApiResponse<Value>，值是
+      // capacity_service.rs::list_work_centers 的 Vec<WorkCenterCapacity> 序列化，data 裸数组；
+      // 详情路径 /capacity/work-centers/{id} 在 routes/production.rs 只挂 put 与 delete，
+      // GET 预检必得 405，删前删后证据只能走列表通道。
+      // 删除腿：capacity_service.rs::delete_work_center 写 status='INACTIVE'，
+      // 而列表 handler 带 Status != 'INACTIVE' 过滤，删后该 id 必从列表消失。
+      listKey: 'bare',
       payload: {
         name: `P0中心${TS}`,
         code: `P0-WC-${TS}`,
@@ -523,6 +740,12 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
     {
       label: 'Webhook',
       createApi: '/webhooks',
+      // webhook_handler.rs::list_webhooks → ApiResponse<Vec<WebhookResponse>>，data 裸数组；
+      // analytics.rs 的 webhooks() 对 /{id} 只挂 delete，GET 预检必得 405，
+      // 删前删后证据只能走列表通道。
+      // 列表带 is_active=true 过滤，删除腿 webhook_service.rs::delete_webhook 写
+      // is_active=false，因此删前该 id 在列表可见、删后必从列表消失。
+      listKey: 'bare',
       payload: {
         name: `P0钩子${TS}`,
         url: 'https://example.com/p0hook',
@@ -840,7 +1063,7 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
       listKey: 'users',
       payload: {
         username: `p0user${TS}`,
-        password: 'P0Test!2026xY',
+        password: testPassword(),
         email: `p0user${TS}@test.com`,
         phone: '13600000001',
       },

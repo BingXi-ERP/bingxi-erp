@@ -67,7 +67,9 @@ impl ArReconciliationService {
             .ok_or_else(|| AppError::not_found("对账单不存在"))?;
 
         if model.reconciliation_status.as_deref() != Some(ar_status::RECONCILIATION_DRAFT) {
-            return Err(AppError::business(
+            // 发送腿状态门：仅草稿可发送，前置状态未满足，归业务族；
+            // 文案点名唯一合法前置，公开规则、不含标识，可外显
+            return Err(AppError::business_displayable(
                 "只有草稿状态的对账单可以发送".to_string(),
             ));
         }
@@ -134,7 +136,9 @@ impl ArReconciliationService {
         if status != ar_status::RECONCILIATION_CONFIRMED
             && status != ar_status::RECONCILIATION_DISPUTED
         {
-            return Err(AppError::business(
+            // 关闭腿状态门：仅已确认或有争议可关闭，前置状态未满足，归业务族；
+            // 文案点名两条合法前置，公开规则、不含标识，可外显
+            return Err(AppError::business_displayable(
                 "只有已确认或有争议的对账单可以关闭".to_string(),
             ));
         }

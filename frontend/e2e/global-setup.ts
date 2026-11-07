@@ -40,6 +40,10 @@ const SHARD_PASSWORD = BASE_PASSWORD;
 // AI 限流隔离专用第二用户：ai/02 使用此用户登录，与 ai/01 的 SHARD_USERNAME 不同 user_id，
 // 后端 rate_limit_ai_endpoint 按 user_id 维度限流（rate_limit.rs:330）→ 两文件独立 10/min 桶。
 const AI_USERNAME = SHARD_INDEX !== '' ? `e2e_ai_s${SHARD_INDEX}` : 'e2e_ai';
+// AI 限流隔离第二桶用户：与 AI_USERNAME 同形状、同密码、同 admin 角色，只 user_id 不同。
+// 单桶口径是 rate_limit_ai_endpoint 按 user_id 10 req/min（rate_limit.rs:330），
+// 一段用例的 AI 端点调用数超过 10 时必须另起一桶，否则窗口内第 11 次起必拿 429。
+const AI2_USERNAME = SHARD_INDEX !== '' ? `e2e_ai2_s${SHARD_INDEX}` : 'e2e_ai2';
 
 /**
  * requestWithCsrfRecovery / assignPermissionList 的响应契约（单一声明点）。
@@ -145,8 +149,9 @@ export default async function globalSetup(config: FullConfig) {
     await ensureShardUserViaApi();
   }
 
-  // ---- 1.2 AI 限流隔离第二用户（admin 角色，与分片主用户不同 user_id → 独立 AI 限流桶）----
-  await ensureAiUser();
+  // ---- 1.2 AI 限流隔离用户池（admin 角色，与分片主用户不同 user_id → 独立 AI 限流桶）----
+  await ensureAiUser(AI_USERNAME);
+  await ensureAiUser(AI2_USERNAME);
 
   // ---- 1.5 全量角色账号 setup（P3.1）----
   await ensureRoleUsers();
@@ -487,13 +492,17 @@ async function ensureWorkerSessionPool(
 }
 
 /**
- * 确保 AI 限流隔离第二用户存在并可登录（admin 角色）。
- * ai/02-prediction 使用此用户登录，与 ai/01 的分片主用户（e2e_admin_s{n}）拥有不同
- * user_id → 后端 rate_limit_ai_endpoint 按 user_id 维度的 10 req/min 桶彼此独立，
- * 两文件在 extras 分片内并行（workers=2）不再争抢同一桶，确定性根除 429 互踩。
- * 幂等：已存在（400/409/「已存在」）视为成功跳过。
+ * 确保一个 AI 限流隔离用户存在并可登录（admin 角色）。
+ * 入参 username：账号名由调用方按分片派生（AI_USERNAME / AI2_USERNAME），
+ *      本函数不自己拼名字，避免账号命名出现第二处事实来源。
+ * 授权面：与分片主账号映射同一个 admin 角色 id，不额外授任何权限键
+ *      （AI 端点的读权限 ai-*:read 由 admin 角色全量覆盖）。
+ * 密码：沿用建号主体密码 BASE_PASSWORD（与 worker 会话池同一份密码，见 SHARD_PASSWORD 赋值），
+ *      因此取用侧只需用户名、不需另写一份凭证文件；
+ *      凭证文件 e2e/.auth/role-credentials.json 只登记角色账号，AI 隔离账号不在其内。
+ * 幂等：已存在（400/409/「已存在」）视为成功跳过，终验以真实登录收口。
  */
-async function ensureAiUser(): Promise<void> {
+async function ensureAiUser(username: string): Promise<void> {
   const loginCtx = await request.newContext({
     baseURL: API_BASE,
     extraHTTPHeaders: {
@@ -541,21 +550,21 @@ async function ensureAiUser(): Promise<void> {
     `${API_PREFIX}/users`,
     headers,
     {
-      username: AI_USERNAME,
+      username,
       password: BASE_PASSWORD,
       role_id: adminRole.id,
       real_name: 'E2E-AI限流隔离',
     }
   );
   if (createResp.ok()) {
-    console.log(`[globalSetup] AI 隔离用户 ${AI_USERNAME} 创建成功`);
+    console.log(`[globalSetup] AI 隔离用户 ${username} 创建成功`);
   } else if (createResp.status() === 400 || createResp.status() === 409) {
-    console.log(`[globalSetup] AI 隔离用户 ${AI_USERNAME} 已存在，跳过`);
+    console.log(`[globalSetup] AI 隔离用户 ${username} 已存在，跳过`);
   } else {
     const body = await createResp.text();
     await loginCtx.dispose();
     throw new Error(
-      `ensureAiUser: 创建 ${AI_USERNAME} 失败 HTTP ${createResp.status()}: ${body.slice(0, 300)}`
+      `ensureAiUser: 创建 ${username} 失败 HTTP ${createResp.status()}: ${body.slice(0, 300)}`
     );
   }
   await loginCtx.dispose();
@@ -568,15 +577,15 @@ async function ensureAiUser(): Promise<void> {
       'X-Requested-With': 'XMLHttpRequest',
     },
   });
-  const loginCheck = await loginWithRetry(checkCtx, AI_USERNAME, BASE_PASSWORD);
+  const loginCheck = await loginWithRetry(checkCtx, username, BASE_PASSWORD);
   await checkCtx.dispose();
   if (!loginCheck.ok()) {
     const body = await loginCheck.text().catch(() => '');
     throw new Error(
-      `ensureAiUser: ${AI_USERNAME} 终验登录失败 HTTP ${loginCheck.status()}: ${body.slice(0, 300)}`
+      `ensureAiUser: ${username} 终验登录失败 HTTP ${loginCheck.status()}: ${body.slice(0, 300)}`
     );
   }
-  console.log(`[globalSetup] AI 隔离用户 ${AI_USERNAME} 就绪`);
+  console.log(`[globalSetup] AI 隔离用户 ${username} 就绪`);
 }
 
 // ==================== P3.1 全量角色账号 setup ====================
@@ -696,9 +705,26 @@ const SEED_ROLE_EXTRA_PERMISSIONS: Record<string, string[]> = {
     'crm-leads:create',
     'crm-leads:update',
     'crm-leads:delete',
+    // 客户档案读面（GET /crm/customers 与 GET /crm/customers/enhanced 运行时同派生为
+    // customers:read；后端矩阵 sales_rep 在册持 ("customers","read")，见
+    // init_service_ops/permission.rs，前端 /customer 与 /crm-enhanced 路由门控同键）。
+    // salesperson 是 e2e 侧 CI 镜像岗（traversal/permission-model.ts::CI_MIRRORED_ROLES），
+    // 后端既无建角也无授权分组，其权限码闭合等于 SHELL + 本清单，故必须在此逐键对齐
+    // sales_rep 的读面，缺键即 RBAC 403，不会由后端同名角色矩阵带入。
+    'customers:read',
+    // 客户建档写面（POST /crm/customers 运行时键 customers:create）：与后端 init 矩阵
+    // sales_rep 分组在册的 ("customers","create") 同口径（本镜像岗闭合等于 SHELL + 本清单，
+    // 后端同名岗的授权不会由 init 带进来，缺此键即 RBAC 403）。
+    // 本键也是"归属行"造数的唯一通路：customers.owner_id 由服务端写成 created_by
+    // （services/customer_ops/update.rs 的 build_customer_active_model），业务员自建即本人
+    // 归属；认领与分配两条改归属通路同样要求 customers:create，缺键即无法为按
+    // customers.owner_id 收敛的行级作用域用例准备真实归属行。
+    'customers:create',
+    // 色卡读面（GET /color-cards/… 运行时键 color-cards:read）：后端 init 矩阵把
+    // ("color-cards","read") 明确授给 sales_rep，镜像岗缺此键即被 RBAC 拒为 403。
+    'color-cards:read',
     // PII 按需揭示（POST /crm/customers/{id}/pii/reveal 运行时键 customers:reveal，
-    // 与后端 init 矩阵 sales_rep/crm_rep 及 m0086 存量补授三通道同口径；
-    // salesperson 为 sales_rep 的 CI/部署别名码，同 pieces:read 在册别名）
+    // 与后端 init 矩阵 sales_rep/crm_rep 及 m0086 存量补授三通道同口径）
     'customers:reveal',
     // 发货对话框第四维匹号候选来自 GET /inventory/pieces（与后端 permission.rs 的
     // sales_rep ("pieces","read") 同口径；只读，不授打印）
@@ -706,6 +732,11 @@ const SEED_ROLE_EXTRA_PERMISSIONS: Record<string, string[]> = {
     // 出口商检只读（与后端 permission.rs 的 sales_rep ("export-inspections","read")
     // 同口径；建单/登记结果属 customs_specialist，CI 不建该角色码故本 SEED 面不含）
     'export-inspections:read',
+    // 报价单读面（与后端 permission.rs 的 sales_rep ("quotations","read") 同口径）。
+    // 报价族五条路由的可见门由粗域键改判细资源键 quotations:read，本岗在后端在册持该键；
+    // 缺码则侧栏报价入口对业务员不可达，遍历基线里业务员的两条报价可达路由随之失配。
+    // 只授读，建单改单提交撤销属后端 sales_rep 的写面，本 SEED 面不扩。
+    'quotations:read',
   ],
   // sales_manager 对齐 permission.rs：orders 只读+审批链（此处仅补读，其余 approve/reject
   // 由后端角色 init 授予，本 spec 只依赖 GET 列表/详情）。不授 purchase 侧任何码。
@@ -3104,6 +3135,12 @@ async function ensureGlobalBusinessSeed(
         'INSERT INTO currencies (code, name, symbol, "precision", is_base, is_active, is_deleted, created_at, updated_at)\n' +
         "SELECT 'CNY', '人民币', '¥', 2, true, true, false, now(), now()\n" +
         "WHERE NOT EXISTS (SELECT 1 FROM currencies WHERE code = 'CNY');\n" +
+        // 非本位币种子：多币种腿（flow 442-03 与 finance 面若干判据）的前置是"库里有一枚启用中的
+        // 非本位币"，币种同样无创建端点，直连 DB 是唯一写路径；USD 取 validate_currency_code
+        // 白名单内的真实 ISO 4217 码，is_base 恒 false，不参与本位币唯一约束。
+        'INSERT INTO currencies (code, name, symbol, "precision", is_base, is_active, is_deleted, created_at, updated_at)\n' +
+        "SELECT 'USD', '美元', '$', 2, false, true, false, now(), now()\n" +
+        "WHERE NOT EXISTS (SELECT 1 FROM currencies WHERE code = 'USD');\n" +
         'UPDATE currencies SET is_base = true, updated_at = now()\n' +
         "WHERE code = 'CNY'\n" +
         '  AND NOT EXISTS (SELECT 1 FROM currencies WHERE is_base = true);\n';
@@ -3127,6 +3164,24 @@ async function ensureGlobalBusinessSeed(
           recordSeedFailure('本位币种子回读', '写语句已执行但查无 is_base=true 行——种子未真实生效');
         } else {
           console.log(`[globalSeed] 本位币就绪：code=${baseCode}`);
+        }
+        // 非本位币回读：多币种腿的前置键，缺失即种子未生效，按同一口径计入台账而不是留给用例判红
+        const nonBaseCode = execSync(
+          `psql -d ${psqlTarget} -tAc "SELECT code FROM currencies WHERE is_base = false AND is_active = true AND is_deleted = false LIMIT 1"`,
+          {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            env: { ...process.env, PGCONNECT_TIMEOUT: '5' },
+          }
+        )
+          .toString()
+          .trim();
+        if (!nonBaseCode) {
+          recordSeedFailure(
+            '非本位币种子回读',
+            '写语句已执行但查无启用中的非本位币行——多币种腿前置未就绪'
+          );
+        } else {
+          console.log(`[globalSeed] 非本位币就绪：code=${nonBaseCode}`);
         }
       } catch (e) {
         const err = e as { stderr?: { toString(): string }; message?: string };

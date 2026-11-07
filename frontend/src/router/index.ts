@@ -1252,6 +1252,10 @@ const routes: RouteRecordRaw[] = [
         }, // 该入口要求下方 meta.permission 列出的模块读权限键
       },
       // 报价单模块 - 列表 + 新建
+      // 键取细资源 quotations：后端把本族端点挂在 /api/v1/erp/quotations 下，派生鉴权键即
+      // quotations 加动作；此前写粗域键 sales:read 会让持 sales 域任一细资源读权的岗位
+      // （如只持 pieces 与 reports 读权的仓储岗）在侧栏看见报价单入口，而点进去必被后端
+      // 鉴权判 403，属展示面与鉴权面口径不一致，不是放宽权限。
       {
         path: 'quotations',
         name: 'QuotationList',
@@ -1259,7 +1263,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '报价单管理',
           icon: 'ShoppingCart',
-          permission: 'sales:read',
+          permission: 'quotations:read',
           requiresAuth: true,
         },
       },
@@ -1270,7 +1274,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '新建报价单',
           icon: 'ShoppingCart',
-          permission: 'sales:read',
+          permission: 'quotations:read',
           requiresAuth: true,
           hidden: true,
         },
@@ -1282,7 +1286,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '报价单详情',
           icon: 'ShoppingCart',
-          permission: 'sales:read',
+          permission: 'quotations:read',
           requiresAuth: true,
           hidden: true,
         },
@@ -1294,7 +1298,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '编辑报价单',
           icon: 'ShoppingCart',
-          permission: 'sales:read',
+          permission: 'quotations:read',
           requiresAuth: true,
           hidden: true,
         },
@@ -1306,7 +1310,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '报价单审批',
           icon: 'ShoppingCart',
-          permission: 'sales:read',
+          permission: 'quotations:read',
           requiresAuth: true,
           hidden: true,
         },

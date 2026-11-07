@@ -96,7 +96,7 @@
           </el-col>
           <el-col :span="8">
             <el-form-item :label="t('quotations.create.labelExchangeRate')" prop="exchange_rate">
-              <el-input-number
+              <NumericInput
                 v-model="form.exchange_rate"
                 :min="0"
                 :precision="6"
@@ -111,7 +111,7 @@
           </el-col>
           <el-col :span="8">
             <el-form-item :label="t('quotations.create.labelTaxRate')" prop="tax_rate">
-              <el-input-number
+              <NumericInput
                 v-model="form.tax_rate"
                 :min="0"
                 :max="100"
@@ -134,12 +134,12 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="MOQ">
-              <el-input-number v-model="form.moq" :min="0" style="width: 100%" />
+              <NumericInput v-model="form.moq" :min="0" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item :label="t('quotations.create.labelLeadTime')">
-              <el-input-number v-model="form.lead_time_days" :min="0" style="width: 100%" />
+              <NumericInput v-model="form.lead_time_days" :min="0" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -228,6 +228,7 @@ import { useUserStore } from '@/store/user';
 import { decimalWireToNumber, formatDecimalAmount } from '@/utils/money';
 import QuotationItemEditor from './components/QuotationItemEditor.vue';
 import TermEditor from './components/TermEditor.vue';
+import NumericInput from '@/components/NumericInput.vue';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -262,7 +263,7 @@ function defaultValidUntil(): string {
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
-/** 表单数据（编辑态：金额/数量/税率为 number 与 el-input-number 双向绑定；提交前 quotationToWire 转后端 DecimalWire string） */
+/** 表单数据（编辑态：金额/数量/税率为 number 与 NumericInput 双向绑定；提交前 quotationToWire 转后端 DecimalWire string） */
 const form = reactive<QuotationEditForm>({
   // v11 批次 163 P2-1 修复：undefined as any 改为类型断言
   customer_id: undefined as unknown as number,
@@ -346,12 +347,26 @@ const subtotal = computed(
       0
     ) || 0
 );
-/** 税额展示，含税价口径下税额为 0，不含税时按单据税率（百分数）算，税率未填不出数（不做数字兜底） */
+/** 含税金额合计：含税录入态下各行 qty × unit_price_with_tax 是录入事实，总额取此累加（口径与后端行腿 amount_with_tax 一致） */
+const inclusiveSubtotal = computed(
+  () =>
+    form.items.reduce(
+      (sum: number, i: QuotationItemEditForm) =>
+        sum + (i.quantity || 0) * (i.unit_price_with_tax || 0),
+      0
+    ) || 0
+);
+/** 税额展示：含税态取"含税总额减净额小计"的差额并与含税钩稽，禁止用乘法造含税；
+ *  不含税时按单据税率（百分数）算，税率未填不出数（不做数字兜底） */
 const taxAmount = computed(() => {
-  if (form.tax_inclusive || form.tax_rate === undefined) return 0;
+  if (form.tax_rate === undefined) return 0;
+  if (form.tax_inclusive) return inclusiveSubtotal.value - subtotal.value;
   return (subtotal.value * form.tax_rate) / 100;
 });
-const totalAmount = computed(() => subtotal.value + taxAmount.value);
+/** 总额：含税态取含税事实累加，不含税态取净额小计加税额 */
+const totalAmount = computed(() =>
+  form.tax_inclusive ? inclusiveSubtotal.value : subtotal.value + taxAmount.value
+);
 
 /** 加载客户下拉 */
 async function loadCustomers() {
