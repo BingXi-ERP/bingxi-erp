@@ -401,31 +401,6 @@ export function pickListArray<T = Record<string, unknown>>(
   return arr;
 }
 
-async function waitListResponse(
-  page: Page,
-  apiPath: string,
-  listKey: ListShapeKey,
-  timeout = 20000
-): Promise<unknown[]> {
-  try {
-    const resp = await page.waitForResponse(
-      r => r.url().includes(apiPath) && r.request().method() === 'GET',
-      { timeout }
-    );
-    const json = await resp.json().catch(e => {
-      console.warn(`[waitListResponse] GET ${apiPath} 响应非 JSON:`, (e as Error).message);
-      return {};
-    });
-    // 单一形状直读（listKey 由调用方声明）；形状漂移即抛错，由本函数外层 catch 记为告警。
-    // 注意：这里捕获抛错仅用于「UI 页未命中响应」的降级路径——真正判定形状的权威路径
-    // 是 readFirstEntityId 随后的 API 直查（那里不吞异常，形状不符会让用例失败）。
-    return pickListArray(json?.data, listKey, `waitListResponse ${apiPath}`);
-  } catch (e) {
-    console.warn(`[waitListResponse] 等待 GET ${apiPath} 失败: ${(e as Error).message}`);
-    return [];
-  }
-}
-
 function firstId(items: unknown[]): number | undefined {
   const item = items[0] as Record<string, unknown> | undefined;
   return item?.id as number | undefined;
@@ -980,8 +955,31 @@ export async function readFirstEntityId(
   listKey: ListShapeKey = 'items'
 ): Promise<number | undefined> {
   try {
+    // 列表 GET 由导航自身触发，等待器必须在 goto 之前挂上；后挂会错过已完成的响应，
+    // 每次都白等满 20s，把整片分片拖到作业级超时。
+    const armed = page
+      .waitForResponse(r => r.url().includes(listApiPath) && r.request().method() === 'GET', {
+        timeout: 20000,
+      })
+      .then(r =>
+        r.json().catch(e => {
+          console.warn(`[readFirstEntityId] GET ${listApiPath} 响应非 JSON:`, (e as Error).message);
+          return {};
+        })
+      )
+      .then(json =>
+        pickListArray(
+          (json as { data?: unknown }).data,
+          listKey,
+          `readFirstEntityId ${listApiPath}`
+        )
+      )
+      .catch(e => {
+        console.warn(`[readFirstEntityId] 等待 GET ${listApiPath} 失败: ${(e as Error).message}`);
+        return [] as unknown[];
+      });
     await safeGoto(page, route);
-    const items = await waitListResponse(page, listApiPath, listKey, 20000);
+    const items = await armed;
     const id = firstId(items);
     if (id !== undefined) return id;
   } catch (e) {
@@ -1089,6 +1087,30 @@ export async function uiDeleteRow(
     const deleteBtn = await findRowAction(page, rowIdentifier.value, row =>
       row.locator('button.el-button--danger, button:has-text("删除")')
     );
+    const listApi = options?.listApiPath;
+    const listKey = options?.listKey ?? 'items';
+    // 刷新响应由点击触发，等待器必须在点击之前挂上；后挂只能空等到超时。
+    // 形状判定与原来一致：命中响应后仍按声明的 listKey 校验，失配只记告警，
+    // 行是否真消失由后面 findTableRow 的 UI 断言兜底。
+    const refreshed = listApi
+      ? page
+          .waitForResponse(r => r.url().includes(listApi) && r.request().method() === 'GET', {
+            timeout: 15000,
+          })
+          .then(r =>
+            r.json().catch(e => {
+              console.warn(`[uiDeleteRow] GET ${listApi} 响应非 JSON:`, (e as Error).message);
+              return {};
+            })
+          )
+          .then(json =>
+            pickListArray((json as { data?: unknown }).data, listKey, `uiDeleteRow ${listApi}`)
+          )
+          .catch(e => {
+            console.warn(`[uiDeleteRow] 列表刷新响应等待失败: ${(e as Error).message}`);
+            return [] as unknown[];
+          })
+      : undefined;
     await deleteBtn.click();
     console.log(`[uiDeleteRow] 已点击删除按钮（${rowIdentifier.column}=${rowIdentifier.value}）`);
 
@@ -1105,15 +1127,7 @@ export async function uiDeleteRow(
       console.log(`[uiDeleteRow] 已确认删除`);
     }
 
-    // 等待列表刷新
-    await page.waitForTimeout(2000);
-    if (options?.listApiPath) {
-      await waitListResponse(page, options.listApiPath, options.listKey ?? 'items', 15000).catch(
-        e => {
-          console.warn(`[uiDeleteRow] 列表刷新响应等待失败:`, (e as Error).message);
-        }
-      );
-    }
+    await refreshed;
 
     // 验证行消失
     const stillExists = await findTableRow(page, rowIdentifier.value);
