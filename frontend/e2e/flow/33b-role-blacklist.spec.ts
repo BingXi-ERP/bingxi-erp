@@ -26,13 +26,17 @@ const BLACKLIST_ROLES = ['customer', 'temporary'];
 
 test.describe('33b 角色黑名单（print/export/dye-recipe）', () => {
   /**
-   * 打印黑名单断言的宿主端点：/pieces/{id}/print。
+   * 打印黑名单断言的宿主端点：/inventory/pieces/{id}/print（piece_routes 挂在
+   * routes/mod.rs 的 /api/v1/erp/inventory 前缀下，权限中间件按 segment3 查资源段白名单、
+   * 按第 4 段取 resource_type，故裸 /pieces 会被判"未知的资源路径"连 admin 一起拒）。
    * 权限字典（services/init_service_ops/permission.rs）里在册的 print 动作码只有 pieces 与
    * export-inspections 两族，后者无打印路由，故"持码仍 403"只能落在 pieces 上；
    * BOM 族的 boms:print 已随整域下线从字典撤除，不再有合法宿主。
    * 匹号行由验布链（services/fabric_inspection_service.rs）写入，本用例不重建该链：
-   * 无宿主行时打印返回 404，而 404 不等于 403，黑名单一旦失效真缺陷照样判红，
-   * 所以黑名单侧断言不以宿主行存在为前提；admin 侧按是否取到行分别硬断。
+   * 无该行时打印走 not_found 出 404，非 dyed 或缺打印字段走 400（print_service.rs），
+   * 两者都不等于 403，黑名单一旦失效真缺陷照样判红，所以黑名单侧断言不以宿主行存在为前提。
+   * 文档真实可达性不在此重验：fabric/05-piece-label-print.spec.ts 已按完整验布链造出
+   * 可打匹号并硬断 200 与 docx 容器，取列表首行断可达会因该行未必可打而假红。
    */
   let printPieceId = 0;
   let printPieceDiag = '';
@@ -41,16 +45,16 @@ test.describe('33b 角色黑名单（print/export/dye-recipe）', () => {
     const page = await browser.newPage();
     try {
       await loginAsRole(page, 'admin');
-      // /pieces：handler 走 inventory_piece::Entity 查询 → PaginatedResponse → data={items}
-      const pieces = await apiCallRaw<unknown>(page, 'GET', '/pieces?page=1&page_size=1');
+      // 出参走 PaginatedResponse，data={items}
+      const pieces = await apiCallRaw<unknown>(page, 'GET', '/inventory/pieces?page=1&page_size=1');
       const pieceList = pickListArray<{ id: number }>(pieces, 'items', '33b 匹号打印宿主列表');
       printPieceId = pieceList[0]?.id ?? 0;
       if (printPieceId) {
         console.log(`[33b] 打印黑名单宿主匹号 id=${printPieceId}（验布链既有行）`);
       } else {
         console.warn(
-          '[33b] 库中无匹号行：黑名单侧仍硬断 403（无行时打印为 404，不会误判为通过）；' +
-            'admin 侧只断不被黑名单误伤，打印文档可达性属验布链用例覆盖面'
+          '[33b] 库中无匹号行：黑名单侧仍硬断 403（无行时打印为 404 或 400，不会误判为通过）；' +
+            'admin 侧只断不被黑名单误伤，文档可达性由验布链用例承担'
         );
       }
     } catch (e) {
@@ -72,7 +76,9 @@ test.describe('33b 角色黑名单（print/export/dye-recipe）', () => {
       // 无宿主行时退回固定 id：打印会 404，而 404 不等于 403，黑名单失效仍判红
       const targetId = printPieceId || 1;
 
-      const resp = await page.request.get(`${API_BASE}${API_PREFIX}/pieces/${targetId}/print`);
+      const resp = await page.request.get(
+        `${API_BASE}${API_PREFIX}/inventory/pieces/${targetId}/print`
+      );
 
       const status = resp.status();
       expect(
@@ -119,14 +125,16 @@ test.describe('33b 角色黑名单（print/export/dye-recipe）', () => {
 
   test('admin 对照：打印端点不被黑名单误伤', async ({ page }) => {
     await loginAsRole(page, 'admin');
-    // 查询本身抛错说明 /pieces 路由或响应形状有问题，必须判红而不是退化成"无宿主"
+    // 查询本身抛错说明宿主列表读面或响应形状有问题，必须判红而不是退化成"无宿主"
     expect(
       printPieceDiag,
       `beforeAll 查询匹号宿主失败（${printPieceDiag || '无'}），打印面对照无法执行`
     ).toBe('');
 
     const targetId = printPieceId || 1;
-    const resp = await page.request.get(`${API_BASE}${API_PREFIX}/pieces/${targetId}/print`);
+    const resp = await page.request.get(
+      `${API_BASE}${API_PREFIX}/inventory/pieces/${targetId}/print`
+    );
 
     const status = resp.status();
     // admin 不在黑名单：不应 403；不应 5xx
@@ -135,15 +143,20 @@ test.describe('33b 角色黑名单（print/export/dye-recipe）', () => {
     );
     expect(status, `admin 打印不应 5xx，实际 ${status}`).toBeLessThan(500);
     if (printPieceId) {
-      // 有真实匹号行时，404 才意味着路由或宿主前置失效
-      expect(status, `admin 打印真实匹号 ${printPieceId} 返回 404——打印路由或匹号行缺失`).not.toBe(
-        404
-      );
+      // 取到的是列表真实行，故 not_found 只可能是路由或取数缺陷，这一档要挡；
+      // 而 400（非 dyed 或缺打印字段，print_service.rs 的 fail-closed）对本用例是合法结果——
+      // 首行不保证可打，按 2xx 硬断会假红。文档真实可达性由
+      // fabric/05-piece-label-print.spec.ts 承担，它按完整验布链造出可打匹号并硬断
+      // 200 与 docx 容器，本用例不重复那一层。
+      expect(
+        status,
+        `admin 打印既有匹号 ${printPieceId} 不应 404——行确实存在，404 说明打印路由或取数有缺陷`
+      ).not.toBe(404);
     }
     console.log(
       `[33b] ✅ admin 对照 ${status}（黑名单仅命中指定角色；` +
         (printPieceId
-          ? `宿主匹号 ${printPieceId} 文档可达性一并核过`
+          ? `宿主匹号 ${printPieceId} 一并挡了 404，400 属未走验布链的合法不可打状态`
           : '库中无匹号行，只断非 403') +
         `）`
     );
