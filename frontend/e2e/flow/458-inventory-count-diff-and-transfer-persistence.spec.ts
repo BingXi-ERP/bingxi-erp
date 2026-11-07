@@ -71,10 +71,11 @@ import {
  * 盘点过账的库存写法在 services/inventory_count_service.rs 的 apply_stock_adjustments：
  * 只对 quantity_difference 非零的明细执行 update_many，把 quantity_on_hand 与
  * quantity_available 双双置为 quantity_actual（覆盖而非增减），并 version 加一、
- * last_count_date 落时间戳；该路径不写 inventory_transactions 流水，全仓 grep 亦无
- * 盘点族流水类型写入点。因此"差异过账后流水与账面同步"在盘点面缺实现（源码缺陷，
- * 本支只暴露不修）：458-01 按批次把流水行数钉成过账前后恒等，并用 console.error
- * 点名缺口。调拨面相反，services/inv/batch.rs 的 ship 与 receive 逐行写 TRANSFER_OUT
+ * last_count_date 落时间戳；同事务内经 record_transaction_txn 逐笔写
+ * inventory_transactions 流水（transaction_type=INVENTORY_COUNT，
+ * source_bill_type=inventory_count，source_bill_no=盘点单号，quantity_meters=差异量，
+ * 带过账前后值）。458-01 按批次钉过账后新增流水逐值对账。调拨面同理，
+ * services/inv/batch.rs 的 ship 与 receive 逐行写 TRANSFER_OUT
  * 与 TRANSFER_IN 流水，故流水对账腿落在 458-03。
  * 盘点状态门一律 AppError::business 族（出参脱敏），只钉 HTTP 与机器码不钉文案；
  * 删除门与调拨状态门为 business_displayable 族，文案原文必须逐字钉住。
@@ -255,6 +256,7 @@ const TRANSFER_STATUS = {
 const TX_TYPE = {
   TRANSFER_OUT: 'TRANSFER_OUT',
   TRANSFER_IN: 'TRANSFER_IN',
+  INVENTORY_COUNT: 'INVENTORY_COUNT',
 } as const;
 
 test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
@@ -263,7 +265,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     await ensureTestEntities(page);
   });
 
-  test('458-01 盘盈单腿差异过账 库存两列等于实盘量且版本递增 盘点面无流水写入', async ({
+  test('458-01 盘盈单腿差异过账 库存两列等于实盘量且版本递增 盘点流水逐值对账', async ({
     page,
   }) => {
     const ctx = getCtx();
@@ -333,10 +335,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     const headAfterCreate = await readCount(page, countId, '458-01 建单后');
     const lines = headAfterCreate.items as Row[];
     expect(lines.length, `建单快照明细必须恰 1 行，实际 ${lines.length}`).toBe(1);
-    expect(
-      numOf(lines[0], 'stock_id', '快照明细行'),
-      '快照明细必须挂在本用例的库存行上'
-    ).toBe(stockId);
+    expect(numOf(lines[0], 'stock_id', '快照明细行'), '快照明细必须挂在本用例的库存行上').toBe(
+      stockId
+    );
     expect(
       numOf(lines[0], 'quantity_before', '快照明细行'),
       '账面数必须取自建单时刻的 quantity_on_hand'
@@ -352,10 +353,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
 
     const headAfterRecord = await readCount(page, countId, '458-01 录入后');
     const recLines = headAfterRecord.items as Row[];
-    expect(
-      numOf(recLines[0], 'quantity_actual', '录入后明细行'),
-      '实盘量必须如实落库为 118'
-    ).toBe(118);
+    expect(numOf(recLines[0], 'quantity_actual', '录入后明细行'), '实盘量必须如实落库为 118').toBe(
+      118
+    );
     expect(
       numOf(recLines[0], 'quantity_difference', '录入后明细行'),
       '差异列必须等于实盘减账面'
@@ -385,10 +385,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     });
     const onHandAfter = numOf(after, 'quantity_on_hand', '过账后库存行');
     expect(onHandAfter, `过账后账面必须等于实盘 118，实际 ${onHandAfter}`).toBe(118);
-    expect(
-      numOf(after, 'quantity_available', '过账后库存行'),
-      '过账后可用量必须等于实盘 118'
-    ).toBe(118);
+    expect(numOf(after, 'quantity_available', '过账后库存行'), '过账后可用量必须等于实盘 118').toBe(
+      118
+    );
     expect(
       numOf(after, 'version', '过账后库存行'),
       `过账必须递增乐观锁版本号（${versionBefore}→），实际 ${numOf(after, 'version', '行')}`
@@ -401,21 +400,32 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `明细差异合计必须等于账面变化量（${onHandBefore}→${onHandAfter}），实际 ${summed.total}`
     ).toBe(onHandAfter - onHandBefore);
 
-    // 假成功防线第二层：盘点过账不写 inventory_transactions（源码事实，缺口点名）
+    // 流水对账：过账为每条非零差异明细写一条 INVENTORY_COUNT 流水（本单恰 1 条）
     const ledgerAfter = await readLedgerRows(page, productId, batchNo);
+    const newRows = ledgerAfter.filter(r => !ledgerBefore.some(b => b.id === r.id));
     expect(
-      ledgerAfter.length,
-      `盘点过账前后按批次 ${batchNo} 的流水行数必须逐值相同（当前实现不为盘盈盘亏写流水），` +
-        `实际 ${ledgerBefore.length}→${ledgerAfter.length}；若本断言转红说明写入方新增了盘点族流水，` +
-        `届时应改为正向日志对账并把本注释一并撤下`
-    ).toBe(ledgerBefore.length);
-    console.error(
-      `[458-01][缺陷登记] 盘点差异过账零流水：POST /inventory/counts/{id}/approve 之后 ` +
-        `inventory_stocks 两列已按实盘量改写，但 inventory_transactions 按批次 ${batchNo} ` +
-        `仍为 ${ledgerAfter.length} 条，账面与流水无法对账。写入方见 ` +
-        `services/inventory_count_service.rs::apply_stock_adjustments（只 update_many，` +
-        `不调 record_transaction_txn），调拨面 services/inv/batch.rs 才有流水。` +
-        `此为源码缺陷，本支只暴露不修。`
+      newRows.length,
+      `盘点过账必须为本单唯一非零差异明细新增恰 1 条流水，实际新增 ${newRows.length} 条` +
+        `（基线 ${ledgerBefore.length}→过账后 ${ledgerAfter.length}）`
+    ).toBe(1);
+    const tx = newRows[0];
+    expect(
+      String(tx.transaction_type),
+      `盘点流水类型必须逐字符等于写入方 ${TX_TYPE.INVENTORY_COUNT}，实际 ${tx.transaction_type}`
+    ).toBe(TX_TYPE.INVENTORY_COUNT);
+    expect(
+      String(tx.source_bill_no),
+      `盘点流水必须回写盘点单号 ${approved.count_no}，实际 ${tx.source_bill_no}`
+    ).toBe(String(approved.count_no));
+    expect(
+      numOf(tx, 'quantity_meters', '盘点流水'),
+      '盘点流水量必须等于明细差异（实盘 118 减账面 100）'
+    ).toBe(18);
+    expect(numOf(tx, 'quantity_before_meters', '盘点流水'), '盘点流水必须带过账前账面 100').toBe(
+      onHandBefore
+    );
+    expect(numOf(tx, 'quantity_after_meters', '盘点流水'), '盘点流水必须带过账后账面 118').toBe(
+      onHandAfter
     );
   });
 
@@ -635,10 +645,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       colorNo: '',
       label: '458-03 审批后',
     });
-    expect(
-      numOf(srcAfterApprove, 'quantity_on_hand', '审批后调出仓'),
-      '审批动作不许搬库存'
-    ).toBe(srcOnHandBefore);
+    expect(numOf(srcAfterApprove, 'quantity_on_hand', '审批后调出仓'), '审批动作不许搬库存').toBe(
+      srcOnHandBefore
+    );
 
     await apiCall(page, 'POST', `/inventory/transfers/${transferId}/ship`);
     const shipped = await readTransfer(page, transferId, '458-03 发货后');
@@ -728,10 +737,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       numOf(targetAfterReceive, 'quantity_incoming', '收货后调入仓'),
       '收货后在途量必须归零（入库与在途两列同事务结转）'
     ).toBe(0);
-    expect(
-      textOf(targetAfterReceive, 'batch_no'),
-      '调入仓行的批次必须与调拨批次逐字符相同'
-    ).toBe(batchNo);
+    expect(textOf(targetAfterReceive, 'batch_no'), '调入仓行的批次必须与调拨批次逐字符相同').toBe(
+      batchNo
+    );
 
     const itemsAfterReceive = await readTransferItems(page, transferId, '458-03 收货后');
     expect(
@@ -770,10 +778,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     expect(outDelta, `调出流水米数必须净减 30，实际 ${outDelta}`).toBe(30);
     expect(inDelta, `调入流水米数必须净增 30，实际 ${inDelta}`).toBe(30);
     expect(inDelta, `调出量与调入量必须相等（${outDelta} vs ${inDelta}）`).toBe(outDelta);
-    expect(
-      textOf(outRow as Row, 'batch_no'),
-      '调出流水的批次必须与调拨批次逐字符相同'
-    ).toBe(batchNo);
+    expect(textOf(outRow as Row, 'batch_no'), '调出流水的批次必须与调拨批次逐字符相同').toBe(
+      batchNo
+    );
     expect(textOf(inRow as Row, 'batch_no'), '调入流水的批次必须与调拨批次逐字符相同').toBe(
       batchNo
     );
@@ -845,10 +852,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       colorNo: `E2E${tag}-K`,
       label: '458-04 幽灵行录入后',
     });
-    expect(
-      numOf(keepAfterGhost, 'quantity_on_hand', '幽灵行录入后'),
-      '被拒录入不许动库存'
-    ).toBe(80);
+    expect(numOf(keepAfterGhost, 'quantity_on_hand', '幽灵行录入后'), '被拒录入不许动库存').toBe(
+      80
+    );
 
     // 负例二：先删掉一条明细，再拿已删明细对应的库存行录入 → 404
     const dropLine = (headAfterGhost.items as Row[]).find(
@@ -858,10 +864,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     const dropItemId = numOf(dropLine as Row, 'id', '待删明细行');
     await apiCall(page, 'DELETE', `/inventory/counts/items/${dropItemId}`);
     const afterDeleteItems = await readCount(page, countId, '458-04 删明细后');
-    expect(
-      (afterDeleteItems.items as Row[]).length,
-      '删除后的明细行不许再出现在盘点单里'
-    ).toBe(1);
+    expect((afterDeleteItems.items as Row[]).length, '删除后的明细行不许再出现在盘点单里').toBe(1);
     const deletedRecord = await apiCallExpectFail(
       page,
       'POST',
@@ -939,10 +942,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       colorNo: `E2E${tag}-K`,
       label: '458-04 超量拒绝后',
     });
-    expect(
-      numOf(keepAfterOver, 'quantity_available', '超量拒绝后'),
-      '被拒调拨不许动可用量'
-    ).toBe(80);
+    expect(numOf(keepAfterOver, 'quantity_available', '超量拒绝后'), '被拒调拨不许动可用量').toBe(
+      80
+    );
 
     // 负例六：染色布缺缸号 → 字段必填族 400，文案回显用户提交的色号（可外显族逐字钉）
     const missingDimColor = `E2E${tag}-DIM`;
@@ -1090,12 +1092,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `再编辑门必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(denEdit.code)}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
 
-    const denRecord = await apiCallExpectFail(
-      page,
-      'POST',
-      `/inventory/counts/${countId}/record`,
-      { items: [{ stock_id: stockId, quantity_actual: '66.00' }] }
-    );
+    const denRecord = await apiCallExpectFail(page, 'POST', `/inventory/counts/${countId}/record`, {
+      items: [{ stock_id: stockId, quantity_actual: '66.00' }],
+    });
     expect(denRecord.status, `in_review 再录入必须 400，实际 ${denRecord.status}`).toBe(400);
     expect(
       failureCode(denRecord),
@@ -1124,14 +1123,10 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       colorNo: `E2E${tag}-G`,
       label: '458-05 被拒三连后',
     });
-    expect(
-      numOf(stockAfterDenials, 'quantity_on_hand', '被拒后库存行'),
-      '未过账不许动账面'
-    ).toBe(50);
-    expect(
-      String(headAfterDenials.notes),
-      '被拒的编辑不许把 notes 改写'
-    ).toBe(`E2E${tag}-NOTES`);
+    expect(numOf(stockAfterDenials, 'quantity_on_hand', '被拒后库存行'), '未过账不许动账面').toBe(
+      50
+    );
+    expect(String(headAfterDenials.notes), '被拒的编辑不许把 notes 改写').toBe(`E2E${tag}-NOTES`);
 
     // 过账一次：库存按实盘量落库
     await apiCall(page, 'POST', `/inventory/counts/${countId}/approve`);
@@ -1149,11 +1144,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     expect(onHandAfterApprove, '过账后账面必须等于实盘 58').toBe(58);
 
     // 重复过账被状态门拒绝，且库存零二次变化（版本号不增说明没执行 update_many）
-    const reApprove = await apiCallExpectFail(
-      page,
-      'POST',
-      `/inventory/counts/${countId}/approve`
-    );
+    const reApprove = await apiCallExpectFail(page, 'POST', `/inventory/counts/${countId}/approve`);
     expect(reApprove.status, `completed 单重复过账必须 400，实际 ${reApprove.status}`).toBe(400);
     expect(
       failureCode(reApprove),
@@ -1219,10 +1210,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     const editAfterReject = await apiCallRaw<Row>(page, 'PUT', `/inventory/counts/${secondId}`, {
       notes: `E2E${tag}-S2-AGAIN`,
     });
-    expect(
-      String(editAfterReject.status),
-      '驳回后同一编辑动作必须成功（反证拒绝来自状态门）'
-    ).toBe(COUNT_STATUS.PENDING);
+    expect(String(editAfterReject.status), '驳回后同一编辑动作必须成功（反证拒绝来自状态门）').toBe(
+      COUNT_STATUS.PENDING
+    );
     const headAfterRejectEdit = await readCount(page, secondId, '458-05 驳回后编辑回读');
     expect(String(headAfterRejectEdit.notes), '驳回后的编辑必须落库').toBe(`E2E${tag}-S2-AGAIN`);
 
@@ -1235,21 +1225,15 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     ).toBeNull();
 
     // NOT NULL 列清空必须被拒且原值不动
-    const denClearDate = await apiCallExpectFail(
-      page,
-      'PUT',
-      `/inventory/counts/${secondId}`,
-      { count_date: null }
-    );
+    const denClearDate = await apiCallExpectFail(page, 'PUT', `/inventory/counts/${secondId}`, {
+      count_date: null,
+    });
     expect(denClearDate.status, `NOT NULL 列清空必须 400，实际 ${denClearDate.status}`).toBe(400);
     expect(String(denClearDate.message), '清空拒因必须外显可读').toBe(
       '盘点日期不能清空：该字段为必填项'
     );
     const headDateIntact = await readCount(page, secondId, '458-05 拒清空后');
-    expect(
-      headDateIntact.count_date,
-      '被拒的清空不许把 count_date 抹成 NULL'
-    ).toBeDefined();
+    expect(headDateIntact.count_date, '被拒的清空不许把 count_date 抹成 NULL').toBeDefined();
 
     // 第二张单已过账的库存不受其影响：账面仍是第一张单的实盘量
     const stockFinal = await readStockRow(page, {
@@ -1348,10 +1332,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       'POST',
       `/inventory/counts/${countId}/approve`
     );
-    expectDenied(
-      accountantApprove,
-      `accountant 直连差异过账必须被权限门拒绝（403 加 FORBIDDEN）`
-    );
+    expectDenied(accountantApprove, `accountant 直连差异过账必须被权限门拒绝（403 加 FORBIDDEN）`);
     const acctCreate = await apiCallExpectFail(page, 'POST', '/inventory/transfers', {
       from_warehouse_id: warehouseId,
       to_warehouse_id: toWarehouseId,
@@ -1376,10 +1357,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     // 越权拒绝后重读：调拨单状态与两库位账面逐值不变
     await loginViaUI(page, undefined, undefined, true);
     const headAfterShipDeny = await readTransfer(page, transferId, '458-06 越权发货被拒后');
-    expect(
-      String(headAfterShipDeny.status),
-      '被拒的发货与收货不许推进调拨单状态'
-    ).toBe(statusBeforeShipDeny);
+    expect(String(headAfterShipDeny.status), '被拒的发货与收货不许推进调拨单状态').toBe(
+      statusBeforeShipDeny
+    );
     const stockAfterShipDeny = await readStockRow(page, {
       productId,
       warehouseId,
@@ -1419,7 +1399,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `库存经理提交后必须为 ${COUNT_STATUS.IN_REVIEW}，实际 ${JSON.stringify(mgrSubmit.status)}`
     ).toBe(COUNT_STATUS.IN_REVIEW);
     const mgrApprove = await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${countId}/approve`);
-    expect(String(mgrApprove.status), '库存经理过账后必须为 completed').toBe(COUNT_STATUS.COMPLETED);
+    expect(String(mgrApprove.status), '库存经理过账后必须为 completed').toBe(
+      COUNT_STATUS.COMPLETED
+    );
 
     const stockAfterMgrApprove = await readStockRow(page, {
       productId,
@@ -1482,10 +1464,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `主表 total_quantity 必须由明细算出等于 ${itemSum}，实际 ${JSON.stringify(head.total_quantity)}`
     ).toBe(itemSum);
     expect(numOf(head, 'id', '主表'), '主表回读必须就是刚建的单').toBe(transferId);
-    expect(
-      String(head.status),
-      '建单后状态必须由库里读得 pending'
-    ).toBe(TRANSFER_STATUS.PENDING);
+    expect(String(head.status), '建单后状态必须由库里读得 pending').toBe(TRANSFER_STATUS.PENDING);
 
     // 审批与发货后再读：主表状态与明细发出量、库存账面三处必须自洽
     await apiCall(page, 'POST', `/inventory/transfers/${transferId}/approve`, { approved: true });
@@ -1493,18 +1472,15 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     expect(String(approvedHead.status), '审批后必须由库里读得 approved').toBe(
       TRANSFER_STATUS.APPROVED
     );
-    expect(
-      approvedHead.approved_by,
-      '审批人必须落库而非只在响应里回显'
-    ).not.toBeNull();
+    expect(approvedHead.approved_by, '审批人必须落库而非只在响应里回显').not.toBeNull();
 
     await apiCall(page, 'POST', `/inventory/transfers/${transferId}/ship`);
     const shippedItems = await readTransferItems(page, transferId, '458-07 发货后');
-    const shippedSum = shippedItems.reduce((acc, r) => acc + numOf(r, 'shipped_quantity', '明细行'), 0);
-    expect(
-      shippedSum,
-      '发货后明细发出量合计必须等于主表总量 18，实际 ' + shippedSum
-    ).toBe(itemSum);
+    const shippedSum = shippedItems.reduce(
+      (acc, r) => acc + numOf(r, 'shipped_quantity', '明细行'),
+      0
+    );
+    expect(shippedSum, '发货后明细发出量合计必须等于主表总量 18，实际 ' + shippedSum).toBe(itemSum);
 
     const src = await readStockRow(page, {
       productId,
@@ -1527,7 +1503,9 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     expect(missingHead.status, `不存在主键的调拨详情必须 404，实际 ${missingHead.status}`).toBe(
       404
     );
-    expect(failureCode(missingHead), '不存在主键必须归因 NOT_FOUND').toBe(APP_ERROR_CODES.NOT_FOUND);
+    expect(failureCode(missingHead), '不存在主键必须归因 NOT_FOUND').toBe(
+      APP_ERROR_CODES.NOT_FOUND
+    );
     const missingCount = await apiCallExpectFail(page, 'GET', '/inventory/counts/99999999');
     expect(missingCount.status, `不存在主键的盘点详情必须 404，实际 ${missingCount.status}`).toBe(
       404
@@ -1565,15 +1543,12 @@ async function readTransfer(page: Page, transferId: number, label: string): Prom
  * 传给谁 GET /inventory/transfers/{id}/items（出参直接是数组，不是 PaginatedResponse）。
  * 存什么，返回 inventory_transfer_items 行数组；结构异常当场红并点名步骤。
  */
-async function readTransferItems(
-  page: Page,
-  transferId: number,
-  label: string
-): Promise<Row[]> {
+async function readTransferItems(page: Page, transferId: number, label: string): Promise<Row[]> {
   const res = await apiCallRaw<Row[]>(page, 'GET', `/inventory/transfers/${transferId}/items`);
-  expect(Array.isArray(res), `${label} 调拨明细读口必须直接出数组，实际 ${JSON.stringify(res)}`).toBe(
-    true
-  );
+  expect(
+    Array.isArray(res),
+    `${label} 调拨明细读口必须直接出数组，实际 ${JSON.stringify(res)}`
+  ).toBe(true);
   expect(res.length, `${label} 调拨明细不能为空数组（建单明细未落库）`).toBeGreaterThan(0);
   return res;
 }
