@@ -237,9 +237,9 @@ function voucherOfType(
   const hit = rows.find(r => String(r['voucher_type']) === type);
   if (!hit) {
     throw new Error(
-      `${label}：未取到 type=${type} 的凭证（实得类型集=${rows
-        .map(r => String(r['voucher_type']))
-        .join(',') || '(空)'}）`
+      `${label}：未取到 type=${type} 的凭证（实得类型集=${
+        rows.map(r => String(r['voucher_type'])).join(',') || '(空)'
+      }）`
     );
   }
   return hit;
@@ -886,9 +886,21 @@ test.describe('457 委外染整不合格返工与扣款钩稽', () => {
       orderReceived.abnormal_loss_amount,
       '扣款凭证金额=订单扣款额'
     );
-    expectDecEqualsEachOther(receiptVoucher.amount, orderReceived.total_cost, '入库凭证金额=订单总成本');
-    expectDecEqualsEachOther(receiptVoucher.amount, receipt.total_cost, '入库凭证金额=收回单总成本');
-    expectDecEqualsEachOther(issueVoucher.amount, orderReceived.material_cost, '发料凭证金额=材料成本');
+    expectDecEqualsEachOther(
+      receiptVoucher.amount,
+      orderReceived.total_cost,
+      '入库凭证金额=订单总成本'
+    );
+    expectDecEqualsEachOther(
+      receiptVoucher.amount,
+      receipt.total_cost,
+      '入库凭证金额=收回单总成本'
+    );
+    expectDecEqualsEachOther(
+      issueVoucher.amount,
+      orderReceived.material_cost,
+      '发料凭证金额=材料成本'
+    );
     expect(
       String(issueVoucher.voucher_no) === String(orderReceived.voucher_no_issue),
       `发料凭证号与订单回写逐字符同源，凭证=${JSON.stringify(issueVoucher.voucher_no)} ` +
@@ -914,16 +926,25 @@ test.describe('457 委外染整不合格返工与扣款钩稽', () => {
       decSumOfResponses(orderSettled.processing_fee, orderSettled.freight_fee, '染费+运费'),
       '染费凭证金额=调整后染费+运费'
     );
-    expectDecEqualsEachOther(feeVoucher.tax_amount, orderSettled.tax_amount, '染费凭证税额=订单进项税额');
+    expectDecEqualsEachOther(
+      feeVoucher.tax_amount,
+      orderSettled.tax_amount,
+      '染费凭证税额=订单进项税额'
+    );
     expect(String(feeVoucher.voucher_no), '结算凭证号必须回写订单').toBe(
       String(orderSettled.voucher_no_fee)
     );
     // 成本腿与扣款腿合计对平：入库凭证 + 扣款凭证 = 发料凭证 + 染费凭证（四条后端出参）
-    expectDecEquals(
-      decSumOfResponses(receiptVoucher.amount, lossVoucher.amount, '入库腿+扣款腿'),
-      decSumOfResponses(issueVoucher.amount, feeVoucher.amount, '材料腿+染费腿'),
-      '成本腿合计必须与费用腿合计逐分对平'
+    const costLegSum = decSumOfResponses(
+      receiptVoucher.amount,
+      lossVoucher.amount,
+      '入库腿+扣款腿'
     );
+    const feeLegSum = decSumOfResponses(issueVoucher.amount, feeVoucher.amount, '材料腿+染费腿');
+    expect(
+      decCmp(costLegSum, feeLegSum) === 0,
+      `成本腿合计必须与费用腿合计逐分对平：左=${decText(costLegSum)} 右=${decText(feeLegSum)}`
+    ).toBe(true);
     expect(
       vouchersAfterSettle.length,
       `扣款链四张凭证齐备（实得类型集=${vouchersAfterSettle
@@ -1046,10 +1067,9 @@ test.describe('457 委外染整不合格返工与扣款钩稽', () => {
       `/production/outsourcing-receipts/${opened.receiptId}/confirm`
     );
     expectStateGateRejection(doubleConfirm, '已确认收回单二次确认应被状态门拒绝');
-    expect(
-      failureCode(doubleConfirm),
-      '二次确认机器码属业务族（该拒绝为脱敏文案，只锁码）'
-    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    expect(failureCode(doubleConfirm), '二次确认机器码属业务族（该拒绝为脱敏文案，只锁码）').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
     const afterDoubleConfirm = await readReceipt(page, opened.receiptNo);
     expect(String(afterDoubleConfirm.status), '二次确认被拒后状态不得漂移').toBe(
       RECEIPT_STATUS_CONFIRMED
@@ -1360,9 +1380,9 @@ test.describe('457 委外染整不合格返工与扣款钩稽', () => {
     const afterNegatives = await safeGetList<Record<string, unknown>>(page, receiptsPath);
     expect(
       afterNegatives.length,
-      `被拒的收回单请求不得落库任何行，实得 id 集=${afterNegatives
-        .map(r => String(r['id']))
-        .join(',') || '(空)'}`
+      `被拒的收回单请求不得落库任何行，实得 id 集=${
+        afterNegatives.map(r => String(r['id'])).join(',') || '(空)'
+      }`
     ).toBe(0);
     const ghostRows = await safeGetList<Record<string, unknown>>(
       page,
