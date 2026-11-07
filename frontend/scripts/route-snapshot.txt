@@ -1,4 +1,4 @@
-# layers=8 endpoints=1822
+# layers=8 endpoints=1824
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -866,6 +866,7 @@ GET	/api/v1/erp/quotations/*	quotation_handler::get_quotation	quotations
 GET	/api/v1/erp/quotations/*/print	crate::handlers::print_handler::sales_quotation_print_docx	quotations
 GET	/api/v1/erp/quotations/*/terms	quotation_handler::get_quotation_terms	quotations
 GET	/api/v1/erp/quotations/color-prices/*	quotation_handler::list_color_prices	quotations
+GET	/api/v1/erp/quotations/discount-config	quotation_handler::get_discount_config	quotations
 GET	/api/v1/erp/quotations/expired	quotation_handler::list_expired	quotations
 GET	/api/v1/erp/quotations/expiring	quotation_handler::list_expiring	quotations
 GET	/api/v1/erp/recommendations	ai_analysis_handler::get_recommendations	analytics
@@ -1788,6 +1789,7 @@ PUT	/api/v1/erp/purchase/suppliers/*/qualifications/*	supplier_handler::update_s
 PUT	/api/v1/erp/quality-standards/*	quality_standard_handler::update_standard	mod
 PUT	/api/v1/erp/quotations/*	quotation_handler::update_quotation	quotations
 PUT	/api/v1/erp/quotations/*/terms	quotation_handler::set_quotation_terms	quotations
+PUT	/api/v1/erp/quotations/discount-config	quotation_handler::update_discount_config	quotations
 PUT	/api/v1/erp/reports/enhanced/subscriptions/*	report_enhanced_handler::subscriptions::update	analytics
 PUT	/api/v1/erp/reports/enhanced/templates/*	report_enhanced_handler::update_report_template	analytics
 PUT	/api/v1/erp/roles/*	role_handler::update_role	iam
