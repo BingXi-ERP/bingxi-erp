@@ -127,7 +127,9 @@ impl QuotationApprovalService {
         if ![quotation_status::DRAFT, quotation_status::REJECTED]
             .contains(&quotation.status.as_str())
         {
-            return Err(AppError::business(format!(
+            // 提交腿状态门：仅草稿与被拒的可提交，拒绝点名行自身当前态供提交人自查；
+            // 公开规则、不含标识，走可外显通道，机器码仍是 BUSINESS_ERROR
+            return Err(AppError::business_displayable(format!(
                 "报价单当前状态不允许提交：{}",
                 quotation.status
             )));
@@ -294,7 +296,9 @@ impl QuotationApprovalService {
 
         if ![quotation_status::DRAFT, quotation_status::REJECTED].contains(&latest.status.as_str())
         {
-            return Err(AppError::business(format!(
+            // 提交腿事务内状态门（并发提交串行化后的终判）：拒绝点名行自身当前态；
+            // 公开规则、不含标识，走可外显通道，机器码仍是 BUSINESS_ERROR
+            return Err(AppError::business_displayable(format!(
                 "报价单当前状态不允许提交：{}",
                 latest.status
             )));
@@ -338,7 +342,9 @@ impl QuotationApprovalService {
             .await?
             .ok_or_else(|| AppError::not_found("报价单不存在"))?;
         if quotation.status != quotation_ext_status::PENDING_APPROVAL {
-            return Err(AppError::business(format!(
+            // 审批腿状态门：批准与拒绝的唯一前置都是待审批，拒绝点名行自身当前态；
+            // 公开规则、不含标识，走可外显通道，机器码仍是 BUSINESS_ERROR
+            return Err(AppError::business_displayable(format!(
                 "报价单不在待审批状态：{}",
                 quotation.status
             )));

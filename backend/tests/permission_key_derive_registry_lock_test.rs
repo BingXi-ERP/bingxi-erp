@@ -54,6 +54,9 @@ const DISAMBIGUATION_CASES: &[(&str, &str, &str)] = &[
     // 质量检验 URL 段是单数 quality-inspection，注册表与授权是复数 quality-inspections，
     // 不消歧则运行时键恒不等于已授复数键、quality_inspector 访问自己检验/缺陷面反而 403。
     ("production", "quality-inspection", "quality-inspections"),
+    // 色卡扫码面 /color-cards/scan/{色号} 的第四段 scan 不是注册表名，不消歧则派生出注册表外的
+    // scan:read，除超管旁路外持色卡读面键的岗位也恒 403；对齐到权威名 color-cards。
+    ("color-cards", "scan", "color-cards"),
     // BI 分析域
     ("bi", "sales", "bi-analysis"),
     // BPM 工作流域。`bpm` 是模块前缀，第四段若不消歧就派生出裸 tasks/approval/templates 等名：

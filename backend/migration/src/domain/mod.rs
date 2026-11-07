@@ -174,6 +174,8 @@ pub mod product_grade_vocab_check;
 pub mod scan_receipt_grant;
 // 库存匹冗余库存状态列探测式下线域，同上一条口径：晚于代码面摘除读写，先改代码再收列形态。
 pub mod piece_inventory_status_drop;
+// 库存匹米数列扩位域：把 length 列型对齐收回数量的计量口径，链尾独立域（建表与加列均早于本域）。
+pub mod piece_length_scale_widen;
 // 报价超折扣审批门数据地基域（单行阈值配置表 + 报价主表提交人列）。独立顶层域，理由见域头
 // （并入已应用域会在复用库被整体跳过，建表与加列永不落地）。
 pub mod quotation_discount_gate;

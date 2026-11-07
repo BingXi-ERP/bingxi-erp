@@ -42,7 +42,7 @@ function toScaled(v: unknown, scale: number, label: string): bigint {
   const m = /^(-?)(\d+)(?:\.(\d+))?$/.exec(s);
   if (!m) throw new Error(`${label}：Decimal 出参形态非法，raw="${s}"`);
   const [, sign, intPart, frac = ''] = m;
-  const padded = (intPart + frac).padEnd(intPart.length + scale, '0');
+  const padded = (intPart + frac.slice(0, scale)).padEnd(intPart.length + scale, '0');
   const value = BigInt(padded);
   return sign === '-' ? -value : value;
 }

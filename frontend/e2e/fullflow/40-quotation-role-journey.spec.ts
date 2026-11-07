@@ -62,6 +62,7 @@ import {
   apiCall,
   apiCallRaw,
   apiCallExpectFail,
+  API_PREFIX,
   ensureTestEntities,
   failureCode,
   genCode,
@@ -167,11 +168,25 @@ function pickQuotationItem(detail: Row, productId: number): Row {
 }
 
 /**
+ * 从审计快照取状态位。快照缺失、快照不是对象、快照里没有 status 键三种情况各返回可点名的文本，
+ * 不折成空串——折成空串会把"读面结构不对"冒充成"跃迁不存在"，判红时看不出是哪一种。
+ */
+function snapshotStatus(raw: unknown): string {
+  if (raw === null || raw === undefined) return '无快照';
+  if (typeof raw !== 'object') return `非对象:${typeof raw}`;
+  const status = (raw as Row).status;
+  if (status === undefined || status === null) return '快照缺status键';
+  return String(status);
+}
+
+/**
  * 审计跃迁定位（admin 读面）。
- * 入参：admin 会话 page 与筛选口径。传给谁：GET /audit-logs（handler 现实要求 admin 角色）。
- * 判据：resource_type 等于报价单实体体表名且 resource_id 恰等于报价 id（读取侧的 resource_id
- * 是等值契约，不用 keyword 模糊——keyword=5 会命中 resource_id 为 15 的行），
- * 再按 old_value 与 new_value 快照里的 status 对精确匹配一次跃迁，命中必须恰好一行。
+ * 入参：admin 会话 page 与筛选口径。传给谁：先 GET /audit-logs 按资源键取候选行主键，
+ * 再逐行 GET /audit-logs/{id} 取详情。
+ * 判据：变更前后两列只在详情出参（AuditLogDetailResponse 的 before_snapshot 与 after_snapshot），
+ * 列表出参（AuditLogListItem）没有这两列，因此在列表上判跃迁恒得 0 命中；
+ * 资源侧仍按 resource_type 与 resource_id 等值筛（keyword=5 会命中 resource_id 为 15 的行，不用模糊），
+ * 再取详情快照里的 status 对精确匹配一次跃迁，命中必须恰好一行。
  * 审计现实缺 description 与 request_path（均 NULL），因此跃迁语义只能由快照状态对判定，
  * 这一档与文件头"审计面现实核到的字段清单"一致。
  */
@@ -188,21 +203,31 @@ async function findAuditTransition(
     `/audit-logs?resource_type=${AUDIT_RESOURCE_TYPE}&resource_id=${quotationId}&page=1&page_size=100`
   );
   const rows = pickListArray<Row>(list, 'items', `${context}审计列表`);
-  const hits = rows.filter(r => {
-    if (String(r.resource_type ?? '') !== AUDIT_RESOURCE_TYPE) return false;
-    if (String(r.resource_id ?? '') !== String(quotationId)) return false;
-    const beforeRaw = r.old_value;
-    const afterRaw = r.new_value;
-    if (!beforeRaw || typeof beforeRaw !== 'object') return false;
-    if (!afterRaw || typeof afterRaw !== 'object') return false;
-    const before = beforeRaw as Row;
-    const after = afterRaw as Row;
-    return String(before.status ?? '') === fromStatus && String(after.status ?? '') === toStatus;
-  });
+  // 判红时必须把逐行读到的跃迁自证出来：只报行数会把"资源键不同源""详情读面被门挡"
+  // "跃迁被别的动作抢先"三种成因混成同一条红，下一轮仍要重新取证。
+  const observed: string[] = [];
+  const hits: Row[] = [];
+  for (const row of rows) {
+    const auditId = Number(row.id);
+    if (!Number.isInteger(auditId) || auditId <= 0) {
+      throw new Error(
+        `${context}：审计列表行的 id 应为正整数主键，实际=${String(row.id)}，行键=${Object.keys(row).join(',')}`
+      );
+    }
+    const detail = await apiCallRaw<Row>(page, 'GET', `/audit-logs/${auditId}`);
+    const before = snapshotStatus(detail.before_snapshot);
+    const after = snapshotStatus(detail.after_snapshot);
+    observed.push(
+      `id=${auditId} rt=${String(detail.resource_type ?? '无')} rid=${String(
+        detail.resource_id ?? '无'
+      )} op=${String(detail.operation_type ?? '无')} from=${before} to=${after}`
+    );
+    if (before === fromStatus && after === toStatus) hits.push(detail);
+  }
   expect(
     hits.length,
     `${context}：审计中应恰好一行 ${fromStatus} 到 ${toStatus} 的跃迁（报价 ${quotationId}），` +
-      `实际 ${hits.length} 行，本页共 ${rows.length} 行`
+      `实际 ${hits.length} 行，候选 ${rows.length} 行；逐行详情读到的跃迁=${observed.join(' | ') || '空'}`
   ).toBe(1);
   const row = hits[0];
   // 每行跃迁都必须同时交出操作人与时间，缺一即审计留痕不完整
@@ -729,23 +754,36 @@ test.describe('40 报价单多角色审批流转', () => {
                 { key: 'rejQuotationId', value: quotationId },
                 { key: 'rejQuotationNo', value: quotationNo },
                 { key: 'rejRepUsername', value: session.username },
+                { key: 'rejCustomerId', value: customerId },
               ],
             };
           },
         },
         {
           role: 'sales_manager',
-          label: '拒绝报价并留痕（详情页按钮对照腿）',
-          run: async ({ session, require }) => {
+          label: '跨 owner 读面拒 自名下按钮对照 办理拒绝',
+          run: async ({ session, require, registerCleanup }) => {
             const quotationId = Number(require('rejQuotationId'));
-            // UI 对照：审批棒进详情页，批准与拒绝按钮应各自恰有一个可达
-            // （canApprove canReject computed 要求状态 pending_approval 且持对应键，二者都满足）
+            // 读面判据：报价的归属人列是 sales_user_id（quotation_ops/crud.rs 的
+            // ensure_visible_by_scope 按归属人判可见），本棒 data_scope=dept 而报价资源无部门维列，
+            // 部门成员集合为空使可见集退化为仅本人，因此跨 owner 读他人报价详情必被行级数据范围门
+            // fail-closed 拒成 403，与 e2e/flow/123 与 e2e/flow/94 在册判据同口径。
             // 动作区整块在详情卡的 v-if="quotation" 内：读面失败时 quotation 为 null，
-            // 连返回按钮都不会渲染（views/quotations/detail.vue 的 loadData 失败分支）。
-            // 因此先显式等这次报价详情 GET 并点名状态码，把"读面被行级数据范围门挡"
-            // 与"按钮本身缺失"两种红分开，而不是让 15s 超时替两者一起背锅。
+            // 连返回按钮都不会渲染（views/quotations/detail.vue 的 loadData 失败分支），
+            // 所以这条腿只钉读面状态码，不在这张他人行上做按钮对照。
+            // 等待判据必须按 pathname 精确等于 API 详情路径：同一次导航里浏览器文档请求
+            // /quotations/{id} 也回 200，宽松子串匹配会被它抢先命中，后续定位就只能超时；
+            // 精确等式同时排除 /quotations/{id}/terms 等子路径，非预期码不跳过、原样交给下方断言点名。
+            const detailPathname = `${API_PREFIX}/quotations/${quotationId}`;
             const detailRead = session.page.waitForResponse(
-              r => r.request().method() === 'GET' && r.url().includes(`/quotations/${quotationId}`),
+              r => {
+                if (r.request().method() !== 'GET') return false;
+                try {
+                  return new URL(r.url()).pathname === detailPathname;
+                } catch {
+                  return false;
+                }
+              },
               { timeout: 15000 }
             );
             await safeGoto(session.page, `/quotations/${quotationId}`);
@@ -754,21 +792,97 @@ test.describe('40 报价单多角色审批流转', () => {
               detailStatus = (await detailRead).status();
             } catch (e) {
               throw new Error(
-                `审批棒进详情页后 15s 内没有拿到报价详情读响应，读面未发或被守卫吞掉：${
+                `审批棒进他人报价详情后 15s 内没有拿到详情读响应，读面未发或被守卫吞掉：${
                   (e as Error).message
                 }`
               );
             }
             expect(
               detailStatus,
-              `审批棒读报价详情应 200，实际 ${detailStatus}；非 200 时该会话被行级数据范围门挡在取数入口，动作区整块不会渲染`
-            ).toBe(200);
+              `跨 owner 读报价详情应 403（被行级数据范围门 fail-closed 拒绝，与 123 与 94 在册判据一致），实际 ${detailStatus}`
+            ).toBe(403);
             const guard = session.page.url();
             expect(guard, `审批棒进报价详情不应被守卫挡到无权限页，实际落在 ${guard}`).not.toMatch(
               /\/403(\?|#|$)/
             );
+
+            // 对照单的归属人必须与提交会话同源：POST /quotations/{id}/submit 的 handler 先过
+            // get_by_id_scoped 行级归属门（handlers/quotation_handler.rs 提交腿注释「提交是创建人
+            // 推进自身草稿的动作，必须先证归属」；门口径 services/quotation_ops/crud.rs 的
+            // ensure_visible_by_scope，DataScope::Self_ 要求归属人等于会话用户 id，fail-closed 拒 403），
+            // 而 sales_rep 的行级范围是 self，所以归属人写另一棒的 user_id 必被这道门拒——本轮真实红因，
+            // 门是正确契约，不是 RBAC 缺失。建单与提交都沿用建单棒会话（relay.sessions 按棒次顺序，
+            // 第 2 棒持 create 与 submit），sales_user_id 取该棒会话真实登录用户 id，与本文件头
+            // 「取本棒会话真实登录用户 id，不用上下文之外的 id」同口径；金额沿用
+            // buildQuotationPayload 的净额 200000，落在 10 万到 50 万档，提交走 BPM 分支，
+            // 不会被小额自批短路直接落 approved。
+            const builder = relay.sessions[1];
+            const ctrlMarker = genCode('F40CT');
+            const ctrlCreated = await apiCallRaw<Row>(
+              builder.page,
+              'POST',
+              '/quotations',
+              buildQuotationPayload(
+                Number(require('rejCustomerId')),
+                builder.userId,
+                Number(require('rejProductId')),
+                String(require('rejProductUnit')),
+                `E2E-F40CTRL-${ctrlMarker}`
+              )
+            );
+            const ctrlQuotationId = requireId(ctrlCreated.id, '建单棒名下对照建单');
+            await apiCall(builder.page, 'POST', `/quotations/${ctrlQuotationId}/submit`);
+            // 提交后的状态坐实由归属棒自己读回（它在这张单的可见集内；换棒读必被同一道门拒）
+            const ctrlSubmitted = await readQuotationStatus(builder.page, ctrlQuotationId);
+            expect(
+              String(ctrlSubmitted.status ?? ''),
+              `建单棒名下对照单提交后应 pending_approval（10 万到 50 万档走 BPM 分支），实际=${JSON.stringify(
+                ctrlSubmitted.status
+              )}`
+            ).toBe('pending_approval');
+            // 报价族后端无 DELETE 端点，cancel 是它在册的终结面，按本文件清理范式登记收尾；
+            // 本棒（审批棒）授权面只有 quotations 的读与批准拒绝四键，无 cancel 键，该清理腿预期
+            // 被权限门拒而残留，未落终态时该单以唯一 notes 标记点名残留（与本文件头登记的现实残留同口径）。
+            registerCleanup({
+              method: 'POST',
+              path: `/quotations/${ctrlQuotationId}/cancel`,
+              label: `对照报价#${ctrlQuotationId}`,
+            });
+            // 详情页动作区对照搬到归属棒（建单棒）：动作区只有在归属人自己读得通的那张单上才渲染。
+            // 审批棒侧「读自己名下这张单得 200 并各出 1 枚批准与拒绝按钮」无法由用例自建合法前置——
+            // 对照单归审批棒时提交被行级归属门拒（本轮红因），归建单棒时审批棒读面被同一道门拒
+            // （即上方 403 判据），而审批棒按 SoD 不持 create 与 submit 键（init 矩阵 quotation 分组），
+            // 现实中不存在"自己名下且处于待审批"的报价行可造；批准面的 UI 可达由 40-01 的真实办理腿
+            // 与本链链尾的授权面互斥判据承载，本腿只钉建单棒这一侧的负向可达（缺口如实登记，见交付回报）。
+            const ctrlPathname = `${API_PREFIX}/quotations/${ctrlQuotationId}`;
+            const ctrlRead = builder.page.waitForResponse(
+              r => {
+                if (r.request().method() !== 'GET') return false;
+                try {
+                  return new URL(r.url()).pathname === ctrlPathname;
+                } catch {
+                  return false;
+                }
+              },
+              { timeout: 15000 }
+            );
+            await safeGoto(builder.page, `/quotations/${ctrlQuotationId}`);
+            let ctrlStatus = 0;
+            try {
+              ctrlStatus = (await ctrlRead).status();
+            } catch (e) {
+              throw new Error(
+                `建单棒进自名下报价详情后 15s 内没有拿到详情读响应，读面未发或被守卫吞掉：${
+                  (e as Error).message
+                }`
+              );
+            }
+            expect(
+              ctrlStatus,
+              `归属棒读自己名下待审报价详情应 200（归属人在自身可见集内，动作区才可能渲染），实际 ${ctrlStatus}`
+            ).toBe(200);
             // 先等动作区渲染出来（返回按钮是那一块里唯一无条件渲染的），再数批准与拒绝
-            await session.page
+            await builder.page
               .locator('.actions .el-button', { hasText: '返回' })
               .first()
               .waitFor({ state: 'visible', timeout: 15000 });
@@ -776,28 +890,32 @@ test.describe('40 报价单多角色审批流转', () => {
             let rejectButtons = 0;
             await expect
               .poll(async () => {
-                approveButtons = await session.page
+                approveButtons = await builder.page
                   .locator('.actions .el-button', { hasText: '批准' })
                   .count();
-                rejectButtons = await session.page
+                rejectButtons = await builder.page
                   .locator('.actions .el-button', { hasText: '拒绝' })
                   .count();
                 return `${approveButtons}:${rejectButtons}`;
-              }, `审批棒详情页动作区应各出 1 枚批准与拒绝按钮`)
-              .toBe('1:1');
+              }, `建单棒（不持审批键）在待审单详情页动作区应既无批准也无拒绝`)
+              .toBe('0:0');
             expect(
               approveButtons,
-              `审批棒详情页应恰有 1 个批准按钮，实际 ${approveButtons} 个`
-            ).toBe(1);
-            expect(rejectButtons, `审批棒详情页应恰有 1 个拒绝按钮，实际 ${rejectButtons} 个`).toBe(
-              1
-            );
-            // 真实办理拒绝（reject 端点理由必填并落库，handler 现实收口 trim 非空）
+              `建单棒详情页不应出现批准入口（SoD：持建单提交面无批准面），实际 ${approveButtons} 个`
+            ).toBe(0);
+            expect(rejectButtons, `建单棒详情页不应出现拒绝入口，实际 ${rejectButtons} 个`).toBe(0);
+
+            // 真实办理拒绝仍打在原来那张他人行上：这条腿验的事实是 reject 端点不设归属门，
+            // 跨 owner 也能办理；与上方"跨 owner 读面被行级数据范围门拒成 403"是两条独立判据，不矛盾。
             await apiCall(session.page, 'POST', `/quotations/${quotationId}/reject`, {
               reason: 'E2E-F40 价格低于成本线驳回',
             });
             return {
-              artifacts: [{ key: 'rejManagerUsername', value: session.username }],
+              artifacts: [
+                { key: 'rejManagerUsername', value: session.username },
+                { key: 'ctrlQuotationId', value: ctrlQuotationId },
+                { key: 'ctrlQuotationMarker', value: ctrlMarker },
+              ],
             };
           },
         },
@@ -832,10 +950,20 @@ test.describe('40 报价单多角色审批流转', () => {
               failureCode(convFail),
               `rejected 转单机器码应 BUSINESS_ERROR，实际 code=${convFail.code ?? ''}`
             ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+            // 文案判据与被拒点原文逐字同源（quotation_convert_service.rs 的转单状态门），
+            // 并从"点名状态门"加严到点名允许态与本单实际态三条。
             expect(
               String(convFail.message ?? ''),
               `rejected 转单拒绝文案应点名状态门，实际=${JSON.stringify(convFail.message)}`
-            ).toMatch(/当前状态不允许/);
+            ).toContain('报价单状态不允许转订单');
+            expect(
+              String(convFail.message ?? ''),
+              `拒绝文案应点名允许态 approved，实际=${JSON.stringify(convFail.message)}`
+            ).toContain('仅 approved 状态可转换');
+            expect(
+              String(convFail.message ?? ''),
+              `拒绝文案应回显本单实际状态 rejected，实际=${JSON.stringify(convFail.message)}`
+            ).toContain('：rejected');
             const still = await readQuotationStatus(session.page, quotationId);
             expect(
               String(still.status ?? ''),

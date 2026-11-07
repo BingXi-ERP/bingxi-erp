@@ -477,7 +477,7 @@ impl InitService {
                 &[
                     // 超折扣审批阈值：总经理既是审批链上的读取方（要知道多少折扣要经审批），
                     // 也是政策参数的写入方之一（阈值决定"多少折扣必须经主管审批"，属管理侧
-                    // 政策参数）。两枚键与 m0130 存量库补授的角色集逐字符同源。
+                    // 政策参数）。两枚键与 m0134 存量库补授的角色集逐字符同源。
                     ("quotation-discount-config", "read"),
                     ("quotation-discount-config", "update"),
                     // 经营分析入口要读期末报表快照与行业基准对标；`/period-report-snapshots`、
@@ -599,6 +599,9 @@ impl InitService {
                     ("quotation-discount-config", "read"),
                     ("custom-orders", "*"),
                     ("color-cards", "*"),
+                    // 大货批色单读面：批色审批由主管岗推进，读权限与色卡读面同归销售主管；
+                    // 只给 read，降等与发送客户等写面仍不在本岗授权内。
+                    ("bulk-color-approvals", "read"),
                     ("color-prices", "*"),
                     ("customers", "*"),
                     ("customer-credits", "read"),
@@ -1492,7 +1495,7 @@ impl InitService {
                 "system_admin",
                 &[
                     // 超折扣审批阈值配置面：系统管理岗负责政策参数的落地维护，读写两枚键
-                    // 与 m0130 存量库补授的角色集逐字符同源（update 只给 gm 与本岗）。
+                    // 与 m0134 存量库补授的角色集逐字符同源（update 只给 gm 与本岗）。
                     ("quotation-discount-config", "read"),
                     ("quotation-discount-config", "update"),
                     ("users", "*"),

@@ -100,16 +100,16 @@ BEGIN
          WHERE NOT EXISTS (SELECT 1 FROM "roles" r WHERE r."code" = a)
       ) m;
     IF hit = 0 THEN
-        RAISE NOTICE 'm0130：quotation-discount-config:read 的目标受授角色在当前库中一个都不存在，本次未授予任何权限。若是迁移早于系统初始化建角色的新装库属正常时序（init 角色矩阵按同口径授予），否则请核对 roles.code 是否被改名。';
+        RAISE NOTICE 'm0134：quotation-discount-config:read 的目标受授角色在当前库中一个都不存在，本次未授予任何权限。若是迁移早于系统初始化建角色的新装库属正常时序（init 角色矩阵按同口径授予），否则请核对 roles.code 是否被改名。';
     ELSE
-        RAISE NOTICE 'm0130：quotation-discount-config:read 授予命中 % 个角色；当前库不存在的角色码：%（自动跳过）', hit, COALESCE(miss, '无');
+        RAISE NOTICE 'm0134：quotation-discount-config:read 授予命中 % 个角色；当前库不存在的角色码：%（自动跳过）', hit, COALESCE(miss, '无');
     END IF;
 
     SELECT COUNT(*) INTO hit FROM "roles" WHERE "code" = ANY({update_arr});
     IF hit = 0 THEN
-        RAISE NOTICE 'm0130：quotation-discount-config:update 的目标受授角色在当前库中一个都不存在，阈值写入面对非超管不可用，请核对初始化角色是否落齐。';
+        RAISE NOTICE 'm0134：quotation-discount-config:update 的目标受授角色在当前库中一个都不存在，阈值写入面对非超管不可用，请核对初始化角色是否落齐。';
     ELSE
-        RAISE NOTICE 'm0130：quotation-discount-config:update 授予命中 % 个角色', hit;
+        RAISE NOTICE 'm0134：quotation-discount-config:update 授予命中 % 个角色', hit;
     END IF;
 END
 $$;

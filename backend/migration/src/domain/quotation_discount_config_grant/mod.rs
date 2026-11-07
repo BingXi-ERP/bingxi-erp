@@ -3,7 +3,7 @@
 //! 本域只落一条授权数据迁移台账，登记为新的顶层域而非并入任何已应用域：已应用域在复用库上
 //! 台账已记账、整体跳过，嵌在其中的补授在存量库永远不会执行。链尾新域名在复用库上属 pending，
 //! 必然执行。
-//! - m0130_grant_quotation_discount_config_keys: 按 roles.code 反查 id，为读面四岗补
+//! - m0134_grant_quotation_discount_config_keys: 按 roles.code 反查 id，为读面四岗补
 //!   `quotation-discount-config:read`、为写面两岗补 `:update`，与 init 矩阵授予逐字符同源；
 //!   NOT EXISTS 守卫使重跑等价，命中 0 个角色时以 NOTICE 报出不静默通过。
 //!
@@ -17,7 +17,7 @@
 
 use sea_orm_migration::prelude::*;
 
-mod m0130_grant_quotation_discount_config_keys;
+mod m0134_grant_quotation_discount_config_keys;
 
 pub struct Migration;
 
@@ -30,13 +30,13 @@ impl MigrationName for Migration {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        m0130_grant_quotation_discount_config_keys::Migration
+        m0134_grant_quotation_discount_config_keys::Migration
             .up(manager)
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        m0130_grant_quotation_discount_config_keys::Migration
+        m0134_grant_quotation_discount_config_keys::Migration
             .down(manager)
             .await?;
         Ok(())

@@ -69,8 +69,12 @@ import {
  * 会话身份：本文件的正写腿用分片 worker 会话（admin 短路 RBAC），跨角色腿按角色码取账号。
  * 角色授权面依据 backend/src/services/init_service_ops/permission.rs 的角色分组：
  * lab_technician 与 dye_recipe_master 持 ("lab-dip","*") 与 ("color-cards","*")，
- * sales_manager 持 ("color-cards","*")，salesperson 属 e2e 镜像岗、只有应用外壳键与本文件涉及的
- * 资源键（color-cards / lab-dip）都不在其授权面内 —— 这既成立正例（三岗可写本链）也成立反例（业务员必被拒）。
+ * sales_manager 持 ("color-cards","*")，sales_rep（e2e 镜像岗 salesperson 的同名后端岗）持
+ * ("color-cards","read") —— 因此业务员对色卡读面是有键岗位，只能当"读得到"的正例，
+ * 不能当"被 RBAC 拒"的反例。反例取 report_viewer：该岗既不在 init 的角色分组里，
+ * 镜像建岗面又闭合到应用外壳两枚键（dashboard:read 与 notifications:read），
+ * 对本文件的色卡与化验资源零授权键，403 只能来自权限门。
+ * 化验室打样（lab-dip）面对业务员与 report_viewer 都不放行，两条反例同口径成立。
  *
  * 给谁看。色卡仓储与化验室打样两个域的实现者，以及后续要把这条链并入主流程回归的交付侧。
  */
@@ -389,7 +393,10 @@ function deepKeys(value: unknown, out: Set<string> = new Set()): string[] {
   return [...out];
 }
 
-/** 成本与进价类键名清单：本文件用它点名"读面不该带出的东西"，取值逐字符照后端列名 */
+/**
+ * 金额类键名清单：本文件用它点名"读面不该带出的东西"，取值逐字符照后端列名。
+ * 只收列本身携带金额的列名；指向价格记录的外键 ID 列不含任何金额，不入此列。
+ */
 const COST_KEYS = [
   'dye_cost',
   'auxiliary_cost',
@@ -397,7 +404,6 @@ const COST_KEYS = [
   'base_price',
   'cost_price',
   'purchase_price',
-  'product_color_price_id',
 ] as const;
 
 /**
@@ -894,6 +900,8 @@ test.describe('色卡与样品打样主链', () => {
       );
       expectPermissionGateRejection(outsiderWrite, '业务员岗（无化验室打样授权键）建打样通知单');
 
+      // 建单即 pending，后端只允许 sampling 状态挂小样，先推 pending → sampling 再建样。
+      await apiCallRaw<unknown>(sampler.page, 'POST', `${LD}/requests/${requestId}/start-sampling`);
       await createLabDipSample(sampler.page, requestId, {
         recipe_no: genCode('R440A'),
         formula: '活性红 3BS 2%(o.w.f)',
@@ -1154,7 +1162,11 @@ test.describe('色卡与样品打样主链', () => {
     });
 
     const reader = await openRoleSession(browser, 'sales_manager');
-    const outsider = await openRoleSession(browser, 'salesperson');
+    // "无授权键的岗位"必须按后端矩阵实名选岗：init 矩阵把 ("color-cards","read") 明确授给
+    // sales_rep、("color-cards","*") 授给 sales_manager 与化验与染整两岗，业务员本来就持读键，
+    // 拿它当无键岗位只会把"岗位确实有权"读成"权限门被拒"。report_viewer 在矩阵与授权分组
+    // 都零色卡键，镜像建岗面闭合到 SHELL 两枚键，是被 RBAC 拒的真实无键岗位。
+    const outsider = await openRoleSession(browser, 'report_viewer');
     try {
       const listResp = await reader.page.request.fetch(
         `${API_BASE}${API_PREFIX}${CC}?keyword=${encodeURIComponent(cardName)}&page=1&page_size=20`
@@ -1196,7 +1208,7 @@ test.describe('色卡与样品打样主链', () => {
       for (const key of COST_KEYS) {
         expect(
           detailKeys,
-          `色卡与色号读面的响应体不应携带成本或价格列 ${key}（色卡读面不涉价）`
+          `色卡详情读面的响应体不应携带金额列 ${key}（色卡读面不出金额）`
         ).not.toContain(key);
       }
 
@@ -1228,6 +1240,7 @@ test.describe('色卡与样品打样主链', () => {
     }
 
     await tryCleanup(page, 'DELETE', `${CC}/${cardId}`, '归档本次新建色卡（跨角色腿）');
+    // 已知缺口：按色号扫码面的出参 ScanResult.price_summary.base_price 确实带金额（后端 models/color_card_response_dto.rs 的 PriceSummary），本用例对它零断言，需另开专项钉扫码读面的金额可见性口径。
   });
 
   test('440-05 时序门控：无小样不可送确认、版数与版本标识受限、未确认不可复样、未通过不可开卡，且拒绝零写入', async ({

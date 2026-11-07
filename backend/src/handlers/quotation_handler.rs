@@ -352,7 +352,7 @@ pub struct DiscountConfigUpdateRequest {
 
 /// GET /api/v1/erp/quotations/discount-config
 /// 读超折扣审批阈值。权限键 `quotation-discount-config:read`（URL 第四段 discount-config
-/// 经 utils/path_utils.rs::RESOURCE_NAME_MAP 消歧为权威资源名，与 m0130 补授键逐字符一致）。
+/// 经 utils/path_utils.rs::RESOURCE_NAME_MAP 消歧为权威资源名，与 m0134 补授键逐字符一致）。
 pub async fn get_discount_config(
     _auth: AuthContext,
     State(state): State<AppState>,
