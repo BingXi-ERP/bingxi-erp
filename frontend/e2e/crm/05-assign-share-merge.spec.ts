@@ -200,11 +200,24 @@ test.describe('CRM 分配·共享·合并流程', () => {
       });
       const claimId = claimLead.data?.id;
       expect(claimId, '建第二条线索失败').toBeTruthy();
-      // 一次性取证探针：认领链路的三个拒绝分支按源码静态读都不成立（建的是 new、
-      // 认领人已经 is_active 过滤、认领人非该线索归属人），而 CI 实返脱敏 business，
-      // 该文案只可能来自"认领瞬间状态已非 new"这一条分支。故在认领之前现查该行现场值，
-      // 并取出最后写者（本表有 updated_by 列，可把改写归因到具体用户），
-      // 用于判定是否同分片并行用例跨行改写。只加读，不改原调用与断言次序。
+      // 取证探针：认领请求返回脱敏 business。该文案在认领链路上只有两处能产出
+      // （services/crm/assign.rs），逐处以源码事实排除后只剩一处，故现查该行的认领前现场值：
+      // - 认领人已停用被排除：本腿的认领目标是自建的新专属账号（建后即为启用态）；
+      //   未改写的版本里认领人由 pickTwoOtherUserIds 选出，也已按 is_active 过滤并排除会话自身。
+      //   两种取源下停用分支都不成立。
+      // - 状态不会因取数缺键落成 NULL：models/dto/crm_dto.rs 的 CreateLeadRequest
+      //   无 rename_all，请求键名与字段名逐字相同；services/crm/lead.rs 的 create_lead
+      //   按请求值原样落 lead_status，且与认领门控同引 models/status/crm_lead 这一套词表
+      //   （NEW 即小写 new），不存在大小写分歧。
+      // - 认领人即归属人被排除：create_lead 把 owner_id 落为建单会话用户，
+      //   而 crm_assignment_handler.rs 的 claim_lead 只把会话身份当操作人，
+      //   不用它覆盖请求体里的认领人。
+      // 现查走详情读面，其掩码函数 mask_lead_pii_defaults 对 admin 原值返回、
+      // 非 admin 也只剔地址与联系方式类列，故 updated_by 一定能读出，可把改写归因到用户。
+      // 只加一次读，不改原请求、断言与执行次序；根因定位后撤除本探针。
+      // 打印项只取探针自己读到的字段，不引用本测试的局部变量：本文件在其它在途支上
+      // 有一版把认领目标改为本腿自建专属账号的重写，那一版里会话用户与认领人的局部名
+      // 都不存在，引用它们会让探针在并基后抛出 ReferenceError 并把用例本身打死。
       const probe = await apiCallRaw<{
         lead_status: string | null;
         owner_id: number;
@@ -214,7 +227,7 @@ test.describe('CRM 分配·共享·合并流程', () => {
       console.log(
         `[crm-05 probe] 认领前现场 lead#${claimId} status=${probe.lead_status} ` +
           `owner=${probe.owner_id} updated_by=${probe.updated_by} ` +
-          `updated_at=${probe.updated_at} 会话用户=${me.id} 认领人=${assigneeA}`
+          `updated_at=${probe.updated_at}`
       );
       try {
         await apiCall(page, 'POST', '/crm/assignments/claim', {
