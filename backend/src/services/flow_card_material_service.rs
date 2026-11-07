@@ -20,6 +20,9 @@
 //! - 单位受控两值 kg 与 m（值域见 `models::flow_card_material` 的 UNIT_KG 与 UNIT_METER），
 //!   与库存行的公斤列与米数列一一对应；其它单位在建单期显式拒绝，不做任何换算或等比折算，
 //!   避免出现"按米扣一个按公斤买的东西"。
+//! - 等级受控三值 一等品/二等品/等外品（值域见 `models::flow_card_material` 的 GRADE_* 三常量，
+//!   与库存等级词表 `inventory_stock_grade` 同源）；词表外取值在建单期显式拒绝，
+//!   避免登记面放过扣料期必然命不中或扣错等外品库存行的行。
 //! - 四维（批次、色号、缸号、等级）与 `inventory_stock` 的库存行区分维度同构，扣料据此命中
 //!   唯一库存行；这里不校验库存是否够，够不够由完工扣料在同一事务内判定，避免两个地方各判
 //!   一次而口径分叉。
@@ -35,7 +38,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::flow_card_material::{
     ActiveModel as MaterialActiveModel, Column as MaterialColumn, Entity as MaterialEntity,
-    Model as MaterialModel, Relation as MaterialRelation, UNIT_KG, UNIT_METER,
+    GRADE_FIRST, GRADE_OFF, GRADE_SECOND, Model as MaterialModel, Relation as MaterialRelation,
+    UNIT_KG, UNIT_METER,
 };
 use crate::models::product;
 use crate::models::production_flow_card::{
@@ -46,6 +50,10 @@ use crate::utils::error::AppError;
 
 /// 允许的计量单位取值集合，唯一事实来源在 `models::flow_card_material`
 const ALLOWED_UNITS: [&str; 2] = [UNIT_KG, UNIT_METER];
+
+/// 允许的等级取值集合，唯一事实来源在 `models::flow_card_material`
+/// （与库存等级词表 `inventory_stock_grade` 同源）
+const ALLOWED_GRADES: [&str; 3] = [GRADE_FIRST, GRADE_SECOND, GRADE_OFF];
 
 /// 新增投纱行入参
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -65,7 +73,8 @@ pub struct CreateFlowCardMaterialRequest {
     /// 缸号，可空
     #[serde(default)]
     pub dye_lot_no: Option<String>,
-    /// 等级；未分等传空串
+    /// 等级；必选受控三值 一等品/二等品/等外品（与库存行等级同源），词表外取值建单期拒绝；
+    /// 缺键按空串进入同一词表门拒绝，不外抛 serde 缺字段裸错
     #[serde(default)]
     pub grade: String,
     /// 投入数量（绝对量）
@@ -87,6 +96,7 @@ pub struct UpdateFlowCardMaterialRequest {
     pub color_no: String,
     #[serde(default)]
     pub dye_lot_no: Option<String>,
+    /// 等级；受控三值，与新建同门同族拒绝
     #[serde(default)]
     pub grade: String,
     pub quantity: Decimal,
@@ -126,13 +136,14 @@ impl FlowCardMaterialService {
         Self { db }
     }
 
-    /// 新增一条投纱记录；卡不存在或单位不合法或数量为负均显式拒绝
+    /// 新增一条投纱记录；卡不存在或单位不合法或等级越出词表或数量为负均显式拒绝
     pub async fn create(
         &self,
         req: CreateFlowCardMaterialRequest,
         user_id: i32,
     ) -> Result<MaterialModel, AppError> {
         Self::validate_unit(&req.unit)?;
+        Self::validate_grade(&req.grade)?;
         Self::validate_quantity(req.quantity)?;
         self.ensure_card_exists(req.flow_card_id).await?;
 
@@ -176,6 +187,7 @@ impl FlowCardMaterialService {
         user_id: i32,
     ) -> Result<MaterialModel, AppError> {
         Self::validate_unit(&req.unit)?;
+        Self::validate_grade(&req.grade)?;
         Self::validate_quantity(req.quantity)?;
 
         let existing = MaterialEntity::find_by_id(row_id)
@@ -311,6 +323,19 @@ impl FlowCardMaterialService {
             Err(AppError::validation_displayable(
                 "投纱计量单位只支持公斤与米两种，请按实际采购口径选择",
             ))
+        }
+    }
+
+    /// 等级词表门：与库存等级同源三值之外的取值（含空串与历史译文值）一律建单期拒绝，
+    /// 判错形态与库存侧 update_stock_grade 的同词表校验同族
+    fn validate_grade(grade: &str) -> Result<(), AppError> {
+        if ALLOWED_GRADES.contains(&grade) {
+            Ok(())
+        } else {
+            Err(AppError::validation_displayable(format!(
+                "非法等级值 {}，仅允许 一等品/二等品/等外品",
+                grade
+            )))
         }
     }
 
