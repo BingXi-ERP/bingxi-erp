@@ -124,9 +124,10 @@
                 </el-tooltip>
               </span>
             </template>
-            <!-- 数字列统一 el-input 加校验规则，禁用带加减按钮的数字输入框 -->
+            <!-- 数字列统一 el-input 加校验规则，禁用带加减按钮的数字输入框，inputmode 唤起移动端数字小键盘 -->
             <el-input
               v-model="formData.width"
+              inputmode="decimal"
               :placeholder="t('product.productFormDialogTab.placeholderWidth')"
             />
           </el-form-item>
@@ -146,6 +147,7 @@
             </template>
             <el-input
               v-model="formData.gram_weight"
+              inputmode="decimal"
               :placeholder="t('product.productFormDialogTab.placeholderGramWeight')"
             />
           </el-form-item>
