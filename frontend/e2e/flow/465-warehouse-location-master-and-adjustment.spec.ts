@@ -10,14 +10,13 @@
  * 入参：page 会话（worker admin 与 warehouse_keeper 两种岗位）、getCtx() 的 warehouseIds
  * （ensureTestEntities 保证 ≥1 个仓库，跨仓过滤腿需 ≥2，不足即显式判红）。
  * 传给谁：backend warehouse_handler::create_location / list_locations / get_location /
- * update_location / delete_location（路由挂载 backend/src/routes/catalog.rs:96-114）。
+ * update_location / delete_location（路由挂载 backend/src/routes/catalog.rs）。
  * 存什么：warehouse_locations 行的 warehouse_id/location_code/location_type/max_weight/
  * max_height/is_batch_managed/is_color_managed；DECIMAL(12,2) 列出参为序列化字符串，
  * 比较一律经 Number() 归一，测试内不做二次舍入。
  * 存哪里：PostgreSQL warehouse_locations（DDL migration/src/domain/business/
- * m0010_add_inventory_extensions.rs:154-169，含 FK→warehouses 与唯一索引
- * (warehouse_id, location_code)）；端点存在性唯一事实来源 frontend/scripts/route-snapshot.txt
- * :134/:978/:979/:1642/:1822。
+ * m0010_add_inventory_extensions.rs，含 FK→warehouses 与唯一索引
+ * (warehouse_id, location_code)）；端点存在性唯一事实来源 frontend/scripts/route-snapshot.txt。
  *
  * 覆盖端点（路径均为 API_PREFIX=/api/v1/erp 之后部分）：
  *   POST   /warehouses/locations
@@ -26,7 +25,7 @@
  *   PUT    /warehouses/locations/{id}
  *   DELETE /warehouses/locations/{id}
  *
- * 未覆盖（如实申报，见 E:/logs/ci/loc-period-e2e-findings-2026-11-04.md §5）：
+ * 未覆盖（如实申报）：
  * 重复 location_code 与不存在 warehouse_id 两条 DB 约束腿——写入方对唯一索引/FK 无前置
  * 校验，当前落 500 DATABASE_ERROR（utils/error.rs From<DbErr>），断 500 等于把缺陷钉成
  * 预期、断 400 必真红，均不取；待后端映射为业务错误后另立新用例。
@@ -80,7 +79,7 @@ type LocationRow = {
  * 存什么：不持久化。
  * 存哪里：无。
  */
-function decimalFieldAsNumber(row: LocationRow, field: string, context: string): number {
+function decimalFieldAsNumber(row: LocationRow, field: keyof LocationRow, context: string): number {
   const raw = row[field];
   if (typeof raw !== 'string' && typeof raw !== 'number') {
     throw new Error(
@@ -174,7 +173,7 @@ test.describe('库位维护族全腿', () => {
       '回读最大高度必须等于写入值 3.5'
     ).toBe(3.5);
     // 隐藏前置取证：is_batch_managed/is_color_managed 由写入方强制置 Some(true)
-    // （warehouse_handler.rs:245-246），请求体不承载——断的是服务端写入值，不是入参回显
+    // （warehouse_handler.rs），请求体不承载——断的是服务端写入值，不是入参回显
     expect(readBack.is_batch_managed, '建单批次管理位必须落库为 true（写入方强制值）').toBe(true);
     expect(readBack.is_color_managed, '建单色号管理位必须落库为 true（写入方强制值）').toBe(true);
 
@@ -240,7 +239,7 @@ test.describe('库位维护族全腿', () => {
     if (typeof id !== 'number') {
       throw new Error(`[465-T2] 建单未返回 data.id，实际 ${JSON.stringify(created)}`.slice(0, 300));
     }
-    deferCleanup(page0 => page0, 'DELETE', `/warehouses/locations/${id}`, '465-T2 location');
+    deferCleanup(cleanup, 'DELETE', `/warehouses/locations/${id}`, '465-T2 location');
 
     // 第一腿：有值=覆盖。只提交 code/type/weight/batch 位，height 与 color 位缺席
     const code1 = genCode('E2E-LOC2R');
@@ -283,7 +282,7 @@ test.describe('库位维护族全腿', () => {
     expect(afterClear.location_code, '清空腿不得波及其他列：编码保持 code1').toBe(code1);
     expect(afterClear.is_batch_managed, '清空腿不得波及其他列：批次位保持 false').toBe(false);
 
-    // NOT NULL 列门：location_code 显式 null 必须在入口被业务拒绝（warehouse_handler.rs:282-286）
+    // NOT NULL 列门：location_code 显式 null 必须在入口被业务拒绝（warehouse_handler.rs）
     const clearGuard = await apiCallExpectFail(page, 'PUT', `/warehouses/locations/${id}`, {
       location_code: null,
     });
@@ -404,7 +403,7 @@ test.describe('库位维护族全腿', () => {
     if (typeof id !== 'number') {
       throw new Error(`[465-T5] 建单未返回 data.id，实际 ${JSON.stringify(created)}`.slice(0, 300));
     }
-    deferCleanup(page0 => page0, 'DELETE', `/warehouses/locations/${id}`, '465-T5 location');
+    deferCleanup(cleanup, 'DELETE', `/warehouses/locations/${id}`, '465-T5 location');
 
     await loginAsRole(page, 'warehouse_keeper');
     const keeperList = await apiCallRaw<{ items?: unknown }>(
@@ -414,7 +413,7 @@ test.describe('库位维护族全腿', () => {
     );
     if (!Array.isArray(keeperList.items)) {
       throw new Error(
-        `[465-T5] 仓管（权限键 ${PERMISSIONS.WAREHOUSE_READ}，init_service_ops/permission.rs:884 在册）` +
+        `[465-T5] 仓管（权限键 ${PERMISSIONS.WAREHOUSE_READ}，init_service_ops/permission.rs 在册）` +
           `读库位列表未返回 items 数组，实际片段=${JSON.stringify(keeperList).slice(0, 200)}`
       );
     }
