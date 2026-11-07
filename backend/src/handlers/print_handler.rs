@@ -11,7 +11,7 @@ use validator::Validate;
 
 use crate::container::AppState;
 use crate::handlers::print_task_handler::{
-    submit_print_task, CreatePrintTaskRequest, PrintTaskJobRef,
+    CreatePrintTaskRequest, PrintTaskJobRef, submit_print_task,
 };
 use crate::middleware::auth_context::AuthContext;
 use crate::models::audit_log::{OperationType, Severity};
@@ -25,9 +25,9 @@ use crate::utils::html_escape::{escape_html, sanitize_css_block};
 use crate::utils::optional_json::OptionalJson;
 use crate::utils::response::ApiResponse;
 use axum::{
+    Json,
     extract::{Path, State},
     response::Response,
-    Json,
 };
 use tracing::info;
 

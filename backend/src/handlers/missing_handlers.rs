@@ -8,8 +8,8 @@
 //! 3. CRM 公海回收规则 — 数据库持久化（迁移至 `crm_recycle_rules` 表）
 
 use axum::{
-    extract::{Path, State},
     Json,
+    extract::{Path, State},
 };
 use chrono::{DateTime, TimeZone, Utc};
 use sea_orm::{
