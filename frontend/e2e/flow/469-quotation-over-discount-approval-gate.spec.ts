@@ -3,7 +3,8 @@
  *
  * 功能：把 E8 新增的两端点（GET 与 PUT /quotations/discount-config）与提交腿的超折扣
  *   强制审批门做端到端验证。管理员读阈值、写阈值并回读坐实持久化，越界与超精度入参
- *   被 400 拒绝；sales_rep 对配置面 GET 与 PUT 均被权限门 403 拒绝；设阈值为 5 后
+ *   被 400 拒绝；sales_rep 对配置面只读（GET 200 读到规则值，m0134 三通道授予）、
+ *   写面 PUT 被权限门 403 拒绝；设阈值为 5 后
  *   sales_rep 建行折扣率 10 的报价单（金额 1 远低于 10 万自批档）提交，断言状态进
  *   pending_approval 且 submitted_by 留痕为操作人（超折扣门取更严者，金额再小也不自批）；
  *   改阈值为 20 后同角色建行折扣率 5 的报价单提交，断言状态直接 approved 且 approved_by
@@ -66,20 +67,16 @@ test.describe.serial('超折扣审批门：阈值配置、权限拒绝、超阈�
     // ── 1 阈值配置读写往返 ──
     const original = await apiCallRaw<Row>(page, 'GET', '/quotations/discount-config');
     const originalThreshold = Number(original.over_discount_threshold_pct);
-    expect(
-      originalThreshold,
-      '初始阈值应为 0 到 100 之间的有效数值'
-    ).toBeGreaterThanOrEqual(0);
+    expect(originalThreshold, '初始阈值应为 0 到 100 之间的有效数值').toBeGreaterThanOrEqual(0);
     expect(originalThreshold, '初始阈值应不超过 100').toBeLessThanOrEqual(100);
     expect(original.updated_at, '初始阈值配置应带更新时间').toBeTruthy();
 
     const updated = await apiCall<Row>(page, 'PUT', '/quotations/discount-config', {
       over_discount_threshold_pct: '15.50',
     });
-    expect(
-      updated.message,
-      'PUT 响应文案应含超折扣审批阈值已更新'
-    ).toContain('超折扣审批阈值已更新');
+    expect(updated.message, 'PUT 响应文案应含超折扣审批阈值已更新').toContain(
+      '超折扣审批阈值已更新'
+    );
     expect(
       Number(updated.data.over_discount_threshold_pct),
       'PUT 出参阈值应与入参 15.50 一致'
@@ -93,32 +90,20 @@ test.describe.serial('超折扣审批门：阈值配置、权限拒绝、超阈�
     ).toBe(15.5);
 
     // ── 2 校验拒绝：越界与超精度 ──
-    const over100 = await apiCallExpectFail(
-      page,
-      'PUT',
-      '/quotations/discount-config',
-      { over_discount_threshold_pct: '101' }
-    );
+    const over100 = await apiCallExpectFail(page, 'PUT', '/quotations/discount-config', {
+      over_discount_threshold_pct: '101',
+    });
     expect(over100.status, '阈值 101 超出上界 100 应被 400 拒绝').toBe(400);
 
-    const under0 = await apiCallExpectFail(
-      page,
-      'PUT',
-      '/quotations/discount-config',
-      { over_discount_threshold_pct: '-1' }
-    );
+    const under0 = await apiCallExpectFail(page, 'PUT', '/quotations/discount-config', {
+      over_discount_threshold_pct: '-1',
+    });
     expect(under0.status, '阈值 -1 超出下界 0 应被 400 拒绝').toBe(400);
 
-    const overPrecision = await apiCallExpectFail(
-      page,
-      'PUT',
-      '/quotations/discount-config',
-      { over_discount_threshold_pct: '10.123' }
-    );
-    expect(
-      overPrecision.status,
-      '阈值 10.123 超出列刻度两位小数应被 400 拒绝'
-    ).toBe(400);
+    const overPrecision = await apiCallExpectFail(page, 'PUT', '/quotations/discount-config', {
+      over_discount_threshold_pct: '10.123',
+    });
+    expect(overPrecision.status, '阈值 10.123 超出列刻度两位小数应被 400 拒绝').toBe(400);
 
     // 恢复原值，后续测试从干净基线出发
     await apiCall(page, 'PUT', '/quotations/discount-config', {
@@ -142,21 +127,15 @@ test.describe.serial('超折扣审批门：阈值配置、权限拒绝、超阈�
             });
             const productId = Number(created?.id);
             expect(productId, '建产品应返回有效 id').toBeGreaterThan(0);
-            const detail = await apiCallRaw<Row>(
-              session.page,
-              'GET',
-              `/products/${productId}`
-            );
+            const detail = await apiCallRaw<Row>(session.page, 'GET', `/products/${productId}`);
             const unit = String(detail?.unit ?? '');
             expect(unit, '产品回读应有交易单位供报价行取值').toBeTruthy();
 
             const customerName = genCode('E2E-DISC-CUS');
-            const customer = await apiCallRaw<Row>(
-              session.page,
-              'POST',
-              '/crm/customers',
-              { customer_name: customerName, contact_phone: '13800000000' }
-            );
+            const customer = await apiCallRaw<Row>(session.page, 'POST', '/crm/customers', {
+              customer_name: customerName,
+              contact_phone: '13800000000',
+            });
             const customerId = Number(customer?.id);
             expect(customerId, '建客户应返回有效 id').toBeGreaterThan(0);
             registerCleanup({
@@ -186,13 +165,17 @@ test.describe.serial('超折扣审批门：阈值配置、权限拒绝、超阈�
             const productUnit = String(require('productUnit'));
             const customerId = Number(require('customerId'));
 
-            // sales_rep 无 quotation-discount-config 读写权限，GET 与 PUT 均 403
-            const getDenied = await apiCallExpectFail(
+            // 阈值读面按角色矩阵与 m0134 补授契约归 sales_rep 只读（提交前须看到
+            // 超阈规则值），写面只归 gm 与 system_admin，本岗 PUT 仍 403。
+            const repConfig = await apiCallRaw<Row>(
               session.page,
               'GET',
               '/quotations/discount-config'
             );
-            expectDenied(getDenied, 'sales_rep GET discount-config 应被权限门 403');
+            expect(
+              Number(repConfig.over_discount_threshold_pct),
+              'sales_rep 应可读阈值配置且读到的就是 admin 刚设的超阈阈值 5'
+            ).toBe(5);
 
             const putDenied = await apiCallExpectFail(
               session.page,
@@ -245,18 +228,11 @@ test.describe.serial('超折扣审批门：阈值配置、权限拒绝、超阈�
             ).toBe(session.userId);
 
             // 回读坐实持久化
-            const back = await apiCallRaw<Row>(
-              session.page,
-              'GET',
-              `/quotations/${quotationId}`
+            const back = await apiCallRaw<Row>(session.page, 'GET', `/quotations/${quotationId}`);
+            expect(back.status, '回读状态应为 pending_approval').toBe('pending_approval');
+            expect(Number(back.submitted_by), '回读 submitted_by 应为操作人 user_id').toBe(
+              session.userId
             );
-            expect(back.status, '回读状态应为 pending_approval').toBe(
-              'pending_approval'
-            );
-            expect(
-              Number(back.submitted_by),
-              '回读 submitted_by 应为操作人 user_id'
-            ).toBe(session.userId);
 
             return {
               artifacts: [
@@ -315,31 +291,23 @@ test.describe.serial('超折扣审批门：阈值配置、权限拒绝、超阈�
               'POST',
               `/quotations/${quotationId}/submit`
             );
-            expect(
-              submitted.data?.status,
-              '未超阈小额提交后状态应为 approved（自批腿）'
-            ).toBe('approved');
+            expect(submitted.data?.status, '未超阈小额提交后状态应为 approved（自批腿）').toBe(
+              'approved'
+            );
             expect(
               Number(submitted.data?.approved_by),
               '自批后 approved_by 应为操作人 user_id'
             ).toBe(session.userId);
 
             // 回读坐实持久化
-            const back = await apiCallRaw<Row>(
-              session.page,
-              'GET',
-              `/quotations/${quotationId}`
-            );
+            const back = await apiCallRaw<Row>(session.page, 'GET', `/quotations/${quotationId}`);
             expect(back.status, '回读状态应为 approved').toBe('approved');
-            expect(
-              Number(back.approved_by),
-              '回读 approved_by 应为操作人 user_id'
-            ).toBe(session.userId);
+            expect(Number(back.approved_by), '回读 approved_by 应为操作人 user_id').toBe(
+              session.userId
+            );
 
             return {
-              artifacts: [
-                { key: 'underThresholdQuotationId', value: quotationId },
-              ],
+              artifacts: [{ key: 'underThresholdQuotationId', value: quotationId }],
             };
           },
         },
@@ -352,14 +320,9 @@ test.describe.serial('超折扣审批门：阈值配置、权限拒绝、超阈�
     await apiCall(page, 'PUT', '/quotations/discount-config', {
       over_discount_threshold_pct: String(originalThreshold),
     });
-    const restored = await apiCallRaw<Row>(
-      page,
-      'GET',
-      '/quotations/discount-config'
+    const restored = await apiCallRaw<Row>(page, 'GET', '/quotations/discount-config');
+    expect(Number(restored.over_discount_threshold_pct), '收尾阈值应恢复到原值').toBe(
+      originalThreshold
     );
-    expect(
-      Number(restored.over_discount_threshold_pct),
-      '收尾阈值应恢复到原值'
-    ).toBe(originalThreshold);
   });
 });
