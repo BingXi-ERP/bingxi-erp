@@ -110,16 +110,15 @@ fn prefix_constants_are_pure_uppercase_and_match_legacy_prefixes() {
 #[test]
 fn registry_registers_new_unique_document_no_columns() {
     let src = read(GEN);
-    for (doc_type, col_expr) in [("warehouse", "warehouse::Column::WarehouseCode.eq(no)")] {
-        assert!(
-            src.contains(&format!("\"{doc_type}\" =>")),
-            "带 UNIQUE 的新收口单据号列必须登记 is_document_no_taken：缺 {doc_type}"
-        );
-        assert!(
-            src.contains(col_expr),
-            "注册表 {doc_type} 必须指向真实实体真实列 {col_expr}"
-        );
-    }
+    let (doc_type, col_expr) = ("warehouse", "warehouse::Column::WarehouseCode.eq(no)");
+    assert!(
+        src.contains(&format!("\"{doc_type}\" =>")),
+        "带 UNIQUE 的新收口单据号列必须登记 is_document_no_taken：缺 {doc_type}"
+    );
+    assert!(
+        src.contains(col_expr),
+        "注册表 {doc_type} 必须指向真实实体真实列 {col_expr}"
+    );
 }
 
 // =========================================================
