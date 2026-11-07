@@ -190,25 +190,23 @@ test.describe('470 信用额度门无条件生效且占用口径唯一', () => {
     const ctx = getCtx();
     if (!ctx.productIds[0]) throw new Error('前置缺失：productIds 为空');
     const customerId = await seedCustomer(page);
-    // 额度 1000，先占 900（另一张单），使本单 200 超额（900+200>1000）
+    // 额度 1000，先建两张单（建单侧门只查可用额度，尚未占用），再提交第一张占 900
     await seedCreditRating(page, customerId, '1000.00');
 
-    // 第一张单占住 900
     const block = await seedOrder(page, {
       customerId,
       productId: ctx.productIds[0],
       quantity: '9',
       unitPrice: '100.00',
     });
-    await apiCallRaw<Row>(page, 'POST', `/sales/orders/${block.id}/submit`);
-
-    // 第二张单 200 超额
     const over = await seedOrder(page, {
       customerId,
       productId: ctx.productIds[0],
       quantity: '2',
       unitPrice: '100.00',
     });
+    // 提交第一张占住 900，使第二张提交时可用额度不足
+    await apiCallRaw<Row>(page, 'POST', `/sales/orders/${block.id}/submit`);
     const fail = await apiCallExpectFail(page, 'POST', `/sales/orders/${over.id}/submit`);
     expectAppError(fail, '超额提交');
     expect(failureCode(fail), '机器码 BUSINESS_ERROR').toBe(APP_ERROR_CODES.BUSINESS_ERROR);

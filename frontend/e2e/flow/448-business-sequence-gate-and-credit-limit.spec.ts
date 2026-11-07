@@ -499,16 +499,7 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
     const ctx = getCtx();
     if (!ctx.productIds[0]) throw new Error('前置缺失：ctx.productIds 为空');
     const customerId = await seedDedicatedCustomer(page);
-    await apiCallRaw<Row>(page, 'POST', '/crm/customer-credits', {
-      customer_id: customerId,
-      credit_level: 'E2E',
-      credit_limit: '10.00',
-      credit_days: 30,
-      remark: `E2E 提交门 ${genCode('L')}`,
-    });
-    CLEANUP.push({ path: `/crm/customer-credits/${customerId}`, label: `credit#${customerId}` });
-
-    // 含税总额 226.00（净额 200.00 + 13% 税），远超 10.00 额度
+    // 先建单（无信用评级 => 建单侧门放行），再设低额度使提交侧门拦截
     const order = await seedOrderForCustomer(page, {
       customerId,
       productId: ctx.productIds[0],
@@ -522,6 +513,15 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
     // 净额只由除法反算：226.00 ÷ 1.13 = 200.00（不许用乘法造含税）
     const net = divRound(gross * 100n, 113n);
     expect(net, '净额 = 含税 ÷ (1 + 税率)').toBe(20000n);
+
+    await apiCallRaw<Row>(page, 'POST', '/crm/customer-credits', {
+      customer_id: customerId,
+      credit_level: 'E2E',
+      credit_limit: '10.00',
+      credit_days: 30,
+      remark: `E2E 提交门 ${genCode('L')}`,
+    });
+    CLEANUP.push({ path: `/crm/customer-credits/${customerId}`, label: `credit#${customerId}` });
 
     const blocked = await apiCallExpectFail(page, 'POST', `/sales/orders/${order.id}/submit`);
     expectAppErrorEnvelope(blocked, APP_ERROR_CODES.BUSINESS_ERROR, '超额订单提交');
@@ -556,6 +556,15 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
     });
     CLEANUP.push({ path: `/crm/customer-credits/${customerId}`, label: `credit#${customerId}` });
 
+    // 先建单（评级 active => 建单侧门放行），再停用使提交侧门拦截
+    const order = await seedOrderForCustomer(page, {
+      customerId,
+      productId: ctx.productIds[0],
+      quantity: '1',
+      unitPrice: '1.00',
+      taxPercent: '0',
+    });
+
     const deactivated = await apiCall<string>(
       page,
       'POST',
@@ -572,14 +581,6 @@ test.describe('448 业务流时序门控与客户信用额度', () => {
       { amount: '1.00' }
     );
     expectAppErrorEnvelope(occupyFail, APP_ERROR_CODES.BUSINESS_ERROR, '非活跃评级下占用额度');
-
-    const order = await seedOrderForCustomer(page, {
-      customerId,
-      productId: ctx.productIds[0],
-      quantity: '1',
-      unitPrice: '1.00',
-      taxPercent: '0',
-    });
     const submitFail = await apiCallExpectFail(page, 'POST', `/sales/orders/${order.id}/submit`);
     expectAppErrorEnvelope(submitFail, APP_ERROR_CODES.BUSINESS_ERROR, '非活跃评级下提交订单');
     expect(String(submitFail.message), '提交侧拒绝文案点名信用前置').toContain('信用额度不足');
