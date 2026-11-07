@@ -1000,14 +1000,20 @@ export async function uiDeleteRow(
 
     await refreshed;
 
-    // 验证行消失
-    const stillExists = await findTableRow(page, rowIdentifier.value);
-
-    if (stillExists && expectRowGone) {
-      throw new Error(
-        `[uiDeleteRow] ❌ ${entityLabel} 删除后行仍存在（${rowIdentifier.column}=${rowIdentifier.value}）` +
-          '——删除未生效或被后端拒绝，属真实失败，不再以 false 静默上报'
-      );
+    // 行消失是异步后置条件（DELETE、列表刷新、渲染三段链），未传 listApiPath 时
+    // refreshed 为空即零等待，确认后一次性读 DOM 必与刷新链竞态。轮询到真消失才放行，
+    // 超时仍在才判红，判据不放宽只对齐真实后置条件。
+    if (expectRowGone) {
+      await expect
+        .poll(async () => await findTableRow(page, rowIdentifier.value), {
+          timeout: 30_000,
+          message:
+            `[uiDeleteRow] ❌ ${entityLabel} 删除后行仍存在（${rowIdentifier.column}=${rowIdentifier.value}）` +
+            '——删除未生效或被后端拒绝，属真实失败，不再以 false 静默上报',
+        })
+        .toBeNull();
+    } else {
+      await findTableRow(page, rowIdentifier.value);
     }
     console.log(
       expectRowGone
