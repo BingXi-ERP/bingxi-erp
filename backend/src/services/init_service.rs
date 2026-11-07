@@ -45,7 +45,6 @@ pub const PERMISSION_RESOURCES: &[&str] = &[
     // 必须授此键（CI 矩阵 purchaser 真缺口，裁定 R-6）。
     "product-categories",
     "warehouses",
-    "boms",
     "chemicals",
     "chemical-categories",
     "chemical-lots",
@@ -119,8 +118,6 @@ pub const PERMISSION_RESOURCES: &[&str] = &[
     "outsourcing-vouchers",
     "business-modes",
     "business-mode-links",
-    "mrp",
-    "mrp-history",
     "capacity",
     "scheduling",
     "material-shortage",
