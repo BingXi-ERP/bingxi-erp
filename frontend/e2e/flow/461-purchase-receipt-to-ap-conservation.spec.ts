@@ -980,9 +980,10 @@ test.describe.serial('461 采购收货→应付→付款 钩稽守恒', () => {
     expect(String(listed!.supplier_name), '列表供应商名必须等于 suppliers.supplier_name 真值').toBe(
       supplier.name
     );
-    expect(String(listed!.warehouse_name), '列表仓库名必须等于 warehouses.name 真值').toBe(
-      String(warehouse.name)
-    );
+    expect(
+      String(listed!.warehouse_name),
+      '列表仓库名必须等于仓库详情出参 warehouse_name 真值'
+    ).toBe(String(warehouse.warehouse_name));
     expect(String(listed!.purchase_order_no), '列表来源订单号必须等于 order_no 真值').toBe(orderNo);
     for (const key of ['supplier_name', 'warehouse_name', 'purchase_order_no']) {
       expect(
