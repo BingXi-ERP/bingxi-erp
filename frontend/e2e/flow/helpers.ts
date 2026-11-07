@@ -1738,8 +1738,9 @@ export async function apiCallExpectFail(
     await syncCsrfFromResponse(page, response, url);
   }
 
-  // 失败体原样回传：统一信封的 code/message/trace_id/timestamp 四键都要能被调用方读到，
-  // 在此按三键收窄会让信封形状判据永不成立。
+  // 失败体全字段原样透传，含 trace_id 与 timestamp：统一信封（utils/error.rs 与
+  // utils/response.rs 的 unified_error_response）本就回填这两个键，这里只挑三个键返回
+  // 会让调用方把"判定器没取到"误读成"服务端没回填"。
   return { status: response.status(), ...json };
 }
 
