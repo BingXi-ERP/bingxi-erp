@@ -197,28 +197,20 @@ pub fn detect_operation_page(headers: &header::HeaderMap) -> Option<String> {
             return Some(fragment.to_string());
         }
     }
-    // 无片段则取 URL 的路径部分（scheme://host 之后、?query 之前）
+    // 无片段则取 URL 的路径部分（scheme://host 之后、?query 之前的完整路径）
     let after_scheme = referer
         .find("://")
         .map(|i| &referer[i + 3..])
         .unwrap_or(referer);
     let path = after_scheme
-        .split('/')
-        .nth(1)
-        .map(|rest| format!("/{}", rest))
-        .or_else(|| {
-            if after_scheme.contains('/') {
-                Some(format!("/{}", &after_scheme[after_scheme.find('/')? + 1..]))
-            } else {
-                None
-            }
-        })
-        .unwrap_or_default();
-    let path = path.split('?').next().unwrap_or(&path).to_string();
+        .find('/')
+        .map(|i| &after_scheme[i..])
+        .unwrap_or("");
+    let path = path.split('?').next().unwrap_or(path);
     if path.is_empty() || path == "/" {
         None
     } else {
-        Some(path)
+        Some(path.to_string())
     }
 }
 

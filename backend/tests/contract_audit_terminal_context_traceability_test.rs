@@ -30,7 +30,7 @@ use axum::{
     Router,
     body::Body,
     extract::{Path, Query, State},
-    http::{HeaderName, HeaderValue, Method, Request, StatusCode},
+    http::{HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode},
     middleware::{Next, from_fn, from_fn_with_state},
     response::{IntoResponse, Response},
 };
@@ -39,8 +39,8 @@ use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::{audit_log_handler, sales_order_handler};
 use bingxi_backend::middleware::audit_context::{
     RISK_DELETE, RISK_REVERSE, RISK_VOID, TERMINAL_H5, TERMINAL_MINIPROGRAM, TERMINAL_PC,
-    TERMINAL_UNKNOWN, audit_context_middleware, mark_audit_high_risk, set_audit_change_reason,
-    set_audit_doc_no,
+    TERMINAL_UNKNOWN, audit_context_middleware, detect_operation_page, mark_audit_high_risk,
+    set_audit_change_reason, set_audit_doc_no,
 };
 use bingxi_backend::middleware::auth_context::{AuthContext, SessionRoleCode};
 use bingxi_backend::models::audit_log::{OperationType, Severity};
@@ -1248,4 +1248,44 @@ async fn production_reverse_endpoint_writes_real_delivery_no_and_reason() {
         .expect("结果里应有本次红冲行");
     assert_eq!(leg["doc_no"].as_str(), Some(delivery_no));
     assert_eq!(leg["change_reason"].as_str(), Some(reason));
+}
+
+// ============================================================
+// detect_operation_page 的 Referer 回退口径：无页面头无 hash 时取 host 之后、
+// ?query 之前的完整路径，而不是首段。纯函数逐条钉住，不发 HTTP 不碰库。
+// ============================================================
+
+fn referer_only(referer: &str) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert("referer", HeaderValue::from_str(referer).unwrap());
+    headers
+}
+
+#[test]
+fn detect_operation_page_referer_fallback_keeps_full_path_strips_query() {
+    // 完整多段路径：不能截成首段 /sales
+    assert_eq!(
+        detect_operation_page(&referer_only("https://erp.example.com/sales/orders")).as_deref(),
+        Some("/sales/orders"),
+        "无页面头应回退 Referer 完整路径"
+    );
+    // 带 query：?query 之前的完整路径保留
+    assert_eq!(
+        detect_operation_page(&referer_only("https://erp.example.com/sales/orders?page=2"))
+            .as_deref(),
+        Some("/sales/orders"),
+        "Referer 带 query 应剥掉查询段保留完整路径"
+    );
+    // 根路径：host 之后无路径段记 None
+    assert_eq!(
+        detect_operation_page(&referer_only("https://erp.example.com/")).as_deref(),
+        None,
+        "Referer 根路径应记 None"
+    );
+    // hash 路由优先于路径
+    assert_eq!(
+        detect_operation_page(&referer_only("https://erp.example.com/x#/sales/orders")).as_deref(),
+        Some("/sales/orders"),
+        "hash 片段应优先于路径部分"
+    );
 }
