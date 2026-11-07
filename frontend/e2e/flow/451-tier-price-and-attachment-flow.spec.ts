@@ -793,7 +793,7 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
    * 功能：把产品删除门钉成两段真实腿——"被引用时删除被拒且拒绝点名阻塞面与行数"，以及
    * "清掉引用后删除放行并真删"；另把"软删色价不等于移除引用"钉成真实契约断言。
    * 调用方：backend delete_product 的引用预检（services/product_ops/crud.rs 的
-   * find_product_references，计数与物理外键对齐、不过滤 is_active，crud.rs:408 注释明文）；
+   * find_product_references，计数与物理外键对齐、不过滤 is_active，crud.rs 注释明文）；
    * 引用面一腿 DELETE /color-prices/:id（color_price_crud_service::delete 为软删，只置
    * is_active=false，全库无该表物理删端点）；可物理清除腿用 DELETE /sales/sales-prices/:id
    * （sales_price_service::delete_price 走 delete_with_audit 物理 DELETE）。
