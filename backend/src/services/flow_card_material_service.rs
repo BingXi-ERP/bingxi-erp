@@ -290,31 +290,6 @@ impl FlowCardMaterialService {
         Ok(collected)
     }
 
-    /// 事务内校验投纱行是否存在（供完工扣料在扣减前做前置判定）
-    pub async fn has_rows_in_txn(
-        txn: &sea_orm::DatabaseTransaction,
-        order_id: i32,
-    ) -> Result<bool, AppError> {
-        let card_ids: Vec<i32> = CardEntity::find()
-            .filter(CardColumn::ProductionOrderId.eq(order_id))
-            .filter(CardColumn::IsDeleted.eq(false))
-            .all(txn)
-            .await?
-            .into_iter()
-            .map(|c| c.id)
-            .collect();
-        if card_ids.is_empty() {
-            return Ok(false);
-        }
-        let exists = MaterialEntity::find()
-            .filter(MaterialColumn::FlowCardId.is_in(card_ids))
-            .filter(MaterialColumn::IsDeleted.eq(false))
-            .one(txn)
-            .await?
-            .is_some();
-        Ok(exists)
-    }
-
     async fn ensure_card_exists(&self, card_id: i32) -> Result<(), AppError> {
         let exists = CardEntity::find_by_id(card_id)
             .filter(CardColumn::IsDeleted.eq(false))
