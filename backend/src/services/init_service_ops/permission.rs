@@ -591,6 +591,9 @@ impl InitService {
                     ("quotations", "reject"),
                     ("custom-orders", "*"),
                     ("color-cards", "*"),
+                    // 大货批色单读面：批色审批由主管岗推进，读权限与色卡读面同归销售主管；
+                    // 只给 read，降等与发送客户等写面仍不在本岗授权内。
+                    ("bulk-color-approvals", "read"),
                     ("color-prices", "*"),
                     ("customers", "*"),
                     ("customer-credits", "read"),

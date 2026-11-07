@@ -57,8 +57,8 @@ import {
  * 假绿防线。金额一律按序列化字符串拆成整数分比对，不做浮点加法、不再舍入，
  * 五列之和与 total_cost 逐分对平，禁止合计凑平。每次被拒写操作紧跟列表回读
  * 探针断零残留。状态词表逐字符比对 draft 与 approved 与 rejected。
- * 负例走 apiCallExpectFail 读统一信封机器码，不读文案。数据以 genCode 唯一批次
- * 与缸号隔离，收尾用 tryCleanup 显式删除并留日志。
+ * 负例走 apiCallExpectFail 读统一信封机器码，不读文案。数据以 genCode 唯一缸号与归集单号隔离，
+ * 批次号只在 445-02 为构造"同批次多笔"前置而复用一次，收尾用 tryCleanup 显式删除并留日志。
  */
 
 type Row = Record<string, unknown>;
@@ -120,9 +120,18 @@ let docA: DocHandle | undefined;
 let docB: DocHandle | undefined;
 let deleteAuditId: number | undefined;
 
-/** 建一张成本归集单并做详情回读，入参为五列金额与批次缸号 */
-async function createCostDoc(page: Page, fees: FeeSet): Promise<DocHandle> {
-  const batchNo = genCode('E445B');
+/**
+ * 建一张成本归集单并做详情回读，入参为五列金额与批次缸号。
+ * 批次与缸号缺省各自新造唯一值（负例与清理腿靠它互相隔离）；调用方传入 batchNo 时按该批次落单，
+ * 供「同一批次多笔归集」的批次分析腿构造前置（cost_collections.batch_no 无唯一约束，
+ * 见 migration 快照 001_consolidated_schema.sql 的 idx_cost_collections_batch 普通索引）。
+ */
+async function createCostDoc(
+  page: Page,
+  fees: FeeSet,
+  reuse?: { batchNo: string }
+): Promise<DocHandle> {
+  const batchNo = reuse?.batchNo ?? genCode('E445B');
   const dyeLotNo = genCode('E445L');
   const body: Record<string, unknown> = {
     collection_date: new Date().toISOString().slice(0, 10),
@@ -193,13 +202,19 @@ test.describe.serial('445 成本归集分摊对平与审计追溯链', () => {
       );
     }
     const a = docA;
-    const b = await createCostDoc(page, {
-      direct_material: '500.06',
-      direct_labor: '50.07',
-      manufacturing_overhead: '60.08',
-      processing_fee: '0.00',
-      dyeing_fee: '120.12',
-    });
+    // 批次分析腿的前置是「同一批次两笔」，第二笔必须复用 A 的批次号；缸号仍逐单唯一，
+    // 445-04b 依赖按缸号在删除快照里回溯本单。
+    const b = await createCostDoc(
+      page,
+      {
+        direct_material: '500.06',
+        direct_labor: '50.07',
+        manufacturing_overhead: '60.08',
+        processing_fee: '0.00',
+        dyeing_fee: '120.12',
+      },
+      { batchNo: a.batchNo }
+    );
     docB = b;
 
     const analysis = await apiCallRaw<Row[]>(

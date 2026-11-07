@@ -13,6 +13,10 @@
 use crate::models::status::inventory_count as count_status;
 use crate::models::{inventory_count, inventory_count_item, inventory_stock, user, warehouse};
 use crate::services::audit_log_service::AuditLogService;
+// 盘点差异过账要把流水落到 inventory_transactions：复用库存服务的事务版写入口与参数对象，
+// 不在此重复手写 ActiveModel（与采购退货/生产入库等 leg 同一写法）
+use crate::services::inventory_stock_query::RecordTransactionArgs;
+use crate::services::inventory_stock_service::InventoryStockService;
 // V15 P0-S01：行级数据权限工具
 use crate::utils::data_scope::{
     DataScopeContext, apply_data_scope, check_resource_owner_by_member_scope,
@@ -535,12 +539,20 @@ impl InventoryCountService {
         Ok((items, stock_map))
     }
 
-    /// 对有差异的明细按乐观锁更新库存数量
+    /// 对有差异的明细按乐观锁更新库存数量，并为每笔差异在同一事务内落一条库存流水。
+    ///
+    /// 流水是账实差异的唯一可追溯凭证：只改库存数值而不记流水，盘点审批过后就查不到
+    /// "哪一行、从多少调到多少、由哪张盘点单触发"，差异报告与成本核对都失去依据
+    /// （`inventory_transaction.transaction_type` 的取值域本就含盘点，见该模型列注释）。
+    /// 返回待发布事件，由 `approve_count` 在 commit 成功后统一 publish（避免回滚造成幻事件）。
     async fn apply_stock_adjustments(
         txn: &sea_orm::DatabaseTransaction,
+        count: &inventory_count::Model,
+        approver_id: i32,
         items: &[inventory_count_item::Model],
         stock_map: &std::collections::HashMap<i32, inventory_stock::Model>,
-    ) -> Result<(), AppError> {
+    ) -> Result<Vec<BusinessEvent>, AppError> {
+        let mut pending_events: Vec<BusinessEvent> = Vec::new();
         for item in items {
             if item.quantity_difference == Decimal::ZERO {
                 continue;
@@ -549,14 +561,33 @@ impl InventoryCountService {
                 .get(&item.stock_id)
                 .ok_or_else(|| AppError::not_found(format!("库存 ID {} 不存在", item.stock_id)))?;
             let expected_version = stock.version;
+            // 本域 quantity_on_hand / quantity_available / quantity_meters 同为米数口径
+            // （建库三列同写 quantity_meters，出库三列同减），实盘米数即这三列的新值。
+            let new_quantity_meters = item.quantity_actual;
+            // 公斤数按该行既有 米↔公斤 比率同步缩放，口径与调拨出库的
+            // `inv::batch::compute_ship_new_quantities` 一致；米数为 0 的行无从定义比率，
+            // 重量列保持原值不动（不猜、不塞 0）。
+            let new_quantity_kg = if stock.quantity_meters > Decimal::ZERO {
+                (stock.quantity_kg * item.quantity_actual / stock.quantity_meters).round_dp(4)
+            } else {
+                stock.quantity_kg
+            };
             let result = inventory_stock::Entity::update_many()
                 .col_expr(
                     inventory_stock::Column::QuantityOnHand,
-                    Expr::val(item.quantity_actual),
+                    Expr::val(new_quantity_meters),
                 )
                 .col_expr(
                     inventory_stock::Column::QuantityAvailable,
-                    Expr::val(item.quantity_actual),
+                    Expr::val(new_quantity_meters),
+                )
+                .col_expr(
+                    inventory_stock::Column::QuantityMeters,
+                    Expr::val(new_quantity_meters),
+                )
+                .col_expr(
+                    inventory_stock::Column::QuantityKg,
+                    Expr::val(new_quantity_kg),
                 )
                 .col_expr(
                     inventory_stock::Column::LastCountDate,
@@ -577,8 +608,37 @@ impl InventoryCountService {
                     item.stock_id
                 )));
             }
+            // 差异流水：维度列取被调整库存行本身（缸号/批次/色号/等级如实落），
+            // 数量列记有符号差异与前后值，来源单据指向本张盘点单。
+            let (_, event) = InventoryStockService::record_transaction_txn(
+                txn,
+                RecordTransactionArgs {
+                    transaction_type: "INVENTORY_COUNT".to_string(),
+                    product_id: stock.product_id,
+                    warehouse_id: stock.warehouse_id,
+                    batch_no: stock.batch_no.clone(),
+                    color_no: stock.color_no.clone(),
+                    dye_lot_no: stock.dye_lot_no.clone(),
+                    grade: stock.grade.clone(),
+                    quantity_meters: item.quantity_difference,
+                    quantity_kg: new_quantity_kg - stock.quantity_kg,
+                    source_bill_type: Some("inventory_count".to_string()),
+                    source_bill_no: Some(count.count_no.clone()),
+                    source_bill_id: Some(i64::from(count.id)),
+                    quantity_before_meters: Some(stock.quantity_meters),
+                    quantity_before_kg: Some(stock.quantity_kg),
+                    quantity_after_meters: Some(new_quantity_meters),
+                    quantity_after_kg: Some(new_quantity_kg),
+                    notes: Some(format!("盘点差异过账 - 盘点单号: {}", count.count_no)),
+                    created_by: Some(approver_id),
+                },
+            )
+            .await?;
+            if let Some(event) = event {
+                pending_events.push(event);
+            }
         }
-        Ok(())
+        Ok(pending_events)
     }
 
     /// 盘点单状态置为 completed 并写入审计日志
@@ -602,7 +662,7 @@ impl InventoryCountService {
         Ok(updated)
     }
 
-    /// 审批通过并完成盘点(同步更新库存数量,commit 后发布完成事件)
+    /// 审批通过并完成盘点(同步更新库存数量并落差异流水,commit 后发布完成事件与流水事件)
     pub async fn approve_count(
         &self,
         count_id: i32,
@@ -611,10 +671,20 @@ impl InventoryCountService {
         let txn = (*self.db).begin().await?;
         let count_model = self.lock_count_for_approval(&txn, count_id).await?;
         let (items, stock_map) = Self::load_items_with_stocks(&txn, count_id).await?;
-        Self::apply_stock_adjustments(&txn, &items, &stock_map).await?;
+        let pending_events =
+            Self::apply_stock_adjustments(&txn, &count_model, approver_id, &items, &stock_map)
+                .await?;
         let updated = Self::finalize_count_completion(&txn, count_model, approver_id).await?;
         txn.commit().await?;
         // commit 成功后发布事件,避免事务回滚时幻事件
+        for event in pending_events {
+            EVENT_BUS.publish(event);
+        }
+        tracing::info!(
+            count_id = updated.id,
+            variance_items = updated.variance_items,
+            "盘点审批过账完成，差异流水已落 inventory_transactions 并发布 InventoryTransactionCreated 事件"
+        );
         EVENT_BUS.publish(BusinessEvent::InventoryCountCompleted {
             count_id: updated.id,
             variance_count: updated.variance_items,

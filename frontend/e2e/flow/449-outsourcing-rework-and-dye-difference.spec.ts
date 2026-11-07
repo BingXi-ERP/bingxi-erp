@@ -3,12 +3,19 @@ import {
   apiCall,
   apiCallRaw,
   apiCallExpectFail,
+  ensureTestEntities,
   expectDenied,
   expectStateGateRejection,
   failureCode,
   genCode,
+  genDyeLotNo,
+  getCtx,
   loginAsRole,
+  pickDyeableWarehouse,
   safeGetList,
+  seedColorCardArchive,
+  seedDyedOutboundBundle,
+  tryCleanup,
 } from './helpers';
 
 /**
@@ -59,6 +66,7 @@ const RECEIPT_STATUS_CONFIRMED = 'confirmed';
 let reworkId: number | undefined;
 let reworkOriginalBatchNo: string | undefined;
 let outsourcingOrderId: number | undefined;
+let outsourcingItemId: number | undefined;
 let outsourcingOrderNo: string | undefined;
 let outsourcingSupplierId: number | undefined;
 let outsourcingProductId: number | undefined;
@@ -71,24 +79,39 @@ test.describe('449 委外染整返工与缸差登记', () => {
   test('缸差返工按状态机逐级推进且每级时间戳落库可读回', async ({ page }) => {
     // 功能：在一个真实处于 inspecting/stored 的染整批次上发起同缸色差回修，逐级推进状态机。
     // 调用方：本用例 → POST /production/dye-batch-reworks（dye_batch_state_machine_handler::create_rework）。
-    // 入参 original_batch_id/original_batch_no 取自 GET /production/dye-batches 的真实行；
+    // 入参 original_batch_id/original_batch_no 取自本用例自建的染整缸号行；
+    // 建档端点采信入参 status（先按缸号生命周期 14 态校验，缺省才落 pending_schedule），
+    // 因此直接落一枚 inspecting 的缸，不赌共享库里恰好存在可回修的行。
     // rework_type=color_difference、original_status=该批次当前状态词、同缸回修时 rework_batch_id 等于原缸。
     // 传给谁：services/dye_batch_state_machine_ops/rework.rs（validate_rework_type + 回修资格校验）。
     // 存什么：status 与 approved_by/approved_at/started_at/completed_at；未到达的级保持 null。
     // 存哪里：表 dye_batch_rework（backend/src/models/dye_batch_rework.rs）。
-    const batches = await safeGetList<Record<string, unknown>>(
+    const archive = await seedColorCardArchive(page, { context: '449 缸差回修前置建缸' });
+    const batchRow = await apiCallRaw<Record<string, unknown>>(
       page,
-      '/production/dye-batches?page=1&page_size=50'
+      'POST',
+      '/production/dye-batches',
+      {
+        // batch_no 不手工传入：缺省缸号由后端取号器在事务内生成并对唯一冲突重试，
+        // 手写时间戳号跨分片同秒撞 UNIQUE 的概率非零。
+        color_no: archive.colorCode,
+        dye_lot_no: genDyeLotNo(),
+        planned_quantity: 100,
+        dye_date: new Date().toISOString().slice(0, 10),
+        status: REWORK_ELIGIBLE_STATUSES[0],
+      }
     );
-    const eligible = batches.find(r => REWORK_ELIGIBLE_STATUSES.includes(String(r['status'])));
-    if (!eligible) {
-      throw new Error(
-        `前置不成立：${REWORK_ELIGIBLE_STATUSES.join('/')} 状态的染整缸号为 0 条（共取到 ${batches.length} 条），无法发起缸差回修`
-      );
-    }
-    const batchId = Number(eligible['id']);
-    const batchNo = String(eligible['batch_no']);
-    const eligibleStatus = String(eligible['status']);
+    const batchId = Number(batchRow['id']);
+    const batchNo = String(batchRow['batch_no']);
+    const eligibleStatus = String(batchRow['status']);
+    expect(
+      Number.isInteger(batchId) && batchId > 0,
+      `自建缸号建档必须返回整数主键，实际 ${JSON.stringify(batchRow['id'])}`
+    ).toBe(true);
+    expect(
+      REWORK_ELIGIBLE_STATUSES.includes(eligibleStatus),
+      `建档后缸号状态必须落在可回修词表 ${REWORK_ELIGIBLE_STATUSES.join('/')} 内，实际 ${eligibleStatus}`
+    ).toBe(true);
     reworkOriginalBatchNo = batchNo;
 
     const created = await apiCallRaw<Record<string, unknown>>(
@@ -249,6 +272,14 @@ test.describe('449 委外染整返工与缸差登记', () => {
     expect(String(afterCancel.data['status']), '取消被拒后终态仍应为 completed').toBe(
       REWORK_STATUS_COMPLETED
     );
+
+    // 收尾：本用例自建的缸号按删除端点回收；缸号已被回修单引用时后端可正当拒绝，tryCleanup 只登记不判负。
+    await tryCleanup(
+      page,
+      'DELETE',
+      `/production/dye-batches/${batchId}`,
+      `449 自建缸号 ${batchNo}`
+    );
   });
 
   test('回修类型与回修资格校验被拒且不落库', async ({ page }) => {
@@ -317,18 +348,17 @@ test.describe('449 委外染整返工与缸差登记', () => {
     // 功能：建委外染整订单 → 读回全部写入值 → 发料 → 加工 → 结算，每跳重读校验状态词与金额字段。
     // 调用方：outsourcing_handler::create_outsourcing_order / issue_outsourcing_order /
     // record_processing / settle_outsourcing_order。
-    // 入参 order_type=dyeing（词表 wage_energy_chemical_business.rs）；supplier_id 与
-    // product_id/warehouse_id 取库内真实主数据；issue_date 为业务日期字面量。
+    // 入参 order_type=dyeing（词表 wage_energy_chemical_business.rs）；supplier_id 取本 worker
+    // 夹具（ensureTestEntities 无条件自建的专属供应商）的 id，product_id/warehouse_id 取库内真实
+    // 主数据；issue_date 为业务日期字面量。
     // 传给谁：services/outsourcing_ops/order.rs（单号查重、成本计算、状态流转）。
     // 存什么：outsourcing_order 的 order_no/order_type/supplier_id/issue_quantity/issue_unit/
     // material_cost/processing_fee/freight_fee/tax_amount/status。
     // 存哪里：表 outsourcing_order（字段见 services/outsourcing_ops/types.rs）。
-    const orders = await safeGetList<Record<string, unknown>>(
-      page,
-      '/production/outsourcing-orders?page=1&page_size=10'
-    );
-    if (orders.length === 0) {
-      throw new Error('前置不成立：库内无委外订单，无法取到真实 supplier_id 建单');
+    await ensureTestEntities(page);
+    const ctx = getCtx();
+    if (!ctx.supplierId) {
+      throw new Error('前置不成立：本 worker 专属供应商未建立，无法取到真实 supplier_id 建单');
     }
     const products = await safeGetList<Record<string, unknown>>(
       page,
@@ -344,7 +374,7 @@ test.describe('449 委外染整返工与缸差登记', () => {
     if (warehouses.length === 0) {
       throw new Error('前置不成立：库内无仓库主数据，收回单无法挂真实 warehouse_id');
     }
-    outsourcingSupplierId = Number(orders[0]['supplier_id']);
+    outsourcingSupplierId = ctx.supplierId;
     outsourcingProductId = Number(products[0]['id']);
     outsourcingWarehouseId = Number(warehouses[0]['id']);
     const orderNo = genCode('WO449');
@@ -430,6 +460,66 @@ test.describe('449 委外染整返工与缸差登记', () => {
       OUTSOURCING_STATUS_DRAFT
     );
 
+    // 发料前置（本轮红面）：门在 outsourcing_ops/order.rs::issue_order 内经
+    // piece_domain_service::validate_pieces_for_issue 逐条判定——空明细拒绝、缺匹号拒绝、
+    // 匹不存在或非可用拒绝、同单重复引用同一匹拒绝，染色外发的发料必须精确到生产匹。
+    // 红因是本腿未登记发料明细，属用例前置缺失而不是门错，故先造真实可用匹、再按匹登记明细。
+    if (!outsourcingProductId) {
+      throw new Error('前置不成立：产品句柄未建立，发料明细无法挂真实 product_id');
+    }
+    const issueTarget = await pickDyeableWarehouse(page);
+    const issueBundle = await seedDyedOutboundBundle(page, {
+      productId: outsourcingProductId,
+      warehouseId: issueTarget.id,
+      quantityMeters: '1200',
+      pieceCount: 1,
+      context: '449-issue',
+    });
+    // 入参按 services/outsourcing_ops/types.rs 的 CreateOutsourcingOrderItemRequest：
+    // outsourcing_order_id / product_id / quantity / unit_cost 必填，四维取自真实可用匹；
+    // 数量与建单的 issue_quantity 同值、单价按 material_cost÷数量，保证成本钩稽不被门拒。
+    const itemResp = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      '/production/outsourcing-orders/items',
+      {
+        outsourcing_order_id: id,
+        product_id: outsourcingProductId,
+        warehouse_id: issueTarget.id,
+        color_no: issueBundle.stockRow.color_no,
+        dye_lot_no: issueBundle.stockRow.dye_lot_no,
+        batch_no: issueBundle.stockRow.batch_no,
+        piece_no: issueBundle.pieces[0].piece_no,
+        quantity: 1200,
+        unit: '米',
+        unit_cost: 20,
+        remarks: 'e2e 委外发料明细（精确到匹）',
+      }
+    );
+    const itemId = Number(itemResp['id']);
+    expect(
+      Number.isInteger(itemId) && itemId > 0,
+      `登记发料明细应返回整数 id，实际 ${JSON.stringify(itemResp)}`
+    ).toBe(true);
+    outsourcingItemId = itemId;
+
+    // 前置成立证明：按单回读发料明细必须看到刚登记的那条匹，否则发料门仍会拒。
+    // list_outsourcing_items 的出参是 ApiResponse<Vec<Model>> 裸数组，不是分页信封，
+    // 读法按数组通道取 data 并先自证是数组。
+    const itemRows = await apiCallRaw<Record<string, unknown>[]>(
+      page,
+      'GET',
+      `/production/outsourcing-orders/items/by-order/${id}`
+    );
+    expect(
+      Array.isArray(itemRows),
+      `按单读发料明细应返回数组，实际 ${JSON.stringify(itemRows)}`
+    ).toBe(true);
+    expect(
+      itemRows.some(r => Number(r['id']) === itemId),
+      `发料明细 ${itemId} 必须能按单读回，实际 ${JSON.stringify(itemRows)}`
+    ).toBe(true);
+
     // 合法推进：draft → issued → processing。
     const issued = await apiCallRaw<Record<string, unknown>>(
       page,
@@ -473,6 +563,16 @@ test.describe('449 委外染整返工与缸差登记', () => {
       settleBeforeReceipt,
       `processing 委外订单 ${id} 未收回即结算应被状态门拒绝`
     );
+
+    // 收尾：回收本腿自建的发料明细（删除面在 frontend/scripts/route-snapshot.txt 在册，
+    // outsourcing_handler::delete_outsourcing_item）。后续收回腿若仍引用该明细，
+    // tryCleanup 只登记原文不判负——发料门自身的判据写在本腿正文里，不由清理腿兜绿。
+    await tryCleanup(
+      page,
+      'DELETE',
+      `/production/outsourcing-orders/items/${outsourcingItemId}`,
+      `清理发料明细 ${outsourcingItemId}`
+    );
   });
 
   test('委外收回入库实测值落库可读回且缺值保持 NULL', async ({ page }) => {
@@ -481,7 +581,11 @@ test.describe('449 委外染整返工与缸差登记', () => {
     // 调用方：outsourcing_handler::create_outsourcing_receipt / confirm_outsourcing_receipt。
     // 入参 outsourcing_order_id 用上一笔真实订单；return_quantity/loss_quantity 为业务数量；
     // weight/width/gram_weight 三列按 types.rs 的可空口径分别构造有值与缺席。
-    // 传给谁：services/outsourcing_ops/receipt.rs（validate_measured_value 取值域门）。
+    // 传给谁：services/outsourcing_ops/receipt.rs（validate_measured_value 取值域门与
+    // validate_receipt_quality_status 结论词门）。本列只认
+    // models/status/wage_energy_chemical_business.rs::outsourcing_receipt_quality_status 的
+    // 四态 pending/qualified/concession/unqualified；passed 与 failed 属染化料来料检验域、
+    // 中文合格与不合格属库存质量状态，写进本列会在入口处被业务拒。
     // 存什么：return_quantity/loss_quantity/weight/width/gram_weight/quality_status/grade/status。
     // 存哪里：表 outsourcing_receipt（字段见 services/outsourcing_ops/types.rs）。
     if (!outsourcingOrderId || !outsourcingProductId || !outsourcingWarehouseId) {
@@ -572,7 +676,7 @@ test.describe('449 委外染整返工与缸差登记', () => {
         warehouse_id: outsourcingWarehouseId,
         return_quantity: 1100,
         loss_quantity: 20,
-        quality_status: 'passed',
+        quality_status: 'qualified',
         grade: '一等品',
         weight: 250.5,
         width: 160,
@@ -591,6 +695,10 @@ test.describe('449 委外染整返工与缸差登记', () => {
     expect(Number(okRead.data['width']), '读回实测幅宽应等于写入值').toBe(160);
     expect(Number(okRead.data['gram_weight']), '读回实测克重应等于写入值').toBe(185);
     expect(String(okRead.data['grade']), '读回等级应按写入值逐字保留').toBe('一等品');
+    expect(
+      String(okRead.data['quality_status']),
+      '读回质检结论应与写入值逐字符相同（本列词表只有四态，别域写法进不来）'
+    ).toBe('qualified');
 
     const confirmed = await apiCallRaw<Record<string, unknown>>(
       page,

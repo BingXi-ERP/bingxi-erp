@@ -1738,7 +1738,10 @@ export async function apiCallExpectFail(
     await syncCsrfFromResponse(page, response, url);
   }
 
-  return { status: response.status(), code: json.code, message: json.message };
+  // 失败体全字段原样透传，含 trace_id 与 timestamp：统一信封（utils/error.rs 与
+  // utils/response.rs 的 unified_error_response）本就回填这两个键，这里只挑三个键返回
+  // 会让调用方把"判定器没取到"误读成"服务端没回填"。
+  return { status: response.status(), ...json };
 }
 
 const LOGGED_IN = { done: false };

@@ -235,12 +235,10 @@ pub async fn create_location(
         location_code: sea_orm::ActiveValue::Set(req.location_code),
         location_type: sea_orm::ActiveValue::Set(req.location_type),
         max_weight: sea_orm::ActiveValue::Set(
-            req.max_weight
-                .and_then(rust_decimal::Decimal::from_f64_retain),
+            req.max_weight.and_then(crate::utils::decimal::from_f64),
         ),
         max_height: sea_orm::ActiveValue::Set(
-            req.max_height
-                .and_then(rust_decimal::Decimal::from_f64_retain),
+            req.max_height.and_then(crate::utils::decimal::from_f64),
         ),
         is_batch_managed: sea_orm::ActiveValue::Set(Some(true)),
         is_color_managed: sea_orm::ActiveValue::Set(Some(true)),
@@ -301,7 +299,7 @@ pub async fn update_location(
     }
     if let Some(w) = req.max_weight {
         active.max_weight = sea_orm::ActiveValue::Set(match w {
-            Some(x) => Some(rust_decimal::Decimal::from_f64_retain(x).ok_or_else(|| {
+            Some(x) => Some(crate::utils::decimal::from_f64(x).ok_or_else(|| {
                 AppError::validation_displayable(format!(
                     "最大承重数值无法转换（NaN/Inf/溢出）：{x}"
                 ))
@@ -311,7 +309,7 @@ pub async fn update_location(
     }
     if let Some(h) = req.max_height {
         active.max_height = sea_orm::ActiveValue::Set(match h {
-            Some(x) => Some(rust_decimal::Decimal::from_f64_retain(x).ok_or_else(|| {
+            Some(x) => Some(crate::utils::decimal::from_f64(x).ok_or_else(|| {
                 AppError::validation_displayable(format!(
                     "最大高度数值无法转换（NaN/Inf/溢出）：{x}"
                 ))

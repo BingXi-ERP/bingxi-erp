@@ -300,7 +300,9 @@ pub async fn create_dye_batch(
         color_name: Set(identity.color_name.clone()),
         color_no: Set(identity.color_no.clone()),
         dye_lot_no: Set(identity.dye_lot_no.clone()),
-        planned_quantity: Set(req.planned_quantity.and_then(Decimal::from_f64_retain)),
+        planned_quantity: Set(req
+            .planned_quantity
+            .and_then(crate::utils::decimal::from_f64)),
         // 完工实际产出三列仅由 complete 端点登记，新建时为 NULL（真实空值，不占位）
         actual_output_kg: Set(None),
         actual_output_m: Set(None),
@@ -387,7 +389,7 @@ pub async fn update_dye_batch(
         batch.dye_lot_no = Set(dye_lot_no);
     }
     if let Some(planned_quantity) = req.planned_quantity {
-        batch.planned_quantity = Set(Decimal::from_f64_retain(planned_quantity));
+        batch.planned_quantity = Set(crate::utils::decimal::from_f64(planned_quantity));
     }
     if let Some(remarks) = req.remarks {
         batch.remarks = Set(Some(remarks));

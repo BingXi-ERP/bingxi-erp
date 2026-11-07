@@ -705,9 +705,26 @@ const SEED_ROLE_EXTRA_PERMISSIONS: Record<string, string[]> = {
     'crm-leads:create',
     'crm-leads:update',
     'crm-leads:delete',
+    // 客户档案读面（GET /crm/customers 与 GET /crm/customers/enhanced 运行时同派生为
+    // customers:read；后端矩阵 sales_rep 在册持 ("customers","read")，见
+    // init_service_ops/permission.rs，前端 /customer 与 /crm-enhanced 路由门控同键）。
+    // salesperson 是 e2e 侧 CI 镜像岗（traversal/permission-model.ts::CI_MIRRORED_ROLES），
+    // 后端既无建角也无授权分组，其权限码闭合等于 SHELL + 本清单，故必须在此逐键对齐
+    // sales_rep 的读面，缺键即 RBAC 403，不会由后端同名角色矩阵带入。
+    'customers:read',
+    // 客户建档写面（POST /crm/customers 运行时键 customers:create）：与后端 init 矩阵
+    // sales_rep 分组在册的 ("customers","create") 同口径（本镜像岗闭合等于 SHELL + 本清单，
+    // 后端同名岗的授权不会由 init 带进来，缺此键即 RBAC 403）。
+    // 本键也是"归属行"造数的唯一通路：customers.owner_id 由服务端写成 created_by
+    // （services/customer_ops/update.rs 的 build_customer_active_model），业务员自建即本人
+    // 归属；认领与分配两条改归属通路同样要求 customers:create，缺键即无法为按
+    // customers.owner_id 收敛的行级作用域用例准备真实归属行。
+    'customers:create',
+    // 色卡读面（GET /color-cards/… 运行时键 color-cards:read）：后端 init 矩阵把
+    // ("color-cards","read") 明确授给 sales_rep，镜像岗缺此键即被 RBAC 拒为 403。
+    'color-cards:read',
     // PII 按需揭示（POST /crm/customers/{id}/pii/reveal 运行时键 customers:reveal，
-    // 与后端 init 矩阵 sales_rep/crm_rep 及 m0086 存量补授三通道同口径；
-    // salesperson 为 sales_rep 的 CI/部署别名码，同 pieces:read 在册别名）
+    // 与后端 init 矩阵 sales_rep/crm_rep 及 m0086 存量补授三通道同口径）
     'customers:reveal',
     // 发货对话框第四维匹号候选来自 GET /inventory/pieces（与后端 permission.rs 的
     // sales_rep ("pieces","read") 同口径；只读，不授打印）
@@ -3118,6 +3135,12 @@ async function ensureGlobalBusinessSeed(
         'INSERT INTO currencies (code, name, symbol, "precision", is_base, is_active, is_deleted, created_at, updated_at)\n' +
         "SELECT 'CNY', '人民币', '¥', 2, true, true, false, now(), now()\n" +
         "WHERE NOT EXISTS (SELECT 1 FROM currencies WHERE code = 'CNY');\n" +
+        // 非本位币种子：多币种腿（flow 442-03 与 finance 面若干判据）的前置是"库里有一枚启用中的
+        // 非本位币"，币种同样无创建端点，直连 DB 是唯一写路径；USD 取 validate_currency_code
+        // 白名单内的真实 ISO 4217 码，is_base 恒 false，不参与本位币唯一约束。
+        'INSERT INTO currencies (code, name, symbol, "precision", is_base, is_active, is_deleted, created_at, updated_at)\n' +
+        "SELECT 'USD', '美元', '$', 2, false, true, false, now(), now()\n" +
+        "WHERE NOT EXISTS (SELECT 1 FROM currencies WHERE code = 'USD');\n" +
         'UPDATE currencies SET is_base = true, updated_at = now()\n' +
         "WHERE code = 'CNY'\n" +
         '  AND NOT EXISTS (SELECT 1 FROM currencies WHERE is_base = true);\n';
@@ -3141,6 +3164,24 @@ async function ensureGlobalBusinessSeed(
           recordSeedFailure('本位币种子回读', '写语句已执行但查无 is_base=true 行——种子未真实生效');
         } else {
           console.log(`[globalSeed] 本位币就绪：code=${baseCode}`);
+        }
+        // 非本位币回读：多币种腿的前置键，缺失即种子未生效，按同一口径计入台账而不是留给用例判红
+        const nonBaseCode = execSync(
+          `psql -d ${psqlTarget} -tAc "SELECT code FROM currencies WHERE is_base = false AND is_active = true AND is_deleted = false LIMIT 1"`,
+          {
+            stdio: ['ignore', 'pipe', 'pipe'],
+            env: { ...process.env, PGCONNECT_TIMEOUT: '5' },
+          }
+        )
+          .toString()
+          .trim();
+        if (!nonBaseCode) {
+          recordSeedFailure(
+            '非本位币种子回读',
+            '写语句已执行但查无启用中的非本位币行——多币种腿前置未就绪'
+          );
+        } else {
+          console.log(`[globalSeed] 非本位币就绪：code=${nonBaseCode}`);
         }
       } catch (e) {
         const err = e as { stderr?: { toString(): string }; message?: string };

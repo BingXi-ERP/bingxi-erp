@@ -5,6 +5,7 @@ import {
   apiCallExpectFail,
   apiCallRaw,
   failureCode,
+  loginAsRole,
   loginViaUI,
 } from './helpers';
 
@@ -47,8 +48,9 @@ import {
  * 存什么与存哪里：阈值三键存 material_shortage_threshold_configs 的单行（主键取单行常量），
  * 缺料预警行存 material_shortage_alerts，账龄规则整行存 aging_alert_rules（rule_code 无唯一
  * 约束，故不断重复编码拒绝），财务预警存 finance_alerts 并把 alert_no 按 FA 前缀加日期加
- * 四位流水生成，通知存 notifications 并由 attach_notification 把通知主键回填到预警行的
- * notification_id，批色提醒只写 notifications 而不改批色行状态。
+ * 四位流水生成，通知存 notifications 并由 attach_notification 按启用规则声明的角色集逐人投递、
+ * 把本轮第一条（主通知）的主键回填到预警行的 notification_id，批色提醒只写 notifications
+ * 而不改批色行状态。
  *
  * 无端点可断的部分见交付说明，不为凑 coverage 编造断言。
  */
@@ -187,8 +189,25 @@ const FINANCE_ALERT_TYPES = [
 const FINANCE_ALERT_STATUSES = ['active', 'acknowledged', 'resolved', 'expired'];
 const BCA_PENDING_STATUS = 'pending';
 
+/**
+ * 功能：推送腿自建启用规则时声明的收件岗位码，也是接收侧判据登录的岗位。
+ * 调用方：账期逾期扫描推送腿的建规则入参 notify_roles、loginAsRole 与断言消息里的岗位名。
+ * 入参：无（常量）。传给谁：aging_alert_rules.notify_roles（JSONB 数组列）与 e2e 建岗凭证。
+ * 存什么：一个在 e2e 建岗花名册在册、且除本腿与 454 之外没有规则写入 notify_roles 的岗位码，
+ * 使接收侧收件箱只承载财务预警投递，判据不被其它用例的读面干扰。
+ * 存哪里：不落库，只保证"角色集声明"与"登录岗位"两处字面量同源。
+ */
+const RECIPIENT_ROLE = 'cost_accountant';
+
 function uniqTag(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+/** 距今 days 天前的日历日（后端 ar_overdue 候选按本地日期比 due_date） */
+function pastDate(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
 }
 
 test.describe.serial('410 定时任务与后台作业的可断腿', () => {
@@ -452,7 +471,49 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
   });
 
   test('账期逾期扫描触发幂等且推送腿通知可回读', async ({ page }) => {
-    const unreadBefore = await apiCallRaw<number>(page, 'GET', '/notifications/unread-count');
+    const tag = uniqTag();
+
+    // 收件人由启用中账龄规则声明的 notify_roles 在唯一解析点决定
+    // （services/finance_alert_service.rs::resolve_recipient_users：角色码到角色 id
+    // 到在册且启用的用户 id），所以本腿先自建一条启用规则、把角色集显式声明为
+    // RECIPIENT_ROLE 并回读自证。触发人岗位不在角色集内，接收侧判据一律换到该岗位自己的会话里读。
+    const rule = await apiCallRaw<AgingRule>(page, 'POST', '/aging-alert-rules', {
+      rule_name: `410 推送腿收件角色集规则 ${tag}`,
+      rule_code: `AGING410PUSH_${tag}`,
+      aging_bucket: '30_days',
+      threshold_days: 30,
+      threshold_amount: '1000.00',
+      alert_level: 'warning',
+      notify_method: 'system',
+      notify_roles: [RECIPIENT_ROLE],
+      is_active: true,
+      remarks: `410 推送腿 ${tag}`,
+    });
+    createdRuleIds.push(rule.id);
+    const ruleRead = await apiCallRaw<AgingRule>(page, 'GET', '/aging-alert-rules/' + rule.id);
+    expect(ruleRead.notify_roles, '推送腿收件角色集应原样读回').toEqual([RECIPIENT_ROLE]);
+    expect(ruleRead.is_active, '推送腿收件规则必须为启用态').toBe(true);
+
+    // 逾期事实由本腿自建且客户本腿专用：扫描按 customer_id 聚合，共用主数据客户会让
+    // 标题里的客户名落在哪一单不确定，`own` 过滤随之空转，而"0 条所以全通过"不是本腿要交付的结论。
+    const custName = `E2E410推送腿客户${tag}`;
+    const createdCustomer = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
+      customer_name: custName,
+    });
+    const customerId = createdCustomer.data?.id;
+    if (typeof customerId !== 'number') {
+      throw new Error(
+        `410 推送腿前置不成立：自建客户未返回数字 id，实际 ${JSON.stringify(createdCustomer)}`
+      );
+    }
+    const invoice = await apiCallRaw<{ id: number }>(page, 'POST', '/ar/invoices', {
+      customer_id: customerId,
+      customer_name: custName,
+      invoice_amount: 7777.77,
+      invoice_date: pastDate(50),
+      due_date: pastDate(45),
+    });
+    await apiCall(page, 'POST', `/ar/invoices/${invoice.id}/approve`);
 
     const first = await apiCallRaw<TriggerScanResult>(
       page,
@@ -461,6 +522,12 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
       { alert_type: 'ar_overdue' }
     );
     expect(first.created.length, 'created_count 必须等于实际写入行数').toBe(first.created_count);
+    const own = first.created.filter(a => a.title.includes(custName));
+    expect(
+      own.length,
+      `本腿自建的逾期应收单必须被扫描成预警，created=${first.created.length} 条，` +
+        `标题集=${JSON.stringify(first.created.map(a => a.title))}`
+    ).toBe(1);
     for (const alert of first.created) {
       expect(alert.alert_type, '按类型过滤扫描出的行必须是该类型').toBe('ar_overdue');
       expect(alert.status, '新生成的预警必须落在 active').toBe('active');
@@ -474,7 +541,8 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
       ).toContain(alert.alert_type);
       expect(
         alert.notification_id,
-        `触发人有值时通知必须生成并回填 id，实际行 ${alert.alert_no} 的 notification_id 为 ${String(alert.notification_id)}`
+        `角色集解析到收件人时通知必须生成并回填主通知 id，实际行 ${alert.alert_no} ` +
+          `的 notification_id 为 ${String(alert.notification_id)}`
       ).not.toBeNull();
     }
 
@@ -489,12 +557,50 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
       `同类型同目标的 active 或 acknowledged 行已存在时必须整批跳过，第二次却新增 ${second.created_count} 行`
     ).toBe(0);
 
-    const unreadAfter = await apiCallRaw<number>(page, 'GET', '/notifications/unread-count');
-    expect(
-      unreadAfter - unreadBefore,
-      `通知未读数增量必须等于本次生成的预警行数 ${first.created.length}`
-    ).toBe(first.created.length);
+    // 反向判据：触发人岗位不在角色集内，其未读列表不应含本腿回填的任何一条主通知。
+    const triggerInbox = await apiCallRaw<NotificationListPage>(
+      page,
+      'GET',
+      '/notifications?status=UNREAD&page=1&page_size=100'
+    );
+    for (const alert of first.created) {
+      expect(
+        triggerInbox.list.some(n => n.id === alert.notification_id),
+        `触发人岗位不在角色集 ${RECIPIENT_ROLE} 内，不应收到预警 ${alert.alert_no} 的通知`
+      ).toBe(false);
+    }
 
+    // 预警按状态机终结、应收单走唯一在册的取消跃迁、规则只在本腿扫描那一刻参与收件人解析，
+    // 三件回收都排在切岗之前（删除与跃迁权属于建事实的岗位）。
+    for (const alert of own) {
+      await apiCall(page, 'POST', `/finance-alerts/${alert.id}/acknowledge`, {
+        remark: '410 推送腿用例回收',
+      });
+      await apiCall(page, 'POST', `/finance-alerts/${alert.id}/resolve`, {
+        resolve_note: '410 推送腿用例回收',
+      });
+    }
+    await apiCall(page, 'POST', `/ar/invoices/${invoice.id}/cancel`, {
+      reason: '410 推送腿用例回收',
+    });
+    await apiCall(page, 'DELETE', '/aging-alert-rules/' + rule.id);
+    const ruleGone = await apiCallExpectFail(page, 'GET', '/aging-alert-rules/' + rule.id);
+    expect(ruleGone.status, `规则回收后应 404，实际 ${ruleGone.status}`).toBe(404);
+    // 本腿专用客户放在最后回收：应收单行仍引用它，外键挡下时点名而不判负（跃迁面已取消）。
+    await apiCall(page, 'DELETE', `/crm/customers/${customerId}`).catch((e: Error) => {
+      console.warn(
+        `[410] 推送腿自建客户 ${customerId} 回收未成（应收单引用时由外键挡）: ${e.message}`
+      );
+    });
+
+    // 接收侧：角色集内岗位自己的收件箱必须逐条读到本腿生成的每一条预警通知，
+    // 且通知落在该岗位自己的用户 id 上，而不是落在点击扫描按钮的人身上。
+    await loginAsRole(page, RECIPIENT_ROLE);
+    const recipient = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
+    expect(
+      Number.isInteger(recipient.id) && recipient.id > 0,
+      `auth/me 应返回 ${RECIPIENT_ROLE} 的数字用户 id，实际 ${JSON.stringify(recipient)}`
+    ).toBe(true);
     const inbox = await apiCallRaw<NotificationListPage>(
       page,
       'GET',
@@ -506,14 +612,21 @@ test.describe.serial('410 定时任务与后台作业的可断腿', () => {
       );
       expect(
         matched.length,
-        `预警 ${alert.alert_no} 必须在通知列表按 business_type 与 business_id 回读到，收件箱共 ${inbox.list.length} 行`
+        `预警 ${alert.alert_no} 必须在角色集内岗位 ${RECIPIENT_ROLE} 的收件箱按 business_type ` +
+          `与 business_id 回读到，收件箱共 ${inbox.list.length} 行`
       ).toBe(1);
-      expect(matched[0].id, '列表回读到的通知主键必须与预警行回填的 id 相同').toBe(
-        alert.notification_id
-      );
+      expect(
+        matched[0].user_id,
+        '通知必须落在本岗位自己的用户 id 上，而不是点击扫描按钮的触发人'
+      ).toBe(recipient.id);
       expect(matched[0].notification_type, '财务预警通知必须落 SYSTEM 类型').toBe('SYSTEM');
       expect(matched[0].status, '新通知必须落 UNREAD').toBe('UNREAD');
     }
+    const unread = await apiCallRaw<number>(page, 'GET', '/notifications/unread-count');
+    expect(
+      typeof unread === 'number' && unread > 0,
+      `${RECIPIENT_ROLE} 收件后未读计数应大于 0，实际 ${String(unread)}`
+    ).toBe(true);
   });
 
   test('财务预警确认与解决的状态机门', async ({ page }) => {

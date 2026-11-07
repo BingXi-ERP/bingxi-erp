@@ -127,7 +127,7 @@ const fetchRfmCustomers = async () => {
   rfmLoading.value = true;
   try {
     const res = await getCustomerList({ page: 1, page_size: 100 });
-    rfmCustomers.value = res.data.data;
+    rfmCustomers.value = res.data.items;
     fetchRfmDistribution();
     // 列表加载成功即触发一次批量档位联显（页内 converted_customer_id 集合，独立于分布聚合面）
     fetchRfmSegments(rfmCustomers.value);

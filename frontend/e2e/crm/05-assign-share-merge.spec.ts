@@ -163,6 +163,22 @@ test.describe('CRM 分配·共享·合并流程', () => {
       });
       const claimId = claimLead.data?.id;
       expect(claimId, '建第二条线索失败').toBeTruthy();
+      // 一次性取证探针：认领链路的三个拒绝分支按源码静态读都不成立（建的是 new、
+      // 认领人已经 is_active 过滤、认领人非该线索归属人），而 CI 实返脱敏 business，
+      // 该文案只可能来自"认领瞬间状态已非 new"这一条分支。故在认领之前现查该行现场值，
+      // 并取出最后写者（本表有 updated_by 列，可把改写归因到具体用户），
+      // 用于判定是否同分片并行用例跨行改写。只加读，不改原调用与断言次序。
+      const probe = await apiCallRaw<{
+        lead_status: string | null;
+        owner_id: number;
+        updated_by: number | null;
+        updated_at: string | null;
+      }>(page, 'GET', `/crm/leads/${claimId}`);
+      console.log(
+        `[crm-05 probe] 认领前现场 lead#${claimId} status=${probe.lead_status} ` +
+          `owner=${probe.owner_id} updated_by=${probe.updated_by} ` +
+          `updated_at=${probe.updated_at} 会话用户=${me.id} 认领人=${assigneeA}`
+      );
       try {
         await apiCall(page, 'POST', '/crm/assignments/claim', {
           user_id: assigneeA,
