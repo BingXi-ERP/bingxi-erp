@@ -13,7 +13,7 @@ import {
 } from './helpers';
 
 /**
- * 92 产量工资契约缺口补测（工序工价状态机 计件单价数值落库 工资记录建单与状态门）
+ * 42 产量工资契约缺口补测（工序工价状态机 计件单价数值落库 工资记录建单与状态门）
  *
  * 与既有覆盖的分工。24 号对本域只发过 verifyEndpointHealthy 与 safePostAction
  * 纯状态探针（判定器 b1 b3 档，返回值不落断言），31b 号只探删除守卫。本 spec 是
@@ -75,13 +75,13 @@ async function createProcessRoute(page: Page, tag: string): Promise<{ id: number
   const code = genCode(tag);
   const res = await apiCall<Row>(page, 'POST', '/production/process-routes', {
     route_code: code,
-    route_name: `92号工序${code}`,
+    route_name: `42号工序${code}`,
     seq: 1,
     process_type: 'dye',
   });
   const id = Number(res.data?.id);
   expect(id, `工序路线创建应返回 id，实际 ${JSON.stringify(res)}`).toBeGreaterThan(0);
-  deferCleanup(CLEANUP, 'DELETE', `/production/process-routes/${id}`, `[92] route ${code}`);
+  deferCleanup(CLEANUP, 'DELETE', `/production/process-routes/${id}`, `[42] route ${code}`);
   return { id, code };
 }
 
@@ -98,13 +98,13 @@ async function createWageRate(
     piece_price: '2.50',
     effective_date: ymd(0),
     workshop,
-    remarks: `92号工价${workshop}`,
+    remarks: `42号工价${workshop}`,
     ...overrides,
   });
   const id = Number(res.data?.id);
   expect(id, `工价创建应返回 id，实际 ${JSON.stringify(res)}`).toBeGreaterThan(0);
   const rateNo = String(res.data?.rate_no);
-  deferCleanup(CLEANUP, 'DELETE', `/production/wage-rates/${id}`, `[92] rate ${rateNo}`);
+  deferCleanup(CLEANUP, 'DELETE', `/production/wage-rates/${id}`, `[42] rate ${rateNo}`);
   return { id, rateNo };
 }
 
@@ -119,12 +119,12 @@ async function createWageRecord(
     period_start: periodStart,
     period_end: periodEnd,
     workshop,
-    remarks: `92号工资单${workshop}`,
+    remarks: `42号工资单${workshop}`,
   });
   const id = Number(res.data?.id);
   expect(id, `工资记录创建应返回 id，实际 ${JSON.stringify(res)}`).toBeGreaterThan(0);
   const recordNo = String(res.data?.record_no);
-  deferCleanup(CLEANUP, 'DELETE', `/production/wage-records/${id}`, `[92] record ${recordNo}`);
+  deferCleanup(CLEANUP, 'DELETE', `/production/wage-records/${id}`, `[42] record ${recordNo}`);
   return { id, recordNo };
 }
 
@@ -162,14 +162,14 @@ async function countRecordsByWorkshop(page: Page, workshop: string): Promise<num
   return Number(data.total);
 }
 
-test.describe.serial('92 产量工资契约：工价状态机与工资记录建单门禁', () => {
+test.describe.serial('42 产量工资契约：工价状态机与工资记录建单门禁', () => {
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
   });
 
-  test('92-01 工价建单落真值，详情与单号双读路径一致，可空列保持 null', async ({ page }) => {
-    const route = await createProcessRoute(page, 'E92RTA');
-    const workshop = genCode('E92WSA');
+  test('42-01 工价建单落真值，详情与单号双读路径一致，可空列保持 null', async ({ page }) => {
+    const route = await createProcessRoute(page, 'E42RTA');
+    const workshop = genCode('E42WSA');
 
     const created = await createWageRate(page, route.id, workshop, {
       grade_a_ratio: '1.0',
@@ -219,9 +219,9 @@ test.describe.serial('92 产量工资契约：工价状态机与工资记录建�
     ).toBe(1);
   });
 
-  test('92-02 工价建单五道校验门全被拒且零写入', async ({ page }) => {
-    const route = await createProcessRoute(page, 'E92RTB');
-    const workshop = genCode('E92WSB');
+  test('42-02 工价建单五道校验门全被拒且零写入', async ({ page }) => {
+    const route = await createProcessRoute(page, 'E42RTB');
+    const workshop = genCode('E42WSB');
 
     // 工价类型非法（wage_type 词表 piece time mixed 之外）
     expectStateGateRejection(
@@ -291,9 +291,9 @@ test.describe.serial('92 产量工资契约：工价状态机与工资记录建�
     ).toBe(0);
   });
 
-  test('92-03 工价 draft active disabled 全程流转与状态门零漂移', async ({ page }) => {
-    const route = await createProcessRoute(page, 'E92RTC');
-    const workshop = genCode('E92WSC');
+  test('42-03 工价 draft active disabled 全程流转与状态门零漂移', async ({ page }) => {
+    const route = await createProcessRoute(page, 'E42RTC');
+    const workshop = genCode('E42WSC');
     const created = await createWageRate(page, route.id, workshop, {
       // 失效日期不提交，可空列必须保持 null（生效查询用 expiry is null 分支）
       grade_c_ratio: '0',
@@ -314,11 +314,11 @@ test.describe.serial('92 产量工资契约：工价状态机与工资记录建�
     // draft 期更新合法（update 门只放行 draft），改后回读真值
     await apiCall(page, 'PUT', `/production/wage-rates/${created.id}`, {
       piece_price: '3.75',
-      remarks: '92-03草稿期更新',
+      remarks: '42-03草稿期更新',
     });
     const edited = await apiCallRaw<Row>(page, 'GET', `/production/wage-rates/${created.id}`);
     expect(toNum(edited.piece_price), 'draft 期更新单价应落库 3.75').toBe(3.75);
-    expect(String(edited.remarks), 'draft 期更新备注应落库').toBe('92-03草稿期更新');
+    expect(String(edited.remarks), 'draft 期更新备注应落库').toBe('42-03草稿期更新');
 
     // activate draft 到 active，生效查询命中同一行
     const activated = await apiCall<Row>(
@@ -390,8 +390,8 @@ test.describe.serial('92 产量工资契约：工价状态机与工资记录建�
     expect(String(afterBadActivate.status), '被拒流转后状态应保持 disabled').toBe('disabled');
   });
 
-  test('92-04 工资记录建单落真值，周期校验门拒绝且零写入', async ({ page }) => {
-    const workshop = genCode('E92WSD');
+  test('42-04 工资记录建单落真值，周期校验门拒绝且零写入', async ({ page }) => {
+    const workshop = genCode('E42WSD');
     const created = await createWageRecord(page, workshop, ymd(0), ymd(0));
 
     expect(
@@ -421,7 +421,7 @@ test.describe.serial('92 产量工资契约：工价状态机与工资记录建�
     expect(Number(byNo.id), 'by-no 与详情应回同一行').toBe(created.id);
 
     // 周期倒挂负例（record.rs::create 校验周期结束不早于开始）后该车间仍只有 1 行
-    const failWorkshop = genCode('E92WSE');
+    const failWorkshop = genCode('E42WSE');
     expectStateGateRejection(
       await apiCallExpectFail(page, 'POST', '/production/wage-records', {
         period_start: ymd(10),
@@ -436,8 +436,8 @@ test.describe.serial('92 产量工资契约：工价状态机与工资记录建�
     ).toBe(0);
   });
 
-  test('92-05 工资记录 calculate confirm pay 门禁拒绝零漂移，cancel 全程', async ({ page }) => {
-    const workshop = genCode('E92WSF');
+  test('42-05 工资记录 calculate confirm pay 门禁拒绝零漂移，cancel 全程', async ({ page }) => {
+    const workshop = genCode('E42WSF');
     // 未来周期保证周期内无任何 completed 工序记录（calculation.rs 空周期分支确定性成立）
     const created = await createWageRecord(page, workshop, ymd(365), ymd(366));
 
@@ -515,6 +515,6 @@ test.describe.serial('92 产量工资契约：工价状态机与工资记录建�
     );
     const finalView = await apiCallRaw<Row>(page, 'GET', `/production/wage-records/${created.id}`);
     expect(String(finalView.status), '终态上四条被拒操作后状态应保持 cancelled').toBe('cancelled');
-    expect(String(finalView.remarks), '被拒更新不得改写备注原值').toBe(`92号工资单${workshop}`);
+    expect(String(finalView.remarks), '被拒更新不得改写备注原值').toBe(`42号工资单${workshop}`);
   });
 });
