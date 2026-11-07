@@ -196,7 +196,7 @@ pub mod fabric_defect_record;
 pub mod process_wage_rate;
 pub mod wage_record;
 pub mod wage_record_detail;
-// v14 批次 428：能耗管理贯通（能源计量设备 + 能耗记录 + 能耗分摊规则 + 能耗分摊记录）
+// 能耗管理（能源计量设备 + 能耗记录 + 能耗分摊规则 + 能耗分摊记录）
 pub mod energy_meter;
 pub mod energy_consumption_record;
 pub mod energy_allocation_rule;
