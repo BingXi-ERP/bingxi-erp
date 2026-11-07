@@ -176,3 +176,5 @@ pub mod scan_receipt_grant;
 pub mod piece_inventory_status_drop;
 // 库存匹米数列扩位域：把 length 列型对齐收回数量的计量口径，链尾独立域（建表与加列均早于本域）。
 pub mod piece_length_scale_widen;
+// 审计日志补定位列（终端类型 操作页面 单据编号 变更原因 风险标记）与追溯索引，链尾独立域
+pub mod m0126_add_audit_terminal_context_columns;

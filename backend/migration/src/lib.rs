@@ -220,6 +220,11 @@
 //!    NOTICE 跳过可重跑，down 探测小数位多于两位的行命中即 RAISE EXCEPTION 不截断，域内绝不
 //!    UPDATE/DELETE。置于链尾为新的顶层条目（并入已应用域会被台账整体跳过、扩位永不执行），
 //!    依赖 business 建表与 production 补列早于本域
+//! 38. m0126_add_audit_terminal_context_columns: 审计日志定位维度域（m0126）——给 audit_logs
+//!    补终端类型 操作页面 单据编号 变更原因 风险标记与操作人角色码六个可空列及按单号与角色码
+//!    的追溯索引，写入单点落库、读取侧列表详情导出出参补维并加等值筛选；探测式幂等加列（列已在
+//!    即 NOTICE 跳过可重跑），down 只回空壳不回填。置于链尾为新的顶层条目（并入已应用域会被台账
+//!    整体跳过、补列永不执行），依赖 system 与 business 建 audit_logs 早于本域
 
 pub use sea_orm_migration::prelude::*;
 
@@ -289,6 +294,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::piece_inventory_status_drop::Migration),
             // 库存匹米数列扩位到 DECIMAL(18,4)，链尾独立域（建表与加列均早于本域，复用库上必然执行）
             Box::new(domain::piece_length_scale_widen::Migration),
+            // 审计定位列（终端类型 操作页面 单据编号 变更原因 风险标记）与追溯索引，链尾独立域
+            Box::new(domain::m0126_add_audit_terminal_context_columns::Migration),
         ]
     }
 }
