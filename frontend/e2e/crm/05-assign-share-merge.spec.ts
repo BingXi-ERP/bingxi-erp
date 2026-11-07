@@ -177,6 +177,9 @@ test.describe('CRM 分配·共享·合并流程', () => {
       // 现查走详情读面，其掩码函数 mask_lead_pii_defaults 对 admin 原值返回、
       // 非 admin 也只剔地址与联系方式类列，故 updated_by 一定能读出，可把改写归因到用户。
       // 只加一次读，不改原请求、断言与执行次序；根因定位后撤除本探针。
+      // 打印项只取探针自己读到的字段，不引用本测试的局部变量：本文件在其它在途支上
+      // 有一版把认领目标改为本腿自建专属账号的重写，那一版里会话用户与认领人的局部名
+      // 都不存在，引用它们会让探针在并基后抛出 ReferenceError 并把用例本身打死。
       const probe = await apiCallRaw<{
         lead_status: string | null;
         owner_id: number;
@@ -186,7 +189,7 @@ test.describe('CRM 分配·共享·合并流程', () => {
       console.log(
         `[crm-05 probe] 认领前现场 lead#${claimId} status=${probe.lead_status} ` +
           `owner=${probe.owner_id} updated_by=${probe.updated_by} ` +
-          `updated_at=${probe.updated_at} 会话用户=${me.id} 认领人=${assigneeA}`
+          `updated_at=${probe.updated_at}`
       );
       try {
         await apiCall(page, 'POST', '/crm/assignments/claim', {
