@@ -117,27 +117,27 @@ pub(crate) async fn apply_lead_field_permission(
     }
 }
 
-/// 从分页出参中定位列表数组：兼容既有两种出参键（`services/crm/lead.rs` 手搓 `json!`
-/// 用 `data`，历史列表接口用 `list`）。定位不到意味着字段级权限无处可施
-/// = 原文直通，属形状漂移而非正常分支，显式记 error 不静默。
+/// 从分页出参中定位列表数组：按仓内分页形状取键
+/// （`items` = PaginatedResponse 规范键，`services/crm/lead.rs` 与历史列表接口的
+/// 强类型出参用它；`list` 与 `data` 为仍在用的历史键）。定位不到意味着字段级权限
+/// 无处可施 = 原文直通，属形状漂移而非正常分支，显式记 error 不静默。
 /// `pub(crate)`：客户增强入口（`crm_customer_handler::list_customers`）出参同为
 /// `list_leads` 分页形状，必须复用同一数组定位实现，不再各写一份键名分支。
 pub(crate) fn paginated_list_array_mut(
     value: &mut serde_json::Value,
 ) -> Option<&mut Vec<serde_json::Value>> {
-    let key = if value.get("list").and_then(Value::as_array).is_some() {
-        "list"
-    } else {
-        "data"
-    };
-    let list = value.get_mut(key).and_then(Value::as_array_mut);
-    if list.is_none() {
-        tracing::error!(
-            key = %key,
-            "分页出参未定位到列表数组（list/data 均缺失），字段级数据权限未应用"
-        );
+    let found = ["items", "list", "data"]
+        .into_iter()
+        .find(|key| value.get(*key).and_then(Value::as_array).is_some());
+    match found {
+        Some(key) => value.get_mut(key).and_then(Value::as_array_mut),
+        None => {
+            tracing::error!(
+                "分页出参未定位到列表数组（items/list/data 均缺失），字段级数据权限未应用"
+            );
+            None
+        }
     }
-    list
 }
 
 /// 商机**字段级**数据权限的唯一实现，五个出口共用（本文件 `list_opportunities`

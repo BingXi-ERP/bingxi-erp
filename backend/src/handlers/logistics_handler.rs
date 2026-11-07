@@ -41,7 +41,7 @@ pub struct CreateWaybillRequest {
 
 /// 运费等金额入参转 Decimal：NaN/Infinity 等不可表示的值直接报错
 fn to_decimal(value: f64, field: &str) -> Result<Decimal, AppError> {
-    Decimal::from_f64_retain(value)
+    crate::utils::decimal::from_f64(value)
         .ok_or_else(|| AppError::bad_request(format!("{} 金额非法：{}", field, value)))
 }
 

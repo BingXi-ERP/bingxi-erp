@@ -48,9 +48,10 @@ import { pickListArray } from './ui-helpers';
  * 公斤→米（kg_to_meters）：米 = 公斤 × 1000 ÷ 克重 ÷ 幅宽(m)，保留两位小数。
  * 换算率（calculate_conversion_rate）：1 公斤对应米数 = 1000 ÷ (克重 × 幅宽m)，保留四位小数。
  * 自洽校验（validate_dual_unit）：以米数折出的公斤为基准，差异 ≤ 基准×误差率（默认 0.5%）判为一致。
- * 端点边界：convert 的 from_unit 只接受 meters 与 kg 两个小写词，其余（含 yards 码）走 bad_request
- * 即 400 加 BAD_REQUEST；克重≤0 与幅宽≤0 让 meters_to_kg 返回 Err，同样经 bad_request 外显原文；
- * validate 的入参经 meters_to_kg，幅宽≤0 亦 400 加 BAD_REQUEST。
+ * 端点边界：convert 的 from_unit 只接受 meters 与 kg 两个小写词，其余（含 yards 码）走
+ * validation_displayable 即 400 加 VALIDATION_ERROR 并外显「无效的单位，必须是 'meters' 或 'kg'」；
+ * 克重≤0 与幅宽≤0 让 meters_to_kg 返回 Err，同样经 validation_displayable 外显真实原因；
+ * validate 的入参经 validate_dual_unit，幅宽≤0 亦 400 加 VALIDATION_ERROR。
  * 入库换算（create_stock_fabric）：仅当克重与幅宽同时非空才触发自动折算，否则回落提交公斤数；
  * 列表口 GET /inventory/stock/fabric 的 data 是裸数组（handler 返回 ApiResponse 包 Vec，非分页信封）。
  *
@@ -69,7 +70,7 @@ import { pickListArray } from './ui-helpers';
  *
  * 假绿防线。换算守恒一律以固定无歧义参数断后端出参本身，不自造舍入；自洽校验钉阈值内与阈值外两条独立分支；
  * 入库换算既断建单出参 quantity_kg，又按唯一批次从列表口读回再断一次，证明真实落库；
- * 边界一律钉 HTTP 400 与机器码 BAD_REQUEST 并外显拒绝原文；
+ * 边界一律钉 HTTP 400 与机器码 VALIDATION_ERROR 并外显真实拒绝原因；
  * 全程不用 ?? 或 || 兜底，后端必出的键缺失即形漂判红；前置不成立当场抛错点名步骤。
  */
 
@@ -321,9 +322,7 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       gram_weight: GRAM,
       width_cm: WIDTH_CM,
     });
-    expect(within.is_valid === true, `0.5% 阈值内必须判一致，实际 ${JSON.stringify(within)}`).toBe(
-      true
-    );
+    expect(within.is_valid, `0.5% 阈值内必须判一致，实际 ${JSON.stringify(within)}`).toBe(true);
     expect(
       toNum(within.calculated_kg),
       `基准公斤必须由米数折出 30，实际 ${str(within.calculated_kg)}`
@@ -344,16 +343,15 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       gram_weight: GRAM,
       width_cm: WIDTH_CM,
     });
-    expect(
-      beyond.is_valid === false,
-      `超 0.5% 阈值必须判不一致，实际 ${JSON.stringify(beyond)}`
-    ).toBe(false);
+    // 判据对象就是出参布尔本身：is_valid 为 false 即"超阈值判不一致"成立，
+    // 不再在断言里二次求值（那会把期望值写成表达式取反后的形状）。
+    expect(beyond.is_valid, `超 0.5% 阈值必须判不一致，实际 ${JSON.stringify(beyond)}`).toBe(false);
     expect(
       toNum(beyond.difference),
       `阈值外差异必须为 1，实际 ${str(beyond.difference)}`
     ).toBeCloseTo(1, 6);
 
-    // 6) 边界 码单位在本换算端点不可达：from_unit=yards 走 bad_request 400 加 BAD_REQUEST
+    // 6) 边界 码单位在本换算端点不可达：from_unit=yards 走 validation_displayable 400 加 VALIDATION_ERROR
     const yardReject = await apiCallExpectFail(page, 'POST', '/convert', {
       value: 100,
       from_unit: 'yards',
@@ -361,13 +359,13 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       width_cm: WIDTH_CM,
     });
     expect(yardReject.status, `码换算在本端点必须 400，实际 ${yardReject.status}`).toBe(400);
-    expect(failureCode(yardReject)).toBe(APP_ERROR_CODES.BAD_REQUEST);
+    expect(failureCode(yardReject)).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
     expect(
       str(yardReject.message).includes('无效的单位'),
       `码拒绝必须外显单位原文，实际 ${str(yardReject.message)}`
     ).toBe(true);
 
-    // 7) 边界 克重非正：meters_to_kg 返回 Err 经 bad_request 外显
+    // 7) 边界 克重非正：meters_to_kg 返回 Err 经参数校验外显真实原因
     const badGram = await apiCallExpectFail(page, 'POST', '/convert', {
       value: METERS,
       from_unit: 'meters',
@@ -375,13 +373,13 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       width_cm: WIDTH_CM,
     });
     expect(badGram.status, `克重为 0 必须 400，实际 ${badGram.status}`).toBe(400);
-    expect(failureCode(badGram)).toBe(APP_ERROR_CODES.BAD_REQUEST);
+    expect(failureCode(badGram)).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
     expect(
       str(badGram.message).includes('克重必须大于 0'),
       `克重非法必须外显真实拒绝文案，实际 ${str(badGram.message)}`
     ).toBe(true);
 
-    // 8) 边界 幅宽非正走自洽校验入参：validate 内部 meters_to_kg Err 经 bad_request
+    // 8) 边界 幅宽非正走自洽校验入参：validate_dual_unit 自身返回 Err 经 validation_displayable
     const badWidth = await apiCallExpectFail(page, 'POST', '/validate', {
       quantity_meters: METERS,
       quantity_kg: KG,
@@ -389,7 +387,7 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       width_cm: 0,
     });
     expect(badWidth.status, `幅宽为 0 的自洽校验必须 400，实际 ${badWidth.status}`).toBe(400);
-    expect(failureCode(badWidth)).toBe(APP_ERROR_CODES.BAD_REQUEST);
+    expect(failureCode(badWidth)).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
     console.log('[452-01] 米↔公斤 双向换算守恒 + 阈值内外 + 单位/参数边界 全部回读通过');
   });
 
@@ -673,15 +671,22 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
     if (stockRow === undefined) {
       throw new Error('452-03 前置不成立：出库后按四维读不到库存行');
     }
+    // 口径（以写入方为准）：出库扣减只写库存行 quantity_available 并累计 quantity_shipped
+    // （services/so/delivery_ops/inventory.rs 的 reduce_inventory_four_dim），
+    // 流水行的 quantity_before_meters/quantity_after_meters 由同一笔扣减的扣前/扣后**可用量**
+    // 落库（StockReduction 三字段，services/so/delivery_ops/ship.rs 写 inventory_transactions）；
+    // models/inventory_stock.rs 的 quantity_meters 是入库时记的主计量总米数，出库与撤销均不写该列。
+    // 因此账实守恒只能拿被扣的同一列 quantity_available 与流水前后对照，
+    // 用 quantity_meters 比流水扣后量属于两个口径相减（左恒为入库总量、右为扣后余量）。
     sameDec(
-      decField(stockRow, 'quantity_meters', '452-03 库存行扣后主计量'),
+      decField(stockRow, 'quantity_available', '452-03 库存行扣后可用量'),
       decField(txn, 'quantity_after_meters', '452-03 流水扣后量'),
-      '452-03 库存行扣后量 vs 流水扣后量'
+      '452-03 库存行扣后可用量 vs 流水扣后量'
     );
     sameDec(
-      decField(bundle.stockRow, 'quantity_meters', '452-03 出库前库存行主计量'),
+      decField(bundle.stockRow, 'quantity_available', '452-03 出库前库存行可用量'),
       decField(txn, 'quantity_before_meters', '452-03 流水扣前量'),
-      '452-03 出库前库存行量 vs 流水扣前量'
+      '452-03 出库前库存行可用量 vs 流水扣前量'
     );
 
     // 8) 母卷出库后离开可用态；零头余码仍可单独查到且长度逐位不变
@@ -753,18 +758,38 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
     }
     const target = await pickDyeableWarehouse(page);
     const batchNo = genCode('452C');
-    // 出库腿的可扣库存：白坯（色号空 ⇒ 服务端缸号归一 None），ShipOrderItemRequest 白坯分支免填匹号
+    // 出库腿的可扣库存：白坯（色号空 ⇒ 服务端缸号归一 None），ShipOrderItemRequest 白坯分支免填匹号。
+    // 量与下方报价行的米数合计同量级（9000 米），保持本腿「录入量 = 可扣量」的原设计关系。
     await seedGreigeStockIn(page, {
       productId,
       warehouseId: target.id,
       batchNo,
-      quantityMeters: '150',
+      quantityMeters: '9000',
     });
 
-    // 段一：报价明细按米录入（两行同产品，验转订单逐行落量与合计守恒）
+    // 段一：报价明细按米录入（两行同产品，验转订单逐行落量与合计守恒）。
+    // 米数合计必须落在 9000 米这一量级：报价审批档位由 quotation_approval_service.rs 的
+    // AMOUNT_THRESHOLD_SELF=100000 按 total_amount 判档，低于 10 万走销售员自批短路（submit
+    // 直接落 approved），/approve 的状态门 lock_and_validate_quotation_for_approval_txn 只放行
+    // pending_approval，本腿要的「提交→批准」两跳就无前置可行；12.5 单价 × 9000 米 = 112500
+    // 落在 10 万到 50 万的经理审批档，提交才真走 BPM 分支落小写 pending_approval。
     const noteTag = genCode('452Q');
+    // 段一还差一户授信客户：夹具客户 ctx.customerId 的 credit_limit 落零，而订单提交面按
+    // 信用额度拦（信用门在销售订单 submit 上，112500 的订单额必被拒"信用额度不足，无法提交订单"）。
+    // 本腿自建一户足额授信客户，报价与由它转出的销售订单都挂这一户，不改夹具客户的额度
+    // （夹具客户被同分片其它腿共用，抬它的额度会把信用门的判据稀释成永真）。
+    const creditCust = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
+      customer_name: `E2E452授信客户${noteTag}`,
+      credit_limit: '1000000.00',
+    });
+    const creditCustomerId = creditCust.data?.id;
+    if (typeof creditCustomerId !== 'number') {
+      throw new Error(
+        `452-04 前置不成立：自建授信客户未返回数字 id，实际 ${JSON.stringify(creditCust)}`
+      );
+    }
     const q = await apiCall<{ id?: number }>(page, 'POST', '/quotations', {
-      customer_id: ctx.customerId,
+      customer_id: creditCustomerId,
       sales_user_id: ctx.userIds[0],
       quotation_date: new Date().toISOString().slice(0, 10),
       valid_until: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
@@ -778,14 +803,14 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
         {
           product_id: productId,
           unit: '米',
-          quantity: '100',
+          quantity: '5000',
           unit_price: '12.5',
           unit_price_with_tax: '12.5',
         },
         {
           product_id: productId,
           unit: '米',
-          quantity: '50',
+          quantity: '4000',
           unit_price: '12.5',
           unit_price_with_tax: '12.5',
         },
@@ -809,8 +834,36 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       .map(it => decField(it, 'quantity', `452-04 报价行 标记 ${noteTag}`));
     expect(quoteMeterLines.length, '段一：按米录入的报价行必须恰 2 行').toBe(2);
 
+    // 提交腿与批准腿的合法前置（逐条读后端源，非推测）：
+    // 1 档位。ApproverRole::from_amount 以 AMOUNT_THRESHOLD_SELF=100000 判档，低于 10 万走销售员
+    //   自批短路（submit 内 self_approve 直接落小写 approved），批准端点的状态门
+    //   lock_and_validate_quotation_for_approval_txn 只放行小写 pending_approval，届时本腿的
+    //   「提交→批准」这一跳没有任何合法前置可行；9000 米 × 12.5 = 112500 落在 10 万到 50 万的
+    //   经理审批档，提交真走 BPM 分支落待审批。提交后先按出参自证档位，把「录入金额落在哪一档」
+    //   变成用例自己可证的判据，而不是事后猜。
+    // 2 理由。POST /quotations/{id}/approve 的请求体键逐字符取 handlers/quotation_handler.rs 的
+    //   ApproveQuotationRequest.approval_reason（Option<String>，经 trim 非空门，缺键即由 handler
+    //   收口成 400 VALIDATION_ERROR「审批通过理由不能为空」），理由落 sales_quotations.approval_reason 列。
     await apiCall(page, 'POST', `/quotations/${quotationId}/submit`);
-    await apiCall(page, 'POST', `/quotations/${quotationId}/approve`);
+    const submittedQ = await apiCallRaw<Row>(page, 'GET', `/quotations/${quotationId}`);
+    expect(
+      String(submittedQ.status ?? ''),
+      `段一前置：提交后应处于小写 pending_approval（models/status/sales.rs 报价模组）才可批准，实际=${JSON.stringify(
+        submittedQ.status
+      )}`
+    ).toBe('pending_approval');
+    await apiCall(page, 'POST', `/quotations/${quotationId}/approve`, {
+      approval_reason: 'E2E 452-04 按米报价审批通过',
+    });
+    const approvedQ = await apiCallRaw<Row>(page, 'GET', `/quotations/${quotationId}`);
+    expect(
+      String(approvedQ.status ?? ''),
+      `批准跃迁后应真落库小写 approved，实际=${JSON.stringify(approvedQ.status)}`
+    ).toBe('approved');
+    expect(
+      String(approvedQ.approval_reason ?? ''),
+      `审批通过理由应真实落列并可经详情出参回读，实际=${JSON.stringify(approvedQ.approval_reason)}`
+    ).toBe('E2E 452-04 按米报价审批通过');
 
     // 段二：转订单后回读订单行主计量
     const converted = await apiCallRaw<Row>(page, 'POST', `/quotations/${quotationId}/convert`);
@@ -827,6 +880,20 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       .map(l => decField(l, 'quantity_meters', `452-04 订单行 订单 ${orderNo}`));
     expect(orderMeterLines.length, '段二：转订单必须按报价行逐行落订单行（2 行）').toBe(2);
     sameDecSum(quoteMeterLines, orderMeterLines, '452-04 报价明细折回主单位 vs 订单行主计量合计');
+
+    // 段三前置：转单写出的销售订单初态是 draft（services/quotation_convert_service.rs 的
+    // status 置值），而发货门只认已审批与部分发货，跳过 submit 与 approve 两跳就会在
+    // POST /sales/orders/{id}/ship 得到"仅已审批或部分发货的订单可发货"。
+    // 审批回读的状态词取写入方口径（models/status/sales_order.rs，小写 approved）。
+    await apiCall(page, 'POST', `/sales/orders/${orderId}/submit`);
+    await apiCall(page, 'POST', `/sales/orders/${orderId}/approve`);
+    const approvedOrder = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${orderId}`);
+    expect(
+      String(approvedOrder.status ?? ''),
+      `452-04 段三前置：转出的订单经提交与批准后应落小写 approved，实际 ${JSON.stringify(
+        approvedOrder.status
+      )}`
+    ).toBe('approved');
 
     // 段三：出库（录入量 = 订单行主计量合计，由后端出参补零求和后原样回传）
     const shipScale = decMaxScale(
@@ -953,7 +1020,13 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
     if (stockBefore === undefined) {
       throw new Error('452-05 前置不成立：出库前按四维读不到库存行');
     }
-    const stockMetersBefore = decField(stockBefore, 'quantity_meters', '452-05 出库前库存行主计量');
+    // 基线列口径同 452-03 步骤 7 的注释：出库扣与撤销补都写 quantity_available，
+    // quantity_meters 由入库录入且出库/撤销不改，拿它当扣前扣后读数会把真实扣减看成零变化。
+    const stockAvailableBefore = decField(
+      stockBefore,
+      'quantity_available',
+      '452-05 出库前库存行可用量'
+    );
     const lineBefore = orderLineOf(
       await apiCallRaw<Row>(page, 'GET', `/sales/orders/${order.id}`),
       productId,
@@ -1014,8 +1087,8 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       throw new Error('452-05 前置不成立：出库后按四维读不到库存行');
     }
     sameDecDiff(
-      stockMetersBefore,
-      decField(stockMid, 'quantity_meters', '452-05 出库后库存行主计量'),
+      stockAvailableBefore,
+      decField(stockMid, 'quantity_available', '452-05 出库后库存行可用量'),
       shipQty,
       '452-05 出库确实扣减：扣前 − 扣后 = 出库量'
     );
@@ -1040,9 +1113,9 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       throw new Error('452-05 撤销后按四维必须仍能读到库存行');
     }
     sameDec(
-      decField(stockAfterCancel, 'quantity_meters', '452-05 撤销后库存行主计量'),
-      stockMetersBefore,
-      '452-05 撤销后库存行主计量 vs 出库前基线'
+      decField(stockAfterCancel, 'quantity_available', '452-05 撤销后库存行可用量'),
+      stockAvailableBefore,
+      '452-05 撤销后库存行可用量 vs 出库前基线'
     );
     const lineAfterCancel = orderLineOf(
       await apiCallRaw<Row>(page, 'GET', `/sales/orders/${order.id}`),

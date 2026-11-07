@@ -78,7 +78,9 @@ impl ProductService {
             pantone_code: Set(input.pantone_code),
             color_type: Set(input.color_type),
             dye_formula: Set(input.dye_formula),
-            extra_cost: Set(Decimal::from_f64_retain(input.extra_cost).unwrap_or(Decimal::ZERO)),
+            extra_cost: Set(
+                crate::utils::decimal::from_f64(input.extra_cost).unwrap_or(Decimal::ZERO)
+            ),
             // 色牢度等级（GB 18401 九档，m0106 加列、m0108 收 CHECK），未录入落 NULL
             color_fastness_grade: Set(input.color_fastness_grade),
             is_active: Set(true),
@@ -145,7 +147,7 @@ impl ProductService {
             color.dye_formula = Set(Some(df));
         }
         if let Some(ec) = extra_cost {
-            color.extra_cost = Set(Decimal::from_f64_retain(ec).unwrap_or(Decimal::ZERO));
+            color.extra_cost = Set(crate::utils::decimal::from_f64(ec).unwrap_or(Decimal::ZERO));
         }
         if let Some(active) = is_active {
             color.is_active = Set(active);

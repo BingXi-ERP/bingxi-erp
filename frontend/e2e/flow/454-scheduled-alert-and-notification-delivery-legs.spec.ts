@@ -23,8 +23,10 @@ import { safeGoto } from './ui-helpers';
  *
  * 1. 缺料预警阈值 handlers/material_shortage_handler.rs：
  *    POST /material-shortage/threshold 入参 safety_factor / critical_threshold / severe_threshold
- *    皆可选且只覆盖提交的键；GET 同名端点读回同一份配置；DECIMAL 出参是序列化字符串，
- *    比较一律经 Number() 归一（存储口径 DECIMAL(10,2) 已裁定，测试内不再二次舍入）。
+ *    皆可选且只覆盖提交的键；GET 同名端点读回同一份配置；DECIMAL 出参是序列化字符串。
+ *    存储口径为 migration/src/domain/v15/mod.rs 建表段的三列 DECIMAL(5,2)，
+ *    库侧串就是事实值：断言按读回串逐字符比，期望值由该串按整数分推导，
+ *    测试内既不再二次舍入，也不用浮点加法造值（浮点会造出列上根本不存在的 50.050000000000004）。
  *    GET /material-shortage/alerts 出参是 PaginatedResponse{items,total,page,page_size}。
  *
  * 2. 账期（账龄）预警规则 handlers/aging_alert_rule_handler.rs + models/aging_alert_rule.rs：
@@ -51,8 +53,12 @@ import { safeGoto } from './ui-helpers';
  *    状态机 active → acknowledged → resolved / expired。
  *    幂等窗口只对未处理态生效：同 alert_type + target_module + target_id 且状态属
  *    {active, acknowledged} 时不再新建，resolved 出窗。
- *    每条新建预警同时给"触发人"写一条站内信（标题前缀 [财务预警]、正文等于预警正文），
- *    并把通知 id 回填进预警行的 notification_id；notification_id 因此是收件人判据的落库锚点。
+ *    站内信按收件人角色集逐人投递（标题前缀 [财务预警]、正文等于预警正文）：角色集由启用中
+ *    账龄规则声明的 notify_roles 在唯一解析点决定（services/finance_alert_service.rs
+ *    ::resolve_recipient_users，角色码到角色 id 到在册且启用的用户 id，去重升序），
+ *    notification_id 存本轮第一条（主通知）号。角色集解析不到用户时显式不投递并保持为空，
+ *    手工触发不因"有人点了按钮"就降级成发给点击者本人。
+ *    因此本文件的接收侧判据一律在角色集内岗位的会话里读，触发人岗位反向判不可见。
  *    GET /finance-alerts 支持 alert_type / alert_level / status / target_module 过滤，
  *    status 与 alert_type 越界一律 400；预警行没有删除路由，终结只能靠 acknowledge + resolve。
  *
@@ -110,8 +116,43 @@ type AlertPage = { items?: AlertRow[]; total?: number };
 type ScanResult = { created: AlertRow[]; created_count: number };
 type CustRow = { id: number; customer_name: string };
 
+/**
+ * 功能：454-04 与 454-06 自建启用规则时声明的收件岗位码，同时是这两腿读站内信的登录岗位。
+ * 调用方：建账龄规则的 notify_roles 入参、loginAsRole 入参与断言消息里的岗位名。
+ * 入参：无（常量）。传给谁：aging_alert_rules.notify_roles（JSONB 数组列）与 e2e 建岗凭证。
+ * 存什么：一个在 e2e 建岗花名册在册、除本文件外没有任何规则把它写进 notify_roles 的岗位码，
+ * 使该岗位收件箱只承载本文件的投递，逐人投递与可见性判据都不被其它用例的投递量干扰。
+ * 存哪里：不落库，只保证"角色集声明"与"登录岗位"两处字面量同源。
+ */
+const NOTIFY_ROLE = 'cost_accountant';
+
 function uniq(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+/**
+ * 功能：把 DECIMAL 序列化串按整数分（两位小数）加量，产出提交值与期望值共用的十进制串。
+ * 调用方：454-01 的阈值写入入参与写后回读断言。
+ * 入参：serialized 是 GET /material-shortage/threshold 读回的列值
+ * （material_shortage_threshold_configs 三列均 DECIMAL(5,2)，见 migration/src/domain/v15/mod.rs 建表段，
+ * PostgreSQL 按列 typmod 归一后序列化串恒带两位小数）；cents 是要加的分数；label 用于点名是哪一列。
+ * 传给谁：apiCall 请求体（DECIMAL 入参按字符串十进制提交，与本仓其它金额入参同形）。
+ * 存什么/存哪里：不落库，只产出与库侧口径逐字符一致的字符串。
+ * 为什么不在测试里做浮点加法：基线 + 0.02 + 0.03 会产生 50.050000000000004，
+ * 该值在两位小数的列上根本不存在，拿它当期望值会把"读回成功"误判成"读不回"。
+ */
+function addCents(serialized: unknown, cents: number, label: string): string {
+  const s = String(serialized);
+  const m = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(s);
+  if (!m) {
+    throw new Error(`${label} 应为最多两位小数的 DECIMAL 序列化串，实际 ${s}`);
+  }
+  const totalCents = Number(m[2]) * 100 + Number((m[3] ?? '').padEnd(2, '0'));
+  const nextCents = totalCents + cents;
+  if (nextCents < 0) {
+    throw new Error(`${label} 按分加量后为负（${nextCents} 分），阈值列非负且业务上不允许负值`);
+  }
+  return `${Math.floor(nextCents / 100)}.${String(nextCents % 100).padStart(2, '0')}`;
 }
 
 /** 距今 days 天前的日期（后端候选判据用本地日历日） */
@@ -158,30 +199,33 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
   test('454-01 缺料预警阈值写入回读一致且改值后旧值不残留', async ({ page }) => {
     test.setTimeout(180_000);
 
+    // 期望值只认库侧序列化串（两位小数），改量按整数分推导，测试内不做浮点加法
     const base = await apiCallRaw<ThresholdConfig>(page, 'GET', '/material-shortage/threshold');
-    const baseCritical = Number(base.critical_threshold);
-    const baseSevere = Number(base.severe_threshold);
-    if (!Number.isFinite(baseCritical) || !Number.isFinite(baseSevere)) {
-      throw new Error(`454-01 前置不成立：阈值基线缺键，实际=${JSON.stringify(base)}`);
+    const baseCritical = String(base.critical_threshold);
+    const baseSevere = String(base.severe_threshold);
+    if (!/^\d+\.\d{2}$/.test(baseCritical) || !/^\d+\.\d{2}$/.test(baseSevere)) {
+      throw new Error(
+        `454-01 前置不成立：阈值基线不是两位小数的 DECIMAL 序列化串，实际=${JSON.stringify(base)}`
+      );
     }
     console.log(`[454-01] 基线 critical=${baseCritical} severe=${baseSevere}`);
 
-    const newCritical = baseCritical + 0.01;
-    const newSevere = baseSevere + 0.02;
+    const newCritical = addCents(baseCritical, 1, '基线 critical');
+    const newSevere = addCents(baseSevere, 2, '基线 severe');
     await apiCall(page, 'POST', '/material-shortage/threshold', {
       critical_threshold: newCritical,
       severe_threshold: newSevere,
     });
     const after = await apiCallRaw<ThresholdConfig>(page, 'GET', '/material-shortage/threshold');
-    expect(Number(after.critical_threshold), '454-01 改后 critical 未读回新值').toBe(newCritical);
-    expect(Number(after.severe_threshold), '454-01 改后 severe 未读回新值').toBe(newSevere);
+    expect(String(after.critical_threshold), '454-01 改后 critical 未读回新值').toBe(newCritical);
+    expect(String(after.severe_threshold), '454-01 改后 severe 未读回新值').toBe(newSevere);
 
     // 只提交单键时另一键保持新值而非回落基线（部分覆盖，不是整表重置）
-    const keepSevere = newSevere + 0.03;
+    const keepSevere = addCents(newSevere, 3, '上一轮 severe');
     await apiCall(page, 'POST', '/material-shortage/threshold', { severe_threshold: keepSevere });
     const partial = await apiCallRaw<ThresholdConfig>(page, 'GET', '/material-shortage/threshold');
-    expect(Number(partial.severe_threshold), '454-01 单键更新 severe 未读回新值').toBe(keepSevere);
-    expect(Number(partial.critical_threshold), '454-01 未提交的 critical 不应被改').toBe(
+    expect(String(partial.severe_threshold), '454-01 单键更新 severe 未读回新值').toBe(keepSevere);
+    expect(String(partial.critical_threshold), '454-01 未提交的 critical 不应被改').toBe(
       newCritical
     );
 
@@ -191,8 +235,8 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
       severe_threshold: baseSevere,
     });
     const restored = await apiCallRaw<ThresholdConfig>(page, 'GET', '/material-shortage/threshold');
-    expect(Number(restored.critical_threshold), '454-01 基线回写 critical').toBe(baseCritical);
-    expect(Number(restored.severe_threshold), '454-01 基线回写 severe').toBe(baseSevere);
+    expect(String(restored.critical_threshold), '454-01 基线回写 critical').toBe(baseCritical);
+    expect(String(restored.severe_threshold), '454-01 基线回写 severe').toBe(baseSevere);
 
     const list = await apiCall<RulePage>(
       page,
@@ -360,9 +404,32 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     expect(badStatus.status, `454-03 大写 status 过滤应 400，实际 ${badStatus.status}`).toBe(400);
   });
 
-  test('454-04 应收逾期预警真实触发落库并给触发人投递站内信', async ({ page }) => {
+  test('454-04 应收逾期预警真实触发落库并按规则角色集投递站内信', async ({ page }) => {
     test.setTimeout(240_000);
     const tag = uniq();
+
+    // 收件人由启用中账龄规则的 notify_roles 在唯一解析点决定，所以本腿先自建一条启用规则、
+    // 把角色集显式声明为 NOTIFY_ROLE 并回读自证；不建规则就解析不到任何收件人，
+    // 预警行的 notification_id 会按"显式不投递"保持为空（不回落成点击者）。
+    const rule = await apiCallRaw<AlertRule>(page, 'POST', '/aging-alert-rules', {
+      rule_name: `E2E-454-04-AGE-${tag}`,
+      rule_code: `e2e454o4${tag}`.slice(0, 40),
+      aging_bucket: '30_days',
+      threshold_days: 30,
+      threshold_amount: 1000,
+      alert_level: 'warning',
+      notify_method: 'system',
+      notify_roles: [NOTIFY_ROLE],
+      is_active: true,
+      remarks: `454-04 收件人角色集 ${tag}`,
+    });
+    expect(
+      Number.isInteger(rule.id) && rule.id > 0,
+      `454-04 建收件人规则应返回正整数 id，实际 ${String(rule.id)}`
+    ).toBe(true);
+    const ruleRead = await apiCallRaw<AlertRule>(page, 'GET', `/aging-alert-rules/${rule.id}`);
+    expect(ruleRead.notify_roles, '454-04 收件人角色集应原样读回').toEqual([NOTIFY_ROLE]);
+    expect(ruleRead.is_active, '454-04 收件人规则必须为启用态').toBe(true);
 
     const custs = await apiCall<{ items?: CustRow[] }>(
       page,
@@ -458,18 +525,13 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     if (typeof notifId !== 'number') {
       throw new Error(`454-04 前置不成立：预警未回填 notification_id=${String(notifId)}`);
     }
-    const inbox = await listNotifications(page, 'UNREAD');
-    const got = inbox.find(n => n.id === notifId);
-    expect(got, `454-04 触发人未读列表应含通知 id=${notifId}`).toBeTruthy();
-    expect(got!.title, '454-04 通知标题应为前缀加预警标题').toBe(`[财务预警] ${alert.title}`);
-    expect(got!.content, '454-04 通知正文应等于预警正文').toBe(alert.content);
-    deferCleanup(cleanup, 'DELETE', `/notifications/${notifId}`, `454-04 notif ${notifId}`);
 
-    const unread = await apiCallRaw<number>(page, 'GET', '/notifications/unread-count');
-    expect(typeof unread === 'number' && unread > 0, `454-04 未读计数异常：${String(unread)}`).toBe(
-      true
-    );
-    console.log(`[454-04] 预警 id=${alert.id} no=${alert.alert_no} 通知 id=${notifId}`);
+    // 反向判据：触发人岗位（本分片会话）不在 notify_roles 内，其未读列表不得出现这条通知。
+    const triggerInbox = await listNotifications(page, 'UNREAD');
+    expect(
+      triggerInbox.find(n => n.id === notifId),
+      `454-04 触发人岗位不在角色集 ${NOTIFY_ROLE} 内，未读列表不应含通知 id=${notifId}`
+    ).toBeUndefined();
 
     // 越界类型不静默回落全量，而是 400
     const badType = await apiCallExpectFail(page, 'POST', '/finance-alerts/trigger-scan', {
@@ -486,6 +548,33 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     await apiCall(page, 'POST', `/ar/invoices/${invoiceId}/cancel`, {
       reason: '454 契约链用例回收',
     });
+    // 规则只在本腿扫描那一刻参与收件人解析，投递完成后当场回收并把 404 读回，
+    // 不把启用中的角色集留给同分片的后续用例；删除权属于建规则的岗位，故排在切岗之前。
+    await apiCall(page, 'DELETE', `/aging-alert-rules/${rule.id}`);
+    const ruleGone = await apiCallExpectFail(page, 'GET', `/aging-alert-rules/${rule.id}`);
+    expect(ruleGone.status, `454-04 规则回收后应 404，实际 ${ruleGone.status}`).toBe(404);
+
+    // 接收侧判据换到角色集内岗位的会话里读；站内信的删除权只属收件人
+    // （notification_service.rs::delete_notification 逐条比 user_id），回收也在这一段登记。
+    await loginAsRole(page, NOTIFY_ROLE);
+    const inbox = await listNotifications(page, 'UNREAD');
+    const got = inbox.find(n => n.title === `[财务预警] ${alert.title}`);
+    expect(
+      got,
+      `454-04 角色集内岗位 ${NOTIFY_ROLE} 的未读列表应含预警 id=${alert.id} 的站内信，` +
+        `实际 ${inbox.length} 行`
+    ).toBeTruthy();
+    deferCleanup(cleanup, 'DELETE', `/notifications/${got!.id}`, `454-04 notif ${got!.id}`);
+    expect(got!.content, '454-04 通知正文应等于预警正文').toBe(alert.content);
+    const unread = await apiCallRaw<number>(page, 'GET', '/notifications/unread-count');
+    expect(
+      typeof unread === 'number' && unread > 0,
+      `454-04 ${NOTIFY_ROLE} 收件后未读计数异常：${String(unread)}`
+    ).toBe(true);
+    console.log(
+      `[454-04] 预警 id=${alert.id} no=${alert.alert_no} 角色集=${NOTIFY_ROLE} ` +
+        `主通知 id=${notifId} 收件通知 id=${got!.id}`
+    );
   });
 
   test('454-05 二次触发不翻倍且终结后未处理集不残留该条', async ({ page }) => {
@@ -613,9 +702,26 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     ).toBe(true);
   });
 
-  test('454-06 站内信条目本角色可见且另一角色不可见', async ({ page }) => {
+  test('454-06 站内信按规则角色集投递，非角色集岗位不可见', async ({ page }) => {
     test.setTimeout(240_000);
     const tag = uniq();
+
+    // 收件人由规则声明的角色集决定（与 454-04 同一个解析点），本腿先自建启用规则并回读自证。
+    const rule = await apiCallRaw<AlertRule>(page, 'POST', '/aging-alert-rules', {
+      rule_name: `E2E-454-06-AGE-${tag}`,
+      rule_code: `e2e454o6${tag}`.slice(0, 40),
+      aging_bucket: '30_days',
+      threshold_days: 30,
+      threshold_amount: 1000,
+      alert_level: 'warning',
+      notify_method: 'system',
+      notify_roles: [NOTIFY_ROLE],
+      is_active: true,
+      remarks: `454-06 收件人角色集 ${tag}`,
+    });
+    const ruleRead = await apiCallRaw<AlertRule>(page, 'GET', `/aging-alert-rules/${rule.id}`);
+    expect(ruleRead.notify_roles, '454-06 收件人角色集应原样读回').toEqual([NOTIFY_ROLE]);
+    expect(ruleRead.is_active, '454-06 收件人规则必须为启用态').toBe(true);
 
     const custs = await apiCall<{ items?: CustRow[] }>(
       page,
@@ -650,27 +756,22 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
         `454-06 前置不成立：预警 id=${alert.id} 未回填 notification_id=${String(notifId)}`
       );
     }
-    deferCleanup(cleanup, 'DELETE', `/notifications/${notifId}`, `454-06 notif ${notifId}`);
 
     const marker = `[财务预警] ${custName}`;
-    await safeGoto(page, '/notification');
-    await expect(
-      page.locator('.notification .card-header').getByText('通知中心', { exact: true }),
-      '454-06 未渲染通知中心页面标题'
-    ).toBeVisible();
-    await expect(
-      page.locator('.item-title', { hasText: marker }).first(),
-      `454-06 触发人站内信列表应出现条目：${marker}`
-    ).toBeVisible();
+    const pageTitle = page.locator('.notification .card-header').getByText('通知中心', {
+      exact: true,
+    });
 
-    // 另一角色登录同一页面：不推错人
-    await loginAsRole(page, 'accountant');
+    // 触发人岗位（本分片会话）不在角色集内：先证页面真渲染，再判 0 才有意义。
     await safeGoto(page, '/notification');
+    await expect(pageTitle, '454-06 未渲染通知中心页面标题').toBeVisible();
     await expect(
       page.locator('.item-title', { hasText: marker }),
-      `454-06 accountant 非收件人，不应看到 ${marker}`
+      `454-06 触发人岗位不在角色集 ${NOTIFY_ROLE} 内，不应看到 ${marker}`
     ).toHaveCount(0);
 
+    // 写侧回收全部留在触发人岗位上做完：预警按状态机终结，规则只在本腿扫描那一刻参与收件人
+    // 解析，投递完成后当场回收并把 404 读回，不把启用中的角色集留给同分片的后续用例。
     await apiCall(page, 'POST', `/finance-alerts/${alert.id}/acknowledge`, { remark: '用例回收' });
     await apiCall(page, 'POST', `/finance-alerts/${alert.id}/resolve`, {
       resolve_note: '454 契约链用例回收',
@@ -678,7 +779,43 @@ test.describe.serial('454 预警配置与通知触达契约链', () => {
     await apiCall(page, 'POST', `/ar/invoices/${invoice.id}/cancel`, {
       reason: '454 契约链用例回收',
     });
-    console.log(`454-06 可见性腿通过：预警 id=${alert.id} 通知 id=${notifId}`);
+    await apiCall(page, 'DELETE', `/aging-alert-rules/${rule.id}`);
+    const ruleGone = await apiCallExpectFail(page, 'GET', `/aging-alert-rules/${rule.id}`);
+    expect(ruleGone.status, `454-06 规则回收后应 404，实际 ${ruleGone.status}`).toBe(404);
+
+    // 会计岗与角色集内岗位的判据走 API 而不是界面：通知中心路由的可见门挂在 users:read
+    // （router/index.ts 的 meta.permission），而 e2e 建岗面除通配超管外无人持这枚键，
+    // 用界面判 0 会把"进不去页面"当成"没推到"。两岗同机制，一读得到一个读不到，
+    // 既排除整个读面空转，也排除投递仍落在点击者身上。
+    await loginAsRole(page, 'accountant');
+    const accountantInbox = await listNotifications(page, 'UNREAD');
+    expect(
+      accountantInbox.find(n => n.title === `[财务预警] ${alert.title}`),
+      `454-06 accountant 非收件人，收件箱不应含预警 id=${alert.id} 的站内信`
+    ).toBeUndefined();
+
+    // 角色集内岗位登录：站内信删除权只属收件人
+    // （notification_service.rs::delete_notification 逐条比 user_id），
+    // 所以本腿最后一段留在这个岗位，延迟回收队列在它之后才 flush。
+    await loginAsRole(page, NOTIFY_ROLE);
+    const inbox = await listNotifications(page, 'UNREAD');
+    const got = inbox.find(n => n.title === `[财务预警] ${alert.title}`);
+    expect(
+      got,
+      `454-06 角色集内岗位 ${NOTIFY_ROLE} 的未读列表应含预警 id=${alert.id} 的站内信，` +
+        `实际 ${inbox.length} 行`
+    ).toBeTruthy();
+    expect(
+      inbox.filter(n => n.title === `[财务预警] ${alert.title}`).length,
+      `454-06 同一预警对同一收件人只应投递一条，实际 ${inbox.length} 行里命中多条`
+    ).toBe(1);
+    deferCleanup(cleanup, 'DELETE', `/notifications/${got!.id}`, `454-06 notif ${got!.id}`);
+    expect(got!.content, '454-06 通知正文应等于预警正文').toBe(alert.content);
+
+    console.log(
+      `454-06 可见性腿通过：预警 id=${alert.id} 角色集=${NOTIFY_ROLE} ` +
+        `主通知 id=${notifId} 收件通知 id=${got!.id}`
+    );
   });
 
   test('454-07 手工建预警走同一状态词表且未知类型被拒', async ({ page }) => {
