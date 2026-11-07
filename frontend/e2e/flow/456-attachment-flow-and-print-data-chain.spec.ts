@@ -35,8 +35,9 @@ import {
  *   attachment_path 为 null 时 404 NOT_FOUND；
  * - DELETE `/purchase/suppliers/{sid}/qualifications/{qid}`（delete_supplier_qualification）
  *   删行后读取端 404；
- * - POST `/purchase/orders`（create_order）body 含 supplier_id/order_date；
- *   出参 ApiResponse<Value>，data 含 id/order_no；
+ * - POST `/purchase/orders`（create_order）body 含 supplier_id/order_date/items
+ *   （items 至少一行，CreatePurchaseOrderRequest 对 items 有 length(min=1) 校验，
+ *   先建空单再补行必 400）；出参 ApiResponse<Value>，data 含 id/order_no；
  * - POST `/purchase/orders/{id}/items`（create_order_item）body 含 line_no/material_id/
  *   quantity_ordered/unit_price；
  * - GET `/purchase/orders/{id}`（get_order）出参含 items 数组；
@@ -110,12 +111,19 @@ async function uploadAttachment(
       `456 upload rejected by CSRF middleware status=${status} code=${parsed.code} — session issue`
     );
   }
-  return { status, code: parsed.code, message: parsed.message ?? null, data: (parsed.data ?? null) as Record<string, unknown> | null };
+  return {
+    status,
+    code: parsed.code,
+    message: parsed.message ?? null,
+    data: (parsed.data ?? null) as Record<string, unknown> | null,
+  };
 }
 
 async function createQualification(page: Page, supplierId: number, label: string): Promise<number> {
   const created = await apiCall<{ id?: number }>(
-    page, 'POST', `/purchase/suppliers/${supplierId}/qualifications`,
+    page,
+    'POST',
+    `/purchase/suppliers/${supplierId}/qualifications`,
     {
       qualification_name: genName(`E456Q${label}`),
       qualification_type: 'system_cert',
@@ -128,15 +136,24 @@ async function createQualification(page: Page, supplierId: number, label: string
   );
   const qid = created.data?.id;
   if (typeof qid !== 'number') {
-    throw new Error(`456 precondition: qualification create returned no id, data=${JSON.stringify(created.data)}`);
+    throw new Error(
+      `456 precondition: qualification create returned no id, data=${JSON.stringify(created.data)}`
+    );
   }
   return qid;
 }
 
 async function readQualFromList(
-  page: Page, supplierId: number, qid: number, leg: string
+  page: Page,
+  supplierId: number,
+  qid: number,
+  leg: string
 ): Promise<Record<string, unknown>> {
-  const list = await apiCallRaw<unknown>(page, 'GET', `/purchase/suppliers/${supplierId}/qualifications`);
+  const list = await apiCallRaw<unknown>(
+    page,
+    'GET',
+    `/purchase/suppliers/${supplierId}/qualifications`
+  );
   if (!Array.isArray(list)) {
     throw new Error(`[${leg}] qualification list shape mismatch: ${JSON.stringify(list)}`);
   }
@@ -148,16 +165,23 @@ async function readQualFromList(
 }
 
 async function assertNoAttachment(
-  page: Page, supplierId: number, qid: number, leg: string
+  page: Page,
+  supplierId: number,
+  qid: number,
+  leg: string
 ): Promise<void> {
   const row = await readQualFromList(page, supplierId, qid, leg);
-  expect(row.attachment_path === null || row.attachment_path === undefined,
+  expect(
+    row.attachment_path === null || row.attachment_path === undefined,
     `[${leg}] rejected upload must leave attachment_path null, actual=${JSON.stringify(row.attachment_path)}`
   ).toBe(true);
   const preview = await apiCallExpectFail(
-    page, 'GET', `/purchase/suppliers/${supplierId}/qualifications/${qid}/attachment`
+    page,
+    'GET',
+    `/purchase/suppliers/${supplierId}/qualifications/${qid}/attachment`
   );
-  expect(preview.status,
+  expect(
+    preview.status,
     `[${leg}] after rejection preview must 404, actual ${preview.status}`
   ).toBe(404);
 }
@@ -166,7 +190,9 @@ let cachedSupplierId: number | undefined;
 
 async function ensureSupplier(page: Page): Promise<number> {
   if (typeof cachedSupplierId === 'number') return cachedSupplierId;
-  const suffix = `${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+  const suffix = `${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0')}`;
   const created = await apiCall<{ id?: number }>(page, 'POST', '/purchase/suppliers', {
     supplier_name: `E2E456Sup${suffix}`,
     supplier_short_name: `E456${suffix.slice(-3)}`,
@@ -174,7 +200,9 @@ async function ensureSupplier(page: Page): Promise<number> {
   });
   const sid = created.data?.id;
   if (typeof sid !== 'number') {
-    throw new Error(`456 precondition: supplier create returned no id, data=${JSON.stringify(created.data)}`);
+    throw new Error(
+      `456 precondition: supplier create returned no id, data=${JSON.stringify(created.data)}`
+    );
   }
   cachedSupplierId = sid;
   console.log(`[456] supplier id=${sid}`);
@@ -183,23 +211,36 @@ async function ensureSupplier(page: Page): Promise<number> {
 
 /** DOCX 解包取正文 XML：验证 PK 魔数 + word/document.xml 存在 + 内容非空 */
 async function documentXml(bytes: Buffer, leg: string): Promise<string> {
-  expect(bytes.byteLength, `[${leg}] docx bytes must be non-empty, actual ${bytes.byteLength}B`).toBeGreaterThan(0);
+  expect(
+    bytes.byteLength,
+    `[${leg}] docx bytes must be non-empty, actual ${bytes.byteLength}B`
+  ).toBeGreaterThan(0);
   expect(bytes[0], `[${leg}] docx first byte must be 0x50 (P), actual ${bytes[0]}`).toBe(0x50);
   expect(bytes[1], `[${leg}] docx second byte must be 0x4b (K), actual ${bytes[1]}`).toBe(0x4b);
   const zip = await JSZip.loadAsync(bytes);
   const entry = zip.file('word/document.xml');
-  expect(entry, `[${leg}] docx must contain word/document.xml, entries: ${Object.keys(zip.files).join(',')}`).toBeTruthy();
+  expect(
+    entry,
+    `[${leg}] docx must contain word/document.xml, entries: ${Object.keys(zip.files).join(',')}`
+  ).toBeTruthy();
   const xml = await entry!.async('string');
-  expect(xml.length, `[${leg}] word/document.xml body must be non-empty, actual ${xml.length}B`).toBeGreaterThan(100);
+  expect(
+    xml.length,
+    `[${leg}] word/document.xml body must be non-empty, actual ${xml.length}B`
+  ).toBeGreaterThan(100);
   return xml;
 }
 
 /** 确保打印模板可用：若首次请求 404 则创建默认模板，返回已清除的 404 证明模板装配腿生效 */
 async function ensurePrintTemplate(
-  page: Page, docType: string, cleanupQueue: { method: 'DELETE' | 'PUT' | 'POST'; path: string; label?: string }[]
+  page: Page,
+  docType: string,
+  cleanupQueue: { method: 'DELETE' | 'PUT' | 'POST'; path: string; label?: string }[]
 ): Promise<void> {
   const existing = await apiCallRaw<{ items?: Record<string, unknown>[] }>(
-    page, 'GET', `/print-templates?doc_type=${docType}&page=1&page_size=1`
+    page,
+    'GET',
+    `/print-templates?doc_type=${docType}&page=1&page_size=1`
   );
   const items = existing?.items;
   if (items && items.length > 0) {
@@ -218,15 +259,20 @@ async function ensurePrintTemplate(
     status: 'active',
   });
   const tplId = Number(tpl.id);
-  expect(Number.isInteger(tplId) && tplId > 0,
-    `[456] create print template must return id, actual ${tpl.id}`).toBe(true);
+  expect(
+    Number.isInteger(tplId) && tplId > 0,
+    `[456] create print template must return id, actual ${tpl.id}`
+  ).toBe(true);
   deferCleanup(cleanupQueue, 'DELETE', `/print-templates/${tplId}`, `print-template-${tplId}`);
   console.log(`[456] print template created for ${docType} id=${tplId}`);
 }
 
 /** 创建采购订单并添加指定数量明细行，返回 {orderId, orderNo, itemCount, totalAmount} */
 async function createOrderWithItems(
-  page: Page, supplierId: number, itemCount: number, cleanupQueue: { method: 'DELETE' | 'PUT' | 'POST'; path: string; label?: string }[]
+  page: Page,
+  supplierId: number,
+  itemCount: number,
+  cleanupQueue: { method: 'DELETE' | 'PUT' | 'POST'; path: string; label?: string }[]
 ): Promise<{ orderId: number; orderNo: string; itemCount: number; totalAmount: number }> {
   const ctx = getCtx();
   const warehouseId = ctx.warehouseIds[0];
@@ -235,33 +281,43 @@ async function createOrderWithItems(
   if (!productId) throw new Error('456 precondition: no product in context');
 
   const orderDate = new Date().toISOString().slice(0, 10);
-  const order = await apiCall<{ id?: number; order_no?: string }>(page, 'POST', '/purchase/orders', {
-    supplier_id: supplierId,
-    order_date: orderDate,
-    warehouse_id: warehouseId,
+  let totalAmount = 0;
+  const items = Array.from({ length: itemCount }, (_, i) => {
+    const unitPrice = 11 + i;
+    const qty = 5;
+    totalAmount += unitPrice * qty;
+    return {
+      line_no: i + 1,
+      material_id: productId,
+      unit_price: String(unitPrice),
+      quantity_ordered: String(qty),
+      tax_rate: '0',
+    };
   });
+  const order = await apiCall<{ id?: number; order_no?: string }>(
+    page,
+    'POST',
+    '/purchase/orders',
+    {
+      supplier_id: supplierId,
+      order_date: orderDate,
+      warehouse_id: warehouseId,
+      items,
+    }
+  );
   const orderId = order.data?.id;
   const orderNo = order.data?.order_no;
   if (typeof orderId !== 'number') {
-    throw new Error(`456 precondition: order create returned no id, data=${JSON.stringify(order.data)}`);
+    throw new Error(
+      `456 precondition: order create returned no id, data=${JSON.stringify(order.data)}`
+    );
   }
   if (typeof orderNo !== 'string' || !orderNo) {
-    throw new Error(`456 precondition: order create returned no order_no, data=${JSON.stringify(order.data)}`);
+    throw new Error(
+      `456 precondition: order create returned no order_no, data=${JSON.stringify(order.data)}`
+    );
   }
   deferCleanup(cleanupQueue, 'DELETE', `/purchase/orders/${orderId}`, `po-${orderId}`);
-
-  let totalAmount = 0;
-  for (let i = 1; i <= itemCount; i++) {
-    const unitPrice = 10 + i;
-    const qty = 5;
-    await apiCall(page, 'POST', `/purchase/orders/${orderId}/items`, {
-      line_no: i,
-      material_id: productId,
-      unit_price: unitPrice,
-      quantity_ordered: qty,
-    });
-    totalAmount += unitPrice * qty;
-  }
   console.log(`[456] order id=${orderId} no=${orderNo} items=${itemCount} total=${totalAmount}`);
   return { orderId, orderNo, itemCount, totalAmount };
 }
@@ -291,49 +347,75 @@ test.describe.serial('456 attachment flow and print data chain', () => {
 
     const expectedPath = `/uploads/qualifications/${sid}_${qid}.pdf`;
     expect(up.data, '456-01 upload response data must be present').not.toBeNull();
-    expect(String(up.data!.attachment_path),
-      `456-01 attachment_path must be server-generated URL ${expectedPath}`).toBe(expectedPath);
-    expect(Number(up.data!.supplier_id),
-      `456-01 attachment belongs to supplier ${sid}`).toBe(sid);
-    expect(Number(up.data!.id),
-      `456-01 attachment belongs to qualification ${qid}`).toBe(qid);
+    expect(
+      String(up.data!.attachment_path),
+      `456-01 attachment_path must be server-generated URL ${expectedPath}`
+    ).toBe(expectedPath);
+    expect(Number(up.data!.supplier_id), `456-01 attachment belongs to supplier ${sid}`).toBe(sid);
+    expect(Number(up.data!.id), `456-01 attachment belongs to qualification ${qid}`).toBe(qid);
 
     // 回读列表确认落库
     const row = await readQualFromList(page, sid, qid, '456-01-readback');
-    expect(String(row.attachment_path),
-      `456-01 list read-back attachment_path must still be ${expectedPath}`).toBe(expectedPath);
+    expect(
+      String(row.attachment_path),
+      `456-01 list read-back attachment_path must still be ${expectedPath}`
+    ).toBe(expectedPath);
 
     // 下载确认字节完整
-    const dl = await page.request.get(fullUrl(`/purchase/suppliers/${sid}/qualifications/${qid}/attachment`));
+    const dl = await page.request.get(
+      fullUrl(`/purchase/suppliers/${sid}/qualifications/${qid}/attachment`)
+    );
     expect(dl.status(), `456-01 download must 200, actual ${dl.status()}`).toBe(200);
     const dlHeaders = dl.headers();
-    expect(dlHeaders['content-type'],
-      `456-01 download content-type must application/pdf, actual ${dlHeaders['content-type']}`).toContain('application/pdf');
+    expect(
+      dlHeaders['content-type'],
+      `456-01 download content-type must application/pdf, actual ${dlHeaders['content-type']}`
+    ).toContain('application/pdf');
     const dlBytes = new Uint8Array(await dl.body());
-    expect(dlBytes.length, `456-01 download bytes must be non-zero, actual ${dlBytes.length}`).toBeGreaterThan(0);
+    expect(
+      dlBytes.length,
+      `456-01 download bytes must be non-zero, actual ${dlBytes.length}`
+    ).toBeGreaterThan(0);
     expect(dlBytes[0], `456-01 first byte %PDF 0x25`).toBe(0x25);
     expect(dlBytes[1], `456-01 second byte %PDF 0x50`).toBe(0x50);
     expect(dlBytes[2], `456-01 third byte %PDF 0x44`).toBe(0x44);
     expect(dlBytes[3], `456-01 fourth byte %PDF 0x46`).toBe(0x46);
-    expect(dlBytes.length, `456-01 download byte count must equal upload ${pdf.length}`).toBe(pdf.length);
+    expect(dlBytes.length, `456-01 download byte count must equal upload ${pdf.length}`).toBe(
+      pdf.length
+    );
 
     // 删除确认消失
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qid}`);
-    const listAfter = await apiCallRaw<unknown>(page, 'GET', `/purchase/suppliers/${sid}/qualifications`);
+    const listAfter = await apiCallRaw<unknown>(
+      page,
+      'GET',
+      `/purchase/suppliers/${sid}/qualifications`
+    );
     if (!Array.isArray(listAfter)) {
       throw new Error(`456-01 list shape mismatch after delete: ${JSON.stringify(listAfter)}`);
     }
     const gone = (listAfter as Record<string, unknown>[]).some(r => Number(r.id) === qid);
     expect(gone, `456-01 after delete qualification id=${qid} must not be in list`).toBe(false);
 
-    const failAfter = await apiCallExpectFail(page, 'GET', `/purchase/suppliers/${sid}/qualifications/${qid}/attachment`);
-    expect(failAfter.status, `456-01 after delete attachment must 404, actual ${failAfter.status}`).toBe(404);
-    expect(failAfter.code, `456-01 after delete code must NOT_FOUND`).toBe(APP_ERROR_CODES.NOT_FOUND);
+    const failAfter = await apiCallExpectFail(
+      page,
+      'GET',
+      `/purchase/suppliers/${sid}/qualifications/${qid}/attachment`
+    );
+    expect(
+      failAfter.status,
+      `456-01 after delete attachment must 404, actual ${failAfter.status}`
+    ).toBe(404);
+    expect(failAfter.code, `456-01 after delete code must NOT_FOUND`).toBe(
+      APP_ERROR_CODES.NOT_FOUND
+    );
   });
 
   // ─── 456-02 多条附件不覆盖：两条并存、删一余一 ─────────────────────────
 
-  test('456-02 two attachments coexist on same supplier delete one keeps other', async ({ page }) => {
+  test('456-02 two attachments coexist on same supplier delete one keeps other', async ({
+    page,
+  }) => {
     const sid = await ensureSupplier(page);
     const qid1 = await createQualification(page, sid, '02a');
     const qid2 = await createQualification(page, sid, '02b');
@@ -346,7 +428,11 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     expect(up2.status, `456-02 upload B must 200, actual ${up2.status}`).toBe(200);
 
     // 两条都在列表中且 attachment_path 各自独立
-    const listBoth = await apiCallRaw<unknown>(page, 'GET', `/purchase/suppliers/${sid}/qualifications`);
+    const listBoth = await apiCallRaw<unknown>(
+      page,
+      'GET',
+      `/purchase/suppliers/${sid}/qualifications`
+    );
     if (!Array.isArray(listBoth)) {
       throw new Error(`456-02 list shape mismatch: ${JSON.stringify(listBoth)}`);
     }
@@ -355,12 +441,20 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     const row2 = arr.find(r => Number(r.id) === qid2);
     expect(row1, '456-02 qualification A must exist in list').toBeTruthy();
     expect(row2, '456-02 qualification B must exist in list').toBeTruthy();
-    expect(String(row1!.attachment_path), `456-02 A path`).toBe(`/uploads/qualifications/${sid}_${qid1}.pdf`);
-    expect(String(row2!.attachment_path), `456-02 B path`).toBe(`/uploads/qualifications/${sid}_${qid2}.pdf`);
+    expect(String(row1!.attachment_path), `456-02 A path`).toBe(
+      `/uploads/qualifications/${sid}_${qid1}.pdf`
+    );
+    expect(String(row2!.attachment_path), `456-02 B path`).toBe(
+      `/uploads/qualifications/${sid}_${qid2}.pdf`
+    );
 
     // 删除 A → B 不丢
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qid1}`);
-    const listAfter = await apiCallRaw<unknown>(page, 'GET', `/purchase/suppliers/${sid}/qualifications`);
+    const listAfter = await apiCallRaw<unknown>(
+      page,
+      'GET',
+      `/purchase/suppliers/${sid}/qualifications`
+    );
     if (!Array.isArray(listAfter)) {
       throw new Error(`456-02 list shape after delete: ${JSON.stringify(listAfter)}`);
     }
@@ -369,8 +463,10 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     const kept2 = arrAfter.find(r => Number(r.id) === qid2);
     expect(gone1, '456-02 deleted A must not be in list').toBeUndefined();
     expect(kept2, '456-02 B must remain after A deletion').toBeTruthy();
-    expect(String(kept2!.attachment_path),
-      `456-02 B attachment_path preserved after A delete`).toBe(`/uploads/qualifications/${sid}_${qid2}.pdf`);
+    expect(
+      String(kept2!.attachment_path),
+      `456-02 B attachment_path preserved after A delete`
+    ).toBe(`/uploads/qualifications/${sid}_${qid2}.pdf`);
 
     // 清理 B
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qid2}`);
@@ -386,12 +482,20 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     const { orderId, orderNo, itemCount } = await createOrderWithItems(page, sid, 22, cleanupQueue);
 
     // 先通过订单详情确认 items 数量
-    const detail = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/purchase/orders/${orderId}`);
+    const detail = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/purchase/orders/${orderId}`
+    );
     const detailItems = detail?.items;
-    expect(Array.isArray(detailItems),
-      `456-03 order detail must contain items array, actual=${JSON.stringify(detail)}`).toBe(true);
-    expect((detailItems as unknown[]).length,
-      `456-03 order must have ${itemCount} items in detail`).toBe(22);
+    expect(
+      Array.isArray(detailItems),
+      `456-03 order detail must contain items array, actual=${JSON.stringify(detail)}`
+    ).toBe(true);
+    expect(
+      (detailItems as unknown[]).length,
+      `456-03 order must have ${itemCount} items in detail`
+    ).toBe(22);
 
     // 调打印腿
     const printResp = await page.request.get(fullUrl(`/purchase/orders/${orderId}/print`));
@@ -400,21 +504,29 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     expect(printStatus, `456-03 print endpoint must 200, actual ${printStatus}`).toBe(200);
 
     const printHeaders = printResp.headers();
-    expect(printHeaders['content-type'] ?? '',
-      `456-03 print content-type must be docx, actual ${printHeaders['content-type']}`).toContain('wordprocessingml');
-    expect(printHeaders['content-disposition'] ?? '',
-      `456-03 content-disposition must contain purchase_order_${orderId}`).toContain(`purchase_order_${orderId}`);
+    expect(
+      printHeaders['content-type'] ?? '',
+      `456-03 print content-type must be docx, actual ${printHeaders['content-type']}`
+    ).toContain('wordprocessingml');
+    expect(
+      printHeaders['content-disposition'] ?? '',
+      `456-03 content-disposition must contain purchase_order_${orderId}`
+    ).toContain(`purchase_order_${orderId}`);
 
     // 解析 DOCX 验证正文含订单号（证明非空壳）与明细行数
     const docxBytes = Buffer.from(await printResp.body());
     const xml = await documentXml(docxBytes, '456-03');
-    expect(xml.includes(orderNo),
-      `456-03 print XML must contain order_no "${orderNo}" — empty shell detection`).toBe(true);
+    expect(
+      xml.includes(orderNo),
+      `456-03 print XML must contain order_no "${orderNo}" — empty shell detection`
+    ).toBe(true);
 
     // 22 行明细不截断：XML 中应含 22 行数据标记（每行的序号 1..22 对应的 product 引用）
     for (let lineNo = 1; lineNo <= 22; lineNo++) {
-      expect(xml.includes(String(lineNo)),
-        `456-03 print XML must contain line_no ${lineNo} (items not truncated)`).toBe(true);
+      expect(
+        xml.includes(String(lineNo)),
+        `456-03 print XML must contain line_no ${lineNo} (items not truncated)`
+      ).toBe(true);
     }
 
     await flushDeferredCleanups(page, cleanupQueue);
@@ -438,25 +550,45 @@ test.describe.serial('456 attachment flow and print data chain', () => {
 
     // quality_inspector: 无 suppliers:read 权限 → 列表 403、下载 403
     await loginAsRole(page, 'quality_inspector');
-    const qiList = await apiCallExpectFail(page, 'GET', `/purchase/suppliers/${sid}/qualifications`);
+    const qiList = await apiCallExpectFail(
+      page,
+      'GET',
+      `/purchase/suppliers/${sid}/qualifications`
+    );
     console.log(`[456-04] quality_inspector list status=${qiList.status} code=${qiList.code}`);
-    expect(qiList.status,
-      `456-04 quality_inspector no suppliers:read, list must 403, actual ${qiList.status}`).toBe(403);
-    expect(qiList.code, `456-04 quality_inspector list code must FORBIDDEN`).toBe(APP_ERROR_CODES.FORBIDDEN);
+    expect(
+      qiList.status,
+      `456-04 quality_inspector no suppliers:read, list must 403, actual ${qiList.status}`
+    ).toBe(403);
+    expect(qiList.code, `456-04 quality_inspector list code must FORBIDDEN`).toBe(
+      APP_ERROR_CODES.FORBIDDEN
+    );
 
-    const qiDl = await apiCallExpectFail(page, 'GET', `/purchase/suppliers/${sid}/qualifications/${qid}/attachment`);
+    const qiDl = await apiCallExpectFail(
+      page,
+      'GET',
+      `/purchase/suppliers/${sid}/qualifications/${qid}/attachment`
+    );
     console.log(`[456-04] quality_inspector download status=${qiDl.status} code=${qiDl.code}`);
-    expect(qiDl.status,
-      `456-04 quality_inspector download attachment must 403, actual ${qiDl.status}`).toBe(403);
-    expect(qiDl.code, `456-04 quality_inspector download code must FORBIDDEN`).toBe(APP_ERROR_CODES.FORBIDDEN);
+    expect(
+      qiDl.status,
+      `456-04 quality_inspector download attachment must 403, actual ${qiDl.status}`
+    ).toBe(403);
+    expect(qiDl.code, `456-04 quality_inspector download code must FORBIDDEN`).toBe(
+      APP_ERROR_CODES.FORBIDDEN
+    );
 
     // quality_inspector 无 purchase orders 权限 → 打印腿 403
     const qiPrint = await apiCallExpectFail(page, 'GET', `/purchase/orders/${orderId}/print`);
     console.log(`[456-04] quality_inspector print status=${qiPrint.status} code=${qiPrint.code}`);
-    expect(qiPrint.status,
-      `456-04 quality_inspector print access must 4xx, actual ${qiPrint.status}`).toBeGreaterThanOrEqual(400);
-    expect(qiPrint.status,
-      `456-04 quality_inspector print must be < 500 (client error), actual ${qiPrint.status}`).toBeLessThan(500);
+    expect(
+      qiPrint.status,
+      `456-04 quality_inspector print access must 4xx, actual ${qiPrint.status}`
+    ).toBeGreaterThanOrEqual(400);
+    expect(
+      qiPrint.status,
+      `456-04 quality_inspector print must be < 500 (client error), actual ${qiPrint.status}`
+    ).toBeLessThan(500);
 
     // 切回 admin 清理
     await loginViaUI(page, undefined, undefined, true);
@@ -471,29 +603,62 @@ test.describe.serial('456 attachment flow and print data chain', () => {
 
     // (a) 空文件：0 字节
     const qidEmpty = await createQualification(page, sid, '05a');
-    const emptyUp = await uploadAttachment(page, sid, qidEmpty, 'empty.pdf', 'application/pdf', Buffer.alloc(0));
-    console.log(`[456-05a] empty upload status=${emptyUp.status} code=${emptyUp.code} msg=${emptyUp.message}`);
-    expect(emptyUp.status >= 400 && emptyUp.status < 500,
-      `456-05a empty file upload must 4xx, actual ${emptyUp.status} code=${emptyUp.code}`).toBe(true);
+    const emptyUp = await uploadAttachment(
+      page,
+      sid,
+      qidEmpty,
+      'empty.pdf',
+      'application/pdf',
+      Buffer.alloc(0)
+    );
+    console.log(
+      `[456-05a] empty upload status=${emptyUp.status} code=${emptyUp.code} msg=${emptyUp.message}`
+    );
+    expect(
+      emptyUp.status >= 400 && emptyUp.status < 500,
+      `456-05a empty file upload must 4xx, actual ${emptyUp.status} code=${emptyUp.code}`
+    ).toBe(true);
     await assertNoAttachment(page, sid, qidEmpty, '456-05a');
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qidEmpty}`);
 
     // (b) 超长文件名（超过常见 255 字符路径限制）
     const qidLong = await createQualification(page, sid, '05b');
     const longName = 'a'.repeat(250) + '.pdf';
-    const longUp = await uploadAttachment(page, sid, qidLong, longName, 'application/pdf', buildPdfBuffer('456-05b'));
-    console.log(`[456-05b] long name upload status=${longUp.status} code=${longUp.code} msg=${longUp.message}`);
-    expect(longUp.status >= 400 && longUp.status < 500,
-      `456-05b long filename must 4xx, actual ${longUp.status} code=${longUp.code}`).toBe(true);
+    const longUp = await uploadAttachment(
+      page,
+      sid,
+      qidLong,
+      longName,
+      'application/pdf',
+      buildPdfBuffer('456-05b')
+    );
+    console.log(
+      `[456-05b] long name upload status=${longUp.status} code=${longUp.code} msg=${longUp.message}`
+    );
+    expect(
+      longUp.status >= 400 && longUp.status < 500,
+      `456-05b long filename must 4xx, actual ${longUp.status} code=${longUp.code}`
+    ).toBe(true);
     await assertNoAttachment(page, sid, qidLong, '456-05b');
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qidLong}`);
 
     // (c) 非法后缀 .exe
     const qidExe = await createQualification(page, sid, '05c');
-    const exeUp = await uploadAttachment(page, sid, qidExe, 'trojan.exe', 'application/pdf', buildPdfBuffer('456-05c'));
-    console.log(`[456-05c] exe upload status=${exeUp.status} code=${exeUp.code} msg=${exeUp.message}`);
-    expect(exeUp.status >= 400 && exeUp.status < 500,
-      `456-05c illegal extension must 4xx, actual ${exeUp.status} code=${exeUp.code}`).toBe(true);
+    const exeUp = await uploadAttachment(
+      page,
+      sid,
+      qidExe,
+      'trojan.exe',
+      'application/pdf',
+      buildPdfBuffer('456-05c')
+    );
+    console.log(
+      `[456-05c] exe upload status=${exeUp.status} code=${exeUp.code} msg=${exeUp.message}`
+    );
+    expect(
+      exeUp.status >= 400 && exeUp.status < 500,
+      `456-05c illegal extension must 4xx, actual ${exeUp.status} code=${exeUp.code}`
+    ).toBe(true);
     await assertNoAttachment(page, sid, qidExe, '456-05c');
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qidExe}`);
   });
