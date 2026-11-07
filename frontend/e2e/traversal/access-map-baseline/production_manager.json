@@ -1,7 +1,6 @@
 {
   "role": "production_manager",
   "reachableRoutes": [
-    "/bom",
     "/bpm",
     "/bpm/approval",
     "/capacity",
@@ -10,8 +9,6 @@
     "/dye-recipe",
     "/greige-fabrics",
     "/material-shortage",
-    "/mrp",
-    "/mrp/history",
     "/production",
     "/purchase",
     "/purchase-contract",

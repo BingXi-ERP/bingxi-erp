@@ -1733,7 +1733,6 @@ const COARSE_DOMAIN_RESOURCES: Record<string, string[]> = {
     'greige-fabrics',
     'fabric-inspections',
     'flow-cards',
-    'mrp',
     'capacity',
     'scheduling',
     'outsourcing-orders',

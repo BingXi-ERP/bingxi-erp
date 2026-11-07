@@ -1,4 +1,4 @@
-# layers=8 endpoints=1822
+# layers=8 endpoints=1827
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -83,6 +83,7 @@ DELETE	/api/v1/erp/production/energy-rules/*	energy_handler::delete_energy_rule	
 DELETE	/api/v1/erp/production/fabric-defects/*	fabric_inspection_handler::delete_defect	production
 DELETE	/api/v1/erp/production/fabric-inspections/*	fabric_inspection_handler::delete_inspection	production
 DELETE	/api/v1/erp/production/flow-cards/*	flow_card_handler::delete_flow_card	production
+DELETE	/api/v1/erp/production/flow-cards/materials/*	flow_card_material_handler::delete_material	production
 DELETE	/api/v1/erp/production/greige-fabrics/*	greige_fabric_handler::delete_greige_fabric	production
 DELETE	/api/v1/erp/production/lab-dip/requests/*	lab_dip_handler::delete_request	production
 DELETE	/api/v1/erp/production/lab-dip/samples/*	lab_dip_handler::delete_sample	production
@@ -723,10 +724,12 @@ GET	/api/v1/erp/production/fabric-inspections/by-no/*	fabric_inspection_handler:
 GET	/api/v1/erp/production/flow-cards	flow_card_handler::list_flow_cards	production
 GET	/api/v1/erp/production/flow-cards/*	flow_card_handler::get_flow_card	production
 GET	/api/v1/erp/production/flow-cards/*/feedbacks	flow_card_handler::list_feedbacks_by_card	production
+GET	/api/v1/erp/production/flow-cards/*/materials	flow_card_material_handler::list_materials_by_card	production
 GET	/api/v1/erp/production/flow-cards/*/print	print_handler::production_flow_card_print_docx	production
 GET	/api/v1/erp/production/flow-cards/*/steps	flow_card_handler::list_steps_by_card	production
 GET	/api/v1/erp/production/flow-cards/by-barcode	flow_card_handler::get_by_barcode	production
 GET	/api/v1/erp/production/flow-cards/feedbacks/*	flow_card_handler::get_feedback	production
+GET	/api/v1/erp/production/flow-cards/materials/*	flow_card_material_handler::get_material	production
 GET	/api/v1/erp/production/flow-cards/steps/*	flow_card_handler::get_step	production
 GET	/api/v1/erp/production/greige-fabrics	greige_fabric_handler::list_greige_fabrics	production
 GET	/api/v1/erp/production/greige-fabrics/*	greige_fabric_handler::get_greige_fabric	production
@@ -1426,6 +1429,7 @@ POST	/api/v1/erp/production/flow-cards/*/terminate	flow_card_handler::terminate_
 POST	/api/v1/erp/production/flow-cards/feedbacks	flow_card_handler::create_feedback	production
 POST	/api/v1/erp/production/flow-cards/feedbacks/*/close	flow_card_handler::close_feedback	production
 POST	/api/v1/erp/production/flow-cards/feedbacks/*/handle	flow_card_handler::handle_feedback	production
+POST	/api/v1/erp/production/flow-cards/materials	flow_card_material_handler::create_material	production
 POST	/api/v1/erp/production/flow-cards/steps/*/complete	flow_card_handler::complete_step	production
 POST	/api/v1/erp/production/flow-cards/steps/*/rework	flow_card_handler::create_rework_step	production
 POST	/api/v1/erp/production/flow-cards/steps/start	flow_card_handler::start_step	production
@@ -1750,6 +1754,7 @@ PUT	/api/v1/erp/production/energy-meters/*	energy_handler::update_energy_meter	p
 PUT	/api/v1/erp/production/energy-rules/*	energy_handler::update_energy_rule	production
 PUT	/api/v1/erp/production/fabric-inspections/*	fabric_inspection_handler::update_inspection	production
 PUT	/api/v1/erp/production/flow-cards/*	flow_card_handler::update_flow_card	production
+PUT	/api/v1/erp/production/flow-cards/materials/*	flow_card_material_handler::update_material	production
 PUT	/api/v1/erp/production/greige-fabrics/*	greige_fabric_handler::update_greige_fabric	production
 PUT	/api/v1/erp/production/lab-dip/requests/*	lab_dip_handler::update_request	production
 PUT	/api/v1/erp/production/lab-dip/samples/*	lab_dip_handler::update_sample	production
