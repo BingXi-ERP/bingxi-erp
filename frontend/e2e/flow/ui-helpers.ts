@@ -759,135 +759,6 @@ export async function createDyeRecipeUI(page: Page): Promise<number | undefined>
   );
 }
 
-/** 创建 BOM */
-export async function createBomUI(page: Page): Promise<number | undefined> {
-  // 后端 CreateBomPayload 校验 items 至少 1 条（"BOM明细不能为空"），
-  // 且 product_id/material_id 必填（i32）——表单已改为产品/物料下拉。
-  // 独立实现：填字段 → 点"添加物料" → 选物料 select → 填单位 → 提交
-  try {
-    await safeGoto(page, '/bom');
-    await page.waitForTimeout(500);
-    const addBtn = page.getByRole('button', { name: /新建|新建 BOM/, exact: false }).first();
-    await addBtn.waitFor({ state: 'visible', timeout: 60000 });
-    await addBtn.click();
-    const dialog = page.locator('.el-dialog:visible').last();
-    await dialog.waitFor({ state: 'visible', timeout: 30000 });
-    await page.waitForTimeout(300);
-
-    // 产品下拉（el-select，选含 E2E 的项，无则选第一项）
-    const productItem = dialog.locator('.el-form-item').filter({ hasText: '产品名称' }).first();
-    const productSelect = productItem.locator('.el-select__wrapper, .el-select').first();
-    await productSelect.waitFor({ state: 'visible', timeout: 20000 });
-    await productSelect.click();
-    // 收口归属面板：按本字段触发 input 引用的面板归属 id 钉定，不取页内任一可见面板
-    const prodDropdown = await ownedDropdown(productSelect, page, 10_000);
-    await prodDropdown.waitFor({ state: 'visible', timeout: 10_000 }).catch(e => {
-      console.warn(`[E2E] 断言容错（元素可能未渲染）: ${(e as Error).message}`);
-    });
-    const e2eProd = dropdownItems(prodDropdown).filter({ hasText: /E2E/i }).first();
-    if ((await e2eProd.count()) > 0) {
-      await e2eProd.click();
-    } else {
-      const first = dropdownItems(prodDropdown).first();
-      if ((await first.count()) > 0) await first.click();
-    }
-    await page.waitForTimeout(300);
-
-    // 版本
-    const versionInput = dialog
-      .locator('.el-form-item')
-      .filter({ hasText: '版本' })
-      .locator('input')
-      .first();
-    await versionInput.waitFor({ state: 'visible', timeout: 20000 }).catch(e => {
-      console.warn(`[E2E] 断言容错（元素可能未渲染）: ${(e as Error).message}`);
-    });
-    await versionInput.fill('1').catch(e => {
-      console.warn(`[E2E] 断言容错（元素可能未渲染）: ${(e as Error).message}`);
-    });
-
-    // 状态下拉（选"启用"或第一项）
-    const statusItem = dialog.locator('.el-form-item').filter({ hasText: '状态' }).first();
-    const statusSelect = statusItem.locator('.el-select__wrapper, .el-select').first();
-    if ((await statusSelect.count()) > 0) {
-      await statusSelect.click();
-      // 收口归属面板：按本字段触发 input 引用的面板归属 id 钉定，不取页内任一可见面板
-      const statusDropdown = await ownedDropdown(statusSelect, page, 10_000);
-      await statusDropdown.waitFor({ state: 'visible', timeout: 10_000 }).catch(e => {
-        console.warn(`[E2E] 断言容错（元素可能未渲染）: ${(e as Error).message}`);
-      });
-      const activeOpt = dropdownItems(statusDropdown)
-        .filter({ hasText: /启用|active/i })
-        .first();
-      if ((await activeOpt.count()) > 0) {
-        await activeOpt.click();
-      } else {
-        const first = dropdownItems(statusDropdown).first();
-        if ((await first.count()) > 0) await first.click();
-      }
-      await page.waitForTimeout(300);
-    }
-
-    // 添加物料明细（items 至少 1 条，后端校验"BOM明细不能为空"）
-    const addItemBtn = dialog.getByRole('button', { name: /添加物料|添加/, exact: false }).first();
-    if ((await addItemBtn.count()) > 0) {
-      await addItemBtn.click();
-      await page.waitForTimeout(300);
-      const firstRow = dialog.locator('.el-table tbody tr').first();
-      if ((await firstRow.count()) > 0) {
-        const matSelect = firstRow.locator('.el-select').first();
-        if ((await matSelect.count()) > 0) {
-          await matSelect.click();
-          // 收口归属面板：按本字段触发 input 引用的面板归属 id 钉定，不取页内任一可见面板
-          const matDropdown = await ownedDropdown(matSelect, page, 10_000);
-          await matDropdown.waitFor({ state: 'visible', timeout: 10_000 }).catch(e => {
-            console.warn(`[E2E] 断言容错（元素可能未渲染）: ${(e as Error).message}`);
-          });
-          const matE2e = dropdownItems(matDropdown).filter({ hasText: /E2E/i }).first();
-          if ((await matE2e.count()) > 0) {
-            await matE2e.click();
-          } else {
-            const first = dropdownItems(matDropdown).first();
-            if ((await first.count()) > 0) await first.click();
-          }
-          await page.waitForTimeout(300);
-        }
-        const unitInput = firstRow.locator('input').nth(2);
-        if ((await unitInput.count()) > 0) {
-          await unitInput.click({ clickCount: 3 }).catch(e => {
-            console.warn(`[E2E] 断言容错（元素可能未渲染）: ${(e as Error).message}`);
-          });
-          await unitInput.fill('米').catch(e => {
-            console.warn(`[E2E] 断言容错（元素可能未渲染）: ${(e as Error).message}`);
-          });
-        }
-      }
-    }
-
-    // 提交
-    const submitBtn = dialog.getByRole('button', { name: /保存|确定/ }).last();
-    await submitBtn.waitFor({ state: 'visible', timeout: 20000 });
-    await submitBtn.click();
-    const data = await waitCreateResponse(page, `${API_PREFIX}/boms`, 45000);
-    // BOM 成功响应为 BomDetailResponse { bom: { id }, items }（非扁平 {id}），
-    // 兼容两种结构取 id，否则误判创建失败
-    const bomId =
-      typeof data?.id === 'number'
-        ? data.id
-        : typeof (data as { bom?: { id?: number } })?.bom?.id === 'number'
-          ? (data as { bom: { id: number } }).bom.id
-          : undefined;
-    if (typeof bomId === 'number') return bomId;
-    await diagnoseFailure(page, 'bom');
-    console.error(`[createBomUI] 创建失败: 响应数据=${JSON.stringify(data)}`);
-    return undefined;
-  } catch (e) {
-    await diagnoseFailure(page, 'bom');
-    console.error(`[createBomUI] 异常: ${(e as Error).message}`);
-    return undefined;
-  }
-}
-
 /** 创建定制订单 */
 export async function createCustomOrderUI(page: Page): Promise<number | undefined> {
   try {
@@ -1953,7 +1824,7 @@ export function dropdownItems(panel: Locator): Locator {
  * 未收起会遮挡后续点击，这里以「可见面板数为 0」真判据暴露）。
  * 失败消息指出仍有可见面板，即浮层未收起的真实缺陷形态。
  *
- * 调用方：停用矩阵回读前置、MRP 计算前收面板、供应商对比两段 Escape 收起后确认、
+ * 调用方：停用矩阵回读前置、供应商对比两段 Escape 收起后确认、
  * 缺料补货筛选下拉切换面板前的隔离确认。
  */
 export async function expectDropdownClosed(page: Page, timeout = 10_000): Promise<void> {
