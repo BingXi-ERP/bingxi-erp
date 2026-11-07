@@ -566,8 +566,8 @@ test.describe.serial('472 流转卡投纱受控取值与完工扣料拒绝面', 
     expect(Number(after.quantity_meters), '[472-05] 库存不足被拒后米数必须保持播种值').toBe(1000);
     expect(Number(after.quantity_kg), '[472-05] 库存绝不允许被扣成负数').toBeGreaterThanOrEqual(0);
     expect(
-      Number(after.quantity_kg),
-      `[472-05] 回读行与播种回读行必须是同一行（id 漂移说明维度隔离失效）`
+      Number(after.id),
+      `[472-05] 回读必须命中播种那一行（比主键，不比数量——数量相同也可能是同维度的另一行）`
     ).toBe(Number(stock.id));
   });
 
