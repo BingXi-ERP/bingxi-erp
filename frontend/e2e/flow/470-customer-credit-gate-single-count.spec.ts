@@ -54,7 +54,7 @@ function cents(v: unknown, label: string): bigint {
 function expectAppError(res: import('./helpers').ApiFailureResult, label: string): void {
   expect(res.status, `${label}：应回 HTTP 400，实际 ${res.status}`).toBe(400);
   const code = failureCode(res);
-  expect(code, `${label}：机器码为字符串`).toBeTypeOf('string');
+  expect(typeof code, `${label}：机器码为字符串`).toBe('string');
   expect((res.message ?? '').trim().length, `${label}：拒绝文案非空`).toBeGreaterThan(0);
   expect(typeof res.trace_id, `${label}：trace_id 存在`).toBe('string');
 }
