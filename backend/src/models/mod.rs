@@ -60,10 +60,7 @@ pub mod user;
 pub mod user_behavior;
 // 批次 158 v11 真实接入：密码策略服务 - 密码历史持久化
 pub mod password_history;
-// MRP生产计划模块
-pub mod bom;
-pub mod bom_item;
-pub mod mrp_result;
+// 生产订单与排程模块
 pub mod production_order;
 pub mod scheduling_result;
 pub mod work_center;

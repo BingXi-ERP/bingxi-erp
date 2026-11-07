@@ -208,13 +208,10 @@ pub mod system_update_ops;
 pub mod totp_service;
 // v11 批次 143 P1-2：用户行为追踪分析服务
 pub mod tracking_service;
-// MRP生产计划模块
-pub mod bom_service;
-// 批次 D10 拆分：bom_service.rs facade 的业务实现子模块（crud/state/tree）
-pub mod bom_ops;
-pub mod mrp_engine_service;
-// 批次 490 D10-3b 拆分：mrp_engine_service 业务实现子模块
-pub mod mrp_engine_ops;
+// BOM 与 MRP 服务面不注册：bom_service / bom_ops 读写 boms 与 bom_items 两表，
+// mrp_engine_service / mrp_engine_ops 读写 mrp_results 表并以默认 BOM 展开需求源；
+// 三张表已由迁移 m0132 下线，纱线需求与扣料的单一来源改为生产流转卡投纱明细
+// （flow_card_material_service），本 crate 不再有该两表的写入方。
 pub mod production_order_service;
 // 批次 488 D10-2 拆分：production_order_service 业务实现子模块
 pub mod production_order_ops;

@@ -106,7 +106,6 @@ pub const SUPPORTED_DOC_TYPES: &[&str] = &[
     "ap_reconciliation",
     "purchase_inspection",
     "inventory_adjustment",
-    "bom",
     "material_shortage",
     "quality_8d_report",
     "labor_contract",
@@ -220,7 +219,6 @@ pub const PRINT_SCOPE_PENDING: &[&str] = &[
     "chemical_requisition",
     "export_inspection",
     "inventory_adjustment",
-    "bom",
     "labor_contract",
     "wage_record",
     "energy_consumption_record",
@@ -385,7 +383,6 @@ impl PrintService {
             "ap_reconciliation" => self.get_ap_reconciliation_print_data(doc_id).await,
             "purchase_inspection" => self.get_purchase_inspection_print_data(doc_id).await,
             "inventory_adjustment" => self.get_inventory_adjustment_print_data(doc_id).await,
-            "bom" => self.get_bom_print_data(doc_id).await,
             "material_shortage" => self.get_material_shortage_print_data(doc_id).await,
             "quality_8d_report" => self.get_quality_8d_report_print_data(doc_id).await,
             "labor_contract" => self.get_labor_contract_print_data(doc_id).await,
@@ -3422,73 +3419,6 @@ impl PrintService {
         })
     }
 
-    /// 物料清单打印数据
-    async fn get_bom_print_data(&self, id: i32) -> Result<PrintData, AppError> {
-        use crate::models::bom;
-
-        use crate::models::bom_item;
-
-        let record = bom::Entity::find_by_id(id)
-            .one(&*self.db)
-            .await?
-            .ok_or_else(|| AppError::not_found(format!("物料清单 {} 未找到", id)))?;
-
-        let items = bom_item::Entity::find()
-            .filter(bom_item::Column::BomId.eq(id))
-            .order_by(bom_item::Column::Id, Order::Asc)
-            .all(&*self.db)
-            .await?;
-
-        let mut data = HashMap::new();
-        data.insert(
-            "product_id".to_string(),
-            serde_json::json!(record.product_id),
-        );
-        data.insert("version".to_string(), serde_json::json!(record.version));
-        data.insert(
-            "is_default".to_string(),
-            serde_json::json!(record.is_default),
-        );
-        data.insert(
-            "status".to_string(),
-            serde_json::json!(record.status.clone()),
-        );
-
-        let mut item_list = Vec::with_capacity(items.len());
-        for item in items {
-            let mut row = HashMap::new();
-            row.insert(
-                "material_id".to_string(),
-                serde_json::json!(item.material_id),
-            );
-            row.insert(
-                "quantity".to_string(),
-                serde_json::json!(item.quantity.to_string()),
-            );
-            row.insert("unit".to_string(), serde_json::json!(item.unit.clone()));
-            // 打印出参口径 = API 百分比数值（与 bom_handler 读边界同源，
-            // 经 scrap_ratio_to_percent 换算；禁止直出 DECIMAL(5,4) 存储比率）
-            row.insert(
-                "scrap_rate".to_string(),
-                serde_json::json!(
-                    crate::services::bom_service::BomService::scrap_ratio_to_percent(
-                        item.scrap_rate
-                    )
-                    .map(|v| v.to_string())
-                    .unwrap_or_default()
-                ),
-            );
-            item_list.push(row);
-        }
-
-        Ok(PrintData {
-            template: "bom".to_string(),
-            data,
-            items: item_list,
-            image: None,
-        })
-    }
-
     /// 物料缺料预警打印数据
     async fn get_material_shortage_print_data(&self, id: i32) -> Result<PrintData, AppError> {
         use crate::models::material_shortage;
@@ -5493,7 +5423,6 @@ impl PrintService {
             "ap_reconciliation" => "应付对账单",
             "purchase_inspection" => "采购质检单",
             "inventory_adjustment" => "库存调整单",
-            "bom" => "物料清单",
             "material_shortage" => "物料缺料预警",
             "quality_8d_report" => "8D质量报告",
             "labor_contract" => "劳动合同",

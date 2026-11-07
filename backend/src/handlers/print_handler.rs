@@ -11,7 +11,7 @@ use validator::Validate;
 
 use crate::container::AppState;
 use crate::handlers::print_task_handler::{
-    CreatePrintTaskRequest, PrintTaskJobRef, submit_print_task,
+    submit_print_task, CreatePrintTaskRequest, PrintTaskJobRef,
 };
 use crate::middleware::auth_context::AuthContext;
 use crate::models::audit_log::{OperationType, Severity};
@@ -25,9 +25,9 @@ use crate::utils::html_escape::{escape_html, sanitize_css_block};
 use crate::utils::optional_json::OptionalJson;
 use crate::utils::response::ApiResponse;
 use axum::{
-    Json,
     extract::{Path, State},
     response::Response,
+    Json,
 };
 use tracing::info;
 
@@ -226,15 +226,6 @@ pub async fn bad_debt_writeoff_print_docx(
 ) -> Result<Response, AppError> {
     let resp = render_print_docx(&state, &auth, "bad_debt_writeoff", doc_id as i32).await?;
     record_print_audit(&state, &auth, "bad_debt_writeoff", doc_id as i32);
-    Ok(resp)
-}
-pub async fn bom_print_docx(
-    Path(doc_id): Path<i32>,
-    State(state): State<AppState>,
-    auth: AuthContext,
-) -> Result<Response, AppError> {
-    let resp = render_print_docx(&state, &auth, "bom", doc_id).await?;
-    record_print_audit(&state, &auth, "bom", doc_id);
     Ok(resp)
 }
 pub async fn bulk_color_approval_print_docx(
@@ -800,14 +791,6 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             name: "坏账核销打印模板".to_string(),
             doc_type: "bad_debt_writeoff".to_string(),
             template_content: "坏账核销打印模板（含核销原因、审批流程）".to_string(),
-            is_default: true,
-            created_at: "2026-01-01T00:00:00Z".to_string(),
-        },
-        PrintTemplateDto {
-            id: 15,
-            name: "BOM物料清单打印模板".to_string(),
-            doc_type: "bom".to_string(),
-            template_content: "BOM物料清单打印模板（含物料组成、用量）".to_string(),
             is_default: true,
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
