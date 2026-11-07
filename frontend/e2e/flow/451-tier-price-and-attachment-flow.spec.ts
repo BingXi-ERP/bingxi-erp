@@ -790,17 +790,24 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
   });
 
   /**
-   * 功能：把"被下游引用的产品档案禁止硬删、且拒绝必须点名是哪一面挡的"钉成真实链路。
-   * 本用例新增覆盖的端点腿：DELETE /products/{id}（handler 为 backend/src/routes 下 product
-   * 分组的 delete_product，前置引用面枚举与拒绝在 services/product_ops/crud.rs）。
-   * 入参：引用面用本文件既有主数据形态搭——新建宿主产品 + 复用作弊夹具的色号建一条
-   * 色号阶梯价（product_color_prices.product_id 对 products(id) 有外键）；宿主两主键先声明
-   * 供 finally 收尾。
+   * 功能：把产品删除门钉成两段真实腿——"被引用时删除被拒且拒绝点名阻塞面与行数"，以及
+   * "清掉引用后删除放行并真删"；另把"软删色价不等于移除引用"钉成真实契约断言。
+   * 调用方：backend delete_product 的引用预检（services/product_ops/crud.rs 的
+   * find_product_references，计数与物理外键对齐、不过滤 is_active，crud.rs:408 注释明文）；
+   * 引用面一腿 DELETE /color-prices/:id（color_price_crud_service::delete 为软删，只置
+   * is_active=false，全库无该表物理删端点）；可物理清除腿用 DELETE /sales/sales-prices/:id
+   * （sales_price_service::delete_price 走 delete_with_audit 物理 DELETE）。
+   * 入参：宿主 A 由本用例新建并挂一条色号阶梯价（product_color_prices.product_id 对
+   * products(id) 有外键，色号复用作弊夹具的报价专用色号）；宿主 B 由本用例新建并挂一条
+   * 销售价目记录（sales_prices.product_id 同族外键面）；业务码带 genCode 唯一后缀，
+   * 不依赖库里恰好存在/不存在的行。
    * 传给谁：拒绝出参交本用例断言（HTTP 400 + BUSINESS_ERROR + message 点名阻塞面与行数），
-   * 产品行回读交 GET /products/{id}，收尾交 page.request 的删除腿按状态码分路。
-   * 存什么：products 一行、product_color_prices 一行（product_id 指宿主）、
-   * color_price_tier 不参与本用例（外键指向色号价而非产品，加了只会稀释归因）。
-   * 存哪里：products 与 product_color_prices；用例结束时两行都必须消失。
+   * 产品行回读交 GET /products/{id}，收尾交 tryCleanup 只告警不抛的回收腿（分档照本文件 451-04 约定）。
+   * 存什么：products 两行、product_color_prices 一行（product_id 指宿主 A）、sales_prices 一行
+   * （product_id 指宿主 B）；color_price_tier 不参与本用例（外键指向色号价而非产品，加了只会稀释归因）。
+   * 存哪里：products / product_color_prices / sales_prices；成功路径上宿主 B 与其销售价目行
+   * 物理消失、宿主 A 的色价行转软删，宿主 A 行因软删色价行永久占位而留在库中（无物理删通道
+   * 正是 A 腿要钉的事实），随 e2e 一次性库回收。
    */
   test('451-05 被色号阶梯价引用的产品禁止硬删且拒绝点名阻塞面与行数', async ({ page }) => {
     const ctx = getCtx();
@@ -811,6 +818,8 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
     const tag = genCode('451E');
     let hostProductId = 0;
     let hostPriceId = 0;
+    let purgeHostProductId = 0;
+    let purgeSalesPriceId = 0;
 
     try {
       const product = requireRow(
@@ -878,43 +887,127 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
         `删除被拒后宿主产品行必须仍在，实际 ${JSON.stringify(stillThere)}`
       ).toBe(hostProductId);
 
-      // 门由引用造成，不是永久锁死：撤掉唯一引用面后删除门必须放行并真删。
+      // 软删不等于移除引用：DELETE /color-prices/:id 只置 is_active=false，行仍在，
+      // 而删除门的计数与物理外键对齐、不过滤 is_active（find_product_references 函数体
+      // 为无过滤的按列 COUNT，物理 FK 约束本身也不认 is_active）。本腿把这条真实契约
+      // 钉成正向断言——软删色价后引用面仍挡住，且文案仍点名同一面与同一行数。
       await apiCallRaw<unknown>(page, 'DELETE', `/color-prices/${hostPriceId}`);
       hostPriceId = 0;
-      await apiCallRaw<unknown>(page, 'DELETE', `/products/${hostProductId}`);
-      const gone = await apiCallExpectFail(page, 'GET', `/products/${hostProductId}`);
+      const stillBlocked = await apiCallExpectFail(page, 'DELETE', `/products/${hostProductId}`);
+      expect(
+        stillBlocked.status,
+        `宿主 A 的色价软删后引用行仍在，删除必须仍被 400 业务拒绝，实际 ${stillBlocked.status}`
+      ).toBe(400);
+      expect(
+        failureCode(stillBlocked),
+        `软删后的守门拒绝机器码必须仍是 BUSINESS_ERROR，实际 ${JSON.stringify(stillBlocked.code)}`
+      ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+      expect(
+        typeof stillBlocked.message === 'string' && stillBlocked.message.includes('色号阶梯价'),
+        `色价软删后阻塞面必须仍点名"色号阶梯价"（软删不移除引用），实际 ${JSON.stringify(stillBlocked.message)}`
+      ).toBe(true);
+      expect(
+        typeof stillBlocked.message === 'string' && stillBlocked.message.includes('1 条'),
+        `色价软删后行数必须仍点名为 1 条（行未物理消失），实际 ${JSON.stringify(stillBlocked.message)}`
+      ).toBe(true);
+
+      // 门由引用造成，不是永久锁死：在可物理清除的引用面（销售价目记录，删除走
+      // delete_with_audit 真物理 DELETE）上撤掉引用后，删除门必须放行并真删。
+      // 宿主 A 不能承担这条断言——色号阶梯价面全库无物理删端点，这是被测契约本身，
+      // 故放行腿立在宿主 B 上，两腿互不掩盖。
+      const purgeHost = requireRow(
+        await apiCallRaw<unknown>(page, 'POST', '/products', {
+          name: genName('撤引用放行宿主产品'),
+          code: `451F${tag}`,
+          unit: 'm',
+          product_type: PRODUCT_TYPE.auxiliary,
+          standard_price: '45.45',
+        }),
+        '宿主 B（撤引用放行腿）建品出参'
+      );
+      purgeHostProductId = toNum(purgeHost.id, '宿主 B 建品主键');
+      expect(
+        purgeHostProductId > 0,
+        `宿主 B 建品必须返回真实主键，实际 ${JSON.stringify(purgeHost)}`
+      ).toBe(true);
+
+      const salesPrice = requireRow(
+        await apiCallRaw<unknown>(page, 'POST', '/sales/sales-prices', {
+          product_id: purgeHostProductId,
+          price: `7788.${String(Date.now() % 1_000_000).padStart(6, '0')}`,
+          unit: 'meter',
+          price_type: 'STANDARD',
+        }),
+        '宿主 B 挂销售价目出参'
+      );
+      purgeSalesPriceId = toNum(salesPrice.id, '销售价目记录主键');
+      expect(
+        purgeSalesPriceId > 0,
+        `销售价目记录必须返回真实主键，实际 ${JSON.stringify(salesPrice)}`
+      ).toBe(true);
+
+      const blockedSales = await apiCallExpectFail(
+        page,
+        'DELETE',
+        `/products/${purgeHostProductId}`
+      );
+      expect(
+        blockedSales.status,
+        `被销售价目记录引用的宿主 B 删除必须先被 400 业务拒绝，实际 ${blockedSales.status}`
+      ).toBe(400);
+      expect(
+        failureCode(blockedSales),
+        `宿主 B 守门拒绝机器码必须是 BUSINESS_ERROR，实际 ${JSON.stringify(blockedSales.code)}`
+      ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+      expect(
+        typeof blockedSales.message === 'string' && blockedSales.message.includes('销售价目记录'),
+        `宿主 B 拒绝文案必须点名阻塞面"销售价目记录"，实际 ${JSON.stringify(blockedSales.message)}`
+      ).toBe(true);
+      expect(
+        typeof blockedSales.message === 'string' && blockedSales.message.includes('1 条'),
+        `宿主 B 拒绝文案必须带出挡住的行数，实际 ${JSON.stringify(blockedSales.message)}`
+      ).toBe(true);
+
+      await apiCallRaw<unknown>(page, 'DELETE', `/sales/sales-prices/${purgeSalesPriceId}`);
+      purgeSalesPriceId = 0;
+      await apiCallRaw<unknown>(page, 'DELETE', `/products/${purgeHostProductId}`);
+      const gone = await apiCallExpectFail(page, 'GET', `/products/${purgeHostProductId}`);
       expect(
         gone.status,
-        `撤掉引用后删除门必须放行，宿主产品按主键读回必须 404，实际 ${gone.status}`
+        `撤掉可物理清除的引用后删除门必须放行，宿主 B 按主键读回必须 404，实际 ${gone.status}`
       ).toBe(404);
       expect(failureCode(gone)).toBe(APP_ERROR_CODES.NOT_FOUND);
-      hostProductId = 0;
+      purgeHostProductId = 0;
     } finally {
-      // 清理腿按删除门状态分路：先撤引用再删宿主，400 表示仍有引用面挡住，
-      // 此时点名出参原文而不判负（守门自身的判据写在用例正文里，不由清理腿兜绿）。
+      // 清理照本文件 451-04 已确立的回收约定分档：先撤本腿拥有的引用行，再收宿主，
+      // 全部走只告警不抛的 tryCleanup——宿主 A 被软删色价行按契约永久挡住（400 属正确
+      // 拒绝），守门自身的判据写在用例正文里，不由清理腿兜绿，也不把正确拒绝当清理失败。
       if (hostPriceId > 0) {
-        const unref = await page.request.delete(
-          `${API_BASE}${API_PREFIX}/color-prices/${hostPriceId}`,
-          { headers: { 'X-CSRF-Token': await csrfOf(page), 'X-Requested-With': 'XMLHttpRequest' } }
+        await tryCleanup(
+          page,
+          'DELETE',
+          `/color-prices/${hostPriceId}`,
+          '[451-05] 色号阶梯价引用行'
         );
-        console.log(
-          `[451-cleanup] 撤引用 DELETE /color-prices/${hostPriceId} => status=${unref.status()}`
+      }
+      if (purgeSalesPriceId > 0) {
+        await tryCleanup(
+          page,
+          'DELETE',
+          `/sales/sales-prices/${purgeSalesPriceId}`,
+          '[451-05] 宿主 B 销售价目引用行'
+        );
+      }
+      if (purgeHostProductId > 0) {
+        await tryCleanup(
+          page,
+          'DELETE',
+          `/products/${purgeHostProductId}`,
+          '[451-05] 宿主 B 撤引用放行腿产品'
         );
       }
       if (hostProductId > 0) {
-        const del = await page.request.delete(
-          `${API_BASE}${API_PREFIX}/products/${hostProductId}`,
-          { headers: { 'X-CSRF-Token': await csrfOf(page), 'X-Requested-With': 'XMLHttpRequest' } }
-        );
-        if (del.status() === 400) {
-          console.warn(
-            `[451-cleanup] 宿主产品仍被引用守门挡住 status=400，出参原文：${await del.text()}`
-          );
-        } else {
-          console.log(
-            `[451-cleanup] 宿主产品 DELETE /products/${hostProductId} => status=${del.status()}`
-          );
-        }
+        await tryCleanup(page, 'DELETE', `/products/${hostProductId}`, '[451-05] 色价引用宿主产品');
       }
     }
   });
