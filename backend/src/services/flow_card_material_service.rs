@@ -29,7 +29,7 @@ use std::sync::Arc;
 use rust_decimal::Decimal;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, FromQueryResult, JoinType,
-    Order, QueryFilter, QueryOrder, QuerySelect, Set,
+    Order, QueryFilter, QueryOrder, QuerySelect, RelationTrait, Set,
 };
 use serde::{Deserialize, Serialize};
 
@@ -111,8 +111,8 @@ pub struct FlowCardMaterialView {
     pub remark: Option<String>,
     pub is_deleted: bool,
     pub created_by: Option<i32>,
-    pub created_at: sea_orm::DateTimeWithTimeZone,
-    pub updated_at: sea_orm::DateTimeWithTimeZone,
+    pub created_at: sea_orm::prelude::DateTimeWithTimeZone,
+    pub updated_at: sea_orm::prelude::DateTimeWithTimeZone,
     pub material_no: Option<String>,
     pub material_name: Option<String>,
 }
