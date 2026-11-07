@@ -83,15 +83,15 @@ impl AuditContext {
     }
 }
 
-/// 请求级审计上下文（task-local，同步写入单点与异步发送点共用）。
-///
-/// 生命周期：由 `audit_context_middleware` 在解析出终端类型与页面之后用
-/// `AUDIT_REQUEST_CTX.scope(RefCell::new(ctx), next.run(req)).await` 绑定，覆盖整个请求
-/// future。业务侧在受理请求的 handler 内可按需把本张单的单据编号与变更原因与风险标记
-/// 写进这枚活对象（RefCell），同步写入点与异步发送点都能读到最新值。
-///
-/// 形态：`RefCell` 只在同步临界区借用（borrow 不跨 await），随请求 task 移动要求
-/// `Send`，AuditContext 各字段皆 String 与 Option<String>，满足 Send。
+// 请求级审计上下文（task-local，同步写入单点与异步发送点共用）。
+//
+// 生命周期：由 `audit_context_middleware` 在解析出终端类型与页面之后用
+// `AUDIT_REQUEST_CTX.scope(RefCell::new(ctx), next.run(req)).await` 绑定，覆盖整个请求
+// future。业务侧在受理请求的 handler 内可按需把本张单的单据编号与变更原因与风险标记
+// 写进这枚活对象（RefCell），同步写入点与异步发送点都能读到最新值。
+//
+// 形态：`RefCell` 只在同步临界区借用（borrow 不跨 await），随请求 task 移动要求
+// `Send`，AuditContext 各字段皆 String 与 Option<String>，满足 Send。
 tokio::task_local! {
     pub static AUDIT_REQUEST_CTX: std::cell::RefCell<AuditContext>;
 }

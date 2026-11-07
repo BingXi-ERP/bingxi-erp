@@ -919,11 +919,6 @@ async fn session_role_code_lands_in_audit_row_and_filters_by_equality() {
 
 /// 桌面 UA（本枚只关心单据维度，终端取值由上面几枚钉）
 const LEG_UA_PC: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120";
-/// 本枚自有 id 段（夹具每用例 RESTART IDENTITY，显式 id 让审计行的 resource_id 可预期）
-const LEG_CUSTOMER_ID: i32 = 9401;
-const LEG_ORDER_ID: i32 = 9402;
-const LEG_DELIVERY_ID: i32 = 9403;
-const LEG_WAREHOUSE_ID: i32 = 9404;
 
 /// 挂生产业务端点的路由：作废腿一条、红冲腿一条，另挂生产列表端点做读侧回读。
 /// 层序与 build_app 一致：audit_context_middleware 在外层绑定 task-local 活上下文，
