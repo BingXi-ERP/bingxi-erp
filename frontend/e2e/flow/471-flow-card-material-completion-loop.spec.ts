@@ -573,8 +573,8 @@ test.describe('流转卡投纱到生产订单完工扣料闭环', () => {
       '471-03 批2完工前'
     );
 
-    // 投纱只登记批次 1；批次 2 与批次 1 在 仓库×纱线×色号×等级 四维全同，
-    // 若实现把批次折平（或按四维聚合取任意一行），批次 2 会被错扣或两行各扣一半。
+    // 投纱只登记第一批；第二批与第一批在 仓库×纱线×色号×等级 四维全同，
+    // 若实现把批次折平（或按四维聚合取任意一行），第二批会被错扣或两行各扣一半。
     await seedMaterial(page, fx, b1, '100', 'kg');
     await completeOrder(page, fx.orderId);
 
@@ -614,7 +614,7 @@ test.describe('流转卡投纱到生产订单完工扣料闭环', () => {
     expect(String(txns[0].batch_no), '471-03 流水批次必须是命中那一行的批次，不能折平').toBe(
       b1.batchNo
     );
-    // 折平的另一种形态是流水挂到批次 2：按批次 2 现查消耗流水必须 0 条。
+    // 折平的另一种形态是流水挂到第二批：按第二批现查消耗流水必须 0 条。
     const txns2 = await readConsumptionTxns(page, fx.yarnId, b2.batchNo, fx.orderNo, '471-03 批2');
     expect(txns2.length, '471-03 未投纱批次名下不得出现本订单的消耗流水').toBe(0);
   });
