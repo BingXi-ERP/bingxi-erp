@@ -10,6 +10,7 @@ import {
   apiCall,
   apiCallRaw,
   apiCallExpectFail,
+  ApiResponse,
   ensureTestEntities,
   failureCode,
   genCode,
@@ -18,7 +19,6 @@ import {
   tryCleanup,
   APP_ERROR_CODES,
 } from './helpers';
-import type { ApiResponse } from './helpers';
 import { pickListArray } from './ui-helpers';
 
 type Row = Record<string, unknown>;
@@ -127,7 +127,8 @@ async function seedQuotation(
   const created = await apiCall<Row>(page, 'POST', '/quotations', {
     customer_id: args.customerId,
     sales_user_id: args.salesUserId,
-    quotation_date: new Date().toISOString().split('T')[0],
+    // 后端入参是 NaiveDate，只收 YYYY-MM-DD；发完整 ISO 时间戳会被判请求格式不正确
+    quotation_date: new Date().toISOString().slice(0, 10),
     valid_until: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
     currency: 'CNY',
     exchange_rate: '1',
