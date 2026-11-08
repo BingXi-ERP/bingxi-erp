@@ -781,10 +781,13 @@ test.describe('盘点明细改写与删除配对', () => {
         typeof body?.code === 'string' ? body.code : undefined,
         `未登录应命中 UNAUTHORIZED 机器码，实际 code=${String(body?.code)}`
       ).toBe('UNAUTHORIZED');
+      // 未登录拒因走中间件固定字面量契约（utils/response.rs 的 unified_error_response 文档）：
+      // 中间件刻意告知下一步动作的文案外显，不走 AppError 对 Unauthorized 的脱敏常量；
+      // 缺凭据分支的字面量逐字符为 缺少认证凭据，断言按该真实契约钉。
       expect(
         typeof body?.message === 'string' ? body.message : undefined,
-        `未认证族走脱敏通道，message 应为固定常量「未授权」，实际 ${String(body?.message)}`
-      ).toBe('未授权');
+        `未登录拒因应为中间件缺凭据固定字面量，实际 ${String(body?.message)}`
+      ).toBe('缺少认证凭据');
       expect(
         typeof body?.trace_id === 'string' && body.trace_id.length > 0,
         `失败体应含 AppError 统一信封的 trace_id，实际 keys=${Object.keys(body ?? {}).join(',')}`
