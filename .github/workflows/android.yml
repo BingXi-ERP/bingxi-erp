@@ -246,7 +246,8 @@ jobs:
           fi
           # kotlin 构件被 Maven Central 重定向到 GitHub release 资产，该资产当前中断。追加仓库无效：
           # 重定向失败是错误而不是缺失，gradle 不会落到后一个仓库，必须插到 repositories 块最前。
-          # 做什么 逐个脚本在每个独立成行的 repositories 块开块行后插入镜像仓库，语法按后缀分流；
+          # 做什么 逐个脚本在每个独立成行的 repositories 块开块行后插入两枚中央仓直连镜像（先对象存储镜像、
+          #        后公共代理，两枚都自管产物字节、不再重定向到 GitHub release），语法按后缀分流。
           #        工程由 初始化 Android 工程 步现场生成，脚本名随模板版本漂移，故按后缀枚举而非写死文件名。
           # 存哪里 只改 CI 现场生成的 src-tauri/gen/android 下 gradle 脚本，不进版本库。
           # 判负 一个 repositories 块都没插进即判红并打出枚举到的脚本清单，防模板漂移静默失效。
@@ -260,8 +261,8 @@ jobs:
               continue
             fi
             case "$F" in
-              *.gradle.kts) LINE='        maven { url = uri("https://maven.aliyun.com/repository/public") }' ;;
-              *) LINE="        maven { url 'https://maven.aliyun.com/repository/public' }" ;;
+              *.gradle.kts) LINE='        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }\n        maven { url = uri("https://maven.aliyun.com/repository/public") }' ;;
+              *) LINE="        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }\n        maven { url 'https://maven.aliyun.com/repository/public' }" ;;
             esac
             sed -i "s|\([[:space:]]*\)repositories {$|\1repositories {\n${LINE}|" "$F"
             if grep -q 'maven.aliyun.com/repository/public' "$F"; then
