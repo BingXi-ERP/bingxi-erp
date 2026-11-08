@@ -5,58 +5,58 @@
 // 轨迹腿做 POST 到 GET 的因果闭环并逐列出参列比对，运费腿按源码计费口径在测试侧
 // 独立复算三通道取大值，关联腿证明 order_id 与 order_type 真实落库，打印腿解包
 // docx 的 word/document.xml 对业务列做成员判定，另钉权限门与时序门与拒绝腿的具体码。
-// 调用方：路由族注册在 backend/src/routes/logistics_tracking.rs:12-35，统一在
-// backend/src/routes/mod.rs:533 以 nest("/api/v1/erp") 挂载；handler 为
-// backend/src/handlers/logistics_tracking_handler.rs 与 print_handler.rs:420；
-// 运单主体由族外 POST /logistics 自建（routes/inventory.rs:297），前端调用面在
-// frontend/src/api/logistics.ts:107-122。本文件用 flow/helpers 的 apiCall 系列直连契约面。
+// 调用方：路由族注册在 backend/src/routes/logistics_tracking.rs，统一在
+// backend/src/routes/mod.rs 以 nest("/api/v1/erp") 挂载；handler 为
+// backend/src/handlers/logistics_tracking_handler.rs 与 print_handler.rs；
+// 运单主体由族外 POST /logistics 自建（routes/inventory.rs），前端调用面在
+// frontend/src/api/logistics.ts。本文件用 flow/helpers 的 apiCall 系列直连契约面。
 // 入参：{waybill_id} 与 {id} 两段在 handler 里一律抽成 i32
-// （logistics_tracking_handler.rs:25、37、49、60，print_handler.rs:421），
-// 运单主体入参取 CreateWaybillRequest（logistics_handler.rs:30-40，order_id 必须是
+// （logistics_tracking_handler.rs、37、49、60，print_handler.rs），
+// 运单主体入参取 CreateWaybillRequest（logistics_handler.rs，order_id 必须是
 // 真实销售订单 id，handler 逐行回查 sales_order 否则 404）；关联腿的 po_id 取真实采购订单 id。
 // 传给谁：LogisticsService（backend/src/services/logistics_service.rs）写
 // logistics_waybills 与 logistics_tracking_events 两张表；打印腿走
-// PrintService::get_logistics_waybill_print_data（print_service.rs:2697）装配后渲染 docx。
+// PrintService::get_logistics_waybill_print_data（print_service.rs）装配后渲染 docx。
 // 存什么：事件行存 event_time、location、description、event_type、data_source；
 // 运单行被本链路改写的是 freight_fee、order_id、order_type；
-// 事件类型取值域来自 backend/src/models/status/bpm_crm_contract.rs:72-86 的
+// 事件类型取值域来自 backend/src/models/status/bpm_crm_contract.rs 的
 // logistics_event_type（小写 pickup/in_transit/arrived/delivered），与运单状态词表
 // logistics_waybill（大写 IN_TRANSIT/DELIVERED/SIGNED，同文件 55-65 行）是两套码，不可互换。
 // 存哪里：logistics_waybills、logistics_tracking_events（SeaORM 实体
 // backend/src/models/logistics_waybill.rs、logistics_tracking_event.rs）。
 //
 // 判据来源与本轮查出的后端缺陷（按现状钉死，不放宽）：
-// 1 计费四列无 HTTP 写入口。CreateWaybillRequest（logistics_handler.rs:30-40）与
-//   UpdateWaybillReq（logistics_handler.rs:270-281）都不含 total_weight、total_volume、
+// 1 计费四列无 HTTP 写入口。CreateWaybillRequest（logistics_handler.rs）与
+//   UpdateWaybillReq（logistics_handler.rs）都不含 total_weight、total_volume、
 //   distance_km、freight_rate，全仓 grep 这三列与 freight_rate 在任何 handler 里都没有
 //   Set 写入点，因此经 API 自建的运单四列恒为 NULL，calculate_freight 的三个通道
-//   （logistics_service.rs:141-144）恒为 0，取大值规则无法用非零数据证伪。
+//   （logistics_service.rs）恒为 0，取大值规则无法用非零数据证伪。
 //   本文件按该现状把"四列 NULL 且运费恒 0"钉成断言，同时仍按源码逐通道复算，
 //   四列一旦出现写入口此锁即判红，逼着把计费口径重新审一遍。
-// 2 重复关联无幂等门。link_purchase_order（logistics_service.rs:50-77）只校验运单与
+// 2 重复关联无幂等门。link_purchase_order（logistics_service.rs）只校验运单与
 //   采购单存在，不校验已关联，第二次关联直接覆盖式重写并返回 200。
 // 3 失败文案全量脱敏。运单不存在与采购订单不存在都走 AppError::not_found
-//   （logistics_service.rs:59、67、91、138），出参 message 为通用脱敏文案，
+//   （logistics_service.rs、67、91、138），出参 message 为通用脱敏文案，
 //   两枚语义不同的 404 在响应面上不可区分；本文件因此只钉 code 与状态码，
-//   并显式断真实内部文案不外泄（utils/error.rs:6 的脱敏约定）。
+//   并显式断真实内部文案不外泄（utils/error.rs 的脱敏约定）。
 // 4 时序门不存在。轨迹、运费、关联三腿在源码里都不检查运单状态，也未要求先签收或
 //   先关联才允许下游动作（logistics_service.rs 全文无状态比较），故本文件不假装覆盖
 //   这道门，只钉住"IN_TRANSIT 之外的下游动作照旧放行"这一现状可见面。
-// 5 事件类型入参校验存在且可外显。logistics_service.rs:97-103 用
+// 5 事件类型入参校验存在且可外显。logistics_service.rs 用
 //   AppError::validation_displayable 直出逐字文案，本文件按词表原文断言整串。
-// 6 打印模板与行级归属门。logistics_waybill 在 print_service.rs:170 登记为"无归属用户列"，
+// 6 打印模板与行级归属门。logistics_waybill 在 print_service.rs 登记为"无归属用户列"，
 //   归属门函数对非 PRINT_SCOPE_GATED 的类型直接放行（同文件 269-277 的注释自陈 PENDING 与
 //   NO_OWNER 同样放行），所以本腿没有行级归属判定，传进去的 DataScopeContext 在这里是死参数。
 //   但按第 7 条，本族派生键没有任何角色持有，当前只有 admin 旁路走得通这条腿，因此该缺口是
 //   补授即开面的潜伏态，不是现网可控越权；本轮不覆盖该水平面。打印腿断的是解包后的业务列
 //   成员，不是只看状态码。
-// 7 权限键由 URL 段推导（middleware/permission.rs:259 起），本族 seg3 是
-//   "logistics-tracking"（utils/path_utils.rs:416 登记），派生键为
+// 7 权限键由 URL 段推导（middleware/permission.rs 起），本族 seg3 是
+//   "logistics-tracking"（utils/path_utils.rs 登记），派生键为
 //   logistics-tracking 加 read/create/print；种子授权只给了 ("logistics", ...)
-//   （services/init_service_ops/permission.rs:1379-1390），没有任何角色持有
+//   （services/init_service_ops/permission.rs），没有任何角色持有
 //   logistics-tracking_*，故 logistics_coordinator 对本族四个动作全 403。
 //   正腿由 worker 超管会话跑（admin 旁路），拒腿用真实持权缺口证明。
-// 8 轨迹事件无删除端点，运单删除只受状态门（logistics_handler.rs:536-546，
+// 8 轨迹事件无删除端点，运单删除只受状态门（logistics_handler.rs，
 //   DELIVERED 与 SIGNED 才拒），而事件行对运单行是外键引用；清理腿因此走 tryCleanup
 //   记日志不判红，自建运单的快递单号带本轮唯一标记，断言只按自建 id 或唯一标记回读。
 import { test, expect } from '../diagnose-fixture';
@@ -75,14 +75,14 @@ import {
 } from './helpers';
 import { inflateRawSync } from 'node:zlib';
 
-/** 轨迹事件类型词表（backend/src/models/status/bpm_crm_contract.rs:72-86 写入方口径） */
+/** 轨迹事件类型词表（backend/src/models/status/bpm_crm_contract.rs 写入方口径） */
 const EVENT_TYPE_IN_TRANSIT = 'in_transit';
 const EVENT_TYPE_PICKUP = 'pickup';
-/** 校验文案里的允许值串，与 logistics_service.rs:101 的 ALL.join("/") 同源 */
+/** 校验文案里的允许值串，与 logistics_service.rs 的 ALL.join("/") 同源 */
 const EVENT_TYPE_ENUM_TEXT = 'pickup/in_transit/arrived/delivered';
 /** 运单状态词表（同文件 55-65 行，大写码） */
 const WAYBILL_STATUS_IN_TRANSIT = 'IN_TRANSIT';
-/** link_purchase_order 写入的 order_type 字面值（logistics_service.rs:72） */
+/** link_purchase_order 写入的 order_type 字面值（logistics_service.rs） */
 const ORDER_TYPE_PURCHASE = 'purchase_order';
 
 /** 运单行出参形状：键名与 backend/src/models/logistics_waybill.rs 的字段逐字一致 */
@@ -127,7 +127,7 @@ interface TrackingEventInput {
   data_source?: string;
 }
 
-/** 分页信封（backend/src/utils/response.rs:34 唯一形态） */
+/** 分页信封（backend/src/utils/response.rs 唯一形态） */
 interface Paginated<T> {
   items: T[];
   total: number;
@@ -141,7 +141,7 @@ interface Paginated<T> {
  * 入参：JSON 值，只容字符串与 null；其它类型即显式抛错（缺键或形状漂移不许当 0 掩盖）。
  * 传给谁：复算表达式；不传给后端。
  * 存什么/存哪里：不持久化。
- * 口径出处：logistics_service.rs:140-144 的 unwrap_or(Decimal::ZERO)。
+ * 口径出处：logistics_service.rs 的 unwrap_or(Decimal::ZERO)。
  */
 function decimalToNumber(value: unknown, column: string): number {
   if (value === null) {
@@ -161,7 +161,7 @@ function decimalToNumber(value: unknown, column: string): number {
 }
 
 /**
- * 功能：按 logistics_service.rs:134-157 的计费口径在测试侧独立复算运费。
+ * 功能：按 logistics_service.rs 的计费口径在测试侧独立复算运费。
  * 调用方：运费腿。
  * 入参：运单行。传给谁：只喂给断言表达式，不发请求。
  * 存什么/存哪里：不持久化。
@@ -328,7 +328,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     });
     expect(created.data.id, '自建运单必须返回主键').toBeGreaterThan(0);
     chain.waybillId = created.data.id;
-    expect(created.data.status, 'create_waybill 落 IN_TRANSIT（logistics_handler.rs:93）').toBe(
+    expect(created.data.status, 'create_waybill 落 IN_TRANSIT（logistics_handler.rs）').toBe(
       WAYBILL_STATUS_IN_TRANSIT
     );
     expect(created.data.tracking_number).toBe(chain.trackingNumber);
@@ -368,7 +368,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     expect(posted.data.event_type).toBe(EVENT_TYPE_PICKUP);
     expect(posted.data.description).toBe(`已揽收${marker}`);
     expect(posted.data.location).toBe(`苏州转运中心${marker}`);
-    // 入参省略 data_source 时源码落 manual（logistics_service.rs:94）
+    // 入参省略 data_source 时源码落 manual（logistics_service.rs）
     expect(posted.data.data_source).toBe('manual');
 
     const second = await apiCall<TrackingEventRow>(
@@ -409,7 +409,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     const sorted = [...byTime].sort((a, b) => a - b);
     expect(
       byTime,
-      'list_tracking_events 按 event_time 升序（logistics_service.rs:127）'
+      'list_tracking_events 按 event_time 升序（logistics_service.rs）'
     ).toEqual(sorted);
     expect(byTime).toEqual([Date.parse(baseTime), Date.parse(laterTime)]);
 
@@ -500,7 +500,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     expect(actual).toBeGreaterThanOrEqual(decimalToNumber(before.data.total_volume, 'total_volume') * rate);
     expect(
       actual,
-      '距离通道 = distance_km * (freight_rate / 1000)（logistics_service.rs:143-144）'
+      '距离通道 = distance_km * (freight_rate / 1000)（logistics_service.rs）'
     ).toBeGreaterThanOrEqual(
       decimalToNumber(before.data.distance_km, 'distance_km') * (rate / 1000)
     );
@@ -581,7 +581,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     expect(text, '面单必须渲染物流公司').toContain(chain.logisticsCompany);
     expect(
       text,
-      '面单必须渲染运单状态（打印数据装配含 status 列，print_service.rs:2697 起）'
+      '面单必须渲染运单状态（打印数据装配含 status 列，print_service.rs 起）'
     ).toContain(WAYBILL_STATUS_IN_TRANSIT);
 
     const browser = page.context().browser();
@@ -649,7 +649,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     );
     expect(
       printDenied.status(),
-      '打印腿派生 print 动作键（middleware/permission.rs:233 关键字表），同属未授予面'
+      '打印腿派生 print 动作键（middleware/permission.rs 关键字表），同属未授予面'
     ).toBe(403);
 
     await loginViaUI(page, testUsername(), testPassword(), true);
@@ -694,8 +694,8 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
  * 调用方：关联腿的"不存在采购单"断言。
  * 入参：失败体 message 原值。传给谁：同一条 expect 的右值。
  * 存什么/存哪里：不持久化。
- * 口径：AppError::not_found 默认脱敏（utils/error.rs:6），源码里的
- * "采购订单 {id} 不存在" 只进 tracing，不外显（logistics_service.rs:67）。
+ * 口径：AppError::not_found 默认脱敏（utils/error.rs），源码里的
+ * "采购订单 {id} 不存在" 只进 tracing，不外显（logistics_service.rs）。
  */
 function ghostMessageProbeOf(message: string | null | undefined): string | null | undefined {
   expect(message ?? '', '脱敏文案不得泄露采购订单 id').not.toContain('999999999');
