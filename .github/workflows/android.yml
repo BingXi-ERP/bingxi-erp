@@ -244,13 +244,21 @@ jobs:
             grep -q '^distributionSha256Sum=' "$WRAP" || echo 'distributionSha256Sum=9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14' >> "$WRAP"
             echo "gradle 发行包回退镜像源：${GVER}"
           fi
-          # kotlin 构件被解析到 GitHub release 而中断时由前置公共镜像兜底：直接给 CI 现场
-          # 生成工程的 settings 与 root build 两个 gradle 文件的首个 repositories 块插入
-          # 具名镜像仓库，构件坐标与版本不变，镜像缺件仍落回后续仓库按原判定判红。
-          for F in src-tauri/gen/android/settings.gradle.kts src-tauri/gen/android/build.gradle.kts; do
-            grep -q 'ciAliyunMirror' "$F" || sed -i '0,/repositories {/s//repositories {\n        maven { name = "ciAliyunMirror"; url = uri("https:\/\/maven.aliyun.com\/repository\/public") }/' "$F"
-            grep -q 'ciAliyunMirror' "$F" || { echo "镜像仓库插入未命中：$F 模板已变，需人工校准"; exit 1; }
+          # kotlin 构件被解析到 GitHub release 而中断时由前置公共镜像兜底：给 CI 现场生成
+          # 工程里实际存在的 gradle 脚本首个 repositories 块插入镜像仓库（kts 与 Groovy 两种
+          # 语法按后缀区分，仓库名由 gradle 自动递增避免重名），构件坐标与版本不变，
+          # 镜像缺件仍落回后续仓库按原判定判红；一个文件都未命中即判红防模板漂移静默失效。
+          PATCHED=0
+          for F in src-tauri/gen/android/settings.gradle.kts src-tauri/gen/android/settings.gradle src-tauri/gen/android/build.gradle.kts src-tauri/gen/android/build.gradle; do
+            [ -f "$F" ] || continue
+            case "$F" in
+              *.kts) LINE='        maven { url = uri("https://maven.aliyun.com/repository/public") }' ;;
+              *) LINE="        maven { url 'https://maven.aliyun.com/repository/public' }" ;;
+            esac
+            grep -q 'maven.aliyun.com/repository/public' "$F" || sed -i "0,/repositories {/s//repositories {\n${LINE}/" "$F"
+            grep -q 'maven.aliyun.com/repository/public' "$F" && PATCHED=1
           done
+          [ "$PATCHED" = "1" ] || { echo '镜像仓库插入未命中任何 gradle 脚本，模板已变，需人工校准'; exit 1; }
 
       - name: 构建 debug APK
         working-directory: mobile-app
