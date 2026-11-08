@@ -2,14 +2,21 @@
 //!
 //! 批次 490 D10-4b 拆分自原 `ar/vfy.rs` 的 `customer_confirm` / `customer_dispute` 方法。
 //! 职责：带状态机校验（lock_exclusive 串行化并发）的客户对账单确认与争议提交，
-//! 审计日志经 `AuditLogService::update_with_audit` 写入。
-//! 本模块扩展 `ArReconciliationService` 的 `customer_confirm` 与 `customer_dispute` 公开方法。
+//! 审计日志经 `AuditLogService::update_with_audit` 写入；另提供开票前置门
+//! `ensure_customer_statement_confirmed`（确认态由本模块写入，判定也归本模块，供开票各腿共用）。
+//! 本模块扩展 `ArReconciliationService` 的 `customer_confirm`、`customer_dispute` 与
+//! `ensure_customer_statement_confirmed` 公开方法。
 
-use chrono::Utc;
-use sea_orm::{EntityTrait, QuerySelect, Set, TransactionTrait};
-use tracing::info;
+use chrono::{NaiveDate, Utc};
+use sea_orm::{
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set,
+    TransactionTrait,
+};
+use tracing::{info, warn};
 
-use crate::models::ar_reconciliation::{ActiveModel, Entity as ReconciliationEntity};
+use crate::models::ar_reconciliation::{
+    ActiveModel, Column as ReconciliationColumn, Entity as ReconciliationEntity,
+};
 use crate::models::status::ar as ar_status;
 use crate::utils::error::AppError;
 
@@ -135,5 +142,82 @@ impl ArReconciliationService {
             ));
         }
         Ok(ar_status::RECONCILIATION_DISPUTED)
+    }
+
+    /// 开票前置门：客户未确认对账单，财务不得开票。
+    ///
+    /// 入参 customer_id 为待开票客户，invoice_date 为即将落 ar_invoices 的开票日期；
+    /// 调用方为 `services/ar_invoice_service::create`（手工开票腿）与
+    /// `services/ar/inv.rs::create_receivable`（销售发货生成应收腿），两腿都在自己的事务内调用，
+    /// 故连接按泛型收 `ConnectionTrait`（DatabaseConnection 与 DatabaseTransaction 同源复用），
+    /// 不在门内另开事务、也不做后置过滤。
+    ///
+    /// 判定口径（只读 reconciliation_status 与 confirmed_by_customer 两列，两列的写入方都在本模块）：
+    /// 取该客户期间覆盖本次开票日期的对账单，命中「已发出待客户确认（sent）」「客户已提异议
+    /// （disputed）」「状态词已是 confirmed 但 confirmed_by_customer 非真（含 NULL，即伪造确认态）」
+    /// 三者之一即拒绝。draft（尚未送客户，未进入客户确认环节）与 closed、cancelled
+    /// （该期已终结，不再等客户回执）不构成阻塞；无覆盖本期的对账单即无待确认事项，放行。
+    ///
+    /// 拒绝走 `AppError::business_displayable`（BUSINESS_ERROR，文案可外显），点名阻塞的对账单号，
+    /// 让操作人知道要去确认哪一张；不做 fail-open，不把缺行兜底成已确认或未确认。
+    /// 成功与阻塞各打一条日志（阻塞为 warn，便于按客户回查未确认就开票的尝试）。
+    pub async fn ensure_customer_statement_confirmed<C: ConnectionTrait>(
+        conn: &C,
+        customer_id: i32,
+        invoice_date: NaiveDate,
+    ) -> Result<(), AppError> {
+        let blocking = ReconciliationEntity::find()
+            .filter(ReconciliationColumn::CustomerId.eq(customer_id))
+            .filter(ReconciliationColumn::PeriodStart.le(invoice_date))
+            .filter(ReconciliationColumn::PeriodEnd.ge(invoice_date))
+            .filter(
+                Condition::any()
+                    .add(ReconciliationColumn::ReconciliationStatus.is_in([
+                        ar_status::RECONCILIATION_SENT,
+                        ar_status::RECONCILIATION_DISPUTED,
+                    ]))
+                    .add(
+                        Condition::all()
+                            .add(
+                                ReconciliationColumn::ReconciliationStatus
+                                    .eq(ar_status::RECONCILIATION_CONFIRMED),
+                            )
+                            // 确认标记为 false 或为 NULL 都算未取得客户确认：NULL 是三处初始化写入的
+                            // 形态，直接写 ne(true) 会被 SQL 三值逻辑漏掉，故显式拆成两臂。
+                            .add(
+                                Condition::any()
+                                    .add(ReconciliationColumn::ConfirmedByCustomer.eq(false))
+                                    .add(ReconciliationColumn::ConfirmedByCustomer.is_null()),
+                            ),
+                    ),
+            )
+            .one(conn)
+            .await?;
+
+        if let Some(rec) = blocking {
+            let status = rec
+                .reconciliation_status
+                .as_deref()
+                .unwrap_or(ar_status::RECONCILIATION_DRAFT);
+            warn!(
+                "开票前置门拦截：客户 {} 的对账单 {}（期间 {} ~ {}）状态为 {}，尚未取得客户确认，拒绝开票（开票日期 {}）",
+                customer_id,
+                rec.reconciliation_no,
+                rec.period_start,
+                rec.period_end,
+                status,
+                invoice_date
+            );
+            return Err(AppError::business_displayable(format!(
+                "对账单 {} 尚未取得客户确认，请先完成客户确认再开票",
+                rec.reconciliation_no
+            )));
+        }
+
+        info!(
+            "开票前置门放行：客户 {} 无未经客户确认的覆盖期对账单（开票日期 {}）",
+            customer_id, invoice_date
+        );
+        Ok(())
     }
 }

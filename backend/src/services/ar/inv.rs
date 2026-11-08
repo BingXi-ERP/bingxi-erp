@@ -117,6 +117,8 @@ impl ArReconciliationService {
 
     /// 创建应收单（P0-2 销售发货→AR 入口）
     /// 复用调用方 txn 保证原子提交；幂等：source_type=SALES_ORDER + source_bill_id=order_id。；账期 payment_terms_days<=0 回退 30 天；状态 DRAFT 待审（P0 3-5 修复）。
+    /// 开票前置门 `ensure_customer_statement_confirmed`（vfy_ops/confirm.rs）按本次落库的
+    /// invoice_date 判定：该客户有覆盖本期且尚未取得客户确认的对账单即拒绝，取号与插入都不执行。
     pub async fn create_receivable(
         &self,
         customer_id: i32,
@@ -143,6 +145,9 @@ impl ArReconciliationService {
         };
         // 6. 计算日期：发票日期 = 今日；到期日 = 发票日期 + 账期天数
         let invoice_date = Utc::now().date_naive();
+        // 开票前置门：用与落库同一个 invoice_date 判定，该客户存在覆盖本期且尚未取得
+        // 客户确认的对账单时拒绝生成应收单（取号与插入都不执行，随调用方事务回滚）。
+        Self::ensure_customer_statement_confirmed(txn, customer_id, invoice_date).await?;
         let due_date = invoice_date + Duration::days(terms as i64);
         // 7-8. 取号与写入同在调用方事务内：`insert_with_no_retry` 生成应收单号并插入，
         // 撞 ar_invoices.invoice_no 的 UNIQUE(23505) 时只回滚本次保存点、重新取号重试；
