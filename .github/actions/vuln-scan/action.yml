@@ -367,15 +367,22 @@ runs:
         mkdir -p "$WORK"
         trap 'rm -rf "$WORK"' EXIT
         URL="https://github.com/zizmorcore/zizmor/releases/download/${ZIZMOR_VERSION}/${ZIZMOR_ASSET}"
-        curl -sSfL --retry 3 -o "$WORK/zizmor.tar.gz" "$URL" \
-          || { echo "::error::zizmor 下载失败（固定版本 ${ZIZMOR_VERSION}），拒绝跳过审计"; exit 1; }
-        ACTUAL="$(sha256sum "$WORK/zizmor.tar.gz" | awk '{print $1}')"
-        if [ "$ACTUAL" != "$ZIZMOR_SHA256" ]; then
-          echo "::error::zizmor 产物 sha256 与钉死值不符（期望 ${ZIZMOR_SHA256}，实得 ${ACTUAL}）：下载截断或内容被替换，审计未开始即判红"
-          exit 1
+        if curl -sSfL --retry 3 -o "$WORK/zizmor.tar.gz" "$URL"; then
+          ACTUAL="$(sha256sum "$WORK/zizmor.tar.gz" | awk '{print $1}')"
+          if [ "$ACTUAL" != "$ZIZMOR_SHA256" ]; then
+            echo "::error::zizmor 产物 sha256 与钉死值不符（期望 ${ZIZMOR_SHA256}，实得 ${ACTUAL}）：下载截断或内容被替换，审计未开始即判红"
+            exit 1
+          fi
+          tar -xzf "$WORK/zizmor.tar.gz" -C "$WORK" zizmor \
+            || { echo "::error::zizmor 归档内取不到 zizmor 成员"; exit 1; }
+        else
+          # release 资产中断时回退 crates.io 钉版本源码构建，版本核对仍在下方执行，
+          # 构建失败即判红，绝不退化成取不到就跳过审计。
+          echo "zizmor release 资产下载失败，回退 cargo install 钉版本 ${ZIZMOR_VERSION#v}"
+          cargo install zizmor --version "${ZIZMOR_VERSION#v}" --root "$WORK/cargo" --locked \
+            || { echo "::error::zizmor 下载与源码构建均失败（固定版本 ${ZIZMOR_VERSION}），拒绝跳过审计"; exit 1; }
+          cp "$WORK/cargo/bin/zizmor" "$WORK/zizmor"
         fi
-        tar -xzf "$WORK/zizmor.tar.gz" -C "$WORK" zizmor \
-          || { echo "::error::zizmor 归档内取不到 zizmor 成员"; exit 1; }
         chmod +x "$WORK/zizmor"
         VER="$("$WORK/zizmor" --version 2>&1)" \
           || { echo "::error::zizmor 二进制无法执行，审计未开始"; exit 1; }
