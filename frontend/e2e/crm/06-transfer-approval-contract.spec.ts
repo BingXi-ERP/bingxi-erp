@@ -108,9 +108,7 @@ async function pickOtherUserId(page: import('@playwright/test').Page): Promise<n
   const me = await apiCallRaw<{ id: number; role_id?: number | null }>(page, 'GET', '/users/me');
   const seedRoleId = Number(me.role_id);
   if (!Number.isInteger(seedRoleId) || seedRoleId <= 0) {
-    throw new Error(
-      `前置不成立：会话用户未挂角色（role_id=${me.role_id}），无法复制转移目标账号`
-    );
+    throw new Error(`前置不成立：会话用户未挂角色（role_id=${me.role_id}），无法复制转移目标账号`);
   }
   const username = `e2e_tt_${genCode('06T')}`.slice(0, 50);
   const created = await apiCall<{ id?: number }>(page, 'POST', '/users', {
