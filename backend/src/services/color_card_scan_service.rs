@@ -40,6 +40,7 @@ impl ColorCardScanService {
         Ok(ScanResult {
             color_item: crate::models::color_card_response_dto::ColorItemInfo {
                 id: item.id,
+                color_card_id: item.color_card_id,
                 color_code: item.color_code,
                 color_name: item.color_name,
                 rgb_r: item.rgb_r,

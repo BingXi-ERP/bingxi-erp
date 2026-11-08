@@ -2,7 +2,7 @@
 //! 财务状态常量分组
 //!
 //! 批次 490 D10-3b 拆分：从 models/status.rs 抽取的财务/应收应付/凭证/会计期间状态常量子模块组。
-//! 包含：ar/ap_invoice/ap_payment_request/voucher/accounting_period/finance_invoice/finance_payment/ap_reconciliation/ap_verification/fixed_asset/cost_collection/accounting_period_closing
+//! 包含：ar/ap_invoice/ap_payment_request/voucher/accounting_period/finance_invoice/finance_payment/ap_reconciliation/ap_verification/fixed_asset/cost_collection/accounting_period_closing/aging_alert_bucket/aging_alert_level/aging_notify_method
 //!
 //! A.18.2 状态大小写规范：财务状态统一小写（draft/submitted/posted 等），
 //! 与 DB CHECK 约束一致。新增代码必须引用本模块常量，禁止字面量（A.19 逐步替换存量）。
@@ -204,4 +204,75 @@ pub mod bad_debt_writeoff_status {
 
     /// 全部合法审批状态，入参校验的唯一取值来源
     pub const ALL: &[&str] = &[PENDING, FINANCE_APPROVED, APPROVED, REJECTED, CANCELLED];
+}
+
+/// 账龄预警区间（aging_alert_rules.aging_bucket，小写 token）
+/// 库侧该列只建为 VARCHAR(255) NOT NULL、无 CHECK 约束，本模块 ALL 是入参校验的唯一取值来源；
+/// 取值集与 models/aging_alert_rule.rs 的列声明逐字符相同
+pub mod aging_alert_bucket {
+    /// 未到期
+    pub const CURRENT: &str = "current";
+
+    /// 逾期满 30 天
+    pub const DAYS_30: &str = "30_days";
+
+    /// 逾期满 60 天
+    pub const DAYS_60: &str = "60_days";
+
+    /// 逾期满 90 天
+    pub const DAYS_90: &str = "90_days";
+
+    /// 逾期满 180 天
+    pub const DAYS_180: &str = "180_days";
+
+    /// 逾期满一年
+    pub const ONE_YEAR: &str = "1_year";
+
+    /// 逾期一年以上
+    pub const OVER_ONE_YEAR: &str = "over_1_year";
+
+    /// 全部合法账龄区间，入参校验的唯一取值来源
+    pub const ALL: &[&str] = &[
+        CURRENT,
+        DAYS_30,
+        DAYS_60,
+        DAYS_90,
+        DAYS_180,
+        ONE_YEAR,
+        OVER_ONE_YEAR,
+    ];
+}
+
+/// 账龄预警级别（aging_alert_rules.alert_level，小写 token）
+/// 库侧该列无 CHECK 约束，本模块 ALL 是入参校验的唯一取值来源；
+/// 取值集与 models/aging_alert_rule.rs 的列声明逐字符相同
+pub mod aging_alert_level {
+    /// 提示级
+    pub const INFO: &str = "info";
+
+    /// 警告级
+    pub const WARNING: &str = "warning";
+
+    /// 严重级
+    pub const CRITICAL: &str = "critical";
+
+    /// 全部合法预警级别，入参校验的唯一取值来源
+    pub const ALL: &[&str] = &[INFO, WARNING, CRITICAL];
+}
+
+/// 账龄预警通知方式（aging_alert_rules.notify_method，小写 token）
+/// 库侧该列无 CHECK 约束，本模块 ALL 是入参校验的唯一取值来源；
+/// 取值集与 models/aging_alert_rule.rs 的列声明逐字符相同
+pub mod aging_notify_method {
+    /// 站内信（不触发邮件与短信外发）
+    pub const SYSTEM: &str = "system";
+
+    /// 邮件
+    pub const EMAIL: &str = "email";
+
+    /// 短信
+    pub const SMS: &str = "sms";
+
+    /// 全部合法通知方式，入参校验的唯一取值来源
+    pub const ALL: &[&str] = &[SYSTEM, EMAIL, SMS];
 }

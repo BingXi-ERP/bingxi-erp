@@ -101,13 +101,17 @@ impl ArReconciliationService {
 
     /// 客户确认状态门（纯状态判定，不触 DB，生产与集成测试同源调用）：
     /// confirmed 拒绝重复确认，disputed 需先解决争议；其余状态放行并返回目标状态常量
-    /// RECONCILIATION_CONFIRMED。拒绝族别为 `AppError::business`（脱敏业务错误）。
+    /// RECONCILIATION_CONFIRMED。两条拒绝都点名唯一可放行的前置（已确认行不可再确认、
+    /// 争议行须先解争议），文案只述公开规则与行自身状态，不含标识，走
+    /// `AppError::business_displayable` 外显，机器码仍是 BUSINESS_ERROR。
     pub fn check_customer_confirm_status(status: &str) -> Result<&'static str, AppError> {
         if status == ar_status::RECONCILIATION_CONFIRMED {
-            return Err(AppError::business("对账单已确认，不可重复确认".to_string()));
+            return Err(AppError::business_displayable(
+                "对账单已确认，不可重复确认".to_string(),
+            ));
         }
         if status == ar_status::RECONCILIATION_DISPUTED {
-            return Err(AppError::business(
+            return Err(AppError::business_displayable(
                 "对账单存在争议，请先解决争议后再确认".to_string(),
             ));
         }
@@ -116,13 +120,19 @@ impl ArReconciliationService {
 
     /// 客户争议状态门（纯状态判定，不触 DB，生产与集成测试同源调用）：
     /// confirmed 不可提争议，closed 不可提争议；其余状态放行并返回目标状态常量
-    /// RECONCILIATION_DISPUTED。拒绝族别为 `AppError::business`（脱敏业务错误）。
+    /// RECONCILIATION_DISPUTED。两条拒绝各自点名不可提争议的前置状态，
+    /// 文案只述公开规则与行自身状态，走 `AppError::business_displayable` 外显，
+    /// 机器码仍是 BUSINESS_ERROR。
     pub fn check_customer_dispute_status(status: &str) -> Result<&'static str, AppError> {
         if status == ar_status::RECONCILIATION_CONFIRMED {
-            return Err(AppError::business("对账单已确认，不可提出争议".to_string()));
+            return Err(AppError::business_displayable(
+                "对账单已确认，不可提出争议".to_string(),
+            ));
         }
         if status == ar_status::RECONCILIATION_CLOSED {
-            return Err(AppError::business("对账单已关闭，不可提出争议".to_string()));
+            return Err(AppError::business_displayable(
+                "对账单已关闭，不可提出争议".to_string(),
+            ));
         }
         Ok(ar_status::RECONCILIATION_DISPUTED)
     }

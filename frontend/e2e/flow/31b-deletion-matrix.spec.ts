@@ -10,6 +10,7 @@ import {
   testStorageStatePath,
   tryCleanup,
 } from './helpers';
+import { testPassword } from './helpers';
 import { pickListArray, type ListShapeKey } from './ui-helpers';
 // 产品类型单源常量（与后端 product_type 词表同源）：建品夹具取值必须经成员引用。
 import { PRODUCT_TYPE } from '../../src/constants/product-type';
@@ -163,7 +164,9 @@ async function probeListById(
 }
 
 /** 详情体/列表命中行的软删标记摘要（只摘判定相关四字段，序列化进判负消息） */
-function softDeleteMarkerSummary(d: Record<string, unknown> | null): Record<string, unknown> | null {
+function softDeleteMarkerSummary(
+  d: Record<string, unknown> | null
+): Record<string, unknown> | null {
   if (d == null) {
     return null;
   }
@@ -234,7 +237,9 @@ async function createThenApiDelete(
       `[31b-${c.label}] 详情预检 ${getApi} → HTTP 200 ${preDetailHit ? '命中本条 id' : '未命中本条 id（响应体无该记录）'}`
     );
   } else {
-    console.log(`[31b-${c.label}] 详情预检 ${getApi} → HTTP ${preStatus}（无可用详情路由，存在证据降级到列表）`);
+    console.log(
+      `[31b-${c.label}] 详情预检 ${getApi} → HTTP ${preStatus}（无可用详情路由，存在证据降级到列表）`
+    );
   }
 
   // 2) 预检异常状态（401/403/5xx 及 404/405 之外的非 200）：不是"路由缺失"而是
@@ -246,7 +251,13 @@ async function createThenApiDelete(
   ).toBe(true);
 
   // 3) 删前存在证据 B：列表回读（原"只 console 不判负"，详情路由不可用时提升为断言）
-  const beforeList = await probeListById(page, listQuery, listKey, id, `31b-${c.label} 删前列表回读`);
+  const beforeList = await probeListById(
+    page,
+    listQuery,
+    listKey,
+    id,
+    `31b-${c.label} 删前列表回读`
+  );
 
   // 通道定型：预检 200 且命中本条 → detail；其余（404/405 路由缺失、200 未命中）→ list。
   const channel: 'detail' | 'list' = preStatus === 200 && preDetailHit ? 'detail' : 'list';
@@ -299,7 +310,9 @@ async function createThenApiDelete(
         marker = d != null && typeof d === 'object' ? (d as Record<string, unknown>) : null;
         verified = detailHitsId(d, id) && isSoftDeletedRecord(marker);
       } catch (e) {
-        console.warn(`[31b-${c.label}] 删除后回读 200 响应解析失败（判负）: ${(e as Error).message}`);
+        console.warn(
+          `[31b-${c.label}] 删除后回读 200 响应解析失败（判负）: ${(e as Error).message}`
+        );
       }
     }
     // postStatus 为非 200/404（500/403 等）或 200 但记录仍活跃/无标记：verified 保持 false 判负。
@@ -310,7 +323,13 @@ async function createThenApiDelete(
     ).toBe(true);
     console.log(`[31b-${c.label}] ✅ 详情证据通道通过（删除后 HTTP ${postStatus}）`);
   } else {
-    const afterList = await probeListById(page, listQuery, listKey, id, `31b-${c.label} 删后列表回读`);
+    const afterList = await probeListById(
+      page,
+      listQuery,
+      listKey,
+      id,
+      `31b-${c.label} 删后列表回读`
+    );
     let verified = afterList.found === false;
     let hitRow: Record<string, unknown> | null = null;
     if (afterList.found === true && afterList.hitRow != null) {
@@ -840,6 +859,15 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
         remarks: 'P0销售订单备注',
         notes: 'P0销售订单备注2',
       },
+      // 信用门控在所有环境生效：customer_id=1 可能被同分片其他用例登记评级且占用额度，
+      // 导致建单侧门拦截。创建前注入无评级的专属客户，使 check_credit_available 返回 true。
+      preCreate: async (page, payload) => {
+        const customer = await apiCallRaw<{ id: number }>(page, 'POST', '/crm/customers', {
+          customer_name: `P0-SO-CUSTOMER-${TS}`,
+          status: 'active',
+        });
+        payload.customer_id = customer.id;
+      },
     },
     {
       label: '采购订单',
@@ -1044,7 +1072,7 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
       listKey: 'users',
       payload: {
         username: `p0user${TS}`,
-        password: 'P0Test!2026xY',
+        password: testPassword(),
         email: `p0user${TS}@test.com`,
         phone: '13600000001',
       },
