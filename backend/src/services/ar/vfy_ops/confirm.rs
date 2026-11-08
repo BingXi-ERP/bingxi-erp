@@ -168,8 +168,8 @@ impl ArReconciliationService {
     ) -> Result<(), AppError> {
         let blocking = ReconciliationEntity::find()
             .filter(ReconciliationColumn::CustomerId.eq(customer_id))
-            .filter(ReconciliationColumn::PeriodStart.le(invoice_date))
-            .filter(ReconciliationColumn::PeriodEnd.ge(invoice_date))
+            .filter(ReconciliationColumn::PeriodStart.lte(invoice_date))
+            .filter(ReconciliationColumn::PeriodEnd.gte(invoice_date))
             .filter(
                 Condition::any()
                     .add(ReconciliationColumn::ReconciliationStatus.is_in([
