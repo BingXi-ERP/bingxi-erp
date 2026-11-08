@@ -13,7 +13,7 @@ import {
 } from './helpers';
 
 /**
- * 93 能耗契约缺口补测（计量设备建账 能耗登记服务端算量与读数回写 分摊记录算比与确认门）
+ * 49 能耗契约缺口补测（计量设备建账 能耗登记服务端算量与读数回写 分摊记录算比与确认门）
  *
  * 与既有覆盖的分工。24 号对本域只发过 verifyEndpointHealthy 与 safePostAction
  * 纯状态探针（判定器 b1 b3 档），31b 号只探计量设备删除守卫。本 spec 是能耗三类
@@ -73,7 +73,7 @@ async function createMeter(
   overrides: Record<string, unknown> = {}
 ): Promise<{ id: number; meterNo: string }> {
   const res = await apiCall<Row>(page, 'POST', '/production/energy-meters', {
-    meter_name: `93号电表${workshop}`,
+    meter_name: `49号电表${workshop}`,
     meter_type: 'electricity',
     workshop,
     unit_price: '2.00',
@@ -84,7 +84,7 @@ async function createMeter(
   const id = Number(res.data?.id);
   expect(id, `计量设备创建应返回 id，实际 ${JSON.stringify(res)}`).toBeGreaterThan(0);
   const meterNo = String(res.data?.meter_no);
-  deferCleanup(CLEANUP, 'DELETE', `/production/energy-meters/${id}`, `[93] meter ${meterNo}`);
+  deferCleanup(CLEANUP, 'DELETE', `/production/energy-meters/${id}`, `[49] meter ${meterNo}`);
   return { id, meterNo };
 }
 
@@ -111,7 +111,7 @@ async function createConsumption(
   const id = Number(res.data?.id);
   expect(id, `能耗登记应返回 id，实际 ${JSON.stringify(res)}`).toBeGreaterThan(0);
   const recordNo = String(res.data?.record_no);
-  deferCleanup(CLEANUP, 'DELETE', `/production/energy-consumptions/${id}`, `[93] cons ${recordNo}`);
+  deferCleanup(CLEANUP, 'DELETE', `/production/energy-consumptions/${id}`, `[49] cons ${recordNo}`);
   return { id, recordNo };
 }
 
@@ -139,7 +139,7 @@ async function createAllocation(
     CLEANUP,
     'DELETE',
     `/production/energy-allocations/${id}`,
-    `[93] alloc ${allocationNo}`
+    `[49] alloc ${allocationNo}`
   );
   return { id, allocationNo };
 }
@@ -195,13 +195,13 @@ async function findEnergyVoucher(page: Page, allocationNo: string): Promise<Row>
   return hit as Row;
 }
 
-test.describe.serial('93 能耗契约：登记算量回写与分摊确认门', () => {
+test.describe.serial('49 能耗契约：登记算量回写与分摊确认门', () => {
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
   });
 
-  test('93-01 计量设备建账落真值，单号与详情双读路径一致', async ({ page }) => {
-    const workshop = genCode('E93MSA');
+  test('49-01 计量设备建账落真值，单号与详情双读路径一致', async ({ page }) => {
+    const workshop = genCode('E49MSA');
     const created = await createMeter(page, workshop);
 
     expect(
@@ -229,10 +229,10 @@ test.describe.serial('93 能耗契约：登记算量回写与分摊确认门', (
     expect(Number(byNo.id), 'by-no 与详情应回同一行').toBe(created.id);
 
     // 非法能源类型与负单价两条建账负例被拒且该车间零写入
-    const rejectWorkshop = genCode('E93MSB');
+    const rejectWorkshop = genCode('E49MSB');
     expectStateGateRejection(
       await apiCallExpectFail(page, 'POST', '/production/energy-meters', {
-        meter_name: '93非法类型探针',
+        meter_name: '49非法类型探针',
         meter_type: 'firewood',
         workshop: rejectWorkshop,
       }),
@@ -240,7 +240,7 @@ test.describe.serial('93 能耗契约：登记算量回写与分摊确认门', (
     );
     expectStateGateRejection(
       await apiCallExpectFail(page, 'POST', '/production/energy-meters', {
-        meter_name: '93负单价探针',
+        meter_name: '49负单价探针',
         meter_type: 'electricity',
         workshop: rejectWorkshop,
         unit_price: '-1.00',
@@ -253,8 +253,8 @@ test.describe.serial('93 能耗契约：登记算量回写与分摊确认门', (
     ).toBe(0);
   });
 
-  test('93-02 能耗登记服务端算量与设备读数回写，confirm 后 cancel 全程', async ({ page }) => {
-    const workshop = genCode('E93CSA');
+  test('49-02 能耗登记服务端算量与设备读数回写，confirm 后 cancel 全程', async ({ page }) => {
+    const workshop = genCode('E49CSA');
     const meter = await createMeter(page, workshop);
     const created = await createConsumption(page, meter.id, workshop, '100', '150.5');
 
@@ -342,13 +342,13 @@ test.describe.serial('93 能耗契约：登记算量回写与分摊确认门', (
     expect(String(finalView.status), '被拒的重复 cancel 后状态应保持 cancelled').toBe('cancelled');
   });
 
-  test('93-03 能耗登记时段与引用负例拒绝且零写入', async ({ page }) => {
-    const workshop = genCode('E93CSB');
+  test('49-03 能耗登记时段与引用负例拒绝且零写入', async ({ page }) => {
+    const workshop = genCode('E49CSB');
     const meter = await createMeter(page, workshop);
 
-    const periodWorkshop = genCode('E93CSC');
-    const ghostWorkshop = genCode('E93CSD');
-    const methodWorkshop = genCode('E93CSE');
+    const periodWorkshop = genCode('E49CSC');
+    const ghostWorkshop = genCode('E49CSD');
+    const methodWorkshop = genCode('E49CSE');
 
     // 时段倒挂（consumption.rs 校验结束时间必须晚于开始时间）
     expectStateGateRejection(
@@ -408,10 +408,10 @@ test.describe.serial('93 能耗契约：登记算量回写与分摊确认门', (
     ).toBe(0);
   });
 
-  test('93-04 分摊记录缺省比例派生量与显式比例派生量都落真值，confirm 后更新被拒', async ({
+  test('49-04 分摊记录缺省比例派生量与显式比例派生量都落真值，confirm 后更新被拒', async ({
     page,
   }) => {
-    const workshop = genCode('E93ASA');
+    const workshop = genCode('E49ASA');
     const defaultRatio = await createAllocation(page, workshop, { output_quantity: '40' });
     expect(
       defaultRatio.allocationNo,
@@ -552,8 +552,8 @@ test.describe.serial('93 能耗契约：登记算量回写与分摊确认门', (
     );
   });
 
-  test('93-05 分摊建单基准与时段负例拒绝且零写入', async ({ page }) => {
-    const badBasisWorkshop = genCode('E93ASB');
+  test('49-05 分摊建单基准与时段负例拒绝且零写入', async ({ page }) => {
+    const badBasisWorkshop = genCode('E49ASB');
     // 非法分摊基准（validate_allocation_basis 值域四键之外）
     expectStateGateRejection(
       await apiCallExpectFail(page, 'POST', '/production/energy-allocations', {
@@ -569,7 +569,7 @@ test.describe.serial('93 能耗契约：登记算量回写与分摊确认门', (
       '非法分摊基准应被业务门拒绝'
     );
 
-    const badPeriodWorkshop = genCode('E93ASC');
+    const badPeriodWorkshop = genCode('E49ASC');
     // 时段倒挂（allocation_record.rs 校验结束时间必须晚于开始时间）
     expectStateGateRejection(
       await apiCallExpectFail(page, 'POST', '/production/energy-allocations', {
@@ -585,7 +585,7 @@ test.describe.serial('93 能耗契约：登记算量回写与分摊确认门', (
       '时段倒挂的分摊建单应被业务门拒绝'
     );
 
-    const badTypeWorkshop = genCode('E93ASD');
+    const badTypeWorkshop = genCode('E49ASD');
     // 非法能源类型
     expectStateGateRejection(
       await apiCallExpectFail(page, 'POST', '/production/energy-allocations', {
