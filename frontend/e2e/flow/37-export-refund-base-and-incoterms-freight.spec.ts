@@ -14,33 +14,33 @@ import {
 } from './helpers';
 
 /**
- * 70 出口合规域深断言（续 61 号）：退税申报基数"只认已核验"收紧口径 + Incoterms 主运费口径全量词表
+ * 37 出口合规域深断言（续 61 号）：退税申报基数"只认已核验"收紧口径 + Incoterms 主运费口径全量词表
  *
  * 端点与 DTO 真实性（逐条对过当前源码，非臆造）：
- * - POST /export-refunds/customs-declarations                     routes/export_refund.rs:14-17（mod.rs:493 nest /api/v1/erp）
- *   入参 CreateCustomsDeclarationRequest（export_refund_service.rs:28-42：declaration_no/export_date/
+ * - POST /export-refunds/customs-declarations                     routes/export_refund.rs（mod.rs nest /api/v1/erp）
+ *   入参 CreateCustomsDeclarationRequest（export_refund_service.rs：declaration_no/export_date/
  *   total_amount/exchange_rate 必填，sales_order_id 等 Option）；出参 export_customs_declaration::Model
- *   （models/export_customs_declaration.rs:14-46，rust_decimal 出参字符串：total_amount/exchange_rate）；
+ *   （models/export_customs_declaration.rs，rust_decimal 出参字符串：total_amount/exchange_rate）；
  *   创建恒 status='pending'（service:146 Set("pending")）。
- * - POST /export-refunds/refund-declarations                      routes/export_refund.rs:26-29；
- *   入参 GenerateRefundDeclarationRequest（export_refund_handler.rs:27-34：period_year/period_month/
+ * - POST /export-refunds/refund-declarations                      routes/export_refund.rs；
+ *   入参 GenerateRefundDeclarationRequest（export_refund_handler.rs：period_year/period_month/
  *   refund_rate/input_vat_amount/carryforward_from_prev 必填）；出参 export_refund_declaration::Model
- *   （models/export_refund_declaration.rs:16-53：export_sales_amount/refundable_vat_amount/
+ *   （models/export_refund_declaration.rs：export_sales_amount/refundable_vat_amount/
  *   exempt_vat_amount/credit_vat_amount/actual_refund_amount/carryforward_amount/refund_rate/
  *   documents_complete/status，decimal 列全部字符串序列化）。
  * - GET  /export-refunds/refund-declarations?period_year=&period_month=
- *   routes/export_refund.rs:30-33；出参 Vec<RefundModel> **裸数组**（handler:94-104 to_value(Vec)），
+ *   routes/export_refund.rs；出参 Vec<RefundModel> **裸数组**（handler:94-104 to_value(Vec)），
  *   非 PaginatedResponse——本域列表没有分页信封，禁止臆造 items/total。
- * - POST /incoterms/cost-calculation                              routes/incoterms.rs:17-20（mod.rs:494 nest）；
- *   入参 CalculateCostsRequest（incoterms_handler.rs:26-33：incoterm serde UPPERCASE 枚举 +
+ * - POST /incoterms/cost-calculation                              routes/incoterms.rs（mod.rs nest）；
+ *   入参 CalculateCostsRequest（incoterms_handler.rs：incoterm serde UPPERCASE 枚举 +
  *   product_cost Decimal 必填 + freight/insurance/duty Option<Decimal>）；出参固定四键
  *   {product_cost, freight_cost, insurance_cost, duty_cost}（handler:59-64），Option::None 序列化为 null。
  *   判定源 utils/incoterms.rs::includes_freight（:111-116，EXW/FCA/FAS/FOB=false）、
  *   includes_insurance（:99-104，仅 CIF/CIP/DDP）、requires_duty_paid（:119-121，仅 DDP）；
- *   services/incoterms_service.rs:114-140：不含主运费的术语把提交的 freight_cost 置 None 返回。
+ *   services/incoterms_service.rs：不含主运费的术语把提交的 freight_cost 置 None 返回。
  *
  * 本文件钉住的修复判据（对应后端修复点，而非"页面能打开"）：
- * 1) 退税基数只认已核验（export_refund_service.rs:96-107 VERIFIED_STATUS +
+ * 1) 退税基数只认已核验（export_refund_service.rs VERIFIED_STATUS +
  *    verified_export_sales_amount，生成申报 :285-294 聚合口径）：
  *    修复前实现把期间内**全部**报关行逐单 total_amount×exchange_rate 求和进基数；收紧后
  *    非 verified 行一律不进基数。API 可建的全部报关行恒 pending（service:146），故同月
@@ -57,7 +57,7 @@ import {
  * 当前源码全库**不存在**任何把报关单 status 置 verified 的端点（routes/export_refund.rs 仅
  * create/verification(只读)/calculation/declarations 生成与列表；grep 全 handlers 无
  * export_customs_declaration 状态更新路径），且外汇核销单**没有创建端点**
- * （CreateFxVerificationRequest 标 dead_code "预留：待接入"，export_refund_service.rs:44-47），
+ * （CreateFxVerificationRequest 标 dead_code "预留：待接入"，export_refund_service.rs），
  * documents_complete 的 verified+verified 前提（service:176-215）在 HTTP 面上不可达。
  * 因此"同月一张未核验+一张已核验、基数只含已核验金额"的正向样本无法经 API seed，
  * 属"出口退税域无核验写端点"的域闭环缺口——已列入交付报告"待主编排立案"，
@@ -81,7 +81,7 @@ function requireBareArray(data: unknown, endpoint: string): Row[] {
 }
 
 function declNo(): string {
-  return genCode('E2E70CD');
+  return genCode('E2E37CD');
 }
 
 /** 创建一张报关单并断言 POST 真实响应即落库真值（status 必 pending、decimal 字符串归一） */
@@ -127,13 +127,13 @@ function expectRejected4xx(r: ApiFailureResult, what: string, expectedCode: stri
   );
 }
 
-test.describe.serial('70 退税申报基数收紧 + Incoterms 主运费口径全量判定', () => {
+test.describe.serial('37 退税申报基数收紧 + Incoterms 主运费口径全量判定', () => {
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
     await ensureTestEntities(page);
   });
 
-  test('70-01 同月多张 pending 报关单+下界前/上界日各一张 → 2097-05 申报基数必须 0（只认 verified 收紧口径）', async ({
+  test('37-01 同月多张 pending 报关单+下界前/上界日各一张 → 2097-05 申报基数必须 0（只认 verified 收紧口径）', async ({
     page,
   }) => {
     const ctx = getCtx();
@@ -199,7 +199,7 @@ test.describe.serial('70 退税申报基数收紧 + Incoterms 主运费口径全
     expect(row?.documents_complete, '列表回读齐全=false').toBe(false);
   });
 
-  test('70-02 申报期间非法值（month=13/0）业务拒绝+拒绝后无痕；month=12 跨年上界合法', async ({
+  test('37-02 申报期间非法值（month=13/0）业务拒绝+拒绝后无痕；month=12 跨年上界合法', async ({
     page,
   }) => {
     const genBody = (month: number) => ({
@@ -264,7 +264,7 @@ test.describe.serial('70 退税申报基数收紧 + Incoterms 主运费口径全
     ).toBeTruthy();
   });
 
-  test('70-03 同一批货 11 术语全量运费口径：EXW/FCA/FAS/FOB 主运费必须 null，其余原值计入（CIF 对照 FOB）', async ({
+  test('37-03 同一批货 11 术语全量运费口径：EXW/FCA/FAS/FOB 主运费必须 null，其余原值计入（CIF 对照 FOB）', async ({
     page,
   }) => {
     // 一组真实"货"：货款 8000.25 / 主运费 1200.50 / 保险 300.25 / 关税 500.50
@@ -291,7 +291,7 @@ test.describe.serial('70 退税申报基数收紧 + Incoterms 主运费口径全
       if (expectFreight === null) {
         expect(
           r.freight_cost,
-          `${term}：includes_freight=false（utils/incoterms.rs:111-116），主运费必须判为未计入（null），实际 ${JSON.stringify(r)}`
+          `${term}：includes_freight=false（utils/incoterms.rs），主运费必须判为未计入（null），实际 ${JSON.stringify(r)}`
         ).toBeNull();
       } else {
         expect(
@@ -321,7 +321,7 @@ test.describe.serial('70 退税申报基数收紧 + Incoterms 主运费口径全
     );
   });
 
-  test('70-04 成本计算非法值/缺省边界：小写术语拒绝、缺 product_cost 拒绝、CIF 未提交运费→null（与显式 0 区分）', async ({
+  test('37-04 成本计算非法值/缺省边界：小写术语拒绝、缺 product_cost 拒绝、CIF 未提交运费→null（与显式 0 区分）', async ({
     page,
   }) => {
     // serde rename_all=UPPERCASE（utils/incoterms.rs::Incoterms2020）：'fob' 不是合法 token，

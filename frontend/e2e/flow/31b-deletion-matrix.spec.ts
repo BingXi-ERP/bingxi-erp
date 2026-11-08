@@ -859,6 +859,15 @@ test.describe('P0 删除矩阵：全资源 API 创建→删除→回读验证', 
         remarks: 'P0销售订单备注',
         notes: 'P0销售订单备注2',
       },
+      // 信用门控在所有环境生效：customer_id=1 可能被同分片其他用例登记评级且占用额度，
+      // 导致建单侧门拦截。创建前注入无评级的专属客户，使 check_credit_available 返回 true。
+      preCreate: async (page, payload) => {
+        const customer = await apiCallRaw<{ id: number }>(page, 'POST', '/crm/customers', {
+          customer_name: `P0-SO-CUSTOMER-${TS}`,
+          status: 'active',
+        });
+        payload.customer_id = customer.id;
+      },
     },
     {
       label: '采购订单',
