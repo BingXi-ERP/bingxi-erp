@@ -358,13 +358,14 @@ async fn greige_update_non_owner_403_and_zero_drift() {
 }
 
 // ============================================================
-// C) greige_fabric delete 归属门
+// C) greige_fabric delete 归属门与可撤回性门
 // ============================================================
 
 #[tokio::test]
 async fn greige_delete_owner_200_and_is_deleted() {
     let db = test_common::setup_test_db().await;
     // 可删态要由库存事实表达：建档后把在架四列清零，等价于这批已全部出库
+    // 可撤回性判据是零在架实物且无活单据引用，与状态词无关
     seed_greige_fabric(&db, 1, Some(100), "已出库", dec("10.00")).await;
     empty_shelf_stock(&db, 1).await;
 
@@ -378,6 +379,28 @@ async fn greige_delete_owner_200_and_is_deleted() {
         .unwrap()
         .unwrap();
     assert_eq!(row.is_deleted, Some(true));
+}
+
+#[tokio::test]
+async fn greige_delete_remaining_stock_400_and_zero_drift() {
+    let db = test_common::setup_test_db().await;
+    seed_greige_fabric(&db, 1, Some(100), "已出库", dec("10.00")).await;
+
+    let app = build_greige_app(db.clone(), make_auth(100, Some("self")));
+    let (status, v) = call(&app, Method::DELETE, "/greige-fabrics/1", None).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    // 拒因可外显且点名数量与单位，文案与 remaining_stock_rejection 逐字同源
+    assert_eq!(
+        v["message"].as_str().unwrap(),
+        "坯布 GF-TEST-0001 仍有在架库存 10.00 公斤 与 100.00 米，请先完成出库再删除"
+    );
+
+    let row = greige_fabric::Entity::find_by_id(1)
+        .one(&db)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(row.is_deleted, Some(false));
 }
 
 #[tokio::test]
