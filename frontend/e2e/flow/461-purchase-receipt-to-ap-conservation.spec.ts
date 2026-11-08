@@ -211,6 +211,11 @@ function expectDecEqualsEachOther(left: unknown, right: unknown, label: string):
   ).toBe(true);
 }
 
+/** 已解析定标值与一条后端原始出参对平：原始侧仍过线格式契约，解析侧不得回喂原始解析口 */
+function expectDecMatchRaw(parsed: Dec, raw: unknown, label: string): void {
+  expectDecMatch(parsed, expectDecimalString(raw, `${label}出参线格式`), label);
+}
+
 /** 出参必须是十进制字符串（Decimal 未开 serde-float 的线格式契约） */
 function expectDecimalString(raw: unknown, label: string): Dec {
   expect(
@@ -1144,7 +1149,7 @@ test.describe.serial('461 采购收货→应付→付款 钩稽守恒', () => {
       gross,
       '应付账面额必须等于订单行价税合计'
     );
-    expectDecEqualsEachOther(
+    expectDecMatchRaw(
       gross,
       (await apiCallRaw<Record<string, unknown>>(page, 'GET', `/purchase/orders/${poId}`))
         .total_amount,
@@ -1152,7 +1157,7 @@ test.describe.serial('461 采购收货→应付→付款 钩稽守恒', () => {
     );
     // 未付款：已付落 0.00、未付等于账面额（0 是写入方声明的初值，不是缺省兜底）
     expectDecEquals(ap.paid_amount, decZero(), '新建应付单已付金额初值');
-    expectDecEqualsEachOther(ap.unpaid_amount, gross, '新建应付单未付金额必须等于账面额');
+    expectDecMatchRaw(gross, ap.unpaid_amount, '新建应付单未付金额必须等于账面额');
     expect(String(ap.currency), '应付单币种默认本位币').toBe('CNY');
     expectDecEquals(ap.exchange_rate, decLiteral('1', '本位币汇率'), '本位币汇率必须为 1');
 
@@ -1254,7 +1259,7 @@ test.describe.serial('461 采购收货→应付→付款 钩稽守恒', () => {
     });
     expectReject400(overFail, '461-03 申请金额超未付余额应被拒');
     const afterOver = await readInvoice(page, invoiceId);
-    expectDecEqualsEachOther(afterOver.unpaid_amount, unpaid, '461-03 被拒申请不得改动未付余额');
+    expectDecMatchRaw(unpaid, afterOver.unpaid_amount, '461-03 被拒申请不得改动未付余额');
     expectDecEquals(afterOver.paid_amount, decZero(), '461-03 被拒申请不得产生已付金额');
     await expectNoResidualByNotes(
       page,
@@ -1381,7 +1386,7 @@ test.describe.serial('461 采购收货→应付→付款 钩稽守恒', () => {
     ).toBe(AP_PAYMENT_STATUS_REGISTERED);
     const apAfterGate = await readInvoice(page, invoiceId);
     expectDecEquals(apAfterGate.paid_amount, decZero(), '461-03 被拒确认不得产生已付金额');
-    expectDecEqualsEachOther(apAfterGate.unpaid_amount, unpaid, '461-03 被拒确认不得改动未付余额');
+    expectDecMatchRaw(unpaid, apAfterGate.unpaid_amount, '461-03 被拒确认不得改动未付余额');
     expect(String(apAfterGate.invoice_status), '461-03 被拒确认不得推进应付单状态').toBe(
       AP_STATUS_AUDITED
     );
@@ -1424,7 +1429,7 @@ test.describe.serial('461 采购收货→应付→付款 钩稽守恒', () => {
     const ap0 = await readInvoice(page, invoiceId);
     const gross = expectDecScaleAtMost(ap0.amount, 2, '应付账面额');
     expectDecEquals(ap0.paid_amount, decZero(), '付款前已付金额');
-    expectDecEqualsEachOther(ap0.unpaid_amount, gross, '付款前未付金额等于账面额');
+    expectDecMatchRaw(gross, ap0.unpaid_amount, '付款前未付金额等于账面额');
 
     // 第一笔部分付款：申请额取夹具声明值（小于账面额），余额按出参相减对平
     const firstApply = decLiteral('500.00', '首笔申请额');
@@ -1461,7 +1466,7 @@ test.describe.serial('461 采购收货→应付→付款 钩稽守恒', () => {
     const ap1 = await readInvoice(page, invoiceId);
     const paid1 = expectDecScaleAtMost(ap1.paid_amount, 2, '首笔后已付金额');
     const unpaid1 = expectDecScaleAtMost(ap1.unpaid_amount, 2, '首笔后未付金额');
-    expectDecEqualsEachOther(paid1, pay1.payment_amount, '已付金额必须等于付款单金额出参');
+    expectDecMatchRaw(paid1, pay1.payment_amount, '已付金额必须等于付款单金额出参');
     expectDecMatch(decSub(gross, paid1), unpaid1, '未付余额必须等于账面额减已付金额');
     expectDecMatch(unpaid1, decSub(gross, firstApply), '首笔后未付余额逐分对平');
     expect(String(ap1.invoice_status), '部分付款后状态（大写词表）').toBe(AP_STATUS_PARTIAL_PAID);
@@ -1481,7 +1486,7 @@ test.describe.serial('461 采购收货→应付→付款 钩稽守恒', () => {
     const unpaid2 = expectDecScaleAtMost(ap2.unpaid_amount, 2, '付清后未付金额');
     expectDecMatch(decSub(gross, paid2), unpaid2, '付清后仍须满足余额相减关系');
     expectDecEquals(unpaid2, decZero(), '付清后未付金额必须为 0.00');
-    expectDecEqualsEachOther(paid2, gross, '付清后已付金额必须等于账面额');
+    expectDecMatch(paid2, gross, '付清后已付金额必须等于账面额');
     expect(String(ap2.invoice_status), '付清后状态（大写词表 PAID）').toBe(AP_STATUS_PAID);
 
     // 两笔付款额合计 = 应付账面额（全部取后端出参相加）
@@ -1507,7 +1512,7 @@ test.describe.serial('461 采购收货→应付→付款 钩稽守恒', () => {
       invoiceRel,
       `钩稽关系必须含本应付单 ${invoiceId} 的来源收货单腿 ${receiptId}`
     ).toBeTruthy();
-    expectDecEqualsEachOther(invoiceRel!.amount, gross, '钩稽关系中的应付金额必须等于账面额出参');
+    expectDecMatchRaw(gross, invoiceRel!.amount, '钩稽关系中的应付金额必须等于账面额出参');
     expect(String(invoiceRel!.status), '钩稽关系回显的应付状态必须与详情一致').toBe(AP_STATUS_PAID);
     for (const [paymentRow, label] of [
       [pay1, '首笔'],
