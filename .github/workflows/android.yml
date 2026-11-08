@@ -249,8 +249,8 @@ jobs:
           mkdir -p "$HOME/.gradle/init.d"
           printf '%s\n' \
             'allprojects {' \
-            '    buildscript { repositories { addFirst(maven { url = uri("https://maven.aliyun.com/repository/public") }) } }' \
-            '    repositories { addFirst(maven { url = uri("https://maven.aliyun.com/repository/public") }) }' \
+            '    buildscript { repositories { addFirst(maven { name = "ciAliyunMirror"; url = uri("https://maven.aliyun.com/repository/public") }) } }' \
+            '    repositories { addFirst(maven { name = "ciAliyunMirror"; url = uri("https://maven.aliyun.com/repository/public") }) }' \
             '}' > "$HOME/.gradle/init.d/ci-mirror.gradle"
 
       - name: 构建 debug APK
