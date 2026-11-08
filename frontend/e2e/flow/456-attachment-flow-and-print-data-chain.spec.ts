@@ -277,8 +277,10 @@ async function createOrderWithItems(
   const ctx = getCtx();
   const warehouseId = ctx.warehouseIds[0];
   const productId = ctx.productIds[0];
+  const departmentId = ctx.departmentIds[0];
   if (!warehouseId) throw new Error('456 precondition: no warehouse in context');
   if (!productId) throw new Error('456 precondition: no product in context');
+  if (!departmentId) throw new Error('456 precondition: no department in context');
 
   const orderDate = new Date().toISOString().slice(0, 10);
   let totalAmount = 0;
@@ -302,6 +304,7 @@ async function createOrderWithItems(
       supplier_id: supplierId,
       order_date: orderDate,
       warehouse_id: warehouseId,
+      department_id: departmentId,
       items,
     }
   );
