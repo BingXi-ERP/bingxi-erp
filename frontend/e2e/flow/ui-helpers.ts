@@ -1430,6 +1430,11 @@ async function applyKeywordFilter(
   }
 }
 
+/** 行文本读取的超时上限。count 与逐行读之间行可能被删后刷新移除，无超时的 textContent
+ *  会按默认三十秒挂等已消失的行，吃光调用方轮询预算，把行已消失误报成行仍存在；
+ *  有界读让消失行立即记为空串继续扫，调用方下一轮轮询即可拿到真实的未命中。 */
+const ROW_TEXT_READ_TIMEOUT_MS = 1000;
+
 /** 在给定行集合内按匹配粒度找目标行的序号；未命中返回 -1。 */
 async function locateRowIndexIn(
   rows: Locator,
@@ -1444,11 +1449,11 @@ async function locateRowIndexIn(
       const cellText = await row
         .locator(firstCellSel)
         .first()
-        .textContent()
+        .textContent({ timeout: ROW_TEXT_READ_TIMEOUT_MS })
         .catch(() => '');
       if ((cellText ?? '').trim() === target) return i;
     } else {
-      const txt = await row.textContent().catch(() => '');
+      const txt = await row.textContent({ timeout: ROW_TEXT_READ_TIMEOUT_MS }).catch(() => '');
       if (txt?.includes(target)) return i;
     }
   }
