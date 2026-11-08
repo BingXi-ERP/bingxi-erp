@@ -192,6 +192,121 @@ impl CustomerCreditService {
         Ok(())
     }
 
+    /// 事务内占用信用额度（与提交订单共用同一事务，保证原子性）。
+    ///
+    /// 功能：在调用方事务内对 customer_credit_ratings 行加 FOR UPDATE 锁后扣减可用额度。
+    /// 调用方：services/so/order_workflow.rs submit_order。
+    /// 入参：txn——调用方已开启的事务；customer_id——客户；amount——占用金额；user_id——操作人。
+    /// 传给谁：失败经 submit_order 透传给 handler 出参；成功则在同一事务内落库。
+    /// 存什么·存哪里：更新 customer_credit_ratings.used_credit/available_credit。
+    ///
+    /// 无信用评级客户视为未启用信用控制，静默跳过（与 check_credit_available 口径一致）。
+    pub async fn occupy_credit_txn(
+        &self,
+        txn: &sea_orm::DatabaseTransaction,
+        customer_id: i32,
+        amount: Decimal,
+        user_id: i32,
+    ) -> Result<(), AppError> {
+        info!(
+            "用户 {} 在事务内占用客户 {} 的信用额度 {}",
+            user_id, customer_id, amount
+        );
+
+        let credit = match customer_credit::Entity::find()
+            .filter(customer_credit::Column::CustomerId.eq(customer_id))
+            .lock(sea_orm::sea_query::LockType::Update)
+            .one(txn)
+            .await?
+        {
+            Some(c) => c,
+            None => {
+                tracing::debug!(
+                    customer_id = customer_id,
+                    "客户无信用评级记录，跳过信用占用"
+                );
+                return Ok(());
+            }
+        };
+
+        if credit.status != master_data::ACTIVE {
+            return Err(AppError::business_displayable("客户信用状态非活跃"));
+        }
+
+        if amount > credit.available_credit {
+            return Err(AppError::business(format!(
+                "可用额度不足：请求 {}，可用 {}",
+                amount, credit.available_credit
+            )));
+        }
+
+        let mut credit_active: customer_credit::ActiveModel = credit.clone().into();
+        credit_active.used_credit = Set(credit.used_credit + amount);
+        credit_active.available_credit = Set(credit.available_credit - amount);
+        credit_active.save(txn).await?;
+
+        info!(
+            "客户 {} 信用额度事务内占用成功，已占用：{}",
+            customer_id,
+            credit.used_credit + amount
+        );
+        Ok(())
+    }
+
+    /// 事务内释放信用额度（取消/拒绝订单时在同一事务内归还占用）。
+    ///
+    /// 功能：在调用方事务内对 customer_credit_ratings 行加 FOR UPDATE 锁后归还可用额度。
+    /// 调用方：services/so/order_workflow.rs cancel_order；services/so/contract.rs reject_order。
+    /// 入参：txn——调用方已开启的事务；customer_id——客户；amount——释放金额；user_id——操作人。
+    /// 传给谁：失败经调用方透传给 handler 出参；成功则在同一事务内落库。
+    /// 存什么·存哪里：更新 customer_credit_ratings.used_credit/available_credit。
+    ///
+    /// 无信用评级客户视为未启用信用控制，静默跳过。
+    pub async fn release_credit_txn(
+        &self,
+        txn: &sea_orm::DatabaseTransaction,
+        customer_id: i32,
+        amount: Decimal,
+        user_id: i32,
+    ) -> Result<(), AppError> {
+        info!(
+            "用户 {} 在事务内释放客户 {} 的信用额度 {}",
+            user_id, customer_id, amount
+        );
+
+        let credit = match customer_credit::Entity::find()
+            .filter(customer_credit::Column::CustomerId.eq(customer_id))
+            .lock(sea_orm::sea_query::LockType::Update)
+            .one(txn)
+            .await?
+        {
+            Some(c) => c,
+            None => {
+                tracing::debug!(
+                    customer_id = customer_id,
+                    "客户无信用评级记录，跳过信用释放"
+                );
+                return Ok(());
+            }
+        };
+
+        if amount > credit.used_credit {
+            return Err(AppError::business_displayable("释放额度超过已占用额度"));
+        }
+
+        let mut credit_active: customer_credit::ActiveModel = credit.clone().into();
+        credit_active.used_credit = Set(credit.used_credit - amount);
+        credit_active.available_credit = Set(credit.available_credit + amount);
+        credit_active.save(txn).await?;
+
+        info!(
+            "客户 {} 信用额度事务内释放成功，已占用：{}",
+            customer_id,
+            credit.used_credit - amount
+        );
+        Ok(())
+    }
+
     /// 调整信用额度
     pub async fn adjust_credit_limit(
         &self,

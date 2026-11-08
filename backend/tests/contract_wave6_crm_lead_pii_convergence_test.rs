@@ -317,9 +317,9 @@ async fn list_and_detail_default_mask_covers_tel_phone_and_drops_address() {
 
     let (status, v) = get_json(&app, "/erp/crm/leads?page=1&page_size=10").await;
     assert_eq!(status, StatusCode::OK, "列表 200 契约: {v}");
-    let items = v["data"]["data"]
+    let items = v["data"]["items"]
         .as_array()
-        .unwrap_or_else(|| panic!("分页列表形状漂移（期望 data.data 数组）: {v}"));
+        .unwrap_or_else(|| panic!("分页列表形状漂移（期望 data.items 数组）: {v}"));
     assert_eq!(items.len(), 2, "self 用户应见本人两行: {v}");
     let pool_row = items
         .iter()
@@ -421,7 +421,7 @@ async fn list_with_allowed_fields_keeps_tel_phone_raw() {
         make_auth(USER_A, 2, "self"),
     );
     let (_, v) = get_json(&app, "/erp/crm/leads?page=1&page_size=10").await;
-    let items = v["data"]["data"].as_array().expect("列表数组");
+    let items = v["data"]["items"].as_array().expect("列表数组");
     let row = items
         .iter()
         .find(|i| i["id"] == json!(1))
