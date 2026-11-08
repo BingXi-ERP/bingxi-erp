@@ -8,7 +8,7 @@
 // 调用方：路由族注册在 backend/src/routes/logistics_tracking.rs，统一在
 // backend/src/routes/mod.rs 以 nest("/api/v1/erp") 挂载；handler 为
 // backend/src/handlers/logistics_tracking_handler.rs 与 print_handler.rs；
-// 运单主体由族外 POST /logistics 自建（routes/inventory.rs），前端调用面在
+// 运单主体由族外 POST /inventory/logistics 自建（routes/inventory.rs），前端调用面在
 // frontend/src/api/logistics.ts。本文件用 flow/helpers 的 apiCall 系列直连契约面。
 // 入参：{waybill_id} 与 {id} 两段在 handler 里一律抽成 i32
 // （logistics_tracking_handler.rs、37、49、60，print_handler.rs），
@@ -295,7 +295,7 @@ const chain = {
 test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('前置：族外 POST /logistics 自建运单主体并回读计费四列现状', async ({ page }) => {
+  test('前置：族外 POST /inventory/logistics 自建运单主体并回读计费四列现状', async ({ page }) => {
     await loginViaUI(page, testUsername(), testPassword());
 
     const salesOrders = await apiCall<Paginated<{ id: number }>>(
@@ -318,7 +318,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
 
     chain.trackingNumber = `WB${marker}`;
     chain.logisticsCompany = `顺达物流${marker}`;
-    const created = await apiCall<WaybillRow>(page, 'POST', '/logistics', {
+    const created = await apiCall<WaybillRow>(page, 'POST', '/inventory/logistics', {
       order_id: salesOrders.data.items[0].id,
       logistics_company: chain.logisticsCompany,
       tracking_number: chain.trackingNumber,
@@ -336,7 +336,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     const readback = await apiCall<WaybillRow>(
       page,
       'GET',
-      `/logistics/${chain.waybillId}`
+      `/inventory/logistics/${chain.waybillId}`
     );
     expect(readback.data.id).toBe(chain.waybillId);
     // 缺陷 1 的可见面：四列无任何写入口，自建运单恒 NULL，运费三通道恒 0
@@ -478,7 +478,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
   });
 
   test('运费腿：按源码口径独立复算三通道取大值，并回读 freight_fee 落库', async ({ page }) => {
-    const before = await apiCall<WaybillRow>(page, 'GET', `/logistics/${chain.waybillId}`);
+    const before = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
     const expected = recomputeFreight(before.data);
 
     const freight = await apiCall<unknown>(
@@ -508,7 +508,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     expect(actual, '计费四列无写入口时运费恒 0').toBe(0);
     chain.freightAfterLink = actual;
 
-    const persisted = await apiCall<WaybillRow>(page, 'GET', `/logistics/${chain.waybillId}`);
+    const persisted = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
     expect(
       typeof persisted.data.freight_fee,
       '运费回写落库后 freight_fee 仍是 DECIMAL 字符串'
@@ -528,7 +528,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     );
     expect(linked.data.order_type).toBe(ORDER_TYPE_PURCHASE);
 
-    const readback = await apiCall<WaybillRow>(page, 'GET', `/logistics/${chain.waybillId}`);
+    const readback = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
     expect(readback.data.order_id, '关联必须真实落库（回读 order_id 等于目标采购单）').toBe(
       chain.purchaseOrderId
     );
@@ -554,7 +554,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     // 缺陷 3：与"运单不存在"共用同一脱敏文案，两枚 404 在响应面上不可区分
     expect(badPo.message).toBe(ghostMessageProbeOf(badPo.message));
 
-    const unchanged = await apiCall<WaybillRow>(page, 'GET', `/logistics/${chain.waybillId}`);
+    const unchanged = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
     expect(unchanged.data.order_id, '被拒的关联腿不得改写 order_id').toBe(chain.purchaseOrderId);
 
     const ghostWaybill = await apiCallExpectFail(
@@ -603,7 +603,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
       'GET',
       `${waybillPath(chain.waybillId)}/tracking-events`
     );
-    const beforeFreight = await apiCall<WaybillRow>(page, 'GET', `/logistics/${chain.waybillId}`);
+    const beforeFreight = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
 
     await loginAsRole(page, 'logistics_coordinator');
     const readDenied = await apiCallExpectFail(
@@ -663,7 +663,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
       afterEvents.data.filter(row => row.description.includes(`越权事件${marker}`)).length,
       '越权事件必须零落库'
     ).toBe(0);
-    const afterFreight = await apiCall<WaybillRow>(page, 'GET', `/logistics/${chain.waybillId}`);
+    const afterFreight = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
     expect(afterFreight.data.freight_fee, '被拒的运费腿不得改写 freight_fee').toBe(
       beforeFreight.data.freight_fee
     );
@@ -673,11 +673,11 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
   });
 
   test('收数据：删除本轮自建运单（状态门之外的清理尝试只记日志）', async ({ page }) => {
-    await tryCleanup(page, 'DELETE', `/logistics/${chain.waybillId}`, '本轮自建运单');
+    await tryCleanup(page, 'DELETE', `/inventory/logistics/${chain.waybillId}`, '本轮自建运单');
     const readback = await apiCallExpectFail(
       page,
       'GET',
-      `/logistics/${chain.waybillId}`
+      `/inventory/logistics/${chain.waybillId}`
     );
     expect(
       [200, 404].includes(readback.status),
