@@ -244,14 +244,13 @@ jobs:
             grep -q '^distributionSha256Sum=' "$WRAP" || echo 'distributionSha256Sum=9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14' >> "$WRAP"
             echo "gradle 发行包回退镜像源：${GVER}"
           fi
-          # kotlin 构件被解析到 GitHub release 而中断时由前置公共镜像兜底：addFirst 使镜像
-          # 优先于工程内仓库，构件坐标与版本不变，镜像缺件仍会落回后续仓库并按原判定判红。
-          mkdir -p "$HOME/.gradle/init.d"
-          printf '%s\n' \
-            'allprojects {' \
-            '    buildscript { repositories { addFirst(maven { name = "ciAliyunMirror"; url = uri("https://maven.aliyun.com/repository/public") }) } }' \
-            '    repositories { addFirst(maven { name = "ciAliyunMirror"; url = uri("https://maven.aliyun.com/repository/public") }) }' \
-            '}' > "$HOME/.gradle/init.d/ci-mirror.gradle"
+          # kotlin 构件被解析到 GitHub release 而中断时由前置公共镜像兜底：直接给 CI 现场
+          # 生成工程的 settings 与 root build 两个 gradle 文件的首个 repositories 块插入
+          # 具名镜像仓库，构件坐标与版本不变，镜像缺件仍落回后续仓库按原判定判红。
+          for F in src-tauri/gen/android/settings.gradle.kts src-tauri/gen/android/build.gradle.kts; do
+            grep -q 'ciAliyunMirror' "$F" || sed -i '0,/repositories {/s//repositories {\n        maven { name = "ciAliyunMirror"; url = uri("https:\/\/maven.aliyun.com\/repository\/public") }/' "$F"
+            grep -q 'ciAliyunMirror' "$F" || { echo "镜像仓库插入未命中：$F 模板已变，需人工校准"; exit 1; }
+          done
 
       - name: 构建 debug APK
         working-directory: mobile-app
