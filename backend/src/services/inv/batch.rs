@@ -957,6 +957,11 @@ impl InventoryTransferService {
         });
         let inserted = transaction.insert(txn).await?;
         pending_events.push(Self::build_inventory_transaction_created_event(&inserted));
+        // 与既有库存分支同源：收货腿必须把明细项的 received_quantity 落库，否则新建库存
+        // 分支下明细收货量恒留 0（库存与状态已搬对，唯独明细缺写），破坏发货/收货双腿守恒。
+        // 先提取 received_quantity 再 move item，避免 use of moved value。
+        let received_quantity = item.quantity;
+        Self::update_item_received_quantity(txn, item, received_quantity).await?;
         Ok(())
     }
 
