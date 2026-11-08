@@ -244,6 +244,14 @@ jobs:
             grep -q '^distributionSha256Sum=' "$WRAP" || echo 'distributionSha256Sum=9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14' >> "$WRAP"
             echo "gradle 发行包回退镜像源：${GVER}"
           fi
+          # kotlin 构件被解析到 GitHub release 而中断时由前置公共镜像兜底：addFirst 使镜像
+          # 优先于工程内仓库，构件坐标与版本不变，镜像缺件仍会落回后续仓库并按原判定判红。
+          mkdir -p "$HOME/.gradle/init.d"
+          printf '%s\n' \
+            'allprojects {' \
+            '    buildscript { repositories { addFirst(maven { url = uri("https://maven.aliyun.com/repository/public") }) } }' \
+            '    repositories { addFirst(maven { url = uri("https://maven.aliyun.com/repository/public") }) }' \
+            '}' > "$HOME/.gradle/init.d/ci-mirror.gradle"
 
       - name: 构建 debug APK
         working-directory: mobile-app
