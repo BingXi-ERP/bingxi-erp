@@ -250,7 +250,7 @@ impl ArReconciliationService {
             ar_status::RECONCILIATION_CANCELLED,
         ];
         if !allowed_statuses.contains(&status) {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "非法的对账单状态：{}，允许的状态：{:?}",
                 status, allowed_statuses
             )));
@@ -307,7 +307,9 @@ impl ArReconciliationService {
     /// - →cancelled 只由本方法的通用改状态写（无专用腿）；
     /// - closed 与 cancelled 是终态，无出边；自跃迁（前后同值）不构成迁移，按非法拒。
     ///
-    /// 拒绝走 `AppError::business`（BUSINESS_ERROR），文案点名前态、后态与该前态允许的下一态集合，
+    /// 拒绝走 `AppError::business_displayable`（BUSINESS_ERROR 且出参携带真实文案），
+    /// 文案点名前态、后态与该前态允许的下一态集合；文案只含用户提交的状态词与公开词表，
+    /// 满足可外显安全边界。若用脱敏的 business，出参恒为固定常量，点名落不到操作人眼前。
     /// 与同域「拒绝应点名可关闭的前置状态」的既有外显口径一致。
     pub fn check_status_transition(from: &str, to: &str) -> Result<(), AppError> {
         let allowed_next: &[&str] = match from {
@@ -331,14 +333,14 @@ impl ArReconciliationService {
             ar_status::RECONCILIATION_CLOSED | ar_status::RECONCILIATION_CANCELLED => &[],
             // 库中出现词表外前态（历史脏值）时不放行任何迁移，点名后拒绝
             other => {
-                return Err(AppError::business(format!(
+                return Err(AppError::business_displayable(format!(
                     "对账单当前状态 {} 不在状态词表内，不允许任何状态迁移",
                     other
                 )));
             }
         };
         if to == from || !allowed_next.contains(&to) {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "对账单状态不允许从 {} 迁移到 {}，{} 可迁移到的状态：{:?}",
                 from, to, from, allowed_next
             )));
