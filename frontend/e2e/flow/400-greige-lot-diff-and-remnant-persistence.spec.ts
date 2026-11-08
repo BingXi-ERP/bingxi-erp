@@ -29,7 +29,7 @@
  * 端点存在性以 frontend/scripts/route-snapshot.txt 在册行为准。
  * 坯布建档与读写通道为 greige_fabric_handler 的 create_greige_fabric、
  * get_greige_fabric、list_greige_fabrics、update_greige_fabric、delete_greige_fabric、
- * stock_out。CreateGreigeFabricRequest 与 UpdateGreigeFabricRequest 均带
+ * stock-out。CreateGreigeFabricRequest 与 UpdateGreigeFabricRequest 均带
  * dye_lot_no 与 color_no（V15 P2 21.3 缸号色号追溯段注释）；列表筛选支持
  * fabric_no 与 status，分页键为 page 与 page_size。
  * 状态词表唯一来源为 models/status/purchase_inventory.rs 的 greige_fabric_status
