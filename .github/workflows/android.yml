@@ -235,6 +235,15 @@ jobs:
           grep -q 'manifestPlaceholders\["usesCleartextTraffic"\] = "false"' "$GRADLE" || { echo '未找到明文流量占位符默认值，Tauri 模板已变，需人工校准'; exit 1; }
           sed -i 's/manifestPlaceholders\["usesCleartextTraffic"\] = "false"/manifestPlaceholders["usesCleartextTraffic"] = "true"/' "$GRADLE"
           grep -q 'manifestPlaceholders\["usesCleartextTraffic"\] = "true"' "$GRADLE" || { echo '明文流量占位符改写未生效'; exit 1; }
+          # gradle 发行包官方源超时中断时回退可达镜像，distributionSha256Sum 钉死官方校验值
+          # 保完整性（镜像产物被替换即 wrapper 自判红）；镜像不可达或版本不符保持官方源不改动。
+          WRAP="src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties"
+          GVER="$(sed -n 's|^distributionUrl=.*gradle-\([0-9.]*\)-bin\.zip.*|\1|p' "$WRAP")"
+          if [ "$GVER" = "9.6.1" ] && curl -sIf --max-time 20 -o /dev/null "https://mirrors.cloud.tencent.com/gradle/gradle-${GVER}-bin.zip"; then
+            sed -i "s|^distributionUrl=.*|distributionUrl=https://mirrors.cloud.tencent.com/gradle/gradle-${GVER}-bin.zip|" "$WRAP"
+            grep -q '^distributionSha256Sum=' "$WRAP" || echo 'distributionSha256Sum=9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14' >> "$WRAP"
+            echo "gradle 发行包回退镜像源：${GVER}"
+          fi
 
       - name: 构建 debug APK
         working-directory: mobile-app
