@@ -253,6 +253,9 @@ test.describe.serial('超折扣审批门：阈值配置、权限拒绝、超阈�
         {
           role: 'sales_rep',
           label: '未超阈小额自批',
+          // 未超阈且低于自批金额档时提交人自审是业务契约，与提交棒同身份属预期，
+          // 显式豁免重复身份守卫；其余棒次仍受守卫约束
+          allowRepeatIdentity: true,
           run: async ({ session, require }) => {
             const productId = Number(require('productId'));
             const productUnit = String(require('productUnit'));
