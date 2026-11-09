@@ -941,10 +941,13 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       failureCode(noStock),
       `无匹配库存必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(noStock.code)}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    // BUSINESS 族的公开文案是固定值，明细只进 tracing 日志（utils/messages.rs 的
+    // BUSINESS_PUBLIC 与 utils/error.rs 的口径），所以拒因分支只能钉 code 与副作用，
+    // 不能拿内部明细文案当断言对象；这里把"明细不外显"本身钉成正向契约。
     expect(
       String(noStock.message),
-      `无匹配库存腿的拒因必须落在批次维度，实际 ${JSON.stringify(noStock.message)}`
-    ).toContain('无匹配库存');
+      `BUSINESS 族公开文案必须固定不外显明细，实际 ${JSON.stringify(noStock.message)}`
+    ).toBe('业务处理失败');
 
     // 负例五：调拨量超出现存量 → business 族 400，且库存与明细零落库
     const overQty = await apiCallExpectFail(page, 'POST', '/inventory/transfers', {
@@ -961,10 +964,8 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
     expect(
       String(overQty.message),
-      `超量腿必须被可用量不足挡住而不是无匹配库存，否则该腿没测到预检本身，实际 ${JSON.stringify(
-        overQty.message
-      )}`
-    ).toContain('库存不足');
+      `BUSINESS 族公开文案必须固定不外显明细，实际 ${JSON.stringify(overQty.message)}`
+    ).toBe('业务处理失败');
     const keepAfterOver = await readStockRow(page, {
       productId,
       warehouseId,
