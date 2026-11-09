@@ -118,3 +118,36 @@ backend/migration/src/domain/piece_length_scale_widen/m0128_widen_inventory_piec
 本文件第二节补上该层，两者合并才是完整排期依据。审计另更正三处旧口径
 （蓝牙打印已接通、customers 导入已真通而空转方为 inventory、通知已有 WebSocket 通道），
 这三条在采信前仍须按两种互不依赖口径复核。
+
+## 七 残量复核更正第二节的判定，自适应分支不是干净增量
+
+第二节把 feat/mobile-adaptive-ui 记为"42 枚源码面增量"，本轮按 blob 与行内容集合复核后更正。
+该支相对主干的 42 枚改动分布是 5 枚 A、1 枚 D、36 枚 M，merge-base 为 0a95c915c，主干顶点 6a0ca600e。
+
+五枚 A 全部是两侧独立新增（merge-base 时都不在册），逐枚比对结果为：
+tauri.d.ts 与 android-permissions.ts 两枚逐字节相同，即主干已完整承载；
+87-mobile-content-and-dedup.spec.ts 主干 675 行对分支 298 行，分支独有 74 行而主干独有 423 行；
+mobile-content.css 主干 216 行对分支 195 行，分支独有 2 行而主干独有 20 行；
+bluetooth-print.ts 主干 517 行对分支 373 行，分支独有 14 行而主干独有 145 行。
+三十六枚 M 全部（36 比 36）在 merge-base 之后被主干改过，即该支的修改都基于陈旧 base。
+
+结论：该支是陈旧的并行迭代，主干已在同一域走得更远，整支合入会把三枚文件回退掉共 588 行主干内容。
+真实残量只有三枚文件里的 90 行分支独有内容（74 加 2 加 14），且这 90 行是否已被主干以别的写法覆盖还需逐行判。
+故该支不按"落地整支"处理，改为逐行残量审查后只移植确属缺失的部分。
+
+那 1 枚 D 是 frontend/src/views/periods/index.vue。复核发现主干也不在册该文件，
+即两侧共同删除，不是该支删掉主干仍在的页面，不构成回归。本轮曾误判为回归，此处更正。
+
+真正干净的增量在 test/e2e-mobile-form-layout：131-mobile-form-layout.spec.ts 与
+132-mobile-numeric-input.spec.ts 两枚都是 A 且主干确认不在册，无撞面无陈旧 base，可直接收编。
+
+小程序分支的门面抽查结果是干净的：miniprogram-checks.yml、scripts/ci/miniprogram-checks.sh、
+mp-check-pages.cjs、mp-endpoint-check.cjs 四枚都是 A，.gitignore 是 M，无 add/add 撞面。
+故第三节的两处阻塞（242 枚产物与 m0128 撞号）仍是该域仅有的阻塞，判定不变。
+
+更正后的域划分与次序：
+- 微信小程序域一支（任务 85）不变，承载小程序树与四枚门面加微信后端腿，先解产物与撞号。
+- 移动端域（任务 86）改性质：不再整支合入 feat/mobile-adaptive-ui。
+  先收编 131 与 132 两枚干净增量 e2e，再对该自适应支做逐行残量审查，
+  只移植主干确缺的内容，审查结论若是残量为零则关支不删分支并留实证评论。
+  这样避免用陈旧版本回退主干已走远的 588 行。
