@@ -1024,6 +1024,21 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       numOf(negativeItems[0], 'quantity', '负数量明细行'),
       '负数量必须如实落库为 -5（不被静默取绝对值或清零）'
     ).toBe(-5);
+    // 库存经理无库存数据权限配置且非 admin，出参的数量列会被 handlers/inventory_stock_handler.rs
+    // 的脱敏分支整列移除。先在该会话就地锁住脱敏面，再切管理员读真实值，
+    // 否则可用量恒为 undefined，读到的不是库存而是权限面。
+    const maskedAfterNegative = await readStockRow(page, {
+      productId,
+      warehouseId,
+      batchNo: greigeBatch,
+      colorNo: '',
+      label: '458-04 负数量建单后经理脱敏面',
+    });
+    expect(
+      Object.prototype.hasOwnProperty.call(maskedAfterNegative, 'quantity_available'),
+      '非 admin 且无库存数据权限配置的岗位，库存出参必须隐藏 quantity_available'
+    ).toBe(false);
+    await loginAsRole(page, 'admin');
     const keepAfterNegative = await readStockRow(page, {
       productId,
       warehouseId,
@@ -1434,6 +1449,23 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       COUNT_STATUS.COMPLETED
     );
 
+    // 库存列表与详情对"无 inventory_stock 数据权限配置且非 admin"的岗位默认隐藏五个数量列
+    // （inventory_stock_handler.rs 的详情与列表辅助函数同一口径）。经理会话下读不到账面量
+    // 是脱敏契约生效，不是过账没落库。先在经理会话把这条脱敏正向钉住，再切回 admin 做库读，
+    // 证明实盘 77 真落进库存行，两件事各自可证，不拿被隐藏的字段当落库证据。
+    const stockAsMgr = await readStockRow(page, {
+      productId,
+      warehouseId,
+      batchNo,
+      colorNo: `E2E${tag}-R`,
+      label: '458-06 经理会话脱敏面',
+    });
+    expect(
+      Object.prototype.hasOwnProperty.call(stockAsMgr, 'quantity_on_hand'),
+      '非 admin 且无库存数据权限配置的岗位，库存出参必须隐藏 quantity_on_hand'
+    ).toBe(false);
+
+    await loginAsRole(page, 'admin');
     const stockAfterMgrApprove = await readStockRow(page, {
       productId,
       warehouseId,
@@ -1513,6 +1545,23 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     );
     expect(shippedSum, '发货后明细发出量合计必须等于主表总量 18，实际 ' + shippedSum).toBe(itemSum);
 
+    // 本腿在库存经理会话里跑，而库存详情与列表对"无 inventory_stock 数据权限配置且非 admin"
+    // 的岗位默认隐藏五个数量列（inventory_stock_handler.rs 详情与列表辅助同口径）。
+    // 先在经理会话把脱敏正向钉住，再切回 admin 库读证守恒，两件事各自可证，
+    // 不拿被隐藏的字段当"库里没变"或"库里变了"的证据。
+    const srcAsMgr = await readStockRow(page, {
+      productId,
+      warehouseId: fromWarehouseId,
+      batchNo,
+      colorNo: '',
+      label: '458-07 经理会话脱敏面',
+    });
+    expect(
+      Object.prototype.hasOwnProperty.call(srcAsMgr, 'quantity_on_hand'),
+      '非 admin 且无库存数据权限配置的岗位，库存出参必须隐藏 quantity_on_hand'
+    ).toBe(false);
+
+    await loginAsRole(page, 'admin');
     const src = await readStockRow(page, {
       productId,
       warehouseId: fromWarehouseId,
