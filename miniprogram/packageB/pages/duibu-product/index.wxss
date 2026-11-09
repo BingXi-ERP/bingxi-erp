@@ -1,0 +1,72 @@
+.duibu_product {
+  background: #f5f7f9;
+  height: calc(100% - 130rpx);
+  overflow: hidden;
+  overflow-y: scroll;
+  padding: 32rpx 32rpx 50rpx;
+}
+.preview-img-wrap {
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: wrap;
+}
+.justify-between {
+  justify-content: space-between;
+}
+.preview-img-item {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin-bottom: 16rpx;
+  position: relative;
+  width: 22%;
+}
+.color_card_item {
+  width: 25%;
+}
+.db-mr-8 {
+  margin-right: 16rpx;
+}
+.preview-cover {
+  background: rgba(0, 0, 0, 0.3);
+  bottom: 0.2rem;
+  color: #fff;
+  font-size: 12px;
+  left: 50%;
+  padding: 8rpx 0;
+  position: absolute;
+  right: 0;
+  text-align: center;
+  transform: translateX(-50%);
+  width: 5rem;
+  z-index: 1;
+}
+.db-card {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 16px;
+}
+.db-card > .van-cell {
+  padding-left: 0;
+  padding-right: 0;
+}
+.db-mt-8 {
+  margin-top: 16rpx;
+}
+.group-cell-product {
+  margin: 16rpx 0 0 !important;
+}
+.cell-title-color {
+  color: #969799 !important;
+}
+.cell-value-color {
+  color: #323233 !important;
+}
+.title {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  padding-bottom: 16rpx;
+}

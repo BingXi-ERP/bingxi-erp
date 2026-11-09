@@ -1,0 +1,7 @@
+<view class="box">
+  <image
+    class="img"
+    mode="widthFix"
+    src="http://chuangjing-prod-images.oss-cn-hangzhou.aliyuncs.com/duibu/shop/20240328-175813.jpg"
+  ></image>
+</view>

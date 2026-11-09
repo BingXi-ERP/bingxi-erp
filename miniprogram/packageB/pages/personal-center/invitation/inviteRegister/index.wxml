@@ -1,0 +1,28 @@
+<view class="inviteRegister">
+    <image class="headerImg" src="{{icon.headerImg}}"></image>
+    <view class="fr-between-center friendTalk">
+        <view class="userImg bg-img" style="background-image:url(\"{{userHeadImg?userHeadImg+'?imageView2/2/w/200':userHeadImg}}\")"></view>
+        <view class="text positonBgImg" style="background-image:url('{{icon.textContent}}')">Hi！朋友，送你30元现金红包，注册并回复需求即可得，和我一起赚补贴拉大单吧！</view>
+    </view>
+    <view class="inputInfo">
+        <view class="fr-between-center inputVal">
+            <input bindinput="inputVal" data-type="mobile" maxlength="11" placeholder="请输入手机号" placeholderClass="placeholder" type="number"></input>
+        </view>
+        <view class="fr-between-center inputVal">
+            <input bindinput="inputVal" data-type="code" maxlength="4" placeholder="请输入短信验证码" placeholderClass="placeholder" type="number"></input>
+            <button bindtap="getVerificationCode" class="verificationCode" disabled="{{disabled}}">{{codeName}}</button>
+        </view>
+    </view>
+    <cpm-color-btn catch:toPath="toPath" class="inputBtn" disabled="{{!mobile||!code||!check}}" title="注册"></cpm-color-btn>
+    <view class="fl register-check">
+        <view bindtap="checkboxChange" class="fl check">
+            <image src="{{icon.selected}}" wx:if="{{check}}"></image>
+            <view class="noCheck" wx:if="{{!check}}"></view>
+        </view>
+        <text class="nonmal">我已阅读并同意</text>
+        <text bindtap="agreePage" class="agreePage">《秉羲工作台用户协议》</text>与<text bindtap="toPrivacy" class="agreePage">《隐私条款》</text>
+    </view>
+</view>
+<view class="mask">
+    <text>活动已结束</text>
+</view>

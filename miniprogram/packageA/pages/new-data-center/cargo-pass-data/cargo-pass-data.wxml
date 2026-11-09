@@ -1,0 +1,81 @@
+<view class="contain">
+  <view class="topContent">
+    <view class="dateChoose">
+      <view class="lately-date-choose">
+        <button
+          catchtap="choosedWeek"
+          class="dateB buttonSpace {{confirmDate==2?'choosedBotton':''}}"
+        >
+          近7天
+        </button>
+        <button
+          catchtap="choosedMonth"
+          class="dateB {{confirmDate==3?'choosedBotton':''}}"
+        >
+          近30天
+        </button>
+      </view>
+      <view class="date-choose displayFlex">
+        <picker
+          bindchange="bindStartDateChange"
+          end="2027-09-01"
+          mode="date"
+          start="2015-09-01"
+          value="{{date}}"
+        >
+          <view class="picker data-choose"
+            >{{startDate==''?'请选择时间':startDate}}</view
+          >
+        </picker>
+        <span class="dateRange">至</span>
+        <picker
+          bindchange="bindEndDateChange"
+          end="2027-09-01"
+          mode="date"
+          start="2015-09-01"
+          value="{{endDate}}"
+        >
+          <view class="picker data-choose"
+            >{{endDate==''?'请选择时间':endDate}}</view
+          >
+        </picker>
+      </view>
+    </view>
+  </view>
+  <view class="chartContent">
+    <view class="chartTitle">TOP5曝光次数</view>
+    <view class="canvas-container">
+      <ec-canvas
+        canvasId="mychart-top"
+        ec="{{et}}"
+        id="mychart-dom-top"
+        index="{{0}}"
+      ></ec-canvas>
+    </view>
+  </view>
+  <view style="height: 20rpx; background: #f5f5f9"></view>
+  <view class="chartContent">
+    <view class="chartTitle">客户点击量</view>
+    <view class="canvas-container">
+      <ec-canvas
+        canvasId="mychart-barcurt"
+        ec="{{ec}}"
+        id="mychart-dom-barcurt"
+        index="{{1}}"
+      ></ec-canvas>
+    </view>
+  </view>
+  <view style="height: 20rpx; background: #f5f5f9"></view>
+  <view class="chartContent">
+    <view class="chartTitle">商品搜索次数排名TOP5</view>
+    <view class="canvas-container">
+      <ec-canvas
+        canvasId="mychart-psearch"
+        ec="{{es}}"
+        id="mychart-dom-psearch"
+        index="{{2}}"
+      ></ec-canvas>
+    </view>
+  </view>
+  <view style="height: 20rpx; background: #f5f5f9"></view>
+</view>

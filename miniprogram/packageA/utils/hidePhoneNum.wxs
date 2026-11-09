@@ -1,0 +1,11 @@
+var hidePhoneNum = function (num) {
+  if (num) {
+    var curNum = num.toString();
+    if (curNum.length === 11) {
+      var reg = getRegExp("^(\x5cd{3})\x5cd{4}(\x5cd{4})$");
+      newNum = curNum.replace(reg, "$1****$2");
+      return newNum;
+    }
+  }
+};
+module.exports = hidePhoneNum;

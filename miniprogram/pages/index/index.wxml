@@ -1,0 +1,177 @@
+<view class="indexPlace">
+    <view class="info-box" wx:if="{{storeInfo.boxExpireMessage}}">
+        <van-notice-bar leftIcon="info-o" text="{{storeInfo.boxExpireMessage}}"></van-notice-bar>
+    </view>
+    <view class="fl indexTop">
+        <view style="text-align:center;">
+            <view class="avatar bg-img" style="background-image:url(\"{{personInfo.avatar}}\")"></view>
+        </view>
+        <view class="storeName g_limtRow" wx:if="{{storeInfo.companyName}}">{{storeInfo.companyName}}</view>
+        <view bindtap="toLogin" class="storeName" wx:else>{{'请先登录/注册'}}</view>
+        <view class="fl storeSee">
+            <view class="storeIcon">
+                <image bindtap="toSearchPicture" class="storeImg" src="{{icon.toImgSearch}}"></image>
+            </view>
+            <view class="storeIcon storeState">
+                <image bindtap="toNewsCenter" class="storeImg" src="{{icon.toNews}}"></image>
+                <span class="redPoint" wx:if="{{noReadCount>0}}">{{noReadCount}}</span>
+            </view>
+        </view>
+    </view>
+    <view class="contain">
+        <view class="pageInfo">
+            <image class="backgroundImage" src="{{icon.bg}}"></image>
+            <view class="storeInfo">
+                <view class="leftInfo">
+                    <view class="turnover" wx:if="{{userAuthList['stat:summary']&&userAuthList['stat:summary:person']}}">今日{{currentRoleId==1?'个人':'全店'}}营业额(元)<p bindtap="switchRoleTo">
+                            <text>⇋</text>看{{currentRoleId==1?'全店':'个人'}}</p>
+                    </view>
+                    <view class="turnoverNum g_limtRow" wx:if="{{userAuthList['stat:summary']||userAuthList['stat:summary:person']}}">{{storeDataInfo.todayShopTurnover}}</view>
+                    <view class="turnoverNum g_limtRow" wx:if="{{!userAuthList['stat:summary']&&!userAuthList['stat:summary:person']}}">-</view>
+                </view>
+                <view bind:tap="toDataCenter" class="rightIcon">
+                    <van-icon color="#fff" name="arrow"></van-icon>
+                </view>
+            </view>
+            <view catch:tap="toDataCenter" class="monthInfo">
+                <view class="cardInfo" data-tid="0">
+                    <view class="detailName">今日开单(笔)</view>
+                    <view class="detailNum g_limtRow" wx:if="{{userAuthList['stat:summary']||userAuthList['stat:summary:person']}}">{{storeDataInfo.todayBillingCount}}</view>
+                    <view class="detailNum g_limtRow" wx:if="{{!userAuthList['stat:summary']&&!userAuthList['stat:summary:person']}}">-</view>
+                </view>
+                <view class="cardInfo" data-tid="1">
+                    <view class="waitPay">待收款(元)</view>
+                    <view class="waitPayNum g_limtRow" style="{{'margin-left: '+(storeDataInfo.totalDebtAmount.length>9?'0':storeDataInfo.totalDebtAmount.length>8?'12rpx':'45rpx')}}" wx:if="{{userAuthList['stat:summary']||userAuthList['stat:summary:person']}}">{{storeDataInfo.totalDebtAmount}}</view>
+                    <view class="detailNum g_limtRow" wx:if="{{!userAuthList['stat:summary']&&!userAuthList['stat:summary:person']}}">-</view>
+                </view>
+                <view class="cardInfo" data-tid="1">
+                    <view class="todayVist">今日访问(人)</view>
+                    <view class="todayVistNum g_limtRow" wx:if="{{userAuthList['stat:summary']||userAuthList['stat:summary:person']}}">{{storeDataInfo.todayAccessCount}}</view>
+                    <view class="detailNum g_limtRow" wx:if="{{!userAuthList['stat:summary']&&!userAuthList['stat:summary:person']}}">-</view>
+                </view>
+            </view>
+        </view>
+        <view class="banner" wx:if="{{bannerData&&bannerData.imageUrl}}">
+            <van-image catchtap="onClickBanner" fit="cover" height="160rpx" src="{{bannerData.imageUrl}}" width="100%"></van-image>
+        </view>
+        <view class="white-block" wx:if="{{userAuthList['goods:query']||userAuthList['order:saveBilling']||userAuthList['order:refund']}}">
+            <text class="menu-text" wx:if="{{userAuthList['goods:query']||userAuthList['order:saveBilling']||userAuthList['order:refund']}}">常用功能</text>
+            <view class="moduleArea">
+                <view bind:tap="formSubmit" catch:tap="toColorCard" class="fun-item" wx:if="{{userAuthList['goods:query']}}">
+                    <image class="item-img" src="{{bussinessIcon.pic1}}"></image>
+                    <view class="moduleName">面料管理</view>
+                </view>
+                <view catch:tap="tosalesReturn" class="storeState" style="position:relative" wx:if="{{userAuthList['order:refund']}}">
+                    <image src="{{bussinessIcon.pic2}}" style="width:64rpx;height:64rpx;"></image>
+                    <view class="moduleName">退货</view>
+                </view>
+                <view catch:tap="toSearchRecord" class="storeState" style="position:relative;" wx:if="{{userAuthList['search_record']}}">
+                    <image src="{{bussinessIcon.pic3}}" style="width:64rpx;height:64rpx;"></image>
+                    <view class="moduleName">搜索记录</view>
+                </view>
+                <view catch:tap="toReleaseCargoPass" class="storeState" style="position:relative;" wx:if="{{userAuthList['release:cargo:pass:list']}}">
+                    <image src="{{bussinessIcon.pic4}}" style="width:64rpx;height:64rpx;"></image>
+                    <view class="moduleName">放货通</view>
+                </view>
+                <view catch:tap="toReleaseRestockPass" class="storeState" style="position:relative" wx:if="{{userAuthList['purchasing:model:list']}}">
+                    <image src="{{bussinessIcon.pic5}}" style="width:64rpx;height:64rpx;"></image>
+                    <view class="moduleName">进货通</view>
+                </view>
+                <view catch:tap="toElColorCard" class="storeState" style="position:relative">
+                    <image src="./color-img.png" style="width:64rpx;height:64rpx;"></image>
+                    <view class="moduleName">电子色卡</view>
+                </view>
+                <view bindtap="toSearchPicture" class="storeState" style="position:relative" wx:if="{{userAuthList['goods:goodsImgSearch']}}">
+                    <image src="./tusou.png" style="width:64rpx;height:64rpx;"></image>
+                    <view class="moduleName">图搜</view>
+                </view>
+                <view bindtap="toNewsCenter" class="storeState" style="position:relative">
+                    <image src="./message.png" style="width:64rpx;height:64rpx;"></image>
+                    <view class="moduleName">消息通知</view>
+                </view>
+            </view>
+        </view>
+        <view class="white-block" wx:if="{{userAuthList['crm:query']||userAuthList['stat:balance:due']}}">
+            <text class="menu-text" wx:if="{{userAuthList['crm:query']||userAuthList['stat:balance:due']}}">客户管理</text>
+            <view class="moduleArea flex-bt">
+                <view catch:tap="toCustomer" class="fun-item-column" wx:if="{{userAuthList['crm:query']}}">
+                    <view class="left-layout">
+                        <view class="img-wrap">
+                            <image class="item-img" src="{{bussinessIcon.pic6}}"></image>
+                        </view>
+                        <view class="moduleName">客户管理</view>
+                    </view>
+                    <van-icon color="#d8d8d8" name="arrow" size="24rpx"></van-icon>
+                </view>
+                <view catch:tap="toCustomerAccount" class="fun-item-column" wx:if="{{userAuthList['stat:balance:due']}}">
+                    <view class="left-layout">
+                        <view class="img-wrap">
+                            <image class="item-img" src="{{bussinessIcon.pic7}}"></image>
+                        </view>
+                        <view class="moduleName">客户对账</view>
+                    </view>
+                    <van-icon color="#d8d8d8" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </view>
+        </view>
+        <view class="white-block" wx:if="{{storeInfo.companyName}}">
+            <text class="menu-text">店铺管理</text>
+            <view class="moduleArea flex-bt">
+                <view catch:tap="toMiniProgram" class="fun-item-column">
+                    <view class="left-layout">
+                        <view class="img-wrap">
+                            <image src="{{bussinessIcon.pic8}}" style="width:64rpx;height:64rpx;"></image>
+                        </view>
+                        <view class="moduleName">店铺预览</view>
+                    </view>
+                    <van-icon color="#d8d8d8" name="arrow" size="24rpx"></van-icon>
+                </view>
+                <view catch:tap="toDataCenter" class="fun-item-column" wx:if="{{userAuthList['stat:center']}}">
+                    <view class="left-layout">
+                        <view class="img-wrap">
+                            <image src="{{bussinessIcon.pic9}}" style="width:64rpx;height:64rpx;"></image>
+                        </view>
+                        <view class="moduleName">数据中心</view>
+                    </view>
+                    <van-icon color="#d8d8d8" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </view>
+        </view>
+    </view>
+</view>
+<view class="tipsModal" wx:if="{{modalDisplay}}">
+    <view class="tipsModalContent">
+        <view class="tipsBg" style="background-image:url(\"{{icon.tips}}\");"></view>
+        <view style="padding-top:48rpx;padding-left:32rpx;padding-right:32rpx;">
+            <view class="InfoTop">尊敬的秉羲工作台用户：</view>
+            <view class="InfoContent">【秉羲工作台商家&面料专家】现已更新至v2.20.0，更新内容如下：</view>
+            <view class="InfoUpdate">1.隐藏【需求广场】入口。</view>
+            <view class="InfoUpdate">2.店铺导航隐藏【在线找版】入口。</view>
+        </view>
+    </view>
+    <view style="text-align:center;">
+        <image catch:tap="closeTips" class="closeTips" src="{{icon.close}}"></image>
+    </view>
+</view>
+<cmp-tab-bar active="{{active}}" class="cmp_tab_bar"></cmp-tab-bar>
+<van-popup :close-on-click-over class="tip-dialog" lay="true" show="{{showCancelComfirm}}">
+    <view class="popTitle">{{msgTitle||''}}</view>
+    <rich-text class="popContent" nodes="{{msgContent}}"></rich-text>
+    <view class="popBtn">
+        <button bindtap="got" class="btns" plain="true" size="mini">知道了</button>
+    </view>
+    <view class="popBox">
+        <checkbox-group bindchange="checkboxChange">
+            <label class="checkbox">
+                <checkbox checked="{{checkedMessage}}" value="cb"></checkbox>下次不再提示</label>
+        </checkbox-group>
+    </view>
+</van-popup>
+<van-popup bind:close="onCloseAdvertis" class="ad-dialog" show="{{showAdvertising}}" zIndex="{{9999}}">
+    <view class="ad">
+        <van-image bindtap="onCapAdvertis" fit="widthFix" src="{{advertisData.imageUrl}}" width="100%"></van-image>
+        <view bindtap="onCloseAdvertis" class="close">
+            <van-icon name="close"></van-icon>
+        </view>
+    </view>
+</van-popup>

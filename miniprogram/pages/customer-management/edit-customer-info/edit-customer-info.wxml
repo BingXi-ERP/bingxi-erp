@@ -1,0 +1,103 @@
+<view class="section" style="background:#b7bed9;color:white;padding:10rpx" wx:if="{{!isRegister}}">*该客户还未注册秉羲工作台无法及时给他推送消息，赶快去邀请他成为店铺会员！<span catchtap="inviteRegister" style="font-weight:bold;">立即邀请></span>
+</view>
+<view class="section" wx:if="{{!isRegister}}">
+    <view class="flex-wrp" style="flex-direction:row;">
+        <view class="flex-item-lef">
+            <span style="color:red" wx:if="{{customerInfo.grouping!==3}}">*</span>姓名</view>
+        <view class="flex-item-right">
+            <input bindinput="inputgetName" class="inputStyle" data-name="customerInfo.customerName" maxlength="15" placeholder="" value="{{customerInfo.customerName}}"></input>
+        </view>
+    </view>
+    <view class="flex-wrp" style="flex-direction:row;">
+        <view class="flex-item-lef">授权手机</view>
+        <view class="flex-item-right">{{customerInfo.userMobile}}</view>
+    </view>
+    <view class="flex-wrp" style="flex-direction:row;">
+        <view class="flex-item-lef noBorder">电话</view>
+        <view class="flex-item-right noBorder">
+            <input bindinput="inputgetName" class="inputStyle" data-name="customerInfo.customerPhone" maxlength="20" placeholder="请输入电话号码" type="number" value="{{customerInfo.customerPhone}}"></input>
+        </view>
+    </view>
+</view>
+<view class="section" wx:if="{{isRegister}}">
+    <view class="flex-wrp" style="flex-direction:row;">
+        <view class="flex-item-lef">微信头像</view>
+        <view class="flex-item-right">
+            <image src="{{customerInfo.avatar}}" style="width:60rpx;height:60rpx;border-radius:50%;margin-top:10rpx"></image>
+        </view>
+    </view>
+    <view class="flex-wrp" style="flex-direction:row;">
+        <view class="flex-item-lef">微信昵称</view>
+        <view class="flex-item-right g_limtRow">{{customerInfo.nickName}}</view>
+    </view>
+    <view class="flex-wrp noBorder" style="flex-direction:row;" wx:if="{{customerInfo.grouping!==3}}">
+        <view class="flex-item-lef noBorder">授权手机号：</view>
+        <view class="flex-item-right noBorder">{{customerInfo.userMobile}}</view>
+    </view>
+    <view class="cut"></view>
+    <view class="flex-wrp" style="flex-direction:row;" wx:if="{{customerInfo.grouping!==3}}">
+        <view class="flex-item-lef">
+            <span style="color:red" wx:if="{{customerInfo.grouping!==3}}">*</span>姓名</view>
+        <view class="flex-item-right">
+            <input bindinput="inputgetName" class="inputStyle" data-name="customerInfo.customerName" maxlength="32" placeholder="" value="{{customerInfo.customerName}}"></input>
+        </view>
+    </view>
+    <view class="flex-wrp noBorder" style="flex-direction:row;" wx:if="{{customerInfo.grouping!==3}}">
+        <view class="flex-item-lef ">电话</view>
+        <view class="flex-item-right ">
+            <input bindinput="inputgetName" class="inputStyle" data-name="customerInfo.customerPhone" maxlength="20" placeholder="请输入电话号码" type="number" value="{{customerInfo.customerPhone}}"></input>
+        </view>
+    </view>
+</view>
+<view class="section">
+    <view class="flex-wrp" style="flex-direction:row" wx:if="{{customerInfo.grouping!==3}}">
+        <view class="flex-item-lef">公司:</view>
+        <view class="flex-item-right">
+            <input bindinput="inputgetName" class="inputStyle" data-name="customerInfo.customerCompany" maxlength="32" placeholder="请输入公司" value="{{customerInfo.customerCompany}}"></input>
+        </view>
+    </view>
+    <view class="flex-wrp area-wrp" style="flex-direction:row;" wx:if="{{customerInfo.grouping!==3}}">
+        <view class="flex-item-lef">地区</view>
+        <view class="flex-item-right">
+            <picker bindchange="bindRegionChange" customItem="{{customItem}}" mode="region" style="height:100%;" value="{{region}}">
+                <view class="picker">
+                    <view wx:if="{{!region||region.length===0}}">请选择所在地区</view>
+                    <view class="area-text" wx:else>{{region[0]}} {{region[1]}} {{region[2]}}</view>
+                </view>
+            </picker>
+        </view>
+        <view class="bg-img icon" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+    </view>
+    <view class="flex-wrp address-wrp" style="flex-direction:row;" wx:if="{{customerInfo.grouping!==3}}">
+        <view class="flex-item-lef" style="height:140rpx;">地址：</view>
+        <view class="flex-item-right address-text-wrapper" style="width:75%!important;height:140rpx">
+            <view bindtap="changeShow" class="fakeTextArea {{customerInfo.addr?'':'textColoe'}}" wx:if="{{showTextArea}}">{{customerInfo.addr||'街道、楼牌号'}}</view>
+            <textarea autoFocus="true" bindblur="changeShow" bindinput="inputgetName" class="inputStyle address-input" data-name="customerInfo.addr" maxlength="32" placeholder="街道、楼牌号" style="display:inline-block;height:100%;width:90%;line-height:28rpx;margin-top:5%;" value="{{customerInfo.addr}}" wx:else></textarea>
+        </view>
+    </view>
+    <view class="flex-wrp noBorder explain-wrp" style="flex-direction:row;" wx:if="{{customerInfo.grouping!==3}}">
+        <view class="flex-item-lef customer-explain-left">备注：</view>
+        <view bindtap="addExplain" class="flex-item-right customer-explain-right">
+            <input bindinput="inputgetName" class="explain-text" data-name="customerInfo.remark" disabled="true" maxlength="16" placeholder="备注信息" placeholderClass="placeholder" style="display:inline-block;height:80rpx;" value="{{customerInfo.remark}}"></input>
+        </view>
+        <view class="bg-img icon" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+    </view>
+</view>
+<view class="section" wx:if="{{userAuthList['crm:editCustomer']}}">
+    <view class="flex-wrp noBorder stop-wrp" style="flex-direction:row;">
+        <view class="stop">
+            <view class="title f14 font-black">停用客户</view>
+            <text class="subtitle f12 font-gray">停用后，客户将不可查看店铺</text>
+        </view>
+        <view class="flex-item-right">
+            <switch bindchange="switch1Change" checked="{{customerInfo.status==0?true:false}}" color="#2F7BFD"></switch>
+        </view>
+    </view>
+</view>
+<view class="confrim-wrapper" wx:if="{{userAuthList['crm:editCustomer']}}">
+    <view catchtap="setLocationId" class="g_bottomBtn" style="font-size:32rpx;">确认修改</view>
+</view>
+<modal mask bindcancel="modalCancle" bindconfirm="modalSure" cancelText="取消" confirmText="确定" hidden="{{modalHidden}}" style="z-index:999" title="">确认发送短信至 {{customerInfo.fullname}}，邀请他注册秉羲工作台？</modal>
+<modal bindcancel="getExplain" bindconfirm="getExplain" cancelText="取消" confirmText="确定" hidden="{{!dialog.show}}" style="z-index:999" title="请输入备注">
+    <input bindinput="inputgetName" data-name="customerInfo.remark" maxlength="15" placeholder="请输入内容" value="{{customerInfo.remark}}"></input>
+</modal>

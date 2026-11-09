@@ -1,0 +1,28 @@
+<view class="color-card-filter-wrapper">
+    <view class="tab-wrapper {{userType==1?'':'tabBarCenter'}}">
+        <view class="tabBar">
+            <view bindtap="onChange" class="f14 sell {{tabActive==0?'choosedBar':''}}" data-index="0">出售中 ({{count.on}})<view class="SellBar" wx:if="{{tabActive==0}}"></view>
+            </view>
+        </view>
+        <view bindtap="onChange" class="unSell {{tabActive==1?'choosedBar':''}}" data-index="1">下架中 ({{count.off}})<view class="unSellBar" wx:if="{{tabActive==1}}"></view>
+        </view>
+    </view>
+</view>
+<view class=" fr-between-center filterChoose">
+    <view bindtap="changeFilter" class="filterItem {{item.checked?'itemCheck':''}}" data-action="{{item.action}}" data-on-or-down="{{item.onOrDown}}" wx:for="{{filterArr}}" wx:key="index">
+        <text class="item">{{item.name}}</text>
+        <image mode="aspectFill" src="{{item.icon}}"></image>
+    </view>
+</view>
+<view class="filter-area" wx:if="{{filter.show}}">
+    <view class="text">
+        <view bindtap="filterTap" class="item" data-filterId="{{item.filterId}}" data-filterKey="{{item.filterKey}}" wx:for="{{filter.list}}" wx:key="index">
+            <view class="name {{filter.activeId==index?'active':''}}">{{item.name}}</view>
+            <view class="icon" style="background-image:url(\"{{item.activeIcon}}\");background-repeat:no-repeat;" wx:if="{{filter.activeId==index}}"></view>
+        </view>
+    </view>
+    <view class="btn-wrapper">
+        <view bindtap="confirm" class="confirm">确定</view>
+        <view bindtap="cancel" class="cancel">取消</view>
+    </view>
+</view>

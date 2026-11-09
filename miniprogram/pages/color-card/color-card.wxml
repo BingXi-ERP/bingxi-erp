@@ -1,0 +1,96 @@
+<view class="main-container">
+  <view class="header-container">
+    <view class="search">
+      <search-input
+        bind:confirm="onSearch"
+        bind:getValue="getValue"
+        bind:search="onSearch"
+        placeholder="请输入搜索关键词"
+        width="500"
+      ></search-input>
+      <view bindtap="serviceConnnet" class="connect-device-btn">
+        <image src="./device.png"></image>
+        <view>连接设备</view>
+      </view>
+    </view>
+    <view class="filter-container">
+      <view class="left-tab">
+        <view
+          bind:tap="changeStatus"
+          class="table-item {{getDataListParams.collectStatus===item.value?'active':''}}"
+          data-value="{{item.value}}"
+          wx:for="{{filterTabs}}"
+          wx:key="index"
+          >{{item.label}}</view
+        >
+      </view>
+      <view class="fr-between-center filterChoose">
+        <view
+          bindtap="changeFilter"
+          class="filterItem {{item.checked?'itemCheck':''}}"
+          data-action="{{item.action}}"
+          data-on-or-down="{{item.onOrDown}}"
+          wx:for="{{filterArr}}"
+          wx:key="label"
+        >
+          <text class="item">{{item.name}}</text>
+          <image mode="aspectFill" src="{{item.icon}}"></image>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="list-container">
+    <van-empty
+      description="暂无色卡数据"
+      wx:if="{{list.length===0}}"
+    ></van-empty>
+    <view class="body-contianer" wx:else>
+      <view
+        class="project-item"
+        wx:for="{{list}}"
+        wx:for-index="productId"
+        wx:key="productId"
+      >
+        <view class="project-cover">
+          <image
+            mode="aspectFill"
+            src="{{item.shareColorImg}}"
+            wx:if="{{item.shareColorImg}}"
+          ></image>
+          <view class="cover-placeholder" wx:else>暂无图片</view>
+          <view class="code" wx:if="{{item.shelvesNumber}}"
+            >{{item.shelvesNumber}}</view
+          >
+        </view>
+        <view class="project-info">
+          <view class="title g_limtRowTwo">{{item.productName}}</view>
+          <view class="progress-container">
+            <view class="name"
+              >颜色 {{item.collectedCount}}/{{item.totalCount}}</view
+            >
+            <view class="progress">
+              <view
+                class="pp"
+                style="width:{{item.totalCount?item.collectedCount/item.totalCount*100:0}}%;"
+              ></view>
+            </view>
+          </view>
+          <view class="opr-btns">
+            <view
+              bindtap="colorActionTap"
+              class="btn gather"
+              data-goodsid="{{item.productId}}"
+              >颜色采集</view
+            >
+            <view
+              bindtap="colorSetting"
+              class="setting"
+              data-goodsid="{{item.productId}}"
+              >设置</view
+            >
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

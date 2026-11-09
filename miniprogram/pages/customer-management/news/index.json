@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  },
+  "navigationBarTitleText": "消息中心",
+  "navigationBarTextStyle": "white",
+  "navigationBarBackgroundColor": "#4471E7"
+}

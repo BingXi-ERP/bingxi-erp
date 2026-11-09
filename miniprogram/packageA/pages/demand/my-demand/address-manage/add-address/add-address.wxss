@@ -1,0 +1,61 @@
+page {
+  background-color: #eff0f7;
+  font-size: 26rpx;
+}
+.section {
+  background: #fff;
+  border-radius: 28rpx;
+  box-sizing: border-box;
+  margin-left: 34rpx;
+  margin-top: 40rpx;
+  padding: 0 28rpx;
+  width: calc(100vw - 68rpx);
+}
+.section .children {
+  border-bottom: 2rpx solid #f4f4f4;
+}
+.section .children:last-child {
+  border-bottom: none;
+}
+.children .children-title {
+  color: #5d5d5d;
+  font-size: 26rpx;
+  padding-top: 28rpx;
+}
+.children-tips {
+  color: #5d5d5d;
+  font-size: 22rpx;
+  margin-top: 14rpx;
+  padding-bottom: 28rpx;
+}
+.flex-item-right {
+  position: absolute;
+  right: 50rpx;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.children .children-title text {
+  color: red;
+}
+.children .children-value {
+  color: #333;
+  padding: 20rpx 0 28rpx;
+}
+.children .children-value input {
+  width: 100%;
+}
+.children .children-value .picker {
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+}
+.children .no-address {
+  color: silver;
+  font-size: 26rpx;
+}
+.noBorder {
+  border: none;
+}
+input {
+  color: #000;
+}

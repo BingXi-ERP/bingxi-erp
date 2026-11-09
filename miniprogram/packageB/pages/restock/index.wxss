@@ -1,0 +1,87 @@
+page {
+  background-color: #f5f7f9;
+}
+.restock,
+page {
+  height: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+.restock {
+  align-items: center;
+  box-sizing: border-box;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-top: -180rpx;
+  padding: 0 32rpx;
+}
+.h1 {
+  font-size: 30px;
+  line-height: 96rpx;
+}
+.tip {
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 14px;
+  margin-bottom: 64rpx;
+}
+.headSearch {
+  border-radius: 32rpx;
+  font-weight: 400;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+.headSearch .van-search {
+  padding: 10rpx 6rpx;
+}
+.headSearch .van-search__content {
+  background: #fff;
+}
+.search_btn {
+  background: #4177f5;
+  border-radius: 36rpx;
+  height: 60rpx;
+  right: 10rpx;
+  text-align: center;
+  width: 116rpx;
+}
+.search_btn .search_btn_text {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  position: relative;
+  top: -2rpx;
+}
+.history_key {
+  margin-top: 64rpx;
+  width: 100%;
+}
+.history_key_title {
+  align-items: center;
+  color: rgba(0, 0, 0, 0.6);
+  display: -webkit-flex;
+  display: flex;
+  font-size: 14px;
+  justify-content: space-between;
+  margin-bottom: 32rpx;
+}
+.history_key_title .van-icon {
+  color: #000;
+  font-size: 16px;
+}
+.history_key_content {
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: wrap;
+}
+.history_key_item {
+  background: #fff;
+  border-radius: 32rpx;
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 14px;
+  margin-bottom: 16rpx;
+  margin-right: 16rpx;
+  padding: 16rpx 32rpx;
+}

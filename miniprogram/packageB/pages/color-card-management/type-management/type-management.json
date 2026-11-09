@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "分类管理",
+  "navigationBarBackgroundColor": "#f5f5f9",
+  "usingComponents": {
+    "van-search": "../../../../miniprogram_npm/@vant/weapp/search/index",
+    "van-button": "../../../../miniprogram_npm/@vant/weapp/button/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

@@ -1,0 +1,220 @@
+<view class="contain">
+    <view wx:if="{{viewDisplay=='see'}}">
+        <view class="page-body">
+            <view class="page-section page-section-spacing swiper">
+                <swiper class="botm_card">
+                    <swiper-item wx:for="{{imageList}}" wx:key="index">
+                        <view class="swiper-item ">
+                            <image bindtap="swipclick" class="swiper-img" data-index="{{index}}" mode="aspectFill" overflow="show" src="{{item}}"></image>
+                        </view>
+                    </swiper-item>
+                </swiper>
+            </view>
+        </view>
+        <form>
+            <view class="page-body">
+                <view class="colordetail-info">
+                    <view class="colordetail-infos">
+                        <view class="productName" wx:if="{{cardDetailsInfo.businessProductName.length>0}}">{{cardDetailsInfo.businessProductName}}</view>
+                        <view class="colordetail-infos-price" wx:if="{{cardDetailsInfo.price}}">
+                            <text class="validate-no seeColored">报价：</text>
+                            <span style="font-size:26rpx;font-weight:500;">￥</span>
+                            <span style="font-size:36rpx;font-weight:500;">{{cardDetailsInfo.price}}/{{cardDetailsInfo.priceUnit}}</span>
+                        </view>
+                    </view>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no seeColor">颜色：</text>
+                    <view class="weui-input">{{cardDetailsInfo.colorList.length}}个颜色</view>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no seeColor">成分：</text>
+                    <view class="weui-input">{{cardDetailsInfo.material}}</view>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no seeColor">货架：</text>
+                    <view class="weui-input">{{cardDetailsInfo.goodsShelves||''}}</view>
+                </view>
+            </view>
+            <view class="page-body">
+                <view class="commodity-list">
+                    <text class="validate-no seeColor">供应商名称：</text>
+                    <view class="weui-input">{{cardDetailsInfo.companyName||''}}</view>
+                </view>
+                <view class="commodity-list no-border">
+                    <text class="validate-no seeColor">联系人：</text>
+                    <view class="weui-input">{{cardDetailsInfo.contacter||''}}</view>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no seeColor">手机：</text>
+                    <view bindtap="callSeller" class="weui-input" data-phone="{{cardDetailsInfo.mobileNumber}}" style="display:flex;" wx:if="{{cardDetailsInfo.mobileNumber}}">
+                        <view>{{cardDetailsInfo.mobileNumber}}</view>
+                        <view>
+                            <image class="phone" src="{{icon.phone}}"></image>
+                        </view>
+                    </view>
+                </view>
+                <view class="commodity-list no-border">
+                    <text class="validate-no seeColor">座机：</text>
+                    <view bindtap="callSeller" class="weui-input" data-phone="{{cardDetailsInfo.telephoneNumber}}" style="display:flex;" wx:if="{{cardDetailsInfo.telephoneNumber}}">
+                        <view>{{cardDetailsInfo.telephoneNumber}}</view>
+                        <view>
+                            <image class="phone" src="{{icon.phone}}"></image>
+                        </view>
+                    </view>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no seeColor">传真：</text>
+                    <view class="weui-input">{{cardDetailsInfo.faxNumber||''}}</view>
+                </view>
+            </view>
+            <view class="page-body textarea-page-section">
+                <form catchreset="formReset" class="com-form">
+                    <view class="commodity-list no-border">
+                        <text class="validate-no seeColor">仓库地址：</text>
+                        <view class="weui-input">{{cardDetailsInfo.warehouseAddress||''}}</view>
+                    </view>
+                    <view class="commodity-list">
+                        <text class="validate-no seeColor">工厂地址：</text>
+                        <view class="weui-input">{{cardDetailsInfo.factoryAddress||''}}</view>
+                    </view>
+                    <view class="commodity-list">
+                        <text class="validate-no seeColor">备注</text>
+                        <view class="weui-input">{{cardDetailsInfo.remark||''}}</view>
+                    </view>
+                </form>
+            </view>
+            <view bindtap="edit" class="g_bottomBtn">
+                <view>编辑底卡</view>
+            </view>
+        </form>
+    </view>
+    <view wx:if="{{viewDisplay=='add'||viewDisplay=='edit'}}">
+        <view class="page-body">
+            <form catchreset="formReset" class="com-form">
+                <view class="commodity-list">
+                    <text class="validate-no-no">底卡图片</text>
+                    <view class="weui-uploader__info">添加底卡及细节图片 最多可添加6张</view>
+                </view>
+                <view style="padding-left:36rpx;">
+                    <upload-img bind:delImg="delImg" bind:uoloadImg="uoloadImg" filePath="bdd/muzzleDoorhead" list="{{imageList}}" uploadPiece="{{uploadPiece}}" uploadType="{{6}}"></upload-img>
+                </view>
+                <view></view>
+            </form>
+        </view>
+        <view class="commodity-list" wx:if="{{viewDisplay=='edit'&&isShowTwo}}">
+            <text class="validate-no-no">2/5倍图</text>
+        </view>
+        <view class="weui-uploader__bd" wx:if="{{viewDisplay=='edit'&&isShowTwo}}">
+            <view class="weui-uploader__files">
+                <view>
+                    <view class="weui-uploader__file" wx:for="{{duibuImageFiles}}" wx:for-item="image" wx:key="index">
+                        <image catchtap="detailImgDuibuTap" class="weui-uploader__img item normal" data-index="{{index}}" data-src="{{image.value}}" id="{{index}}" lazyLoad="true" mode="aspectFill" src="{{image.value}}?x-oss-process=image/rotate,0"></image>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <form>
+            <view class="page-body">
+                <view class="commodity-list">
+                    <text class="validate">品名</text>
+                    <van-field bind:blur="onInputProductName" bind:input="onInputValuation" border="{{false}}" data-name="businessProductName" errorMessage="{{productNameError}}" errorMessageAlign="right" maxlength="15" value="{{cardDetailsInfo.businessProductName}}" placeholder="请输入品名"></van-field>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no">编号</text>
+                    <van-field bind:blur="onInputShelvesNumber" bind:input="onInputValuation" border="{{false}}" data-name="spuNumber" errorMessage="{{shelvesNumberError}}" errorMessageAlign="right" value="{{cardDetailsInfo.spuNumber}}" placeholder="请输入编号"></van-field>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no">报价</text>
+                    <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.price" placeholder="请输入价格" type="digit" value="{{cardDetailsInfo.price}}"></input>
+                    <picker bindchange="bindPickerChange2" range="{{array2}}" value="{{index2}}">
+                        <view>{{cardDetailsInfo.priceUnit?cardDetailsInfo.priceUnit:'米'}}</view>
+                    </picker>
+                </view>
+                <view class="commodity-list arrow-right">
+                    <text class="validate-no">色号</text>
+                    <input bindtap="toColor" class="weui-input" disabled="true" placeholder="请添加色号" value="{{colorLength}}"></input>
+                </view>
+            </view>
+            <view class="page-body">
+                <view class="commodity-list">
+                    <text class="validate-no">货架：</text>
+                    <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.goodsShelves" placeholder="请输入" value="{{cardDetailsInfo.goodsShelves}}"></input>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no">克重</text>
+                    <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.gramWeight" placeholder="请输入克重(选填)" type="text" value="{{cardDetailsInfo.gramWeight}}"></input>
+                    <picker bindchange="bindPickerChange3" range="{{array3}}" value="{{index3}}">
+                        <view>{{array3[index3]||'选择'}}</view>
+                    </picker>
+                </view>
+                <view class="commodity-list arrow-right">
+                    <text class="validate-no">成分</text>
+                    <input bindtap="toIngredient" class="weui-input" data-status="{{showIngredientName}}" disabled="true" name="" placeholder="请输入成分(选填)" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" value="{{cardDetailsInfo.material}}"></input>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no">门幅</text>
+                    <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.clothWidth" placeholder="请输入门幅(选填)" type="text" value="{{cardDetailsInfo.clothWidth}}"></input>
+                    <picker bindchange="bindPickerChange4" range="{{array4}}" value="{{index4}}">
+                        <view>{{array4[index4]||'选择'}}</view>
+                    </picker>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no">缩水率</text>
+                    <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.shrinkage" maxlength="6" placeholder="请输入缩水率(选填)" value="{{cardDetailsInfo.shrinkage}}"></input>
+                </view>
+                <view bindtap="toType" class="commodity-list">
+                    <view class="validate-no add-img" style="width:100%;">
+                        <view style="flex:1;margin-left:12rpx">添加其他属性</view>
+                        <view class="bg-img icon" style="background-image:url(\"{{icon.add}}\");"></view>
+                    </view>
+                </view>
+            </view>
+            <view class="page-body">
+                <view class="commodity-list">
+                    <text class="validate-no ">供应商名称：</text>
+                    <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.companyName" placeholder="请输入" value="{{cardDetailsInfo.companyName}}"></input>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no">联系人：</text>
+                    <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.contacter" placeholder="请输入" value="{{cardDetailsInfo.contacter}}"></input>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no">手机：</text>
+                    <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.mobileNumber" maxlength="11" placeholder="请输入" type="digit" value="{{cardDetailsInfo.mobileNumber}}"></input>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no">座机：</text>
+                    <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.telephoneNumber" maxlength="15" placeholder="请输入" type="digit" value="{{cardDetailsInfo.telephoneNumber}}"></input>
+                </view>
+                <view class="commodity-list">
+                    <text class="validate-no">传真：</text>
+                    <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.faxNumber" placeholder="请输入" type="digit" value="{{cardDetailsInfo.faxNumber}}"></input>
+                </view>
+            </view>
+            <view class="page-body textarea-page-section">
+                <form catchreset="formReset" class="com-form">
+                    <view class="commodity-list">
+                        <text class="validate-no">仓库地址：</text>
+                        <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.warehouseAddress" placeholder="请输入" value="{{cardDetailsInfo.warehouseAddress}}"></input>
+                    </view>
+                    <view class="commodity-list">
+                        <text class="validate-no">工厂地址：</text>
+                        <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.factoryAddress" placeholder="请输入" value="{{cardDetailsInfo.factoryAddress}}"></input>
+                    </view>
+                    <view class="commodity-list">
+                        <text class="validate-no">备注</text>
+                        <input bindinput="inputgetName" class="weui-input" data-name="cardDetailsInfo.remark" placeholder="请输入" value="{{cardDetailsInfo.remark}}"></input>
+                    </view>
+                </form>
+            </view>
+            <view bindtap="addList" class="g_bottomBtn" wx:if="{{viewDisplay=='add'}}">
+                <view>保存</view>
+            </view>
+            <view class="btn-edit  fl " wx:if="{{viewDisplay=='edit'}}">
+                <view bindtap="updateBaseCard" class="g_newConfirmBtn">保存</view>
+                <view bindtap="deleteBaseCard" class="g_newNormalBtn">删除</view>
+            </view>
+        </form>
+    </view>
+</view>

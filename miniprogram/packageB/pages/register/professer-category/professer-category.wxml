@@ -1,0 +1,15 @@
+<view class="chooseCategory">
+  <view class="head">
+    <view class="title">您熟悉的品类</view>
+    <view class="titleIllustrate">请选择您熟悉的品类</view>
+  </view>
+  <cmp-cmp-cloth-category
+    isRadio
+    bind:onCancel="onCancel"
+    bind:onConfirm="getHasList"
+    list="{{chooseList}}"
+  ></cmp-cmp-cloth-category>
+  <button bindtap="comfirm" class="newBtn" disabled="{{!hasList.length}}">
+    提交
+  </button>
+</view>

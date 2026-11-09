@@ -1,0 +1,164 @@
+page {
+  background-color: #eff0f7;
+}
+.containerr {
+  color: #333335;
+  font-size: 30rpx;
+  padding-bottom: 200rpx;
+  padding-top: 110rpx;
+  width: 100%;
+}
+.tips {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 999;
+}
+.list-empty-wrapper {
+  text-align: center;
+}
+.combo-item {
+  background: #fff;
+  background-position: 400rpx 200rpx;
+  background-repeat: no-repeat;
+  background-size: 200rpx;
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  margin-bottom: 24rpx;
+  margin-left: 34rpx;
+  padding: 28rpx;
+  position: relative;
+  width: calc(100vw - 68rpx);
+}
+.seal-img {
+  height: 240rpx;
+  left: 50%;
+  opacity: 0.12;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-30deg);
+  width: 240rpx;
+}
+.recommend {
+  background-color: #fb562c;
+  color: #fff;
+  font-size: 24rpx;
+  padding: 8rpx 12rpx 8rpx 36rpx;
+  position: absolute;
+  right: 0;
+  top: 10px;
+}
+.recommend::before {
+  background: #fff;
+  content: "";
+  height: 42rpx;
+  left: -22rpx;
+  position: absolute;
+  top: 4rpx;
+  transform: rotate(45deg);
+  width: 42rpx;
+}
+.combo-title {
+  color: #373c55;
+  font-size: 34rpx;
+  font-weight: 700;
+  margin-bottom: 30rpx;
+  width: 550rpx;
+}
+.first-price {
+  color: #fb562c;
+  font-size: 38rpx;
+  font-weight: 700;
+  margin-top: 26rpx;
+}
+.price-unit {
+  color: #9ca3af;
+  margin-left: 8rpx;
+  margin-right: 16rpx;
+}
+.original-price {
+  color: #9ca3af;
+  font-size: 28rpx;
+  margin-top: 26rpx;
+  text-decoration: line-through;
+}
+.discount-desc {
+  color: #fb562c;
+  font-size: 24rpx;
+  margin-bottom: 20rpx;
+  margin-top: 16rpx;
+}
+.benefit-desc {
+  font-size: 26rpx;
+}
+.benefit-desc span {
+  color: #2ecc71;
+  margin-right: 8rpx;
+}
+.account-limit {
+  font-size: 24rpx;
+  margin-top: 10rpx;
+}
+.account-limit span {
+  margin-right: 8rpx;
+}
+.current-btn {
+  background: #f7f7f7;
+  color: rgba(0, 0, 0, 0.3);
+}
+.current-btn,
+.open-btn {
+  border-radius: 50rpx;
+  font-size: 32rpx;
+  margin: 30rpx auto 10rpx;
+  text-align: center;
+  width: 600rpx;
+}
+.open-btn {
+  background: linear-gradient(180deg, #ff8b6c, #fb562c);
+  color: #fff;
+}
+.no-data {
+  height: 174rpx;
+  margin-top: 300rpx;
+  width: 182rpx;
+}
+.empty-text {
+  margin-top: 28rpx;
+}
+.empty-text,
+.footer {
+  color: #999;
+  font-size: 24rpx;
+  text-align: center;
+}
+.footer {
+  background: #eff0f7;
+  bottom: 0;
+  height: 160rpx;
+  position: fixed;
+  width: 100%;
+}
+.footer .top {
+  margin-bottom: 30rpx;
+  margin-top: 30rpx;
+}
+.footer .top span:first-child {
+  color: #2ecc71;
+  margin-right: 8rpx;
+}
+.footer .foot span {
+  color: #fb562c;
+}
+.service {
+  font-size: 24rpx;
+  padding: 40rpx;
+}
+.phone,
+.service {
+  text-align: center;
+}
+.phone {
+  padding-bottom: 50rpx;
+}

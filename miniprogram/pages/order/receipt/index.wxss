@@ -1,0 +1,199 @@
+page {
+  background-color: #eff0f7;
+  padding-top: 40rpx;
+}
+.card {
+  background-color: #fff;
+  border-radius: 20rpx;
+  margin: 20rpx 34rpx 34rpx;
+}
+.card-head {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin: 0 30rpx;
+  padding: 30rpx 0;
+}
+.card-box {
+  height: 300rpx;
+}
+.order-receipt {
+  color: #333;
+  font-size: 28rpx;
+  padding-bottom: 200rpx;
+}
+.order-receipt .placeholder-gray {
+  color: #ccc;
+}
+.order-receipt .fixed-toolbar-bottom {
+  height: 98rpx;
+  overflow: hidden;
+  padding: 0;
+}
+.toolbar-button-primary {
+  height: 98rpx;
+  line-height: 98rpx;
+  width: 260rpx;
+}
+.order-receipt .fixed-toolbar-bottom .totle-name {
+  color: #999;
+  font-size: 24rpx;
+}
+.order-receipt .fixed-toolbar-bottom .totle-content {
+  color: #ed5c5c;
+  font-size: 24rpx;
+}
+.order-receipt .fixed-toolbar-bottom .totle-content .totle-number {
+  font-size: 32rpx;
+  font-size: 40rpx;
+  font-weight: 500;
+}
+.order-receipt .card-body .cell {
+  border-bottom: 2rpx solid #f4f4f4;
+}
+.order-receipt .card-body .cell-item {
+  margin: 0 28rpx;
+  padding: 28rpx 0;
+}
+.order-receipt .card-body .cell-title {
+  color: #5d5d5d;
+  font-size: 26rpx;
+}
+.order-receipt .card-body .cell-value {
+  color: #0b0b0b;
+  font-size: 26rpx;
+}
+.order-receipt .card-body .cell-value.strong {
+  color: #e2525a;
+}
+.order-receipt .card-extra {
+  margin: 0 30rpx;
+}
+.order-receipt .card-extra .cell {
+  padding: 30rpx 0;
+}
+.order-receipt .payment-title {
+  display: -webkit-flex;
+  display: flex;
+  font-weight: 400;
+  justify-content: space-between;
+}
+.order-receipt .payment-title .tips {
+  color: silver;
+  font-size: 24rpx;
+}
+.order-receipt .payment-title text {
+  display: inline-block;
+  font-size: 28rpx;
+  font-weight: 700;
+  position: relative;
+}
+.payment-content {
+  background-color: #fff;
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  margin-left: 34rpx;
+  padding: 30rpx 30rpx 0;
+  width: calc(100vw - 68rpx);
+}
+.payment-content .payment-cell {
+  border-bottom: 2rpx solid #f4f4f4;
+  padding: 28rpx 0;
+}
+.payment-content .payment-cell:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+.payment-content .payment-cell .cell-title image {
+  height: 40rpx;
+  margin-right: 22rpx;
+  vertical-align: middle;
+  width: 40rpx;
+}
+.payment-content .payment-cell .cell-title text {
+  color: #333;
+  font-size: 28rpx;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.payment-content .payment-cell .cell-title {
+  flex: none;
+}
+.payment-content .payment-cell .cell-value {
+  flex: 1;
+  padding: 20rpx 0 0;
+  text-align: right;
+}
+.payment-content .payment-cell .cell-value input {
+  text-align: left;
+  width: 100%;
+}
+.discount-cell {
+  padding: 28rpx 0;
+}
+.discount-cell .cell-title {
+  color: #5d5d5d;
+  flex: none;
+  font-size: 26rpx;
+}
+.discount-cell .cell-value {
+  flex: 1;
+  padding: 20rpx 0 0;
+}
+.discount-cell .cell-value input {
+  width: 100%;
+}
+.order-payment-record .cell {
+  padding: 15rpx 0;
+}
+.order-payment-record .payment-record {
+  padding: 0 30rpx;
+}
+.order-payment-record .card-body .cell-title,
+.order-payment-record .card-extra .cell-title {
+  color: #999;
+}
+.order-payment-record .card-body .cell-value,
+.order-payment-record .card-extra .cell-value {
+  color: #333;
+}
+.order-payment-record .label {
+  color: #999;
+  margin-right: 20rpx;
+}
+.order-payment-record .strong {
+  color: #2f7bfd;
+}
+.order-payment-record .h3 {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-bottom: 30rpx;
+}
+.order-payment-record .payment-record {
+  color: #999;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 24rpx;
+}
+.order-payment-record .no-data {
+  padding: 30rpx 0;
+  text-align: center;
+}
+.order-payment-record .no-data image {
+  height: 174rpx;
+  margin: auto;
+  width: 180rpx;
+}
+.order-payment-record .payment-record > text,
+.order-payment-record .payment-record > view {
+  flex: 1;
+  padding: 15rpx 0;
+}
+.payment-amount {
+  color: #0b0b0b;
+}
+.data-empty {
+  color: #999;
+  font-size: 24rpx;
+  padding: 50rpx 0;
+  text-align: center;
+}

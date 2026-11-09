@@ -1,0 +1,24 @@
+<view class="color-card-list-block">
+    <view catchtap="goEditPage" class="info {{showbottom&&list.goodsStatus===0?'newInfo':''}}" data-goodsid="{{list.id}}">
+        <view class="bg-wrapper">
+            <view class="img-bg" style="background-image:url(\"{{storagePath}}\")"></view>
+        </view>
+        <view class="info-info">
+            <view class="g_limtRowTwo name f13">{{list.businessProductName||list.goodsName}} {{list.spuNumber||''}}</view>
+            <view class="price" style="visibility:hidden;">
+                <view wx:if="{{list.price&&list.price!=='0'&&list.price!=='0.0'}}">¥<text class="line" style="font-size:24rpx;color:#373C55;">{{list.price||''}}</text>
+                    <text style="font-size:24rpx;color:#373C55;">{{list.priceUnit||''}}</text>
+                </view>
+                <view style="font-size:24rpx;color:#373C55;" wx:else>面议</view>
+            </view>
+        </view>
+        <view class="btn_gloup">
+            <view catchtap="revokeApply" class="btn1" data-status="3" wx:if="{{list.productStatus===3}}">撤销申请</view>
+            <block wx:if="{{list.productStatus===2}}">
+                <view catchtap="revokeApply" class="btn1" data-status="2" wx:if="{{list.isPlatformShelves===1}}">重新放货</view>
+                <view class="shelves" wx:else>平台下架</view>
+            </block>
+            <view catchtap="revokeApply" class="btn1" data-status="1" wx:if="{{list.productStatus===1&&userAuthList['release:cargo:pass:stop']}}">暂停</view>
+        </view>
+    </view>
+</view>

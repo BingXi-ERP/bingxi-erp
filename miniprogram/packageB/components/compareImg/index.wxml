@@ -1,0 +1,108 @@
+<van-popup
+  rootPortal
+  bind:close="onCloseCompare"
+  customClass="compareImage"
+  customStyle="width: 100%; height: {{popupHeight}};border-radius: 32rpx 32rpx 0 0;"
+  position="bottom"
+  safeAreaInsetTop="true"
+  show="{{show}}"
+>
+  <view class="compare_content" wx:if="{{show}}">
+    <image
+      catchtap="onCloseCompare"
+      class="close_icon"
+      mode="aspectFit"
+      src="{{icon.icon}}"
+    ></image>
+    <view class="color_compare" wx:if="{{colorCompare}}">
+      <text class="compare_title">颜色对比图</text>
+      <view class="compare_color_main">
+        <view
+          class="compare_color_item"
+          wx:for="{{compareColorOptions}}"
+          wx:key="index"
+        >
+          <view
+            class="color_block"
+            style="background-color:{{data[item.prop].color1}}"
+          >
+            <image
+              class="empty_color"
+              mode="aspectFill"
+              src="{{icon.noColorBg}}"
+              wx:if="{{!data[item.prop].color1}}"
+            ></image>
+            <view class="color_value">
+              <text>{{item.label}}</text>
+            </view>
+          </view>
+          <view class="color_bot_block">
+            <text wx:for="{{colorOptions}}" wx:for-item="color" wx:key="index"
+              >{{(color.prop==='colorScore'||color.prop==='colorName')&&item.prop==='sampleImg'?'':color.label+color.symbol+(data[item.prop][color.prop]===null?'':data[item.prop][color.prop]+color.unit)}}</text
+            >
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="compare_main" wx:elif="{{isCompare}}">
+      <view class="compare_img_main_l">
+        <text class="compare_title">样布图</text>
+        <view
+          class="compare_img_item"
+          wx:for="{{compareImgOptions}}"
+          wx:for-item="samp"
+          wx:key="index"
+        >
+          <image
+            catchtap="onPreviewImg"
+            data-index="{{index}}"
+            data-item="sampleImg"
+            data-value="{{data.sampleImg[samp.prop]}}"
+            mode="aspectFit"
+            src="{{data.sampleImg[samp.prop]||icon.noImageBg}}"
+          ></image>
+          <text>{{samp.label}}</text>
+        </view>
+      </view>
+      <view class="compare_img_main_r">
+        <text class="compare_title">对比图</text>
+        <view
+          class="compare_img_item"
+          wx:for="{{compareImgOptions}}"
+          wx:key="index"
+        >
+          <image
+            catchtap="onPreviewImg"
+            data-index="{{index}}"
+            data-item="compareImg"
+            data-value="{{data.compareImg[item.prop]}}"
+            mode="aspectFit"
+            src="{{data.compareImg[item.prop]||icon.noImageBg}}"
+          ></image>
+          <text>{{item.label}}</text>
+        </view>
+      </view>
+    </view>
+    <view wx:else>
+      <text class="compare_title">样布图</text>
+      <view class="compare_img_main flex-just-spet">
+        <view
+          class="compare_img_item"
+          wx:for="{{compareImgOptions}}"
+          wx:for-item="samp"
+          wx:key="index"
+        >
+          <image
+            catchtap="onPreviewImg"
+            data-index="{{index}}"
+            data-item="sampleImg"
+            data-value="{{data[samp.prop]}}"
+            mode="aspectFit"
+            src="{{data[samp.prop]||icon.noImageBg}}"
+          ></image>
+          <text>{{samp.label}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</van-popup>

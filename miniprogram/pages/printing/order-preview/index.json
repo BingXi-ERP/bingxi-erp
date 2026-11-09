@@ -1,0 +1,7 @@
+{
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  },
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "navigationBarTitleText": "打印预览"
+}

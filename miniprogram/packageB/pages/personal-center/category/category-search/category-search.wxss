@@ -1,0 +1,60 @@
+page {
+  background-color: #f8f8f8;
+  height: 100%;
+}
+.search-panel {
+  background-color: #fff;
+  padding-bottom: 180rpx;
+  width: 100%;
+}
+.select-lists image {
+  height: 36rpx;
+  vertical-align: middle;
+  width: 36rpx;
+}
+.select-lists {
+  background-color: #fff;
+  margin: auto;
+  width: 90%;
+}
+.select-list {
+  -webkit--moz-box-pack: space-between;
+  box-pack: space-between;
+  border-bottom: 1rpx solid #f1f1f1;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  font-size: 28rpx;
+  justify-content: space-between;
+  padding: 20rpx 20rpx 20rpx 0;
+}
+.select-list-tip view {
+  text-align: center;
+  width: 100%;
+}
+.footer-btns {
+  background-color: #fff;
+  border-top: 1rpx solid #f7f7f7;
+  bottom: 0;
+  height: 108rpx;
+  line-height: 108rpx;
+  position: fixed;
+  width: 100%;
+  z-index: 999;
+}
+.footer-btns button {
+  background-color: #2f7bfd;
+  border: none;
+  border-radius: 100rpx;
+  color: #fff;
+  font-size: 28rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  margin-top: 15rpx;
+  width: 90%;
+}
+.footer-btns .btn-gray {
+  background-color: #d8d8d8 !important;
+  color: #fff !important;
+}

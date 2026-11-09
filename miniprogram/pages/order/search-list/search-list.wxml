@@ -1,0 +1,83 @@
+<view class="order-list container-gray">
+    <search-bar autoFocus="{{autoFocus}}" bind:confirm="handleConfirm" bind:input="handleInput" placeholder="搜索客户名称/品名/色卡编号"></search-bar>
+    <scroll-view scrollY bindscrolltolower="arrivedBottom" class="list-wrapper" wx:if="{{index===activedIndex&&list.length>0}}" wx:for="{{list}}" wx:key="index">
+        <view class="list" wx:if="{{list[index].length>0}}" wx:for="{{list[index]}}" wx:for-index="idx" wx:key="{{idx}}">
+            <view bind:tap="toDetail" class="list-item" data-orderId="{{item.id}}" data-orderNo="{{item.orderNo}}" data-orderStatus="{{item.orderStatus}}">
+                <view class="order-type" wx:if="{{item.saleType==1||item.saleType==2}}">
+                    <text>{{item.saleType==1?'大货':''}}{{item.saleType==2?'剪样':''}}</text>
+                </view>
+                <view class="order-info">
+                    <text class="order-status {{item.orderStatus==10?'order-status-hl':''}}">{{orderConditon[item.orderStatus]}}
+            </text>
+                    <text class="order-create-at {{item.saleType==1||item.saleType==2?'timeSpace':''}}" wx:if="{{item.orderStatus!=-10&&item.orderStatus!=-20}}">时间：{{item.orderTime}}</text>
+                    <text class="order-create-at {{item.saleType==1||item.saleType==2?'timeSpace':''}}" wx:if="{{item.orderStatus==-10||item.orderStatus==-20}}">时间：{{item.orderClosedTime}}</text>
+                    <view class="order-create-by">
+                        <image mode="aspectFill" src="{{item.buyerHeadImg?item.buyerHeadImg+'?imageView2/2/w/200':item.buyerHeadImg}}"></image>
+                        <text>{{item.buyerName}}</text>
+                    </view>
+                </view>
+                <view class="order-product">
+                    <view class="product" wx:for="{{item.orderGoods}}" wx:key="index">
+                        <image class="product-image" mode="aspectFill" src="{{replImage(item.goodsImgPath,globalApp,180)}}"></image>
+                        <view class="product-content">
+                            <text class="product-title">{{item.goodsName}} {{item.goodsNo||''}}</text>
+                            <text class="product-total">合计：{{item.colorCount}}个颜色,  {{item.totalQuantity}}{{item.goodsUnit}}</text>
+                        </view>
+                    </view>
+                </view>
+                <view class="order-unpay" wx:if="{{activedIndex===1}}">欠款：¥ {{item.payableAmount}}</view>
+                <view class="order-total">
+                    <text>共：{{item.colorCount}}种颜色 </text>
+                    <text>合计：¥ <text class="strong">{{item.orderAmount}}</text>
+                    </text>
+                </view>
+                <view class="order-actions">
+                    <button catch:tap="handleOrderPrint" class="button-normal" data-orderId="{{item.id}}" wx:if="{{item.orderStatus==40||item.orderStatus==50}}">打印</button>
+                    <button catch:tap="handleShowShareOrder" class="button-normal" data-id="{{item.id}}" wx:if="{{item.orderStatus==40||item.orderStatus==50}}">分享</button>
+                    <button catch:tap="hanleConcatCustom" class="button-normal" data-mobild="{{item.buyerMobile}}" wx:if="{{item.orderStatus!=-20}}">联系买家</button>
+                    <button catch:tap="hanleCloseOrder" class="button-normal" data-id="{{item.id}}" wx:if="{{item.orderStatus==10}}">关闭订单</button>
+                    <button catch:tap="hanleOrderCreate" class="button-primary" data-id="{{item.id}}" data-order-no="{{item.orderNo}}" wx:if="{{item.orderStatus==10}}">去开单</button>
+                    <button catch:tap="hanleOrderCreate" class="button-normal" data-id="{{item.id}}" data-order-no="{{item.orderNo}}" wx:if="{{item.orderStatus==-20}}">重新开单</button>
+                    <button catch:tap="hanlePay" class="button-primary" data-item="{{item}}" wx:if="{{item.orderStatus==40||item.orderStatus==45}}">收款</button>
+                </view>
+            </view>
+        </view>
+        <view class="history-wrapper" wx:if="{{list[index].length===0}}">
+            <view class="title">
+                <view class="text">最近搜索：</view>
+                <view bindtap="delHistory" class="bg-img icon" style="background-image:url(\"{{icon.del}}\")"></view>
+            </view>
+            <view class="history">
+                <view bindtap="historyTap" class="item" data-keyword="{{item}}" wx:for="{{historyList}}" wx:key="index">{{item.keyword}}</view>
+            </view>
+        </view>
+        <view class="no-data flex-column" wx:if="{{list[index].length===0}}">
+            <view class="icon bg-img" style="background-image:url(\"{{icon.noData}}\")"></view>
+            <view class="text f16 font-black">暂无数据</view>
+            <view class="text2 f28 font-gray2">SORRY</view>
+        </view>
+    </scroll-view>
+    <van-dialog asyncClose showCancelButton useSlot bind:cancel="handleCloseOrder" bind:confirm="handleCloseOrderNoreason" cancelButtonText="提交" class="dialog-close-reason" confirmButtonText="无理由，跳过" show="{{show}}">
+        <view class="close-reason">
+            <image bind:tap="closeDialog" class="button-close" mode="aspectFill" src="../../../assets/images/icon2nd/ic_tianjia@3x.png"></image>
+            <textarea bindinput="handleInputReason" placeholder="请输入关闭订单的理由" placeholderClass="{{className}}" value="{{closeReason}}"></textarea>
+        </view>
+    </van-dialog>
+    <van-dialog id="van-dialog"></van-dialog>
+    <van-toast id="van-toast"></van-toast>
+</view>
+<van-popup bind:close="handleCloseShareOrder" id="van-popup" show="{{showShareImage}}">
+    <view class="image-preview">
+        <view class="image-content">
+            <text class="n">分享订单</text>
+            <image mode="scaleToFill" src="{{QRCode}}"></image>
+        </view>
+        <view class="image-tip">此订单仅下单的采购商有权限查看 保存图片，分享给微信好友</view>
+        <view class="actions">
+            <button bindtap="handleDownload">保存图片</button>
+        </view>
+    </view>
+</van-popup>
+<van-dialog asyncClose showCancelButton useSlot bind:close="handleCloseAuthDialog" bind:opensetting="openSetting" confirmButtonOpenType="openSetting" show="{{showAuth}}">
+    <view class="auth-apply">“秉羲工作台商家”需要保存图片或者视频到你的相册</view>
+</van-dialog>

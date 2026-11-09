@@ -1,0 +1,15 @@
+<view class="add-img-wrapper">
+    <view class="add-img">
+        <view bindtap="imgTap" bindtouchstart="movestart" catchtouchend="moveend" catchtouchmove="move" class="upload-img item {{index==current?'moving':'normal'}}" data-index="{{index}}" id="{{index}}" style="background-image:url(\"{{item.text}}\");width:{{uploadBtnWidth}}rpx;height:{{uploadBtnHeight}}rpx;margin:{{uploadMargin}};" wx:if="{{showImgList!=[]}}" wx:for="{{showImgList}}" wx:key="index">
+            <view catchtap="delImg" class="del-icon" data-index="{{index}}"></view>
+        </view>
+        <view class="add-icon-wrapper">
+            <view bindtap="chooseImg" class="add-icon" style="border:{{uploadBtnBorder}};background-color:{{uploadBtnBg}};border-radius:{{uploadBtnRadius}}rpx;width:{{uploadBtnWidth}}rpx;height:{{uploadBtnHeight}}rpx;" wx:if="{{showImgList.length<uploadPiece&&showImgList}}">
+                <image src="{{uploadBtnIcon}}" wx:if="{{uploadBtnIcon}}"></image>
+                <text class="upload-btn-icon" wx:else>+</text>
+                <text class="upload-btn-word" style="font-size:{{uploadBtnWordFontSize}}rpx;color:{{uploadBtnWordFontColor}}">{{uploadBtnWord}}</text>
+            </view>
+        </view>
+    </view>
+</view>
+<view class="clear"></view>

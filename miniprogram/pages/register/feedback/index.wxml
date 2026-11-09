@@ -1,0 +1,14 @@
+<view class="feed-container">
+  <view class="text-area-wrap">
+    <textarea
+      bindinput="changeInput"
+      class="text-area"
+      placeholder="请填写您要增加的类目"
+    ></textarea>
+  </view>
+  <view class="text">可选择其他类目，后续可在店铺中重新设置</view>
+  <view class="">
+    <button bind:tap="submit" class="g_bottomBtn">提交</button>
+  </view>
+  <van-toast id="van-toast"></van-toast>
+</view>

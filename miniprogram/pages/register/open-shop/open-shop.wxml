@@ -1,0 +1,10 @@
+<view class="bg-all">
+  <view class="img-wrapper">
+    <image mode="aspectFit" src="{{image.bg}}"></image>
+  </view>
+  <view>
+    <button bindtap="toRegister" class="share-btn-null" lang="zh_CN">
+      太棒了，我要开店
+    </button>
+  </view>
+</view>

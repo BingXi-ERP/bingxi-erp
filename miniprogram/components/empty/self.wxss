@@ -1,0 +1,20 @@
+.noList {
+  bottom: 0;
+  left: 0;
+  position: absolute;
+  top: 500rpx;
+  width: 100%;
+}
+.noImg {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: 320rpx 320rpx;
+  height: 320rpx;
+}
+.noList .text {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: center;
+}

@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "打印记录",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

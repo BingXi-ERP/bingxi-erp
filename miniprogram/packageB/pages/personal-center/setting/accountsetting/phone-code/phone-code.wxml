@@ -1,0 +1,8 @@
+<view class="color-ys-bg"></view>
+<view class="phone">
+    <view class="phone-tip">我们已将验证码发送至你的手机</view>
+</view>
+<view class="list-li">
+    <input bindinput="test_code" placeholder="请输入验证码"></input>
+</view>
+<button bindtap="toChange" class="btn-active">完成</button>

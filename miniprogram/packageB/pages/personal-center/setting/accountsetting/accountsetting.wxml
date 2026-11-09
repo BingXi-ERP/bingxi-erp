@@ -1,0 +1,13 @@
+<view class="center-list">
+  <view
+    bindtap="toDetail"
+    class="list-li"
+    data-pages-Detail="{{stallData.phoneUrl}}"
+  >
+    <view class="c-title">手机号</view>
+    <view class="c-value">
+      <text>{{mobile}}</text>
+      <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+    </view>
+  </view>
+</view>

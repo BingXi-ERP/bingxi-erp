@@ -1,0 +1,43 @@
+.bottom-wrap {
+  font-size: 24rpx;
+}
+.agreement-wrap {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.agreement-checkbox {
+  height: 20px;
+  margin-right: 10px;
+  width: 20px;
+}
+.agreement-area {
+  bottom: 100rpx;
+  margin-bottom: 88rpx;
+  position: absolute;
+}
+.bottom-wrap {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.agreement-checkbox {
+  height: 25rpx;
+  margin-right: 10rpx;
+  width: 25rpx;
+}
+.checked-icon {
+  height: 16rpx;
+  margin: 7rpx;
+  width: 16rpx;
+}
+.unchecked-icon {
+  height: 0;
+  width: 0;
+}
+.agreement-text {
+  color: #666;
+}
+.agreement-link {
+  color: #ff5722;
+}

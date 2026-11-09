@@ -1,0 +1,44 @@
+.chooseRole .head {
+  padding: 48rpx 48rpx 0;
+}
+.chooseRole .title {
+  color: #373c55;
+  font-family: PingFangSC-Semibold;
+  font-size: 24px;
+  font-weight: 600;
+  height: 80rpx;
+}
+.titleIllustrate {
+  color: #999bb4;
+  font-family: PingFangSC-Light;
+  font-size: 14px;
+  font-weight: 300;
+}
+.content {
+  margin-bottom: 50rpx;
+  padding-top: 50rpx;
+}
+.contentDashed {
+  position: relative;
+}
+.contentDashed::after {
+  border-top: 1rpx dashed #dee1e8;
+  content: "";
+  height: 1rpx;
+  left: 48rpx;
+  position: absolute;
+  right: 48rpx;
+  top: 0;
+}
+.content .img {
+  height: 220rpx;
+  width: 100%;
+}
+.content .text {
+  color: #373c55;
+  font-family: PingFangSC-Light;
+  font-size: 12px;
+  font-weight: 300;
+  line-height: 17px;
+  padding: 0 48rpx;
+}

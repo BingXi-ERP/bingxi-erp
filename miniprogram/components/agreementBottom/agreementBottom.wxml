@@ -1,0 +1,19 @@
+<view class="bottom-wrap">
+  <view class="agreement-checkbox">
+    <van-checkbox
+      bind:change="onChange"
+      checkedColor="#FB562C"
+      iconSize="25rpx"
+      shape="square"
+      value="{{isAgreed}}"
+    ></van-checkbox>
+  </view>
+  <text bindtap="onChange" class="agreement-text">已阅读并同意</text>
+  <text bindtap="goToAgreementPage" class="agreement-link"
+    >《秉羲工作台服务协议》</text
+  >
+  <text class="agreement-text">和</text>
+  <text bindtap="goToPrivacyPolicyPage" class="agreement-link"
+    >《隐私政策》</text
+  >
+</view>

@@ -1,0 +1,34 @@
+<van-popup bind:close="onClose" overlay="{{overlay}}" position="{{position}}" show="{{show}}" zIndex="999">
+    <view class="header">
+        <view class="has-chosen-card-text">分类至（按分类展示商品，方便买家筛选）</view>
+    </view>
+    <scroll-view scrollY class="content" style="height:486rpx;">
+        <view bindtap="checkTap" class="item-block" data-categoryName="{{item.name}}" data-categoryidList="{{item.id}}" data-index="{{index}}" wx:for="{{categoryList}}" wx:key="index">
+            <view class="item-name">
+                <view class="min" style="background-image:url(\"{{selectStatusArr[index]?icon.checkedBg:icon.noCheckBg}}\")"></view>
+                <view>
+                    <view class="title">{{item.name}}</view>
+                    <view class="subtitle" wx:if="{{item.visiableFlag=='1'}}">
+                        <view class="icon" style="background-image:url(\"{{icon.suoyouren}}\")"></view>
+                        <view class="text">所有人可见</view>
+                    </view>
+                    <view class="subtitle" wx:if="{{item.visiableFlag=='3'}}">
+                        <view class="icon" style="background-image:url(\"{{icon.zhidingkehu}}\")"></view>
+                        <view class="text">指定客户可见</view>
+                    </view>
+                    <view class="subtitle" wx:if="{{item.visiableFlag=='2'}}">
+                        <view class="icon" style="background-image:url(\"{{icon.zhidingkehu}}\")"></view>
+                        <view class="text">仅扫码可见</view>
+                    </view>
+                </view>
+            </view>
+            <view class="stepper-wrapper">
+                <text class="count">{{item.productCount}}件商品</text>
+            </view>
+        </view>
+    </scroll-view>
+    <view class="footer">
+        <view bindtap="cancel" class="has-chosen-btn">取消</view>
+        <view bindtap="confirm" class="confirm-btn">确定</view>
+    </view>
+</van-popup>

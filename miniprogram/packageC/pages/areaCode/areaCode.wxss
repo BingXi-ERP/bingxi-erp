@@ -1,0 +1,53 @@
+page {
+  padding-bottom: 100rpx;
+  padding-top: 40rpx;
+}
+.area-code-input,
+page {
+  background-color: #eff0f7;
+}
+.area-code-input {
+  height: 120rpx;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 100%;
+}
+.area-code-input-box {
+  background-color: #fff;
+  border-radius: 32rpx;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 26rpx;
+  justify-content: space-between;
+  margin: 36rpx;
+  padding: 14rpx 28rpx;
+}
+.area-code-list {
+  background-color: #fff;
+  border-radius: 22rpx;
+  margin: 100rpx 36rpx 20rpx;
+}
+.area-code-list-item {
+  border-bottom: 2rpx solid #f4f4f4;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 26rpx;
+  justify-content: space-between;
+  margin: 0 20rpx;
+  padding: 20rpx 0;
+}
+.area-code-list-item:last-child {
+  border-bottom: none;
+}
+.country-name image {
+  height: 28rpx;
+  margin-right: 10rpx;
+  width: 46rpx;
+}
+.no-moer-msg {
+  color: #5d5d5d;
+  font-size: 22rpx;
+  text-align: center;
+}

@@ -1,0 +1,159 @@
+<view class="order-detail {{show?'banScroll':''}}">
+    <view class="content">
+        <view class="panel order-payment borderR16">
+            <view class="order-status order-status-undeal">
+                <view class="order-status-content">
+                    <text class="order-status-title">{{orderDetailInfo.billingStatus==-20?'已作废':'已退货'}}</text>
+                    <view class="tios">
+                        <image src="{{icon.okgray}}"></image>
+                        <text class="order-status-detail">{{orderDetailInfo.billingStatus==-20?'该订单已作废':'该订单已退货'}}</text>
+                    </view>
+                </view>
+            </view>
+            <view class="cell no-border">
+                <image class="header-icon" src="{{icon.header}}"></image>
+                <view class="concatHead">
+                    <text>{{orderDetailInfo.fullname}}</text>
+                </view>
+                <view class="concatPhone">
+                    <text>{{orderDetailInfo.mobile}}</text>
+                </view>
+            </view>
+            <view class="cell">
+                <view class="cell-title">
+                    <text class="label">退货时间</text>
+                    <text class="val">{{orderDetailInfo.billingDate}}</text>
+                </view>
+            </view>
+            <view class="cell">
+                <view class="cell-title">
+                    <text class="label">业务员</text>
+                    <text class="val">{{orderDetailInfo.billingUser}}</text>
+                </view>
+            </view>
+            <view class="cell">
+                <view class="cell-title">
+                    <text class="label">退货金额</text>
+                    <text class="val">{{toFixNum(orderDetailInfo.orderAmount,2,true,true)}}</text>
+                </view>
+            </view>
+            <view class="cell cell-border-no">
+                <view class="cell-title">
+                    <text class="label">退货单号</text>
+                    <text class="val">{{orderDetailInfo.billingNo}}</text>
+                </view>
+            </view>
+        </view>
+        <view class="billing panel borderR16">
+            <view class="panel-titl">
+                <image src="{{icon.tdetail}}"></image>退货商品明细</view>
+            <view class="cell" wx:for="{{orderDetailInfo.refundGoodsDetailModels}}" wx:key="index">
+                <view class="cell-value flex-direction-column">
+                    <view class="post">
+                        <view class="post-image">
+                            <image mode="aspectFill" src="{{replImage(item.goodsImgPath,globalapp,300)}}"></image>
+                        </view>
+                        <view class="post-content">
+                            <text class="post-title">{{item.goodsName}} {{item.goodsNo||''}}</text>
+                            <view class="fr-between-center post-extra">
+                                <view class="hl goodsSummaryInfo">{{item.goodsSummaryInfo}}</view>
+                            </view>
+                        </view>
+                    </view>
+                    <view catch:tap="detailDisplay" class="buttom-toggle" data-index="{{index}}">
+                        <view class="fr-between-center tr">
+                            <text class="n">合计：</text>
+                            <view class="strong">{{toFixNum(orderDetailInfo.goodsAmount,2,true,true)}}</view>
+                            <text>（{{orderDetailInfo.colorCount}}种颜色）</text>
+                        </view>
+                        <view class="arows">
+                            <text>{{item.display?'收起':'展开'}}</text>
+                            <image src="{{item.display?icon.up:icon.down}}"></image>
+                        </view>
+                    </view>
+                    <view class="product-detail" wx:if="{{item.display}}">
+                        <text class="product-detail-title">颜色</text>
+                        <view class="product-detail-tab">
+                            <view catch:tap="detailTableDisplay" class="badge  {{color.goodsColorId===item.tabCurrentColorId?'badge-primary':'badge-gray'}}" data-index="{{idx}}" data-product-id="{{item.id}}" wx:for="{{item.refundGoodsColorModels}}" wx:for-index="idx" wx:for-item="color" wx:key="{{idx}}">
+                                <text class="badge-button g_limtRow">{{color.colorNo}}{{color.colorName}}</text>
+                                <text class="badge-sup">{{color.dyelotModelList.length}}</text>
+                            </view>
+                        </view>
+                        <text class="product-detail-title">缸号</text>
+                        <view class="product-detail-tab">
+                            <view catch:tap="changeCurrentDyelot" class="badge  {{dyelotArr.dyelot===item.tabCurrentDyelotId?'badge-primary':'badge-gray'}}" data-index="{{idx}}" data-product-id="{{item.id}}" data-product-item="{{item}}" wx:for="{{item.tabCurrentDyelot}}" wx:for-index="idx" wx:for-item="dyelotArr" wx:key="{{idx}}">
+                                <text class="badge-button g_limtRow">{{dyelotArr.dyelot}}</text>
+                                <text class="badge-sup">{{dyelotArr.quantityModelList.length}}</text>
+                            </view>
+                        </view>
+                        <view class="table">
+                            <view class="tr">
+                                <text class="">编号</text>
+                                <text class="">单价(元)</text>
+                                <text class="">数量</text>
+                                <text class="">小计</text>
+                            </view>
+                            <view class="tr" wx:for="{{item.tabCurrentColorList}}" wx:for-item="colorList" wx:key="index">
+                                <text class="g_limtRow">{{index+1}}</text>
+                                <text class="g_limtRow">{{colorList.colorPrice}}</text>
+                                <text class="g_limtRow">{{colorList.totalQuantity}} {{colorList.quantityUnit}}</text>
+                                <text class="g_limtRow">{{toFixNum(colorList.colorAmount)}}</text>
+                            </view>
+                            <view class="tr trr" wx:for="{{item.tabCurrentColorList}}" wx:for-item="colorList" wx:key="index">
+                                <text class="g_limtRow">合计</text>
+                                <text class="g_limtRow g_limtRow-bold">{{toFixNum(orderDetailInfo.goodsAmount,2,true,true)}}</text>
+                            </view>
+                        </view>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <view class="remarks panel borderR16">
+            <view class="cell-title arrow-right">
+                <text class="label">关联销售单</text>
+                <input bind:tap="toSalesDetail" class="weui-input" disabled="true" value="{{orderDetailInfo.saleBillingNo?orderDetailInfo.saleBillingNo:'无'}}"></input>
+            </view>
+        </view>
+        <view class="remarks panel borderR16">
+            <view class="cell-title arrow-right">
+                <text class="label">备注</text>
+                <view bind:tap="goRemarks" class="inputRemark">{{orderRemark}}</view>
+            </view>
+        </view>
+        <view class="panel borderR16 images">
+            <view class="cell-title arrow-right">
+                <text class="label">其他信息</text>
+                <input bind:tap="goImages" class="weui-input" disabled="true"></input>
+            </view>
+            <view class="fl recodeImg" wx:if="{{orderDetailInfo.refundImgPathList.length}}">
+                <view bindtap="previewImage" class="recode" data-src="{{item}}" style="background-image:url({{item}})" wx:if="{{item}}" wx:for="{{orderDetailInfo.refundImgPathList}}" wx:key="{{index}}"></view>
+            </view>
+        </view>
+    </view>
+    <view class="fixed-bottom-tools iphone_bottom">
+        <view class="button-group">
+            <button catch:tap="hanleConcatCustom" class="button-normal" data-mobild="{{orderDetailInfo.mobile}}" wx:if="{{userAuthList['crm:contact']}}">联系买家</button>
+            <button catch:tap="handleCancel" class="button-normal" wx:if="{{userAuthList['order:cancelRefund']&&orderDetailInfo.billingStatus!=-20}}">作废退货单</button>
+            <button catch:tap="handleOrderPrint" class="button-normal-ineer" wx:if="{{userAuthList['order:print']}}">打印</button>
+        </view>
+    </view>
+</view>
+<van-popup :close-on-click-overlay="true" class="tip-dialog" show="{{showCancelComfirm}}">
+    <text class="popTitle">作废退货单</text>
+    <view class="popContent">是否确认作废该退货单？销售单的退货单作废后会同步影响应销售单的应收款金额！</view>
+    <view class="popBtn">
+        <view catch:tap="handleCancel" class="popBtn cancelBtn" size="small">取消</view>
+        <view catch:tap="comfirmCancel" class="popBtn confirmBtn" size="small">确定</view>
+    </view>
+</van-popup>
+<van-popup round useSlot class="dialog-close-reason" show="{{isShow}}">
+    <view class="close-reason">
+        <van-icon bind:tap="closeDialog" class="button-close" color="#C0C0C0" name="cross"></van-icon>
+        <view class="button-title">作废退货单</view>
+        <textarea bindinput="handleInputReason" placeholder="{{modalExplain}}" placeholderClass="{{className}}" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{closeReason}}"></textarea>
+        <view class="foot-btn">
+            <view bind:tap="refundCancel" class="foot-btn-left" data-bool="false">无理由，跳过</view>
+            <view bind:tap="refundCancel" class="foot-btn-right" data-bool="true">提交</view>
+        </view>
+    </view>
+</van-popup>

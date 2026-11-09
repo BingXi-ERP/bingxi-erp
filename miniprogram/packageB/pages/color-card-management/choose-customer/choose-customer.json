@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "指定可见",
+  "usingComponents": {
+    "search-input": "/components/search-input/search-input",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

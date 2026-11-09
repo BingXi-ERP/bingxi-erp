@@ -1,0 +1,27 @@
+<view class="select-categories">
+  <view class="select-title">
+    <view>{{listName}}->{{childName}}</view>
+    <view bindtap="allNoCheck" wx:if="{{allCheck==1}}"
+      >全选<image mode="aspectFit" src="{{imgS}}"></image>
+    </view>
+    <view bindtap="allCheck" wx:else
+      >全选<image mode="aspectFit" src="{{imgNo}}"></image>
+    </view>
+  </view>
+  <view class="select-lists">
+    <view
+      bindtap="checkCategories"
+      class="select-list"
+      data-index="{{index}}"
+      data-parent-Id="{{idList}}"
+      id="{{item.id}}"
+      wx:for="{{subChildList}}"
+      wx:key="index"
+    >
+      <view>{{item.name}}</view>
+      <view>
+        <image mode="aspectFit" src="{{item.isChecked==1?imgS:imgNo}}"></image>
+      </view>
+    </view>
+  </view>
+</view>

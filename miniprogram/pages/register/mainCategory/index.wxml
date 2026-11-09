@@ -1,0 +1,24 @@
+<view class="main">
+  <view class="card-box">
+    <view
+      bind:tap="handleClick"
+      class="single"
+      data-index="{{index}}"
+      data-item="{{item}}"
+      wx:for="{{backendData}}"
+      wx:key="index"
+    >
+      <text>{{item.name}}</text>
+      <van-checkbox
+        checkedColor="#FB562C"
+        iconSize="30rpx"
+        shape="square"
+        value="{{item.checked}}"
+      ></van-checkbox>
+    </view>
+  </view>
+</view>
+<view class="fixed-bottom-tools">
+  <button catchtap="submit" class="g_bottomBtn">确定</button>
+</view>
+<van-toast id="van-toast"></van-toast>

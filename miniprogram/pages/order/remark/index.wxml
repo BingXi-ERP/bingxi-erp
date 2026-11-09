@@ -1,0 +1,20 @@
+<view class="cell-value">
+  <textarea
+    autoHeight
+    bindblur="handleHideTextarea"
+    bindfocus="handleShowTextarea"
+    bindinput="handleUpdateVal"
+    class="remarks-input"
+    data-key="billingRemark"
+    focus="{{remarksFocus}}"
+    maxlength="30"
+    placeholder="请输入备注信息(30字以内)"
+    placeholderClass="place-holder placeholder-text"
+    showConfirmBar="{{false}}"
+    value="{{billingRemark}}"
+  ></textarea>
+  <view class="numLimit">{{billingRemark.length}}/30</view>
+</view>
+<view class="fixed-bottom-tools">
+  <button catchtap="saveRemark" class="g_bottomBtn">保存</button>
+</view>

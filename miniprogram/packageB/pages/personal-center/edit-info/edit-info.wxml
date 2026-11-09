@@ -1,0 +1,23 @@
+<view>
+    <view class="input-list">
+        <view bindtap="changeAvatar" class="avatar-wrapper">
+            <view class="bg-img avatar" style="background-image:url(\"{{avatar}}?imageView2/2/w/200\")" wx:if="{{avatar}}"></view>
+            <view class="camera-img">
+                <image src="{{cameraImg}}"></image>
+            </view>
+        </view>
+        <view class="dataItem">
+            <view class="input-list-li">
+                <view class="title">昵称</view>
+                <view bindtap="changeNickName" class="nicename">
+                    <text>{{nickName}}</text>
+                    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </view>
+            <view class="input-list-st">
+                <view class="title">手机号</view>
+                <input bindinput="input_val" class="mobile-input" data-name="telephone" disabled="true" name="mobile" value="{{mobile}}(不可更改)"></input>
+            </view>
+        </view>
+    </view>
+</view>

@@ -1,0 +1,30 @@
+<template name="stallsearch">
+    <view class="search-panel">
+        <view class="search-box">
+            <image alt="" class="search-icon" mode="aspectFit" src="/image/icon2nd/symbols-search.png"></image>
+            <input bindtap="toSearch" class="search-input" disabled="true" id="stallSearch" placeholder="请输入档口名称/电话" value="{{searchKey}}"></input>
+        </view>
+        <block wx:if="{{shopList.length>0}}">
+            <view class="stall-list" wx:for="{{shopList}}" wx:key="{{index}}">
+                <view class="stall-list-img">
+                    <image class="picture" mode="scaleToFill" src="{{item.ownerHeadImg}}"></image>
+                </view>
+                <view class="stall-list-info">
+                    <view class="stall-list-info-hd">{{item.shopName}}<button bindtap="toShop" id="{{item.id}}" type="">进入店铺</button>
+                    </view>
+                    <view class="stall-list-info-bd">
+                        <text>电话：{{item.telephone}}</text>
+                        <text>地址：{{item.shopProvince}}{{item.shopCity}}{{item.shopArea}}{{item.shopAddress}}</text>
+                    </view>
+                    <view class="stall-list-info-fd">
+                        <span class="tags" type="">{{item.category}}</span>
+                    </view>
+                </view>
+            </view>
+        </block>
+        <view class="color-data-list-null" wx:else>
+            <image mode="aspectFit" src="{{app.config.imgHost}}/img/customer/duibuIcon/icon/symbols-stall-null.png"></image>
+            <text class="f14">没有找到你要的档口~</text>
+        </view>
+    </view>
+</template>

@@ -1,0 +1,36 @@
+.content {
+  padding-left: 10%;
+  padding-right: 10%;
+  padding-top: 10%;
+}
+.flexDisplay {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+}
+.content {
+  color: #666;
+  font-size: 26rpx;
+  height: 100rpx;
+  padding: 42rpx 100rpx;
+}
+.headImg {
+  border-radius: 50%;
+  height: 110rpx;
+  width: 110rpx;
+}
+.conTop {
+  border-bottom: 1rpx solid #ddd;
+  height: 160rpx;
+}
+.createUser {
+  color: #333;
+  font-size: 40rpx;
+  font-weight: 600;
+  line-height: 120rpx;
+}
+.createTime {
+  color: #999;
+  font-size: 24rpx;
+}

@@ -1,0 +1,154 @@
+page {
+  background-color: #f5f6fa;
+}
+.selectBillContent {
+  padding: 30rpx 0 230rpx;
+}
+.list {
+  padding: 30rpx 30rpx 0;
+}
+.list-item {
+  background-color: #fff;
+  border: 1px solid #fff;
+  border-radius: 4px;
+  box-sizing: border-box;
+  margin-bottom: 20rpx;
+  padding: 30rpx;
+  position: relative;
+}
+.list .selectedColor {
+  background-color: #f5fff7;
+  border: 1px solid #66cf7e;
+  border-radius: 4px;
+}
+.order-info {
+  border-bottom: 1rpx solid #edeff6;
+  justify-content: space-between;
+  padding-bottom: 30rpx;
+}
+.order-info,
+.order-status {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.order-status {
+  color: #999;
+  font-size: 24rpx;
+  justify-content: flex-end;
+}
+.order-status-hl {
+  color: #e2525a;
+}
+.order-create-by {
+  display: -webkit-flex;
+  display: flex;
+}
+.order-create-by image {
+  border-radius: 50%;
+  height: 48rpx;
+  margin-right: 20rpx;
+  width: 48rpx;
+}
+.order-create-by text {
+  flex: 1;
+  font-size: 32rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.order-create-at {
+  color: #999bb4;
+  display: block;
+  font-size: 24rpx;
+  height: 32rpx;
+  line-height: 12rpx;
+}
+.userName {
+  width: 200rpx;
+}
+.order-product .product {
+  border-bottom: 1rpx solid #edeff6;
+  display: -webkit-flex;
+  display: flex;
+  padding: 30rpx 0;
+}
+.order-product .product-image {
+  height: 88rpx;
+  margin-right: 34rpx;
+  width: 88rpx;
+}
+.order-product .product-title {
+  margin-bottom: 8rpx;
+  width: 480rpx;
+}
+.order-product .product-total {
+  color: #999;
+  font-size: 24rpx;
+  width: 480rpx;
+  word-break: break-all;
+}
+.order-unpay {
+  color: #ed5c5c;
+  font-size: 24rpx;
+  margin-bottom: -20rpx;
+  text-align: right;
+}
+.order-total {
+  align-items: flex-end;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 24rpx;
+  justify-content: flex-end;
+}
+.order-total .total-before {
+  margin: 4rpx 32rpx 0 0;
+}
+.order-total .strong {
+  color: #373c55;
+  font-size: 32rpx;
+  font-weight: 500;
+}
+.orderDebt {
+  color: #ed5c5c;
+  margin-bottom: 10rpx;
+  text-align: right;
+}
+.type-unpay {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 24rpx;
+  position: relative;
+}
+.order-type {
+  background: #82a5ff;
+  border-radius: 0 20rpx 20rpx 0;
+  color: #fff;
+  font-size: 24rpx;
+  height: 40rpx;
+  left: -30rpx;
+  line-height: 40rpx;
+  overflow: hidden;
+  padding: 0 20rpx;
+  position: absolute;
+  text-align: center;
+  top: 28rpx;
+}
+.more {
+  height: 60rpx;
+  position: relative;
+}
+.moreIcon {
+  color: #999bb4;
+  font-size: 12px;
+  font-weight: 400;
+  height: 17px;
+  left: 50%;
+  position: absolute;
+  text-align: center;
+  top: 5px;
+  transform: translateX(-50%);
+  width: 80px;
+}

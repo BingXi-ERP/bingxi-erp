@@ -1,0 +1,46 @@
+<block wx:if="{{baseList.length>0}}">
+  <view class="cardlist" wx:for="{{baseList}}" wx:key="index">
+    <view bindtap="toEdit" data-id="{{item.id}}">
+      <view class="card-bd arrow-right">
+        <view class="card-bd-img">
+          <image
+            lazyLoad="true"
+            mode="aspectFill"
+            src="{{replImage(item.imgList[0].storagePath,globalApp,300)}}"
+          ></image>
+        </view>
+        <view class="card-bd-info">
+          <view class="card-bd-info-name">{{item.companyName||''}}</view>
+          <view class="card-bd-info-price"
+            >{{(item.name||'')+' '+(item.shelvesNumber||'')}}</view
+          >
+          <view class="visit-info red" wx:if="{{item.price}}"
+            >￥{{item.price}}/{{item.saleUnit}}</view
+          >
+          <view class="tool">
+            <view
+              catch:tap="ontoProductCard"
+              class="btCardButton"
+              data-item="{{item}}"
+              >移出底卡</view
+            >
+            <view catchtap="printTap" class="print" data-goodsid="{{item.id}}"
+              >打印</view
+            >
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</block>
+<view class="color-data-list-null" wx:else>
+  <image
+    mode="aspectFit"
+    src="/assets/images/icon2nd/symbols-color-l.png"
+  ></image>
+  <text class="f14">你没有添加任何底卡~</text>
+</view>
+<view class="heihgt-line"></view>
+<view bindtap="toAdd" class="g_bottomBtn" id="{{goodsId}}">
+  <view>添加底卡</view>
+</view>

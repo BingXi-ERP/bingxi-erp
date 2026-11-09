@@ -1,0 +1,20 @@
+page {
+  background-color: #f8f8f8;
+}
+.color-data-list-null {
+  font-size: 30rpx;
+  margin-top: 50%;
+}
+.colour-fd view {
+  width: 100%;
+}
+.child-list-fd image {
+  height: 36rpx;
+  width: 34rpx;
+}
+.child-list .child-list-fd {
+  padding-right: 3%;
+}
+.child-lists {
+  margin-bottom: 150rpx;
+}

@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "主营品类(多选)",
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "usingComponents": {
+    "van-checkbox": "../../../miniprogram_npm/@vant/weapp/checkbox/index",
+    "van-search": "../../../miniprogram_npm/@vant/weapp/search/index",
+    "van-toast": "../../../miniprogram_npm/@vant/weapp/toast/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

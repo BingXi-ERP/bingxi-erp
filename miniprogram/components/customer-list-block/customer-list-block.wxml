@@ -1,0 +1,39 @@
+<view bindtap="tabBlock" class="wrapper" data-cid="{{customerList.customerId}}" data-uid="{{customerList.id}}">
+    <view class="avatar" style="background-image:url(\"{{customerList.headImg||customerList.customerHeadImg}}\")"></view>
+    <view class="info">
+        <view class="header">
+            <text class="name">{{customerList.fullname||customerList.customerName}}</text>
+            <text class="id" wx:if="{{customerList.markRead==0||!customerList.markRead}}">{{customerList.tag}}</text>
+        </view>
+        <view class="contain" wx:if="{{customerList.grouping||customerList.message!=''}}">
+            <view class="icon" style="background-image:url(\"{{customerList.goodsImgPath}}\")" wx:if="{{customerList.goodsImgPath}}"></view>
+            <view class="icon" style="background-image:url(\"{{customerList.icon}}\")" wx:if="{{customerList.icon}}"></view>
+            <image class="icon" src="/assets/images/icon2nd/ic_yyee@4.5x.png" wx:if="{{customerList.importantImg}}"></image>
+            <view class="text">
+                <view>{{customerList.message||'-'}}</view>
+            </view>
+            <view class="in"></view>
+        </view>
+        <view class="img-wrapper" wx:if="customerList.recordImgList && customerList.recordImgList !=[]">
+            <view class="item-img item-img{{index}}" wx:if="{{index<4}}" wx:for="{{customerList.recordImgList}}" wx:for-item="img" wx:key="index">
+                <image src="{{img.imgPath?img.imgPath+'?imageView2/2/w/200':img.imgPath}}"></image>
+            </view>
+            <view class="modal" wx:if="{{customerList.recordImgList.length>3}}">+{{customerList.recordImgList.length-3}}</view>
+        </view>
+        <view class="footer">
+            <view>
+                <view class="date" wx:if="{{customerList.grouping=='3'&&customerList.status!='-1'&&customerList.lastVisitTime}}">{{customerList.lastVisitTime}}</view>
+                <view class="date" wx:if="{{customerList.status=='-1'&&customerList.messageTime}}">{{customerList.messageTime||''}}</view>
+                <view class="date" wx:if="{{customerList.grouping=='2'&&customerList.status!='-1'&&customerList.messageTime}}">{{customerList.messageTime}}</view>
+                <view class="date" wx:if="{{customerList.grouping=='1'&&customerList.status!='-1'&&customerList.messageTime}}">{{customerList.messageTime}}</view>
+                <view class="date" wx:if="{{!customerList.grouping&&customerList.status!='-1'}}">{{customerList.messageTime||'-'}}</view>
+            </view>
+            <view>
+                <view class="explain" wx:if="{{customerList.status=='-1'}}">操作人：{{customerList.operator}}</view>
+                <view class="explain" wx:if="{{customerList.grouping=='1'&&customerList.status!='-1'}}">开单人：{{customerList.operator}}</view>
+                <view class="explain" wx:if="{{customerList.grouping=='2'&&customerList.status!='-1'&&customerList.msgType=='6'}}">手动添加</view>
+                <view class="explain" wx:if="{{customerList.grouping=='2'&&customerList.status!='-1'&&customerList.msgType=='4'}}">客户扫描领取</view>
+            </view>
+        </view>
+    </view>
+</view>

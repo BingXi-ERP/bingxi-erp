@@ -1,0 +1,71 @@
+page {
+  background-color: #eff0f7;
+  padding-top: 40rpx;
+}
+.center-list {
+  background-color: #fff;
+  border-radius: 20rpx;
+  margin-left: 34rpx;
+  width: calc(100vw - 68rpx);
+}
+.list-li {
+  font-size: 26rpx;
+  padding: 28rpx;
+}
+.list-li .c-title {
+  color: #5d5d5d;
+}
+.list-li .c-value {
+  color: #0b0b0b;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 22rpx;
+}
+.list-li.navigator-arrow::after {
+  border-right: 1rpx solid #c3c8cb;
+  border-top: 1rpx solid #c3c8cb;
+  content: "";
+  height: 12rpx;
+  position: absolute;
+  right: 52rpx;
+  top: 45%;
+  transform: rotate(45deg);
+  width: 12rpx;
+}
+.list-li button {
+  background-color: hsla(0, 0%, 100%, 0);
+  display: -webkit-flex;
+  display: flex;
+  flex-flow: wrap;
+  height: 100%;
+  justify-content: left;
+  padding: 0;
+  width: 100%;
+}
+.list-li button::after {
+  border: none;
+}
+.list-li button text {
+  line-height: 40rpx;
+}
+.list-li1 {
+  margin-left: 0;
+  text-align: center;
+  width: 100%;
+}
+.color-ys-bg1 {
+  height: 300rpx;
+}
+.list-li text {
+  display: inline-block;
+  width: 49%;
+}
+.list-li text:nth-child(1) {
+  margin-left: 0;
+}
+.list-li text:nth-child(2) {
+  color: #9d9d9d;
+  padding-right: 30rpx;
+  text-align: right;
+}

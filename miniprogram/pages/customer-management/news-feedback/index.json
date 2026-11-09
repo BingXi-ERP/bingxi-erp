@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "问题反馈",
+  "component": true,
+  "usingComponents": {
+    "van-popup": "../../../miniprogram_npm/@vant/weapp/popup/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

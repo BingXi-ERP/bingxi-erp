@@ -1,0 +1,30 @@
+.code {
+  margin: auto;
+  text-align: center;
+  width: 80%;
+}
+.code image {
+  background: #f8f8f8;
+  height: 454rpx;
+  margin-top: 40rpx;
+  width: 454rpx;
+}
+.code view {
+  color: #5d5d5d;
+  display: block;
+  font-size: 22rpx;
+  margin-top: 28rpx;
+  text-align: center;
+}
+.spe-text {
+  margin-bottom: 5%;
+  position: relative;
+  width: 100%;
+}
+.spe-text image {
+  height: 34rpx;
+  margin-right: 10rpx;
+  margin-top: 0;
+  vertical-align: middle;
+  width: 34rpx;
+}

@@ -1,0 +1,8 @@
+{
+  "component": true,
+  "usingComponents": {
+    "popup-share": "/components/popup-share/popup-share",
+    "van-tag": "/miniprogram_npm/@vant/weapp/tag/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

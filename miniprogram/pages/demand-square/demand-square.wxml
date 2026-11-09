@@ -1,0 +1,68 @@
+<view class="demand-square">
+    <view class="vanTabs">
+        <van-tabs animated active="{{tabItem.categoryId}}" bind:change="tabText" swipeThreshold="7" zIndex="20">
+            <van-tab class="vanTab" id="{{item.categoryId}}" title="{{item.category}}" wx:for="{{userTab}}" wx:key="{{item.categoryId}}"></van-tab>
+        </van-tabs>
+        <view class="fl curList">
+            <block wx:for="{{tablist}}" wx:key="{{item}}">
+                <view catch:tap="toItem" class="demandItem" data-list-id="{{i.id}}" wx:for="{{item}}" wx:for-item="i" wx:key="{{i.id}}">
+                    <form bindsubmit="formSubmit" class="item-form" reportSubmit="true">
+                        <button class="form-btn" formType="submit"></button>
+                    </form>
+                    <view class="rightContent">
+                        <view class="imgContent">
+                            <view class="img-bg" style="background-image:url(\"{{i.contentImg[0]}}?imageView2/2/w/320\")" wx:if="{{i.contentImg[0]}}"></view>
+                        </view>
+                        <view class="itemFooter">
+                            <view class="category g_limtRow">{{i.category}}</view>
+                            <view class="fr-between-center footer">
+                                <view class="itemIcon">回复瓜分</view>
+                                <view class="price g_limtRow">¥<text class="numBig">{{i.rewardAmountNum}}</text>.{{i.rewardAmountDecimals}}</view>
+                            </view>
+                        </view>
+                    </view>
+                </view>
+            </block>
+        </view>
+        <view class="more">
+            <view class="moreIcon" wx:if="{{!isAll}}">上拉更多</view>
+            <view class="moreIcon" wx:if="{{isAll}}">没有更多数据</view>
+            <form bindsubmit="formSubmit" data-item-type="toPostDemand" reportSubmit="true" wx:if="{{userType&&userType!==4}}">
+                <image class="toIfnoBtn" src="{{banner.demandIcon}}"></image>
+                <button class="toIfnoBtn fakeBtn" formType="submit"></button>
+            </form>
+        </view>
+    </view>
+    <view class="pageMask" wx:if="{{newPropleAward}}">
+        <image class="imgContent" src="{{banner.newPropleAward}}">
+            <view bindtap="closeAward" class="imgBtn"></view>
+        </image>
+    </view>
+</view>
+<image bind:tap="toBanner" class="awardIcon" src="{{banner.awardRule}}"></image>
+<cmp-tab-bar active="{{active}}"></cmp-tab-bar>
+<van-popup :close-on-click-overlay="true" class="tip-dialog" show="{{showPop}}">
+    <text class="popTitle">温馨提示</text>
+    <view class="popContent">平台查到您的账户存在刷单异常，暂时被冻结，有任何疑问请联系平台客服！</view>
+    <view class="popBtn">
+        <button catch:tap="cancelService" class="popBtn cancelBtn" size="small">取消</button>
+        <button catch:tap="cancleService" class="popBtn" openType="contact" sessionFrom="weapp" size="small">联系客服</button>
+    </view>
+</van-popup>
+<van-popup :close-on-click-overlay="true" class="tip-dialog" show="{{showStopPop}}">
+    <text class="popTitle">《需求广场》停止服务公告</text>
+    <view class="popContent stopPop">
+        <view>尊敬的秉羲工作台商家，亲爱的朋友们：</view>
+        <view>
+            <text>感谢大家长久以来的支持，很遗憾地通知您，我们决定将业务重心回归到布行管理工具上，</text>
+            <text class="stopBule">秉羲工作台商家小程序将于2020年7月7日00:00正式停止《需求广场》服务。</text>
+            <text>我们将保留除此以外的全部管理功能，请放心使用。 </text>
+        </view>
+        <view>由衷感谢您的支持，如有疑问，请及时联系我们的客服工作人员。</view>
+        <view style="text-align:right;margin:0">秉羲工作台团队</view>
+        <view style="text-align:right;margin:0">2020年7月1日</view>
+    </view>
+    <view class="popBtn stopBule">
+        <button catch:tap="cancleStopPop" class="popBtn cancelBtn" size="small">我知道了</button>
+    </view>
+</van-popup>

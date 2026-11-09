@@ -1,0 +1,13 @@
+<view class="fabricGuide">
+  <view class="title marginTop32"
+    >亲爱的
+    {{userInfoList.nickName}}，因您当前角色为【面料专家】，可支持服务有限，您可选择申请升级供应商，获取更多服务资源。</view
+  >
+  <view class="marginTop32 img">
+    <image src="{{img.info}}"></image>
+  </view>
+  <button bindtap="goPath" class="btn">
+    {{openShopStatus===0?'查看进度':'申请成为供货商'}}
+  </button>
+  <view bindtap="logout" class="logout">退出登录</view>
+</view>

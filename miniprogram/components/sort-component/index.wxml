@@ -1,0 +1,7 @@
+<view bindtap="changeAsc" class="dult fr-between-center">
+  <text>{{text}}</text>
+  <view class="toSort">
+    <image src="{{icon.up}}" wx:if="{{sort==='asc'}}"></image>
+    <image src="{{icon.down}}" wx:if="{{sort==='desc'}}"></image>
+  </view>
+</view>

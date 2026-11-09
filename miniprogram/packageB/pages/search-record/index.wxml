@@ -1,0 +1,59 @@
+<view class="search-record">
+  <search-bar
+    autoFocus="{{autoFocus}}"
+    bind:confirm="handleConfirm"
+    bind:input="handleInput"
+    customSearchBar="record-search-bar"
+    customSearchWrapper="record-search-wrapper"
+    placeholder="搜索ID、搜索人"
+  ></search-bar>
+  <view class="record_tool">
+    <span class="tip">全部</span>
+    <view bindtap="onFilterDate" class="time"
+      >{{sel_list.start_time||sel_list.end_time?sel_list.start_time+'-'+sel_list.end_time:'时间'}}<image
+        src="{{icon.settime}}"
+      ></image>
+    </view>
+  </view>
+  <view class="record_content">
+    <data-empty wx:if="{{recordList.length===0}}"></data-empty>
+    <scroll-view
+      bindscrolltolower="onScrollLower"
+      scrollY="true"
+      style="height: 98%"
+      wx:else
+    >
+      <view
+        bindtap="handleNavTo"
+        class="record_item"
+        data-id="{{item.searchId}}"
+        wx:for="{{recordList}}"
+        wx:key="searchId"
+      >
+        <view class="record_item_t">
+          <span class="title">搜索ID:{{item.searchId}}</span>
+        </view>
+        <search-pic-color
+          bind:childFunc="handleNavTo"
+          data="{{item}}"
+          data-id="{{item.searchId}}"
+          disabled="{{true}}"
+        ></search-pic-color>
+        <view class="record_item_b">
+          <span class="name">{{item.createName}}</span>
+          <span>{{item.createTime}}</span>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</view>
+<date
+  bind:tapNo="closeTapNoModal"
+  bind:tapYes="dateSubmit"
+  id="dateEle"
+  isShow="{{showSelDate}}"
+  minDate="2019/1/1"
+  theme_color="#2493F8"
+  timeEnd="{{sel_list.end_time}}"
+  timeStart="{{sel_list.start_time}}"
+></date>

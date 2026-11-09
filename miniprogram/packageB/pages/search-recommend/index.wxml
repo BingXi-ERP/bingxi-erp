@@ -1,0 +1,40 @@
+<view class="search-result">
+  <view class="result_tool">
+    <search-new-bar
+      bind:confirm="handleConfirm"
+      bind:input="handleInput"
+      placeholder="搜索品名、商品编号"
+    ></search-new-bar>
+  </view>
+  <view class="result_type_bar">
+    <text
+      bindtap="onSwitchSearchType"
+      class="{{item.value===formInline.searchSortType?'active':''}}"
+      data-type="{{item.value}}"
+      wx:for="{{searchTypeOpt}}"
+      wx:key="value"
+      >{{item.label}}</text
+    >
+  </view>
+  <view class="result_content">
+    <van-empty
+      description="暂无数据"
+      wx:if="{{searchBotData.length===0}}"
+    ></van-empty>
+    <scroll-view
+      bindscrolltolower="onScrollLower"
+      scrollY="true"
+      style="height: 98%"
+      wx:else
+    >
+      <result-card
+        data="{{item}}"
+        mainFlag="{{true}}"
+        sampleData="{{searchTopData}}"
+        searchId="{{formInline.searchId}}"
+        wx:for="{{searchBotData}}"
+        wx:key="uuid"
+      ></result-card>
+    </scroll-view>
+  </view>
+</view>

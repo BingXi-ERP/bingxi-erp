@@ -1,0 +1,101 @@
+.searchDemand {
+  background: #fff;
+  color: #333;
+  font-size: 28rpx;
+  overflow-x: hidden;
+  padding-top: 122rpx;
+}
+.searchBar {
+  background-color: #fff;
+  box-sizing: border-box;
+  height: 112rpx;
+  left: 0;
+  padding: 0 40rpx;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  z-index: 1;
+}
+.searchBar .searchInput {
+  align-items: center;
+  background: #f5f6fa;
+  border-radius: 44rpx;
+  box-sizing: border-box;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+  height: 72rpx;
+  margin-right: auto;
+  padding: 0 36rpx;
+  position: relative;
+  width: 576rpx;
+}
+.searchInput input {
+  color: #333;
+  font-size: 28rpx;
+  height: 40rpx;
+  padding: 0 36rpx;
+  width: 400rpx;
+}
+.searchWrapper image {
+  height: 40rpx;
+  position: relative;
+  top: 2px;
+  width: 40rpx;
+}
+.searchCancel {
+  color: #4c7cf9;
+  font-size: 16px;
+  font-weight: 400;
+}
+.no-data {
+  padding-top: 150rpx;
+}
+.no-data .icon {
+  height: 250rpx;
+  margin-bottom: 40rpx;
+  width: 300rpx;
+}
+.no-data .text {
+  color: #c8c9db;
+  font-weight: 400;
+}
+.placeholder {
+  color: #ccc;
+}
+.searchItem {
+  height: 128rpx;
+  padding: 0 32rpx;
+  position: relative;
+}
+.searchItem::after {
+  border: 1rpx solid #f5f5f5;
+  bottom: 0;
+  content: "";
+  height: 1rpx;
+  left: 32rpx;
+  position: absolute;
+  width: 100vw;
+}
+.searchItem image {
+  height: 80rpx;
+  margin-right: 16rpx;
+  width: 80rpx;
+}
+.customName {
+  flex: 1;
+  margin-right: auto;
+}
+.customDebt {
+  color: #ed5c5c;
+  flex: 1;
+  text-align: right;
+}
+.moreIcon {
+  color: #999bb4;
+  font-size: 24rpx;
+  height: 128rpx;
+  line-height: 128rpx;
+  text-align: center;
+  width: 100%;
+}

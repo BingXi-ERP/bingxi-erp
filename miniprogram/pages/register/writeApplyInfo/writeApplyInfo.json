@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "填写申请资料",
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "usingComponents": {
+    "van-icon": "../../../miniprogram_npm/@vant/weapp/icon/index",
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-cascader": "/miniprogram_npm/@vant/weapp/cascader/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

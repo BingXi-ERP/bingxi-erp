@@ -1,0 +1,56 @@
+<view class="authSetting-page" wx:if="{{hasUserInfo}}">
+    <view class="heights"></view>
+    <view class="authSetting-shop">
+        <image src="/assets/images/icon2nd/img_users@2x.png"></image>
+    </view>
+    <view class="shopname-title">{{shopName}}邀请你成为公司员工</view>
+    <view class="authSetting-info">
+        <view class="login-info">
+            <view class="input_phone">
+                <text class="text" decode="{{true}}">姓&emsp;名：</text>
+                <input bindinput="input_val" data-name="login_name" maxlength="12" placeholder="请输入您的姓名" type="text" value="{{login_name}}"></input>
+                <image bindtap="clearInput" id="2" src="{{login_name.length>0?delImage:''}}"></image>
+            </view>
+            <view class="input_phone">
+                <text class="text">手机号：</text>
+                <input bindinput="input_val" data-name="login_member" maxlength="11" name="login_member" placeholder="请输入您的手机号" type="number" value="{{login_member}}"></input>
+                <image bindtap="clearInput" id="0" src="{{login_member.length>0?delImage:''}}"></image>
+            </view>
+            <view class="input_code">
+                <text class="text">验证码：</text>
+                <input bindinput="code_val" placeholder="请输入验证码" type="number" value="{{login_code}}"></input>
+                <image catchtap="clearInput" id="1" src="{{login_code.length>0?delImage:''}}"></image>
+                <button bindtap="getVerificationCode" disabled="{{disabled}}">{{codeName}}</button>
+            </view>
+        </view>
+        <view bindtap="accountLogin" class="btn-big2 bg-blue2 font-white login-btn">绑定</view>
+    </view>
+</view>
+<view class="container" wx:else>
+    <view class="page-body">
+        <view class="page-section">
+            <view class="page-body-info">
+                <view class="userinfo-avatar">
+                    <open-data type="userAvatarUrl"></open-data>
+                </view>
+                <view>
+                    <open-data type="userNickName"></open-data>
+                </view>
+            </view>
+            <view class="page-body-infos">
+                <view>申请获得以下权限:</view>
+                <view>· 获得你的公开信息（昵称、头像）</view>
+            </view>
+            <view class="btn-area">
+                <button bindgetuserinfo="onGotUserInfo" class="btn-bg-color" lang="zh_CN" openType="getUserInfo" withCredentials="true">允许</button>
+            </view>
+        </view>
+    </view>
+</view>
+<view class="authSetting-page" wx:if="{{inviteShopId.length>0&&codeStatus==false}}">
+    <view class="heights"></view>
+    <view class="authSetting-shop">
+        <image src="/assets/images/icon2nd/img_users@2x.png"></image>
+    </view>
+    <view class="shopname-title">邀请二维码已过期</view>
+</view>

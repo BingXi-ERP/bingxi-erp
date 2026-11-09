@@ -1,0 +1,6 @@
+<view class="agreement">
+  <text class="f12">{{name}}</text>
+  <button bindtap="checkAgreement" class="btn-bg-color">
+    我已认真阅读，并同意协议
+  </button>
+</view>

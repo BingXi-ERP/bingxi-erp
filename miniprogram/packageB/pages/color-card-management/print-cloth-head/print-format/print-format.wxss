@@ -1,0 +1,208 @@
+page {
+  background-color: #eff0f7;
+  padding-top: 40rpx;
+}
+.print-list1 {
+  background-position: 50%;
+  background-size: cover;
+  height: 510rpx;
+}
+.print-list,
+.print-list1 {
+  background-color: #fff;
+  border-radius: 20rpx;
+  margin-bottom: 20rpx;
+  margin-left: 34rpx;
+  overflow: hidden;
+  width: calc(100vw - 68rpx);
+}
+.print-list .print-list-bd {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  justify-content: space-between;
+}
+.print-list .print-list-bd,
+.print-list .print-list-bdc {
+  font-size: 28rpx;
+  margin: auto;
+  padding: 24rpx 0;
+  width: 92%;
+}
+.print-list .print-list-bdc image {
+  height: 36rpx;
+  width: 36rpx;
+}
+.print-list .print-list-bd text {
+  width: 175rpx;
+}
+.print-list .print-list-bd text:nth-child(1) {
+  color: #5d5d5d;
+  font-size: 26rpx;
+}
+.print-list .print-list-bd .arrow-picker {
+  background-color: #fff;
+  height: 40rpx;
+  position: absolute;
+  right: -10px;
+  top: 0;
+  width: 40rpx;
+  z-index: 9;
+}
+.print-list-bd input {
+  text-align: right;
+}
+.print-list-bd image {
+  height: 36rpx;
+  width: 36rpx;
+}
+.print-list2 {
+  margin-bottom: 110rpx;
+}
+.picker-select picker,
+.picker-select > view {
+  padding-right: 25rpx;
+  position: relative;
+}
+.marRight {
+  text-align: left;
+}
+.choose-data {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  margin: 20rpx 0 28rpx;
+}
+.picker-select picker::after,
+.picker-select > view::after {
+  border-bottom: 1rpx solid #c3c8cb;
+  border-right: 1rpx solid #c3c8cb;
+  color: #c3c8cb;
+  content: "";
+  display: block;
+  height: 14rpx;
+  margin-left: 20rpx;
+  position: absolute;
+  right: 0;
+  top: 25%;
+  transform: rotate(45deg);
+  width: 14rpx;
+}
+.no-border {
+  border: none;
+}
+.remarks {
+  background: #f8f9fc;
+  color: #999bb4;
+  height: 200rpx;
+  padding: 20rpx;
+  width: 640rpx;
+}
+.numLimit {
+  bottom: 40rpx;
+  color: silver;
+  font-size: 26rpx;
+  position: absolute;
+  right: 40rpx;
+}
+.customer-icon {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 20rpx;
+  margin-left: 20rpx;
+  margin-top: 10rpx;
+  width: 10rpx;
+}
+.right-arrow {
+  height: 20rpx;
+  position: absolute;
+  right: 0rpx;
+  top: 80%;
+  transform: translateY(-80%);
+  width: 20rpx;
+}
+.print-btn {
+  background-color: #fff;
+  bottom: 60rpx;
+  left: 0rpx;
+  padding: 20rpx 0;
+  position: fixed;
+  width: 100%;
+  z-index: 999;
+}
+.print-btn button {
+  background: linear-gradient(90deg, #7ab5ff, #336af8);
+  border-radius: 24px;
+  box-shadow: 0 6px 12px -2px rgba(120, 169, 255, 0.5);
+  box-sizing: border-box;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+  width: 690rpx;
+}
+.fontColor {
+  color: #999;
+}
+.customerInfo {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 400rpx;
+}
+.colorCardDetail {
+  border: 2px solid #f2f4f9;
+  height: 496rpx;
+  margin: 0 auto;
+  padding: 32rpx;
+  width: 622rpx;
+}
+.colorCardInfo {
+  color: #333;
+  font-size: 24rpx;
+}
+.topSpace {
+  margin-top: 20rpx;
+  padding-top: 0;
+}
+.bottomBorder {
+  border-bottom: 1rpx solid #f5f5f9;
+}
+.colorCardInfoC {
+  color: #0b0b0b !important;
+  font-size: 26rpx;
+  font-weight: 600;
+  margin-left: 28rpx;
+  margin-top: 28rpx;
+}
+.comFont {
+  color: #5d5d5d;
+  font-size: 32rpx;
+  font-size: 26rpx;
+  justify-content: space-between;
+  min-width: 200rpx;
+}
+.comFont,
+.flexDispay {
+  display: -webkit-flex;
+  display: flex;
+}
+.flexDispay {
+  flex-direction: row;
+}
+.flexDispay .disable {
+  background-color: #dcdcdf;
+  border-radius: 50%;
+  height: 36rpx;
+  width: 36rpx;
+}
+.dataChoose {
+  height: 40rpx;
+  margin-right: 30rpx;
+  position: relative;
+  text-align: right;
+  width: 100%;
+}

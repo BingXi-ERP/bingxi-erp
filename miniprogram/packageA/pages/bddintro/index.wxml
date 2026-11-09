@@ -1,0 +1,49 @@
+<view
+  class="intro"
+  style="background:url({{introImage.background}}) no-repeat;background-size:cover;"
+>
+  <view class="content">
+    <view class="word">
+      <van-image
+        height="100%"
+        src="{{introImage.word}}"
+        width="100%"
+      ></van-image>
+    </view>
+    <view class="video">
+      <video
+        autoplay
+        controls
+        playsinline
+        poster="{{introImage.videoPoster}}"
+        src="{{introImage.video}}"
+        style="width: 100%; height: 175px"
+        webkitPlaysinline="true"
+      ></video>
+    </view>
+    <view catchtap="onNavTo" class="apply">
+      <van-image
+        height="64rpx"
+        src="{{introImage.apply}}"
+        width="264rpx"
+      ></van-image>
+    </view>
+    <view class="promotion">
+      <view class="text">平台海量源头一批商和仓库资源</view>
+      <view class="text">欢迎各大布行来电咨询/体验/入驻</view>
+      <view class="plat">
+        <van-image
+          height="112px"
+          src="{{introImage.wx}}"
+          width="112px"
+        ></van-image>
+        <van-image
+          height="112px"
+          src="{{introImage.dy}}"
+          width="112px"
+        ></van-image>
+      </view>
+      <view class="text">关注秉羲工作台公众号及抖音获取更多资讯</view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,27 @@
+<view class="color-ys-bg"></view>
+<view class="child-lists" wx:if="{{roleList.length>0}}">
+  <view class="child-list" wx:for="{{roleList}}" wx:key="index">
+    <view class="child-list-bd">
+      <view>{{item.name}}</view>
+      <text class="f14">权限:{{item.menuNames.join(',')||'-'}}</text>
+    </view>
+    <view
+      bindtap="toJobs"
+      class="child-list-fd"
+      data-item="{{item}}"
+      data-type="1"
+    >
+      <image src="/assets/images/icon2nd/icon_edit.png"></image>
+    </view>
+  </view>
+</view>
+<view class="color-data-list-null" wx:else>
+  <text>您还未创建任何岗位~</text>
+</view>
+<view class="heihgt-line"></view>
+<view class="colour-fd">
+  <view bindtap="toJobs" data-type="0">
+    <image mode="aspectFit" src="/assets/images/icon2nd/icon_add.png"></image
+    >新建岗位</view
+  >
+</view>

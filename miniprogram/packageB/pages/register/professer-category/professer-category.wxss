@@ -1,0 +1,57 @@
+.chooseCategory .head {
+  padding: 48rpx;
+}
+.chooseCategory .title {
+  color: #373c55;
+  font-family: PingFangSC-Semibold;
+  font-size: 24px;
+  font-weight: 600;
+  height: 80rpx;
+}
+.titleIllustrate {
+  color: #999bb4;
+  font-family: PingFangSC-Light;
+  font-size: 14px;
+  font-weight: 300;
+}
+.newBtn {
+  background: #d8d9e3;
+  background: linear-gradient(90deg, #7ab5ff, #336af8);
+  border-radius: 48rpx;
+  color: #fff;
+  height: 96rpx;
+  width: 622rpx;
+}
+.chooseCategory .newBtn[disabled] {
+  background: #d8d9e3;
+  color: #fff;
+}
+.content {
+  flex-wrap: wrap;
+}
+.content,
+.item {
+  margin-bottom: 32rpx;
+}
+.item {
+  background: #fff;
+  border: 1rpx solid #c7c8d8;
+  border-radius: 48rpx;
+  color: #64689e;
+  font-family: PingFangSC-Medium;
+  font-size: 16px;
+  font-weight: 500;
+  height: 96rpx;
+  line-height: 96rpx;
+  margin-right: 32rpx;
+  text-align: center;
+  width: 192rpx;
+}
+.item:nth-child(3n + 3) {
+  margin-right: 0;
+}
+.isChoose {
+  background: #f0f8ff;
+  border: 1rpx solid #336af8;
+  color: #336af8;
+}

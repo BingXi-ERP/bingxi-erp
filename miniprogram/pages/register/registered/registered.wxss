@@ -1,0 +1,64 @@
+.container {
+  margin: 0;
+}
+.wrapper {
+  margin-top: 100rpx;
+}
+image.registered-bg {
+  margin-top: -40rpx;
+  width: 100%;
+}
+.registered-content {
+  background-color: #fff;
+  border-radius: 24px;
+  height: auto;
+  margin: auto;
+  text-align: center;
+  width: 85%;
+}
+.user-img.userinfo-avatar {
+  border: 15rpx solid #fff;
+  border-radius: 50%;
+  display: block;
+  height: 100rpx;
+  margin: 0 auto;
+  overflow: hidden;
+  width: 100rpx;
+}
+.registered-user-name {
+  color: #666;
+  font-size: 28rpx;
+  margin-bottom: 50rpx;
+  padding-bottom: 20rpx;
+}
+.icon-check-success {
+  margin-top: 26rpx;
+}
+.icon-check-success .registered-bgs {
+  height: 130rpx;
+  width: 130rpx;
+}
+.registered-tip {
+  margin-bottom: 80rpx;
+  margin-top: 22rpx;
+}
+.registered-tip p {
+  color: #2c2c2c;
+  display: block;
+  font-size: 48rpx;
+  height: 66rpx;
+  letter-spacing: 1rpx;
+  line-height: 66rpx;
+}
+.registered-tip .registered-tip-sub {
+  color: #999;
+  font-size: 13px;
+  height: 36rpx;
+  letter-spacing: 0;
+  line-height: 36rpx;
+  margin-top: 16rpx;
+}
+.to-shop-btn {
+  background-color: #2f7bfd;
+  color: #fff;
+}

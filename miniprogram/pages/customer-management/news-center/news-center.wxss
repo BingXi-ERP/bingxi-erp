@@ -1,0 +1,121 @@
+page {
+  background-color: #f5f6fa;
+}
+.news-wrapper {
+  padding: 32rpx 32rpx 0;
+}
+.header {
+  height: 142rpx;
+  width: 750rpx;
+}
+.noResult {
+  left: 50%;
+  position: absolute;
+  text-align: center;
+  top: 35%;
+  transform: translate(-50%, -35%);
+}
+.noResult .noPage {
+  background: url(https://img.duibu.cn/duibu/shop/img/customer/Defaultpage_NoRecord_Color.png)
+    no-repeat;
+  background-position: 50%;
+  background-size: 320rpx 320rpx;
+  height: 320rpx;
+  margin-bottom: 32rpx;
+  width: 320rpx;
+}
+.noResult .title {
+  color: #70728c;
+  font-family: PingFangSC-Medium;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 16rpx;
+}
+.noResult .text {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+}
+.listItem {
+  align-items: center;
+  background-color: #fff;
+  border-radius: 16rpx;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 32rpx;
+  min-height: 160rpx;
+  padding: 16rpx 32rpx;
+  width: calc(100% - 64rpx);
+}
+.list-avatar {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border-radius: 50%;
+  height: 96rpx;
+  margin-right: 16rpx;
+  width: 96rpx;
+}
+.list-content {
+  flex-direction: column;
+  width: calc(100% - 112rpx);
+}
+.content-top,
+.list-content {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+}
+.content-top {
+  width: 100%;
+}
+.top-left .name {
+  color: #373c55;
+  font-size: 30rpx;
+  font-weight: 500;
+  margin-right: 16rpx;
+}
+.top-left .new-tag {
+  background: #fff0f0;
+  color: #ed5c5c;
+}
+.top-left .close-tag,
+.top-left .new-tag {
+  border-radius: 8px;
+  font-size: 20rpx;
+  padding: 0 18rpx;
+}
+.top-left .close-tag {
+  background: #edeff6;
+  color: #999bb4;
+}
+.top-right {
+  color: #c7c8d8;
+  font-size: 24rpx;
+}
+.content-bottom {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 12rpx;
+  width: 100%;
+}
+.content-bottom text {
+  color: #70728c;
+  font-size: 24rpx;
+  line-height: 40rpx;
+  word-break: break-word;
+}
+.noPage {
+  background: url(https://img.duibu.cn/duibu/shop/img/v2.7.8/Defaultpage_NoMessages@2x.png)
+    no-repeat;
+  background-position: 50%;
+  background-size: 320rpx 320rpx;
+  height: 320rpx;
+  margin-bottom: 32rpx;
+  width: 320rpx;
+}

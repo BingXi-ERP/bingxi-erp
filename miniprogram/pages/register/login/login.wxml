@@ -1,0 +1,41 @@
+<view class="page-container">
+    <view class="top-area">
+        <view class="app-name">
+            <image src="{{icon.duibuLogo}}"></image>
+        </view>
+        <view class="app-title">秉羲工作台</view>
+        <view class="app-slogan">登录账号以使用更多服务</view>
+    </view>
+    <view class="login-area">
+        <view class="phone-display">
+            <view class="l-area">
+                <text class="area-code">+{{areaCode}}</text>
+                <view class="arrow-up">
+                    <van-icon name="arrow-down" size="24rpx"></van-icon>
+                </view>
+            </view>
+            <input bindinput="onPhoneNumberInput" class="phone-number" maxlength="11" placeholder="请输入手机号" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="number" value="{{phoneNumber}}"></input>
+        </view>
+        <view bindtap="navigateToNextPage" class="next-button">下一步</view>
+    </view>
+    <view class="agreement-area">
+        <agreement-bottom bind:change="handleAgreementChange" isAgreed="{{isAgreed}}"></agreement-bottom>
+    </view>
+</view>
+<view class="login-other">
+    <view class="other_type">
+        <span></span>
+        <text>其他方式登录</text>
+        <span></span>
+    </view>
+    <view class="other_login">
+        <button bindgetphonenumber="getPhoneNumber" class="share-btn-null" openType="getPhoneNumber">
+            <image mode="aspectFit" src="{{icon.weChat}}"></image>
+            <text>微信快捷登录</text>
+        </button>
+    </view>
+</view>
+<van-dialog useSlot bind:cancel="handleCloseDialog" cancelButtonColor="#FB562C" cancelButtonText="好的" show="{{showDialog}}" showCancelButton="{{true}}" showConfirmButton="{{false}}">
+    <view class="d-text">请填写正确的手机号</view>
+</van-dialog>
+<van-dialog id="van-dialog"></van-dialog>

@@ -1,0 +1,28 @@
+<view class="login-page">
+    <view class="login-logo bg-img" style="background-image:url(\"{{icon.logo}}\")"></view>
+    <view class="login-info">
+        <view class="input_phone">
+            <text class="text">手机号：</text>
+            <input bindinput="input_val" maxlength="11" placeholder="请输入您的手机号" type="number" value="{{login_member}}"></input>
+            <image bindtap="clearInput" class="clear-img" id="0" src="{{icon.delImage}}" wx:if="{{login_member.length>0}}"></image>
+        </view>
+        <view class="input_code">
+            <text class="text">验证码：</text>
+            <input bindinput="code_val" placeholder="请输入验证码" type="number" value="{{login_code}}"></input>
+            <image catchtap="clearInput" class="clear-img" id="1" src="{{icon.delImage}}" wx:if="{{login_code.length>0}}"></image>
+            <button bindtap="getVerificationCode" disabled="{{disabled}}">{{codeName}}</button>
+        </view>
+    </view>
+    <button bindgetuserinfo="loginByMobile" class=" newBtn font-white login-btn" disabled="{{!login_member.length||!login_code.length||!check}}" lang="zh_CN" openType="getUserInfo">下一步</button>
+</view>
+<van-popup :close-on-click-overlay="true" class="tip-dialog" show="{{showPop}}">
+    <view class="popTitle" style="background-image:url( '{{icon.stopHeader}}' )"></view>
+    <view class="popContent">
+        <view>您的账号已被停用,请联系客服做沟通确认!</view>
+        <view>({{customsPhoneNum}})</view>
+    </view>
+    <view class="popBtn">
+        <button class="popBtn cancelBtn" openType="contact" sessionFrom="weapp" size="small">在线客服</button>
+        <button catch:tap="contact" class="popBtn " size="small">电话联系</button>
+    </view>
+</van-popup>

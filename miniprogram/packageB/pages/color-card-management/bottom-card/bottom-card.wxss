@@ -1,0 +1,329 @@
+.btn-big {
+  bottom: 20rpx;
+  left: 0;
+  margin-left: auto;
+  margin-right: auto;
+  position: fixed;
+  right: 0;
+}
+.add-btn-icon {
+  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/ic_tianjia.png?imageView2/2/w/750);
+  height: 38rpx;
+  margin-right: 16rpx;
+  width: 38rpx;
+}
+.search-panel,
+.search-panel .search-box input,
+page {
+  width: 100%;
+}
+.navbarlist2 {
+  background-color: #fff;
+  border-top: 1rpx solid #f1f1f1;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 28rpx;
+  height: 80rpx;
+  justify-content: space-around;
+  line-height: 80rpx;
+  width: 100%;
+}
+.sortactive {
+  color: #ff6065;
+}
+.cardlist {
+  background-color: #fff;
+  margin-top: 20rpx;
+  padding-top: 30rpx;
+  width: 100%;
+}
+.card-bd {
+  padding-bottom: 30rpx;
+  position: relative;
+}
+.arrow-right::after {
+  border-right: 4rpx solid #c3c8cb;
+  border-top: 4rpx solid #c3c8cb;
+  content: "";
+  height: 16rpx;
+  position: absolute;
+  right: 20rpx;
+  top: 50%;
+  transform: rotate(45deg);
+  width: 16rpx;
+}
+.card-bd-top.arrow-right::after {
+  top: 0;
+}
+.card-bd,
+.card-fd {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  flex-wrap: wrap;
+  margin: auto;
+  width: 90%;
+}
+.card-bd-img {
+  border-radius: 4rpx;
+  height: 144rpx;
+  overflow: hidden;
+  position: relative;
+  width: 144rpx;
+}
+.card-bd-img image {
+  height: 100%;
+  width: 100%;
+}
+.card-bd-img-bg {
+  background: #000;
+  height: 220rpx;
+  left: 0;
+  opacity: 0.5;
+  position: absolute;
+  top: 0;
+  width: 220rpx;
+  z-index: 999;
+}
+.card-bd-img-bg image {
+  height: 144rpx;
+  left: 15%;
+  position: absolute;
+  top: 20%;
+  width: 144.2rpx;
+  z-index: 9999;
+}
+.card-bd-info {
+  margin-left: 20rpx;
+  position: relative;
+  width: 55%;
+}
+.card-bd-info-name {
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: #333;
+  display: -webkit-box;
+  font-size: 28rpx;
+  line-height: 34rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 15em;
+  word-break: break-all;
+}
+.card-bd-info-price {
+  color: #f8464b;
+  font-size: 36rpx;
+  line-height: 30rpx;
+  margin-top: 20rpx;
+}
+.visit-info {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  font-size: 30rpx;
+  margin-top: 10rpx;
+  width: 70%;
+}
+.visit-info view {
+  color: #505050;
+  font-size: 24rpx;
+}
+.card-fd {
+  border-top: 1rpx solid #f1f1f1;
+  width: 100%;
+}
+.card-fd view {
+  display: table-cell;
+  padding-top: 20rpx;
+  text-align: center;
+  vertical-align: middle;
+  width: 20%;
+}
+.card-fd view image {
+  height: 34rpx;
+  width: 34rpx;
+}
+.card-fd view image.icon-visit {
+  width: 48rpx;
+}
+.card-fd view image.icon-cards {
+  height: 32rpx;
+  width: 32rpx;
+}
+.card-fd view text {
+  color: #505050;
+  display: block;
+  font-size: 24rpx;
+  line-height: 40rpx;
+}
+.card-fd.card-fd2 view {
+  text-align: center;
+  width: 33.33%;
+}
+.colour-fd view {
+  color: #3b3b3b;
+  font-size: 32rpx;
+  text-align: center;
+  width: 32.888%;
+}
+.colour-fd view:nth-child(1) {
+  border-right: 1rpx solid #ececec;
+}
+.colour-fd view:nth-child(3) {
+  border-left: 1rpx solid #ececec;
+}
+.navbarlist2 view {
+  font-size: 28rpx;
+}
+.navbarlist2 image {
+  height: 26rpx;
+  margin-left: 10rpx;
+  width: 16rpx;
+}
+.heihgt-line {
+  height: 200rpx;
+}
+.search-panel .search-box .clear-icon {
+  right: 50rpx;
+}
+.modal-mask {
+  background: #000;
+  color: #fff;
+  height: 100%;
+  left: 0;
+  opacity: 0.7;
+  top: 0;
+  width: 100%;
+  z-index: 9000;
+}
+.modal-dialog,
+.modal-mask {
+  overflow: hidden;
+  position: fixed;
+}
+.modal-dialog {
+  height: 80%;
+  left: 15%;
+  margin: auto;
+  top: 10%;
+  width: 70%;
+  z-index: 99999;
+}
+.modal-title {
+  color: #030303;
+  font-size: 36rpx;
+  padding-top: 50rpx;
+  text-align: center;
+}
+.modal-content {
+  background: #fff;
+  padding: 0;
+}
+.modal-input {
+  background: #fff;
+  border-radius: 4rpx;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  font-size: 28rpx;
+  height: 90%;
+}
+.input {
+  box-sizing: border-box;
+  color: #333;
+  font-size: 28rpx;
+  height: 82rpx;
+  line-height: 28rpx;
+  padding: 0 20rpx;
+  width: 100%;
+}
+input-holder {
+  color: #666;
+  font-size: 28rpx;
+}
+.modal-footer {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  flex-direction: row;
+  font-size: 34rpx;
+  height: 148rpx;
+  line-height: 148rpx;
+}
+.modal-tip {
+  bottom: 40rpx;
+  color: #fff;
+  position: fixed;
+}
+.btn-cancel {
+  border-right: 1rpx solid #dedede;
+  color: #666;
+  text-align: center;
+  width: 50%;
+}
+.btn-confirm {
+  background: #ff6065;
+  border-radius: 100px;
+  box-shadow: 0 2px 5px 0 rgba(255, 96, 101, 0.4);
+  color: #fff;
+  height: 80rpx;
+  line-height: 80rpx;
+  margin-top: 40rpx;
+  width: 300rpx;
+}
+page {
+  background-color: #f8f8f8;
+}
+.color-fd-btn button {
+  height: 80rpx;
+  line-height: 80rpx;
+  margin-top: 10rpx;
+  width: 45%;
+}
+.card-bd-info-price {
+  color: #999;
+  font-size: 24rpx;
+}
+.card-bd-info {
+  flex: 1;
+  margin-left: 50rpx;
+}
+.red {
+  color: #f8464b;
+}
+.arrow-right::after {
+  top: 0;
+}
+.color-data-list-null {
+  margin-top: 50%;
+}
+.tool {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20rpx;
+}
+.btCardButton {
+  color: #4177f5;
+  font-size: 14px;
+  text-align: center;
+}
+.print {
+  background: linear-gradient(90deg, #7ab5ff, #336af8);
+  border-radius: 40rpx;
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 500;
+  height: 64rpx;
+  line-height: 64rpx;
+  margin-left: 30rpx;
+  text-align: center;
+  width: 160rpx;
+}

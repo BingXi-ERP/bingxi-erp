@@ -1,0 +1,10 @@
+<view class="color-ys-bg"></view>
+<view class="phone">
+    <view class="phone-tip">绑定手机号，下次登录可使用手机号登录</view>
+    <view class="phone-tip" wx:if="{{phoneType==0}}">当前手机号：{{mobiles}}</view>
+</view>
+<view class="list-li">
+    <input bindinput="test_number" maxlength="11" placeholder="请填写手机号码"></input>
+</view>
+<button bindtap="toNext" class="btn-active">下一步</button>
+<aj-captcha bind:success="ajCaptchaSuccess" class="smsCaptchas" opt="{{captchaOpt}}"></aj-captcha>

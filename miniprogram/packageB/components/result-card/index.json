@@ -1,0 +1,7 @@
+{
+  "component": true,
+  "usingComponents": {
+    "search-pic-color": "/packageB/components/search-pic-color/index",
+    "van-icon": "/miniprogram_npm/@vant/weapp/icon/index"
+  }
+}

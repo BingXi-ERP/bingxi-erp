@@ -1,0 +1,36 @@
+.clothCategory {
+  padding: 0 32rpx;
+}
+.fl {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+}
+.clothCategory .content {
+  flex-wrap: wrap;
+  margin-bottom: 80rpx;
+}
+.item {
+  background: #fff;
+  border: 1rpx solid #c7c8d8;
+  border-radius: 48rpx;
+  color: #64689e;
+  font-family: PingFangSC-Medium;
+  font-size: 16px;
+  font-weight: 500;
+  height: 72rpx;
+  line-height: 72rpx;
+  margin-bottom: 48rpx;
+  margin-right: 32rpx;
+  min-width: 192rpx;
+  text-align: center;
+}
+.item:nth-child(3n + 3) {
+  margin-right: 0;
+}
+.isChoose {
+  background: #f0f8ff;
+  border: 1rpx solid #336af8;
+  color: #336af8;
+}

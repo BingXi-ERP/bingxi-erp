@@ -1,0 +1,59 @@
+page {
+  background-color: #f5f5f5;
+}
+.news {
+  overflow-x: hidden;
+  padding: 0 32rpx;
+}
+.newsItem {
+  align-items: center;
+  background: #fff;
+  border-radius: 16rpx;
+  display: -webkit-flex;
+  display: flex;
+  margin-top: 24rpx;
+  padding: 40rpx 32rpx;
+  position: relative;
+}
+.newsItem image {
+  height: 80rpx;
+  margin-right: 24rpx;
+  width: 80rpx;
+}
+.newsItem .right {
+  flex: 1;
+  padding-right: 30rpx;
+}
+.newsItem .header {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+}
+.right .title {
+  color: #373c55;
+  margin-right: 10rpx;
+}
+.right .detail {
+  color: #999bb4;
+}
+.rightArrow {
+  height: 20rpx;
+  width: 20rpx;
+}
+.messageNum {
+  color: #7f7f7f;
+  font-size: 12px;
+}
+.logo {
+  background: #edf3fc;
+  border-radius: 16rpx;
+  color: #4c7cf9;
+  height: 32rpx;
+  left: 260rpx;
+  line-height: 32rpx;
+  min-width: 10rpx;
+  padding: 0 10rpx;
+  position: absolute;
+  text-align: center;
+}

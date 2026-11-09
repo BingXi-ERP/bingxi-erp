@@ -1,0 +1,13 @@
+{
+  "navigationBarTitleText": "搜索",
+  "component": true,
+  "usingComponents": {
+    "search-input": "/components/search-input/search-input",
+    "panel-img": "/components/panel-img/panel-img",
+    "color-card-list-block": "/components/color-card-list-block/color-card-list-block",
+    "cargo-pass-list-block": "/components/cargo-pass-list-block/cargo-pass-list-block",
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-empty": "../../miniprogram_npm/@vant/weapp/empty/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

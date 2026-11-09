@@ -1,0 +1,6 @@
+<view class="c-search-bar custom-search-bar">
+    <view class="c-search-bar-wrapper custom-search-wrapper">
+        <input autoFocus="{{autoFocus}}" bindconfirm="onConfirm" bindinput="onKeyInput" class="c-search-bar-input" confirmType="search" placeholder="{{placeholder}}" type="text" value="{{value}}"></input>
+        <image bindtap="onConfirm" class="c-search-bar-btn" mode="aspectFit" src="/assets/images/icon2nd/ic_sous@3x.png"></image>
+    </view>
+</view>

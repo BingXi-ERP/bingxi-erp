@@ -1,0 +1,21 @@
+var replImage = function (url, app, size) {
+  if (!url) return "";
+  var expIncludes = getRegExp("\x5c?x-oss-process");
+  if (url && expIncludes.test(url)) {
+    url = url.split("?x-oss-process")[0];
+  }
+  var isHttp = getRegExp("^http:\x5c/\x5c/");
+  if (url && isHttp.test(url)) {
+    url = url.replace("http:", "https:");
+  }
+  var exp = getRegExp("^http(s)?:\x5c/\x5c/");
+  var ossSize = size
+    ? "?x-oss-process\x3dimage/resize,m_fill,h_" + size + ",w_" + size
+    : "";
+  return url && exp.test(url)
+    ? url + ossSize
+    : app.config.imgOssHost +
+        (url.charAt(0) === "/" ? url.substring(1, url.length) : url) +
+        ossSize;
+};
+module.exports = replImage;

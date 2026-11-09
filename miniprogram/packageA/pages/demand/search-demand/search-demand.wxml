@@ -1,0 +1,29 @@
+<view class="searchDemand container-gray" wx:if="{{!showNoData}}">
+    <view class="searchBar fl">
+        <view class="searchInput ">
+            <view class="searchWrapper">
+                <image mode="aspectFit" src="/assets/images/icon2nd/Icon_Nav_Search_Gray@2x.png"></image>
+            </view>
+            <input bindconfirm="confirm" bindinput="getValue" placeholder="搜索品名/色卡编号" placeholderClass="placeholder" value="{{inputValue}}"></input>
+            <view bind:tap="searchCancel" class="searchWrapper" wx:if="{{inputValue!=''}}">
+                <image mode="aspectFit" src="{{icon.delete}}"></image>
+            </view>
+        </view>
+        <view bind:tap="backPage" class="searchCancel">取消</view>
+    </view>
+    <view class="searchHistory">
+        <view class="title fl">最近搜索</view>
+        <block wx:if="{{searchType==='join'}}">
+            <view bind:tap="toItemData" class="searchItem fl" data-keyword="{{item}}" wx:for="{{joinHistoryList}}" wx:key="item">{{item}}</view>
+        </block>
+        <block wx:if="{{searchType==='post'}}">
+            <view bind:tap="toItemData" class="searchItem fl" data-keyword="{{item}}" wx:for="{{postHistoryList}}" wx:key="item">{{item}}</view>
+        </block>
+        <view bind:tap="historyClear" class="historyClear">清除记录</view>
+    </view>
+    <view class="no-data flex-column" wx:if="{{showNoData}}">
+        <view class="icon bg-img" style="background-image:url(\"{{icon.noData}}\")"></view>
+        <view class="text f16 font-black">暂无数据</view>
+        <view class="text2 f28 font-gray2">SORRY</view>
+    </view>
+</view>

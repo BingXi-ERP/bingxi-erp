@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "客户详情",
+  "enablePullDownRefresh": false,
+  "usingComponents": {
+    "van-tab": "/miniprogram_npm/@vant/weapp/tab/index",
+    "van-tabs": "/miniprogram_npm/@vant/weapp/tabs/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

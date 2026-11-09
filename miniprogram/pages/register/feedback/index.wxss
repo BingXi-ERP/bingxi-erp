@@ -1,0 +1,32 @@
+.feed-container {
+  background: #f5f7f9;
+  height: 100vh;
+}
+.text {
+  color: rgba(0, 0, 0, 0.5);
+  font-family: PingFangSC\, PingFang SC;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 20px;
+  margin-top: 24px;
+  text-align: center;
+  width: 100%;
+}
+.text-area-wrap {
+  align-items: center;
+  background-color: #fff;
+  border-radius: 10px;
+  box-sizing: border-box;
+  display: -webkit-flex;
+  display: flex;
+  height: 300rpx;
+  justify-content: center;
+  margin: 0 16px 16px;
+  padding: 16px;
+}
+.text-area {
+  background-color: #fff;
+  height: 100%;
+  width: 100%;
+}

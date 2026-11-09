@@ -1,0 +1,27 @@
+<view id="color-card-list">
+    <view class="input-wrapper">
+        <search-input bind:confirm="confirm" bind:getValue="getValue" bind:scan="scan" bind:search="search" placeholder="{{placeholder}}" rightType="2"></search-input>
+    </view>
+    <view class="list-wrapper">
+        <view bindtap="checkTap" class="item {{selectedStatusArr[index]?'active':''}}" data-goodsName="{{item.businessProductName}}" data-goodsNo="{{item.goodsNo}}" data-goodsid="{{item.id}}" data-index="{{index}}" data-mainImgPath="{{replImage(item.mainImgPath,app,210)}}" wx:for="{{colorCardList}}" wx:key="index">
+            <view class="check-wrapper">
+                <view class="checked" style="background-image:url(\"{{selectedStatusArr[index]?icon.checked:icon.noCheck}}\")"></view>
+            </view>
+            <view class="img" style="background-image:url(\"{{replImage(item.mainImgPath,app,210)}}\")"></view>
+            <view class="info-wrapper">
+                <view class="name f14 font-black g_limtRow" style="width:400rpx">{{item.businessProductName}} {{item.spuNumber||''}}</view>
+                <view class="price f16 font-blue2">¥ {{item.price}} | {{item.priceUnit}}</view>
+                <view class="other">
+                    <view class="see f12 font-gray">浏览量 {{item.viewCount}}</view>
+                    <view class="collect f12 font-gray">收藏量 {{item.favoriteCount}}</view>
+                </view>
+            </view>
+        </view>
+        <view class="bottom"></view>
+    </view>
+    <view class="btn-wrapper iphone_bottom">
+        <view bindtap="showPopupStepper" class="choosen bg-white font-blue2">已选({{selectedArr.length}})</view>
+        <view bindtap="toAddRecord" class="comfirm bg-blue2 font-white">确定</view>
+    </view>
+</view>
+<popup-stepper bind:confirm="confirmColorCard" bind:delList="delList" bind:minTap="minTap" bind:onClose="closePopupStepper" colorCardList="{{selectedArr}}" show="{{popupStepper.show}}"></popup-stepper>

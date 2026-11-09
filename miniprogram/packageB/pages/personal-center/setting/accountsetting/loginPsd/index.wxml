@@ -1,0 +1,15 @@
+<view class="loginPsd">
+    <view class="psd_box">
+        <input bindinput="handleInputVal" data-prop="password1" maxlength="16" name="password1" password="{{passwordShow}}" placeholder="请输入您要设置的密码（8-16位）" value="{{password1}}"></input>
+        <image bindtap="handleClickIcon" class="password-icon" data-prop="passwordShow" src="{{icon.icon}}" wx:if="{{passwordShow}}"></image>
+        <image bindtap="handleClickIcon" class="password-icon" data-prop="passwordShow" src="{{icon.shape}}" wx:else></image>
+    </view>
+    <view class="psd_box">
+        <input bindinput="handleInputVal" data-prop="password2" maxlength="16" name="password2" password="{{passwordShow2}}" placeholder="请再次输入您要设置的密码" value="{{password2}}"></input>
+        <image bindtap="handleClickIcon" class="password-icon" data-prop="passwordShow2" src="icon.icon" wx:if="{{passwordShow2}}"></image>
+        <image bindtap="handleClickIcon" class="password-icon" data-prop="passwordShow2" src="{{icon.shape}}" wx:else></image>
+    </view>
+    <view bindtap="save" class="g_bottomBtn">
+        <view>保存</view>
+    </view>
+</view>

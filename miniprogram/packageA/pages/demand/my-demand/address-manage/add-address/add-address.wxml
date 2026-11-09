@@ -1,0 +1,51 @@
+<view class="section">
+    <view class="children">
+        <view class="children-title">收货人<text>*</text>
+        </view>
+        <view class="children-value">
+            <input bindinput="inputgetName" data-name="addressInfo.name" maxlength="15" placeholder="请输入收货人" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{addressInfo.name}}"></input>
+        </view>
+    </view>
+    <view class="children">
+        <view class="children-title">手机号<text>*</text>
+        </view>
+        <view class="children-value">
+            <input bindinput="inputgetPhone" data-name="addressInfo.phone" maxlength="11" placeholder="请输入手机号" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{addressInfo.phone}}"></input>
+        </view>
+    </view>
+    <view class="children">
+        <view class="flex-area">
+            <view class="children-title">所在地区<text>*</text>
+            </view>
+            <view class="children-value">
+                <picker bindchange="bindRegionChange" customItem="{{customItem}}" mode="region" value="{{region}}">
+                    <view class="picker">
+                        <view class="no-address" wx:if="{{!region||region.length===0}}">请选择所在省市区</view>
+                        <view class="area-text" wx:else>{{region[0]}} {{region[1]}} {{region[2]}}</view>
+                        <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                    </view>
+                </picker>
+            </view>
+            <view class="bg-img icon" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+        </view>
+    </view>
+    <view class="children">
+        <view class="children-title">详细地址<text>*</text>
+        </view>
+        <view class="children-value">
+            <input bindinput="inputgetName" data-name="addressInfo.detailAddress" placeholder="请输入详细地址" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{addressInfo.detailAddress}}"></input>
+        </view>
+    </view>
+    <view class="children">
+        <view class="children-title" style="color:#0B0B0B;">设为默认收货地址</view>
+        <view class="children-tips">提醒：下单时会优先使用该地址</view>
+        <view class="flex-item-right">
+            <switch bindchange="switch1Change" checked="{{addressInfo.defaultFlag}}" color="#FB562C" style="transform:scale(0.7);"></switch>
+        </view>
+    </view>
+</view>
+<view class="fixed-bottom-tools">
+    <button catchtap="setLocationId" class="g_bottomBtn">
+        <text class="n">保存</text>
+    </button>
+</view>

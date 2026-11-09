@@ -1,0 +1,71 @@
+<template name="classification">
+  <view bindtap="cancelClassify" class="mask-modal mask-modal2"></view>
+  <view class="classify-modal">
+    <view class="classify-modal-list classify-modal-list-hd"
+      >分类至（按分类展示商品，方便买家筛选）</view
+    >
+    <scroll-view scrollY style="height: 510rpx">
+      <view
+        class="classify-modal-list classify-modal-block"
+        wx:for="{{categoryGoodsList}}"
+        wx:key="index"
+      >
+        <view class="checkList">
+          <view
+            bindtap="checkBindCategory"
+            data-check="0"
+            data-value="{{item.id}}"
+            wx:if="{{item.checked==1}}"
+          >
+            <image
+              mode="aspectFit"
+              src="../../../assets/images/phone_check@2x.png"
+              style="width: 20px; height: 20px"
+            ></image>
+          </view>
+          <view
+            bindtap="checkBindCategory"
+            data-check="1"
+            data-value="{{item.id}}"
+            wx:else
+          >
+            <image
+              mode="aspectFit"
+              src="../../../assets/images/phone_uncheck@2x.png"
+              style="width: 20px; height: 20px"
+            ></image>
+          </view>
+        </view>
+        <view class="classify-modal-list-main">
+          <view>
+            <view class="title">{{item.name}}</view>
+            <view class="subtitle" wx:if="{{item.visiableFlag==1}}">
+              <view class="bg-img icon-suoyouren-gray"></view>
+              <view>所有人可见</view>
+            </view>
+            <view class="subtitle" wx:if="{{item.visiableFlag==3}}">
+              <view class="bg-img icon-zhidingyonghu-gray"></view>
+              <view>指定客户可见</view>
+            </view>
+            <view class="subtitle" wx:if="{{item.visiableFlag==2}}">
+              <view class="bg-img icon-zhidingyonghu-gray"></view>
+              <view>仅扫码可见</view>
+            </view>
+          </view>
+          <view>{{item.productCount}}件商品 ></view>
+        </view>
+      </view>
+      <view style="height: 30rpx"></view>
+    </scroll-view>
+    <view class="classify-modal-fd">
+      <view class="classify-modal-list classify-modal-list-fd-btn">
+        <view bindtap="cancelClassify" class="btn-bg-color-fill cancel"
+          >取消</view
+        >
+        <view bindtap="sureClassify" class="btn-bg-color-fill confirm"
+          >确定</view
+        >
+      </view>
+    </view>
+  </view>
+</template>

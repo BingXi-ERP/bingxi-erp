@@ -1,0 +1,50 @@
+<view class="container log-list">
+    <view class="color-code-input">
+        <view class="color-code-input-box">
+            <input bindconfirm="getColorItem" bindinput="getValue" maxlength="15" placeholder="搜索颜色名称" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{inputValue}}"></input>
+            <van-icon name="search" size="18"></van-icon>
+        </view>
+    </view>
+    <scroll-view enableBackToTop scrollWithAnimation bindscroll="scroll" scrollIntoView="{{toView}}" scrollTop="{{scrollTop}}" scrollY="true" style="height:{{scrollViewHeight}}px;white-space:nowrap;">
+        <view class="list-group" data-index="{{index}}" id="{{group.letter}}" wx:for="{{logs}}" wx:for-index="fIndex" wx:for-item="group" wx:key="index">
+            <view class="title">{{group.letter}}</view>
+            <view bindtap="checkColorName" bindtouchend="drawEnd" bindtouchmove="drawMove" bindtouchstart="drawStart" class="order-item" data-fIndex="{{fIndex}}" data-index="{{index}}" data-item="{{item}}" style="right:{{item.right}}rpx" wx:for="{{group.childer}}" wx:key="index">
+                <view class="g_limtRow content" style="width:600rpx;">{{item.colorName}}/{{item.engColorName}}</view>
+                <view catch:tap="delItem" class="remove" data-colorName="{{item.colorName}}" data-id="{{item.id}}">
+                    <van-icon color="#ffffff" name="delete-o" size="30rpx"></van-icon>
+                </view>
+            </view>
+        </view>
+        <view style="width:100%;height:1200rpx;"></view>
+    </scroll-view>
+    <view class="list-shortcut">
+        <text bindtap="scrollToview" class="{{currentIndex===index?'current':''}}" data-currentIndex="{{index}}" data-id="{{item.letter}}" wx:for="{{logs}}" wx:key="index">{{item.letter}}</text>
+    </view>
+    <view class="list-fixed {{fixedTitle==''?'hide':''}}" style="transform:translate3d(0,{{fixedTop}}px,0);" wx:if="{{currentIndex!=0}}">
+        <view class="fixed-title" style="color:#FB562C">{{fixedTitle}}</view>
+    </view>
+</view>
+<view class="fixed-bottom-tools">
+    <button catchtap="addColorNameModal" class="g_bottomBtn">新增颜色</button>
+</view>
+<van-popup round :close-on-click-overlay="true" class="tip-dialog" position="bottom" show="{{showAddColorName}}">
+    <view class="popBody">
+        <view class="headers">
+            <view catchtap="cancelAdd" class="cancel-btn">取消</view>
+            <text>自定义颜色</text>
+            <view catchtap="sureAddName" class="confirm-btn">添加</view>
+        </view>
+        <view class="content">
+            <view class="title">颜色名称<text>*</text>
+            </view>
+            <view class="inputAear">
+                <input bindinput="addColorName" cursorSpacing="50" maxlength="6" placeholder="请输入颜色的名称" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{colorName}}"></input>
+            </view>
+            <view class="title">英文颜色名称<text>*</text>
+            </view>
+            <view class="inputAear">
+                <input bindinput="addColorEngName" cursorSpacing="30" maxlength="30" placeholder="请输入颜色的英文名称(选填项)" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{engColorName}}"></input>
+            </view>
+        </view>
+    </view>
+</van-popup>

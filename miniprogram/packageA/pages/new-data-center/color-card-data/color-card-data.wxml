@@ -1,0 +1,61 @@
+<view class="contain">
+    <view class="topContent">
+        <view class="dateChoose">
+            <view class="lately-date-choose">
+                <button catchtap="choosedWeek" class="dateB buttonSpace {{confirmDate==2?'choosedBotton':''}}">近7天</button>
+                <button catchtap="choosedMonth" class="dateB {{confirmDate==3?'choosedBotton':''}}">近30天</button>
+            </view>
+            <view class="date-choose displayFlex">
+                <picker bindchange="bindStartDateChange" end="2027-09-01" mode="date" start="2015-09-01" value="{{date}}">
+                    <view class="picker data-choose">{{startDate==''?'请选择时间':startDate}}</view>
+                </picker>
+                <span class="dateRange">至</span>
+                <picker bindchange="bindEndDateChange" end="2027-09-01" mode="date" start="2015-09-01" value="{{endDate}}">
+                    <view class="picker data-choose">{{endDate==''?'请选择时间':endDate}}</view>
+                </picker>
+            </view>
+        </view>
+    </view>
+    <view class="chartContent">
+        <view class="canvas-container">
+            <ec-canvas canvasId="mychart-lineF" ec="{{ec}}" id="mychart-dom-lineF"></ec-canvas>
+        </view>
+    </view>
+    <view style="height:20rpx;background:#F5F5F9"></view>
+    <view>
+        <view class="dataList">
+            <view>
+                <image class="dataSourceLogo" src="{{icon.paihan}}"></image>
+            </view>
+            <view class="dataSource">色卡领取明细</view>
+            <view class="totalRanking">
+                <view catchtap="toRankingList">总排行榜</view>
+                <view>
+                    <image class="rankingList" mode="aspectFill" src="{{icon.rightArrow}}"></image>
+                </view>
+            </view>
+        </view>
+        <view class="list" wx:for="{{DataSourceList}}" wx:key="index">
+            <view class="list-date">{{item.date}}</view>
+            <view class="data-list " wx:for="{{item.respList}}" wx:for-index="listIndex" wx:for-item="listItem" wx:key="index">
+                <view class="orderList {{listIndex==item.respList.length-1?'noBorder':''}}">
+                    <view class="">
+                        <image class="customerInfo" src="{{replImage(listItem.goodsImgPath,globalApp,90)}}"></image>
+                    </view>
+                    <view class="orderInfo">
+                        <view class="orderMoney">
+                            <view>{{listItem.goodsName||'-'}}</view>
+                        </view>
+                        <view>{{listItem.goodsNo||''}}</view>
+                    </view>
+                    <view class="orderReceiveTimes">{{listItem.num}}份</view>
+                </view>
+            </view>
+        </view>
+        <view class="noDataComtent" wx:if="{{DataSourceList.length==0}}">
+            <view class="noDataBg" style="background-image:url(\"{{icon.noDataBg}}\")"></view>
+            <view class="noDataContent">暂无数据</view>
+        </view>
+        <view class="spaceBg" wx:if="{{DataSourceList.length>0}}"></view>
+    </view>
+</view>

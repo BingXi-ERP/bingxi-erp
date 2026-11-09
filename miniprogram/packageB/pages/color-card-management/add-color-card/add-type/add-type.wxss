@@ -1,0 +1,40 @@
+.color-fd-btn button {
+  height: 80rpx;
+  line-height: 80rpx;
+  margin-top: 15rpx;
+  width: 80%;
+}
+picker {
+  padding-right: 35rpx;
+  position: relative;
+  width: 60%;
+}
+picker,
+picker view {
+  overflow: hidden;
+  text-align: right;
+}
+picker view {
+  display: block;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+picker::after {
+  border-bottom: 1rpx solid #c3c8cb;
+  border-right: 1rpx solid #c3c8cb;
+  color: #c3c8cb;
+  content: "";
+  display: block;
+  height: 7px;
+  position: absolute;
+  right: 5rpx;
+  top: 35%;
+  transform: rotate(45deg);
+  width: 7px;
+}
+.bg-null {
+  background-color: #f8f8f8;
+  height: 20rpx;
+  width: 100%;
+}

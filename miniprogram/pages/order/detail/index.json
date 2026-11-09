@@ -1,0 +1,11 @@
+{
+  "navigationBarTitleText": "销售单详情",
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "usingComponents": {
+    "van-dialog": "../../../miniprogram_npm/@vant/weapp/dialog/index",
+    "van-toast": "../../../miniprogram_npm/@vant/weapp/toast/index",
+    "van-popup": "../../../miniprogram_npm/@vant/weapp/popup/index",
+    "van-icon": "/miniprogram_npm/@vant/weapp/icon/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

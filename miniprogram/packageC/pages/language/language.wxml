@@ -1,0 +1,14 @@
+<view class="language-code">
+    <view class="language-code-input">
+        <view class="language-code-input-box">
+            <input bindinput="inputgetName" maxlength="15" placeholder="搜索语言" placeholderStyle="color: #C0C0C0; font-size: 26rpx;"></input>
+            <van-icon name="search" size="18"></van-icon>
+        </view>
+    </view>
+    <view class="language-code-list">
+        <view class="language-code-list-item" wx:for="{{list}}" wx:key="index">
+            <text>{{item}}</text>
+            <van-icon color="#FB562C" name="success"></van-icon>
+        </view>
+    </view>
+</view>

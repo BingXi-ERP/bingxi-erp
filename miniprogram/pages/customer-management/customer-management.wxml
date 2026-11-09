@@ -1,0 +1,87 @@
+<view id="customer-index-wrapper">
+  <view class="searchArea">
+    <search-input
+      bind:confirm="search"
+      bind:getValue="getValue"
+      bind:search="search"
+      placeholder="{{input.text}}"
+      width="648"
+    ></search-input>
+  </view>
+  <view class="contain">
+    <view class="panel-block">
+      <view
+        bind:tap="toCustomDetail"
+        class="panel-part"
+        data-type="{{item.customerType}}"
+        wx:for="{{panel}}"
+        wx:key="*this"
+      >
+        <image src="{{item.img}}"></image>
+        <text>{{item.title}}</text>
+        <text class="count">{{item.count}}</text>
+      </view>
+    </view>
+    <view class="allCustomer">
+      <view class="customerTitle fr-between-center">
+        <view class="left">全部客户总数: {{customerTotal}}</view>
+        <view bindtap="changeAsc" class="dult fr-between-center">
+          <text>欠款</text>
+          <view class="toSort">
+            <image
+              src="{{icon.up}}"
+              wx:if="{{searchParams.sort==='asc'}}"
+            ></image>
+            <image
+              src="{{icon.down}}"
+              wx:if="{{searchParams.sort==='desc'}}"
+            ></image>
+          </view>
+        </view>
+      </view>
+      <view
+        bind:tap="handleClickCustom"
+        class="customerContent fr-between-center"
+        data-fullname="{{item.fullname}}"
+        data-id="{{item.id}}"
+        data-mobile="{{item.mobile}}"
+        wx:for="{{customerList}}"
+        wx:key="{{item.id}}"
+      >
+        <view class="headImg">
+          <image
+            class=""
+            src="{{item.headImg}}?imageView2/2/2/200"
+            wx:if="{{item.headImg}}"
+          ></image>
+        </view>
+        <view class="customerInfo fr-between-center">
+          <view class="q">
+            <view class="customerName g_limtRow"
+              >{{item.customerName||''}}</view
+            >
+            <view class="infoDetail g_limtRow"
+              >{{item.customerCompany||''}}</view
+            >
+          </view>
+          <view class="arrearage g_limtRow" wx:if="{{item.unsettledAmount>0}}"
+            >欠款：{{item.unsettledAmount<0?'-￥'+-item.unsettledAmount:'￥'+item.unsettledAmount}}</view
+          >
+        </view>
+      </view>
+      <view class="moreIcon" wx:if="{{!isDone&&customerList.length}}"
+        >上拉更多</view
+      >
+      <view class="moreIcon" wx:if="{{isDone&&customerList.length}}"
+        >这是底线</view
+      >
+    </view>
+    <view class="add-btn-wrapper" wx:if="{{userAuthList['crm:saveCustomer']}}">
+      <image
+        bindtap="toAddCustomer"
+        mode="aspectFill"
+        src="{{icon.addIcon}}"
+      ></image>
+    </view>
+  </view>
+</view>

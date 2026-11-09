@@ -1,0 +1,60 @@
+page {
+  background-color: #f8f8f8;
+}
+.bind-phone {
+  width: 100%;
+}
+.bind-phone-lists {
+  background-color: #fff;
+  font-size: 32rpx;
+  width: 100%;
+}
+.bind-phone-list {
+  border-bottom: 1rpx solid #f9f9f9;
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: wrap;
+  height: 100rpx;
+  justify-content: left;
+  line-height: 100rpx;
+  margin: auto;
+  width: 90%;
+}
+.bind-phone-list span {
+  width: 60px;
+}
+.bind-phone-list input {
+  height: 100rpx;
+  line-height: 100rpx;
+  padding: 0;
+  width: 300rpx;
+}
+.bind-phone-list button {
+  background-color: #fff;
+  color: #489cf8;
+  display: inline-block;
+  font-size: 30rpx;
+  height: 100rpx;
+  line-height: 100rpx;
+  margin: 0;
+  padding: 0;
+  text-align: right;
+  width: 30%;
+}
+.bind-phone-list button[disabled] {
+  background-color: #fff;
+}
+.fd-btns {
+  margin: 7%auto auto;
+  width: 88%;
+}
+.fd-btns button {
+  background: #1bac19;
+  border: 1rpx solid #179c15;
+  color: #fff;
+}
+.heights {
+  background-color: #f8f8f8;
+  height: 20rpx;
+  width: 100%;
+}

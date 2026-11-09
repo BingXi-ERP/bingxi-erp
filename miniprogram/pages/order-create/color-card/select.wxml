@@ -1,0 +1,45 @@
+<view class="order-select-color-card">
+    <view class="search-color-input">
+        <view class="search-color-input-box">
+            <input bind:confirm="handleConfirm" bind:search="handleConfirm" bindinput="getValue" maxlength="15" placeholder="搜索品名、色卡编号" placeholderStyle="color: #C0C0C0; font-size: 26rpx;"></input>
+            <van-icon bind:tap="handleConfirm" name="search" size="18"></van-icon>
+        </view>
+    </view>
+    <view class="out-wrap">
+        <view bind:tap="handleAll" class="all  {{curIndex==-1?'active':''}}">全部分类</view>
+        <view class="right-box">
+            <view bind:tap="handleType" class="single {{curIndex==index?'active':''}}" data-id="{{item.id}}" data-index="{{index}}" wx:for="{{titleType}}" wx:key="index">{{item.name}}</view>
+        </view>
+    </view>
+    <view class="list-empty-wrapper" wx:if="{{result.length===0}}">
+        <image class="noaddress" src="{{noDataBg}}"></image>
+        <view class="empty-text">暂无商品信息～</view>
+    </view>
+    <view class="color-cards {{checkedId?'color-cards-checked':''}}" wx:if="{{result.length>0}}">
+        <view bind:tap="handleSelect" class="card-item {{item.id===checkedId?'card-item-checked':''}} {{item.isAdded?'card-item-added':''}}" data-added="{{item.isAdded}}" data-id="{{item.id}}" wx:for="{{result}}" wx:key="id">
+            <view class="card-item-image">
+                <image mode="aspectFill" src="{{replImage(item.mainImgPath,app,288)}}"></image>
+            </view>
+            <view class="card-item-content">
+                <view class="card-item-title g_limtRow">{{item.businessProductName}} {{item.spuNumber||''}}</view>
+                <view class="card-item-extra">
+                    <view class="card-item-meda-left">{{item.viewCount}}人浏览</view>
+                    <view class="card-item-meda-right">{{item.favoriteCount}}人收藏</view>
+                </view>
+                <view class="card-item-meda">
+                    <block wx:if="{{item.price&&item.price!='0.0'}}">
+                        <text class="currency">￥</text>
+                        <text class="money">{{item.price}}</text>
+                        <text class="unit">元/{{item.priceUnit}}</text>
+                    </block>
+                    <text class="m" wx:else>面议</text>
+                </view>
+            </view>
+        </view>
+        <text class="list-status" wx:if="{{isLast}}">没有更多内容了～</text>
+    </view>
+    <view class="fixed-bottom-tools">
+        <button catchtap="add" class="g_bottomBtn">新增商品</button>
+    </view>
+</view>
+<van-toast id="van-toast"></van-toast>

@@ -1,0 +1,480 @@
+#van-dialog {
+  position: relative;
+  z-index: 100002;
+}
+.steps {
+  display: -webkit-flex;
+  display: flex;
+  font-size: 24rpx;
+  padding: 45rpx;
+}
+.steps > view {
+  flex-basis: 33.333%;
+  flex-shrink: 1;
+  margin-right: 0;
+  text-align: center;
+}
+.steps .pointer,
+.steps > view {
+  display: inline-block;
+  position: relative;
+}
+.steps .pointer {
+  background: #b4ccff;
+  border: 6rpx solid #e7eeff;
+  border-radius: 28rpx;
+  height: 20rpx;
+  width: 20rpx;
+  z-index: 1;
+}
+.steps .step-line {
+  background-color: #d0dbff;
+  border-color: inherit;
+  height: 4rpx;
+  left: 50%;
+  position: absolute;
+  right: -50%;
+  top: 13rpx;
+}
+.steps .cur-step-line {
+  background: #5c84ff;
+}
+.steps .half-step-line {
+  background: linear-gradient(90deg, #5c84ff, #b4ccff);
+}
+.steps .step-main {
+  margin-top: 20rpx;
+  opacity: 0.5;
+}
+.steps .current .pointer {
+  background: #2f7bfd;
+  border: 6rpx solid #b5d0ff;
+}
+.steps .current .step-main {
+  opacity: 1;
+}
+.order-create {
+  font-size: 28rpx;
+  padding-bottom: 160rpx;
+  padding-top: 65rpx;
+}
+.place-holder {
+  color: #ccc;
+}
+.place-holder-right {
+  text-align: right;
+}
+.order-create .unit {
+  margin-left: 10rpx;
+}
+.order-create .button {
+  background: #f2f5ff;
+  border: 2rpx solid #2f7bfd;
+  border-radius: 4rpx;
+  color: #2f7bfd;
+  display: inline-block;
+  height: 60rpx;
+  line-height: 60rpx;
+  padding: 0 20rpx;
+  position: relative;
+}
+.order-create .totle-name {
+  color: #999;
+  font-size: 24rpx;
+  font-weight: 400;
+}
+.order-create .totle-content {
+  color: #e2525a;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+.order-create .totle-content:first-child {
+  font-size: 22rpx;
+}
+.order-create .strong {
+  color: #000;
+  opacity: 1;
+}
+.customerName {
+  max-width: 400rpx;
+}
+.order-create .post-image {
+  height: 200rpx;
+  position: relative;
+  width: 200rpx;
+}
+.order-create .post-image image {
+  height: 100%;
+  width: 100%;
+}
+.order-create .post-image .post-btn-edit {
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.3);
+  bottom: 0;
+  color: #fff;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 20rpx;
+  justify-content: center;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.order-create .post-image .post-btn-edit image {
+  height: 37rpx;
+  width: 37rpx;
+}
+.order-create .hl {
+  color: #373c55;
+  font-size: 28rpx;
+  font-weight: 400;
+}
+.order-create .buttom-toggle {
+  display: inline-block;
+  margin-left: 15rpx;
+}
+.order-create .buttom-toggle .arrow {
+  position: relative;
+  top: 3rpx;
+}
+.order-create .button-edit {
+  height: 32rpx;
+  position: absolute;
+  right: 90rpx;
+  top: 0;
+  width: 32rpx;
+}
+.order-create .button-del {
+  height: 32rpx;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 32rpx;
+}
+.order-create .flex-direction-column {
+  align-items: flex-start;
+  display: block;
+  flex-direction: column;
+  width: 100%;
+}
+.product-cell {
+  margin: 0 30rpx;
+  padding: 30rpx 0;
+}
+.pdoduct-add-cell {
+  border-top: 1rpx solid #ddd;
+  padding: 30rpx;
+}
+.order-create .product-detail {
+  background: #f6f9fd;
+  box-sizing: border-box;
+  flex: 1;
+  margin-top: 28rpx;
+  width: 100%;
+}
+.order-create .product-detail-title {
+  color: #000;
+  display: inline-block;
+  font-size: 28rpx;
+  font-weight: 600;
+  height: 40rpx;
+  line-height: 40rpx;
+  margin: 30rpx;
+}
+.order-create .product-detail-tab {
+  margin-left: 30rpx;
+  margin-right: 30rpx;
+}
+.order-create .product-detail-tab .badge {
+  margin-bottom: 30rpx;
+  margin-right: 30rpx;
+}
+.order-create .divider-wapper {
+  margin-left: 30rpx;
+  margin-right: 30rpx;
+}
+.order-create .buttom-toggle-right {
+  box-sizing: border-box;
+  flex: 1;
+  margin-top: 28rpx;
+  padding-right: 30rpx;
+  text-align: right;
+  width: 100%;
+}
+.order-info .panel-title {
+  border-bottom: 1rpx solid #ddd;
+  padding-bottom: 38rpx;
+}
+.order-info-item {
+  color: #666;
+  font-size: 24rpx;
+  padding: 15rpx 0;
+}
+.declaration-item {
+  background: #f8f9fc;
+  padding: 15rpx 0;
+}
+.declaration-item:not(:last-child) {
+  margin-bottom: 20rpx;
+}
+.declaration-item .cell {
+  border-bottom: none;
+  padding: 15rpx 30rpx;
+}
+.declaration-item .cell-title {
+  color: #999;
+  flex: none;
+  margin-right: 10rpx;
+}
+.declaration-item .cell-value {
+  color: #333;
+  flex: 1;
+  position: relative;
+}
+.declaration-item .cell-value .extra {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.declaration-item .table {
+  padding: 15rpx 0;
+}
+.declaration-item .hr-line {
+  box-sizing: border-box;
+  margin-top: 20rpx;
+  padding: 0 30rpx;
+  width: 100%;
+}
+.declaration-item .hr-line-inner {
+  border-bottom: 1rpx solid #ddd;
+  box-sizing: border-box;
+  width: 100%;
+}
+.declaration-item .strong {
+  color: #e2525a;
+  margin-left: 20rpx;
+}
+.toolbar-button-group-right {
+  background: #fff;
+  font-size: 0;
+  height: 90rpx;
+}
+.order-create .cell-remarks {
+  align-items: flex-start;
+}
+.order-create .remarks-input {
+  background: #fff;
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.2;
+  padding: 0;
+  width: 480rpx;
+}
+.order-create .placeholder-text {
+  color: #ccc;
+  text-align: right;
+}
+.cost-cell .cell-title {
+  flex: none;
+}
+.cost-cell .cell-value {
+  flex: 1;
+}
+.cost-cell .cell-value input {
+  box-sizing: border-box;
+  width: 100%;
+}
+.form-btn {
+  background: rgba(0, 155, 0, 0);
+  border-radius: 0;
+  height: 100%;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+.table .tr > text,
+.table .tr > view {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  text-align: center;
+}
+.table .tr:nth-child(even) {
+  background: #edf3fc;
+}
+.tr .strong {
+  color: #ed5c5c;
+  font-size: 14px;
+  font-weight: 500;
+}
+.table .tr .totle {
+  flex: inherit;
+  width: 180rpx;
+}
+.table .tr text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 150rpx;
+}
+.radio-group {
+  width: 260rpx;
+}
+.checkBtn {
+  border: 1rpx solid #c7c8d8;
+  border-radius: 32rpx;
+  box-sizing: border-box;
+  color: #373c55;
+  font-size: 28rpx;
+  font-weight: 400;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  width: 112rpx;
+}
+.chooseBtn {
+  background: #4471e7;
+  border: 0;
+  color: #fff;
+}
+.cellItem {
+  height: 96rpx;
+  padding: 0 30rpx;
+}
+.cellItem .title {
+  align-items: center;
+  color: #fb562c;
+  display: -webkit-flex;
+  display: flex;
+  position: relative;
+}
+.cellItem .title text {
+  margin-right: 6rpx;
+}
+.cellItem .title image {
+  height: 40rpx;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 40rpx;
+}
+.marBottom65 {
+  margin-bottom: 65rpx;
+}
+.grayInfo {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 20rpx;
+  font-weight: 400;
+  left: 30rpx;
+  position: absolute;
+  top: -40rpx;
+}
+.customsForm {
+  background: #fff;
+  padding: 0 32rpx;
+}
+.customsForm .title {
+  color: #373c55;
+  font-family: PingFangSC-Medium;
+  font-size: 15px;
+  font-weight: 500;
+  height: 96rpx;
+  line-height: 96rpx;
+  position: relative;
+}
+.customsForm .title::after {
+  border-bottom: 1rpx solid #f1f1f1;
+  bottom: 0;
+  content: "";
+  height: 1rpx;
+  left: 0;
+  position: absolute;
+  width: 100vw;
+}
+.customsForm .content {
+  height: 264rpx;
+}
+.customsForm .image image {
+  height: 200rpx;
+  width: 200rpx;
+}
+.reAddBtn {
+  background: #fff;
+  border: 1rpx solid #ff5050;
+  border-radius: 32rpx;
+  color: #ff5050;
+  margin-right: 32rpx;
+  width: 128rpx;
+}
+.addBtn,
+.reAddBtn {
+  font-family: PingFangSC-Medium;
+  font-size: 14px;
+  font-weight: 500;
+  height: 64rpx;
+  line-height: 64rpx;
+  margin-left: 0;
+  padding-left: 0;
+  padding-right: 0;
+  text-align: center;
+}
+.addBtn {
+  background: #e8f1ff;
+  border-radius: 32rpx;
+  color: #5c84ff;
+  width: 192rpx;
+}
+.addBtn image {
+  height: 20rpx;
+  width: 20rpx;
+}
+.reChoose {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+}
+.midlle {
+  flex: auto;
+  padding-left: 32rpx;
+  position: relative;
+}
+.colorBtn {
+  margin-top: 90rpx;
+}
+.midlle .colorInfo {
+  width: 250rpx;
+}
+.delIcon {
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.delIcon image {
+  height: 40rpx;
+  width: 40rpx;
+}
+.post-extra {
+  margin-top: 125rpx;
+}
+.post-title {
+  width: 40vw;
+}
+.post-content {
+  flex: 1;
+}
+.imgTitle {
+  padding: 30rpx 30rpx 10rpx;
+}
+.uploadText {
+  padding-bottom: 30rpx;
+  padding-left: 30rpx;
+}
+.marR {
+  margin-right: 16rpx;
+}

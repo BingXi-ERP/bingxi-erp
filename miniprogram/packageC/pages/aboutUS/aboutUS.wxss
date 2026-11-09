@@ -1,0 +1,35 @@
+page {
+  background-color: #eff0f7;
+  padding-top: 40rpx;
+}
+.about-us {
+  background-color: #fff;
+  border-radius: 20rpx;
+  margin-left: 34rpx;
+  padding-bottom: 24rpx;
+  text-align: center;
+  width: calc(100vw - 68rpx);
+}
+.about-us image {
+  height: 106rpx;
+  margin-top: 80rpx;
+  width: 106rpx;
+}
+.version {
+  color: #5d5d5d;
+  font-size: 26rpx;
+  margin-top: 28rpx;
+}
+.about-item {
+  border-bottom: 2rpx solid #f4f4f4;
+  color: #0b0b0b;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 26rpx;
+  justify-content: space-between;
+  margin: 0 52rpx;
+  padding: 28rpx 0;
+}
+.about-item:last-child {
+  border-bottom: none;
+}

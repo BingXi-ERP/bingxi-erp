@@ -1,0 +1,71 @@
+<view class="salesReturnList">
+  <view class="noList" wx:if="{{salesReturnList.length===0}}">
+    <view class="noImg" style="background-image:url('{{icon.noImg}}')"></view>
+    <view class="text">暂无数据</view>
+  </view>
+  <view class="listContent" wx:else>
+    <view class="selectBillContent list-wrapper">
+      <view wx:for="{{salesReturnList}}" wx:for-index="idx" wx:key="{{idx}}">
+        <view class="list">
+          <view bind:tap="toDetail" class="list-item" data-id="{{item.id}}">
+            <image
+              class="cancelIcon"
+              src="{{icon.cancelIcon}}"
+              wx:if="{{item.billingStatus==-20}}"
+            ></image>
+            <view class="{{item.billingStatus==-20?'cancelOrder':''}}">
+              <view class="fr-between-center orderId">
+                <view class="f14 g_limtRow listId">{{item.billingNo}}</view>
+                <view class="order-status order-status-hl">
+                  <text class="order-create-at">
+                    {{formatDateTime(item.billingDate,true)}}
+                  </text>
+                </view>
+              </view>
+              <view class="order-info">
+                <view class="fl order-create-by">
+                  <image
+                    mode="aspectFill"
+                    src="{{addDefaultAvatar(item.customerHeadImg,initImgApp)+'?imageView2/2/w/200'}}"
+                  ></image>
+                  <view class="g_limtRow f14 userName">{{item.fullname}}</view>
+                </view>
+              </view>
+              <view class="order-product">
+                <view
+                  class="product"
+                  wx:for="{{item.refundGoodsDetailModels}}"
+                  wx:key="index"
+                >
+                  <image
+                    class="product-image"
+                    mode="aspectFill"
+                    src="{{replImage(item.goodsImgPath,initImgApp,180)}}"
+                  ></image>
+                  <view class="product-content">
+                    <view class="f14 product-title g_limtRow"
+                      >{{item.goodsName}} {{item.goodsNo||''}}</view
+                    >
+                    <view class="product-total">{{item.goodsSummaryInfo}}</view>
+                  </view>
+                </view>
+              </view>
+              <view class="order-total">
+                <view class="total-before">共：{{item.colorCount}}种颜色</view>
+                <view
+                  >合计退货：<text class="strong"
+                    >{{toFixNum(item.orderAmount,2,true,true)}}</text
+                  >
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+      <view class="more">
+        <view class="moreIcon" wx:if="{{!isAll}}">上拉更多</view>
+        <view class="moreIcon" wx:if="{{isAll}}">已经到底了</view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,8 @@
+<view class="postSchedule">
+  <van-steps
+    active="{{steps.length}}"
+    activeColor="#2D74EE "
+    direction="vertical"
+    steps="{{steps}}"
+  ></van-steps>
+</view>

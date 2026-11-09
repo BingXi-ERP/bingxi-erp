@@ -1,0 +1,43 @@
+page {
+  background: #eff0f7;
+  padding-top: 40rpx;
+}
+.cell-value {
+  background: #fff;
+  border-radius: 20rpx;
+  height: 314rpx;
+  margin-left: 34rpx;
+  position: relative;
+  width: calc(100vw - 68rpx);
+}
+.cell-remarks {
+  align-items: flex-start;
+}
+textarea.remarks-input {
+  color: #333;
+  display: block;
+  font-size: 26rpx;
+  height: 268rpx !important;
+  line-height: 1.2;
+  padding: 32rpx;
+  width: 100%;
+}
+.placeholder-text {
+  color: #999bb4;
+  text-align: right;
+}
+.save-btn {
+  background: linear-gradient(90deg, #7ab5ff, #336af8);
+  border-radius: 48rpx;
+  box-shadow: 0 12rpx 24rpx -2px rgba(120, 169, 255, 0.5);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 500;
+}
+.numLimit {
+  bottom: 40rpx;
+  color: #999;
+  font-size: 24rpx;
+  position: absolute;
+  right: 40rpx;
+}

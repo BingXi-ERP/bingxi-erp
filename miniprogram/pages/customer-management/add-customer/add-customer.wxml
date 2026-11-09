@@ -1,0 +1,57 @@
+<view class="section">
+    <view class="flex-wrp">
+        <view class="flex-item-top">姓名<text>*</text>
+        </view>
+        <view class="flex-item-bottom">
+            <input bindinput="inputgetName" data-name="customerInfo.customerName" maxlength="15" placeholder="请输入客户的姓名" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{customerInfo.customerName}}"></input>
+        </view>
+    </view>
+    <view class="flex-wrp">
+        <view class="flex-item-top">电话</view>
+        <view class="flex-item-bottom">
+            <input bindinput="inputgetName" data-name="customerInfo.customerPhone" maxlength="11" placeholder="请输入客户的电话" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{customerInfo.customerPhone}}"></input>
+        </view>
+    </view>
+    <view class="flex-wrp">
+        <view class="flex-item-top">公司</view>
+        <view class="flex-item-bottom">
+            <input bindinput="inputgetName" data-name="customerInfo.customerCompany" maxlength="15" placeholder="请输入客户的公司名称" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{customerInfo.customerCompany}}"></input>
+        </view>
+    </view>
+    <view class="flex-wrp">
+        <view class="flex-item-top">地区</view>
+        <view class="flex-item-bottom">
+            <picker bindchange="bindRegionChange" customItem="{{customItem}}" mode="region" value="{{region}}">
+                <view class="region-picker">
+                    <view class="area-text-msg" wx:if="{{!region||region.length===0}}">请选择客户所在的省市区</view>
+                    <view class="area-text" wx:else>{{region[0]}} {{region[1]}} {{region[2]}}</view>
+                    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </picker>
+        </view>
+        <view class="bg-img icon" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+    </view>
+    <view class="flex-wrp">
+        <view class="flex-item-top">地址</view>
+        <view class="flex-item-bottom">
+            <input bindinput="inputgetName" class="input-address" data-name="customerInfo.addr" maxlength="30" name="deliveryName" placeholder="请输入客户的详细地址" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{customerInfo.addr}}"></input>
+        </view>
+    </view>
+    <view class="flex-wrp">
+        <view class="flex-item-top">备注</view>
+        <view class="flex-item-bottom">
+            <input bindinput="inputgetName" class="explain-text" data-name="customerInfo.remark" maxlength="32" placeholder="请输入备注信息" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{customerInfo.remark}}"></input>
+        </view>
+        <view class="bg-img icon" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+    </view>
+    <view class="flex-wrp">
+        <view class="flex-item-topt">停用客户</view>
+        <view class="flex-item-bottomt">停用后，用户将无法查看店铺</view>
+        <view class="flex-item-right">
+            <switch bindchange="switch1Change" checked="{{customerInfo.status}}" color="#FB562C" style="transform:scale(0.7);"></switch>
+        </view>
+    </view>
+</view>
+<view class="fixed-bottom-tools">
+    <button bindtap="setLocationId" class="g_bottomBtn">保存</button>
+</view>

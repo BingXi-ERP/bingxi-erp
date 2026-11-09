@@ -1,0 +1,122 @@
+page {
+  background-color: #eff0f7;
+  padding-top: 40rpx;
+}
+.b-box {
+  background-color: #fff;
+  border-radius: 20rpx;
+  margin-left: 34rpx;
+  width: calc(100vw - 68rpx);
+}
+.b-box-child {
+  border-bottom: 2rpx solid #f4f4f4;
+  margin: 0 28rpx;
+  padding: 28rpx 0;
+}
+.b-box-child:last-child {
+  border-bottom: none;
+}
+.b-box-child .title {
+  color: #5d5d5d;
+  font-size: 26rpx;
+}
+.picker {
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20rpx;
+}
+.picker .nochoose {
+  color: silver;
+  font-size: 26rpx;
+}
+.picker .choose {
+  color: #0b0b0b;
+  font-size: 26rpx;
+}
+.b-box-child input {
+  font-size: 26rpx;
+  margin-top: 20rpx;
+  width: 100%;
+}
+.bankCardnormal {
+  margin-bottom: 20rpx;
+  padding-left: 24rpx;
+  padding-right: 24rpx;
+}
+.account {
+  border-bottom: 1rpx solid #ddd;
+  font-size: 28rpx;
+  height: 108rpx;
+  line-height: 108rpx;
+}
+.account .title {
+  color: #333;
+  float: left;
+}
+.account .content {
+  float: right;
+}
+.account .content input {
+  height: 100rpx;
+  line-height: 108rpx;
+  text-align: right;
+}
+.addRecord {
+  color: #0b0b0b;
+  font-size: 26rpx;
+  margin-left: 10rpx;
+}
+.bankCard > view:nth-of-type(1) {
+  float: left;
+  line-height: 210rpx;
+}
+.bankCard > view:nth-of-type(2) {
+  background-size: 100%;
+  border-radius: 20rpx;
+  float: right;
+  height: 210rpx;
+  width: 600rpx;
+}
+.bankCard > view:nth-of-type(2) > view:nth-of-type(1) {
+  border-bottom: 1rpx solid #fff;
+  height: 25rpx;
+  margin: 30rpx 38rpx 0rpx;
+  padding-bottom: 38rpx;
+}
+.bankCard > view:nth-of-type(2) > view:nth-of-type(2) {
+  margin: 30rpx 38rpx 0rpx;
+}
+.bankCard > view:nth-of-type(2) > view:nth-of-type(1) > view:nth-of-type(1),
+.bankCard > view:nth-of-type(2) > view:nth-of-type(2) > view:nth-of-type(1) {
+  color: #fff;
+  float: left;
+  font-size: 16px;
+}
+.bankCard > view:nth-of-type(2) > view:nth-of-type(1) > view:nth-of-type(2),
+.bankCard > view:nth-of-type(2) > view:nth-of-type(2) > view:nth-of-type(2) {
+  color: #fff;
+  float: right;
+  font-size: 14px;
+}
+.accountNum {
+  font-size: 14px;
+  text-align: right;
+}
+.bottom-up {
+  height: 200rpx;
+  width: 100%;
+}
+.add-btn-icon {
+  height: 38rpx;
+  margin-right: 16rpx;
+  width: 38rpx;
+}
+.btn-big {
+  bottom: 20rpx;
+  left: 0;
+  margin-left: auto;
+  margin-right: auto;
+  position: fixed;
+  right: 0;
+}

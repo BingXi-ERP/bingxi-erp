@@ -1,0 +1,195 @@
+page {
+  background-color: #eff0f7;
+}
+.containerr {
+  color: #333335;
+  font-size: 30rpx;
+  margin-top: 40rpx;
+  padding-bottom: 200rpx;
+  width: 100%;
+}
+.d-text {
+  font-size: 26rpx;
+  padding: 86rpx 20rpx;
+}
+.d-text,
+.list-empty-wrapper {
+  text-align: center;
+}
+.addressItem {
+  background: #fff;
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  margin-bottom: 24rpx;
+  margin-left: 34rpx;
+  padding: 28rpx;
+  width: calc(100vw - 68rpx);
+}
+.btn-bg-color {
+  background: linear-gradient(90deg, #7ab5ff, #336af8);
+  border-radius: 48rpx;
+  box-shadow: 0rpx 12rpx 24rpx -4rpx rgba(120, 169, 255, 0.5);
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 600;
+  height: 92rpx;
+  width: 690rpx;
+}
+.defaultChoosed {
+  background: #fff0ec;
+  border-radius: 16rpx;
+  color: #fb562c;
+  font-size: 22rpx;
+  height: 35rpx;
+  line-height: 32rpx;
+  margin-top: 6rpx;
+  text-align: center;
+  width: 84rpx;
+}
+.itemSpace {
+  margin-left: 28rpx;
+}
+.address-group-btns {
+  display: -webkit-flex;
+  display: flex;
+}
+.address-delete,
+.address-edit {
+  align-items: center;
+  border: 2rpx solid #ffe6df;
+  border-radius: 36rpx;
+  color: #fb562c;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 26rpx;
+  height: 64rpx;
+  justify-content: center;
+  width: 122rpx;
+}
+.address-edit {
+  margin-left: 28rpx;
+}
+.address-wrapper {
+  border: 1rpx solid #fff;
+  padding: 30rpx;
+}
+.address-title {
+  color: #373c55;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+.address-content {
+  color: #0b0b0b;
+  font-size: 26rpx;
+  overflow: hidden;
+  padding: 20rpx 0;
+}
+.address-footer {
+  justify-content: space-between;
+  padding-top: 8rpx;
+}
+.address-checked,
+.address-footer {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.address-checked text {
+  color: #5d5d5d;
+  font-size: 22rpx;
+  margin-left: 10rpx;
+}
+.operate-icon {
+  height: 50rpx;
+  margin-right: 10rpx;
+  width: 50rpx;
+}
+.active-default {
+  border-color: #e94709;
+}
+.submit-wrap {
+  margin: 30rpx 50rpx 20rpx;
+}
+.submit-btn {
+  background-color: #ffcd00;
+}
+.fd-btn {
+  background: #fff;
+  height: 128rpx;
+}
+.fd-btn button {
+  margin-top: 20rpx;
+  width: 690rpx;
+}
+.noaddress {
+  height: 174rpx;
+  margin-top: 300rpx;
+  width: 182rpx;
+}
+.empty-text {
+  color: #999;
+  font-size: 24rpx;
+  margin-top: 28rpx;
+  text-align: center;
+}
+.deleteMask {
+  background: rgba(0, 0, 0, 0.5);
+  height: 100%;
+  left: 0;
+  position: fixed;
+  top: 0;
+  width: 100%;
+}
+.deleteContain {
+  background: #fff;
+  border-radius: 2rpx;
+  height: 620rpx;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 160rpx;
+  padding-top: 1rpx;
+  width: 600rpx;
+}
+.deleteImg {
+  display: block;
+  height: 230rpx;
+  width: 210rpx;
+}
+.deleteImg,
+.deleteInfo {
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 78rpx;
+}
+.deleteInfo {
+  color: #191919;
+  font-size: 34rpx;
+  font-weight: 600;
+  font-weight: 500;
+  text-align: center;
+  width: 354rpx;
+}
+.deleteButtom {
+  display: -webkit-flex;
+  display: flex;
+  margin-top: 78rpx;
+}
+.cancel {
+  border-right: 1rpx solid #ddd;
+}
+.cancel,
+.confirmDelete {
+  font-size: 32rpx;
+  text-align: center;
+  width: 300rpx;
+}
+.confirmDelete {
+  color: #999;
+}
+.defaultAddress {
+  color: #ff3e00;
+  font-size: 24rpx;
+  line-height: 64rpx;
+}

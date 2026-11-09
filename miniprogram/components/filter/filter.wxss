@@ -1,0 +1,29 @@
+.filter-wrapper {
+  font-size: 28rpx;
+}
+.filter-wrapper .item {
+  float: left;
+  margin-right: 70rpx;
+}
+.item .value {
+  border-bottom: 4rpx solid #fff;
+  color: #343434;
+  display: inline-block;
+  height: 50rpx;
+  line-height: 50rpx;
+  padding-bottom: 8rpx;
+  text-align: center;
+  width: 100rpx;
+}
+.img-wrapper {
+  display: inline-block;
+  margin: 0 0 10rpx 30rpx;
+}
+.filter-wrapper image {
+  height: 20rpx;
+  width: 20rpx;
+}
+.active {
+  border-bottom: 4rpx solid #2f7bfd !important;
+  color: #2f7bfd !important;
+}

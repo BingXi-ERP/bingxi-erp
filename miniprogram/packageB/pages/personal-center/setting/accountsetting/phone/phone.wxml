@@ -1,0 +1,12 @@
+<view class="phone">
+  <block wx:if="{{mobile}}">
+    <view class="number-bind">已绑定手机号：{{mobile}}</view>
+    <view bindtap="toChangePhone" class="btn-active" id="0">更换手机号</view>
+  </block>
+  <block wx:else>
+    <view class="number-bind">你当前还未绑定任何手机</view>
+    <button bindtap="toChangePhone" class="btn-active" id="1">
+      绑定手机号
+    </button>
+  </block>
+</view>

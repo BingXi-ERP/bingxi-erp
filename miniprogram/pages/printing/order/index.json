@@ -1,0 +1,15 @@
+{
+  "navigationBarTitleText": "打印订单",
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "usingComponents": {
+    "van-toast": "../../../miniprogram_npm/@vant/weapp/toast/index",
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-radio": "/miniprogram_npm/@vant/weapp/radio/index",
+    "van-radio-group": "/miniprogram_npm/@vant/weapp/radio-group/index",
+    "van-cell": "/miniprogram_npm/@vant/weapp/cell/index",
+    "van-cell-group": "/miniprogram_npm/@vant/weapp/cell-group/index",
+    "van-picker": "/miniprogram_npm/@vant/weapp/picker/index",
+    "van-icon": "/miniprogram_npm/@vant/weapp/icon/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

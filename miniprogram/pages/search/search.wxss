@@ -1,0 +1,140 @@
+page {
+  background-color: #f5f5f9;
+}
+.searchPage {
+  padding-bottom: 100rpx;
+}
+.serch-wrapper {
+  left: 0;
+  padding: 10rpx 0 12rpx;
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 100%;
+  z-index: 999;
+}
+.color-card-list {
+  padding-top: 100rpx;
+}
+.cargoPass-list,
+.customer-list {
+  height: 100%;
+  margin-top: 20rpx;
+}
+.item-wrapper {
+  height: 100%;
+  width: 100%;
+}
+.no-data {
+  background-color: #f5f5f9;
+  padding-top: 150rpx;
+}
+.no-data .icon {
+  height: 250rpx;
+  margin-bottom: 80rpx;
+  width: 300rpx;
+}
+.history-wrapper {
+  background-color: #fff;
+  padding: 50rpx 0 0;
+  width: 100%;
+}
+.history-wrapper .title {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+.history-wrapper .title .text {
+  color: 333;
+  font-size: 32rpx;
+  padding-left: 30rpx;
+}
+.history-wrapper .title .text .tip {
+  color: #666;
+  font-size: 26rpx;
+}
+.history-wrapper .title .icon {
+  height: 36rpx;
+  margin-right: 50rpx;
+  width: 28rpx;
+}
+.history-wrapper .history {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin: 30rpx auto;
+  width: 90%;
+}
+.history-wrapper .history .item {
+  background-color: #f5f5f9;
+  border-radius: 52rpx;
+  color: #666;
+  font-size: 28rpx;
+  margin: 0 30rpx 30rpx 0;
+  padding: 8rpx 20rpx;
+}
+.history-wrapper .searchRange .item {
+  border-radius: 6px;
+}
+.history-wrapper .searchRange .item.active {
+  background: #4177f5;
+  color: #fff;
+}
+.canvas-popup-wrapper {
+  background-color: transparent !important;
+}
+.share-monents-notice-wrapper {
+  color: #fff;
+  font-size: 26rpx;
+  margin-top: 20rpx;
+  text-align: center;
+}
+.save-share-btn {
+  background-color: #2f7bfd;
+  border-radius: 10rpx;
+  color: #fff;
+  height: 68rpx;
+  line-height: 68rpx;
+  margin: 20rpx 0;
+  text-align: center;
+  width: 250px;
+}
+.btn_panel {
+  justify-content: space-around;
+  width: 100%;
+}
+.btn_panel,
+.btn_panel .c_btn {
+  display: -webkit-flex;
+  display: flex;
+}
+.btn_panel .c_btn {
+  align-items: center;
+  background-color: #fff;
+  border-radius: 100rpx;
+  color: #4177f5;
+  margin: 20rpx 0;
+  padding: 20rpx 40rpx;
+}
+.btn_panel .c_btn image {
+  margin-right: 10rpx;
+}
+.hideCanvas {
+  display: none;
+  height: 0;
+  overflow: hidden;
+  width: 0;
+}
+.showBigCanvas {
+  left: -1500rpx;
+  opacity: 0;
+  position: absolute;
+  top: -2700rpx;
+}
+.hideBigCanvas {
+  display: none;
+}

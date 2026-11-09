@@ -1,0 +1,12 @@
+{
+  "navigationBarBackgroundColor": "#2d74ee",
+  "navigationBarTextStyle": "white",
+  "navigationBarTitleText": "客户列表",
+  "backgroundColor": "#eeeeee",
+  "backgroundTextStyle": "light",
+  "usingComponents": {
+    "filter": "/components/filter/filter",
+    "customer-list-block": "/components/customer-list-block/customer-list-block",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

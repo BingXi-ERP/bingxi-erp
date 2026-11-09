@@ -1,0 +1,36 @@
+<view class="color-ys-bg"></view>
+<view class="child-lists">
+    <view class="child-list">
+        <view class="child-list-bd flex-layout">
+            <view>账号状态</view>
+            <view class="use-Status">{{checked?'已启用':'已停用'}}</view>
+        </view>
+        <view class="child-list-fd">
+            <switch bindchange="switchChange" checked="{{checked}}" color="#2f7bfd"></switch>
+        </view>
+    </view>
+    <view class="color-ys-bg"></view>
+    <view class="child-list arrow-right">
+        <view class="child-list-bd">姓名</view>
+        <view bindtap="toName" class="child-list-fd">{{subAccountDetail.nickName}}</view>
+    </view>
+    <view class="child-list">
+        <view class="child-list-bd">手机号</view>
+        <view class="child-list-fd">{{subAccountDetail.phone}}</view>
+    </view>
+    <view class="child-list arrow-right">
+        <view class="child-list-bd">岗位</view>
+        <view bindtap="onSelectRoles" class="child-list-fd">{{pageParams.roleName}} </view>
+    </view>
+</view>
+<view bindtap="delSubAccount" class="del-wrapper font-red">
+    <view class="icon bg-img" style="background-image:url(\"{{icon.del}}\")"></view>
+    <view class="text f12">删除子账号</view>
+</view>
+<van-action-sheet bind:close="onJobsClose" show="{{showJobs}}" title="岗位选择">
+    <view class="multiple_sel_jobs">
+        <van-checkbox-group bind:change="onCheckSubChange" value="{{checkGangWei}}">
+            <van-checkbox customClass="multile_checkbox" labelClass="multile_checkbox_label" name="{{item.id}}" wx:for="{{jobList}}" wx:key="index">{{item.name}}</van-checkbox>
+        </van-checkbox-group>
+    </view>
+</van-action-sheet>

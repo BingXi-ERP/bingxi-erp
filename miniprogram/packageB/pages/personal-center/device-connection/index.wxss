@@ -1,0 +1,21 @@
+page {
+  background-color: #eff0f7;
+}
+.device-connection {
+  background-color: #fff;
+  border-radius: 20rpx;
+  color: #333;
+  font-size: 24rpx;
+  margin-left: 34rpx;
+  margin-top: 40rpx;
+  width: calc(100vw - 68rpx);
+}
+.device-connection .deviceChild {
+  display: -webkit-flex;
+  display: flex;
+  margin: 0 28rpx;
+  padding: 28rpx 0;
+}
+.device-connection .deviceChild:first-child {
+  border-bottom: 2rpx solid #f4f4f4;
+}

@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "添加记录",
+  "component": true,
+  "usingComponents": {
+    "panel-img": "/components/panel-img/panel-img",
+    "upload-img": "/components/upload-img/upload-img",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

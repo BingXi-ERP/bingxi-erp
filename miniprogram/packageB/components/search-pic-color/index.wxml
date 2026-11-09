@@ -1,0 +1,29 @@
+<view class="search-pic-color">
+  <image
+    binderror="onImageError"
+    catchtap="onShowCompare"
+    class="product-image"
+    data-prop="{{item.prop}}"
+    data-type="image"
+    mode="aspectFill"
+    src="{{searchImg[item.prop]||defBg}}"
+    wx:for="{{imgOptions}}"
+    wx:key="id"
+  ></image>
+  <view
+    catchtap="onShowCompare"
+    class="color_card"
+    data-type="color"
+    style="background-color:{{data.color1}}"
+    wx:if="{{data.color1}}"
+  ></view>
+  <view catchtap="onShowCompare" class="empty_color" data-type="color" wx:else>
+    <image mode="aspectFill" src="{{noColorBg}}"></image>
+  </view>
+</view>
+<compare-image
+  colorCompare="{{isCompareColor}}"
+  data="{{compareData}}"
+  isCompare="{{isCompare}}"
+  show="{{showCompare}}"
+></compare-image>

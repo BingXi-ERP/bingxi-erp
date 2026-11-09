@@ -1,0 +1,20 @@
+<view class="area-code">
+    <view class="area-code-input">
+        <view class="area-code-input-box">
+            <input bindinput="inputgetName" maxlength="15" placeholder="搜索国家/地区代码" placeholderStyle="color: #C0C0C0; font-size: 26rpx;"></input>
+            <van-icon name="search" size="18"></van-icon>
+        </view>
+    </view>
+    <view class="area-code-list">
+        <view bind:tap="clickHandle" class="area-code-list-item" data-code="{{item.dial_code}}" wx:for="{{list}}" wx:key="index">
+            <view class="list-item-left">
+                <view class="country-name">
+                    <image mode="aspectFit" src="{{icon}}{{item.icon}}.png"></image>
+                    <text>{{item.localName}}</text>
+                </view>
+            </view>
+            <view class="list-item-right">+{{item.dial_code}}</view>
+        </view>
+    </view>
+    <view class="no-moer-msg">没有更多内容了～</view>
+</view>

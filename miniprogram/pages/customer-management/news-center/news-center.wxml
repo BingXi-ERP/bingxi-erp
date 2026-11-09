@@ -1,0 +1,22 @@
+<view id="news-center">
+    <view class="news-wrapper" wx:if="{{newsList.length>0}}">
+        <view bindtap="tabBlock" class="listItem" data-cid="{{item.customerId}}" wx:for="{{newsList}}" wx:key="index">
+            <view class="list-avatar" style="background-image:url(\"{{item.customerHeadImg&&item.customerHeadImg!==''?item.customerHeadImg:item.defaultHeadImg}}\")"></view>
+            <view class="list-content">
+                <view class="content-top">
+                    <view class="top-left">
+                        <text class="name">{{item.fullname}}</text>
+                    </view>
+                    <text class="top-right">{{item.messageTime||'-'}}</text>
+                </view>
+                <view class="content-bottom">
+                    <text>{{item.message}}</text>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="noResult" wx:if="{{newsList.length==0}}">
+        <view class="noPage"></view>
+        <view class="title">暂无数据</view>
+    </view>
+</view>

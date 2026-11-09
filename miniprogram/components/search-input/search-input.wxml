@@ -1,0 +1,9 @@
+<view class="wrapper">
+    <view class="search-input-wrapper" style="width:{{width}}rpx">
+        <input bindconfirm="confirm" bindinput="input" class="search-input" placeholder="{{placeholder}}" placeholderClass="placeholder" value="{{value}}"></input>
+        <view bindtap="search" class="search-icon-wrapper">
+            <image mode="aspectFit" src="/assets/images/icon2nd/ic_sous@3x.png"></image>
+        </view>
+    </view>
+    <view bindtap="cancel" class="tools" wx:if="{{rightType=='1'}}">取消</view>
+</view>

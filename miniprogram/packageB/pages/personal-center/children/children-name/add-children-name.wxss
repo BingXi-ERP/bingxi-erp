@@ -1,0 +1,21 @@
+page {
+  background-color: #f8f8f8;
+}
+.btn-active {
+  background: #ff6065;
+  border-radius: 8rpx;
+  color: #fff;
+  font-size: 32rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  margin: 5%auto auto;
+  width: 85%;
+}
+.child-list input {
+  padding-left: 20rpx;
+  width: 85%;
+}
+.btn-actives {
+  color: #ffafb2;
+  opacity: 0.65;
+}

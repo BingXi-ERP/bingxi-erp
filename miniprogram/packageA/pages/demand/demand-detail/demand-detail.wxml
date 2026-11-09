@@ -1,0 +1,330 @@
+<view class="demandDetail">
+  <view class="prviewPic">
+    <swiper bindchange="changeGoodsSwip">
+      <swiper-item wx:for="{{productDate.contentImg}}" wx:key="{{item}}">
+        <image
+          bindtap="previewImage"
+          class="slide-image"
+          data-src="{{item}}"
+          mode="aspectFill"
+          src="{{item}}"
+        ></image>
+      </swiper-item>
+    </swiper>
+  </view>
+  <view class="imgCount">
+    <view>{{current+1}}/{{productDate.contentImg.length}}</view>
+  </view>
+  <view class="detailData">
+    <view class="detailHead">
+      <view class="overTime" wx:if="{{reply==='0'&&!showBtn}}"
+        >距结束还剩 {{productDate.lastTimeStr}}</view
+      >
+      <view
+        class="waitIcon  {{itemType===20||itemType===10?'waitText':itemType===30||itemType===40||itemType===50?'successText':itemType===60||itemType===15?'loseText':'closeText'}}"
+        wx:if="{{showBtn}}"
+        >{{itemTypeName}}</view
+      >
+    </view>
+    <view class="loseReason" wx:if="{{productDate.lose}}">
+      <text>失败原因：布料与需求不匹配</text>
+    </view>
+    <view class="describe" wx:if="{{!showBtn}}">
+      <text class="title">回复需求即可瓜分补贴</text>
+      <view class="content">
+        <image class="hongBao" src="{{icon.hongBao}}"></image>
+        <text class="hongBaoText"
+          >{{productDate.rewardAmount}} <text class="yuan">元</text>
+        </text>
+      </view>
+    </view>
+    <view class="creatTime fl">
+      <view class="creat"
+        >{{formatDateTime(productDate.createTime,true)}} 发布</view
+      >
+      <view class="location"
+        >{{productDate.province}} {{productDate.city}}</view
+      >
+    </view>
+    <view class="checkReason" wx:if="{{productDate.askStatus==15}}">
+      <text>审核失败原因：{{productDate.auditFailReasonContent}}</text>
+      <view class="fl checkReasonBtn">
+        <view>
+          <image src="{{icon.service}}"></image>在线客服<button
+            class="contact"
+            openType="contact"
+            sessionFrom="weapp"
+          ></button>
+        </view>
+        <view bindtap="toService">
+          <image class="contentNum" src="{{icon.contact}}"></image
+          >拨打电话</view
+        >
+      </view>
+    </view>
+    <view class=".parameters">
+      <view class="parametersLayout">
+        <text>需求编号</text>
+        <text class="parametersDatial">{{productDate.askNo}}</text>
+      </view>
+      <view class="parametersLayout">
+        <text>面料描述</text>
+        <text class="parametersDatial"
+          >{{productDate.text?productDate.text:'-'}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>面料品类</text>
+        <text class="parametersDatial"
+          >{{productDate.category?productDate.category:'-'}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>底布类型</text>
+        <text class="parametersDatial"
+          >{{productDate.bottomType?productDate.bottomType:'-'}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>面料幅宽</text>
+        <text class="parametersDatial" wx:if="{{productDate.breadth}}"
+          >{{productDate.breadth}} / {{productDate.breadthUnit}}</text
+        >
+        <text class="parametersDatial" wx:else>-</text>
+      </view>
+      <view class="parametersLayout">
+        <text>面料成分</text>
+        <text class="parametersDatial"
+          >{{productDate.ingredient?productDate.ingredient:'-'}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>货期要求</text>
+        <text class="parametersDatial"
+          >{{productDate.acceptDeliveryDay===0?'现货':productDate.acceptDeliveryDay+'天'}}</text
+        >
+      </view>
+    </view>
+  </view>
+  <view class="detailDataTips" wx:if="{{reply==='1'}}">
+    <view
+      class="inNum"
+      wx:if="{{myPostData.rewardType==2||myPostData.rewardType==3}}"
+      >已参与回复 {{myPostData.replyNum}}人</view
+    >
+    <view class="tips">*确保回复内容真实性，回复越早奖金越高</view>
+  </view>
+  <view
+    class="myoffer"
+    hoverClass="none"
+    hoverStopPropagation="false"
+    wx:if="{{reply==='1'}}"
+  >
+    <view class="fr-between-center title">
+      <view class="fl titleRight">
+        <image
+          class="marginR"
+          src="{{myPostData.headImg}}?imageView2/2/w/160"
+          wx:if="{{myPostData.headImg}}"
+        ></image>
+        <view class="myAnsower">
+          <view class="fl marginB">
+            <view class="answer marginR">我的回复</view>
+            <view
+              class="answerStatus marginR {{myPostData.matchStatusName=='待审核'?'audit':myPostData.matchStatusName=='已采纳'?'accept':myPostData.matchStatusName=='未被采纳'?'notAccept':myPostData.matchStatusName=='待采纳'?'waitAccept':myPostData.matchStatusName=='审核失败'?'fail':''}}"
+              >{{myPostData.matchStatusName}}</view
+            >
+          </view>
+          <view class="systemBack">{{myPostData.rewardRemark}}</view>
+        </view>
+      </view>
+      <view class="titleLeft">
+        <view
+          class="bouns"
+          wx:if="{{myPostData.rewardType==2&&myPostData.rank==1}}"
+        >
+          <image class="NO1" src="{{icon.NO1}}"></image>
+          <view class="bounsText"
+            >获得补贴 ¥<text>{{myPostData.rewardAmount}}</text>
+          </view>
+        </view>
+        <view
+          class="award"
+          wx:if="{{myPostData.rewardType==2&&myPostData.rank!==1}}"
+        >
+          <view class="speed">回复速度：No. {{myPostData.rank}}</view>
+          <view class="bouns" style="text-align: right"
+            >获得补贴 ¥<text>{{myPostData.rewardAmount}}</text>
+          </view>
+        </view>
+        <view class="award" wx:if="{{myPostData.rewardType==3}}">
+          <view class="speed">回复速度：No. {{myPostData.rank}}</view>
+          <view class="bouns" style="text-align: right"
+            >参与奖 ¥<text>{{myPostData.rewardAmount}}</text>
+          </view>
+        </view>
+        <view class="waitOpen" wx:if="{{myPostData.rewardType==1}}"
+          >即将揭晓</view
+        >
+      </view>
+    </view>
+    <view class="answerImg">
+      <view class="answerTitle">细节图</view>
+      <view class="fl offerImg">
+        <image
+          mode="aspectFill"
+          src="{{item}}"
+          wx:for="{{myPostData.imgDetailArr}}"
+          wx:key="{{item}}"
+        ></image>
+      </view>
+      <view class="answerTitle">色卡图</view>
+      <view class="offerImg">
+        <image
+          mode="aspectFill"
+          src="{{item}}"
+          wx:for="{{myPostData.imgColorCardArr}}"
+          wx:key="{{item}}"
+        ></image>
+      </view>
+    </view>
+    <view class=".parameters">
+      <view class="parametersLayout">
+        <text>品名编号</text>
+        <text class="parametersDatial">{{myPostData.goodsInfo}}</text>
+      </view>
+      <view class="parametersLayout">
+        <text>大货价格</text>
+        <text class="parametersDatial"
+          >{{myPostData.bulkPrice}} 元 / {{myPostData.bulkPriceUnit}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>剪版价格</text>
+        <text class="parametersDatial"
+          >{{myPostData.partPrice}} 元 / {{myPostData.partPriceUnit}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>空差</text>
+        <text class="parametersDatial">{{myPostData.deviation}}</text>
+      </view>
+      <view class="parametersLayout">
+        <text>货期</text>
+        <text class="parametersDatial"
+          >{{myPostData.deliveryDay===0?'现货':myPostData.deliveryDay+'天'}}</text
+        >
+      </view>
+      <view class="parametersLayout">
+        <text>描述</text>
+        <text class="parametersDatial"
+          >{{myPostData.remark?myPostData.remark:'-'}}</text
+        >
+      </view>
+    </view>
+    <view class="failReson" wx:if="{{myPostData.matchStatusName=='审核失败'}}">
+      <view class="failTitle">失败原因：</view>
+      <view class="failContent">{{myPostData.noMatchReason}}</view>
+    </view>
+  </view>
+  <view
+    catchtap="makeCall"
+    class="g_bottomBtn"
+    wx:if="{{myPostData.isShowContactBtn==1}}"
+    >联系采购商</view
+  >
+  <view
+    class="footer {{showBtn?'b#fff':''}}"
+    wx:if="{{showBtn||!showBtn&&productDate.isMyAsk===0&&(myPostData.status===3||reply==='0')}}"
+  >
+    <colorBtn
+      bind:toPath="toPath"
+      title="立刻回复"
+      wx:if="{{!showBtn&&productDate.isMyAsk===0&&productDate.isReply==1}}"
+    ></colorBtn>
+    <view class="detailBtn" wx:if="{{showBtn&&!showIcon}}">
+      <view
+        bind:tap="toPostResult"
+        class="btn blueBtn"
+        wx:if="{{itemType===30||itemType===40||itemType===50||productDate.isMatch===1&&(itemType===20||itemType===5||itemType===60)}}"
+        >查看匹配结果<view class="point" wx:if="{{productDate.matchPushNum}}"
+          >{{productDate.matchPushNum}}</view
+        >
+      </view>
+      <view
+        catch:tap="closeDemand"
+        class="btn blueBtn"
+        wx:if="{{itemType===10}}"
+        >关闭需求单</view
+      >
+      <view
+        bind:tap="toPost"
+        class="btn blueBtn"
+        wx:if="{{itemType===15||productDate.isMatch===2&&(itemType===60||itemType===5)}}"
+        >重新发起</view
+      >
+    </view>
+  </view>
+</view>
+<view bindtap="toHome" class="toHome" wx:if="{{showIcon===1}}">
+  <image
+    src="../../../assets/images/Icon_Backtohome@2x.png"
+    style="width: 144rpx; height: 144rpx"
+  ></image>
+</view>
+<van-popup
+  bind:close="popupClose"
+  position="bottom"
+  safeAreaInsetTop="true"
+  show="{{popup.showPopup}}"
+>
+  <view class="popupContent">
+    <view class="title fl">请选择关闭理由</view>
+    <van-radio-group bind:change="popupChange" value="{{popup.popupRadio}}">
+      <van-cell-group>
+        <van-cell
+          clickable
+          bind:click="popupClick"
+          data-name="1"
+          title="已找到，无需匹配"
+        >
+          <van-radio checkedColor="#66CF7E" name="1"></van-radio>
+        </van-cell>
+        <van-cell
+          clickable
+          bind:click="popupClick"
+          data-name="2"
+          title="填写错误，需重新发起需求"
+        >
+          <van-radio checkedColor="#66CF7E" name="2"></van-radio>
+        </van-cell>
+        <van-cell
+          clickable
+          bind:click="popupClick"
+          data-name="3"
+          title="其他原因"
+        >
+          <van-radio checkedColor="#66CF7E" name="3"></van-radio>
+        </van-cell>
+      </van-cell-group>
+    </van-radio-group>
+    <view class="itemArea">
+      <view
+        class="fackArea textarea-placeholder"
+        wx:if="{{popup.popupRadio!=='3'}}"
+        >请输入原因</view
+      >
+      <textarea
+        bindinput="inputgetName"
+        data-name="closeForm.closeReason"
+        placeholder="请输入原因"
+        placeholderStyle="fontSize:12px;"
+        wx:if="{{popup.popupRadio==='3'}}"
+      ></textarea>
+    </view>
+    <view class="popupBtn">
+      <view bind:tap="popupComfirm" class="popupComfirm">确定</view>
+      <view bind:tap="popupCancle" class="popupCancle">取消</view>
+    </view>
+  </view>
+</van-popup>

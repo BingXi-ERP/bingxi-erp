@@ -1,0 +1,98 @@
+<view class="contain">
+  <view class="topContent">
+    <view class="dateChoose">
+      <view class="lately-date-choose">
+        <button
+          catchtap="choosedWeek"
+          class="dateB buttonSpace {{confirmDate==2?'choosedBotton':''}}"
+        >
+          近7天
+        </button>
+        <button
+          catchtap="choosedMonth"
+          class="dateB {{confirmDate==3?'choosedBotton':''}}"
+        >
+          近30天
+        </button>
+      </view>
+      <view class="date-choose displayFlex">
+        <picker
+          bindchange="bindStartDateChange"
+          end="2027-09-01"
+          mode="date"
+          start="2015-09-01"
+          value="{{startDate}}"
+        >
+          <view class="picker data-choose"
+            >{{startDate==''?'请选择时间':startDate}}</view
+          >
+        </picker>
+        <span class="dateRange">至</span>
+        <picker
+          bindchange="bindEndDateChange"
+          end="2027-09-01"
+          mode="date"
+          start="2015-09-01"
+          value="{{endDate}}"
+        >
+          <view class="picker data-choose"
+            >{{endDate==''?'请选择时间':endDate}}</view
+          >
+        </picker>
+      </view>
+    </view>
+  </view>
+  <view class="db-card marketing-card">
+    <view class="card-item">
+      <view class="card-label">销售数量（{{billingItemCount}}条）</view>
+      <view class="card-content">{{billingPricingQuantity}}</view>
+    </view>
+    <view class="card-item">
+      <view class="card-label right">销售金额（¥）</view>
+      <view class="card-content">{{orderAmount}}</view>
+    </view>
+  </view>
+  <view class="customerTitle fr-between-center">
+    <view class="left">品名</view>
+    <sort-component bindevent="sortFn" text="销售数量"></sort-component>
+    <sort-component bindevent="sortFn" text="销售金额"></sort-component>
+  </view>
+  <view class="product-list-box">
+    <view class="midle-wrap">
+      <view
+        bind:tap="handleClickProduct"
+        class="pro-row"
+        data-billingIds="{{item.billingIds}}"
+        data-billingItemCount="{{item.billingItemCount}}"
+        data-billingPricingQuantity="{{item.billingPricingQuantity}}"
+        data-colorAmount="{{item.colorAmount}}"
+        data-goodsId="{{item.goodsId}}"
+        data-goodsName="{{item.goodsName}}"
+        data-quantityUnit="{{item.quantityUnit}}"
+        wx:for="{{productList}}"
+        wx:key="{{item.goodsId}}"
+      >
+        <view class="w30 ellipsis">{{item.goodsName}}</view>
+        <view class="w30">
+          <view class="text"
+            >{{item.billingPricingQuantity}}{{item.quantityUnit}}</view
+          >
+          <view class="unit">{{item.billingItemCount}} 条</view>
+        </view>
+        <view class="w30">
+          <view class="text tr">{{item.colorAmount}}</view>
+          <view class="unit tr"
+            >{{item.colorPrice}}元/{{item.quantityUnit}}</view
+          >
+        </view>
+        <van-icon name="arrow"></van-icon>
+      </view>
+      <view class="moreIcon" wx:if="{{!isDone&&productList.length}}"
+        >上拉更多</view
+      >
+      <view class="moreIcon" wx:if="{{isDone&&productList.length}}"
+        >这是底线</view
+      >
+    </view>
+  </view>
+</view>

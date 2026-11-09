@@ -1,0 +1,12 @@
+<view class="no-power-wrapper">
+  <view class="img-wrapper">
+    <image
+      mode="aspectFit"
+      src="{{successBg}}"
+      style="width: 198rpx; height: 198rpx"
+    ></image>
+  </view>
+  <view class="title">资料提交成功</view>
+  <view class="text1">待业务员上门审核，预计 [1-3] 个工作日</view>
+  <view class="text3">注意:审核期间请确保电话畅通，方便业务员联系上门服务</view>
+</view>

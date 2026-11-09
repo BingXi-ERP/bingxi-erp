@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "修改备注",
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

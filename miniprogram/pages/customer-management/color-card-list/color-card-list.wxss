@@ -1,0 +1,92 @@
+page {
+  background-color: #f5f5f9;
+}
+.input-wrapper {
+  background-color: #fff;
+  padding: 20rpx 0 10rpx;
+}
+.list-wrapper {
+  margin-bottom: 120rpx;
+}
+.bottom {
+  height: 200rpx;
+}
+.item {
+  align-items: center;
+  background-color: #fff;
+  border: 1rpx solid #fff;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: center;
+  margin: 20rpx auto;
+  padding: 20rpx 0;
+  width: 690rpx;
+}
+.check-wrapper {
+  flex: 0.5;
+}
+.checked {
+  height: 32rpx;
+  margin: 0 auto;
+  width: 32rpx;
+}
+.checked,
+.img {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+.img {
+  height: 144rpx;
+  width: 144rpx;
+}
+.info-wrapper {
+  display: -webkit-flex;
+  display: flex;
+  flex: 3;
+  flex-direction: column;
+  height: 144rpx;
+  margin-left: 20rpx;
+  padding-right: 30rpx;
+}
+.info-wrapper > view {
+  flex: 1;
+}
+.other {
+  display: -webkit-flex;
+  display: flex;
+  margin-top: 10rpx;
+}
+.see {
+  text-align: left;
+}
+.colect,
+.see {
+  flex: 1;
+}
+.colect {
+  text-align: right;
+}
+.btn-wrapper {
+  align-items: center;
+  background: #fff;
+  bottom: 0rpx;
+  display: -webkit-flex;
+  display: flex;
+  height: 100rpx;
+  justify-content: center;
+  left: 0;
+  position: fixed;
+  right: 0;
+  width: 750rpx;
+}
+.btn-wrapper > view {
+  flex: 1;
+  height: 100rpx;
+  line-height: 100rpx;
+  text-align: center;
+}
+.active {
+  background-color: #f2f5ff !important;
+  border: 1rpx solid #629cff !important;
+}
