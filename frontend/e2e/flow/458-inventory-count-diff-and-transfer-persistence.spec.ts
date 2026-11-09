@@ -1538,6 +1538,23 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     );
     expect(shippedSum, '发货后明细发出量合计必须等于主表总量 18，实际 ' + shippedSum).toBe(itemSum);
 
+    // 本腿在库存经理会话里跑，而库存详情与列表对"无 inventory_stock 数据权限配置且非 admin"
+    // 的岗位默认隐藏五个数量列（inventory_stock_handler.rs 详情与列表辅助同口径）。
+    // 先在经理会话把脱敏正向钉住，再切回 admin 库读证守恒，两件事各自可证，
+    // 不拿被隐藏的字段当"库里没变"或"库里变了"的证据。
+    const srcAsMgr = await readStockRow(page, {
+      productId,
+      warehouseId: fromWarehouseId,
+      batchNo,
+      colorNo: '',
+      label: '458-07 经理会话脱敏面',
+    });
+    expect(
+      Object.prototype.hasOwnProperty.call(srcAsMgr, 'quantity_on_hand'),
+      '非 admin 且无库存数据权限配置的岗位，库存出参必须隐藏 quantity_on_hand'
+    ).toBe(false);
+
+    await loginAsRole(page, 'admin');
     const src = await readStockRow(page, {
       productId,
       warehouseId: fromWarehouseId,
