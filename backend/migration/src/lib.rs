@@ -290,6 +290,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::product_grade_vocab_check::Migration),
             // 仓储两岗补授扫码入库细键，链尾独立域（roles 与 role_permissions 由 system 域先建）
             Box::new(domain::scan_receipt_grant::Migration),
+            // 审计日志表只追加约束，链尾独立域（两张表由 system 域先建，晚于它们的本域必然执行）
+            Box::new(domain::audit_append_only_guard::Migration),
             // 库存匹冗余库存状态列探测式下线，同上一条口径：本支已摘除该列全部读写与实体字段
             Box::new(domain::piece_inventory_status_drop::Migration),
             // 库存匹米数列扩位到 DECIMAL(18,4)，链尾独立域（建表与加列均早于本域，复用库上必然执行）
