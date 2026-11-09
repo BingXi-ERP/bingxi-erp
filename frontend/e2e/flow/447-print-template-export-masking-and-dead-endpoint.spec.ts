@@ -459,14 +459,36 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
   test('447-3 两枚单据打印腿真内容：docx 正文必须带出打样申请号与定制订单号', async ({ page }) => {
     const queue: DeferredCleanup[] = [];
 
-    const labRows = rowsOf(
-      await apiCallRaw<unknown>(page, 'GET', '/production/lab-dip/requests?page=1&page_size=20'),
-      '打样申请列表'
+    // 打印腿的取证对象由本用例自建：库里是否恰好有一条打样申请不是可信前置
+    // （该行此前靠打样链用例的遗留数据，分片组成一变列表就恒空）。请求体必填两列是
+    // light_source 与 required_date（services/lab_dip_ops/request.rs，早于当天即拒），
+    // 申请号由服务端取号，断言只认响应回显。lab_dip_request 无终结腿，不排清理，
+    // 行以唯一备注隔离。
+    const requiredDate = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+    const lab = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      '/production/lab-dip/requests',
+      {
+        light_source: 'D65',
+        secondary_light_source: 'TL84',
+        sample_type: 'fabric',
+        customer_color_no: genCode('CL447'),
+        customer_color_name: 'E2E 447 打印腿客户色名',
+        fabric_spec: '40S/1 全棉平纹 门幅 160cm 克重 180g/m²',
+        fabric_component: '棉 100%',
+        sample_size: '30x15cm',
+        dye_category: 'reactive',
+        eco_requirement: 'Oeko-Tex',
+        expected_days: 3,
+        sample_versions: 2,
+        required_date: requiredDate,
+        remarks: `E2E 447 打印腿自建单 ${genCode('P447LD')}`,
+      }
     );
-    expect(labRows.length, '测试库必须至少有一条打样申请，否则打印腿无从取证').toBeGreaterThan(0);
-    const labId = Number(labRows[0].id);
-    const labNo = str(labRows[0].request_no ?? labRows[0].lab_dip_no ?? labRows[0].code);
-    expect(Number.isInteger(labId) && labId > 0, `打样申请主键非法：${labRows[0].id}`).toBe(true);
+    const labId = Number(lab.id);
+    const labNo = str(lab.request_no ?? lab.lab_dip_no ?? lab.code);
+    expect(Number.isInteger(labId) && labId > 0, `打样申请主键非法：${lab.id}`).toBe(true);
     expect(
       labNo.length,
       `打样申请列表未回显申请号列（候选 request_no/lab_dip_no/code 全空），无法做真内容断言`
@@ -1166,16 +1188,36 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
       await apiCallRaw<unknown>(page, 'GET', '/custom-orders?page=1&page_size=5'),
       '定制订单列表'
     );
-    const labRows = rowsOf(
-      await apiCallRaw<unknown>(page, 'GET', '/production/lab-dip/requests?page=1&page_size=5'),
-      '打样申请列表'
+    // 死端点腿的打样申请打印位点同样由本用例自建取证行：列表是否恰好有行不是可信前置，
+    // NaN 主键会被该断言读成路由族空转。载荷必填列与 447-3 同源，申请号不参与判定。
+    const scanLab = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      '/production/lab-dip/requests',
+      {
+        light_source: 'D65',
+        secondary_light_source: 'TL84',
+        sample_type: 'fabric',
+        customer_color_no: genCode('CL447S'),
+        customer_color_name: 'E2E 447 死端点腿客户色名',
+        fabric_spec: '40S/1 全棉平纹 门幅 160cm 克重 180g/m²',
+        fabric_component: '棉 100%',
+        sample_size: '30x15cm',
+        dye_category: 'reactive',
+        eco_requirement: 'Oeko-Tex',
+        expected_days: 3,
+        sample_versions: 2,
+        required_date: new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10),
+        remarks: `E2E 447 死端点腿自建单 ${genCode('P447LDS')}`,
+      }
     );
+    const scanLabId = Number(scanLab.id);
     const cardRows = rowsOf(
       await apiCallRaw<unknown>(page, 'GET', '/color-cards?page=1&page_size=5'),
       '色卡列表'
     );
     const coId = Number(coRows[0]?.id);
-    const labId = Number(labRows[0]?.id);
+    const labId = scanLabId;
     const cardId = Number(cardRows[0]?.id);
     const scanLegs: Array<[string, string]> = [
       [`/custom-orders/${coId}/print`, '定制订单打印'],
