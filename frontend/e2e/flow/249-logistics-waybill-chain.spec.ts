@@ -605,7 +605,9 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     if (browser === null) {
       throw new Error('无法取得 browser 句柄，匿名 401 腿需要一个不带会话的 context');
     }
-    const anon = await browser.newContext();
+    // browser.newContext() 默认继承 project.use 的 storageState（被 diagnose-fixture
+    // 覆盖成 worker 会话文件），不显式置空会带登录态而非匿名
+    const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     try {
       const anonResp = await anon.request.get(url);
       expect(anonResp.status(), '未登录取面单必须 401').toBe(401);
