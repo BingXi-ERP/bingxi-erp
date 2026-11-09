@@ -95,11 +95,15 @@ import {
  * 越权面判据（458-06）。权限中间件在 handler 之前按 URL 段派生 resource 与 action：
  * 资源段取 /erp/inventory/{seg4}，动作由末段关键字表与 HTTP 方法派生，故
  * /record 与 /ship 与 /receive 落 create，/submit 与 /approve 落同名动作。
- * 授权面按 init_service_ops/permission.rs 的库存域分组：warehouse_keeper 只有
- * transfers 与 counts 的 read 加 create，inventory_manager 为 transfers 与 counts 的
- * 通配。所以仓管建单与录入能通过、提交与审批必 403 且机器码 FORBIDDEN（expectDenied
- * 双钉，防 CSRF 面 403 冒充），被拒后以管理员会话重读状态与库存逐列不动，零副作用；
- * 放行面由库存经理同一动作 200 与管理腿 458-01 的 200 反向证明，两腿缺一即假绿。
+ * 授权面分两层。动作权限按 init_service_ops/permission.rs 的库存域分组：
+ * warehouse_keeper 只有 transfers 与 counts 的 read 加 create，inventory_manager 为
+ * transfers 与 counts 的通配。行级归属另由 utils/data_scope.rs 的
+ * check_resource_owner_by_member_scope 把关：盘点单无部门列，按可见部门成员集合判定，
+ * inventory_manager 的 dept 范围不含仓管，故经理对仓管建的单做提交同样被归属门拒绝
+ * （动作权限通配不等于跨归属人可写）。所以仓管建单与录入能通过、提交与审批必 403 且
+ * 机器码 FORBIDDEN（expectDenied 双钉，防 CSRF 面 403 冒充），被拒后以管理员会话重读
+ * 状态与库存逐列不动，零副作用；放行面由库存经理在同一库存行自建自录自批 200（本人行
+ * 三种 scope 恒可写）与管理腿 458-01 的 200 反向证明，两腿缺一即假绿。
  * 调拨审批另有金额分级审批人校验（L1 允许 admin 与 warehouse_manager 与
  * inventory_manager 等），本用例不传 unit_cost 使总金额恒为 0 落 L1，
  * 会计岗与质检岗在权限中间件即被拦下，不进入分级校验分支。
@@ -1405,15 +1409,33 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `被拒的会计岗建单不许落库，实际命中 ${JSON.stringify(mine).slice(0, 200)}`
     ).toBe(0);
 
-    // 库存经理做自己那步：提交与过账都放行（键 counts:submit 与 counts:approve）
-    // 并证明过账真实落库——仓管录的 77 米在库存行上读出，不是响应回显
+    // 库存经理做自己那步：提交与过账都放行（键 counts:submit 与 counts:approve）。
+    // 盘点单无部门列，归属门按成员集合判定（check_resource_owner_by_member_scope），
+    // 库存经理 data_scope 为 dept 而仓管不在其可见成员集合内，故经理对仓管建的单做提交
+    // 会被归属门拒绝（与越权面同源，属正确拦截而非端点坏）。放行面由经理在同一库存行上
+    // 自建自录自批证明：本人行三种 scope 恒可写，提交与过账真实放行，过账把实盘 77 落进
+    // 库存行（库读非响应回显）。仓管那张单维持 pending 不受影响，零副作用判据仍成立。
     await loginAsRole(page, 'inventory_manager');
-    const mgrSubmit = await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${countId}/submit`);
+    const mgrCount = await apiCallRaw<Row>(page, 'POST', '/inventory/counts', {
+      warehouse_id: warehouseId,
+      count_date: new Date().toISOString(),
+      notes: `E2E${tag}-MGR`,
+      stock_ids: [stockId],
+    });
+    const mgrCountId = numOf(mgrCount, 'id', '库存经理建单响应');
+    await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${mgrCountId}/record`, {
+      items: [{ stock_id: stockId, quantity_actual: '77.00' }],
+    });
+    const mgrSubmit = await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${mgrCountId}/submit`);
     expect(
       String(mgrSubmit.status),
       `库存经理提交后必须为 ${COUNT_STATUS.IN_REVIEW}，实际 ${JSON.stringify(mgrSubmit.status)}`
     ).toBe(COUNT_STATUS.IN_REVIEW);
-    const mgrApprove = await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${countId}/approve`);
+    const mgrApprove = await apiCallRaw<Row>(
+      page,
+      'POST',
+      `/inventory/counts/${mgrCountId}/approve`
+    );
     expect(String(mgrApprove.status), '库存经理过账后必须为 completed').toBe(
       COUNT_STATUS.COMPLETED
     );
@@ -1427,13 +1449,15 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     });
     expect(
       numOf(stockAfterMgrApprove, 'quantity_on_hand', '库存经理过账后'),
-      '仓管录入加库存经理过账的跨岗位链路必须把实盘 77 落进库存行'
+      '库存经理自录自批的链路必须把实盘 77 落进库存行'
     ).toBe(77);
     expect(
       numOf(stockAfterMgrApprove, 'quantity_available', '库存经理过账后'),
       '过账后可用量必须同步为实盘 77'
     ).toBe(77);
-    console.log(`[458-06] 角色面完成 count=${countId} transfer=${transferId}`);
+    console.log(
+      `[458-06] 角色面完成 keeperCount=${countId} mgrCount=${mgrCountId} transfer=${transferId}`
+    );
   });
 
   test('458-07 写后重读防线 派生值与主表统计一律以库里读数为准', async ({ page }) => {
