@@ -407,10 +407,9 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     }
     const byTime = mine.map(row => Date.parse(row.event_time));
     const sorted = [...byTime].sort((a, b) => a - b);
-    expect(
-      byTime,
-      'list_tracking_events 按 event_time 升序（logistics_service.rs）'
-    ).toEqual(sorted);
+    expect(byTime, 'list_tracking_events 按 event_time 升序（logistics_service.rs）').toEqual(
+      sorted
+    );
     expect(byTime).toEqual([Date.parse(baseTime), Date.parse(laterTime)]);
 
     const pickupRow = mine.find(row => row.event_type === EVENT_TYPE_PICKUP);
@@ -478,7 +477,11 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
   });
 
   test('运费腿：按源码口径独立复算三通道取大值，并回读 freight_fee 落库', async ({ page }) => {
-    const before = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
+    const before = await apiCall<WaybillRow>(
+      page,
+      'GET',
+      `/inventory/logistics/${chain.waybillId}`
+    );
     const expected = recomputeFreight(before.data);
 
     const freight = await apiCall<unknown>(
@@ -486,9 +489,10 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
       'POST',
       `${waybillPath(chain.waybillId)}/calculate-freight`
     );
-    expect(typeof freight.data, 'calculate_freight 出参是裸 DECIMAL 字符串（handler 直接序列化 Decimal）').toBe(
-      'string'
-    );
+    expect(
+      typeof freight.data,
+      'calculate_freight 出参是裸 DECIMAL 字符串（handler 直接序列化 Decimal）'
+    ).toBe('string');
     const actual = Number(freight.data);
     expect(Number.isFinite(actual), `运费出参无法转数字：${JSON.stringify(freight.data)}`).toBe(
       true
@@ -496,8 +500,12 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     expect(actual, '运费必须等于三通道取大值的复算结果').toBe(expected);
     // 取大值语义的另一半：运费不小于任一单通道
     const rate = decimalToNumber(before.data.freight_rate, 'freight_rate');
-    expect(actual).toBeGreaterThanOrEqual(decimalToNumber(before.data.total_weight, 'total_weight') * rate);
-    expect(actual).toBeGreaterThanOrEqual(decimalToNumber(before.data.total_volume, 'total_volume') * rate);
+    expect(actual).toBeGreaterThanOrEqual(
+      decimalToNumber(before.data.total_weight, 'total_weight') * rate
+    );
+    expect(actual).toBeGreaterThanOrEqual(
+      decimalToNumber(before.data.total_volume, 'total_volume') * rate
+    );
     expect(
       actual,
       '距离通道 = distance_km * (freight_rate / 1000)（logistics_service.rs）'
@@ -508,7 +516,11 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     expect(actual, '计费四列无写入口时运费恒 0').toBe(0);
     chain.freightAfterLink = actual;
 
-    const persisted = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
+    const persisted = await apiCall<WaybillRow>(
+      page,
+      'GET',
+      `/inventory/logistics/${chain.waybillId}`
+    );
     expect(
       typeof persisted.data.freight_fee,
       '运费回写落库后 freight_fee 仍是 DECIMAL 字符串'
@@ -523,12 +535,14 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
       `${waybillPath(chain.waybillId)}/link-purchase-order`,
       { po_id: chain.purchaseOrderId }
     );
-    expect(linked.data.order_id, '关联成功出参直接回显被改写的运单行').toBe(
-      chain.purchaseOrderId
-    );
+    expect(linked.data.order_id, '关联成功出参直接回显被改写的运单行').toBe(chain.purchaseOrderId);
     expect(linked.data.order_type).toBe(ORDER_TYPE_PURCHASE);
 
-    const readback = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
+    const readback = await apiCall<WaybillRow>(
+      page,
+      'GET',
+      `/inventory/logistics/${chain.waybillId}`
+    );
     expect(readback.data.order_id, '关联必须真实落库（回读 order_id 等于目标采购单）').toBe(
       chain.purchaseOrderId
     );
@@ -554,7 +568,11 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     // 缺陷 3：与"运单不存在"共用同一脱敏文案，两枚 404 在响应面上不可区分
     expect(badPo.message).toBe(ghostMessageProbeOf(badPo.message));
 
-    const unchanged = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
+    const unchanged = await apiCall<WaybillRow>(
+      page,
+      'GET',
+      `/inventory/logistics/${chain.waybillId}`
+    );
     expect(unchanged.data.order_id, '被拒的关联腿不得改写 order_id').toBe(chain.purchaseOrderId);
 
     const ghostWaybill = await apiCallExpectFail(
@@ -579,10 +597,9 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
     const text = docxPlainText(bytes);
     expect(text, '面单必须渲染快递单号').toContain(chain.trackingNumber);
     expect(text, '面单必须渲染物流公司').toContain(chain.logisticsCompany);
-    expect(
-      text,
-      '面单必须渲染运单状态（打印数据装配含 status 列，print_service.rs 起）'
-    ).toContain(WAYBILL_STATUS_IN_TRANSIT);
+    expect(text, '面单必须渲染运单状态（打印数据装配含 status 列，print_service.rs 起）').toContain(
+      WAYBILL_STATUS_IN_TRANSIT
+    );
 
     const browser = page.context().browser();
     if (browser === null) {
@@ -603,7 +620,11 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
       'GET',
       `${waybillPath(chain.waybillId)}/tracking-events`
     );
-    const beforeFreight = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
+    const beforeFreight = await apiCall<WaybillRow>(
+      page,
+      'GET',
+      `/inventory/logistics/${chain.waybillId}`
+    );
 
     await loginAsRole(page, 'logistics_coordinator');
     const readDenied = await apiCallExpectFail(
@@ -638,9 +659,7 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
       ['POST link-purchase-order 派生 create', linkDenied],
       ['POST calculate-freight 派生 create', freightDenied],
     ] as const) {
-      expect(denied.status, `${label} 应被权限门拒（种子无角色持 logistics-tracking_*）`).toBe(
-        403
-      );
+      expect(denied.status, `${label} 应被权限门拒（种子无角色持 logistics-tracking_*）`).toBe(403);
       expect(denied.code, `${label} 的 403 必须归因权限门机器码`).toBe(APP_ERROR_CODES.FORBIDDEN);
     }
 
@@ -663,7 +682,11 @@ test.describe('物流面单链路 轨迹_运费_关联_打印 契约回读', () 
       afterEvents.data.filter(row => row.description.includes(`越权事件${marker}`)).length,
       '越权事件必须零落库'
     ).toBe(0);
-    const afterFreight = await apiCall<WaybillRow>(page, 'GET', `/inventory/logistics/${chain.waybillId}`);
+    const afterFreight = await apiCall<WaybillRow>(
+      page,
+      'GET',
+      `/inventory/logistics/${chain.waybillId}`
+    );
     expect(afterFreight.data.freight_fee, '被拒的运费腿不得改写 freight_fee').toBe(
       beforeFreight.data.freight_fee
     );
