@@ -30,6 +30,8 @@ import {
  * - POST `/purchase/suppliers/{sid}/qualifications/{qid}/attachment`（upload_supplier_qualification_attachment）
  *   multipart 文件字段名 `file`，成功回写 attachment_path 为服务端生成受控路径；
  *   校验清单：扩展名白名单 pdf/jpg/jpeg/png、魔数与后缀同族、大小<=5MB、非空；
+ *   客户端原名仅用于提取扩展名，不落盘不落库（服务端生成 {sid}_{qid}.{ext}），
+ *   原名长度不构成拒绝条件，attachment_path 列宽 VARCHAR(500) 约束的是生成 URL；
  * - GET `/purchase/suppliers/{sid}/qualifications/{qid}/attachment`（get_supplier_qualification_attachment）
  *   成功出参是裸字节流，Content-Type 按扩展名，Content-Disposition 含文件名；
  *   attachment_path 为 null 时 404 NOT_FOUND；
@@ -599,9 +601,11 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     await flushDeferredCleanups(page, cleanupQueue);
   });
 
-  // ─── 456-05 反假成功：空文件/超长名/非法后缀拒绝且无残留 ────────────────
+  // ─── 456-05 反假成功：空文件/非法后缀拒绝无残留；超长原名走服务端受控文件名 ───
 
-  test('456-05 empty file long name illegal ext all rejected no residual', async ({ page }) => {
+  test('456-05 empty file illegal ext rejected no residual long client name uses server-generated path', async ({
+    page,
+  }) => {
     const sid = await ensureSupplier(page);
 
     // (a) 空文件：0 字节
@@ -624,26 +628,56 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     await assertNoAttachment(page, sid, qidEmpty, '456-05a');
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qidEmpty}`);
 
-    // (b) 超长文件名（超过常见 255 字符路径限制）
+    // (b) 超长客户端原名：服务端丢弃原名、生成 {sid}_{qid}.{ext} 受控文件名（supplier_handler.rs），
+    // 原名不参与路径拼接也不落库，长度不是拒绝条件。断言真实契约：上传 200、attachment_path
+    // 为受控形态且不泄漏原名（等值断言同时覆盖 VARCHAR(500) 列宽）、回读一致、下载字节完整、删除后无残留。
     const qidLong = await createQualification(page, sid, '05b');
     const longName = 'a'.repeat(250) + '.pdf';
-    const longUp = await uploadAttachment(
-      page,
-      sid,
-      qidLong,
-      longName,
-      'application/pdf',
-      buildPdfBuffer('456-05b')
-    );
+    const pdfLong = buildPdfBuffer('456-05b');
+    const longUp = await uploadAttachment(page, sid, qidLong, longName, 'application/pdf', pdfLong);
     console.log(
       `[456-05b] long name upload status=${longUp.status} code=${longUp.code} msg=${longUp.message}`
     );
     expect(
-      longUp.status >= 400 && longUp.status < 500,
-      `456-05b long filename must 4xx, actual ${longUp.status} code=${longUp.code}`
-    ).toBe(true);
-    await assertNoAttachment(page, sid, qidLong, '456-05b');
+      longUp.status,
+      `456-05b long client name is discarded server-side, upload must 200, actual ${longUp.status} msg=${longUp.message}`
+    ).toBe(200);
+    expect(longUp.code, `456-05b success envelope code must 200, actual ${longUp.code}`).toBe(200);
+    const controlledPath = `/uploads/qualifications/${sid}_${qidLong}.pdf`;
+    expect(longUp.data, '456-05b upload response data must be present').not.toBeNull();
+    expect(
+      String(longUp.data!.attachment_path),
+      `456-05b attachment_path must be server-generated ${controlledPath}, client name must not leak into path`
+    ).toBe(controlledPath);
+    const rowLong = await readQualFromList(page, sid, qidLong, '456-05b-readback');
+    expect(
+      String(rowLong.attachment_path),
+      `456-05b list read-back attachment_path must be ${controlledPath}`
+    ).toBe(controlledPath);
+    const dlLong = await page.request.get(
+      fullUrl(`/purchase/suppliers/${sid}/qualifications/${qidLong}/attachment`)
+    );
+    expect(dlLong.status(), `456-05b download must 200, actual ${dlLong.status()}`).toBe(200);
+    const dlLongBytes = Buffer.from(await dlLong.body());
+    expect(
+      dlLongBytes.length,
+      `456-05b download byte count must equal upload ${pdfLong.length}, actual ${dlLongBytes.length}`
+    ).toBe(pdfLong.length);
+    // latin1 逐字节一一映射为码点，字符串相等即字节内容相等（Buffer 窄类型面无 equals）
+    expect(
+      dlLongBytes.toString('latin1'),
+      '456-05b download bytes must equal uploaded PDF content'
+    ).toBe(pdfLong.toString('latin1'));
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qidLong}`);
+    const goneLong = await apiCallExpectFail(
+      page,
+      'GET',
+      `/purchase/suppliers/${sid}/qualifications/${qidLong}/attachment`
+    );
+    expect(
+      goneLong.status,
+      `456-05b after delete attachment must 404, actual ${goneLong.status}`
+    ).toBe(404);
 
     // (c) 非法后缀 .exe
     const qidExe = await createQualification(page, sid, '05c');
