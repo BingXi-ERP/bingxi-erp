@@ -6,7 +6,6 @@ use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use crate::models::notification::{NotificationStatus, NotificationType};
 use crate::services::notification_service::NotificationService;
-use crate::utils::admin_checker::is_admin_role;
 use crate::utils::error::AppError;
 use crate::utils::response::ApiResponse;
 use axum::{
@@ -227,20 +226,13 @@ pub struct AnnouncementResult {
     pub delivered_count: usize,
 }
 
-/// 发送系统公告（仅管理员）：向指定用户列表广播 SYSTEM 类型通知
+/// 发送系统公告（门控口径是权限键 notifications:create，由鉴权中间件按 URL 段派生后判定）：
+/// 向指定用户列表广播 SYSTEM 类型通知
 pub async fn create_announcement(
     auth: AuthContext,
     State(state): State<AppState>,
     Json(req): Json<CreateAnnouncementRequest>,
 ) -> Result<Json<ApiResponse<AnnouncementResult>>, AppError> {
-    // 仅管理员可发公告（与用户管理同一 admin 判定）
-    let role_id = auth
-        .role_id
-        .ok_or_else(|| AppError::permission_denied("用户未分配角色，无法发送系统公告"))?;
-    if !is_admin_role(&state.db, role_id).await {
-        return Err(AppError::permission_denied("系统公告仅限管理员发送"));
-    }
-
     // 入参校验
     let title = req.title.trim();
     let content = req.content.trim();
