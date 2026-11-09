@@ -168,3 +168,14 @@ mp-check-pages.cjs、mp-endpoint-check.cjs 四枚都是 A，.gitignore 是 M，�
 2. 工具自身故障（CLI 取不到、网络失败、依赖装不上）归 unverified，不判红也不判绿，并在日志打显式哨兵行。
 3. 该 job 必须同时登记进 ci-cleanup-retry.needs，否则收尾聚合看不见它，等于没接门禁；改 needs 后要以下一轮实跑输出的格数为准复核，不按声明数采信。
 4. declared 那份手工映射表与本域新增的 e2e 用例之间存在反向耦合：新增页面而 declared 不更新，配对门就只会报"未声明"而不是"缺用例"。本域落地时必须同时把新面补进 declared，并在同一笔提交里补配套用例，否则按用户口径禁止合并。
+
+### 第八节补 配对门的作用面实测与一条必须同时补的洞
+
+主干确实已有"新增功能必须配套 e2e 用例"的判定器 frontend/scripts/check-e2e-feature-pairing.mjs（配套 exempt 清单 e2e-feature-pairing-exempt.json），它自述端点集取自 walkBackendRoutes()，与 check-api-paths 和 route-snapshot 同一套；源文本集默认只扫 frontend/src。
+
+由此两条结论，都要在小程序这一支里同时处理：
+
+1. 小程序新增的微信后端腿端点会天然进配对门：只要新增端点而没有任何 spec 文本引用它，门就判负。这是好事，不另立门。
+2. 小程序页面本身不在门的作用面内：页面的 wxml 与 json 不在 frontend/src 下，页面级新增不会触发配对判定，于是"新增功能必须配套用例"这条对小程序页面是静默失效而不是通过。修法是把小程序页面目录显式纳入判定器的源集或另立一条页面↔用例配对（页面路径出现在 app.json 的 pages 或 subPackages 里，就必须能在用例文本或页面级清单里被引用），并按本仓新门纪律先跑"只报告加首轮基线"，否则刚落地的小程序树会把每条在途支挂红。
+
+附带一条已排除的风险：feature-completeness-check 在第 4088 行附近有 sys.exit(1)，是硬门；其 declared 手工映射在 BOM 下线支里已同步摘掉 BOM 项（该支实测同时改了 router、TermsView 与本文件），所以该支不会因为摘 BOM 路由而撞这枚门。
