@@ -91,3 +91,17 @@
 1. 二者必须同源，只能选一种：把受理面的角色判定换成权限键判定（并让矩阵只有 admin 持 notifications:create），或者前端把公告卡的可达条件改成与后端同一 admin 事实。建议前者，理由是仓内鉴权键由 URL 段推导，权限键才是唯一口径，硬编码角色码是第二套真相源。
 2. 配套 e2e 断两向：持 notifications:create 的非 admin 岗位公告卡不可达（或点发送得到与后端一致的拒绝文案），admin 岗位发送成功且 delivered_count 由库里回读。
 3. 不许用前端隐藏代替后端判定，也不许把后端判定放宽成权限键而矩阵仍发给非 admin，那样会把拒绝变成真发送。
+
+## D-66 取档回来的小程序源码缺四张页面，11 处跳转是死链（P1，功能缺失）
+
+实证（同日实测，工作树 wt-mp-land 分支 feat/wechat-miniprogram-domain）：门禁 `bash scripts/ci/miniprogram-checks.sh` 首轮真跑 rc 1，第七道报 `MP_ROUTE_RED 有 11 处跳转路由落不到 app.json 声明页`。11 处调用点去重成 10 个"调用点文件 加 跳转目标"键，归并为 4 个落点页。双口径逐条核存在性：一是查页面上的 wxml 与 json 文件，二是查 app.json 的 pages 与 subPackages 声明，四个落点两口径全为零。
+
+四个缺失落点分别是发布需求 post-demand、报价信息 offer-info、选择报价 my-post-result-choose、需求订单详情 demand-order-detail。app.json 的 demand 族实际只声明 13 页（demand-square、demand-banner、demand-detail、demand-order/index、add-address、address-manage、my-demand、my-post-result-detail、my-post-result、my-post-schedule、search-demand、search-join、search-post），均不含上述四页。其中 offer-info 的调用点字面量写成 offer-onfo，看似笔误，但把正确拼写一并查也是盘上零文件零声明，故不能只改拼交了事。
+
+后果：这四条链路的入口在界面上可点，点了必然跳转失败。目标里"询样提交""客户自助对账确认""看订单进度"这类小程序独有链路因此实际不可达，属功能缺失而非用例缺失。
+
+处置与边界（本轮已做与不许做的分开写清）：
+
+1. 已做：第七道改只报告加棘轮基线（提交 9771a888b）。基线文件 scripts/ci/miniprogram-route-baseline.txt 十条键不含行号，理由是行号会随上方任意改动漂移而造出假新增；判定改成分层，基线内打 MP_ROUTE_RATCHET baselined=N new=0 并返 0，基线外新增打 MP_ROUTE_NEW_DEAD 逐条点名后判红；缺基线文件或基线去注释后为空一律走 tool_bug，不把读不到参照面咽成没有新增。改后三件验证齐过：bash -n rc 0，--self-test 仍 caught=7/7 missed:0 与 MP_DETECTOR_OK（证明反向探针没被基线吞掉，新增判红路径仍有效），真跑 MP_CHECK_GREEN 且 STEP_END routes rc 0。
+2. 不许做：不凭空补造这四页。页面业务逻辑未知，造页等于编功能，属仓内禁止的假可供性，也与"测试要真测"相悖。基线文件头已写明修掉一条就从基线删一行，基线是债务台账不是免修凭证。
+3. 待办：拿真实小程序源（或向业务确认目标页应落何处）逐条补齐，补齐后同支删对应基线行并把跳转链路的 e2e 或小程序侧用例补上；号段用 473 到 479 中已划给小程序域的号。
