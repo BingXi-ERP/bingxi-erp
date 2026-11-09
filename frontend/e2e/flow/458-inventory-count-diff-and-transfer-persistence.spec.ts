@@ -926,13 +926,26 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `无匹配库存必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(noStock.code)}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
 
-    // 负例五：调拨量超出现存量 → business 族 400，且库存与明细零落库
+    // 负例五：调拨量超出现存量 → business 族 400，且库存与明细零落库。
+    // 量门腿走白坯行：染色布出库强制第四维匹号且须命中真实可用匹，维度校验先于可用量
+    // 预检执行，指着染色行会让本腿被维度门挡掉而测不到超量判定；白坯免缸号与匹号，
+    // 四维退化为批次唯一维度，available 小于 quantity 这一支才真被测到。
+    const overBatch = `B-OVER-${tag}`;
+    const overSeed = await seedGreigeStockIn(page, {
+      productId,
+      warehouseId,
+      batchNo: overBatch,
+      quantityMeters: '80',
+    });
+    expect(numOf(overSeed, 'id', '超量腿白坯播种行'), '白坯库存行主键必须为正整数').toBeGreaterThan(
+      0
+    );
     const overQty = await apiCallExpectFail(page, 'POST', '/inventory/transfers', {
       from_warehouse_id: warehouseId,
       to_warehouse_id: toWarehouseId,
       transfer_date: new Date().toISOString(),
       notes: `E2E${tag}-OVERQTY`,
-      items: [{ product_id: productId, quantity: '999999.00', batch_no: keepBatch }],
+      items: [{ product_id: productId, quantity: '999999.00', batch_no: overBatch }],
     });
     expect(overQty.status, `超出现存量的调拨必须 400，实际 ${overQty.status}`).toBe(400);
     expect(
@@ -942,8 +955,8 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     const keepAfterOver = await readStockRow(page, {
       productId,
       warehouseId,
-      batchNo: keepBatch,
-      colorNo: `E2E${tag}-K`,
+      batchNo: overBatch,
+      colorNo: '',
       label: '458-04 超量拒绝后',
     });
     expect(numOf(keepAfterOver, 'quantity_available', '超量拒绝后'), '被拒调拨不许动可用量').toBe(
