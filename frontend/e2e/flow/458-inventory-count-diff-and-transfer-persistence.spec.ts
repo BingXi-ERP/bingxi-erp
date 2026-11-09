@@ -800,11 +800,15 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     const tag = genCode('458D');
     const keepBatch = `B-KEEP-${tag}`;
     const dropBatch = `B-DROP-${tag}`;
+    // 保留行的色号与缸号是调拨四维命中判据的两维，由这里单点定义，
+    // 让播种与后续各条调拨腿共用同一份常量，避免腿里漏传或与播种值漂移
+    const keepColor = `E2E${tag}-K`;
+    const keepLot = `LOT-K-${tag}`;
     const keepRow = await seedFourDimStockIn(page, {
       productId,
       warehouseId,
-      colorNo: `E2E${tag}-K`,
-      dyeLotNo: `LOT-K-${tag}`,
+      colorNo: keepColor,
+      dyeLotNo: keepLot,
       batchNo: keepBatch,
       quantityMeters: '80',
     });
@@ -849,7 +853,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       productId,
       warehouseId,
       batchNo: keepBatch,
-      colorNo: `E2E${tag}-K`,
+      colorNo: keepColor,
       label: '458-04 幽灵行录入后',
     });
     expect(numOf(keepAfterGhost, 'quantity_on_hand', '幽灵行录入后'), '被拒录入不许动库存').toBe(
@@ -909,18 +913,32 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     ).toBe('实盘数量不能为负');
 
     // 负例四：调拨批次在调出仓无匹配库存 → business 族 400（建单期预检，不留半截单）
+    // 色号与缸号必须与保留行同值而只把批次换成不存在的号，否则四维匹配在色号这一维
+    // 就落空，该腿会以"无匹配库存"的名义挡住本不该挡的请求，测不到批次维度的判定
     const noStock = await apiCallExpectFail(page, 'POST', '/inventory/transfers', {
       from_warehouse_id: warehouseId,
       to_warehouse_id: toWarehouseId,
       transfer_date: new Date().toISOString(),
       notes: `E2E${tag}-NOSTOCK`,
-      items: [{ product_id: productId, quantity: '10.00', batch_no: `B-ABSENT-${tag}` }],
+      items: [
+        {
+          product_id: productId,
+          quantity: '10.00',
+          color_no: keepColor,
+          dye_lot_no: keepLot,
+          batch_no: `B-ABSENT-${tag}`,
+        },
+      ],
     });
     expect(noStock.status, `无匹配库存的调拨必须 400，实际 ${noStock.status}`).toBe(400);
     expect(
       failureCode(noStock),
       `无匹配库存必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(noStock.code)}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    expect(
+      String(noStock.message),
+      `无匹配库存腿的拒因必须落在批次维度，实际 ${JSON.stringify(noStock.message)}`
+    ).toContain('无匹配库存');
 
     // 负例五：调拨量超出现存量 → business 族 400，且库存与明细零落库
     const overQty = await apiCallExpectFail(page, 'POST', '/inventory/transfers', {
@@ -928,18 +946,32 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       to_warehouse_id: toWarehouseId,
       transfer_date: new Date().toISOString(),
       notes: `E2E${tag}-OVERQTY`,
-      items: [{ product_id: productId, quantity: '999999.00', batch_no: keepBatch }],
+      items: [
+        {
+          product_id: productId,
+          quantity: '999999.00',
+          color_no: keepColor,
+          dye_lot_no: keepLot,
+          batch_no: keepBatch,
+        },
+      ],
     });
     expect(overQty.status, `超出现存量的调拨必须 400，实际 ${overQty.status}`).toBe(400);
     expect(
       failureCode(overQty),
       `超出现存量必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(overQty.code)}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    expect(
+      String(overQty.message),
+      `超量腿必须被可用量不足挡住而不是无匹配库存，否则该腿没测到预检本身，实际 ${JSON.stringify(
+        overQty.message
+      )}`
+    ).toContain('库存不足');
     const keepAfterOver = await readStockRow(page, {
       productId,
       warehouseId,
       batchNo: keepBatch,
-      colorNo: `E2E${tag}-K`,
+      colorNo: keepColor,
       label: '458-04 超量拒绝后',
     });
     expect(numOf(keepAfterOver, 'quantity_available', '超量拒绝后'), '被拒调拨不许动可用量').toBe(
@@ -980,7 +1012,15 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       to_warehouse_id: toWarehouseId,
       transfer_date: new Date().toISOString(),
       notes: `E2E${tag}-NEG`,
-      items: [{ product_id: productId, quantity: '-5.00', batch_no: keepBatch }],
+      items: [
+        {
+          product_id: productId,
+          quantity: '-5.00',
+          color_no: keepColor,
+          dye_lot_no: keepLot,
+          batch_no: keepBatch,
+        },
+      ],
     });
     const negativeId = numOf(negative.data as Row, 'id', '负数量建单响应');
     expect(
@@ -997,7 +1037,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       productId,
       warehouseId,
       batchNo: keepBatch,
-      colorNo: `E2E${tag}-K`,
+      colorNo: keepColor,
       label: '458-04 负数量建单后',
     });
     expect(
