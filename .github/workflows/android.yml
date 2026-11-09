@@ -235,12 +235,74 @@ jobs:
           grep -q 'manifestPlaceholders\["usesCleartextTraffic"\] = "false"' "$GRADLE" || { echo '未找到明文流量占位符默认值，Tauri 模板已变，需人工校准'; exit 1; }
           sed -i 's/manifestPlaceholders\["usesCleartextTraffic"\] = "false"/manifestPlaceholders["usesCleartextTraffic"] = "true"/' "$GRADLE"
           grep -q 'manifestPlaceholders\["usesCleartextTraffic"\] = "true"' "$GRADLE" || { echo '明文流量占位符改写未生效'; exit 1; }
+          # gradle 发行包官方源超时中断时回退可达镜像，distributionSha256Sum 钉死官方校验值
+          # 保完整性（镜像产物被替换即 wrapper 自判红）；镜像不可达或版本不符保持官方源不改动。
+          WRAP="src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties"
+          GVER="$(sed -n 's|^distributionUrl=.*gradle-\([0-9.]*\)-bin\.zip.*|\1|p' "$WRAP")"
+          if [ "$GVER" = "9.6.1" ] && curl -sIf --max-time 20 -o /dev/null "https://mirrors.cloud.tencent.com/gradle/gradle-${GVER}-bin.zip"; then
+            sed -i "s|^distributionUrl=.*|distributionUrl=https://mirrors.cloud.tencent.com/gradle/gradle-${GVER}-bin.zip|" "$WRAP"
+            grep -q '^distributionSha256Sum=' "$WRAP" || echo 'distributionSha256Sum=9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14' >> "$WRAP"
+            echo "gradle 发行包回退镜像源：${GVER}"
+          fi
+          # kotlin 构件被 Maven Central 重定向到 GitHub release 资产，该资产当前中断。追加仓库无效：
+          # 重定向失败是错误而不是缺失，gradle 不会落到后一个仓库，必须插到 repositories 块最前。
+          # 做什么 逐个脚本在每个独立成行的 repositories 块开块行后插入两枚中央仓直连镜像（先对象存储镜像、
+          #        后公共代理，两枚都自管产物字节、不再重定向到 GitHub release），语法按后缀分流。
+          #        工程由 初始化 Android 工程 步现场生成，脚本名随模板版本漂移，故按后缀枚举而非写死文件名。
+          # 存哪里 只改 CI 现场生成的 src-tauri/gen/android 下 gradle 脚本，不进版本库。
+          # 判负 一个 repositories 块都没插进即判红并打出枚举到的脚本清单，防模板漂移静默失效。
+          PATCHED=0
+          while IFS= read -r F; do
+            if grep -q 'maven.aliyun.com/repository/public' "$F"; then
+              PATCHED=1
+              continue
+            fi
+            if ! grep -qE '^[[:space:]]*repositories \{$' "$F"; then
+              continue
+            fi
+            case "$F" in
+              *.gradle.kts) LINE='        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }\n        maven { url = uri("https://maven.aliyun.com/repository/public") }' ;;
+              *) LINE="        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }\n        maven { url 'https://maven.aliyun.com/repository/public' }" ;;
+            esac
+            sed -i "s|\([[:space:]]*\)repositories {$|\1repositories {\n${LINE}|" "$F"
+            if grep -q 'maven.aliyun.com/repository/public' "$F"; then
+              PATCHED=1
+            fi
+          done < <(find src-tauri/gen/android -maxdepth 4 \( -name '*.gradle' -o -name '*.gradle.kts' \) -print | sort)
+          if [ "$PATCHED" != "1" ]; then
+            echo '镜像仓库插入未命中任何 repositories 块，模板已变，需人工校准'
+            find src-tauri/gen/android -maxdepth 4 \( -name '*.gradle' -o -name '*.gradle.kts' \) -print | sort | sed 's|^|在场 gradle 脚本: |'
+            exit 1
+          fi
 
       - name: 构建 debug APK
+        # 调用方 严格冒烟·3 与 严格冒烟·4 与 release 构建与模拟器 E2E 依赖本步产物。入参 无。
+        # 做什么 首跑失败且失败面命中上游构件拉取中断哨兵时原样重跑一次并打出两次日志；
+        #        重跑仍失败按第二次退出码判红，非网络族失败不重跑，判定语义与阈值不变。
+        # 为什么 gradle 发行包与镜像仓库只覆盖有镜像的构件，中央仓重定向到的 GitHub release 资产
+        #        瞬时 5xx 与连接重置无镜像可替，原样重跑是唯一不改判定的兜底。
+        # 存哪里 只写 CI 现场 gradle 缓存与 /tmp 下的两份构建日志，不进版本库。
         working-directory: mobile-app
         env:
           NDK_HOME: ${{ format('{0}/ndk/{1}', env.ANDROID_HOME, env.NDK_VERSION) }}
-        run: cargo tauri android build --debug --apk
+        run: |
+          set -euo pipefail
+          set +e
+          cargo tauri android build --debug --apk > /tmp/apk-build-1.log 2>&1
+          RC=$?
+          set -e
+          cat /tmp/apk-build-1.log
+          if [ "$RC" -ne 0 ] && grep -qE 'Could not GET|Could not download|Could not resolve|Connection reset|Read timed out|status code 5[0-9][0-9]' /tmp/apk-build-1.log; then
+            echo '上游构件拉取中断哨兵命中，原样重跑一次（第二次结果即终局）'
+            set +e
+            cargo tauri android build --debug --apk > /tmp/apk-build-2.log 2>&1
+            RC2=$?
+            set -e
+            cat /tmp/apk-build-2.log
+            [ "$RC2" -eq 0 ] || exit "$RC2"
+          else
+            [ "$RC" -eq 0 ] || exit "$RC"
+          fi
 
       - name: 严格冒烟·3 校验 APK 清单（包名/launcher/minSdk/权限/明文流量/插件类/体积）
         run: |
