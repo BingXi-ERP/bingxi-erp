@@ -624,7 +624,9 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     await assertNoAttachment(page, sid, qidEmpty, '456-05a');
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qidEmpty}`);
 
-    // (b) 超长文件名（超过常见 255 字符路径限制）
+    // (b) 超长文件名：存盘名由服务端按 {supplier}_{qualification}.{ext} 生成，
+    // 客户端原名既不入库也不进路径，因此超长原名不构成拒绝项而是必须被彻底忽略；
+    // 该腿钉的是"原名不参与任何出参与路径"这一契约，而不是状态码拒绝
     const qidLong = await createQualification(page, sid, '05b');
     const longName = 'a'.repeat(250) + '.pdf';
     const longUp = await uploadAttachment(
@@ -639,10 +641,22 @@ test.describe.serial('456 attachment flow and print data chain', () => {
       `[456-05b] long name upload status=${longUp.status} code=${longUp.code} msg=${longUp.message}`
     );
     expect(
-      longUp.status >= 400 && longUp.status < 500,
-      `456-05b long filename must 4xx, actual ${longUp.status} code=${longUp.code}`
-    ).toBe(true);
-    await assertNoAttachment(page, sid, qidLong, '456-05b');
+      longUp.status,
+      `456-05b 后缀与内容体检通过的超长名上传应 200，实际 ${longUp.status} code=${longUp.code}`
+    ).toBe(200);
+    const longPath = String(longUp.data!.attachment_path);
+    expect(
+      longPath,
+      `456-05b 存盘路径必须是服务端生成的 ${sid}_${qidLong}.pdf 形态，实际 ${longPath}`
+    ).toBe(`/uploads/qualifications/${sid}_${qidLong}.pdf`);
+    expect(
+      longPath,
+      `456-05b 客户端原名不得进入存盘路径（否则超长名与路径拼接面可被利用），实际 ${longPath}`
+    ).not.toContain('a'.repeat(30));
+    expect(
+      JSON.stringify(longUp.data ?? {}),
+      '456-05b 出参任何字段都不得回显客户端原名'
+    ).not.toContain('a'.repeat(30));
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qidLong}`);
 
     // (c) 非法后缀 .exe
