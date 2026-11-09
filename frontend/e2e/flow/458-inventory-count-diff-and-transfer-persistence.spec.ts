@@ -1436,28 +1436,52 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `被拒的会计岗建单不许落库，实际命中 ${JSON.stringify(mine).slice(0, 200)}`
     ).toBe(0);
 
-    // 库存经理做自己那步：提交与过账都放行（键 counts:submit 与 counts:approve）
-    // 并证明过账真实落库——仓管录的 77 米在库存行上读出，不是响应回显
+    // 库存经理做自己那步：提交放行（键 counts:submit），过账按岗责分离交下一岗。
+    // 靶子必须是本会话自建自录的盘点单——提交腿在 handler 侧带 data_scope 做归属校验，
+    // 拿仓管名下的单去提交必被归属层拒，那不是本断言要证的键检放行。
+    // 同一岗也不自批：补建岗的授权通道按 create 与 approve 共存校验拒同岗自批自过，
+    // 业务口径上盘点录入岗与差异过账岗本就应当分离，这里把它钉成正向断言。
     await loginAsRole(page, 'inventory_manager');
-    const mgrSubmit = await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${countId}/submit`);
+    const mgrStock = await seedFourDimStockIn(page, {
+      productId,
+      warehouseId,
+      colorNo: `E2E${tag}-M`,
+      dyeLotNo: `LOT-M-${tag}`,
+      batchNo: `B-ROLE2-${tag}`,
+      quantityMeters: '60',
+    });
+    const mgrStockId = numOf(mgrStock, 'id', '经理会话库存行');
+    const mgrCount = await apiCallRaw<Row>(page, 'POST', '/inventory/counts', {
+      warehouse_id: warehouseId,
+      count_date: new Date().toISOString(),
+      notes: `E2E${tag}-M`,
+      stock_ids: [mgrStockId],
+    });
+    const mgrCountId = numOf(mgrCount, 'id', '经理建单响应');
+    await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${mgrCountId}/record`, {
+      items: [{ stock_id: mgrStockId, quantity_actual: '88.00' }],
+    });
+    const mgrSubmit = await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${mgrCountId}/submit`);
     expect(
       String(mgrSubmit.status),
-      `库存经理提交后必须为 ${COUNT_STATUS.IN_REVIEW}，实际 ${JSON.stringify(mgrSubmit.status)}`
+      `库存经理提交自建单后必须为 ${COUNT_STATUS.IN_REVIEW}，实际 ${JSON.stringify(mgrSubmit.status)}`
     ).toBe(COUNT_STATUS.IN_REVIEW);
-    const mgrApprove = await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${countId}/approve`);
-    expect(String(mgrApprove.status), '库存经理过账后必须为 completed').toBe(
-      COUNT_STATUS.COMPLETED
+    const mgrSelfApprove = await apiCallExpectFail(
+      page,
+      'POST',
+      `/inventory/counts/${mgrCountId}/approve`
     );
+    expectDenied(mgrSelfApprove, '提交岗自批差异过账必须被拒（键 counts:approve 未授，岗责分离）');
 
     // 库存列表与详情对"无 inventory_stock 数据权限配置且非 admin"的岗位默认隐藏五个数量列
     // （inventory_stock_handler.rs 的详情与列表辅助函数同一口径）。经理会话下读不到账面量
-    // 是脱敏契约生效，不是过账没落库。先在经理会话把这条脱敏正向钉住，再切回 admin 做库读，
-    // 证明实盘 77 真落进库存行，两件事各自可证，不拿被隐藏的字段当落库证据。
+    // 是脱敏契约生效，不是过账没落库。先在经理会话把自己名下那行钉住脱敏正向，再切到
+    // 过账岗做库读，证明实盘 88 真落进库存行，两件事各自可证，不拿被隐藏的字段当落库证据。
     const stockAsMgr = await readStockRow(page, {
       productId,
       warehouseId,
-      batchNo,
-      colorNo: `E2E${tag}-R`,
+      batchNo: `B-ROLE2-${tag}`,
+      colorNo: `E2E${tag}-M`,
       label: '458-06 经理会话脱敏面',
     });
     expect(
@@ -1465,23 +1489,46 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       '非 admin 且无库存数据权限配置的岗位，库存出参必须隐藏 quantity_on_hand'
     ).toBe(false);
 
+    // 过账腿由岗责分离的下一岗做，并证明过账真实落库——经理自录的 88 米在库存行上读出，
+    // 不是响应回显；同段复核仓管名下那行仍是 70，被拒的提交全程没搬过账面。
     await loginAsRole(page, 'admin');
-    const stockAfterMgrApprove = await readStockRow(page, {
+    const mgrApprove = await apiCallRaw<Row>(
+      page,
+      'POST',
+      `/inventory/counts/${mgrCountId}/approve`
+    );
+    expect(String(mgrApprove.status), '下一岗审批后必须为 completed').toBe(COUNT_STATUS.COMPLETED);
+
+    const stockAfterApprove = await readStockRow(page, {
+      productId,
+      warehouseId,
+      batchNo: `B-ROLE2-${tag}`,
+      colorNo: `E2E${tag}-M`,
+      label: '458-06 过账岗过账后',
+    });
+    expect(
+      numOf(stockAfterApprove, 'quantity_on_hand', '过账岗过账后'),
+      '经理自建自录加下一岗过账的跨岗位链路必须把实盘 88 落进库存行'
+    ).toBe(88);
+    expect(
+      numOf(stockAfterApprove, 'quantity_available', '过账岗过账后'),
+      '过账后可用量必须同步为实盘 88'
+    ).toBe(88);
+
+    const keeperRowFinal = await readStockRow(page, {
       productId,
       warehouseId,
       batchNo,
       colorNo: `E2E${tag}-R`,
-      label: '458-06 库存经理过账后',
+      label: '458-06 被拒单终局复核',
     });
     expect(
-      numOf(stockAfterMgrApprove, 'quantity_on_hand', '库存经理过账后'),
-      '仓管录入加库存经理过账的跨岗位链路必须把实盘 77 落进库存行'
-    ).toBe(77);
-    expect(
-      numOf(stockAfterMgrApprove, 'quantity_available', '库存经理过账后'),
-      '过账后可用量必须同步为实盘 77'
-    ).toBe(77);
-    console.log(`[458-06] 角色面完成 count=${countId} transfer=${transferId}`);
+      numOf(keeperRowFinal, 'quantity_on_hand', '被拒单终局复核'),
+      '仓管那枚提交被拒的盘点单全程不许搬账面'
+    ).toBe(70);
+    console.log(
+      `[458-06] 角色面完成 keeperCount=${countId} mgrCount=${mgrCountId} transfer=${transferId}`
+    );
   });
 
   test('458-07 写后重读防线 派生值与主表统计一律以库里读数为准', async ({ page }) => {
