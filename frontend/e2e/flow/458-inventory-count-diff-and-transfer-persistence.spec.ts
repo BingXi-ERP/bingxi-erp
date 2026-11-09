@@ -1004,6 +1004,10 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       numOf(negativeItems[0], 'quantity', '负数量明细行'),
       '负数量必须如实落库为 -5（不被静默取绝对值或清零）'
     ).toBe(-5);
+    // 建单用库存经理会话避开管理员建单频率门；库存行回读必须切回管理员会话，
+    // 库存列表对非管理员删 quantity_available 等五个数量键（inventory_stock_handler.rs
+    // apply_data_permission_filter 的角色脱敏），库存经理会话读不到可用量键。
+    await loginAsRole(page, 'admin');
     const negativeStockAfter = await readStockRow(page, {
       productId,
       warehouseId,
