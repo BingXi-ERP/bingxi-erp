@@ -972,15 +972,26 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `缺维度拒因必须点明缺哪一维并回显用户提交的色号，实际 ${JSON.stringify(missingDim.message)}`
     ).toBe(`调拨出库：染色布必须提供缸号（color_no=${missingDimColor} 但 dye_lot_no 为空）`);
 
-    // 负数量腿按真实契约钉：调拨明细无非负校验，建单被接受（源码缺陷，本支只暴露不修）
-    // 改由库存经理会话建，避开管理员一小时内 10 次建单的频率门；不发 ship 以免造反向库存
+    // 负数量腿按真实契约钉：调拨明细无非负校验，建单被接受（源码缺陷，本支只暴露不修）。
+    // 预检按归一维度匹配库存行：只带 batch_no 的 payload 其 color_no 缺省为空串（白坯），
+    // 仅命中 color_no 为空的库存行；染色批次缺色号会在匹配期以无匹配库存被拒、到不了数量比较。
+    // 故本腿自建白坯批次，确保预检命中并走到 available < quantity（负数恒不触发）。
+    // 改由库存经理会话建，避开管理员一小时内 10 次建单的频率门；不发 ship 以免造反向库存。
+    const negativeBatch = `B-NEG-${tag}`;
+    const negativeSeed = await seedGreigeStockIn(page, {
+      productId,
+      warehouseId,
+      batchNo: negativeBatch,
+      quantityMeters: '80',
+    });
+    const negativeAvailableBefore = numOf(negativeSeed, 'quantity_available', '负数量白坯播种行');
     await loginAsRole(page, 'inventory_manager');
     const negative = await apiCall<Row>(page, 'POST', '/inventory/transfers', {
       from_warehouse_id: warehouseId,
       to_warehouse_id: toWarehouseId,
       transfer_date: new Date().toISOString(),
       notes: `E2E${tag}-NEG`,
-      items: [{ product_id: productId, quantity: '-5.00', batch_no: keepBatch }],
+      items: [{ product_id: productId, quantity: '-5.00', batch_no: negativeBatch }],
     });
     const negativeId = numOf(negative.data as Row, 'id', '负数量建单响应');
     expect(
@@ -993,17 +1004,17 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       numOf(negativeItems[0], 'quantity', '负数量明细行'),
       '负数量必须如实落库为 -5（不被静默取绝对值或清零）'
     ).toBe(-5);
-    const keepAfterNegative = await readStockRow(page, {
+    const negativeStockAfter = await readStockRow(page, {
       productId,
       warehouseId,
-      batchNo: keepBatch,
-      colorNo: `E2E${tag}-K`,
+      batchNo: negativeBatch,
+      colorNo: '',
       label: '458-04 负数量建单后',
     });
     expect(
-      numOf(keepAfterNegative, 'quantity_available', '负数量建单后'),
+      numOf(negativeStockAfter, 'quantity_available', '负数量建单后'),
       '负数量建单阶段不许动库存'
-    ).toBe(80);
+    ).toBe(negativeAvailableBefore);
     console.error(
       `[458-04][缺陷登记] 调拨负数量缺门：POST /inventory/transfers 接受 quantity=-5 并如实落库` +
         `（明细 id 见 ${negativeId}），建单期可用量预检判据为 available < quantity，负数恒不触发；` +
