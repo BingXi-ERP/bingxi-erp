@@ -912,23 +912,29 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `负实盘量拒因必须外显可读，实际 ${JSON.stringify(negativeActual.message)}`
     ).toBe('实盘数量不能为负');
 
+    // 三条调拨量门腿走白坯行：染色布出库强制第四维匹号且须命中真实可用匹，
+    // 维度校验会先于可用量预检把请求挡掉，量门两支就都测不到；白坯免缸号与匹号，
+    // 四维退化为批次唯一维度，才能分别钉到"无匹配库存"与"可用量不足"（与 458-03 同口径）
+    const greigeBatch = `B-GREIGE-${tag}`;
+    const greigeRow = await seedGreigeStockIn(page, {
+      productId,
+      warehouseId,
+      batchNo: greigeBatch,
+      quantityMeters: '80',
+    });
+    expect(
+      numOf(greigeRow, 'id', '白坯调拨腿库存行'),
+      '白坯库存行主键必须为正整数'
+    ).toBeGreaterThan(0);
+
     // 负例四：调拨批次在调出仓无匹配库存 → business 族 400（建单期预检，不留半截单）
-    // 色号与缸号必须与保留行同值而只把批次换成不存在的号，否则四维匹配在色号这一维
-    // 就落空，该腿会以"无匹配库存"的名义挡住本不该挡的请求，测不到批次维度的判定
+    // 产品与白坯口径都与播种行同源，只把批次换成不存在的号，落空原因才真在批次这一维
     const noStock = await apiCallExpectFail(page, 'POST', '/inventory/transfers', {
       from_warehouse_id: warehouseId,
       to_warehouse_id: toWarehouseId,
       transfer_date: new Date().toISOString(),
       notes: `E2E${tag}-NOSTOCK`,
-      items: [
-        {
-          product_id: productId,
-          quantity: '10.00',
-          color_no: keepColor,
-          dye_lot_no: keepLot,
-          batch_no: `B-ABSENT-${tag}`,
-        },
-      ],
+      items: [{ product_id: productId, quantity: '10.00', batch_no: `B-ABSENT-${tag}` }],
     });
     expect(noStock.status, `无匹配库存的调拨必须 400，实际 ${noStock.status}`).toBe(400);
     expect(
@@ -946,15 +952,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       to_warehouse_id: toWarehouseId,
       transfer_date: new Date().toISOString(),
       notes: `E2E${tag}-OVERQTY`,
-      items: [
-        {
-          product_id: productId,
-          quantity: '999999.00',
-          color_no: keepColor,
-          dye_lot_no: keepLot,
-          batch_no: keepBatch,
-        },
-      ],
+      items: [{ product_id: productId, quantity: '999999.00', batch_no: greigeBatch }],
     });
     expect(overQty.status, `超出现存量的调拨必须 400，实际 ${overQty.status}`).toBe(400);
     expect(
@@ -970,8 +968,8 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     const keepAfterOver = await readStockRow(page, {
       productId,
       warehouseId,
-      batchNo: keepBatch,
-      colorNo: keepColor,
+      batchNo: greigeBatch,
+      colorNo: '',
       label: '458-04 超量拒绝后',
     });
     expect(numOf(keepAfterOver, 'quantity_available', '超量拒绝后'), '被拒调拨不许动可用量').toBe(
@@ -1012,15 +1010,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       to_warehouse_id: toWarehouseId,
       transfer_date: new Date().toISOString(),
       notes: `E2E${tag}-NEG`,
-      items: [
-        {
-          product_id: productId,
-          quantity: '-5.00',
-          color_no: keepColor,
-          dye_lot_no: keepLot,
-          batch_no: keepBatch,
-        },
-      ],
+      items: [{ product_id: productId, quantity: '-5.00', batch_no: greigeBatch }],
     });
     const negativeId = numOf(negative.data as Row, 'id', '负数量建单响应');
     expect(
@@ -1036,8 +1026,8 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     const keepAfterNegative = await readStockRow(page, {
       productId,
       warehouseId,
-      batchNo: keepBatch,
-      colorNo: keepColor,
+      batchNo: greigeBatch,
+      colorNo: '',
       label: '458-04 负数量建单后',
     });
     expect(
