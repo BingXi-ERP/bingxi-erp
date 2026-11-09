@@ -1,0 +1,16 @@
+# 小程序跳转路由死链存量基线（只报告加棘轮，本文件内不判红，基线外新增才判红）
+# 键为两列空白分隔：调用点文件 空格 跳转目标字面量。刻意不含行号，行号会随上方任意改动漂移而造假新增。
+# 目标字面量原样保留查询串，因为串本身参与落点解析（判定器按 ? 前缀取落点）。
+# 每条都是取档带回来的真实缺陷：目标页既无页面文件也无 app.json 声明，用户点到即跳转失败。
+# 修一条就把那一行从本文件删掉；删除后若该条仍出现，说明没真修好。缺页面登记见缺陷 D-66。
+# 来源：2026-11-09 首轮实跑 bash scripts/ci/miniprogram-checks.sh，MP_ROUTE_RED 11 处去重成 10 键。
+packageA/pages/demand/demand-detail/demand-detail.js /packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId=
+packageA/pages/demand/demand-detail/demand-detail.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=
+packageA/pages/demand/demand-order/index.js /packageA/pages/demand/demand-order/demand-order-detail/index?itemId=
+packageA/pages/demand/my-demand/my-demand.js /packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId=
+packageA/pages/demand/my-demand/my-demand.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=
+packageA/pages/demand/my-demand/my-post-result-detail/my-post-result-detail.js /packageA/pages/demand/my-demand/my-post-result-choose/my-post-result-choose?listId=
+packageA/pages/demand/my-demand/my-post-result/my-post-result.js /packageA/pages/demand/my-demand/my-post-result-choose/my-post-result-choose?&&replyId=
+packageA/pages/demand/search-demand/search-join/search-join.js /packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId=
+packageA/pages/demand/search-demand/search-join/search-join.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=
+packageA/pages/demand/search-demand/search-post/search-post.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=

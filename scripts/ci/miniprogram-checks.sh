@@ -52,6 +52,8 @@ MP_TOTAL_LIMIT_KB="${MP_TOTAL_LIMIT_KB:-20480}"
 MP_JS_FLOOR="${MP_JS_FLOOR:-100}"
 MP_EXPOSURE_FLOOR="${MP_EXPOSURE_FLOOR:-100}"
 MP_ROUTE_FLOOR="${MP_ROUTE_FLOOR:-100}"
+MP_SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+MP_ROUTE_BASELINE="${MP_ROUTE_BASELINE:-$MP_SCRIPT_DIR/miniprogram-route-baseline.txt}"
 
 FAIL=0
 TOOL_FAIL=0
@@ -627,8 +629,30 @@ NODE
     return 1
   fi
   if [ "$rc" -ne 0 ]; then
-    red "有跳转路由字面量落不到 app.json 声明页"
-    return 1
+    # 取档带回来的存量死链按只报告加棘轮处理：基线内的条数照打但不判红，基线外（新增）才判红。
+    # 键是"调用点文件 空格 跳转目标字面量"且刻意不含行号，行号会随上方任意改动漂移而造假新增。
+    # 缺基线文件属工装故障，必须走 TOOL_BUG，不许把"读不到基线"咽成"没有新增死链"造出假绿。
+    if [ ! -f "$MP_ROUTE_BASELINE" ]; then
+      tool_bug "缺少路由死链基线文件 $MP_ROUTE_BASELINE，无法分辨存量与新增"
+      return 1
+    fi
+    dead_keys="$(printf '%s\n' "$out" | awk '$1=="ROUTE_DEAD"{f=$2; sub(/:[0-9]+$/,"",f); print f" "$3}' | LC_ALL=C sort -u)"
+    base_keys="$(sed -E 's/[[:space:]]*(#.*)?$//; s/^[[:space:]]+//' "$MP_ROUTE_BASELINE" | sed '/^$/d' | LC_ALL=C sort -u)"
+    if [ -z "$(printf '%s' "$base_keys")" ]; then
+      tool_bug "路由死链基线文件 $MP_ROUTE_BASELINE 去掉注释后为空，棘轮无参照面"
+      return 1
+    fi
+    new_keys="$(comm -23 <(printf '%s\n' "$dead_keys") <(printf '%s\n' "$base_keys") | sed '/^$/d')"
+    new_n="$(printf '%s\n' "$new_keys" | sed '/^$/d' | wc -l | tr -d ' ')"
+    hit_n="$(comm -12 <(printf '%s\n' "$dead_keys") <(printf '%s\n' "$base_keys") | sed '/^$/d' | wc -l | tr -d ' ')"
+    if [ "$new_n" -gt 0 ]; then
+      say "MP_ROUTE_NEW_DEAD $new_n 处新增死链不在基线内"
+      printf '%s\n' "$new_keys" | sed '/^$/d;s/^/  ROUTE_NEW /'
+      red "有新增跳转路由落不到 app.json 声明页且不在死链基线内"
+      return 1
+    fi
+    say "MP_ROUTE_RATCHET baselined=$hit_n new=0 存量死链只报告，修掉一条就从基线删一行"
+    return 0
   fi
   return 0
 }
