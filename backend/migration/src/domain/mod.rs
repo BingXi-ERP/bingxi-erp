@@ -176,3 +176,6 @@ pub mod scan_receipt_grant;
 pub mod piece_inventory_status_drop;
 // 库存匹米数列扩位域：把 length 列型对齐收回数量的计量口径，链尾独立域（建表与加列均早于本域）。
 pub mod piece_length_scale_widen;
+// 运单多态订单列遗留单表外键下线域：order_id 指向哪张表由 order_type 决定，只指 sales_orders
+// 的旧外键拒绝采购单关联写入；链尾独立域（并入已应用域会被台账整体跳过，DROP 永不执行）。
+pub mod logistics_waybill_order_fk_drop;

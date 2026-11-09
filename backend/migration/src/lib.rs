@@ -220,6 +220,14 @@
 //!    NOTICE 跳过可重跑，down 探测小数位多于两位的行命中即 RAISE EXCEPTION 不截断，域内绝不
 //!    UPDATE/DELETE。置于链尾为新的顶层条目（并入已应用域会被台账整体跳过、扩位永不执行），
 //!    依赖 business 建表与 production 补列早于本域
+//! 38. logistics_waybill_order_fk_drop: 运单多态订单列遗留单表外键下线域——
+//!    logistics_waybills.order_id 由 order_type 决定指向哪张单据表（sales_order/purchase_order/
+//!    transfer_order），建表域挂的 fk_logistics_waybills_order 只指 sales_orders，关联采购单
+//!    写入采购单主键即被外键拒绝。多态列无法用单表外键表达，参照完整性由建单与关联两条
+//!    写入路径在事务内回查保证，本域探测式 DROP 该外键并补多态语义列注释；down 先探测
+//!    order_id 不在 sales_orders 的行，命中即 RAISE EXCEPTION 中止后才恢复外键。置于链尾
+//!    为新的顶层条目（并入已应用域会被台账整体跳过、DROP 永不执行），依赖 business 建表
+//!    与 v15 加 order_type 列早于本域
 
 pub use sea_orm_migration::prelude::*;
 
@@ -289,6 +297,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::piece_inventory_status_drop::Migration),
             // 库存匹米数列扩位到 DECIMAL(18,4)，链尾独立域（建表与加列均早于本域，复用库上必然执行）
             Box::new(domain::piece_length_scale_widen::Migration),
+            // 运单 order_id 多态列的遗留单表外键下线，链尾独立域（建表与加列均早于本域，复用库上必然执行）
+            Box::new(domain::logistics_waybill_order_fk_drop::Migration),
         ]
     }
 }
