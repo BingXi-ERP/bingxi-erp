@@ -235,6 +235,8 @@ pub mod data_permission_service;
 // 出参金额隐藏判定单源，与数据权限字段过滤同属出参字段可见性
 pub mod amount_visibility;
 pub mod email_service;
+// 公众号模板消息通知腿，与邮件同属出件通道
+pub mod wechat_mp_service;
 pub mod event_notification_service;
 pub mod notification_scheduler;
 pub mod notification_service;

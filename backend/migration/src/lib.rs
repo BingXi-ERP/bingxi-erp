@@ -24,6 +24,7 @@
 //!   → scan_receipt_grant
 //!   → piece_inventory_status_drop
 //!   → piece_length_scale_widen
+//!   → wechat_mp_binding
 //!
 //! 迁移名: m_system_domain / m_business_domain / m_sales_crm_domain /
 //!         m_production_domain / m_finance_domain / m_v15_domain / m_rls_dept_domain /
@@ -220,6 +221,13 @@
 //!    NOTICE 跳过可重跑，down 探测小数位多于两位的行命中即 RAISE EXCEPTION 不截断，域内绝不
 //!    UPDATE/DELETE。置于链尾为新的顶层条目（并入已应用域会被台账整体跳过、扩位永不执行），
 //!    依赖 business 建表与 production 补列早于本域
+//! 38. wechat_mp_binding: 用户与公众号 openid 绑定关系表建表域（m0135）——落
+//!    `user_wechat_mp_binding`，`user_id` 外键引用 system 域 m0001 建的 users 并 ON DELETE CASCADE，
+//!    `openid` 以具名唯一索引固化一个 openid 只绑一个用户，是公众号模板消息出件按 user_id
+//!    反查收件的唯一库侧来源；建表与两条索引全 IF NOT EXISTS 使重跑等价，域内不播种数据行
+//!    （users 的初始用户由 init 阶段写入且晚于 migrate，迁移内插绑定行在干净库上恒命中 0 影响）。
+//!    置于链尾为新的顶层条目（并入已应用域会被台账整体跳过、建表永不执行）。迁移号取 m0135，
+//!    高于既有全部单档号，与 piece_length_scale_widen 的 m0128 等不同号不同域互不撞台账
 
 pub use sea_orm_migration::prelude::*;
 
@@ -289,6 +297,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::piece_inventory_status_drop::Migration),
             // 库存匹米数列扩位到 DECIMAL(18,4)，链尾独立域（建表与加列均早于本域，复用库上必然执行）
             Box::new(domain::piece_length_scale_widen::Migration),
+            // 用户与公众号 openid 绑定关系表，链尾独立域（users 由 system 域 m0001 先建）
+            Box::new(domain::wechat_mp_binding::Migration),
         ]
     }
 }
