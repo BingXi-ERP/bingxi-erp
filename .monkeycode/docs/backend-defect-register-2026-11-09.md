@@ -45,3 +45,49 @@
 2. 收件人解析必须复用 D-56 已裁定的那一个解析点，不得在发送腿里再算一次角色到用户的映射，否则两处口径会分叉。
 3. 触达判定不得以"调用没抛错"当成功，要按微信返回体里的错误码判；发送状态要能在只读端点或审计里回读，配套 e2e 断"订阅关系存在时才发、未订阅时显式跳过并把跳过原因写进状态、失败重试后只落一条终态"。
 4. 本条与小程序域一支（#85）同域：树、门禁、微信后端腿应一支带走，不再另开分叉支占名额。
+
+## D-63 功能与用例映射检查只在 PR 面触发，目标 4.13 要求的定期执行没有承载（P2，门禁缺口）
+
+实证（同日实测，参照面 origin/main 的七份工作流原文，按 git show 取档后数 schedule 键）：
+
+1. e2e-pairing.yml 的 schedule 计数为 0。该门自述用途是把"新增后端端点必须配套 E2E 用例"落成 PR 门禁，只在 push 与 pull_request 上触发，另有 workflow_dispatch 手工入口。
+2. 带 cron 的只有三份工作流：coverage.yml、dead-code-audit.yml、vuln-scan-daily.yml。ci-cd.yml、android.yml、e2e-batch.yml、e2e-pairing.yml 四份的 schedule 计数均为 0。
+
+后果：主干合入路径不经过该门。两条各自配了用例的支背靠背合并时，配对门只看见各自那一段 diff；合入主干后如果有人删了用例文件或把端点改了名而没动新增侧，主干没有任何定期机制会再判一次。目标 4.13 写的"定期执行功能与用例映射检查，识别漏覆盖功能"目前只有 PR 面触发，不构成定期。
+
+修法方向（按仓内新门接入三件套执行，未拍承载支）：
+
+1. 给 e2e-pairing.yml 增加一条 cron（每日一次，时刻与已有的两枚定期扫描错开），同一判定脚本切两种模式：PR 面保持现在的判负语义，定期面先只报告加棘轮基线，只新增漏配判红，主干存量债不一次挂红所有在途支。
+2. 定期模式必须跑在全量面上：基线取主干顶点而不是分支起点，否则并基后仍只看本支 diff，等于没扩面。
+3. 工具故障与判定不通过要分开：脚本报错归 unverified 并显式打点，不许把取数失败读成零漏配。
+4. 该 job 若新建，必须同时加进 ci-cleanup-retry 的 needs 清单，否则收尾门聚合不到它。
+
+## D-64 审计防篡改的 DB 层只追加约束只覆盖导出二次审计表，两张主审计表没有（P1，安全纵深）
+
+目标 4.11 要求"审计日志不可篡改"。实证分两层，两条口径互不依赖（同日实测，参照面 origin/main）：
+
+1. 应用写面：审计路由全族只有 GET 与 POST 追加（GET 列表、GET 导出、GET 单条、GET summary、POST print-event、GET export-logs），analytics 与 crm 两处审计挂载点同样只有 GET 与 POST，全仓路由里没有对审计的 PUT 与 DELETE。这一层是真的。
+2. DB 层：backend/migration 全族共 8 枚 CREATE TRIGGER，其中只有 trg_audit_log_export_log_no_update 与 trg_audit_log_export_log_no_delete 是防篡改语义，目标表是 audit_log_export_log（V15 的导出二次审计表），函数 fn_audit_log_export_log_immutable 对 UPDATE 与 DELETE 一律 RAISE EXCEPTION。其余 6 枚是部门维同步触发器，与防篡改无关。另有 5 枚 CREATE POLICY 只挂在 customers、suppliers、sales_orders、crm_lead、crm_opportunity 上做行隔离，没有一条挂在审计表上。
+
+后果：audit_logs 与 omni_audit_logs 两张主审计表在库里可被任何有该库连接权限的角色直接 UPDATE 与 DELETE。绕过 HTTP 直接落库改写审计历史，没有任何 DB 层防线会拒绝；而仓内已有的那张表证明了范式与写法都现成，不是不能做，是两张主表没做。
+
+修法方向（登记为缺口，承载待按域排，建议与审计域一支同走）：
+
+1. 照抄 audit_log_export_log 的既有范式给两张主表补同一形状的 BEFORE UPDATE 与 BEFORE DELETE 触发器，异常消息里点名表名，迁移必须幂等（DROP TRIGGER IF EXISTS 再 CREATE）并配探测式前置检查，不许让建库期撞上 42601 一类串内注释坑。
+2. 触发器只挡直连库改写，挡不住持有超级权限的角色，因此验收面要同时断两条：直连库 UPDATE 被拒且错误码可见，以及经 HTTP 无删除面（现状态已满足，用例要钉住防回归）。
+3. 若要做链式校验（行级 prev_hash 加当日校验），属新增列与新迁移，本条先不合并进来，等 1 与 2 落地后另立条目评估。
+
+## D-65 系统公告入口的前端权限键与后端角色判定不同源，非超管看到可用卡片却恒被拒（P2，假可供性）
+
+实证（同日实测，参照面 origin/main 两处原文）：
+
+1. 后端 notification_handler.rs 的 create_announcement 不看权限键，走 is_admin_role(role_id) 判定，admin_checker.rs 里该判定的真相源是 ADMIN_ROLE_CODE 常量等于 admin，非 admin 一律返回"系统公告仅限管理员发送"的权限拒绝。
+2. 前端通知页把公告卡挂在 notifications:create 上，而 init_service_ops/permission.rs 的岗位矩阵里 admin_assistant 显式持有 notifications:read 与 notifications:create 两枚，同时也持有 users:read。
+
+后果：admin_assistant 进通知中心能看到公告卡并填写标题正文，点发送必被后端 403 拒。这不是越权（后端拒绝方向是对的），是前端把不可用的能力摆成可用，属目标里"按钮级权限逐页验证"与 4.8 拦截口径要覆盖的形态。同一处还有第二种分叉风险：只要以后有任何一个岗位被配上 notifications:create 而它不是 admin，就自动复现该假可供性。
+
+修法方向（与 D-61 已收口的通知域一支同支，不另开支）：
+
+1. 二者必须同源，只能选一种：把受理面的角色判定换成权限键判定（并让矩阵只有 admin 持 notifications:create），或者前端把公告卡的可达条件改成与后端同一 admin 事实。建议前者，理由是仓内鉴权键由 URL 段推导，权限键才是唯一口径，硬编码角色码是第二套真相源。
+2. 配套 e2e 断两向：持 notifications:create 的非 admin 岗位公告卡不可达（或点发送得到与后端一致的拒绝文案），admin 岗位发送成功且 delivered_count 由库里回读。
+3. 不许用前端隐藏代替后端判定，也不许把后端判定放宽成权限键而矩阵仍发给非 admin，那样会把拒绝变成真发送。
