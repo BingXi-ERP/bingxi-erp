@@ -900,17 +900,17 @@ test.describe.serial('491 纺织品安全送检单写面', () => {
     const s = seed!;
     const dupNo = genCode('E2E-DUP');
     await createSubmission(page, s, { submission_no: dupNo });
-    // WHY：submission_no 带 DB UNIQUE，但 service.create 无前置查重，重复编码经 insert 落约束违例，
-    // 当前 utils/error.rs From<DbErr> 映射为 500 DATABASE_ERROR（缺陷候选：期望 400 业务拒绝，
-    // 对比 create_test_item 有前置查重）。本腿只钉"被拒 + 只落一行"这一不变量，不把 500 钉成业务契约。
+    // WHY：单号唯一约束在库侧，服务层在插入结果上把唯一冲突归口成业务拒绝，
+    // 所以这里钉 400 加业务机器码加拒因点名冲突单号；钉"非成功即可"会把服务端故障当契约放过。
     const res = await apiCallExpectFail(
       page,
       'POST',
       '/textile-submissions',
       submissionBody(s, { submission_no: dupNo })
     );
-    expect(res.status, '重复编码必须被拒（非成功）').toBeGreaterThanOrEqual(400);
-    expect(failureCode(res), '拒绝体应带字符串机器码').toBeTruthy();
+    expect(res.status, '重复编码属用户可改的业务拒绝，不是服务端故障').toBe(400);
+    expect(failureCode(res), '唯一冲突归口业务机器码').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    expect(res.message ?? '', '拒因须点名冲突的单号').toContain(dupNo);
     const list = await apiCallRaw<{ items: SubmissionRow[] }>(
       page,
       'GET',
