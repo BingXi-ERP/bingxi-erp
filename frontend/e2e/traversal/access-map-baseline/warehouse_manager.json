@@ -3,6 +3,7 @@
   "reachableRoutes": [
     "/dashboard",
     "/greige-fabrics",
+    "/notification",
     "/purchase",
     "/purchase-contract",
     "/purchase-inspection",
