@@ -355,13 +355,33 @@ jobs:
       - name: 构建 release APK（未签名，发布轮必需产物）
         # 调用方 本文件的 准备签名证书 与 签名 release APK 两步，产物再进 上传签名 release APK。
         # 入参 无。tauri v2 的 android build 默认即 release 档，只 --debug 是选项，多传 --release 会被 CLI 判为 unexpected argument 并以退出码 2 终止。
+        # 做什么 与 debug 腿同一判据，首跑失败且失败面命中上游构件拉取中断哨兵时原样重跑一次并打出两次日志；
+        #        重跑仍失败按第二次退出码判红，非网络族失败不重跑，产物校验与阈值不变。
+        # 为什么 release 档另解析 releaseRuntimeClasspath 与 lint 模型，debug 腿已缓存的构件不覆盖它，
+        #        镜像仓库瞬时 5xx 会只打中这一腿；两腿兜底必须同形，否则同一故障在发布轮无重试可走。
+        # 存哪里 只写 CI 现场 gradle 缓存与 /tmp 下的两份构建日志，不进版本库。
         if: env.BUILD_RELEASE == 'true'
         working-directory: mobile-app
         env:
           NDK_HOME: ${{ format('{0}/ndk/{1}', env.ANDROID_HOME, env.NDK_VERSION) }}
         run: |
           set -euo pipefail
-          cargo tauri android build --apk
+          set +e
+          cargo tauri android build --apk > /tmp/apk-release-1.log 2>&1
+          RC=$?
+          set -e
+          cat /tmp/apk-release-1.log
+          if [ "$RC" -ne 0 ] && grep -qE 'Could not GET|Could not download|Could not resolve|Connection reset|Read timed out|status code 5[0-9][0-9]' /tmp/apk-release-1.log; then
+            echo '上游构件拉取中断哨兵命中，原样重跑一次（第二次结果即终局）'
+            set +e
+            cargo tauri android build --apk > /tmp/apk-release-2.log 2>&1
+            RC2=$?
+            set -e
+            cat /tmp/apk-release-2.log
+            [ "$RC2" -eq 0 ] || exit "$RC2"
+          else
+            [ "$RC" -eq 0 ] || exit "$RC"
+          fi
           APK="$(find src-tauri/gen/android/app/build/outputs/apk -path '*universal/release/*.apk' | head -1)"
           test -n "$APK" || { echo '未找到 universal release APK'; exit 1; }
           AAPT2="$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"
