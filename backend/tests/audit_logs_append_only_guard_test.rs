@@ -122,6 +122,12 @@ async fn audit_append_only_guard_blocks_update_and_unflagged_delete() {
     insert_probe(&txn, "guard_upd").await;
     insert_probe(&txn, "guard_del").await;
 
+    // 每条预期被拒的语句各裹一个保存点：PostgreSQL 里语句一旦报错整条事务即进入 aborted 态，
+    // 后续语句只回 current transaction is aborted 而拿不到触发器拒因。ROLLBACK TO SAVEPOINT
+    // 是 aborted 态下仍被允许的清态命令；探针行在保存点之前插入故不受影响，外层事务始终不提交。
+    txn.execute_unprepared("SAVEPOINT sp_upd")
+        .await
+        .expect("开启 UPDATE 探针保存点失败");
     let upd = txn
         .execute_unprepared(
             "UPDATE audit_logs SET action = 'GUARD2' WHERE table_name = 'guard_upd'",
@@ -132,7 +138,13 @@ async fn audit_append_only_guard_blocks_update_and_unflagged_delete() {
         msg.contains("audit_logs"),
         "UPDATE 拒因应点名被拦的表，便于运维定位，实际：{msg}"
     );
+    txn.execute_unprepared("ROLLBACK TO SAVEPOINT sp_upd")
+        .await
+        .expect("回滚到 UPDATE 探针保存点清除 aborted 态失败");
 
+    txn.execute_unprepared("SAVEPOINT sp_del")
+        .await
+        .expect("开启 DELETE 探针保存点失败");
     let del = txn
         .execute_unprepared("DELETE FROM audit_logs WHERE table_name = 'guard_del'")
         .await;
@@ -141,6 +153,9 @@ async fn audit_append_only_guard_blocks_update_and_unflagged_delete() {
         "禁止未声明保留期清理通道的 DELETE",
         "未声明通道的 DELETE",
     );
+    txn.execute_unprepared("ROLLBACK TO SAVEPOINT sp_del")
+        .await
+        .expect("回滚到 DELETE 探针保存点清除 aborted 态失败");
 
     // 反向对照：被拦之后两条探针行都必须仍在——若为 0 行，上面那两条语句就是空转
     // （表里本无匹配行，行级触发器根本不会触发），"被拒"就成了假绿。
