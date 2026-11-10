@@ -307,6 +307,18 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 
 推送落点：库存车道 f62769a0 推入 test/e2e-inventory-write-face-batch1（PR 1191），批量车道 f512cf53 推入 test/e2e-product-batch-write-face（PR 1192），两支 PR 的 head 均回读核到本次提交号。本地门只跑到能跑的四枚，prettier 两文件通过，e2e 类型门 error TS 计数为 2（即既有的 32-import-export 的 path 与 helpers 的 crypto 两枚伪影，无新增），逐文件 rustfmt 在两处都只剩一条与本次改动无关的 use 排序 hunk，未顺手重排。
 
+## 十四 批六选题与落地 financial-analysis 五枚写面（2026-11-10）
+
+选题经过。按 7.2 四条判据在主干顶点语料上重核，financial-analysis 域的五枚写面端点（报告建档、报告更新、报告删除、报告执行、指标建档）在册且语料里只有 GET 回读与页面访问：10b 与 25-finance-full 只打 reports 与 indicators 的 GET，29c 与 smoke 只访问页面，traversal 配置里该域标了 noCreate。写口零断言成立。同域另两枚 POST（trends 与 cash-flow-ratios）被证伪退选：前者前端只有 GET 封装无写入口，后者前端零调用。跨域候选 export-approvals 原正好五腿，核出四腿已被 39b、39d、447、82 的断言链钉住，只剩 reject 一腿，不足一批，退选。号段实量全部车道 460 以上已占到 488，批六取 490（489 留给暂缓的批色正向链）。
+
+写用例过程中量出四处源码缺陷，全部同支修掉。一，编码唯一性：financial_indicators 的 indicator_code 列是 VARCHAR(50) NOT NULL UNIQUE（m0012_add_ap_ar_finance_analysis.rs 第 346 行），而报告编码用秒级时间戳拼 RPT 前缀、指标编码用秒级时间戳拼 IND 前缀，同秒建两笔必撞约束并裸抛数据库错；改走仓内取号器 number_generator.rs 的 generate_no（前缀加八位日期加流水，事务咨询锁串行化）。二，创建报告无校验：CreateReportRequest 只派生 Deserialize 且建档腿从不调用 validate，超长名称直落 VARCHAR(100) 列报数据库错；补 Validate 与列宽一致的长度门并在校验失败时走 validation_displayable 外显。三，分页双重减一：list_reports 先把页号减一再传给服务层，而 get_indicators_list 自己又减一算 offset，第二页退回第一页、第三页拿到第二页；改传一基页号，与同文件 get_indicators 口径一致。四，重复编码归口：服务层 create_indicator 直接 insert，撞唯一约束即裸抛；改为识别 SqlErr::UniqueConstraintViolation 归口 business_displayable，出参 400 加 BUSINESS_ERROR 加"指标编码 某码 已存在"，非唯一约束类错误原样上抛。
+
+用例面。490 一枚 spec 九腿：同秒两笔编码各异且都落库、空名与三处超长被拒且拒后不落库、更新三态与描述段保留期间元数据、更新不存在主键 404、删后回读与二次删除 404、执行腿期间回显与两态透明且不伪造计算值、指标显式与缺省编码、重复编码业务拒绝且只留一行、列表第二页不与第一页重叠。前置全部自建，报告与指标共用一张表故清理都走报告删除腿。
+
+本地门与推送。prettier 通过，e2e 类型门 error TS 计数 2（两枚既有伪影，期间抓出并修掉一处把详情出参误标成指标实体形状的 TS2339），playwright test --list 列出 18 条（九腿乘两个浏览器项目），配对门退出码 0 自述 baseline 1824 current 1824 judged 0。新车道缺 node_modules，用目录联接借既有车道依赖后四档才跑得起来，联接只读不改 donor。三笔提交 fe5bc218、390b4ac4、d76e082c 推入 test/e2e-financial-analysis-write-face，开 PR 1197，head 回读核到 d76e082c。
+
+一条取证纪律再记。本轮扫开放八支红数皆零，但 1191、1192、1197 当时只有 17 到 19 格 check-runs，而全量面是 83 到 86 格，格数不足即全量矩阵尚未开跑，此时的零不是全绿证据，不得据此报可合并。
+
 
 
 
