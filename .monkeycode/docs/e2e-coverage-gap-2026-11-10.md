@@ -369,6 +369,16 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 
 并基实录。该车道原落后主干 7 笔、领先 4 笔，用 git merge origin/main 而非 rebase（首亲为本支头，普通 push 即快进，不触 force 授权档）。冲突恰落在记忆点名的两枚只追加热点 backend/migration/src/domain/mod.rs 与 backend/migration/src/lib.rs，三处冲突按既定解法处理：双方注册都留，主干四条（quotation_discount_gate、quotation_discount_config_grant、logistics_waybill_order_fk_drop、m0126_add_audit_terminal_context_columns）在前，本支 wechat_mp_binding 续编为链文档第 42 条并排在 vec 末尾。同时纠掉本支原文一处已过时的声称（"迁移号 m0135 高于既有全部单档号"，主干已有 m0136），改为"与主干既有单档号互不相同故不撞台账，执行序以 vec 为准"。合并提交 d5ed7146d，落后 0、领先 5，工作树净，七道门复跑仍全绿。rustfmt 逐文件 check 退 1 但差行数为 0，非零码来自既有文件的 CRLF 告警行，按既有判据不算格式红。
 
+## 十九 批八选题与一处配对门待查候选（2026-11-10）
+
+选题方法。在批七车道（已含 491，corpusFiles 437、debt 585）上跑全量面，把债内端点按一级路径段归组得 122 段，再对每段在 e2e 语料里 grep 真实引用并剔除 traversal 配置，按"非遍历引用数升序、债数降序"排。整族零断言的强信号段：textile-export-requirements（债 4、语料 0）、locked-accounts（债 2、语料 0）、aging-grades 与 asset-categories 与 industry-benchmarks（各债 5、语料仅 traversal 一处）。
+
+一处信号污染要点名。textile-reports、textile-limit-rules、textile-test-items 三段的"非遍历引用 1"正是刚落的 491——它把这三面当前置自建（第 178 至 221 行建检测项目与限量规则，第 605 至 638 行建报告并录结果、过完整性门、判定）。所以这三段不是"未被触及"，而是"已被行使但缺断言级覆盖"。按 7.1 判据不能当整族缺口立项，批八对它们要补的是回读、拒绝、门前后状态不变这类断言，不是从零造调用。
+
+批八定案。取纺织品安全合规域剩余四面共 19 腿，分两枚 spec：492 第三方报告面七腿（列表、详情、建档、要素修改、完整性门 accept、逐项目结果 upsert、报告级判定），493 主数据三面十二腿（检测项目、限量规则、出口市场要求各自的列表、建档、修改、删除）。选它的理由是域内合支：批七已开送检单面，同域续完才形成"送检单→报告→判定→主数据"的完整合规链，且出口市场要求面语料真零。号段 492 与 493 待派工前再横扫一次确认空闲。
+
+一处配对门待查候选。491 第 605、620、633、638 行确实调用了 POST /textile-reports、POST /textile-reports/{id}/results、PUT /{id}/acceptance、PUT /{id}/judgement，但全量面仍把这四腿列为 PAIRING_DEBT；同文件不带泛型实参的送检单腿则被正确配对并摘出基线。差异形态是这四腿都写成 apiCallRaw 带泛型实参（如 apiCallRaw<{ id: number }>）。方向是"多报债"而不是假绿，故不紧急、不据此改门；登记为待查，核门体的调用点提取是否被泛型实参或 helper 函数体位置挡住。按既有纪律，改判定器前必须先造反向夹具证明它当前确实漏检，且改后通过集合只许扩大不许缩小。
+
 
 
 
