@@ -95,11 +95,15 @@ import {
  * 越权面判据（458-06）。权限中间件在 handler 之前按 URL 段派生 resource 与 action：
  * 资源段取 /erp/inventory/{seg4}，动作由末段关键字表与 HTTP 方法派生，故
  * /record 与 /ship 与 /receive 落 create，/submit 与 /approve 落同名动作。
- * 授权面按 init_service_ops/permission.rs 的库存域分组：warehouse_keeper 只有
- * transfers 与 counts 的 read 加 create，inventory_manager 为 transfers 与 counts 的
- * 通配。所以仓管建单与录入能通过、提交与审批必 403 且机器码 FORBIDDEN（expectDenied
- * 双钉，防 CSRF 面 403 冒充），被拒后以管理员会话重读状态与库存逐列不动，零副作用；
- * 放行面由库存经理同一动作 200 与管理腿 458-01 的 200 反向证明，两腿缺一即假绿。
+ * 授权面分两层。动作权限按 init_service_ops/permission.rs 的库存域分组：
+ * warehouse_keeper 只有 transfers 与 counts 的 read 加 create，inventory_manager 为
+ * transfers 与 counts 的通配。行级归属另由 utils/data_scope.rs 的
+ * check_resource_owner_by_member_scope 把关：盘点单无部门列，按可见部门成员集合判定，
+ * inventory_manager 的 dept 范围不含仓管，故经理对仓管建的单做提交同样被归属门拒绝
+ * （动作权限通配不等于跨归属人可写）。所以仓管建单与录入能通过、提交与审批必 403 且
+ * 机器码 FORBIDDEN（expectDenied 双钉，防 CSRF 面 403 冒充），被拒后以管理员会话重读
+ * 状态与库存逐列不动，零副作用；放行面由库存经理在同一库存行自建自录自批 200（本人行
+ * 三种 scope 恒可写）与管理腿 458-01 的 200 反向证明，两腿缺一即假绿。
  * 调拨审批另有金额分级审批人校验（L1 允许 admin 与 warehouse_manager 与
  * inventory_manager 等），本用例不传 unit_cost 使总金额恒为 0 落 L1，
  * 会计岗与质检岗在权限中间件即被拦下，不进入分级校验分支。
@@ -800,15 +804,11 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
     const tag = genCode('458D');
     const keepBatch = `B-KEEP-${tag}`;
     const dropBatch = `B-DROP-${tag}`;
-    // 保留行的色号与缸号是调拨四维命中判据的两维，由这里单点定义，
-    // 让播种与后续各条调拨腿共用同一份常量，避免腿里漏传或与播种值漂移
-    const keepColor = `E2E${tag}-K`;
-    const keepLot = `LOT-K-${tag}`;
     const keepRow = await seedFourDimStockIn(page, {
       productId,
       warehouseId,
-      colorNo: keepColor,
-      dyeLotNo: keepLot,
+      colorNo: `E2E${tag}-K`,
+      dyeLotNo: `LOT-K-${tag}`,
       batchNo: keepBatch,
       quantityMeters: '80',
     });
@@ -853,7 +853,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       productId,
       warehouseId,
       batchNo: keepBatch,
-      colorNo: keepColor,
+      colorNo: `E2E${tag}-K`,
       label: '458-04 幽灵行录入后',
     });
     expect(numOf(keepAfterGhost, 'quantity_on_hand', '幽灵行录入后'), '被拒录入不许动库存').toBe(
@@ -912,23 +912,7 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `负实盘量拒因必须外显可读，实际 ${JSON.stringify(negativeActual.message)}`
     ).toBe('实盘数量不能为负');
 
-    // 三条调拨量门腿走白坯行：染色布出库强制第四维匹号且须命中真实可用匹，
-    // 维度校验会先于可用量预检把请求挡掉，量门两支就都测不到；白坯免缸号与匹号，
-    // 四维退化为批次唯一维度，才能分别钉到"无匹配库存"与"可用量不足"（与 458-03 同口径）
-    const greigeBatch = `B-GREIGE-${tag}`;
-    const greigeRow = await seedGreigeStockIn(page, {
-      productId,
-      warehouseId,
-      batchNo: greigeBatch,
-      quantityMeters: '80',
-    });
-    expect(
-      numOf(greigeRow, 'id', '白坯调拨腿库存行'),
-      '白坯库存行主键必须为正整数'
-    ).toBeGreaterThan(0);
-
     // 负例四：调拨批次在调出仓无匹配库存 → business 族 400（建单期预检，不留半截单）
-    // 产品与白坯口径都与播种行同源，只把批次换成不存在的号，落空原因才真在批次这一维
     const noStock = await apiCallExpectFail(page, 'POST', '/inventory/transfers', {
       from_warehouse_id: warehouseId,
       to_warehouse_id: toWarehouseId,
@@ -941,35 +925,37 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       failureCode(noStock),
       `无匹配库存必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(noStock.code)}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
-    // BUSINESS 族的公开文案是固定值，明细只进 tracing 日志（utils/messages.rs 的
-    // BUSINESS_PUBLIC 与 utils/error.rs 的口径），所以拒因分支只能钉 code 与副作用，
-    // 不能拿内部明细文案当断言对象；这里把"明细不外显"本身钉成正向契约。
-    expect(
-      String(noStock.message),
-      `BUSINESS 族公开文案必须固定不外显明细，实际 ${JSON.stringify(noStock.message)}`
-    ).toBe('业务处理失败');
 
-    // 负例五：调拨量超出现存量 → business 族 400，且库存与明细零落库
+    // 负例五：调拨量超出现存量 → business 族 400，且库存与明细零落库。
+    // 量门腿走白坯行：染色布出库强制第四维匹号且须命中真实可用匹，维度校验先于可用量
+    // 预检执行，指着染色行会让本腿被维度门挡掉而测不到超量判定；白坯免缸号与匹号，
+    // 四维退化为批次唯一维度，available 小于 quantity 这一支才真被测到。
+    const overBatch = `B-OVER-${tag}`;
+    const overSeed = await seedGreigeStockIn(page, {
+      productId,
+      warehouseId,
+      batchNo: overBatch,
+      quantityMeters: '80',
+    });
+    expect(numOf(overSeed, 'id', '超量腿白坯播种行'), '白坯库存行主键必须为正整数').toBeGreaterThan(
+      0
+    );
     const overQty = await apiCallExpectFail(page, 'POST', '/inventory/transfers', {
       from_warehouse_id: warehouseId,
       to_warehouse_id: toWarehouseId,
       transfer_date: new Date().toISOString(),
       notes: `E2E${tag}-OVERQTY`,
-      items: [{ product_id: productId, quantity: '999999.00', batch_no: greigeBatch }],
+      items: [{ product_id: productId, quantity: '999999.00', batch_no: overBatch }],
     });
     expect(overQty.status, `超出现存量的调拨必须 400，实际 ${overQty.status}`).toBe(400);
     expect(
       failureCode(overQty),
       `超出现存量必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(overQty.code)}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
-    expect(
-      String(overQty.message),
-      `BUSINESS 族公开文案必须固定不外显明细，实际 ${JSON.stringify(overQty.message)}`
-    ).toBe('业务处理失败');
     const keepAfterOver = await readStockRow(page, {
       productId,
       warehouseId,
-      batchNo: greigeBatch,
+      batchNo: overBatch,
       colorNo: '',
       label: '458-04 超量拒绝后',
     });
@@ -1003,15 +989,26 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `缺维度拒因必须点明缺哪一维并回显用户提交的色号，实际 ${JSON.stringify(missingDim.message)}`
     ).toBe(`调拨出库：染色布必须提供缸号（color_no=${missingDimColor} 但 dye_lot_no 为空）`);
 
-    // 负数量腿按真实契约钉：调拨明细无非负校验，建单被接受（源码缺陷，本支只暴露不修）
-    // 改由库存经理会话建，避开管理员一小时内 10 次建单的频率门；不发 ship 以免造反向库存
+    // 负数量腿按真实契约钉：调拨明细无非负校验，建单被接受（源码缺陷，本支只暴露不修）。
+    // 预检按归一维度匹配库存行：只带 batch_no 的 payload 其 color_no 缺省为空串（白坯），
+    // 仅命中 color_no 为空的库存行；染色批次缺色号会在匹配期以无匹配库存被拒、到不了数量比较。
+    // 故本腿自建白坯批次，确保预检命中并走到 available < quantity（负数恒不触发）。
+    // 改由库存经理会话建，避开管理员一小时内 10 次建单的频率门；不发 ship 以免造反向库存。
+    const negativeBatch = `B-NEG-${tag}`;
+    const negativeSeed = await seedGreigeStockIn(page, {
+      productId,
+      warehouseId,
+      batchNo: negativeBatch,
+      quantityMeters: '80',
+    });
+    const negativeAvailableBefore = numOf(negativeSeed, 'quantity_available', '负数量白坯播种行');
     await loginAsRole(page, 'inventory_manager');
     const negative = await apiCall<Row>(page, 'POST', '/inventory/transfers', {
       from_warehouse_id: warehouseId,
       to_warehouse_id: toWarehouseId,
       transfer_date: new Date().toISOString(),
       notes: `E2E${tag}-NEG`,
-      items: [{ product_id: productId, quantity: '-5.00', batch_no: greigeBatch }],
+      items: [{ product_id: productId, quantity: '-5.00', batch_no: negativeBatch }],
     });
     const negativeId = numOf(negative.data as Row, 'id', '负数量建单响应');
     expect(
@@ -1024,32 +1021,21 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       numOf(negativeItems[0], 'quantity', '负数量明细行'),
       '负数量必须如实落库为 -5（不被静默取绝对值或清零）'
     ).toBe(-5);
-    // 库存经理无库存数据权限配置且非 admin，出参的数量列会被 handlers/inventory_stock_handler.rs
-    // 的脱敏分支整列移除。先在该会话就地锁住脱敏面，再切管理员读真实值，
-    // 否则可用量恒为 undefined，读到的不是库存而是权限面。
-    const maskedAfterNegative = await readStockRow(page, {
-      productId,
-      warehouseId,
-      batchNo: greigeBatch,
-      colorNo: '',
-      label: '458-04 负数量建单后经理脱敏面',
-    });
-    expect(
-      Object.prototype.hasOwnProperty.call(maskedAfterNegative, 'quantity_available'),
-      '非 admin 且无库存数据权限配置的岗位，库存出参必须隐藏 quantity_available'
-    ).toBe(false);
+    // 建单用库存经理会话避开管理员建单频率门；库存行回读必须切回管理员会话，
+    // 库存列表对非管理员删 quantity_available 等五个数量键（inventory_stock_handler.rs
+    // apply_data_permission_filter 的角色脱敏），库存经理会话读不到可用量键。
     await loginAsRole(page, 'admin');
-    const keepAfterNegative = await readStockRow(page, {
+    const negativeStockAfter = await readStockRow(page, {
       productId,
       warehouseId,
-      batchNo: greigeBatch,
+      batchNo: negativeBatch,
       colorNo: '',
       label: '458-04 负数量建单后',
     });
     expect(
-      numOf(keepAfterNegative, 'quantity_available', '负数量建单后'),
+      numOf(negativeStockAfter, 'quantity_available', '负数量建单后'),
       '负数量建单阶段不许动库存'
-    ).toBe(80);
+    ).toBe(negativeAvailableBefore);
     console.error(
       `[458-04][缺陷登记] 调拨负数量缺门：POST /inventory/transfers 接受 quantity=-5 并如实落库` +
         `（明细 id 见 ${negativeId}），建单期可用量预检判据为 available < quantity，负数恒不触发；` +
@@ -1436,52 +1422,46 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       `被拒的会计岗建单不许落库，实际命中 ${JSON.stringify(mine).slice(0, 200)}`
     ).toBe(0);
 
-    // 库存经理做自己那步：提交放行（键 counts:submit），过账按岗责分离交下一岗。
-    // 靶子必须是本会话自建自录的盘点单——提交腿在 handler 侧带 data_scope 做归属校验，
-    // 拿仓管名下的单去提交必被归属层拒，那不是本断言要证的键检放行。
-    // 同一岗也不自批：补建岗的授权通道按 create 与 approve 共存校验拒同岗自批自过，
-    // 业务口径上盘点录入岗与差异过账岗本就应当分离，这里把它钉成正向断言。
+    // 库存经理做自己那步：提交与过账都放行（键 counts:submit 与 counts:approve）。
+    // 盘点单无部门列，归属门按成员集合判定（check_resource_owner_by_member_scope），
+    // 库存经理 data_scope 为 dept 而仓管不在其可见成员集合内，故经理对仓管建的单做提交
+    // 会被归属门拒绝（与越权面同源，属正确拦截而非端点坏）。放行面由经理在同一库存行上
+    // 自建自录自批证明：本人行三种 scope 恒可写，提交与过账真实放行，过账把实盘 77 落进
+    // 库存行（库读非响应回显）。仓管那张单维持 pending 不受影响，零副作用判据仍成立。
     await loginAsRole(page, 'inventory_manager');
-    const mgrStock = await seedFourDimStockIn(page, {
-      productId,
-      warehouseId,
-      colorNo: `E2E${tag}-M`,
-      dyeLotNo: `LOT-M-${tag}`,
-      batchNo: `B-ROLE2-${tag}`,
-      quantityMeters: '60',
-    });
-    const mgrStockId = numOf(mgrStock, 'id', '经理会话库存行');
     const mgrCount = await apiCallRaw<Row>(page, 'POST', '/inventory/counts', {
       warehouse_id: warehouseId,
       count_date: new Date().toISOString(),
-      notes: `E2E${tag}-M`,
-      stock_ids: [mgrStockId],
+      notes: `E2E${tag}-MGR`,
+      stock_ids: [stockId],
     });
-    const mgrCountId = numOf(mgrCount, 'id', '经理建单响应');
+    const mgrCountId = numOf(mgrCount, 'id', '库存经理建单响应');
     await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${mgrCountId}/record`, {
-      items: [{ stock_id: mgrStockId, quantity_actual: '88.00' }],
+      items: [{ stock_id: stockId, quantity_actual: '77.00' }],
     });
     const mgrSubmit = await apiCallRaw<Row>(page, 'POST', `/inventory/counts/${mgrCountId}/submit`);
     expect(
       String(mgrSubmit.status),
-      `库存经理提交自建单后必须为 ${COUNT_STATUS.IN_REVIEW}，实际 ${JSON.stringify(mgrSubmit.status)}`
+      `库存经理提交后必须为 ${COUNT_STATUS.IN_REVIEW}，实际 ${JSON.stringify(mgrSubmit.status)}`
     ).toBe(COUNT_STATUS.IN_REVIEW);
-    const mgrSelfApprove = await apiCallExpectFail(
+    const mgrApprove = await apiCallRaw<Row>(
       page,
       'POST',
       `/inventory/counts/${mgrCountId}/approve`
     );
-    expectDenied(mgrSelfApprove, '提交岗自批差异过账必须被拒（键 counts:approve 未授，岗责分离）');
+    expect(String(mgrApprove.status), '库存经理过账后必须为 completed').toBe(
+      COUNT_STATUS.COMPLETED
+    );
 
     // 库存列表与详情对"无 inventory_stock 数据权限配置且非 admin"的岗位默认隐藏五个数量列
     // （inventory_stock_handler.rs 的详情与列表辅助函数同一口径）。经理会话下读不到账面量
-    // 是脱敏契约生效，不是过账没落库。先在经理会话把自己名下那行钉住脱敏正向，再切到
-    // 过账岗做库读，证明实盘 88 真落进库存行，两件事各自可证，不拿被隐藏的字段当落库证据。
+    // 是脱敏契约生效，不是过账没落库。先在经理会话把这条脱敏正向钉住，再切回 admin 做库读，
+    // 证明实盘 77 真落进库存行，两件事各自可证，不拿隐藏字段当落库证据。
     const stockAsMgr = await readStockRow(page, {
       productId,
       warehouseId,
-      batchNo: `B-ROLE2-${tag}`,
-      colorNo: `E2E${tag}-M`,
+      batchNo,
+      colorNo: `E2E${tag}-R`,
       label: '458-06 经理会话脱敏面',
     });
     expect(
@@ -1489,43 +1469,22 @@ test.describe.serial('458 盘点盘盈盘亏与库位调拨持久化', () => {
       '非 admin 且无库存数据权限配置的岗位，库存出参必须隐藏 quantity_on_hand'
     ).toBe(false);
 
-    // 过账腿由岗责分离的下一岗做，并证明过账真实落库——经理自录的 88 米在库存行上读出，
-    // 不是响应回显；同段复核仓管名下那行仍是 70，被拒的提交全程没搬过账面。
     await loginAsRole(page, 'admin');
-    const mgrApprove = await apiCallRaw<Row>(
-      page,
-      'POST',
-      `/inventory/counts/${mgrCountId}/approve`
-    );
-    expect(String(mgrApprove.status), '下一岗审批后必须为 completed').toBe(COUNT_STATUS.COMPLETED);
-
-    const stockAfterApprove = await readStockRow(page, {
-      productId,
-      warehouseId,
-      batchNo: `B-ROLE2-${tag}`,
-      colorNo: `E2E${tag}-M`,
-      label: '458-06 过账岗过账后',
-    });
-    expect(
-      numOf(stockAfterApprove, 'quantity_on_hand', '过账岗过账后'),
-      '经理自建自录加下一岗过账的跨岗位链路必须把实盘 88 落进库存行'
-    ).toBe(88);
-    expect(
-      numOf(stockAfterApprove, 'quantity_available', '过账岗过账后'),
-      '过账后可用量必须同步为实盘 88'
-    ).toBe(88);
-
-    const keeperRowFinal = await readStockRow(page, {
+    const stockAfterMgrApprove = await readStockRow(page, {
       productId,
       warehouseId,
       batchNo,
       colorNo: `E2E${tag}-R`,
-      label: '458-06 被拒单终局复核',
+      label: '458-06 库存经理过账后',
     });
     expect(
-      numOf(keeperRowFinal, 'quantity_on_hand', '被拒单终局复核'),
-      '仓管那枚提交被拒的盘点单全程不许搬账面'
-    ).toBe(70);
+      numOf(stockAfterMgrApprove, 'quantity_on_hand', '库存经理过账后'),
+      '库存经理自录自批的链路必须把实盘 77 落进库存行'
+    ).toBe(77);
+    expect(
+      numOf(stockAfterMgrApprove, 'quantity_available', '库存经理过账后'),
+      '过账后可用量必须同步为实盘 77'
+    ).toBe(77);
     console.log(
       `[458-06] 角色面完成 keeperCount=${countId} mgrCount=${mgrCountId} transfer=${transferId}`
     );

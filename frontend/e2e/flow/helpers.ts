@@ -477,32 +477,29 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     `[ensureTestEntities] 本 worker 专属供应商已建 id=${ctx.supplierId} name=E2E供应商${supplierSuffix}`
   );
 
-  // ---- 5. 客户（仍用 API，表单字段较多且下拉依赖复杂）----
-  // 口径钉死为启用态：销售提交门要求客户 status=active，而 list_customers 默认不过滤
-  // 软删除/inactive 行（仅显式传入 status 才过滤），首条可能是其他用例停用或软删除的残留；
-  // 新建客户后端默认虽为 active（customer_ops 写入方口径），此处仍显式传 status 防口径漂移。
-  try {
-    const customers = await apiCallRaw<{ items: Array<{ id: number }> }>(
-      page,
-      'GET',
-      '/crm/customers?page=1&page_size=1&status=active'
-    );
-    ctx.customerId = customers.items?.[0]?.id;
-  } catch (e) {
-    throw new Error(`[ensureTestEntities] 客户创建失败: ${(e as Error).message}`);
+  // ---- 5. 客户（本 worker 自建自持，不复用库里的共享行）----
+  // 调用方 销售建单与提交、应收与发货各链按 customer_id 引用本 ctx。入参 page 当前会话。
+  // 传给谁 ctx.customerId 供各 spec 建单与回读。存什么 一条启用态客户主档。存哪里 测试库客户表。
+  // 为什么 销售提交门要求客户 status=active（so/order_workflow.rs），而并行 worker 的收尾会把
+  //        共享客户软删，软删同步把 status 置 inactive（customer_ops/crud.rs）；复用列表首条即使
+  //        取行时筛了 active，取行与用行之间仍可能被停用，表现为 POST /sales/orders/{id}/submit
+  //        回 BUSINESS_ERROR 客户状态为 inactive，红面看着像后端缺陷实为夹具共享态竞态。
+  //        故与本文件供应商同范式一律新建本 worker 专属客户，创建失败即抛错，
+  //        不退回共享行、不兜底假 id。
+  const customerSuffix = `${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0')}`;
+  const createdCustomer = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
+    customer_name: `E2E客户${customerSuffix}`,
+    status: 'active',
+  });
+  if (!createdCustomer.data?.id) {
+    throw new Error(`[ensureTestEntities] 客户创建失败: ${JSON.stringify(createdCustomer)}`);
   }
-  if (!ctx.customerId) {
-    try {
-      const result = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
-        customer_name: 'E2E 客户 ' + Date.now(),
-        status: 'active',
-      });
-      ctx.customerId = result.data?.id;
-    } catch (e) {
-      console.error('[ensureTestEntities] customerId 创建失败:', (e as Error).message);
-      ctx.customerId = undefined;
-    }
-  }
+  ctx.customerId = createdCustomer.data.id;
+  console.log(
+    `[ensureTestEntities] 本 worker 专属客户已建 id=${ctx.customerId} name=E2E客户${customerSuffix}`
+  );
 
   // ---- 6. 会计科目（仍用 API，科目在树形结构中不易 UI 操作）----
   try {
