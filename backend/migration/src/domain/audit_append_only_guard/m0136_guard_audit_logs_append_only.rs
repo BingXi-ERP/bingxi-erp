@@ -128,7 +128,7 @@ BEGIN
     IF attached <> 4 THEN
         RAISE EXCEPTION 'm0136：期望 4 枚只追加触发器就位，实际 % 枚', attached;
     END IF;
-    RAISE NOTICE 'm0136：audit_logs 与 omni_audit_logs 的 UPDATE 与 DELETE 行级门均已就位', attached;
+    RAISE NOTICE 'm0136：audit_logs 与 omni_audit_logs 的 UPDATE 与 DELETE 行级门均已就位（% 枚）', attached;
 END $$;
 "#,
             stmts = stmts
