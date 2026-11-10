@@ -801,7 +801,12 @@ const routes: RouteRecordRaw[] = [
         path: 'notification',
         name: 'Notification',
         component: () => import('@/views/notification/index.vue'),
-        meta: { title: '通知中心', icon: 'Setting', permission: 'users:read', requiresAuth: true }, // 该入口要求下方 meta.permission 列出的模块读权限键
+        meta: {
+          title: '通知中心',
+          icon: 'Setting',
+          permission: 'notifications:read',
+          requiresAuth: true,
+        }, // 通知中心读面端点 GET /notifications 的鉴权键即 notifications:read，路由入口与读面同源
       },
       {
         path: 'data-permission',

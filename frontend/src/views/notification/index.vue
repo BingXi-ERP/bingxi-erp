@@ -227,7 +227,7 @@
 
     <!-- 系统公告直发：走 POST /notifications/announcement（notifications:create），
          与 OA 公告管理页的"建草稿再发布"是两条不同链路，互不替代 -->
-    <el-card v-permission="'notifications:create'" shadow="hover" class="announce-card">
+    <el-card v-permission="PERMISSIONS.NOTIFICATION_CREATE" shadow="hover" class="announce-card">
       <template #header>{{ t('system.notification.announce.title') }}</template>
       <el-form :model="announcementForm" label-width="100px">
         <el-form-item :label="t('system.notification.announce.label.title')" required>
@@ -242,7 +242,11 @@
             show-word-limit
           />
         </el-form-item>
-        <el-form-item :label="t('system.notification.announce.label.recipients')" required>
+        <el-form-item
+          v-permission="PERMISSIONS.USER_READ"
+          :label="t('system.notification.announce.label.recipients')"
+          required
+        >
           <el-select
             v-model="announcementForm.userIds"
             multiple
@@ -271,6 +275,7 @@ import { logAuxLoadFailure, logger } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { loadIfNot, createLazyLoader } from '@/utils/lazy-loader';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { PERMISSIONS } from '@/constants/permissions';
 import {
   getNotification,
   markAsRead,

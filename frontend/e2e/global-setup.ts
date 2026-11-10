@@ -763,6 +763,13 @@ const SEED_ROLE_EXTRA_PERMISSIONS: Record<string, string[]> = {
     // 上述 IDOR 断言只涉及 adjustments 资源，加这两键不改变其 403 判定层）
     'pieces:read',
     'pieces:print',
+    // 盘点族的读、建单与提交：458-06 的库存经理腿要在自己会话里自建自录并提交，
+    // 提交腿的键是 counts:submit（末段 submit 命中 PATH_ACTION_KEYWORDS）。
+    // 刻意不授 counts:approve：过账属岗责分离的下一岗，同岗自批既违反后端
+    // create 与 approve 共存校验，也不是可接受的业务形态，458-06 把这条拒因做成正向断言。
+    'counts:read',
+    'counts:create',
+    'counts:submit',
   ],
   // manager —— fullflow/15-report-export.spec.ts 15-05「finance_report 导出审批链」的申请侧。
   // 该用例里 manager 只打一个端点：POST /export-approvals（创建导出审批申请），随后切回分片

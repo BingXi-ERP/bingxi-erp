@@ -1,7 +1,8 @@
 {
   "role": "department_manager",
   "reachableRoutes": [
-    "/dashboard"
+    "/dashboard",
+    "/notification"
   ],
   "provenance": "ci-mirrored"
 }

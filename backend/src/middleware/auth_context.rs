@@ -76,6 +76,33 @@ impl CsrfSession {
     }
 }
 
+/// 会话角色码（由 auth 中间件在角色行加载成功时注入请求扩展）。
+///
+/// 用途：全端操作审计要按「角色」留痕与过滤，而审计写入单点只持有 `AuditContext`
+/// （由 audit_context 中间件构造，挂在 auth 的内层），既不查库也拿不到角色行。
+/// 本类型把 auth 已经查出的 `roles.code` 一次性带进请求扩展，交给 audit_context 中间件
+/// 写进审计上下文，角色维度不新增任何数据库查询。
+///
+/// 为什么不塞进 [AuthContext] 的字段：与 [CsrfSession] 同理——[AuthContext] 的结构体字面量
+/// 在全仓（含各业务契约测试的夹具）有数百处，加字段会把与本维度无关的文件全部拖进编译失败面。
+/// 角色码只有审计链路消费，单独作为一个扩展类型注入，改动面收敛在认证与审计两个中间件内。
+///
+/// 入参 构造时接收角色码字符串（`roles.code`，非中文展示名 `roles.name`）。
+/// 传给谁 只由 `middleware/auth` 注入、由 `middleware/audit_context` 读出消费。
+/// 存什么 一枚角色码，取不到角色行时不注入（消费侧按 NULL 落库，不得兜底成占位值）。
+/// 存哪里 只存在单个请求的 `Request::extensions()` 里，随请求 future 结束释放，不落库不进全局态。
+#[derive(Debug, Clone)]
+pub struct SessionRoleCode {
+    /// `roles.code`：后端权限矩阵与角色矩阵使用的稳定标识
+    pub code: String,
+}
+
+impl SessionRoleCode {
+    pub fn new(code: impl Into<String>) -> Self {
+        Self { code: code.into() }
+    }
+}
+
 /// 用户认证信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthContext {

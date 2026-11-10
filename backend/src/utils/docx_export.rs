@@ -148,16 +148,8 @@ pub fn build_docx(table: &DocxTable) -> Result<Vec<u8>, AppError> {
         docx = docx.add_table(table_obj);
     }
 
-    // 页脚段落：生成时间
-    docx = docx.add_paragraph(Paragraph::new());
-    let footer_text = format!(
-        "生成时间：{}",
-        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
-    );
-    let footer_para = Paragraph::new()
-        .add_run(Run::new().add_text(&footer_text).italic().size(20))
-        .align(AlignmentType::Right);
-    docx = docx.add_paragraph(footer_para);
+    // 正文不落墙钟生成时间：同一单据多次打印须逐字符一致，渲染 instant 属元数据
+    // （docx core properties 与审计日志已记），写进正文会因秒级漂移让两次渲染不相等。
 
     let mut buf = std::io::Cursor::new(Vec::<u8>::new());
     docx.pack(&mut buf)
@@ -293,16 +285,8 @@ pub fn build_docx_with_kv_and_image(
         docx = docx.add_table(detail_table);
     }
 
-    // 页脚
-    docx = docx.add_paragraph(Paragraph::new());
-    let footer_text = format!(
-        "生成时间：{}",
-        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
-    );
-    let footer_para = Paragraph::new()
-        .add_run(Run::new().add_text(&footer_text).italic().size(20))
-        .align(AlignmentType::Right);
-    docx = docx.add_paragraph(footer_para);
+    // 正文不落墙钟生成时间：同一单据多次打印须逐字符一致，渲染 instant 属元数据
+    // （docx core properties 与审计日志已记），写进正文会因秒级漂移让两次渲染不相等。
 
     let mut buf = std::io::Cursor::new(Vec::<u8>::new());
     docx.pack(&mut buf)

@@ -50,6 +50,8 @@ pub mod sales_order_item;
 pub mod sales_quotation;
 pub mod sales_quotation_item;
 pub mod sales_quotation_term;
+// 报价超折扣审批阈值配置（单行表 quotation_discount_approval_configs，id 恒 1）
+pub mod quotation_discount_config;
 // 销售报价单 DTO（P12 批 1 P0 port PR-2：DTO + 基础 Service）
 pub mod quotation_create_dto;
 pub mod quotation_response_dto;
