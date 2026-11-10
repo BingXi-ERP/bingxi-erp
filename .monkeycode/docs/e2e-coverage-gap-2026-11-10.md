@@ -295,5 +295,18 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 
 网络面的一条环境事实，本轮 git ls-remote 与 git fetch 出现 schannel 握手失败，同一时刻 curl 到 github.com 得 200，退避一次后 git 恢复正常；node fetch 到 api.github.com 首轮 fetch failed，加 8 秒退避重试后建 PR 成功。结论是这类失败属瞬时抖动，处置是退避重试而非判定为断网，更不是禁用证书校验的借口。另记，工装脚本 ghq.sh 在 C 盘用户目录下已不存在，本轮改为在仓库外临时目录写一次性脚本、由脚本自行读取令牌文件，命令行与日志均不含凭据。
 
+## 十三 补测批次一的三枚红定性，一枚真源码缺陷与两类脱敏契约误钉
+
+同一分片可叠多层红因这条判据本轮再次生效：先修的那枚断言挡住的是后面的腿，改完必须回同一 job 再看一次，否则会把"没跑到"当成"没问题"。
+
+真源码缺陷一处，批次转移只扣两列。库存批次建档时 quantity_on_hand、quantity_available、quantity_meters、quantity_kg 四列写成同值，而 transfer_batch 只扣前两列，转移成功后主计量与辅计量两列停在旧值——出参"批次转移成功"、库里米数纹丝不动，守恒破了，读面米数列与在库数列从此分叉。修法是四列同笔扣减，目标行累加分支同步补两列（新建行分支本来就写了这两列，所以只在累加路径缺失），并给辅计量补充足性判定：既然现在开始真扣 quantity_kg，不补这道判定就是新增一条能扣成负数的口子，拒因沿用同一句库存数量不足，不另造第二个契约。用例侧 483-05 的断言本来就是契约，不动。
+
+脱敏契约被当成业务契约误钉两类。第一类是把 not_found 与 bad_request 的出参文案钉成具体字面。backend/src/utils/error.rs 的 public_message 写死只有三个 Displayable 变体返回真文案，其余一律返回固定脱敏常量，NotFound 与 BadRequest 都在"其余"里；所以 484-04 期望"调拨明细 主键 未找到"收到的是资源未找到，483-05 后半腿期望的库存数量不足同样收不到。这类修法是用例侧，只断状态码、机器码与"确有非空拒因"，不断文案。
+
+第二类相反，是源码把仓内既有的外显通道绕掉了。批量产品三枚写面的长度门文案本来就声明在 DTO 的 validate 属性上，而 error.rs 的 From validator::ValidationErrors 会转成 validation_displayable 并把字段级中文文案按出现顺序去重拼接外显；bulk_product_handler.rs 却在调用点写 map_err 重包成 bad_request，等于自己造第二条转换口径并把真文案咽进日志。这条是源码面缺陷，用例那条 toContain 是对的——按"源码错改源码"改三处调用点为直接问号透传，并给用例补钉机器码 VALIDATION_ERROR，把契约钉全。同文件还剩服务调用侧两处 map_err 重包（把下游真实 kind 与 code 拍平成 BAD_REQUEST），同一问题但不挡这枚红，已立条目独立处理，不在这支夹带。
+
+推送落点：库存车道 f62769a0 推入 test/e2e-inventory-write-face-batch1（PR 1191），批量车道 f512cf53 推入 test/e2e-product-batch-write-face（PR 1192），两支 PR 的 head 均回读核到本次提交号。本地门只跑到能跑的四枚，prettier 两文件通过，e2e 类型门 error TS 计数为 2（即既有的 32-import-export 的 path 与 helpers 的 crypto 两枚伪影，无新增），逐文件 rustfmt 在两处都只剩一条与本次改动无关的 use 排序 hunk，未顺手重排。
+
+
 
 
