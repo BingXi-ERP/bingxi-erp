@@ -136,6 +136,13 @@ vue-tsc 与 playwright --list 未跑，类型与实跑结论留给 CI。
 batch/update、batch/delete 共 3 枚（基础档案批量写）。roles 6 枚与 users 3 枚属
 权限域，排在面料主链之后但在读面之前。
 
+批二落地前核验（2026-11-10）：products 的 batch/create、batch/update、batch/delete
+三枚经 grep 确认 frontend/src/api/product.ts 第 279、288、294 行有真实消费点，属可达
+漏配（真实批量写功能缺 e2e），且 catalog 域与七支在途零交集，定为批二首选，落地前
+再核 e2e 零引用与号段空闲。production-recipes/additions 三枚暂缓：1184 BOM 下线支
+大改 backend/src/routes/production.rs 与 production_order_ops，additions 是否随删
+未定，待 1184 合入后再核，避免抢覆盖面写废用例。
+
 ### 6.5 派工前还要做的两件事
 
 一，号段实量：已做。横扫 151 个含 e2e 目录的车道，已占号最大 482，483 起全空，
