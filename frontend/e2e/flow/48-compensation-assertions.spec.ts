@@ -15,6 +15,29 @@ import {
 } from './helpers';
 
 /**
+ * 自建一条独立启用客户供本文件的订单提交链路使用。
+ * ensureTestEntities 的 ctx.customerId 取客户列表首条，即使显式带 status=active 过滤，
+ * 选中后到提交之间仍可能被并发用例停用（销售提交门拒非 active 客户），
+ * 使本用例的提交前置不成立；客户由本用例自产自销才能消除这条竞态。
+ */
+async function createActiveCustomer(
+  page: import('@playwright/test').Page,
+  tag: string
+): Promise<number> {
+  const res = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
+    customer_name: `48${tag}活跃客户${Date.now()}`,
+    customer_type: 'retail',
+    status: 'active',
+  });
+  const id = res?.data?.id;
+  expect(
+    id,
+    `[48-${tag}] 自建 active 客户失败，订单提交前置不成立：${JSON.stringify(res)}`
+  ).toBeTruthy();
+  return id!;
+}
+
+/**
  * 48 静默降级补偿断言（L6）——把"commit 后补偿失败仅 warn"变 CI 可见
  *
  * rule provenance：
@@ -136,8 +159,9 @@ test.describe.serial('48 静默降级补偿断言（P2C/O2C 全链）', () => {
   test('48-2 O2C 全链：发货后收入凭证生成（ship.rs:509-533 补偿产物断言）', async ({ page }) => {
     await ensureTestEntities(page);
     const ctx = getCtx();
+    const customerId = await createActiveCustomer(page, '02');
     const so = await apiCall<{ id?: number }>(page, 'POST', '/sales/orders', {
-      customer_id: ctx.customerId,
+      customer_id: customerId,
       order_date: new Date().toISOString(),
       // SO 明细字段为 product_id（后端 422 明示 items[0]: missing field `product_id`），
       // 原实现误写 material_id
