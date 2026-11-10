@@ -64,9 +64,72 @@ erp/roles 9，erp/textile-submissions 9，erp/vouchers 9，erp/crm 9。
 
 ## 五 尚未量出的（留给下一轮，不在本文充数）
 
-- 167 枚可达漏配的按域分布（要复用判定器的前端调用点谓词才能与 167 对得上，
-  另写一套 grep 口径会得到另一个数，宁可不写）。
+- 167 枚可达漏配的按域分布：已量出，见第六节。
 - 三端归属：这 606 枚里有多少属于 H5 或微信小程序独有链路，
   需要按前端源码目录（PC 的 frontend/src 与小程序树）分面重跑一次可达性。
 - 目标 三 要求的面料核心字段（色号 缸号 批次 门幅 克重 米数 卷号 损耗 余码 色差 打样版本）
   在用例里的落字段覆盖，本清单只到端点粒度，没到字段粒度。
+
+## 六 167 枚可达漏配的按域分布与批一选题（同日较晚实测）
+
+### 6.1 怎么量出来的
+
+判定器新增 `--emit-gap-json`，把全量面已算出的逐枚漏配结果落盘，每行含键、方法、
+路径、资源段分组、前端可达性布尔。可达性谓词与豁免分支用的是同一条
+（matchNeedles 命中 frontend/src 源码），分组也是报告里那一条，不另起口径。
+
+```
+cd frontend && node scripts/check-e2e-feature-pairing.mjs --emit-gap-json <落盘路径>
+```
+
+守恒自证：导出 606 行，reachable=167、dead=439，与 `--self-test` 的
+`SELFTEST_POOL uncovered=606 uncoveredWithUi=167 uncoveredNoUi=439` 逐字相等；
+11 道反向探针仍全命中，说明这次改动没有把判定面改宽或改窄。
+
+### 6.2 分布
+
+167 枚落在 52 个资源段分组。前十：inventory 15、production 14、roles 9、
+quotations 7、sales 7、ar 6、crm 6、financial-analysis 6、bi 5、finance 5。
+
+方法分布 GET 95、POST 54、PUT 10、DELETE 7、PATCH 1。即写面 72 枚、读面 95 枚。
+按第三节优先序，同域内写面先于读面，故批一从这 72 枚里选。
+
+### 6.3 先排除与在途支撞面的域
+
+开放 PR 七支各自的域（按分支名与改动面核）：审计定位维度（audit-logs、business-trace）、
+超折扣审批门（quotations）、BOM 与 MRP 整族下线（boms、production/mrp）、
+开票前置门（ar 发票族、finance）、物流面单配对（logistics-tracking/waybills）、
+配对门自身（scripts）、通知入口权限同源（notifications）。
+
+据此从写面 72 枚里剔除：quotations 3 枚、boms 1 枚、production/mrp/convert-orders 1 枚、
+logistics-tracking 3 枚、inventory/logistics 3 枚（与面单族同属物流域，待逐路径核实前不抢）。
+剔除后剩 61 枚可排批，其中面料主链上的干净候选如下。
+
+### 6.4 批一选题（库存细码写面，7 枚）
+
+- POST inventory/batches/*/transfer（批次转移，对应缸号锁定与调拨）
+- PUT inventory/batches/*（批次改）
+- DELETE inventory/batches/*（批次删，要验有下游引用时拒删）
+- PUT inventory/counts/items/*（盘点明细改）
+- DELETE inventory/counts/items/*（盘点明细删）
+- PUT inventory/transfers/items/*（调拨明细改）
+- DELETE inventory/transfers/items/*（调拨明细删）
+
+选它的理由：inventory 是可达漏配里最大的一域（15 枚），这 7 枚全是写面且直接落在
+目标 三 的库存细码环节与目标 4.1 的 E 节（删除作废红冲持久化）、G 节（缸号锁定与
+库存数字）、4.3 反向链路（调拨、盘点、盘盈盘亏）上；与七支在途域零交集。
+
+拆两枚 spec：批次族 3 端点一枚，盘点与调拨明细族 4 端点一枚。每枚按仓内范式
+自建前置（不依赖库里恰好有行）、写后回读、按角色断可见性与脱敏。
+
+批二候选（同法排除后）：production 的 production-recipes/additions/*/approve 与
+/*/close 与 calculate 共 3 枚（委外染整配料审批），products 的 batch/create、
+batch/update、batch/delete 共 3 枚（基础档案批量写）。roles 6 枚与 users 3 枚属
+权限域，排在面料主链之后但在读面之前。
+
+### 6.5 派工前还要做的两件事
+
+一，号段实量：spec 编号要横扫全部在途工作树取已占清单再划区间，不能只看 main。
+二，逐路径核实 inventory/logistics 与 logistics-tracking/waybills 是否同域：
+若不同域，那 3 枚（sign、改、删）可并入批一，批一变成 10 枚拆三枚 spec。
+本文先按保守口径排除，不抢在途支的覆盖面。
