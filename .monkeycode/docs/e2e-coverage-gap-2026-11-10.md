@@ -236,3 +236,24 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 判据依据：遍历清单与 endpoints.config 出现不算覆盖（判据四），cleanup 与 GET 回读不算写面覆盖（判据三），故以上五条按断言级口径判为真缺口。additions 两腿此前被 endpoints.config 的单点命中掩盖成「有覆盖」，逐词形与命中性质复核后证伪。
 
 落地前置：落笔前先 ls frontend/e2e/flow 向编排方取未占号段，spec 覆盖五腿的状态跃迁、字段回读、非法前置拒因（calculate 依赖配方明细齐备、additions-approve 需先 create、cancel 后禁止再 approve）。与在途四支（BOM 下线、inventory、products、roles-users）零交集。CI 拥塞期不推，待四支收口后排入可推波次。
+
+## 九 批四落地实录 production-recipes 次腿五处（2026-11-10）
+
+号段实量：横扫全部 71 个工作树的 frontend/e2e 用例文件名取号，450 段以上最大实占 486（480 与 481 与 482 归 BOM 支，483 与 484 归 inventory 支，485 归 products 支，486 归 roles-users 支），487 起未占，本批取 487。
+
+交付面：车道 E:/work/bingxi/wt-recipe-legs，分支 test/e2e-production-recipe-legs，基线 origin/main 顶点 565ff6b50，单文件 frontend/e2e/flow/487-production-recipe-cancel-calculate-additions.spec.ts（588 行，九条用例），提交 20a8861ae。与在途四支零文件交集，未新建第二枚 spec，未动 helpers 与遍历清单与基线。
+
+九条用例对五腿的映射：487-01 与 02 与 03 与 04 打 calculate（公式重算、浴比三写法同值、加成系数放大与缺省、四类非法前置）；487-05 打 cancel（腿内返回态、读回落库态、再取消拒、再审核拒、非法跃迁后进库态未变）；487-06 打 additions 建单对 draft 父单的前置门并读回子资源列表证被拒不落库；487-07 打 additions 建单成功腿（路径 id 覆盖请求体关联、PA 号形、单张读回、父单子资源命中、诱饵父单零命中）；487-08 打 additions approve 与 close 两段跃迁各读回并打重复审批与终态再关闭与终态再审核；487-09 打加料跳步（draft 直接 close 拒且状态未进）。
+
+落笔前钉死的契约事实（全部取自 origin/main 顶点实读，非记忆）：
+- calculate 是纯函数，无库访问；公式为 浓度% 乘 备布重量 乘 浴比冒号后数值 除以 100 再乘 加成系数，系数缺省 1，浓度为空的物料行原样返回其用量。浴比接受半角冒号、全角冒号、斜杠三种写法（services/production_recipe_service.rs 的 parse_liquor_ratio 一次遍历归一）。
+- 拒因面：备布重量不大于 0、浴比空串或格式非两段或分母不大于 0、加成系数不大于 0、浓度为负，四族一律用脱敏构造器 AppError::business，HTTP 400 且机器码 BUSINESS_ERROR，出参 message 不外显真实文案。故用例只钉状态码与机器码，不钉中文文案（钉文案会把源码推向可外显改造，属改判责）。唯一可外显的是删除腿（validate_can_delete 用 business_displayable）。
+- 词表实值（models/status/quality_dyeing.rs 第 111 与 126 行两个模块）：大货处方 draft、approved、closed、cancelled 四态全小写，加料处方 draft、approved、closed 三态全小写。跃迁为 draft 到 approved 或 cancelled，approved 到 closed，closed 与 cancelled 是终态。
+- 审核腿实读只校验状态跃迁与「处方明细非空」，不建生产领用单据、不要求工单（services/production_recipe_ops/recipe_state.rs::approve），故 44e 时代「审核后自动建立领用单据」的文档口径在本支不是断言依据。
+- 加料建单的关联父单由 handler 用路径 id 强制覆盖请求体，身份取会话 auth.user_id，请求体不承载身份；单号前缀 RP 与 PA 后接 8 位日期与 3 位流水（utils/number_generator.rs 的 date_prefix 用 %Y%m%d）。
+- 路由面（routes/production.rs 第 185 至 216 行）加料单只挂 GET 详情与 approve、close 两条跃迁，在册 DELETE 仅 /production-recipes/*，且服务端仅草稿可删。
+
+清理与残留：afterAll 走仓内既有 browser 新建上下文形态（481 与 482 同款，已上主干），只对草稿态大货处方发真实 DELETE。已审核、已取消、已关闭的处方与全部加料单没有可达删除端点，按前缀 RP487 留在 e2e 库中，不伪造清理 URL，不为凑绿调断言次序。
+
+未本地验证面（如实登记）：该车道无 frontend/node_modules，tsc 类型门与 playwright --list 均未跑，本地零验证。断言能否通过只认 CI；本批的四处高危形态（DECIMAL 出参字符串线格式、RP 与 PA 号形、被拒建单不落库、路径 id 覆盖）若与真实运行不符会显红，按红面回到同一 job 取证再判责，不在本地预改。
+
