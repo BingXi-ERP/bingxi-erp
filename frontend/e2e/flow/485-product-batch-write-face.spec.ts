@@ -140,12 +140,13 @@ test.describe('产品批量写面 创建回滚 更新三态 删除部分成功',
     expect(res.data.errors!.length).toBe(1);
     expect(res.data.errors![0]).toContain('索引 1');
     expect(res.data.errors![0]).toContain('新建产品必须显式提交产品类型');
-    // 反向对照。首行合法但整体回滚，按编号搜索必须零行，证明不是部分写入
-    const search = await apiCall<ProductPage>(page, 'GET', '/products/select', {
-      search: firstCode,
-      page: 1,
-      page_size: 10,
-    });
+    // 反向对照。首行合法但整体回滚，按唯一名称搜索必须零行，证明不是部分写入。
+    // 列表过滤走查询串而非请求体，后端以 Query 提取器读 search，故拼进路径。
+    const search = await apiCall<ProductPage>(
+      page,
+      'GET',
+      `/products/select?search=${encodeURIComponent(`批量产品-${firstCode}`)}&page=1&page_size=10`
+    );
     expect(search.data.total).toBe(0);
   });
 
