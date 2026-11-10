@@ -257,3 +257,14 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 
 未本地验证面（如实登记）：该车道无 frontend/node_modules，tsc 类型门与 playwright --list 均未跑，本地零验证。断言能否通过只认 CI；本批的四处高危形态（DECIMAL 出参字符串线格式、RP 与 PA 号形、被拒建单不落库、路径 id 覆盖）若与真实运行不符会显红，按红面回到同一 job 取证再判责，不在本地预改。
 
+## 十 配对门本地可跑与批四锁档（2026-11-10）
+
+新取证通道：`node frontend/scripts/check-e2e-feature-pairing.mjs --full-surface` 零依赖、不碰 node_modules，本地即可跑（从 frontend/ 目录执行，退出码 0 打 PAIRING_GREEN）。它把当前全部端点拉进判定集对一份只减不增的棘轮基线，基线内只报告、基线外新发生的才判红，因此全量底数不必等 CI 也能自证。
+
+批四锁档实录（车道 wt-recipe-legs，提交 4caf84d43）：487 落地后该门自报四条由漏配转入 PAIRING_DEBT_RETIRED（GET production-recipes/additions/*、POST additions/*/approve、POST additions/*/close、POST production-recipes/calculate），按门自身话术「已配上用例或已下线，应从棘轮基线删除」从 e2e-feature-pairing-ratchet.json 摘除；摘后复跑 JSON 可解析、rc=0、PAIRING_GREEN，retired 由 16 降到 12，debt 590 不变（摘的是已配上项，不是新漏配）。cancel 腿本就不在基线内。
+
+同一时刻门自证的底数（参照面为该车道基线 origin/main 565ff6b50，语料 437 个 e2e 文件加 733 个 src 文件）：judged=1824 paired=1213 weak=21 exempt=0 debt=590 reachableOrphans=151 deadOrphans=439。这组数是配对门口径的字面引用判据，弱于本清单 7.2 的断言级四条：spec 里出现过该路径前缀且同文件有该 METHOD 记号即算 paired，所以 paired 集合里仍可能藏着零断言的次腿（本批 additions 两腿此前正是被遍历清单命中而看似有覆盖）。反向也成立：debt 集合可直接当候选池用，但入批前必须逐腿回 handler 与 service 复核有无真断言。
+
+下一批候选（门自报、待断言级复核）：GET production-recipes/by-work-order/*（本域剩余唯一基线内漏配）；lab-dip 族四条（resamples 建单、result、tech-card 与同族写腿）在基线内成串出现；mrp/convert-orders 在基线内但该端点随 BOM 下线的在途支可能整族移除，动它前必须先确认承载支归属，避免重复立项。weak=21 那批只点名不判红，属经封装助手发请求的正常形态，不作缺陷登记。
+
+
