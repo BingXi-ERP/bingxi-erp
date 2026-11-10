@@ -813,5 +813,109 @@ test.describe.serial('491 纺织品安全送检单写面', () => {
     );
   });
 
-  // 后续用例分批追加锚点
+  test('491-09 不合格结论也能产出：可测加考超限汇总整单 fail 并落 judged', async ({ page }) => {
+    const s = seed!;
+    const sub = await createSubmission(page, s, { end_user_group: 'child' });
+    await advanceToReported(page, s, sub);
+    const measId = await itemIdByCode(page, s.childMeasCode);
+    // 可测项实测 200 超 lte 上限 100 → fail；人工项与报告项 pass，任一 fail 即整单 fail
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${sub.id}/child-checks`, {
+      rows: [
+        { item_code: s.childMeasCode, measured_value: 200, measured_unit: 'mg/kg' },
+        {
+          item_code: s.childManualCode,
+          check_desc: 'E2E绳带核查',
+          manual_conclusion: VERDICT.PASS,
+        },
+      ],
+    });
+    const out = await apiCallRaw<{
+      submission: SubmissionRow;
+      stock_link: { matched: number; scope_note: string };
+    }>(page, 'PUT', `/textile-submissions/${sub.id}/judgement`, {});
+    expect(out.submission.status, 'fail 结论同样产出 judged 态').toBe(STATUS.JUDGED);
+    expect(out.submission.overall_verdict, '任一行 fail 汇总整单 fail').toBe(VERDICT.FAIL);
+    // 未登记批次号无法点名库存行：联动 matched 0 且口径显式回显（不静默）
+    expect(out.stock_link.matched, '无批次号库存联动零命中').toBe(0);
+    expect(out.stock_link.scope_note.length, '零命中必须点名说明').toBeGreaterThan(0);
+    const d = await detail(page, sub.id);
+    expect(d.submission.overall_verdict).toBe(VERDICT.FAIL);
+    expect(d.child_checks.find(r => r.item_id === measId)?.verdict, '超限可测行判 fail').toBe(
+      VERDICT.FAIL
+    );
+  });
+
+  test('491-10 草稿可删删后 404，非草稿删除被拒记录仍在', async ({ page }) => {
+    const s = seed!;
+    const draft = await createSubmission(page, s);
+    const del = await apiCallRaw<{ deleted: number }>(
+      page,
+      'DELETE',
+      `/textile-submissions/${draft.id}`
+    );
+    expect(del.deleted, '删除回显被删 id').toBe(draft.id);
+    const gone = await apiCallExpectFail(page, 'GET', `/textile-submissions/${draft.id}`);
+    expect(gone.status, '删后详情 404').toBe(404);
+    expectRejection(gone, APP_ERROR_CODES.NOT_FOUND, '491-10 删后回读');
+
+    // 推进到 sampling 后非草稿：删除被业务门拒，记录仍在
+    const advanced = await createSubmission(page, s);
+    await apiCallRaw(page, 'POST', `/textile-submissions/${advanced.id}/items`, {
+      extra_item_codes: [],
+    });
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${advanced.id}/status`, {
+      status: STATUS.SAMPLING,
+    });
+    const res = await apiCallExpectFail(page, 'DELETE', `/textile-submissions/${advanced.id}`);
+    expectRejection(res, APP_ERROR_CODES.BUSINESS_ERROR, '491-10 非草稿删除');
+    expect((await detail(page, advanced.id)).submission.status, '拒绝删除后记录仍在').toBe(
+      STATUS.SAMPLING
+    );
+  });
+
+  test('491-11 不存在 id 各腿 404：详情/修改/删除/状态/清单/核查/判定', async ({ page }) => {
+    const s = seed!;
+    const base = `/textile-submissions/${MISSING_ID}`;
+    const legs: Array<{
+      method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+      path: string;
+      body?: Record<string, unknown>;
+    }> = [
+      { method: 'GET', path: base },
+      { method: 'PUT', path: base, body: submissionBody(s) },
+      { method: 'DELETE', path: base },
+      { method: 'PUT', path: `${base}/status`, body: { status: STATUS.SAMPLING } },
+      { method: 'POST', path: `${base}/items`, body: { extra_item_codes: [] } },
+      { method: 'PUT', path: `${base}/child-checks`, body: { rows: [] } },
+      { method: 'PUT', path: `${base}/judgement`, body: {} },
+    ];
+    for (const leg of legs) {
+      const res = await apiCallExpectFail(page, leg.method, leg.path, leg.body);
+      expect(res.status, `491-11 ${leg.method} ${leg.path} 应 404`).toBe(404);
+      expectRejection(res, APP_ERROR_CODES.NOT_FOUND, `491-11 ${leg.method} ${leg.path}`);
+    }
+  });
+
+  test('491-12 重复编码建单被拒且只落一行（唯一约束不变量）', async ({ page }) => {
+    const s = seed!;
+    const dupNo = genCode('E2E-DUP');
+    await createSubmission(page, s, { submission_no: dupNo });
+    // WHY：submission_no 带 DB UNIQUE，但 service.create 无前置查重，重复编码经 insert 落约束违例，
+    // 当前 utils/error.rs From<DbErr> 映射为 500 DATABASE_ERROR（缺陷候选：期望 400 业务拒绝，
+    // 对比 create_test_item 有前置查重）。本腿只钉"被拒 + 只落一行"这一不变量，不把 500 钉成业务契约。
+    const res = await apiCallExpectFail(
+      page,
+      'POST',
+      '/textile-submissions',
+      submissionBody(s, { submission_no: dupNo })
+    );
+    expect(res.status, '重复编码必须被拒（非成功）').toBeGreaterThanOrEqual(400);
+    expect(failureCode(res), '拒绝体应带字符串机器码').toBeTruthy();
+    const list = await apiCallRaw<{ items: SubmissionRow[] }>(
+      page,
+      'GET',
+      `/textile-submissions?product_id=${s.productId}&page=1&page_size=100`
+    );
+    expect(list.items.filter(r => r.submission_no === dupNo).length, '重复编码只落一行').toBe(1);
+  });
 });
