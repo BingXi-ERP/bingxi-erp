@@ -62,6 +62,12 @@ const CORPUS = flag('corpus', join(REPO, 'frontend', 'e2e'));
 const SRC = flag('src', join(REPO, 'frontend', 'src'));
 const EXEMPT = flag('exempt', join(HERE, 'e2e-feature-pairing-exempt.json'));
 const FLOOR = Number(flag('floor', 1000));
+// 全量面模式：不比"本支相对起点的新增集"，而把当前全部端点拉进判定集，
+// 配一份只减不增的漏配基线（棘轮），存量漏配只报告、新发生的才判红。
+const FULL_SURFACE = argv.includes('--full-surface');
+const RATCHET = flag('ratchet-baseline', join(HERE, 'e2e-feature-pairing-ratchet.json'));
+// 生成/刷新棘轮基线用：跑完把本轮真判红的漏配端点写进该文件后退出，不参与判红结论。
+const EMIT_RATCHET = flag('emit-ratchet', null);
 
 const say = m => process.stdout.write(m + '\n');
 
@@ -220,28 +226,75 @@ function judge(over = {}) {
   const srcDir = over.src || SRC;
   const exemptFile = over.exempt || EXEMPT;
   const floor = over.floor || FLOOR;
-  if (needRef && !baselineRef) {
-    return {
-      code: 9,
-      head:
-        'TOOL_BUG 本道要求基线取分支起点（--require-baseline-ref）却没给 --baseline-ref：' +
-        '改读工作树那份快照会让刚把新端点写进基线的同一支恒判零新增',
-    };
+  const fullSurface = over.fullSurface === undefined ? FULL_SURFACE : over.fullSurface;
+  const ratchetFile = over.ratchet || RATCHET;
+  const emitMode = over.emitRatchet === true;
+  // 全量面（定期腿）不比分支起点差集，改把当前全部端点拉进判定集，配一份只减不增的
+  // 漏配基线：基线内的存量漏配只报告，基线外新发生的才判红。该面不需要分支起点，
+  // 因此也不受 --require-baseline-ref 约束（那条约束 protecting 的是增量面的差集语义）。
+  let baseKeys = null;
+  let baseCount = 0;
+  let baseSource = 'fullSurface';
+  if (!fullSurface) {
+    if (needRef && !baselineRef) {
+      return {
+        code: 9,
+        head:
+          'TOOL_BUG 本道要求基线取分支起点（--require-baseline-ref）却没给 --baseline-ref：' +
+          '改读工作树那份快照会让刚把新端点写进基线的同一支恒判零新增',
+      };
+    }
+    const b = baselineRef
+      ? readBaselineFromRef(baselineRef, baselineFile)
+      : readBaseline(baselineFile);
+    if (b.error) return { code: 9, head: 'TOOL_BUG ' + b.error };
+    if (b.keys.size < floor) {
+      return {
+        code: 9,
+        head:
+          'TOOL_BUG 基线只解析出 ' +
+          b.keys.size +
+          ' 枚端点，低于地板 ' +
+          floor +
+          '，其"零新增"结论不可信',
+      };
+    }
+    baseKeys = b.keys;
+    baseCount = b.keys.size;
+    baseSource = baselineRef ? 'ref' : 'worktree';
   }
-  const b = baselineRef
-    ? readBaselineFromRef(baselineRef, baselineFile)
-    : readBaseline(baselineFile);
-  if (b.error) return { code: 9, head: 'TOOL_BUG ' + b.error };
-  if (b.keys.size < floor) {
-    return {
-      code: 9,
-      head:
-        'TOOL_BUG 基线只解析出 ' +
-        b.keys.size +
-        ' 枚端点，低于地板 ' +
-        floor +
-        '，其"零新增"结论不可信',
-    };
+  // 棘轮基线只在全面模式参与判定：读不到就判工具故障，既不把全部存量债一次判红
+  // （那会让这道门永久挂不住），也不许把它当成零债通过。
+  let debtKeys = new Set();
+  if (fullSurface) {
+    const ratchetMissing = !existsSync(ratchetFile);
+    // 生成基线那一趟本来就没有基线可读，缺文件不算故障；其余任何缺文件都按工具故障处理：
+    // 既不把全部存量债一次判红（那样这道门永久挂不住），也不当成零债通过。
+    if (ratchetMissing && !emitMode) {
+      return {
+        code: 9,
+        head:
+          'TOOL_BUG 全量面缺漏配基线（' +
+          relative(REPO, ratchetFile) +
+          '）：没有它就分不清存量债与新漏配，按不通过处理',
+      };
+    }
+    if (!ratchetMissing) {
+      let parsed;
+      try {
+        parsed = JSON.parse(readFileSync(ratchetFile, 'utf8'));
+      } catch (e) {
+        return { code: 9, head: 'TOOL_BUG 漏配基线不是合法 JSON：' + e.message };
+      }
+      const list = Array.isArray(parsed) ? parsed : parsed && parsed.orphans;
+      if (!Array.isArray(list)) {
+        return {
+          code: 9,
+          head: 'TOOL_BUG 漏配基线既不是数组也没有 orphans 数组字段，无法当键集用',
+        };
+      }
+      debtKeys = new Set(list.filter(k => typeof k === 'string'));
+    }
   }
   const cur = currentKeys();
   if (cur.size < floor) {
@@ -280,12 +333,17 @@ function judge(over = {}) {
   const ex = loadExempt(exemptFile);
   if (ex.error) return { code: 9, head: 'TOOL_BUG ' + ex.error };
 
-  const added = [...cur.keys()].filter(k => !b.keys.has(k)).sort();
+  // 增量面判"本支相对起点新增的端点"，全量面判"当前在册的全部端点"；往下走的判据同一条。
+  const scope = fullSurface
+    ? [...cur.keys()].sort()
+    : [...cur.keys()].filter(k => !baseKeys.has(k)).sort();
   let fail = 0;
   let paired = 0;
   let weak = 0;
   let exempted = 0;
-  for (const key of added) {
+  let debt = 0;
+  const orphanKeys = [];
+  for (const key of scope) {
     const { method, path } = cur.get(key);
     const needles = matchNeedles(path);
     const hits = texts.filter(t => needles.some(n => t.body.includes(n)));
@@ -320,33 +378,105 @@ function judge(over = {}) {
       }
       continue;
     }
+    // 先把零引用端点记进漏配全集：清单要按可达性劈开全集，只劈基线外那部分会漏掉
+    // 存量债，量出来的数就对不上自证池的 uncovered。
+    orphanKeys.push(key);
+    // 全量面：已在棘轮基线里的存量漏配只报告，不判红；基线外新出现的才判红。
+    // 增量面没有这一层（新增集本就由起点差集算出，任何新增漏配都该当场判红）。
+    if (fullSurface && debtKeys.has(key)) {
+      debt += 1;
+      say(
+        '  PAIRING_DEBT ' +
+          key +
+          ' 存量漏配（在棘轮基线内），本轮只报告，补上用例后把该条从基线删掉'
+      );
+      continue;
+    }
     fail += 1;
     say(
-      '  PAIRING_RED ' + key + ' 新增端点在 frontend/e2e 下零引用，须配套用例或显式登记带理由的豁免'
+      '  PAIRING_RED ' +
+        key +
+        (fullSurface
+          ? ' 全量面新漏配：端点在 frontend/e2e 下零引用且不在棘轮基线内，须配套用例或显式登记带理由的豁免'
+          : ' 新增端点在 frontend/e2e 下零引用，须配套用例或显式登记带理由的豁免')
     );
   }
-  const addedSet = new Set(added);
+  const scopeSet = new Set(scope);
   for (const key of ex.map.keys()) {
-    if (!addedSet.has(key)) {
+    if (!scopeSet.has(key)) {
       fail += 1;
       say('  EXEMPT_STALE ' + key + ' 已不在新增集里，豁免条目该删（留着会掩盖同位再发）');
     }
   }
+  // 棘轮基线只减不增：配上用例或端点下线的条目属正常退役，只提示不判红；
+  // 反过来若基线读不出或条目被人为加宽，上面已按工具故障处理，不在这里放行。
+  let retired = 0;
+  if (fullSurface) {
+    const orphanSet = new Set(orphanKeys);
+    for (const key of [...debtKeys].sort()) {
+      if (!orphanSet.has(key)) {
+        retired += 1;
+        say('  PAIRING_DEBT_RETIRED ' + key + ' 已配上用例或已下线，应从棘轮基线删除');
+      }
+    }
+  }
+  // 全量面的漏配分面报告：把本轮判红的零引用端点按"前端有没有调用点"劈成两半，
+  // 再按 URL 资源段分组。可达那半是必须补用例的硬缺口，零调用点那半要先判归属
+  // （对外或内部端点、死端点、还是前端漏接），两者处置完全不同，混在一个数里没法排批。
+  // 可达性谓词与上面豁免分支用的是同一条（matchNeedles 命中前端源码），不另起口径。
+  let reachableOrphans = 0;
+  let deadOrphans = 0;
+  if (fullSurface && orphanKeys.length > 0) {
+    const groupOfKey = key => {
+      const parts = key.split(' ')[1].split('/').filter(Boolean);
+      return (parts[2] || parts[1] || '?') + '/' + (parts[3] || parts[2] || '');
+    };
+    const reach = new Map();
+    const dead = new Map();
+    for (const key of orphanKeys) {
+      const isReachable = matchNeedles(cur.get(key).path).some(n =>
+        srcTexts.some(t => t.includes(n))
+      );
+      const g = groupOfKey(key);
+      const bucket = isReachable ? reach : dead;
+      bucket.set(g, (bucket.get(g) || 0) + 1);
+      if (isReachable) reachableOrphans += 1;
+      else deadOrphans += 1;
+    }
+    const dump = (label, map) => {
+      const rows = [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      say(
+        `  PAIRING_GAP_${label} groups=${rows.length} total=${rows.reduce((s, [, v]) => s + v, 0)}`
+      );
+      for (const [g, n] of rows.slice(0, 20)) say(`    ${label.toLowerCase()} ${g}=${n}`);
+    };
+    dump('REACHABLE', reach);
+    dump('DEAD', dead);
+  }
   return {
     code: fail > 0 ? 1 : 0,
+    unpaired: fail,
+    orphans: orphanKeys,
     head:
-      'PAIRING baseline=' +
-      b.keys.size +
+      'PAIRING mode=' +
+      (fullSurface ? 'full' : 'incremental') +
+      (fullSurface ? ` reachableOrphans=${reachableOrphans} deadOrphans=${deadOrphans}` : '') +
+      ' baseline=' +
+      baseCount +
       ' current=' +
       cur.size +
-      ' added=' +
-      added.length +
+      ' judged=' +
+      scope.length +
       ' paired=' +
       paired +
       ' weak=' +
       weak +
       ' exempt=' +
       exempted +
+      ' debt=' +
+      debt +
+      ' retired=' +
+      retired +
       ' unpaired=' +
       fail +
       ' corpusFiles=' +
@@ -354,7 +484,7 @@ function judge(over = {}) {
       ' srcFiles=' +
       srcFiles.length +
       ' baselineSource=' +
-      (baselineRef ? 'ref' : 'worktree'),
+      baseSource,
   };
 }
 
@@ -533,6 +663,52 @@ function selfTest() {
   ]);
   if (refBase.error) say('  SELFTEST_REF_BASELINE ' + refBase.error);
 
+  // 全量面（定期腿）的两道对照：
+  // 一 空棘轮基线必须把每一条非豁免的零引用端点都判红，证明换成全集后判定器真有检测力，
+  //   而不是"作用面变宽反而恒绿"；
+  // 二 把全部存量漏配登记进基线后，判红数必须恰好减去这么多，证明棘轮只遮住已登记的债，
+  //   不顺手遮住豁免违规、陈旧豁免条目等其它判红项。
+  // 造不出对照（非豁免零引用端点为 0）时直接判工具故障，不留"少跑两道探针也算自证通过"的洞。
+  const exNow = loadExempt(EXEMPT);
+  if (exNow.error) return { code: 9, head: 'TOOL_BUG 全量面自证前置不成立：' + exNow.error };
+  const debtKeys = uncovered.filter(k => !exNow.map.has(k));
+  if (debtKeys.length === 0) {
+    return {
+      code: 9,
+      head: 'TOOL_BUG 全量面自证前置不成立：非豁免的零引用端点为 0，造不出棘轮对照',
+    };
+  }
+  const emptyRatchet = makeTemp(
+    'selftest-ratchet-empty.json',
+    JSON.stringify({ orphans: [] }) + '\n',
+    cleanup
+  );
+  const fullRatchet = makeTemp(
+    'selftest-ratchet-full.json',
+    JSON.stringify({ orphans: debtKeys.sort() }) + '\n',
+    cleanup
+  );
+  const fullA = judge({ fullSurface: true, ratchet: emptyRatchet });
+  const fullB = judge({ fullSurface: true, ratchet: fullRatchet });
+  say(
+    '  SELFTEST_FULL_SURFACE debt=' +
+      debtKeys.length +
+      ' emptyRatchetCode=' +
+      fullA.code +
+      ' fullRatchetCode=' +
+      fullB.code +
+      ' unpairedA=' +
+      fullA.unpaired +
+      ' unpairedB=' +
+      fullB.unpaired
+  );
+  probes.push(['fullSurfaceEmptyRatchetMustRed', fullA.code, 1]);
+  probes.push([
+    'fullSurfaceRatchetSheltersOnlyListedDebt',
+    fullA.unpaired - fullB.unpaired,
+    debtKeys.length,
+  ]);
+
   let caught = 0;
   const missed = [];
   for (const [name, got, want] of probes) {
@@ -558,11 +734,44 @@ function selfTest() {
     : { code: 9, head: 'TOOL_BUG 反向探针有没命中的道，判定器无检测力，其绿不可信' };
 }
 
-const out = SELF_TEST ? selfTest() : judge();
+// 生成基线只能取全量面的漏配集，因此 --emit-ratchet 隐含 --full-surface，不给"只把本支
+// 新增集写进基线"这种会把存量债漏出基线、下一轮全判红的用法留口子。
+const out = SELF_TEST
+  ? selfTest()
+  : judge(EMIT_RATCHET ? { fullSurface: true, emitRatchet: true } : {});
 say(out.head || '');
+if (EMIT_RATCHET) {
+  // 生成/刷新棘轮基线：只把本轮真判红的零引用端点写进去（带理由豁免的条目由 exempt 台账
+  // 单独管，不进基线）。写完按工具态退出，不给通过或不通过的结论——基线是给人审的数据，
+  // 不是判定结果。
+  if (out.code === 9) {
+    say('PAIRING_TOOLBUG 判定器或输入不可用，不生成棘轮基线');
+    process.exit(9);
+  }
+  const list = [...(out.orphans || [])].sort();
+  writeFileSync(EMIT_RATCHET, JSON.stringify({ orphans: list }, null, 2) + '\n');
+  say(
+    'PAIRING_RATCHET_EMITTED ' +
+      list.length +
+      ' 枚存量漏配已写入 ' +
+      relative(REPO, EMIT_RATCHET) +
+      '（只减不增：配上用例或端点下线后删条目，禁止往里加新债）'
+  );
+  process.exit(0);
+}
 if (!SELF_TEST) {
-  if (out.code === 0) say('PAIRING_GREEN 新增端点全部有用例配对或已带理由豁免');
-  if (out.code === 1) say('PAIRING_RED 有新增端点未配套 E2E 用例');
+  if (out.code === 0)
+    say(
+      FULL_SURFACE
+        ? 'PAIRING_GREEN 全量面除已登记棘轮债外无新漏配'
+        : 'PAIRING_GREEN 新增端点全部有用例配对或已带理由豁免'
+    );
+  if (out.code === 1)
+    say(
+      FULL_SURFACE
+        ? 'PAIRING_RED 全量面有新漏配（零引用且不在棘轮基线内）'
+        : 'PAIRING_RED 有新增端点未配套 E2E 用例'
+    );
   if (out.code === 9) say('PAIRING_TOOLBUG 判定器或输入不可用，本道结论按不通过处理');
 } else if (out.code === 0) {
   say('PAIRING_SELFTEST_OK');
