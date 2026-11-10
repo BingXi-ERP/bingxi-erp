@@ -246,9 +246,12 @@ jobs:
           fi
           # kotlin 构件被 Maven Central 重定向到 GitHub release 资产，该资产当前中断。追加仓库无效：
           # 重定向失败是错误而不是缺失，gradle 不会落到后一个仓库，必须插到 repositories 块最前。
-          # 做什么 逐个脚本在每个独立成行的 repositories 块开块行后插入两枚中央仓直连镜像（先对象存储镜像、
-          #        后公共代理，两枚都自管产物字节、不再重定向到 GitHub release），语法按后缀分流。
+          # 做什么 逐个脚本在每个独立成行的 repositories 块开块行后插入三枚直连镜像（先对象存储镜像、
+          #        后公共代理、再谷歌仓代理，前两枚自管中央仓产物字节、不再重定向到 GitHub release，
+          #        第三枚覆盖只发布在谷歌仓的安卓工具链构件，例如 lint 的 lint-checks），语法按后缀分流。
           #        工程由 初始化 Android 工程 步现场生成，脚本名随模板版本漂移，故按后缀枚举而非写死文件名。
+          # 为什么 只插中央仓镜像时，release 档的 lintVitalAnalyze 任务解析 androidLintTool 配置仍只会走
+          #        dl.google.com，该源读超时即整腿判红且重跑同样超时；谷歌仓代理给这批构件一条可达路径。
           # 存哪里 只改 CI 现场生成的 src-tauri/gen/android 下 gradle 脚本，不进版本库。
           # 判负 一个 repositories 块都没插进即判红并打出枚举到的脚本清单，防模板漂移静默失效。
           PATCHED=0
@@ -261,8 +264,8 @@ jobs:
               continue
             fi
             case "$F" in
-              *.gradle.kts) LINE='        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }\n        maven { url = uri("https://maven.aliyun.com/repository/public") }' ;;
-              *) LINE="        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }\n        maven { url 'https://maven.aliyun.com/repository/public' }" ;;
+              *.gradle.kts) LINE='        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }\n        maven { url = uri("https://maven.aliyun.com/repository/public") }\n        maven { url = uri("https://maven.aliyun.com/repository/google") }' ;;
+              *) LINE="        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }\n        maven { url 'https://maven.aliyun.com/repository/public' }\n        maven { url 'https://maven.aliyun.com/repository/google' }" ;;
             esac
             sed -i "s|\([[:space:]]*\)repositories {$|\1repositories {\n${LINE}|" "$F"
             if grep -q 'maven.aliyun.com/repository/public' "$F"; then
@@ -274,6 +277,22 @@ jobs:
             find src-tauri/gen/android -maxdepth 4 \( -name '*.gradle' -o -name '*.gradle.kts' \) -print | sort | sed 's|^|在场 gradle 脚本: |'
             exit 1
           fi
+          # 做什么 给现场工程的 gradle.properties 追加两枚构件下载超时（连接与读各 120 秒），已存在则不重复追加。
+          # 为什么 默认读超时 30 秒，谷歌仓与镜像在跨境链路上单次握手常超过它，超时被 gradle 记成解析失败
+          #        而不是慢；放宽的是等待上限，不是校验口径，构件 checksum 与 lint 判定一律不变。
+          # 传给谁 后续 debug 与 release 两腿的 gradle 调用都读这份 properties。
+          # 存哪里 只改 CI 现场生成的 src-tauri/gen/android/gradle.properties，不进版本库。
+          # 判负 追加后两行必须都在册，少一行即判红，不靠"没报错"当通过。
+          GP="src-tauri/gen/android/gradle.properties"
+          touch "$GP"
+          grep -q '^systemProp.org.gradle.internal.http.connectionTimeout=' "$GP" || echo 'systemProp.org.gradle.internal.http.connectionTimeout=120000' >> "$GP"
+          grep -q '^systemProp.org.gradle.internal.http.socketTimeout=' "$GP" || echo 'systemProp.org.gradle.internal.http.socketTimeout=120000' >> "$GP"
+          if [ "$(grep -c '^systemProp.org.gradle.internal.http.\(connection\|socket\)Timeout=120000$' "$GP")" != "2" ]; then
+            echo "构件下载超时两行未齐，gradle.properties 现状如下"
+            cat "$GP"
+            exit 1
+          fi
+          echo '构件下载超时已就位：连接与读各 120 秒'
 
       - name: 构建 debug APK
         # 调用方 严格冒烟·3 与 严格冒烟·4 与 release 构建与模拟器 E2E 依赖本步产物。入参 无。
