@@ -6,12 +6,17 @@
 // 判据来源：UpdateRolePayload 只有 name description is_system 三列，刻意不含 code（禁止改角色编码防提权），
 // 故本用例提交 code 后回读 code 必须逐字符不变；UpdateUserRequest 五列皆为 Option，
 // 键缺席即保持旧值、带值即覆盖，不存在第三态；两个 handler 都先过 require_admin_role，
-// 非管理员会话拿到 403 且目标行不得被改动。
+// 非管理员会话拿到 403 且目标行不得被改动。403 的出参 message 由错误层统一换成脱敏常量，
+// handler 传入的自定义详情只写日志，所以越权腿钉 HTTP 状态与机器码，不钉文案。
+// 详情的 department_name 与 role_names 由单次 LEFT JOIN 富化（UserResponse 的 From<Model> 带不出这两列），
+// 故改角色后读回的角色名必须跟着新归属走。
 import { test, expect, type Page } from '../diagnose-fixture';
 import {
   apiCallExpectFail,
   apiCallRaw,
+  APP_ERROR_CODES,
   baseAdminPassword,
+  failureCode,
   loginInIsolatedContext,
   loginViaUI,
   tryCleanup,
@@ -171,7 +176,7 @@ test.describe('角色与用户改口写后回读与管理员门', () => {
     const user = await createScratchUser(page, 'e', role.id);
     try {
       const s = stamp();
-      const newEmail = `e2eru改后${s}@example.com`;
+      const newEmail = `e2eru-a-${s}@example.com`;
       await apiCallRaw<UserRow>(page, 'PUT', `/users/${user.id}`, {
         email: newEmail,
         phone: '13900000002',
@@ -182,7 +187,7 @@ test.describe('角色与用户改口写后回读与管理员门', () => {
       expect(after.email, '旧邮箱不得残留').not.toBe(user.email);
       expect(after.phone, '旧电话不得残留').not.toBe(user.phone);
 
-      const nextEmail = `e2eru再改${stamp()}@example.com`;
+      const nextEmail = `e2eru-b-${stamp()}@example.com`;
       await apiCallRaw<UserRow>(page, 'PUT', `/users/${user.id}`, { email: nextEmail });
       const kept = await apiCallRaw<UserRow>(page, 'GET', `/users/${user.id}`);
       expect(kept.email, '只提交 email 时 email 应生效').toBe(nextEmail);
@@ -242,16 +247,27 @@ test.describe('角色与用户改口写后回读与管理员门', () => {
     const session = await loginInIsolatedContext(browser, user.username, baseAdminPassword());
     try {
       const denyUser = await apiCallExpectFail(session.page, 'PUT', `/users/${user.id}`, {
-        email: `e2eru越权${stamp()}@example.com`,
+        email: `e2eru-esc-${stamp()}@example.com`,
       });
       expect(denyUser.status, '非管理员改用户应被后端拒绝回 403，不能只靠前端隐藏按钮').toBe(403);
-      expect(denyUser.message ?? '', '拒因应点名管理员限制').toContain('仅限管理员');
+      // 403 出参 message 是脱敏常量，handler 给的自定义详情只进日志，故这里钉机器码不钉文案
+      expect(
+        failureCode(denyUser),
+        `非管理员改用户的机器码应为 FORBIDDEN，实际=${failureCode(denyUser)}`
+      ).toBe(APP_ERROR_CODES.FORBIDDEN);
+      expect(
+        typeof denyUser.message === 'string' && denyUser.message.length > 0,
+        '403 应带非空脱敏文案'
+      ).toBe(true);
 
       const denyRole = await apiCallExpectFail(session.page, 'PUT', `/roles/${role.id}`, {
         name: `E2E越权改名${stamp()}`,
       });
       expect(denyRole.status, '非管理员改角色应被后端拒绝回 403').toBe(403);
-      expect(denyRole.message ?? '', '拒因应点名管理员限制').toContain('仅限管理员');
+      expect(
+        failureCode(denyRole),
+        `非管理员改角色的机器码应为 FORBIDDEN，实际=${failureCode(denyRole)}`
+      ).toBe(APP_ERROR_CODES.FORBIDDEN);
 
       const userAfter = await apiCallRaw<UserRow>(page, 'GET', `/users/${user.id}`);
       expect(userAfter.email, '越权被拒后用户邮箱必须逐字符不变').toBe(user.email);
