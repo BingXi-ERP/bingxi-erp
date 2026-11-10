@@ -219,3 +219,20 @@ UpdateRolePayload 刻意不含 code 列（禁止改角色编码防提权），�
 update_user 内另有一道提权拦截，但它排在 require_admin_role 之后；非管理员会话
 在更早的门就被拒，该分支经 HTTP 不可达。故只断言真实管理员门回 403 与目标行不变，
 不断言那条不可达文案，避免写出恒过或恒红的假断言。
+
+## 八 批四候选 production-recipes 次腿（端点级已核 2026-11-10）
+
+参照面取 origin/main 顶点 565ff6b50，按 7.2 四条判据逐腿核实，非按族粗筛。
+
+production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆盖：create（03-production、446、44f），approve（03-production 带 status=approved、approved_by、approved_at 三断言），update（03-production PUT 后 GET 回读），close（44f real-lifecycle POST close）。
+
+次腿确证零断言覆盖五条，定批四首选：
+- POST /production-recipes/{id}/cancel 全 e2e 零命中，取消跃迁无测。
+- POST /production-recipes/calculate 零命中，这是大货处方成本计算腿，对客观 4.5 染费运费分摊与毛利口径直接相关，漏测代价高。
+- POST /production-recipes/{id}/additions 投料明细新增，仅在 traversal endpoints.config.ts 遍历清单登记，无断言。
+- POST /production-recipes/additions/{id}/approve 投料明细审批，同上仅遍历清单。
+- POST /production-recipes/additions/{id}/close 投料明细关闭，零命中。
+
+判据依据：遍历清单与 endpoints.config 出现不算覆盖（判据四），cleanup 与 GET 回读不算写面覆盖（判据三），故以上五条按断言级口径判为真缺口。additions 两腿此前被 endpoints.config 的单点命中掩盖成「有覆盖」，逐词形与命中性质复核后证伪。
+
+落地前置：落笔前先 ls frontend/e2e/flow 向编排方取未占号段，spec 覆盖五腿的状态跃迁、字段回读、非法前置拒因（calculate 依赖配方明细齐备、additions-approve 需先 create、cancel 后禁止再 approve）。与在途四支（BOM 下线、inventory、products、roles-users）零交集。CI 拥塞期不推，待四支收口后排入可推波次。
