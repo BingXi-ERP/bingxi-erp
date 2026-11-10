@@ -3,5 +3,6 @@
   "reachableRoutes": [
     "/dashboard",
     "/notification"
-  ]
+  ],
+  "provenance": "ci-mirrored"
 }
