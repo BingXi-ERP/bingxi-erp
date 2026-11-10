@@ -15,15 +15,19 @@ cd frontend && node scripts/check-e2e-feature-pairing.mjs --self-test
 | 口径 | 数 |
 | --- | --- |
 | 在册端点（后端路由面派生，与 route-snapshot 同谓词） | 1822 |
-| 配上用例（用例文件里既命中该路径又出现该方法记号） | 1195 |
-| 弱命中（路径前缀命中某个用例文件，但该文件里没有该方法的记号） | 21 |
-| 零引用（frontend/e2e 下无任何引用） | 606 |
-| 其中 前端有调用点，属用户可达 | 167 |
+| 配上用例（用例文件里既命中该路径又出现该方法记号） | 1199 |
+| 弱命中（路径前缀命中某个用例文件，但该文件里没有该方法的记号） | 20 |
+| 零引用（frontend/e2e 下无任何引用） | 603 |
+| 其中 前端有调用点，属用户可达 | 164 |
 | 其中 前端零调用点 | 439 |
 | 带理由豁免在册生效 | 0 |
 
 零引用占在册约三分之一。此前这个比例没人量过，因为这道门只有增量语义
 （只判"本支相对分支起点新增的端点"），存量面从未被扫过一遍。
+
+上表是并基主干顶点后的修正值。首版量出的是 606/167/1195/21，那次判定跑在
+落后主干一个提交的车道语料上，缺 248 与 458 等已合入用例，把本来已被覆盖的
+三枚端点算成零引用。修正过程与退休的三枚键见第六节 6.6。
 
 ## 二 按资源段分组（零引用 606 枚，共 124 个分组，取前 18）
 
@@ -38,10 +42,10 @@ erp/roles 9，erp/textile-submissions 9，erp/vouchers 9，erp/crm 9。
 
 ## 三 优先序（这条是本清单的结论，不是数字）
 
-1. 先补 167 枚"前端有调用点"的：它们是真用户可达功能，按目标 三 的面料主链顺序排
+1. 先补 164 枚"前端有调用点"的：它们是真用户可达功能，按目标 三 的面料主链顺序排
    （色卡 样品打样 报价 库存细码 采购 销售 委外染整 质检 对账结算），
    高危写面（审批 红冲 作废 发放 锁定）排在同域纯读面之前。
-   这 167 枚是配对门自己定的硬口径，仓内既有规则写明有界面入口的端点不许靠豁免过门。
+   这 164 枚是配对门自己定的硬口径，仓内既有规则写明有界面入口的端点不许靠豁免过门。
 2. 再判 439 枚"前端零调用点"的归属，不要直接给它们补 e2e。
    给一个界面进不去的端点写端到端用例，测的是不存在的能力，属凑覆盖率。
    每条只有三种合法去向：确实是对外或内部集成端点（改走接口测试并显式登记带理由豁免），
@@ -70,7 +74,7 @@ erp/roles 9，erp/textile-submissions 9，erp/vouchers 9，erp/crm 9。
 - 目标 三 要求的面料核心字段（色号 缸号 批次 门幅 克重 米数 卷号 损耗 余码 色差 打样版本）
   在用例里的落字段覆盖，本清单只到端点粒度，没到字段粒度。
 
-## 六 167 枚可达漏配的按域分布与批一选题（同日较晚实测）
+## 六 164 枚可达漏配的按域分布与批一选题（并基主干后修正值）
 
 ### 6.1 怎么量出来的
 
@@ -82,17 +86,17 @@ erp/roles 9，erp/textile-submissions 9，erp/vouchers 9，erp/crm 9。
 cd frontend && node scripts/check-e2e-feature-pairing.mjs --emit-gap-json <落盘路径>
 ```
 
-守恒自证：导出 606 行，reachable=167、dead=439，与 `--self-test` 的
-`SELFTEST_POOL uncovered=606 uncoveredWithUi=167 uncoveredNoUi=439` 逐字相等；
+守恒自证：导出 603 行，reachable=164、dead=439，与 `--self-test` 的
+`SELFTEST_POOL uncovered=603 uncoveredWithUi=164 uncoveredNoUi=439` 逐字相等；
 11 道反向探针仍全命中，说明这次改动没有把判定面改宽或改窄。
 
 ### 6.2 分布
 
-167 枚落在 52 个资源段分组。前十：inventory 15、production 14、roles 9、
+164 枚落在 52 个资源段分组。前十：production 14、inventory 12、roles 9、
 quotations 7、sales 7、ar 6、crm 6、financial-analysis 6、bi 5、finance 5。
 
-方法分布 GET 95、POST 54、PUT 10、DELETE 7、PATCH 1。即写面 72 枚、读面 95 枚。
-按第三节优先序，同域内写面先于读面，故批一从这 72 枚里选。
+方法分布 GET 94、POST 54、PUT 9、DELETE 6、PATCH 1。即写面 70 枚、读面 94 枚。
+按第三节优先序，同域内写面先于读面，故批一从这 70 枚里选。
 
 ### 6.3 先排除与在途支撞面的域
 
@@ -101,26 +105,31 @@ quotations 7、sales 7、ar 6、crm 6、financial-analysis 6、bi 5、finance 5�
 开票前置门（ar 发票族、finance）、物流面单配对（logistics-tracking/waybills）、
 配对门自身（scripts）、通知入口权限同源（notifications）。
 
-据此从写面 72 枚里剔除：quotations 3 枚、boms 1 枚、production/mrp/convert-orders 1 枚、
+据此从写面 70 枚里剔除：quotations 3 枚、boms 1 枚、production/mrp/convert-orders 1 枚、
 logistics-tracking 3 枚、inventory/logistics 3 枚（与面单族同属物流域，待逐路径核实前不抢）。
-剔除后剩 61 枚可排批，其中面料主链上的干净候选如下。
+剔除后剩 59 枚可排批，其中面料主链上的干净候选如下。
 
-### 6.4 批一选题（库存细码写面，7 枚）
+### 6.4 批一选题（库存细码写面，5 枚，已落地）
 
 - POST inventory/batches/*/transfer（批次转移，对应缸号锁定与调拨）
 - PUT inventory/batches/*（批次改）
-- DELETE inventory/batches/*（批次删，要验有下游引用时拒删）
-- PUT inventory/counts/items/*（盘点明细改）
-- DELETE inventory/counts/items/*（盘点明细删）
+- DELETE inventory/batches/*（批次删）
 - PUT inventory/transfers/items/*（调拨明细改）
 - DELETE inventory/transfers/items/*（调拨明细删）
 
-选它的理由：inventory 是可达漏配里最大的一域（15 枚），这 7 枚全是写面且直接落在
+选它的理由：inventory 是可达漏配里第二大的一域（12 枚），这 5 枚全是写面且直接落在
 目标 三 的库存细码环节与目标 4.1 的 E 节（删除作废红冲持久化）、G 节（缸号锁定与
 库存数字）、4.3 反向链路（调拨、盘点、盘盈盘亏）上；与七支在途域零交集。
 
-拆两枚 spec：批次族 3 端点一枚，盘点与调拨明细族 4 端点一枚。每枚按仓内范式
-自建前置（不依赖库里恰好有行）、写后回读、按角色断可见性与脱敏。
+已拆两枚 spec 落地在车道 wt-inv-write-b1（分支 test/e2e-inventory-write-face-batch1，
+基于主干顶点 9389e189c）：483-inventory-batch-write-face.spec.ts 覆盖批次族 3 端点
+（5 个 test、52 条 expect），484-inventory-transfer-items-write-face.spec.ts 覆盖调拨
+明细族 2 端点（4 个 test、45 条 expect）。号段 483 与 484 已横扫 151 个车道实量为空闲。
+两枚都经 prettier 归一与 TypeScript 语法诊断零错；本车道无 node_modules，eslint 与
+vue-tsc 与 playwright --list 未跑，类型与实跑结论留给 CI。
+
+原选题里的盘点明细 PUT 与 DELETE 两枚已撤销，理由见 6.6：它们其实已被 248 号用例
+以 API 字面量覆盖，首版判零引用是陈旧语料造成的假漏配，再写就是重复用例。
 
 批二候选（同法排除后）：production 的 production-recipes/additions/*/approve 与
 /*/close 与 calculate 共 3 枚（委外染整配料审批），products 的 batch/create、
@@ -129,7 +138,33 @@ batch/update、batch/delete 共 3 枚（基础档案批量写）。roles 6 枚�
 
 ### 6.5 派工前还要做的两件事
 
-一，号段实量：spec 编号要横扫全部在途工作树取已占清单再划区间，不能只看 main。
+一，号段实量：已做。横扫 151 个含 e2e 目录的车道，已占号最大 482，483 起全空，
+批一取 483 与 484 两号，落地后已复核无重号。
 二，逐路径核实 inventory/logistics 与 logistics-tracking/waybills 是否同域：
-若不同域，那 3 枚（sign、改、删）可并入批一，批一变成 10 枚拆三枚 spec。
-本文先按保守口径排除，不抢在途支的覆盖面。
+若不同域，那 3 枚（sign、改、删）可并入下一批，批一不变。本文先按保守口径排除，
+不抢在途支的覆盖面。
+
+### 6.6 更正记录 首版底数被陈旧语料抬高三枚
+
+首版（本文第一稿）量出 606 枚零引用、167 枚可达，并据此把盘点明细 PUT 与 DELETE
+选进批一。落地前逐枚核既有语料时发现 248-inventory-count-items-diff-cycle.spec.ts
+对这两枚有十余处真实 API 调用（含状态门、负数量、不存在主键、非法路径、二次删除），
+458 号用例也有一处删除调用。判定器不该判它们零引用。
+
+根因：那次判定跑在 wt-pairing-cron 车道，该车道落后主干一个提交，语料里根本没有
+248 与 458 等已合入用例（语料文件数 423）。并基主干顶点后语料增至 430 个文件，
+重跑自证得 uncovered=603、uncoveredWithUi=164、uncoveredNoUi=439，退休三枚键：
+
+- DELETE /api/v1/erp/inventory/counts/items/*
+- PUT /api/v1/erp/inventory/counts/items/*
+- GET /api/v1/erp/inventory/counts/generate-no
+
+新增零枚，11 道反向探针仍全命中。棘轮基线已按只减不增重算为 603 条并提交。
+
+为什么这不只是数字好看不好看：基线的作用是庇护存量债，被庇护的键日后即使用例
+被删也不会判红。把本来已覆盖的端点写进基线，等于给"删掉 248 号用例"这件事提前
+发了免死金牌，属假绿风险。故发现即收缩，不留到下一轮。
+
+教训入规：量全量面底数与生成棘轮基线之前，必须先并基到主干顶点再跑，不能在
+落后主干的车道语料上量。本文第一稿的 606/167 与批一里的盘点明细两枚就此作废，
+以本节与 6.4 的修正值为准。
