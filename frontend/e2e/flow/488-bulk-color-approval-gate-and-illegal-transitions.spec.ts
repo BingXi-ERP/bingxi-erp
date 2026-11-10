@@ -152,17 +152,26 @@ async function createApproval(
 }
 
 test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
-  test.beforeAll(async ({ page }) => {
-    await ensureTestEntities(page);
-    const ctx = getCtx();
-    expect(
-      typeof ctx.salesOrderId === 'number' && ctx.salesOrderId > 0,
-      `批色单父单缺失，无法建前置：ctx.salesOrderId=${String(ctx.salesOrderId)}`
-    ).toBe(true);
-    expect(
-      typeof ctx.dyeBatchId === 'number' && ctx.dyeBatchId > 0,
-      `染色批次缺失，无法建前置：ctx.dyeBatchId=${String(ctx.dyeBatchId)}`
-    ).toBe(true);
+  test.beforeAll(async ({ browser }) => {
+    // page 与 context fixture 按用例创建，beforeAll 取不到会整片抛错；共享前置自建上下文，
+    // 与本文件 afterAll 同型。前置 ID 落在模块级 ctx，上下文关闭后各用例仍读得到。
+    const browserCtx = await browser.newContext({ storageState: testStorageStatePath() });
+    const page = await browserCtx.newPage();
+    try {
+      await loginViaUI(page);
+      await ensureTestEntities(page);
+      const seeded = getCtx();
+      expect(
+        typeof seeded.salesOrderId === 'number' && seeded.salesOrderId > 0,
+        `批色单父单缺失，无法建前置：ctx.salesOrderId=${String(seeded.salesOrderId)}`
+      ).toBe(true);
+      expect(
+        typeof seeded.dyeBatchId === 'number' && seeded.dyeBatchId > 0,
+        `染色批次缺失，无法建前置：ctx.dyeBatchId=${String(seeded.dyeBatchId)}`
+      ).toBe(true);
+    } finally {
+      await browserCtx.close();
+    }
   });
 
   test('488-01 建档缺省态为 pending 且发货门禁默认阻断并读回一致', async ({ page }) => {
