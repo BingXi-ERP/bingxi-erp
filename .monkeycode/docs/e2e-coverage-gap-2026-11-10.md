@@ -267,4 +267,17 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 
 下一批候选（门自报、待断言级复核）：GET production-recipes/by-work-order/*（本域剩余唯一基线内漏配）；lab-dip 族四条（resamples 建单、result、tech-card 与同族写腿）在基线内成串出现；mrp/convert-orders 在基线内但该端点随 BOM 下线的在途支可能整族移除，动它前必须先确认承载支归属，避免重复立项。weak=21 那批只点名不判红，属经封装助手发请求的正常形态，不作缺陷登记。
 
+## 十一 棘轮基线清档与批五选定（2026-11-10）
+
+清档实录（车道 wt-recipe-legs，提交 9873f0dd6，diff 为 12 行删除零新增）：配对门一轮自报 16 枚 PAIRING_DEBT_RETIRED，其中批四四枚已在 4caf84d43 手摘，余 12 枚按门自报的 RETIRED 键集程序化摘除（只按该集合过滤，禁止往里加条目），基线 602 降到 590。摘后复跑门 rc=0、PAIRING_GREEN、retired=0、debt=590，与基线条数守恒一致。
+
+清档显出的新事实：lab-dip 族三条（resamples 建单、result、tech-card）与另两条 GET 其实早由 flow/210-lab-dip-color-difference.spec.ts 断言级覆盖（该文件第 675 到 825 行覆盖建单诱饵拒因、失败与通过两态、开卡号形与重复开卡拒绝），基线里的条目是清档滞后而非真缺口。教训入册：基线条目只代表"上一次生成时未配上"，判"某腿缺测"必须回到语料读断言本身，不能只读基线；本清单第七节与 7.2 四条判据对门产出的数据同样适用。批五因此改定域（见下），不在已覆盖的 lab-dip 上重复立项。
+
+同域分布实量（清档后 debt=590 按一级路径计数）：production 35、fixed-assets 16、quotations 15、contract-templates 12、color-cards 12、bulk-color-approvals 12、finance 11、boms 11、vouchers 9、quality-standards 9、purchase 9、crm 9、budgets 9、inventory 8、financial-analysis 8、dashboard 8、chemical-requisitions 8、textile-submissions 7。boms 11 枚不选（随 BOM 下线在途支整族消失，动它是重复立项）；production 与 inventory 与 quotations 与 crm 域与在途四支的补测面重叠风险高，选前先核文件交集。
+
+批五选定：bulk-color-approvals 域 14 腿（DELETE 一处、GET 六处：列表 详情 history report statistics 与两个提醒读面；POST 七处：建单 send-to-customer approve reject rework downgrade cut-sample scrap）。该域整条就是大货色样审批状态机，直接挂目标里的面料核心字段（色号、色差、打样版本）、反向链路（返工 降级 报废 剪样）、审批时间线（history 腿）与多角色协同（客户确认与客户驳回），补测价值高于同批其它候选。号段取 488（487 归批四，489 与 490 预留）。
+
+落地前置：先读 handlers/bulk_color_approval_handler.rs 与 services 对应文件的七条写腿入参、状态词表实值与前置门，再核前端页面与在途支是否已在 e2e 侧留号，最后按第七节联动门要求同步遍历清单与基线（生成物用生成器重算，不手改）。CI 拥塞期不推。
+
+
 
