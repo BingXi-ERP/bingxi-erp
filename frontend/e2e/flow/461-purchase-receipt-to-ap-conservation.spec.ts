@@ -1485,7 +1485,7 @@ test.describe.serial('461 采购收货→应付→付款 钩稽守恒', () => {
     const paid2 = expectDecScaleAtMost(ap2.paid_amount, 2, '付清后已付金额');
     const unpaid2 = expectDecScaleAtMost(ap2.unpaid_amount, 2, '付清后未付金额');
     expectDecMatch(decSub(gross, paid2), unpaid2, '付清后仍须满足余额相减关系');
-    expectDecEquals(unpaid2, decZero(), '付清后未付金额必须为 0.00');
+    expectDecMatch(unpaid2, decZero(), '付清后未付金额必须为 0.00');
     expectDecMatch(paid2, gross, '付清后已付金额必须等于账面额');
     expect(String(ap2.invoice_status), '付清后状态（大写词表 PAID）').toBe(AP_STATUS_PAID);
 
