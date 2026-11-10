@@ -459,17 +459,48 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
   test('447-3 两枚单据打印腿真内容：docx 正文必须带出打样申请号与定制订单号', async ({ page }) => {
     const queue: DeferredCleanup[] = [];
 
-    const labRows = rowsOf(
-      await apiCallRaw<unknown>(page, 'GET', '/production/lab-dip/requests?page=1&page_size=20'),
-      '打样申请列表'
+    // 打印腿的取证对象由本用例自建：库内是否恰好存在打样申请不是可信前置，且列表首行可能
+    // 属并行 worker 并在本腿用前被其收尾删除。外键取 ensureTestEntities 备好的真实客户，
+    // 必填 light_source 与 required_date 按 CreateLabDipRequestRequest 口径给足，单号由服务端取号。
+    await ensureTestEntities(page);
+    const ctx = getCtx();
+    if (!ctx.customerId) {
+      throw new Error('447-3 前置不成立：ensureTestEntities 未产出客户外键，自建打样申请无从落库');
+    }
+    const lab = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'POST',
+      '/production/lab-dip/requests',
+      {
+        customer_id: ctx.customerId,
+        customer_color_no: `447${genCode('L')}`,
+        customer_color_name: '447 打印腿打样色号',
+        sample_type: '小样',
+        fabric_spec: '447 打印腿规格',
+        light_source: 'D65',
+        required_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+      }
     );
-    expect(labRows.length, '测试库必须至少有一条打样申请，否则打印腿无从取证').toBeGreaterThan(0);
-    const labId = Number(labRows[0].id);
-    const labNo = str(labRows[0].request_no ?? labRows[0].lab_dip_no ?? labRows[0].code);
-    expect(Number.isInteger(labId) && labId > 0, `打样申请主键非法：${labRows[0].id}`).toBe(true);
+    const labId = Number(lab.id);
+    expect(
+      Number.isInteger(labId) && labId > 0,
+      `自建打样申请必须回主键，实际 ${JSON.stringify(lab)}`
+    ).toBe(true);
+    deferCleanup(
+      queue,
+      'DELETE',
+      `/production/lab-dip/requests/${labId}`,
+      `lab-dip-request-${labId}`
+    );
+    const labRow = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/production/lab-dip/requests/${labId}`
+    );
+    const labNo = str(labRow.request_no ?? labRow.lab_dip_no ?? labRow.code);
     expect(
       labNo.length,
-      `打样申请列表未回显申请号列（候选 request_no/lab_dip_no/code 全空），无法做真内容断言`
+      `自建打样申请回读必须回显申请号列（候选 request_no/lab_dip_no/code 全空），实际 ${JSON.stringify(labRow)}`
     ).toBeGreaterThan(0);
     const labXml = await printDocxWithRealContent(
       page,
@@ -483,9 +514,7 @@ test.describe('447 打印模板与导出的脱敏一致性 + 死端点侦测', (
     // 打印腿的取证对象由本用例自建：库内是否恰好存在定制订单不是可信前置。
     // 外键取 ensureTestEntities 备好的真实客户与产品（custom_orders 两列都是 NOT NULL 外键），
     // order_no 由服务端取号（CreateCustomOrderDto 无该字段），断言只认响应回显的真实单号。
-    await ensureTestEntities(page);
-    const ctx = getCtx();
-    if (!ctx.customerId || !ctx.productIds[0]) {
+    if (!ctx.productIds[0]) {
       throw new Error(
         `447-3 前置不成立：ensureTestEntities 未产出客户/产品外键（${JSON.stringify({
           customerId: ctx.customerId,
