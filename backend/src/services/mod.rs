@@ -195,6 +195,8 @@ pub mod sales_price_service;
 pub mod sales_return_service;
 // 销售报价单 Service（P12 批 1 P0 port PR-2：DTO + 基础 Service）
 pub mod quotation_pricing_service;
+// 报价超折扣审批门：阈值单行配置读取与折扣判定单点（提交腿与阈值配置面共用）
+pub mod quotation_discount_service;
 pub mod quotation_service;
 // D11 拆分：quotation_service.rs facade 的业务实现子模块（crud/update/lifecycle/calc/types）
 pub mod quotation_ops;
