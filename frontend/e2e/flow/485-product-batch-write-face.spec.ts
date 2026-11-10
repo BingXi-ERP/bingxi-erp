@@ -174,6 +174,9 @@ test.describe('产品批量写面 创建回滚 更新三态 删除部分成功',
     const products = Array.from({ length: 501 }, () => validProduct(genCode('P485')));
     const res = await apiCallExpectFail(page, 'POST', '/products/batch/create', { products });
     expect(res.status).toBe(400);
+    // DTO 的 validate() 错误经 validator::ValidationErrors 的统一转换出参，
+    // 机器码固定 VALIDATION_ERROR，文案是 DTO 上声明的那句中文，不另起第二套口径。
+    expect(failureCode(res)).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
     expect(res.message).toContain('批量创建产品数量不能超过 500 条');
   });
 
