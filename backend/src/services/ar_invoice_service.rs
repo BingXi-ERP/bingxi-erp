@@ -89,6 +89,19 @@ impl ArInvoiceService {
             .await?
             .ok_or_else(|| AppError::not_found(format!("客户 {} 不存在", customer_id)))?;
 
+        // 开票前置门：开票日期先按落库口径算出来，再用同一个日期过门，避免"门按今天判、
+        // 单按请求日期落"的漂移；该客户存在覆盖本次开票日期且尚未取得客户确认的对账单时
+        // 直接拒绝（取号与插入都不执行，事务随 ? 回滚）。
+        let invoice_date = req
+            .invoice_date
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+        crate::services::ar::ArReconciliationService::ensure_customer_statement_confirmed(
+            &txn,
+            customer_id,
+            invoice_date,
+        )
+        .await?;
+
         // 在应收事务内取号，锁随本事务提交才释放，与下方 active_model.insert(&txn) 同临界区
         let invoice_no = self.generate_invoice_no(&txn).await?;
         let active_model = Self::build_ar_invoice_active_model(
@@ -96,6 +109,7 @@ impl ArInvoiceService {
             invoice_no,
             customer_id,
             invoice_amount,
+            invoice_date,
             user_id,
         );
         let result = active_model.insert(&txn).await?;
@@ -129,19 +143,20 @@ impl ArInvoiceService {
     }
 
     /// 构建应收单 ActiveModel
+    ///
+    /// invoice_date 由 `create` 按落库口径算出（请求缺省则取当日）并同源用于开票前置门判定，
+    /// 本方法不再自行取当日，避免门判的日期与落库的日期不是同一天。
     fn build_ar_invoice_active_model(
         req: CreateArInvoiceRequest,
         invoice_no: String,
         customer_id: i32,
         invoice_amount: Decimal,
+        invoice_date: chrono::NaiveDate,
         user_id: i32,
     ) -> ar_invoice::ActiveModel {
         ar_invoice::ActiveModel {
             invoice_no: sea_orm::Set(invoice_no),
-            invoice_date: sea_orm::Set(
-                req.invoice_date
-                    .unwrap_or_else(|| chrono::Utc::now().date_naive()),
-            ),
+            invoice_date: sea_orm::Set(invoice_date),
             due_date: sea_orm::Set(
                 req.due_date
                     .unwrap_or_else(|| chrono::Utc::now().date_naive()),

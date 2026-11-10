@@ -137,6 +137,7 @@ fn test_quotation_response_dto_construction() {
         duty_cost: None,
         status: "APPROVED".to_string(),
         approval_instance_id: None,
+        submitted_by: Some(1),
         approved_by: Some(2),
         approved_at: Some(now),
         approval_reason: None,

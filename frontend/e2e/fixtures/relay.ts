@@ -90,6 +90,9 @@ export interface RelayStep {
   role: string;
   /** 本棒在失败信息里的名字，缺省用角色码 */
   label?: string;
+  /** 业务规则本就要求与前序棒同身份时显式豁免重复身份守卫（如未超阈自批由提交人自审）；
+   *  缺省 false，守卫仍拦其余同账号自问自答 */
+  allowRepeatIdentity?: boolean;
   run: (ctx: RelayStepContext) => Promise<RelayStepOutput>;
 }
 
@@ -239,7 +242,7 @@ export async function createRelay(browser: Browser): Promise<RelayHandle> {
         );
       }
       const repeated = identityOwners.get(before.userId);
-      if (repeated !== undefined) {
+      if (repeated !== undefined && !step.allowRepeatIdentity) {
         await raw.close();
         throw new Error(
           `${stepName} 与前序棒次落到同一个用户 id=${before.userId}（账号 ${repeated} 与 ` +
