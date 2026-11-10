@@ -569,5 +569,249 @@ test.describe.serial('491 纺织品安全送检单写面', () => {
     );
   });
 
+  /** 按编码取主数据 id（童装核查行只带 item_id，需此映射对账） */
+  async function itemIdByCode(page: Page, code: string): Promise<number> {
+    const all = await apiCallRaw<{ items: Array<{ id: number; item_code: string }> }>(
+      page,
+      'GET',
+      '/textile-test-items'
+    );
+    const hit = all.items.find(i => i.item_code === code);
+    if (!hit) {
+      throw new Error(`[491] 主数据缺自建项目 ${code}（前置漂移）`);
+    }
+    return hit.id;
+  }
+
+  /**
+   * 推进到已收报告态：推导清单→sampling→sent→登记报告（自动 reported）→录结果→完整性门→报告判定。
+   * accept/judgeReport 置 false 可停在"报告 pending"用于完整性门拒绝腿。报告色号/工艺与送检单一致、
+   * 检验依据含完整标准号加类别展示形，有效期窗口覆盖今日，否则完整性门记缺项落 rejected。
+   */
+  async function advanceToReported(
+    page: Page,
+    s: Seed,
+    sub: SubmissionRow,
+    opts: { accept?: boolean; judgeReport?: boolean; reportValue?: number } = {}
+  ): Promise<{ reportId: number; reportNo: string }> {
+    await apiCallRaw(page, 'POST', `/textile-submissions/${sub.id}/items`, {
+      extra_item_codes: [],
+    });
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${sub.id}/status`, {
+      status: STATUS.SAMPLING,
+    });
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${sub.id}/status`, { status: STATUS.SENT });
+    const reportNo = genCode('E2E-RPT');
+    const report = await apiCallRaw<{ id: number }>(page, 'POST', '/textile-reports', {
+      report_no: reportNo,
+      submission_id: sub.id,
+      inspection_agency: 'E2E第三方检测机构',
+      has_cma: true,
+      has_cnas: false,
+      sample_name: 'E2E送检样品',
+      material_composition: '100%涤纶',
+      color_no: sub.color_no,
+      process_no: sub.process_no,
+      test_basis: 'GB 18401-2010 B类',
+      conclusion: '所检项目符合标准要求',
+      issue_date: today(),
+      valid_until: nextYear(),
+    });
+    await apiCallRaw(page, 'POST', `/textile-reports/${report.id}/results`, {
+      rows: [
+        {
+          item_code: s.gb18401Code,
+          measured_value: opts.reportValue ?? 20,
+          measured_unit: 'mg/kg',
+        },
+      ],
+    });
+    if (opts.accept !== false) {
+      const gate = await apiCallRaw<{
+        report: { acceptance_status: string };
+        missing_elements: string[];
+      }>(page, 'PUT', `/textile-reports/${report.id}/acceptance`, {});
+      expect(gate.report.acceptance_status, '要素齐备完整性门应落 accepted').toBe('accepted');
+      expect(gate.missing_elements.length, 'accepted 时缺项清单应为空').toBe(0);
+    }
+    if (opts.judgeReport !== false) {
+      await apiCallRaw(page, 'PUT', `/textile-reports/${report.id}/judgement`, {});
+    }
+    return { reportId: report.id, reportNo };
+  }
+
+  test('491-06 童装核查逐行 upsert：新增/改/未提交行保留，非法录入形态被拒集合不变', async ({
+    page,
+  }) => {
+    const s = seed!;
+    const created = await createSubmission(page, s, { end_user_group: 'child' });
+    const id = created.id;
+    const measId = await itemIdByCode(page, s.childMeasCode);
+    const manualId = await itemIdByCode(page, s.childManualCode);
+
+    // 新增一行（可测项录实测值，verdict 落待判定）
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${id}/child-checks`, {
+      rows: [{ item_code: s.childMeasCode, measured_value: 50, measured_unit: 'mg/kg' }],
+    });
+    let cc = (await detail(page, id)).child_checks;
+    expect(cc.length, '首次登记新增一行').toBe(1);
+    expect(cc[0].item_id).toBe(measId);
+    expect(Number(cc[0].measured_value), '实测值落库').toBe(50);
+    expect(cc[0].verdict, '录入后待判定').toBe(VERDICT.PENDING);
+
+    // 改一行（可测项重录复位待判定）+ 新增第二行（人工项给结论位）
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${id}/child-checks`, {
+      rows: [
+        { item_code: s.childMeasCode, measured_value: 80, measured_unit: 'mg/kg' },
+        {
+          item_code: s.childManualCode,
+          check_desc: 'E2E绳带条款核查',
+          manual_conclusion: VERDICT.PASS,
+        },
+      ],
+    });
+    cc = (await detail(page, id)).child_checks;
+    expect(cc.length, '改一行并新增一行后共两行').toBe(2);
+    const meas = cc.find(r => r.item_id === measId)!;
+    const manual = cc.find(r => r.item_id === manualId)!;
+    expect(Number(meas.measured_value), '可测项改后等于新值').toBe(80);
+    expect(meas.verdict, '重录复位待判定').toBe(VERDICT.PENDING);
+    expect(manual.check_kind, '人工项核查方式快照取主数据').toBe('manual');
+    expect(manual.manual_conclusion).toBe(VERDICT.PASS);
+
+    // 集合语义是逐行 upsert 而非全量替换：只提交人工项改结论，未提交的可测行保留不删
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${id}/child-checks`, {
+      rows: [{ item_code: s.childManualCode, manual_conclusion: VERDICT.FAIL }],
+    });
+    cc = (await detail(page, id)).child_checks;
+    expect(cc.length, '未提交行保留（无删除语义），仍两行').toBe(2);
+    expect(cc.find(r => r.item_id === manualId)?.manual_conclusion, '人工项改后结论').toBe(
+      VERDICT.FAIL
+    );
+    expect(
+      Number(cc.find(r => r.item_id === measId)?.measured_value),
+      '未提交的可测行原值保留'
+    ).toBe(80);
+
+    // 非法录入形态：可测项不接受人工结论位、人工项不接受实测值，拒后集合不变
+    const badMeas = await apiCallExpectFail(
+      page,
+      'PUT',
+      `/textile-submissions/${id}/child-checks`,
+      {
+        rows: [{ item_code: s.childMeasCode, measured_value: 80, manual_conclusion: VERDICT.PASS }],
+      }
+    );
+    expectRejection(badMeas, APP_ERROR_CODES.VALIDATION_ERROR, '491-06 可测项给人工结论');
+    const badManual = await apiCallExpectFail(
+      page,
+      'PUT',
+      `/textile-submissions/${id}/child-checks`,
+      {
+        rows: [{ item_code: s.childManualCode, measured_value: 5 }],
+      }
+    );
+    expectRejection(badManual, APP_ERROR_CODES.VALIDATION_ERROR, '491-06 人工项给实测值');
+    cc = (await detail(page, id)).child_checks;
+    expect(cc.length, '非法录入被拒后集合不变').toBe(2);
+    expect(Number(cc.find(r => r.item_id === measId)?.measured_value)).toBe(80);
+    expect(cc.find(r => r.item_id === manualId)?.manual_conclusion).toBe(VERDICT.FAIL);
+  });
+
+  test('491-07 整单判定完整性门：非 reported/无采信报告/缺人工结论三腿拒绝且不落半态', async ({
+    page,
+  }) => {
+    const s = seed!;
+    // 腿 A：草稿态判定只从 reported 推进
+    const draft = await createSubmission(page, s, { end_user_group: 'child' });
+    const resA = await apiCallExpectFail(
+      page,
+      'PUT',
+      `/textile-submissions/${draft.id}/judgement`,
+      {}
+    );
+    expectRejection(resA, APP_ERROR_CODES.BUSINESS_ERROR, '491-07 草稿态判定');
+    expect((await detail(page, draft.id)).submission.status).toBe(STATUS.DRAFT);
+
+    // 腿 B：已收报告但报告未过完整性门（pending）→ 无可靠采信对象
+    const subB = await createSubmission(page, s, { end_user_group: 'child' });
+    await advanceToReported(page, s, subB, { accept: false, judgeReport: false });
+    const resB = await apiCallExpectFail(
+      page,
+      'PUT',
+      `/textile-submissions/${subB.id}/judgement`,
+      {}
+    );
+    expectRejection(resB, APP_ERROR_CODES.BUSINESS_ERROR, '491-07 无采信报告');
+    const dB = (await detail(page, subB.id)).submission;
+    expect(dB.status, '拒绝后仍 reported').toBe(STATUS.REPORTED);
+    expect(dB.overall_verdict, '拒绝后整单结论仍空').toBeNull();
+
+    // 腿 C：报告齐备但人工核查项缺结论位 → 拒绝完成（绝不代判）
+    const subC = await createSubmission(page, s, { end_user_group: 'child' });
+    await advanceToReported(page, s, subC);
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${subC.id}/child-checks`, {
+      rows: [
+        { item_code: s.childMeasCode, measured_value: 50, measured_unit: 'mg/kg' },
+        { item_code: s.childManualCode, check_desc: 'E2E待补结论核查' },
+      ],
+    });
+    const resC = await apiCallExpectFail(
+      page,
+      'PUT',
+      `/textile-submissions/${subC.id}/judgement`,
+      {}
+    );
+    expectRejection(resC, APP_ERROR_CODES.BUSINESS_ERROR, '491-07 缺人工结论');
+    const dC = (await detail(page, subC.id)).submission;
+    expect(dC.status, '缺结论拒绝后仍 reported').toBe(STATUS.REPORTED);
+    expect(dC.overall_verdict, '缺结论不得产出整单结论').toBeNull();
+  });
+
+  test('491-08 前置齐备判定产出 pass 与 judged 态，回读结论并可关闭', async ({ page }) => {
+    const s = seed!;
+    const sub = await createSubmission(page, s, { end_user_group: 'child' });
+    const { reportNo } = await advanceToReported(page, s, sub);
+    const measId = await itemIdByCode(page, s.childMeasCode);
+    const manualId = await itemIdByCode(page, s.childManualCode);
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${sub.id}/child-checks`, {
+      rows: [
+        { item_code: s.childMeasCode, measured_value: 50, measured_unit: 'mg/kg' },
+        {
+          item_code: s.childManualCode,
+          check_desc: 'E2E绳带核查',
+          manual_conclusion: VERDICT.PASS,
+        },
+      ],
+    });
+    const out = await apiCallRaw<{
+      submission: SubmissionRow;
+      stock_link: { matched: number; scope_note: string };
+      adoption: { adopted: { report_no: string } | null };
+    }>(page, 'PUT', `/textile-submissions/${sub.id}/judgement`, {});
+    expect(out.submission.status, '判定产出 judged 态').toBe(STATUS.JUDGED);
+    expect(out.submission.overall_verdict, '全 pass 汇总整单 pass').toBe(VERDICT.PASS);
+    expect(out.adoption.adopted?.report_no, '唯一采信本次登记的有效报告').toBe(reportNo);
+    expect(typeof out.stock_link.scope_note, '判定必须回显库存联动口径').toBe('string');
+
+    const d = await detail(page, sub.id);
+    expect(d.submission.status).toBe(STATUS.JUDGED);
+    expect(d.submission.overall_verdict).toBe(VERDICT.PASS);
+    expect(d.child_checks.find(r => r.item_id === measId)?.verdict, '可测加考行判定 pass').toBe(
+      VERDICT.PASS
+    );
+    expect(d.child_checks.find(r => r.item_id === manualId)?.verdict, '人工行搬运结论 pass').toBe(
+      VERDICT.PASS
+    );
+
+    // judged→closed 合法归档
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${sub.id}/status`, {
+      status: STATUS.CLOSED,
+    });
+    expect((await detail(page, sub.id)).submission.status, 'judged→closed 落库').toBe(
+      STATUS.CLOSED
+    );
+  });
+
   // 后续用例分批追加锚点
 });
