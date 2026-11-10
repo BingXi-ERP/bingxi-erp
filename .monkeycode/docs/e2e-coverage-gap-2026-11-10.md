@@ -357,6 +357,18 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 
 一条名额哨兵的假阳性。等待循环初版把"pending 为 0"当名额释放，结果刚推头的 PR 1196 只物化 1 格、PR 1194 物化 0 格，两者 pending 都是 0 却根本没开跑，当场假命中。修正为 total 大于等于 70 且 pending 为 0 才算释放，与"格数不足即全量矩阵尚未开跑"的既有判据同源。这类假阳性与陈旧的日志哨兵（追加式日志里留着上一轮 TOOL_BUG 行，全文 grep 当场命中）是同一族错误，判据必须锚定当轮当 head，不能锚定历史文本。
 
+## 十八 小程序域门禁落点核实与并基保工（2026-11-10）
+
+先纠我自己上一轮的转述。我曾说"小程序四道门禁不在主干 ci-cd.yml，只存在于四条未合车道"，前半句对、后半句的取证口径错：按 ci-cd.yml 单文件 grep 得零，就断言门禁不存在，是扫描面自己变窄。实量四条车道的全部 workflows 后，门禁住在独立文件 .github/workflows/miniprogram-checks.yml，判据单点在 scripts/ci/miniprogram-checks.sh（699 行），另有 mp-check-pages.cjs 与 mp-endpoint-check.cjs 两枚辅助判定器。承载车道是 wt-mp-land（feat/wechat-miniprogram-domain），不是 ci-cd.yml 里缺一段。
+
+七道门与 objective 二 四项要求的对照。门体覆盖 JS 语法逐文件 node --check（带 MIN_JS_FLOOR 扫空判据）、代码包体积（主包与单分包 2048KB、整包 20480KB，取微信官方上限，图片字体计入所在包）、app.json 与磁盘页面双向一一对账、调用点端点对 route-snapshot.txt 权威面、miniprogram_npm 厂商包对 package.json 声明、入库面凭据与主机暴露、跳转路由字面量可解析性（等值命中或按段边界前缀命中，带查询串只许等值）。对照 objective 二 的"打包、依赖、语法、包大小"：语法、包大小、依赖三项已有真判据；**打包一项是缺口**——体积门量的是源码原始字节，没有 wxml 与 wxss 编译、也没有构建 npm 产物的真实打包腿，node --check 只验 JS 语法不验小程序编译。这条缺口如实登记，不拿体积门冒充打包门。
+
+判定器检测力已自证。--self-test 造七道已知违规夹具，caught=7/7、missed=0，退 0 自述 MP_DETECTOR_OK；七道实跑退 0 自述 MP_CHECK_GREEN，路由面 scanned=534、declared=191、urlLiterals=281、exactOk=268、prefixOk=2、dead=11，其中 10 条在死链棘轮基线内只报告、new=0。
+
+推送档位裁定。记忆里的用户裁定明确：仓库是 public，小程序树虽获全量授权但**用户裁定先不推、本地照做**，feat/miniprogram-adapt 与 feat/wechat-mp-notification-leg 报孤本属预期，CI 门禁已推迟。据此本轮**不推送该车道、不开 PR**，只做并基保工。我原先"待名额释放就开车"的计划据此撤回；objective 二 的小程序门禁在主干缺席属用户主动推迟，不是漏做，不得当缺陷去推平。
+
+并基实录。该车道原落后主干 7 笔、领先 4 笔，用 git merge origin/main 而非 rebase（首亲为本支头，普通 push 即快进，不触 force 授权档）。冲突恰落在记忆点名的两枚只追加热点 backend/migration/src/domain/mod.rs 与 backend/migration/src/lib.rs，三处冲突按既定解法处理：双方注册都留，主干四条（quotation_discount_gate、quotation_discount_config_grant、logistics_waybill_order_fk_drop、m0126_add_audit_terminal_context_columns）在前，本支 wechat_mp_binding 续编为链文档第 42 条并排在 vec 末尾。同时纠掉本支原文一处已过时的声称（"迁移号 m0135 高于既有全部单档号"，主干已有 m0136），改为"与主干既有单档号互不相同故不撞台账，执行序以 vec 为准"。合并提交 d5ed7146d，落后 0、领先 5，工作树净，七道门复跑仍全绿。rustfmt 逐文件 check 退 1 但差行数为 0，非零码来自既有文件的 CRLF 告警行，按既有判据不算格式红。
+
 
 
 
