@@ -96,6 +96,7 @@ impl QuotationService {
             total_amount: Set(total_amount),
             status: Set(quotation_status::DRAFT.to_string()),
             approval_instance_id: Set(None),
+            submitted_by: Set(None),
             approved_by: Set(None),
             approved_at: Set(None),
             rejection_reason: Set(None),

@@ -19,6 +19,9 @@ use sea_orm::{
     ColumnTrait, EntityTrait, ExprTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
 };
 
+use crate::middleware::audit_context::{
+    RISK_REVERSE, mark_audit_high_risk, set_audit_change_reason, set_audit_doc_no,
+};
 use crate::models::status::inventory_reservation as reservation_status;
 use crate::models::status::sales_delivery as delivery_status;
 use crate::models::status::sales_order as so_status;
@@ -187,6 +190,17 @@ impl SalesService {
 
         let order_id = delivery.order_id;
         let warehouse_id = delivery.warehouse_id;
+        // 审计定位维度登记：单号取本次真正被冲销那张发货单的 sales_delivery.delivery_no 列
+        //（第 1 步行锁读出的这一行），不从路径 delivery_id 反推、不用 ID 拼号；原因取请求体
+        // CancelDeliveryRequest.reason 原样透传（同一枚值随后也写进 remarks 留业务侧痕迹）。
+        // 标记取 REVERSE 而非 VOID：本动作不是把草稿单作废，而是把已完成的发货反向冲销——
+        // 对称反向恢复库存与匹号、回退订单明细已发货数量与订单状态，并冲销由此产生的应收。
+        // 登记点在本函数第一处审计落库（第 6 步 update_with_audit）之前：写入单点从 task-local
+        // 活上下文取快照，本函数由 handlers/sales_order_handler.rs::cancel_delivery 在同一请求
+        // task 内 await；task-local 不随 tokio::spawn 传播，挪进子任务即失效。
+        set_audit_doc_no(Some(delivery.delivery_no.clone()));
+        set_audit_change_reason(Some(reason.clone()));
+        mark_audit_high_risk(RISK_REVERSE);
 
         // 3. 查询发货明细（用于库存恢复和订单明细回退）
         let delivery_items = sales_delivery_item::Entity::find()

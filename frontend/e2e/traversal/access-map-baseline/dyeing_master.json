@@ -3,6 +3,7 @@
   "reachableRoutes": [
     "/dashboard",
     "/dye-batch",
-    "/dye-recipe"
+    "/dye-recipe",
+    "/notification"
   ]
 }

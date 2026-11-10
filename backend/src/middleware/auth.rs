@@ -1,6 +1,6 @@
 use crate::container::AppState;
 use crate::middleware::audit_context::AuditContext;
-use crate::middleware::auth_context::{AuthContext, CsrfSession};
+use crate::middleware::auth_context::{AuthContext, CsrfSession, SessionRoleCode};
 use crate::middleware::public_routes::is_public_path;
 use crate::services::auth_service::AuthService;
 use crate::utils::audit::{self, SecurityEvent};
@@ -304,13 +304,59 @@ pub async fn auth_middleware(
             // V15 P0-S01 修复：从数据库加载 role.data_scope 和 user.department_id
             // 注入 AuthContext，供 service 层 apply_data_scope 使用。
             // 查询失败时保持 None，service 层按 Self_ 处理（最小权限原则）。
-            if let Some(role_id) = auth_context.role_id {
-                // 查询 role 表的 data_scope 字段
-                if let Ok(Some(role_model)) = crate::models::role::Entity::find_by_id(role_id)
-                    .one(state.db.as_ref())
-                    .await
-                {
-                    auth_context.data_scope = Some(role_model.data_scope);
+            // 同一枚角色行里同时带着 roles.code：审计的角色维度复用它注入 SessionRoleCode
+            // 扩展，交给内层 audit_context 中间件写进审计上下文，本维度不新增任何查询。
+            // 三种取不到的情形（无 role_id / 无角色行 / 查询失败）一律不注入，审计角色列
+            // 保持 NULL，绝不用空串或 UNKNOWN 之类的占位值冒充有值。
+            match auth_context.role_id {
+                Some(role_id) => {
+                    match crate::models::role::Entity::find_by_id(role_id)
+                        .one(state.db.as_ref())
+                        .await
+                    {
+                        Ok(Some(role_model)) => {
+                            let role_code = role_model.code;
+                            auth_context.data_scope = Some(role_model.data_scope);
+                            info!(
+                                path = %path,
+                                method = %method,
+                                user_id = %auth_context.user_id,
+                                role_id,
+                                role_code = %role_code,
+                                "会话角色码已加载并注入请求扩展"
+                            );
+                            request
+                                .extensions_mut()
+                                .insert(SessionRoleCode::new(role_code));
+                        }
+                        Ok(None) => {
+                            warn!(
+                                path = %path,
+                                method = %method,
+                                user_id = %auth_context.user_id,
+                                role_id,
+                                "会话角色码未加载：roles 表无该角色行，data_scope 按最小权限处理，审计角色列落 NULL"
+                            );
+                        }
+                        Err(e) => {
+                            warn!(
+                                path = %path,
+                                method = %method,
+                                user_id = %auth_context.user_id,
+                                role_id,
+                                error = %e,
+                                "会话角色码未加载：roles 表查询失败，data_scope 按最小权限处理，审计角色列落 NULL"
+                            );
+                        }
+                    }
+                }
+                None => {
+                    info!(
+                        path = %path,
+                        method = %method,
+                        user_id = %auth_context.user_id,
+                        "会话未携带 role_id：用户未分配角色，data_scope 按最小权限处理，审计角色列落 NULL"
+                    );
                 }
             }
             // 查询 user 表的 department_id 字段

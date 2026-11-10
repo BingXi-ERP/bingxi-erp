@@ -1,7 +1,8 @@
 {
   "role": "after_sales_manager",
   "reachableRoutes": [
-    "/dashboard"
+    "/dashboard",
+    "/notification"
   ],
   "provenance": "ci-mirrored"
 }

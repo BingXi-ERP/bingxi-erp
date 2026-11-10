@@ -44,6 +44,8 @@ pub struct QuotationResponseDto {
 
     pub status: String,
     pub approval_instance_id: Option<i64>,
+    /// 最近一次把单据推进审批流的操作人 user_id（与列 `sales_quotations.submitted_by` 同名）
+    pub submitted_by: Option<i64>,
     pub approved_by: Option<i64>,
     pub approved_at: Option<DateTime<Utc>>,
     /// 审批通过理由（与列 `sales_quotations.approval_reason` 逐字同名；两动作两列对称可读回）
@@ -94,6 +96,7 @@ impl From<sales_quotation::Model> for QuotationResponseDto {
             total_amount: m.total_amount,
             status: m.status,
             approval_instance_id: m.approval_instance_id,
+            submitted_by: m.submitted_by,
             approved_by: m.approved_by,
             approved_at: m.approved_at,
             approval_reason: m.approval_reason,

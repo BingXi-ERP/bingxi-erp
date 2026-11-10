@@ -24,6 +24,8 @@
 //!   → scan_receipt_grant
 //!   → piece_inventory_status_drop
 //!   → piece_length_scale_widen
+//!   → quotation_discount_gate
+//!   → quotation_discount_config_grant
 //!   → wechat_mp_binding
 //!
 //! 迁移名: m_system_domain / m_business_domain / m_sales_crm_domain /
@@ -221,13 +223,41 @@
 //!    NOTICE 跳过可重跑，down 探测小数位多于两位的行命中即 RAISE EXCEPTION 不截断，域内绝不
 //!    UPDATE/DELETE。置于链尾为新的顶层条目（并入已应用域会被台账整体跳过、扩位永不执行），
 //!    依赖 business 建表与 production 补列早于本域
-//! 38. wechat_mp_binding: 用户与公众号 openid 绑定关系表建表域（m0135）——落
+//! 38. quotation_discount_gate: 报价超折扣审批门数据地基域（m0129）——单行阈值配置表
+//!    quotation_discount_approval_configs（id 恒 1 + CHECK，建表即播种默认阈值，
+//!    ON CONFLICT DO NOTHING 使重跑只补行缺席、绝不把已配置值打回默认）与
+//!    sales_quotations.submitted_by 可空列（自审拦截的唯一可靠判据，域内不回填历史行、
+//!    绝不 UPDATE 造值）。依赖 sales_crm 建的 sales_quotations 与 system 建的 users，
+//!    置于链尾为新的顶层条目，复用库上也必然执行；down 撤本域新建的表与列，不触碰业务数据
+//! 39. quotation_discount_config_grant: 报价超折扣阈值配置面 quotation-discount-config 的
+//!    存量库补授通道（m0134）——读面四岗（sales_rep / sales_manager / gm / system_admin）补
+//!    read、写面两岗（gm / system_admin）补 update，与 init 矩阵授予面、
+//!    init_service.rs::PERMISSION_RESOURCES 的资源名登记、utils/path_utils.rs 的
+//!    ("quotations","discount-config") 消歧映射四通道逐字符同源（该键由
+//!    GET|PUT /api/v1/erp/quotations/discount-config 的模块前缀下第四段派生后消歧而得）。
+//!    按 roles.code 反查 id、NOT EXISTS 幂等、命中 0 角色以 NOTICE 点名不静默通过，
+//!    down 只按本域角色码与键配对回收；新建顶层域而不并入已应用域（复用库上整域跳过会让
+//!    补授永不执行），置于链尾必然执行且晚于承载它的 quotation_discount_gate
+//! 40. logistics_waybill_order_fk_drop: 运单多态订单列遗留单表外键下线域——
+//!    logistics_waybills.order_id 由 order_type 决定指向哪张单据表（sales_order/purchase_order/
+//!    transfer_order），建表域挂的 fk_logistics_waybills_order 只指 sales_orders，关联采购单
+//!    写入采购单主键即被外键拒绝。多态列无法用单表外键表达，参照完整性由建单与关联两条
+//!    写入路径在事务内回查保证，本域探测式 DROP 该外键并补多态语义列注释；down 先探测
+//!    order_id 不在 sales_orders 的行，命中即 RAISE EXCEPTION 中止后才恢复外键。置于链尾
+//!    为新的顶层条目（并入已应用域会被台账整体跳过、DROP 永不执行），依赖 business 建表
+//!    与 v15 加 order_type 列早于本域
+//! 41. m0126_add_audit_terminal_context_columns: 审计日志定位维度域（m0126）——给 audit_logs
+//!    补终端类型 操作页面 单据编号 变更原因 风险标记与操作人角色码六个可空列及按单号与角色码
+//!    的追溯索引，写入单点落库、读取侧列表详情导出出参补维并加等值筛选；探测式幂等加列（列已在
+//!    即 NOTICE 跳过可重跑），down 只回空壳不回填。置于链尾为新的顶层条目（并入已应用域会被台账
+//!    整体跳过、补列永不执行），依赖 system 与 business 建 audit_logs 早于本域
+//! 42. wechat_mp_binding: 用户与公众号 openid 绑定关系表建表域（m0135）——落
 //!    `user_wechat_mp_binding`，`user_id` 外键引用 system 域 m0001 建的 users 并 ON DELETE CASCADE，
 //!    `openid` 以具名唯一索引固化一个 openid 只绑一个用户，是公众号模板消息出件按 user_id
 //!    反查收件的唯一库侧来源；建表与两条索引全 IF NOT EXISTS 使重跑等价，域内不播种数据行
 //!    （users 的初始用户由 init 阶段写入且晚于 migrate，迁移内插绑定行在干净库上恒命中 0 影响）。
-//!    置于链尾为新的顶层条目（并入已应用域会被台账整体跳过、建表永不执行）。迁移号取 m0135，
-//!    高于既有全部单档号，与 piece_length_scale_widen 的 m0128 等不同号不同域互不撞台账
+//!    置于链尾为新的顶层条目（并入已应用域会被台账整体跳过、建表永不执行）。迁移号 m0135
+//!    与主干既有单档号互不相同故不撞台账；执行序以本 vec 为准，本域排在主干四条之后
 
 pub use sea_orm_migration::prelude::*;
 
@@ -293,10 +323,21 @@ impl MigratorTrait for Migrator {
             Box::new(domain::product_grade_vocab_check::Migration),
             // 仓储两岗补授扫码入库细键，链尾独立域（roles 与 role_permissions 由 system 域先建）
             Box::new(domain::scan_receipt_grant::Migration),
+            // 审计日志表只追加约束，链尾独立域（两张表由 system 域先建，晚于它们的本域必然执行）
+            Box::new(domain::audit_append_only_guard::Migration),
             // 库存匹冗余库存状态列探测式下线，同上一条口径：本支已摘除该列全部读写与实体字段
             Box::new(domain::piece_inventory_status_drop::Migration),
             // 库存匹米数列扩位到 DECIMAL(18,4)，链尾独立域（建表与加列均早于本域，复用库上必然执行）
             Box::new(domain::piece_length_scale_widen::Migration),
+            // 报价超折扣审批门数据地基：单行阈值配置表（建表即播种）+ 报价主表提交人列。
+            // 独立顶层域（并入已应用域会在复用库被整域跳过，建表与加列永不落地）
+            Box::new(domain::quotation_discount_gate::Migration),
+            // 报价超折扣阈值配置面的存量库补授通道（读面四岗、写面两岗），晚于上一域
+            Box::new(domain::quotation_discount_config_grant::Migration),
+            // 运单 order_id 多态列的遗留单表外键下线，链尾独立域（建表与加列均早于本域，复用库上必然执行）
+            Box::new(domain::logistics_waybill_order_fk_drop::Migration),
+            // 审计定位列（终端类型 操作页面 单据编号 变更原因 风险标记）与追溯索引，链尾独立域
+            Box::new(domain::m0126_add_audit_terminal_context_columns::Migration),
             // 用户与公众号 openid 绑定关系表，链尾独立域（users 由 system 域 m0001 先建）
             Box::new(domain::wechat_mp_binding::Migration),
         ]

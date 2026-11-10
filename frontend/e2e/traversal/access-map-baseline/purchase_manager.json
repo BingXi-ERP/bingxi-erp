@@ -32,6 +32,7 @@
     "/inventory-count",
     "/inventory-transfer",
     "/logistics",
+    "/notification",
     "/product",
     "/purchase",
     "/purchase-contract",

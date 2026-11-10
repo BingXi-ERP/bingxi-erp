@@ -3,6 +3,9 @@
 //! 应付核销服务层，负责应付核销的核心业务逻辑
 //! 包含自动核销、手工核销、取消核销等管理
 
+use crate::middleware::audit_context::{
+    RISK_REVERSE, mark_audit_high_risk, set_audit_change_reason, set_audit_doc_no,
+};
 use crate::models::status::general::common;
 use crate::models::{ap_invoice, ap_payment, ap_verification, ap_verification_item};
 use crate::utils::error::AppError;
@@ -495,6 +498,18 @@ impl ApVerificationService {
     ) -> Result<ap_verification::Model, AppError> {
         let txn = (*self.db).begin().await?;
         let verification = Self::fetch_verification_for_cancel(&txn, id).await?;
+        // 审计定位维度登记：单号取本次真正被冲销那张核销单的 ap_verification.verification_no 列
+        //（上一步行锁读出的这一行），不从路径 id 反推、不用 ID 拼号；原因取请求体
+        // CancelVerificationRequest.reason 原样透传（同一枚值随后写进 cancelled_reason 专列）。
+        // 登记点在本请求第一处审计落库（回退应付单的 update_with_audit）之前，令同一请求内
+        // 写下的核销单行与各应付单行都归到同一张被冲销的核销单上；写入单点从 task-local
+        // 活上下文取快照，本函数由 handlers/ap_verification_handler.rs::cancel_verification
+        // 在同一请求 task 内 await，task-local 不随 tokio::spawn 传播。
+        set_audit_doc_no(Some(verification.verification_no.clone()));
+        set_audit_change_reason(Some(reason.clone()));
+        // 标记取 REVERSE：取消核销是把已完成核销反向冲销——逐张回退应付单已付金额与未付余额
+        // 并按回退后的金额重定状态，属资金反向操作，不是把草稿单作废。
+        mark_audit_high_risk(RISK_REVERSE);
         let items = Self::fetch_verification_items_for_cancel(&txn, id).await?;
         let invoice_map = Self::lock_invoices_for_cancel(&txn, &items).await?;
         Self::restore_invoices_on_cancel(&txn, invoice_map, items, user_id).await?;

@@ -1,7 +1,8 @@
 {
   "role": "inventory_accountant",
   "reachableRoutes": [
-    "/dashboard"
+    "/dashboard",
+    "/notification"
   ],
   "provenance": "ci-mirrored"
 }

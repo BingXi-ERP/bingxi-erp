@@ -1,6 +1,7 @@
 {
   "role": "e2e_readonly",
   "reachableRoutes": [
-    "/dashboard"
+    "/dashboard",
+    "/notification"
   ]
 }

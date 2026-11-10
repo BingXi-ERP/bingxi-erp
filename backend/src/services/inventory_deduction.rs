@@ -269,6 +269,9 @@ pub fn require_outbound_dimensions(
 
 /// 缺维拒绝的统一包装：出参只回显用户自己提交的维度字段（公开规则 + 用户填入的色号），
 /// 内部 `product_id` 不进 HTTP 出参、只写日志；族别仍是字段必填族 VALIDATION。
+/// 拼接取 public_message 而非 Display：Display 会再叠一层族前缀（验证错误：），
+/// 使外显文案变成「单据_label：验证错误：真实拒因」的双前缀形态，操作人读到的拒绝
+/// 原因被族前缀隔断；public_message 对可外显变体返回构造点原文，日志仍用 Display 留全貌。
 fn outbound_dimension_denied(bill_label: &str, product_id: i32, e: AppError) -> AppError {
     tracing::warn!(
         "出库维度校验拒绝（{}，款号产品 {}）：{}",
@@ -276,7 +279,7 @@ fn outbound_dimension_denied(bill_label: &str, product_id: i32, e: AppError) -> 
         product_id,
         e
     );
-    AppError::validation_displayable(format!("{}：{}", bill_label, e))
+    AppError::validation_displayable(format!("{}：{}", bill_label, e.public_message()))
 }
 
 // =====================================================

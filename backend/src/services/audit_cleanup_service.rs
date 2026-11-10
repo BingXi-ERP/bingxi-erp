@@ -1,6 +1,6 @@
 use crate::utils::error::AppError;
 use futures::FutureExt;
-use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement};
+use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement, TransactionTrait};
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use tokio::time::{Duration, interval};
@@ -63,8 +63,16 @@ impl AuditCleanupService {
     }
 
     /// 清理过期的审计日志（分级保留）
+    ///
+    /// audit_logs 与 omni_audit_logs 上挂着只追加触发器，DELETE 默认被拒；
+    /// 本函数是唯一的保留期清理通道：四张表的删除共处一个事务，事务内先
+    /// SET LOCAL app.audit_purge = 'on' 声明通道，事务结束即失效，不外泄到连接池。
+    /// 调用方为 start_cleanup_task 的日周期定时分支，返回值汇总进清理日志。
     pub async fn cleanup_expired_logs(&self) -> Result<u64, AppError> {
         let mut total_deleted = 0u64;
+        let txn = (*self.db).begin().await?;
+        txn.execute_unprepared("SET LOCAL app.audit_purge = 'on'")
+            .await?;
 
         // omni_audit_logs: 保留 retention_days（默认 365 天）
         let stmt = Statement::from_sql_and_values(
@@ -72,7 +80,7 @@ impl AuditCleanupService {
             "DELETE FROM omni_audit_logs WHERE created_at < NOW() - ($1 * INTERVAL '1 day')",
             [self.retention_days.into()],
         );
-        let result = self.db.as_ref().execute_raw(stmt).await?;
+        let result = txn.execute_raw(stmt).await?;
         let deleted_count = result.rows_affected();
         if deleted_count > 0 {
             tracing::info!(
@@ -89,7 +97,7 @@ impl AuditCleanupService {
             "DELETE FROM audit_logs WHERE created_at < NOW() - ($1 * INTERVAL '1 day')",
             [self.retention_days.into()],
         );
-        let result = self.db.as_ref().execute_raw(stmt).await?;
+        let result = txn.execute_raw(stmt).await?;
         let deleted_count2 = result.rows_affected();
         if deleted_count2 > 0 {
             tracing::info!(
@@ -106,7 +114,7 @@ impl AuditCleanupService {
             "DELETE FROM permission_change_audits WHERE changed_at < NOW() - ($1 * INTERVAL '1 day')",
             [self.permission_audit_retention_days.into()],
         );
-        let result = self.db.as_ref().execute_raw(stmt).await?;
+        let result = txn.execute_raw(stmt).await?;
         let deleted_count3 = result.rows_affected();
         if deleted_count3 > 0 {
             tracing::info!(
@@ -123,7 +131,7 @@ impl AuditCleanupService {
             "DELETE FROM security_alert_logs WHERE created_at < NOW() - ($1 * INTERVAL '1 day')",
             [self.security_alert_retention_days.into()],
         );
-        let result = self.db.as_ref().execute_raw(stmt).await?;
+        let result = txn.execute_raw(stmt).await?;
         let deleted_count4 = result.rows_affected();
         if deleted_count4 > 0 {
             tracing::info!(
@@ -133,6 +141,12 @@ impl AuditCleanupService {
             );
         }
         total_deleted += deleted_count4;
+
+        txn.commit().await?;
+        tracing::info!(
+            deleted = total_deleted,
+            "审计日志保留期清理事务已提交（只追加触发器的声明通道放行）"
+        );
 
         Ok(total_deleted)
     }

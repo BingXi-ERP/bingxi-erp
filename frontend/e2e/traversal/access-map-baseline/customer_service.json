@@ -1,6 +1,7 @@
 {
   "role": "customer_service",
   "reachableRoutes": [
-    "/dashboard"
+    "/dashboard",
+    "/notification"
   ]
 }

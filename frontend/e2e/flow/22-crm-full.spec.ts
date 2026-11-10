@@ -470,18 +470,27 @@ test.describe('CRM 模块：API 端点 + 真实 UI 交互', () => {
       currency: 'CNY',
     });
     if (result.status < 400) {
-      const list = await apiCallRaw<{ items: Array<{ id: number }> }>(
+      const list = await apiCallRaw<{ items: Array<{ customer_id: number }> }>(
         page,
         'GET',
         '/crm/customer-credits?page=1&page_size=1'
       );
-      const creditId = list.items?.[0]?.id;
-      if (creditId) {
-        await apiCallRaw(page, 'GET', `/crm/customer-credits/${creditId}`);
-        await safePostAction(page, `/crm/customer-credits/${creditId}/rating`, { rating: 'A' });
-        await safePostAction(page, `/crm/customer-credits/${creditId}/occupy`, { amount: '1000' });
-        await safePostAction(page, `/crm/customer-credits/${creditId}/release`, { amount: '1000' });
-        await safePostAction(page, `/crm/customer-credits/${creditId}/adjust`, { amount: '5000' });
+      // 详情与动作端点的 {id} 是客户自然键 customer_id（customer_credit_handler.rs
+      // get_credit 注释写明），列表行的行主键 id 在该语义下不指向同一条信用行，
+      // 拿行主键查详情会 404。
+      const customerId = list.items?.[0]?.customer_id;
+      if (customerId) {
+        await apiCallRaw(page, 'GET', `/crm/customer-credits/${customerId}`);
+        await safePostAction(page, `/crm/customer-credits/${customerId}/rating`, { rating: 'A' });
+        await safePostAction(page, `/crm/customer-credits/${customerId}/occupy`, {
+          amount: '1000',
+        });
+        await safePostAction(page, `/crm/customer-credits/${customerId}/release`, {
+          amount: '1000',
+        });
+        await safePostAction(page, `/crm/customer-credits/${customerId}/adjust`, {
+          amount: '5000',
+        });
         await safePostAction(page, '/crm/customer-credits/evaluate', { customer_id: 1 });
       }
     }

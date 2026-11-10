@@ -235,12 +235,93 @@ jobs:
           grep -q 'manifestPlaceholders\["usesCleartextTraffic"\] = "false"' "$GRADLE" || { echo '未找到明文流量占位符默认值，Tauri 模板已变，需人工校准'; exit 1; }
           sed -i 's/manifestPlaceholders\["usesCleartextTraffic"\] = "false"/manifestPlaceholders["usesCleartextTraffic"] = "true"/' "$GRADLE"
           grep -q 'manifestPlaceholders\["usesCleartextTraffic"\] = "true"' "$GRADLE" || { echo '明文流量占位符改写未生效'; exit 1; }
+          # gradle 发行包官方源超时中断时回退可达镜像，distributionSha256Sum 钉死官方校验值
+          # 保完整性（镜像产物被替换即 wrapper 自判红）；镜像不可达或版本不符保持官方源不改动。
+          WRAP="src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties"
+          GVER="$(sed -n 's|^distributionUrl=.*gradle-\([0-9.]*\)-bin\.zip.*|\1|p' "$WRAP")"
+          if [ "$GVER" = "9.6.1" ] && curl -sIf --max-time 20 -o /dev/null "https://mirrors.cloud.tencent.com/gradle/gradle-${GVER}-bin.zip"; then
+            sed -i "s|^distributionUrl=.*|distributionUrl=https://mirrors.cloud.tencent.com/gradle/gradle-${GVER}-bin.zip|" "$WRAP"
+            grep -q '^distributionSha256Sum=' "$WRAP" || echo 'distributionSha256Sum=9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14' >> "$WRAP"
+            echo "gradle 发行包回退镜像源：${GVER}"
+          fi
+          # kotlin 构件被 Maven Central 重定向到 GitHub release 资产，该资产当前中断。追加仓库无效：
+          # 重定向失败是错误而不是缺失，gradle 不会落到后一个仓库，必须插到 repositories 块最前。
+          # 做什么 逐个脚本在每个独立成行的 repositories 块开块行后插入三枚直连镜像（先对象存储镜像、
+          #        后公共代理、再谷歌仓代理，前两枚自管中央仓产物字节、不再重定向到 GitHub release，
+          #        第三枚覆盖只发布在谷歌仓的安卓工具链构件，例如 lint 的 lint-checks），语法按后缀分流。
+          #        工程由 初始化 Android 工程 步现场生成，脚本名随模板版本漂移，故按后缀枚举而非写死文件名。
+          # 为什么 只插中央仓镜像时，release 档的 lintVitalAnalyze 任务解析 androidLintTool 配置仍只会走
+          #        dl.google.com，该源读超时即整腿判红且重跑同样超时；谷歌仓代理给这批构件一条可达路径。
+          # 存哪里 只改 CI 现场生成的 src-tauri/gen/android 下 gradle 脚本，不进版本库。
+          # 判负 一个 repositories 块都没插进即判红并打出枚举到的脚本清单，防模板漂移静默失效。
+          PATCHED=0
+          while IFS= read -r F; do
+            if grep -q 'maven.aliyun.com/repository/public' "$F"; then
+              PATCHED=1
+              continue
+            fi
+            if ! grep -qE '^[[:space:]]*repositories \{$' "$F"; then
+              continue
+            fi
+            case "$F" in
+              *.gradle.kts) LINE='        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2/") }\n        maven { url = uri("https://maven.aliyun.com/repository/public") }\n        maven { url = uri("https://maven.aliyun.com/repository/google") }' ;;
+              *) LINE="        maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }\n        maven { url 'https://maven.aliyun.com/repository/public' }\n        maven { url 'https://maven.aliyun.com/repository/google' }" ;;
+            esac
+            sed -i "s|\([[:space:]]*\)repositories {$|\1repositories {\n${LINE}|" "$F"
+            if grep -q 'maven.aliyun.com/repository/public' "$F"; then
+              PATCHED=1
+            fi
+          done < <(find src-tauri/gen/android -maxdepth 4 \( -name '*.gradle' -o -name '*.gradle.kts' \) -print | sort)
+          if [ "$PATCHED" != "1" ]; then
+            echo '镜像仓库插入未命中任何 repositories 块，模板已变，需人工校准'
+            find src-tauri/gen/android -maxdepth 4 \( -name '*.gradle' -o -name '*.gradle.kts' \) -print | sort | sed 's|^|在场 gradle 脚本: |'
+            exit 1
+          fi
+          # 做什么 给现场工程的 gradle.properties 追加两枚构件下载超时（连接与读各 120 秒），已存在则不重复追加。
+          # 为什么 默认读超时 30 秒，谷歌仓与镜像在跨境链路上单次握手常超过它，超时被 gradle 记成解析失败
+          #        而不是慢；放宽的是等待上限，不是校验口径，构件 checksum 与 lint 判定一律不变。
+          # 传给谁 后续 debug 与 release 两腿的 gradle 调用都读这份 properties。
+          # 存哪里 只改 CI 现场生成的 src-tauri/gen/android/gradle.properties，不进版本库。
+          # 判负 追加后两行必须都在册，少一行即判红，不靠"没报错"当通过。
+          GP="src-tauri/gen/android/gradle.properties"
+          touch "$GP"
+          grep -q '^systemProp.org.gradle.internal.http.connectionTimeout=' "$GP" || echo 'systemProp.org.gradle.internal.http.connectionTimeout=120000' >> "$GP"
+          grep -q '^systemProp.org.gradle.internal.http.socketTimeout=' "$GP" || echo 'systemProp.org.gradle.internal.http.socketTimeout=120000' >> "$GP"
+          if [ "$(grep -c '^systemProp.org.gradle.internal.http.\(connection\|socket\)Timeout=120000$' "$GP")" != "2" ]; then
+            echo "构件下载超时两行未齐，gradle.properties 现状如下"
+            cat "$GP"
+            exit 1
+          fi
+          echo '构件下载超时已就位：连接与读各 120 秒'
 
       - name: 构建 debug APK
+        # 调用方 严格冒烟·3 与 严格冒烟·4 与 release 构建与模拟器 E2E 依赖本步产物。入参 无。
+        # 做什么 首跑失败且失败面命中上游构件拉取中断哨兵时原样重跑一次并打出两次日志；
+        #        重跑仍失败按第二次退出码判红，非网络族失败不重跑，判定语义与阈值不变。
+        # 为什么 gradle 发行包与镜像仓库只覆盖有镜像的构件，中央仓重定向到的 GitHub release 资产
+        #        瞬时 5xx 与连接重置无镜像可替，原样重跑是唯一不改判定的兜底。
+        # 存哪里 只写 CI 现场 gradle 缓存与 /tmp 下的两份构建日志，不进版本库。
         working-directory: mobile-app
         env:
           NDK_HOME: ${{ format('{0}/ndk/{1}', env.ANDROID_HOME, env.NDK_VERSION) }}
-        run: cargo tauri android build --debug --apk
+        run: |
+          set -euo pipefail
+          set +e
+          cargo tauri android build --debug --apk > /tmp/apk-build-1.log 2>&1
+          RC=$?
+          set -e
+          cat /tmp/apk-build-1.log
+          if [ "$RC" -ne 0 ] && grep -qE 'Could not GET|Could not download|Could not resolve|Connection reset|Read timed out|status code 5[0-9][0-9]' /tmp/apk-build-1.log; then
+            echo '上游构件拉取中断哨兵命中，原样重跑一次（第二次结果即终局）'
+            set +e
+            cargo tauri android build --debug --apk > /tmp/apk-build-2.log 2>&1
+            RC2=$?
+            set -e
+            cat /tmp/apk-build-2.log
+            [ "$RC2" -eq 0 ] || exit "$RC2"
+          else
+            [ "$RC" -eq 0 ] || exit "$RC"
+          fi
 
       - name: 严格冒烟·3 校验 APK 清单（包名/launcher/minSdk/权限/明文流量/插件类/体积）
         run: |
@@ -293,13 +374,33 @@ jobs:
       - name: 构建 release APK（未签名，发布轮必需产物）
         # 调用方 本文件的 准备签名证书 与 签名 release APK 两步，产物再进 上传签名 release APK。
         # 入参 无。tauri v2 的 android build 默认即 release 档，只 --debug 是选项，多传 --release 会被 CLI 判为 unexpected argument 并以退出码 2 终止。
+        # 做什么 与 debug 腿同一判据，首跑失败且失败面命中上游构件拉取中断哨兵时原样重跑一次并打出两次日志；
+        #        重跑仍失败按第二次退出码判红，非网络族失败不重跑，产物校验与阈值不变。
+        # 为什么 release 档另解析 releaseRuntimeClasspath 与 lint 模型，debug 腿已缓存的构件不覆盖它，
+        #        镜像仓库瞬时 5xx 会只打中这一腿；两腿兜底必须同形，否则同一故障在发布轮无重试可走。
+        # 存哪里 只写 CI 现场 gradle 缓存与 /tmp 下的两份构建日志，不进版本库。
         if: env.BUILD_RELEASE == 'true'
         working-directory: mobile-app
         env:
           NDK_HOME: ${{ format('{0}/ndk/{1}', env.ANDROID_HOME, env.NDK_VERSION) }}
         run: |
           set -euo pipefail
-          cargo tauri android build --apk
+          set +e
+          cargo tauri android build --apk > /tmp/apk-release-1.log 2>&1
+          RC=$?
+          set -e
+          cat /tmp/apk-release-1.log
+          if [ "$RC" -ne 0 ] && grep -qE 'Could not GET|Could not download|Could not resolve|Connection reset|Read timed out|status code 5[0-9][0-9]' /tmp/apk-release-1.log; then
+            echo '上游构件拉取中断哨兵命中，原样重跑一次（第二次结果即终局）'
+            set +e
+            cargo tauri android build --apk > /tmp/apk-release-2.log 2>&1
+            RC2=$?
+            set -e
+            cat /tmp/apk-release-2.log
+            [ "$RC2" -eq 0 ] || exit "$RC2"
+          else
+            [ "$RC" -eq 0 ] || exit "$RC"
+          fi
           APK="$(find src-tauri/gen/android/app/build/outputs/apk -path '*universal/release/*.apk' | head -1)"
           test -n "$APK" || { echo '未找到 universal release APK'; exit 1; }
           AAPT2="$ANDROID_HOME/build-tools/${ANDROID_BUILD_TOOLS}/aapt2"

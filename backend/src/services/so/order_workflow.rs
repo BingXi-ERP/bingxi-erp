@@ -14,6 +14,7 @@
 
 use super::SalesOrderDetail;
 use super::order::SalesService;
+use crate::middleware::audit_context::{RISK_VOID, mark_audit_high_risk, set_audit_doc_no};
 use crate::models::sales_order;
 use crate::models::sales_order::Entity as SalesOrderEntity;
 use crate::models::status::sales_order as so_status;
@@ -76,7 +77,16 @@ impl SalesService {
                 .await?;
         }
 
+        // 更新订单状态（改用 update_with_audit 写入审计日志，传 &txn 纳入事务保证原子性）
         let customer_id = order.customer_id;
+        // 审计定位维度登记：单号取本次真正被作废那张单的 sales_orders.order_no 列（就是上面
+        // 行锁读出的这一行），不从路径 ID 反推、不用 ID 拼号。必须在 update_with_audit 之前调用
+        // ——写入单点从 task-local 的活上下文取快照，本函数由 handlers/sales_order_handler.rs
+        // 在同一请求 task 内 await（不经 tokio::spawn），故此处写入的值即落库时读到的值；
+        // 一旦把落库挪进 spawn 子任务，task-local 不随任务传播，本登记会静默失效。
+        set_audit_doc_no(Some(order.order_no.clone()));
+        // 取消动作把订单写进 cancelled 终态，语义是作废而非删除，标 VOID
+        mark_audit_high_risk(RISK_VOID);
         let mut order_update: sales_order::ActiveModel = order.into();
         order_update.status = sea_orm::ActiveValue::Set(so_status::CANCELLED.to_string());
         order_update.updated_at = sea_orm::ActiveValue::Set(chrono::Utc::now());

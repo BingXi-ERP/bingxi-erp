@@ -3,6 +3,7 @@
   "reachableRoutes": [
     "/dashboard",
     "/dye-batch",
+    "/notification",
     "/purchase",
     "/purchase-contract",
     "/purchase-inspection",

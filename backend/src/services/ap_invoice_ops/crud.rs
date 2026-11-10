@@ -22,6 +22,9 @@ use sea_orm::{
     QuerySelect, Set, TransactionTrait,
 };
 
+use crate::middleware::audit_context::{
+    RISK_VOID, mark_audit_high_risk, set_audit_change_reason, set_audit_doc_no,
+};
 use crate::models::ap_invoice;
 use crate::services::ap_invoice_service::{
     ApInvoiceListQuery, ApInvoiceService, CreateApInvoiceRequest,
@@ -373,6 +376,16 @@ impl ApInvoiceService {
 
         // 4. 取消应付单
         let now = Utc::now();
+        // 审计定位维度登记：单号取本次真正被作废那张应付单的 ap_invoice.invoice_no 列
+        //（上一步行锁读出的这一行），不从路径 id 反推、不用 id 拼号；原因取请求体
+        // CancelInvoiceRequest.reason 原样透传，与写进 cancelled_reason 专列的是同一枚值。
+        // 必须在 update_with_audit 之前调用——写入单点从 task-local 活上下文取快照，本函数由
+        // handlers/ap_invoice_handler.rs::cancel_ap_invoice 在同一请求 task 内 await；
+        // task-local 不随 tokio::spawn 传播，挪进子任务即失效。
+        set_audit_doc_no(Some(invoice.invoice_no.clone()));
+        set_audit_change_reason(Some(reason.clone()));
+        // 取消动作把应付单写进 CANCELLED 终态，语义是作废，标 VOID
+        mark_audit_high_risk(RISK_VOID);
         let mut invoice_active: ap_invoice::ActiveModel = invoice.into();
         invoice_active.invoice_status =
             Set(crate::models::status::common::STATUS_CANCELLED.to_string());

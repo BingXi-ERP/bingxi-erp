@@ -141,6 +141,7 @@ fn make_quotation(
         duty_cost: None,
         status: status.to_string(),
         approval_instance_id: None,
+        submitted_by: None,
         approved_by: None,
         approved_at: None,
         approval_reason: None,

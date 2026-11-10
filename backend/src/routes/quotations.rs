@@ -35,6 +35,13 @@ pub fn routes() -> Router<AppState> {
         // 状态分类
         .route("/expiring", get(quotation_handler::list_expiring))
         .route("/expired", get(quotation_handler::list_expired))
+        // 超折扣审批阈值配置面（单行配置，权限键 quotation-discount-config:read / :update，
+        // 第四段 discount-config 经 utils/path_utils.rs::RESOURCE_NAME_MAP 消歧）
+        .route(
+            "/discount-config",
+            get(quotation_handler::get_discount_config)
+                .put(quotation_handler::update_discount_config),
+        )
         // 定价引擎
         .route("/calculate-price", post(quotation_handler::calculate_price))
         // 色号价格

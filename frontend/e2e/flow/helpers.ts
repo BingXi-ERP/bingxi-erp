@@ -477,32 +477,29 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     `[ensureTestEntities] 本 worker 专属供应商已建 id=${ctx.supplierId} name=E2E供应商${supplierSuffix}`
   );
 
-  // ---- 5. 客户（仍用 API，表单字段较多且下拉依赖复杂）----
-  // 口径钉死为启用态：销售提交门要求客户 status=active，而 list_customers 默认不过滤
-  // 软删除/inactive 行（仅显式传入 status 才过滤），首条可能是其他用例停用或软删除的残留；
-  // 新建客户后端默认虽为 active（customer_ops 写入方口径），此处仍显式传 status 防口径漂移。
-  try {
-    const customers = await apiCallRaw<{ items: Array<{ id: number }> }>(
-      page,
-      'GET',
-      '/crm/customers?page=1&page_size=1&status=active'
-    );
-    ctx.customerId = customers.items?.[0]?.id;
-  } catch (e) {
-    throw new Error(`[ensureTestEntities] 客户创建失败: ${(e as Error).message}`);
+  // ---- 5. 客户（本 worker 自建自持，不复用库里的共享行）----
+  // 调用方 销售建单与提交、应收与发货各链按 customer_id 引用本 ctx。入参 page 当前会话。
+  // 传给谁 ctx.customerId 供各 spec 建单与回读。存什么 一条启用态客户主档。存哪里 测试库客户表。
+  // 为什么 销售提交门要求客户 status=active（so/order_workflow.rs），而并行 worker 的收尾会把
+  //        共享客户软删，软删同步把 status 置 inactive（customer_ops/crud.rs）；复用列表首条即使
+  //        取行时筛了 active，取行与用行之间仍可能被停用，表现为 POST /sales/orders/{id}/submit
+  //        回 BUSINESS_ERROR 客户状态为 inactive，红面看着像后端缺陷实为夹具共享态竞态。
+  //        故与本文件供应商同范式一律新建本 worker 专属客户，创建失败即抛错，
+  //        不退回共享行、不兜底假 id。
+  const customerSuffix = `${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0')}`;
+  const createdCustomer = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
+    customer_name: `E2E客户${customerSuffix}`,
+    status: 'active',
+  });
+  if (!createdCustomer.data?.id) {
+    throw new Error(`[ensureTestEntities] 客户创建失败: ${JSON.stringify(createdCustomer)}`);
   }
-  if (!ctx.customerId) {
-    try {
-      const result = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
-        customer_name: 'E2E 客户 ' + Date.now(),
-        status: 'active',
-      });
-      ctx.customerId = result.data?.id;
-    } catch (e) {
-      console.error('[ensureTestEntities] customerId 创建失败:', (e as Error).message);
-      ctx.customerId = undefined;
-    }
-  }
+  ctx.customerId = createdCustomer.data.id;
+  console.log(
+    `[ensureTestEntities] 本 worker 专属客户已建 id=${ctx.customerId} name=E2E客户${customerSuffix}`
+  );
 
   // ---- 6. 会计科目（仍用 API，科目在树形结构中不易 UI 操作）----
   try {
@@ -1744,7 +1741,7 @@ export async function apiCallExpectFail(
   return { status: response.status(), ...json };
 }
 
-const LOGGED_IN = { done: false };
+const LOGGED_IN = { done: false, who: undefined as string | undefined };
 
 export async function loginViaUI(
   page: Page,
@@ -1760,12 +1757,29 @@ export async function loginViaUI(
   if (force) {
     await page.context().clearCookies();
     LOGGED_IN.done = false;
+    LOGGED_IN.who = undefined;
   }
 
-  // 检查 cookie 是否还在（同 BrowserContext 内已登录则跳过）
+  // 本用例要用的身份。缺省取本 worker 的会话账号，与 context 初始会话态同源。
+  const wanted = username || testUsername();
+
+  // 身份不匹配必须先重登。同一 worker 内前一个用例（或前一档 spec）用 loginAsRole
+  // 切到受限岗后，模块级登录态与 cookie 都留在该岗，只判 cookie 在不在会让本用例
+  // 静默沿用他人会话，权限类断言于是打在错误的岗位上。who 未置位时不触发，
+  // 保留 context 预置会话的既成事实，不给每条用例多加一次登录。
+  if (!force && LOGGED_IN.done && LOGGED_IN.who !== undefined && LOGGED_IN.who !== wanted) {
+    console.warn(
+      `[loginViaUI] 会话身份不匹配（当前 ${LOGGED_IN.who}，本用例要 ${wanted}），清 cookie 重登`
+    );
+    await page.context().clearCookies();
+    LOGGED_IN.done = false;
+    LOGGED_IN.who = undefined;
+  }
+
+  // 检查 cookie 是否还在（同 BrowserContext 内已登录且身份一致才跳过）
   // 注意：必须同时检查 access_token 和 csrf_token —— CSRF 失效场景下前端会清空 csrf_token
   // Cookie 并跳转登录页，仅凭 access_token 存在就跳过登录会导致后续所有 POST 请求 403。
-  if (LOGGED_IN.done && !force) {
+  if (LOGGED_IN.done && !force && LOGGED_IN.who === wanted) {
     const cookies = await page.context().cookies();
     const hasToken = cookies.some(c => c.name === 'access_token');
     const hasCsrf = cookies.some(c => c.name === 'csrf_token');
@@ -1818,7 +1832,7 @@ export async function loginViaUI(
 
   // 缺省身份 = 本 worker 的会话账号（与 context 初始会话态同源）；显式传参的用例
   // （角色矩阵、越权前提等）按传入身份登录，不受影响。
-  const u = username || testUsername();
+  const u = wanted;
   const p = password || testPassword();
 
   // 最多重试 3 次（处理 Vite 504 + page 被关闭）
@@ -1854,6 +1868,7 @@ export async function loginViaUI(
       // 尝试登录
       await loginOnPage(page, u, p, consoleLogs);
       LOGGED_IN.done = true;
+      LOGGED_IN.who = u;
       page.off('console', handler);
       return;
     } catch (e) {

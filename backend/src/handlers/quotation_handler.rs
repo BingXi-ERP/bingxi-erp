@@ -22,6 +22,7 @@ use crate::models::quotation_update_dto::UpdateQuotationDto;
 use crate::models::status::approval;
 use crate::services::quotation_approval_service::QuotationApprovalService;
 use crate::services::quotation_convert_service::QuotationConvertService;
+use crate::services::quotation_discount_service::QuotationDiscountService;
 use crate::services::quotation_pricing_service::{PricingContext, QuotationPricingService};
 use crate::services::quotation_service::{QuotationService, ServiceError};
 use crate::utils::error::AppError;
@@ -326,6 +327,62 @@ pub async fn cancel_quotation(
     Ok(Json(ApiResponse::success_with_message(
         QuotationResponseDto::from(model),
         "报价单已取消",
+    )))
+}
+
+// ----------------------------------------------------------------------
+// 超折扣审批阈值配置面
+// ----------------------------------------------------------------------
+
+/// 阈值配置出参（单行配置的对外投影）
+#[derive(Debug, Serialize)]
+pub struct DiscountConfigResponse {
+    /// 超折扣阈值（百分点）：行折扣率严格大于此值即必须经主管审批后才能下发客户
+    pub over_discount_threshold_pct: rust_decimal::Decimal,
+    /// 最近一次修改阈值的时间
+    pub updated_at: chrono::DateTime<Utc>,
+}
+
+/// 阈值写入请求体。字段为必填 `Decimal`（无默认值）：缺键由解码层直接拒绝，
+/// 服务端不用任何代码内阈值补算，取值域与列刻度在 service 侧点名校验。
+#[derive(Debug, Deserialize)]
+pub struct DiscountConfigUpdateRequest {
+    pub over_discount_threshold_pct: rust_decimal::Decimal,
+}
+
+/// GET /api/v1/erp/quotations/discount-config
+/// 读超折扣审批阈值。权限键 `quotation-discount-config:read`（URL 第四段 discount-config
+/// 经 utils/path_utils.rs::RESOURCE_NAME_MAP 消歧为权威资源名，与 m0134 补授键逐字符一致）。
+pub async fn get_discount_config(
+    _auth: AuthContext,
+    State(state): State<AppState>,
+) -> Result<Json<ApiResponse<DiscountConfigResponse>>, AppError> {
+    let service = QuotationDiscountService::from_state(&state);
+    let config = service.get_config().await?;
+    Ok(Json(ApiResponse::success(DiscountConfigResponse {
+        over_discount_threshold_pct: config.over_discount_threshold_pct,
+        updated_at: config.updated_at,
+    })))
+}
+
+/// PUT /api/v1/erp/quotations/discount-config
+/// 写超折扣审批阈值。权限键 `quotation-discount-config:update`（PUT 按方法派生）；
+/// 操作人取服务端会话（AuthContext.user_id），请求体不承载身份，写入经审计单点留痕。
+pub async fn update_discount_config(
+    auth: AuthContext,
+    State(state): State<AppState>,
+    Json(payload): Json<DiscountConfigUpdateRequest>,
+) -> Result<Json<ApiResponse<DiscountConfigResponse>>, AppError> {
+    let service = QuotationDiscountService::from_state(&state);
+    let updated = service
+        .save_threshold(payload.over_discount_threshold_pct, auth.user_id)
+        .await?;
+    Ok(Json(ApiResponse::success_with_message(
+        DiscountConfigResponse {
+            over_discount_threshold_pct: updated.over_discount_threshold_pct,
+            updated_at: updated.updated_at,
+        },
+        "超折扣审批阈值已更新",
     )))
 }
 

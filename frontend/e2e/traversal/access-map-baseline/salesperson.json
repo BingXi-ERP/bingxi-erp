@@ -8,6 +8,7 @@
     "/crm/pool",
     "/customer",
     "/dashboard",
+    "/notification",
     "/quotations",
     "/quotations/new",
     "/sales",
