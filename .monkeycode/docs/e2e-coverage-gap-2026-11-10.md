@@ -335,6 +335,20 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 
 监控取数的一条教训。主干全量 run 42829801961 的阻塞式轮询器在 16:03 至 16:18 连续五轮 fetch failed 后按 TOOL_BUG 退出 9，而 run 本身一直在推进（重启后现取 85 枚 job、56 成功、1 跳过、28 在跑排队、0 失败）。五轮连败阈值约十五分钟，短于本机实测的网络抖动窗口，已放宽到十二轮。判"监控退出"必须先读它自己的日志区分连败退出与收口退出，不许把退出 9 读成 run 失败。
 
+## 十六 批七落地实录与 1196 分片红定性（2026-11-10）
+
+批七落地。491 一枚 spec 十二条腿（491-01 至 491-12），921 行、97 处 expect，覆盖建单逐字段回读、四类拒绝腿且拒后零落库、要素修改三态、状态机白名单与非法跃迁与撤回、清单推导集合与主数据 basis 分组一致且重生成幂等、童装核查逐行 upsert、整单判定完整性门三腿、pass 与 fail 两种结论都能产出、草稿删除与非草稿拒删、不存在 id 七腿 404、重复编码只落一行。棘轮基线摘除九条（含 DELETE 通配），全量面 paired 由 1209 升到 1218、debt 由 594 降到 585、corpusFiles 由 436 升到 437，三个数字守恒。六笔提交 eeaa3e1a3、6ec52ac64、cd91dcb61、9301ad312、4ba06d747、ee4895e2d，工作树净。
+
+写用例过程中量出一处源码缺陷并同支修掉。textile_safety_submission_service.rs 的 create 只校验 submission_no 非空，不查重也不归口唯一约束错，直接 insert 后问号上抛，重复编码经库侧 uq_textile_safety_submission_no（m0110_create_textile_safety_tables.rs 第 111 行）落 DbErr，再被 error.rs 的 From DbErr 映射成 500 DATABASE_ERROR 掩码文案。同域 create_test_item 有前置查重落 400 业务拒绝，两处口径不一致。修法是插入侧归口而非前置查重，因为前置查重挡不住并发建单；识别 sea_orm::SqlErr::UniqueConstraintViolation 后转 business_displayable 并点名单号，其余数据库错原样上抛。符号真实性先在 Cargo.lock 钉住的 2.0.2 registry 源码核过（error.rs 第 252 行 sql_err、第 217 行变体），仓内另有六处同型用法。配套把 491-12 的弱断言（只钉状态大于等于 400 与机器码非真）升成钉死 400 加 BUSINESS_ERROR 加拒因包含冲突单号。
+
+两处派工单事实被实例证伪并如实申报。一，棘轮基线真实路径是 frontend/scripts/e2e-feature-pairing-ratchet.json，派工单写的 frontend/e2e/ 下不存在该文件。二，upsert_child_checks 没有"删一行"语义，派工单要求的删腿按真实契约改成"未提交行保留"断言。这两条都属按真实契约写而不是按设想写，判据与 7.2 一致。
+
+本地门结论。tsc 的 error TS 计数 2 且都是既有基线伪影，prettier 通过，playwright test --list 列出 24 条（十二腿乘两个浏览器项目），配对门增量与全量面都退出码 0，注释门退出码 0 结论 PASS 且 ::error 行数 0。rustfmt 逐文件 check 的唯一差行在第 34 行既有 use 排序（本地与 CI 钉版分歧），新增代码零差行，按纪律不顺手重排。名额面开放八支都有在跑矩阵，批七本地压住未推。
+
+1196 分片红定性。PR 1196 head 458f9e75 的 flow e2e/flow(17/20) 判负，job 129920268517，日志 149376 字节、装配正常、reporter 报 1 failed，E2E-ASSERT 块原文是 Playwright 的 fixture 生命周期错误：context 与 page 按用例创建，不能在 beforeAll 里取用。失败附件点名 488-bulk-color-approval-gate-and-illegal-transitions 的 488-01。判责属本支测试面真红，488 spec 第 155 行把共享前置写成 beforeAll 解构 page，整条 describe 在钩子阶段抛错，所以只有一枚失败附件而其余用例未跑；同文件第 441 行 afterAll 已用正确范式（解构 browser 再 newContext 带 storageState 并 loginViaUI），两处写法不一致是直接来源。全车道横扫同型形态只此一处。修法照 afterAll 范式改 beforeAll，断言一条未放宽，提交 07cc9df5b 推入载体支并回读远端头核到同号，PR 正文已补全。
+
+两条新判据。一，fixture 生命周期错误只在运行时暴露，playwright test --list 与 tsc 都抓不到，本地四档全绿不等于这类写法正确，最终判据仍是该分片实跑；这与"编译红使下游分片整片 skipped"是相反形态，本次装配正常且跑到了用例阶段，不能按装配型红处置。二，重试循环里 `if git push ... | tail -n 3; then break; fi` 的退出码取自 tail 恒为 0，首轮失败也会跳出并让人误读成已推；必须 set -o pipefail 或每轮用 ls-remote 回读远端头与本地 HEAD 比对，本次正是靠回读发现 HEAD_MISMATCH 才重推成功。
+
 
 
 
