@@ -1741,7 +1741,7 @@ export async function apiCallExpectFail(
   return { status: response.status(), ...json };
 }
 
-const LOGGED_IN = { done: false };
+const LOGGED_IN = { done: false, who: undefined as string | undefined };
 
 export async function loginViaUI(
   page: Page,
@@ -1757,12 +1757,29 @@ export async function loginViaUI(
   if (force) {
     await page.context().clearCookies();
     LOGGED_IN.done = false;
+    LOGGED_IN.who = undefined;
   }
 
-  // 检查 cookie 是否还在（同 BrowserContext 内已登录则跳过）
+  // 本用例要用的身份。缺省取本 worker 的会话账号，与 context 初始会话态同源。
+  const wanted = username || testUsername();
+
+  // 身份不匹配必须先重登。同一 worker 内前一个用例（或前一档 spec）用 loginAsRole
+  // 切到受限岗后，模块级登录态与 cookie 都留在该岗，只判 cookie 在不在会让本用例
+  // 静默沿用他人会话，权限类断言于是打在错误的岗位上。who 未置位时不触发，
+  // 保留 context 预置会话的既成事实，不给每条用例多加一次登录。
+  if (!force && LOGGED_IN.done && LOGGED_IN.who !== undefined && LOGGED_IN.who !== wanted) {
+    console.warn(
+      `[loginViaUI] 会话身份不匹配（当前 ${LOGGED_IN.who}，本用例要 ${wanted}），清 cookie 重登`
+    );
+    await page.context().clearCookies();
+    LOGGED_IN.done = false;
+    LOGGED_IN.who = undefined;
+  }
+
+  // 检查 cookie 是否还在（同 BrowserContext 内已登录且身份一致才跳过）
   // 注意：必须同时检查 access_token 和 csrf_token —— CSRF 失效场景下前端会清空 csrf_token
   // Cookie 并跳转登录页，仅凭 access_token 存在就跳过登录会导致后续所有 POST 请求 403。
-  if (LOGGED_IN.done && !force) {
+  if (LOGGED_IN.done && !force && LOGGED_IN.who === wanted) {
     const cookies = await page.context().cookies();
     const hasToken = cookies.some(c => c.name === 'access_token');
     const hasCsrf = cookies.some(c => c.name === 'csrf_token');
@@ -1815,7 +1832,7 @@ export async function loginViaUI(
 
   // 缺省身份 = 本 worker 的会话账号（与 context 初始会话态同源）；显式传参的用例
   // （角色矩阵、越权前提等）按传入身份登录，不受影响。
-  const u = username || testUsername();
+  const u = wanted;
   const p = password || testPassword();
 
   // 最多重试 3 次（处理 Vite 504 + page 被关闭）
@@ -1851,6 +1868,7 @@ export async function loginViaUI(
       // 尝试登录
       await loginOnPage(page, u, p, consoleLogs);
       LOGGED_IN.done = true;
+      LOGGED_IN.who = u;
       page.off('console', handler);
       return;
     } catch (e) {

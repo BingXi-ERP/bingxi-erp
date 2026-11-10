@@ -107,6 +107,29 @@ async function findInvoiceBySource(
   return rows.find(r => Number(r.source_bill_id) === orderId && r.source_type === 'SALES_ORDER');
 }
 
+/**
+ * 自建一条独立启用客户供应收链路用例使用。
+ * ensureTestEntities 的 ctx.customerId 取客户列表首条，即使显式带 status=active 过滤，
+ * 选中后到提交订单之间仍可能被并发用例停用（销售提交门拒非 active 客户），
+ * 导致本用例在提交那一环就被拒、后面的应收金额钩稽断言整段失去前提。
+ */
+async function createActiveCustomer(
+  page: import('@playwright/test').Page,
+  tag: string
+): Promise<number> {
+  const res = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
+    customer_name: `91${tag}活跃客户${Date.now()}`,
+    customer_type: 'retail',
+    status: 'active',
+  });
+  const id = res?.data?.id;
+  expect(
+    id,
+    `[91-${tag}] 自建 active 客户失败，出库→应收链路前置不成立：${JSON.stringify(res)}`
+  ).toBeTruthy();
+  return id!;
+}
+
 test.describe('91 出库→开票（应收自动生成与金额一致性）', () => {
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
@@ -117,12 +140,12 @@ test.describe('91 出库→开票（应收自动生成与金额一致性）', ()
     page,
   }) => {
     const ctx = getCtx();
-    if (!ctx.customerId) throw new Error('前置缺失：ctx.customerId 未就绪');
     const productId = ctx.productIds[1] ?? ctx.productIds[0];
     if (!productId) throw new Error('前置缺失：ctx.productIds 为空');
+    const customerId = await createActiveCustomer(page, genCode('91'));
 
     const created = await apiCallRaw<Row>(page, 'POST', '/sales/orders', {
-      customer_id: ctx.customerId,
+      customer_id: customerId,
       order_date: new Date().toISOString(),
       items: [
         {
@@ -141,7 +164,7 @@ test.describe('91 出库→开票（应收自动生成与金额一致性）', ()
     await apiCall(page, 'POST', `/sales/orders/${orderId}/approve`);
 
     // 发货前：该订单名下不允许已存在销售来源应收（未出库先落应收=账实两头空的前兆）
-    const beforeShip = await findInvoiceBySource(page, ctx.customerId, orderId);
+    const beforeShip = await findInvoiceBySource(page, customerId, orderId);
     expect(beforeShip, '发货前不应存在该订单的销售来源应收单').toBeUndefined();
 
     const target = await pickDyeableWarehouse(page);
@@ -186,7 +209,7 @@ test.describe('91 出库→开票（应收自动生成与金额一致性）', ()
     // 订单头总额与行合计的账内自洽（发票金额一致性以此为锚）
     eqAmount(order.total_amount, expectedTotalCents, '订单头 total_amount=行含税合计');
 
-    const inv = await findInvoiceBySource(page, ctx.customerId, orderId);
+    const inv = await findInvoiceBySource(page, customerId, orderId);
     expect(inv, '全额发货必须自动生成销售来源应收单（提示成功未落库在这里现形）').toBeTruthy();
     const invRow = inv as Row;
     eqAmount(
@@ -205,7 +228,7 @@ test.describe('91 出库→开票（应收自动生成与金额一致性）', ()
     expect(invRow.status, '自动应收初始大写词值 DRAFT').toBe('DRAFT');
     expect(invRow.approval_status, '自动应收审批初始大写词值 PENDING').toBe('PENDING');
     // 客户名从客户主档带出（不是 #id 假名、不是空占位）
-    const cust = await apiCallRaw<Row>(page, 'GET', `/crm/customers/${ctx.customerId}`);
+    const cust = await apiCallRaw<Row>(page, 'GET', `/crm/customers/${customerId}`);
     expect(String(invRow.customer_name), '应收客户名必须逐字符等于客户主档名').toBe(
       String(cust.customer_name)
     );

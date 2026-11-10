@@ -237,6 +237,14 @@
 //!    按 roles.code 反查 id、NOT EXISTS 幂等、命中 0 角色以 NOTICE 点名不静默通过，
 //!    down 只按本域角色码与键配对回收；新建顶层域而不并入已应用域（复用库上整域跳过会让
 //!    补授永不执行），置于链尾必然执行且晚于承载它的 quotation_discount_gate
+//! 40. logistics_waybill_order_fk_drop: 运单多态订单列遗留单表外键下线域——
+//!    logistics_waybills.order_id 由 order_type 决定指向哪张单据表（sales_order/purchase_order/
+//!    transfer_order），建表域挂的 fk_logistics_waybills_order 只指 sales_orders，关联采购单
+//!    写入采购单主键即被外键拒绝。多态列无法用单表外键表达，参照完整性由建单与关联两条
+//!    写入路径在事务内回查保证，本域探测式 DROP 该外键并补多态语义列注释；down 先探测
+//!    order_id 不在 sales_orders 的行，命中即 RAISE EXCEPTION 中止后才恢复外键。置于链尾
+//!    为新的顶层条目（并入已应用域会被台账整体跳过、DROP 永不执行），依赖 business 建表
+//!    与 v15 加 order_type 列早于本域
 
 pub use sea_orm_migration::prelude::*;
 
@@ -311,6 +319,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::quotation_discount_gate::Migration),
             // 报价超折扣阈值配置面的存量库补授通道（读面四岗、写面两岗），晚于上一域
             Box::new(domain::quotation_discount_config_grant::Migration),
+            // 运单 order_id 多态列的遗留单表外键下线，链尾独立域（建表与加列均早于本域，复用库上必然执行）
+            Box::new(domain::logistics_waybill_order_fk_drop::Migration),
         ]
     }
 }

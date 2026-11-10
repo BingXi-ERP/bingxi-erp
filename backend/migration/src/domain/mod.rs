@@ -182,3 +182,6 @@ pub mod quotation_discount_gate;
 // 报价超折扣阈值配置面补授键的存量库通道。独立顶层域，与 scan_receipt_grant 同口径；
 // 必须晚于 quotation_discount_gate（补授的判权键对应那两个读写端点所在的配置面）。
 pub mod quotation_discount_config_grant;
+// 运单多态订单列遗留单表外键下线域：order_id 指向哪张表由 order_type 决定，只指 sales_orders
+// 的旧外键拒绝采购单关联写入；链尾独立域（并入已应用域会被台账整体跳过，DROP 永不执行）。
+pub mod logistics_waybill_order_fk_drop;

@@ -56,6 +56,18 @@ declare module 'child_process' {
 }
 
 /**
+ * zlib 最小面声明（本文件既定流程：e2e 新用 Node API 必须在此显式补最小声明）。
+ * 使用方与用到的成员逐一对应，不伪造完整 zlib API 面：
+ * - flow/249-logistics-waybill-chain.spec.ts 的打印腿要把 docx（zip 容器）里的
+ *   word/document.xml 成员解压出来再做文本成员判定，禁止对压缩字节 grep。
+ * 只用到 inflateRawSync（zip 成员是 raw deflate 流，method 8）；method 0 走未压缩分支，
+ * 不需要 zlib。deflate/gzip 等其它成员本仓 e2e 未使用，故不声明。
+ */
+declare module 'node:zlib' {
+  export function inflateRawSync(data: Uint8Array): Buffer;
+}
+
+/**
  * fs 最小面声明（与上面 child_process 同一既定流程：e2e 用 Node API 必须在此显式补声明，
  * 而不是让 `import 'fs'` 长期挂 TS2307 使该文件整段脱离类型检查）。
  * 成员-调用点逐一对应，未用到的 API 一律不声明：
