@@ -1,7 +1,7 @@
 {
   "role": "tax_accountant",
   "reachableRoutes": [
-    "/dashboard"
-  ],
-  "provenance": "ci-mirrored"
+    "/dashboard",
+    "/notification"
+  ]
 }

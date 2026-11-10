@@ -2,6 +2,7 @@
   "role": "sourcing_specialist",
   "reachableRoutes": [
     "/dashboard",
+    "/notification",
     "/product",
     "/purchase",
     "/purchase-contract",

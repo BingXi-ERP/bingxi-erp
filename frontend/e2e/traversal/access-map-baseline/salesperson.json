@@ -8,6 +8,7 @@
     "/crm/pool",
     "/customer",
     "/dashboard",
+    "/notification",
     "/quotations",
     "/quotations/new",
     "/sales",
@@ -15,6 +16,5 @@
     "/sales-contract",
     "/sales-price",
     "/sales-returns"
-  ],
-  "provenance": "ci-mirrored"
+  ]
 }

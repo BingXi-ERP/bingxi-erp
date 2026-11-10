@@ -1,7 +1,7 @@
 {
   "role": "report_viewer",
   "reachableRoutes": [
-    "/dashboard"
-  ],
-  "provenance": "ci-mirrored"
+    "/dashboard",
+    "/notification"
+  ]
 }
