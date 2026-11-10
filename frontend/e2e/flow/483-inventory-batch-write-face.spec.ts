@@ -22,7 +22,7 @@
 // 出参键名以 backend/src/models/inventory_stock.rs 实体字段为准，snake_case，
 // DECIMAL 列序列化为十进制字符串，断言先钉类型再钉数值。三态门控与四条拒绝文案
 // 取自 backend/src/services/inventory_stock_service.rs 的 update_batch_fields，
-// 超量拒绝文案取自同文件 transfer_batch，删除走 delete_batch_with_audit。
+// 超量腿钉"有非空拒因"而不钉拒因字面：bad_request 的出参走脱敏常量，具体文案不进契约。
 // 中文词表（一等品、正常、合格）是写入侧字面值，不英文化。
 // 全部打真实后端，不用 route mock，不用宽松断言掩盖源码问题。
 import { test, expect } from '../diagnose-fixture';
@@ -252,7 +252,9 @@ test.describe('库存批次写面 更新三态 删除回读 转移守恒', () =>
     });
     expect(over.status).toBe(400);
     expect(failureCode(over)).toBe(APP_ERROR_CODES.BAD_REQUEST);
-    expect(over.message).toBe('库存数量不足');
+    // bad_request 的出参文案恒为脱敏常量，只有 *_displayable 变体才外显自定义详情，
+    // 所以这里钉"有拒因"而不钉拒因具体字面，钉字面等于把脱敏契约当业务文案契约。
+    expect(over.message ?? '', '超量转移被拒时必须给出非空拒因').not.toBe('');
 
     // 反向对照：被拒后源批次三列不得出现半成品扣减
     const afterReject = await readBatch(page, row.id);

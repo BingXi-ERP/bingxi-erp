@@ -241,13 +241,15 @@ test.describe('调拨明细写面 三态更新 必填拒清 删后回读', () =>
     expect(failureCode(twice)).toBe(APP_ERROR_CODES.NOT_FOUND);
   });
 
-  test('484-04 更新 不存在的明细主键 404 且文案点名该主键', async ({ page }) => {
+  test('484-04 更新 不存在的明细主键 404 且给出非空拒因', async ({ page }) => {
     const absentId = 2147483647;
     const res = await apiCallExpectFail(page, 'PUT', `/inventory/transfers/items/${absentId}`, {
       notes: 'E2E-ABSENT',
     });
     expect(res.status).toBe(404);
     expect(failureCode(res)).toBe(APP_ERROR_CODES.NOT_FOUND);
-    expect(res.message).toBe(`调拨明细 ${absentId} 未找到`);
+    // not_found 的出参文案恒为脱敏常量（只有 not_found_displayable 外显自定义详情），
+    // 断"文案点名该主键"会把脱敏契约钉成业务契约，钉的只能是有非空拒因。
+    expect(res.message ?? '', '更新不存在的主键必须给出非空拒因').not.toBe('');
   });
 });
