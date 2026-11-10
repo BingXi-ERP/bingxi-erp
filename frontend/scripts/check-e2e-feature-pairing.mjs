@@ -378,6 +378,9 @@ function judge(over = {}) {
       }
       continue;
     }
+    // 先把零引用端点记进漏配全集：清单要按可达性劈开全集，只劈基线外那部分会漏掉
+    // 存量债，量出来的数就对不上自证池的 uncovered。
+    orphanKeys.push(key);
     // 全量面：已在棘轮基线里的存量漏配只报告，不判红；基线外新出现的才判红。
     // 增量面没有这一层（新增集本就由起点差集算出，任何新增漏配都该当场判红）。
     if (fullSurface && debtKeys.has(key)) {
@@ -389,7 +392,6 @@ function judge(over = {}) {
       );
       continue;
     }
-    orphanKeys.push(key);
     fail += 1;
     say(
       '  PAIRING_RED ' +
@@ -418,6 +420,39 @@ function judge(over = {}) {
       }
     }
   }
+  // 全量面的漏配分面报告：把本轮判红的零引用端点按"前端有没有调用点"劈成两半，
+  // 再按 URL 资源段分组。可达那半是必须补用例的硬缺口，零调用点那半要先判归属
+  // （对外或内部端点、死端点、还是前端漏接），两者处置完全不同，混在一个数里没法排批。
+  // 可达性谓词与上面豁免分支用的是同一条（matchNeedles 命中前端源码），不另起口径。
+  let reachableOrphans = 0;
+  let deadOrphans = 0;
+  if (fullSurface && orphanKeys.length > 0) {
+    const groupOfKey = key => {
+      const parts = key.split(' ')[1].split('/').filter(Boolean);
+      return (parts[2] || parts[1] || '?') + '/' + (parts[3] || parts[2] || '');
+    };
+    const reach = new Map();
+    const dead = new Map();
+    for (const key of orphanKeys) {
+      const isReachable = matchNeedles(cur.get(key).path).some(n =>
+        srcTexts.some(t => t.includes(n))
+      );
+      const g = groupOfKey(key);
+      const bucket = isReachable ? reach : dead;
+      bucket.set(g, (bucket.get(g) || 0) + 1);
+      if (isReachable) reachableOrphans += 1;
+      else deadOrphans += 1;
+    }
+    const dump = (label, map) => {
+      const rows = [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      say(
+        `  PAIRING_GAP_${label} groups=${rows.length} total=${rows.reduce((s, [, v]) => s + v, 0)}`
+      );
+      for (const [g, n] of rows.slice(0, 20)) say(`    ${label.toLowerCase()} ${g}=${n}`);
+    };
+    dump('REACHABLE', reach);
+    dump('DEAD', dead);
+  }
   return {
     code: fail > 0 ? 1 : 0,
     unpaired: fail,
@@ -425,6 +460,7 @@ function judge(over = {}) {
     head:
       'PAIRING mode=' +
       (fullSurface ? 'full' : 'incremental') +
+      (fullSurface ? ` reachableOrphans=${reachableOrphans} deadOrphans=${deadOrphans}` : '') +
       ' baseline=' +
       baseCount +
       ' current=' +
