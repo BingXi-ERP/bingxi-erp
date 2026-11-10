@@ -403,5 +403,171 @@ test.describe.serial('491 纺织品安全送检单写面', () => {
     }
   });
 
+  test('491-03 PUT 要素三态：改成功回读新值旧值不残留，非法值被拒原值不变', async ({ page }) => {
+    const s = seed!;
+    const oldColor = genCode('E2E-OLD-C');
+    const created = await createSubmission(page, s, { color_no: oldColor, remarks: 'E2E旧备注' });
+    const newColor = genCode('E2E-NEW-C');
+    const newProcess = genCode('E2E-NEW-P');
+    const newBatch = genCode('E2E-NEW-B');
+    // 改成功：全量字段重提交（update 与建单同判据，body 仍是完整 CreateSubmissionBody）
+    await apiCallRaw(
+      page,
+      'PUT',
+      `/textile-submissions/${created.id}`,
+      submissionBody(s, {
+        submission_no: created.submission_no,
+        color_no: newColor,
+        process_no: newProcess,
+        batch_no: newBatch,
+        color_role: 'representative',
+        target_market: 'eu',
+        remarks: 'E2E新备注',
+      })
+    );
+    const after = (await detail(page, created.id)).submission;
+    expect(after.color_no, '改后色号等于新值').toBe(newColor);
+    expect(after.color_no, '旧色号不得残留').not.toBe(oldColor);
+    expect(after.process_no).toBe(newProcess);
+    expect(after.batch_no).toBe(newBatch);
+    expect(after.color_role).toBe('representative');
+    expect(after.target_market).toBe('eu');
+    expect(after.remarks).toBe('E2E新备注');
+
+    // 非法值被拒：裸 A 不在带前缀词表内（GB18401_A 才是合法码），拒后原值不变
+    const res = await apiCallExpectFail(
+      page,
+      'PUT',
+      `/textile-submissions/${created.id}`,
+      submissionBody(s, {
+        submission_no: created.submission_no,
+        color_no: newColor,
+        safety_category: 'A',
+      })
+    );
+    expectRejection(res, APP_ERROR_CODES.VALIDATION_ERROR, '491-03 裸A类别');
+    const unchanged = (await detail(page, created.id)).submission;
+    expect(unchanged.color_no, '非法修改被拒后色号保持上一次成功值').toBe(newColor);
+    expect(unchanged.safety_category, '非法类别不得落库').toBe(CATEGORY_B);
+  });
+
+  test('491-04 状态机：清单非空门、合法跃迁、非法跃迁与词表外拒绝、撤回腿', async ({ page }) => {
+    const s = seed!;
+    const created = await createSubmission(page, s);
+    const id = created.id;
+    // draft→sampling 要求清单非空：未推导即推进被业务门拦下，状态不变
+    const noItems = await apiCallExpectFail(page, 'PUT', `/textile-submissions/${id}/status`, {
+      status: STATUS.SAMPLING,
+    });
+    expectRejection(noItems, APP_ERROR_CODES.BUSINESS_ERROR, '491-04 清单非空门');
+    expect((await detail(page, id)).submission.status, '被拒后仍是草稿').toBe(STATUS.DRAFT);
+
+    await apiCallRaw(page, 'POST', `/textile-submissions/${id}/items`, { extra_item_codes: [] });
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${id}/status`, { status: STATUS.SAMPLING });
+    expect((await detail(page, id)).submission.status, '合法跃迁 draft→sampling 落库').toBe(
+      STATUS.SAMPLING
+    );
+
+    const sent = await apiCallRaw<{
+      submission: SubmissionRow;
+      stock_link: { matched: number; scope_note: string };
+    }>(page, 'PUT', `/textile-submissions/${id}/status`, { status: STATUS.SENT });
+    expect(sent.submission.status, '合法跃迁 sampling→sent 落库').toBe(STATUS.SENT);
+    expect(typeof sent.stock_link.scope_note, 'sent 推进必须回显库存联动口径').toBe('string');
+    expect((await detail(page, id)).submission.status).toBe(STATUS.SENT);
+
+    // 非法跃迁 sent→draft（白名单无此边）与 sent→judged（judged 只能判定产出）均拒，状态不变
+    for (const target of [STATUS.DRAFT, STATUS.JUDGED]) {
+      const res = await apiCallExpectFail(page, 'PUT', `/textile-submissions/${id}/status`, {
+        status: target,
+      });
+      expectRejection(res, APP_ERROR_CODES.BUSINESS_ERROR, `491-04 非法跃迁 sent→${target}`);
+      expect((await detail(page, id)).submission.status, '非法跃迁后状态不变').toBe(STATUS.SENT);
+    }
+    // 词表外目标状态：校验先于跃迁，落 VALIDATION_ERROR
+    const badVocab = await apiCallExpectFail(page, 'PUT', `/textile-submissions/${id}/status`, {
+      status: 'DONE',
+    });
+    expectRejection(badVocab, APP_ERROR_CODES.VALIDATION_ERROR, '491-04 词表外状态');
+    expect((await detail(page, id)).submission.status).toBe(STATUS.SENT);
+
+    // 撤回腿：sent→withdrawn 合法（旁支终态）
+    await apiCallRaw(page, 'PUT', `/textile-submissions/${id}/status`, {
+      status: STATUS.WITHDRAWN,
+    });
+    expect((await detail(page, id)).submission.status, '撤回腿落 withdrawn').toBe(STATUS.WITHDRAWN);
+  });
+
+  test('491-05 清单推导集合与主数据 basis 分组一致，重生成幂等且点名项存活', async ({ page }) => {
+    const s = seed!;
+    // 童装人群触发 GB31701 加考组；内销不挂 EXPORT 组，推导集确定
+    const created = await createSubmission(page, s, { end_user_group: 'child' });
+    const id = created.id;
+    const gb18401 = await apiCallRaw<{ items: Array<{ item_code: string }> }>(
+      page,
+      'GET',
+      '/textile-test-items?basis=GB18401'
+    );
+    const gb31701 = await apiCallRaw<{ items: Array<{ item_code: string }> }>(
+      page,
+      'GET',
+      '/textile-test-items?basis=GB31701'
+    );
+    const expected = new Set<string>([
+      ...gb18401.items.map(i => i.item_code),
+      ...gb31701.items.map(i => i.item_code),
+      s.custCode,
+    ]);
+    expect(expected.has(s.gb18401Code), '自建 GB18401 项应在推导依据内').toBe(true);
+    expect(expected.has(s.childMeasCode), '童装人群应加挂自建 GB31701 项').toBe(true);
+
+    const first = await apiCallRaw<{ items: ItemRow[]; needs_attention: boolean }>(
+      page,
+      'POST',
+      `/textile-submissions/${id}/items`,
+      { extra_item_codes: [s.custCode] }
+    );
+    const firstCodes = new Set(first.items.map(i => i.item_code));
+    expect([...firstCodes].sort(), '推导集合等于 GB18401∪GB31701∪点名项').toEqual(
+      [...expected].sort()
+    );
+    expect(first.needs_attention, '内销无出口推荐缺口，needs_attention 应为 false').toBe(false);
+    const custRow = first.items.find(i => i.item_code === s.custCode);
+    expect(custRow?.source, '点名项归因 CUSTOMER').toBe(SOURCE.CUSTOMER);
+    expect(
+      first.items.find(i => i.item_code === s.gb18401Code)?.source,
+      '基本安全项归因 GB18401'
+    ).toBe(SOURCE.GB18401);
+    expect(
+      first.items.find(i => i.item_code === s.childMeasCode)?.source,
+      '童装加考项归因 GB31701'
+    ).toBe(SOURCE.GB31701);
+
+    // 重生成幂等：自动行冲掉重插（主键可变），但 item_code 集合与行数不变，CUSTOMER 行原主键存活
+    const second = await apiCallRaw<{ items: ItemRow[] }>(
+      page,
+      'POST',
+      `/textile-submissions/${id}/items`,
+      { extra_item_codes: [s.custCode] }
+    );
+    expect(second.items.length, '重生成不产生重复行（行数不变）').toBe(first.items.length);
+    expect([...new Set(second.items.map(i => i.item_code))].sort(), '重生成项目集合不变').toEqual(
+      [...expected].sort()
+    );
+    const custRow2 = second.items.find(i => i.item_code === s.custCode);
+    expect(custRow2?.id, '点名行主键跨重生成存活').toBe(custRow?.id);
+    expect(custRow2?.source).toBe(SOURCE.CUSTOMER);
+
+    // 点名项不存在：校验先于冲行，拒绝后清单不变
+    const bad = await apiCallExpectFail(page, 'POST', `/textile-submissions/${id}/items`, {
+      extra_item_codes: ['E2E-NO-SUCH-ITEM'],
+    });
+    expectRejection(bad, APP_ERROR_CODES.VALIDATION_ERROR, '491-05 点名项不存在');
+    const unchanged = (await detail(page, id)).items;
+    expect([...new Set(unchanged.map(i => i.item_code))].sort(), '拒绝后清单集合不变').toEqual(
+      [...expected].sort()
+    );
+  });
+
   // 后续用例分批追加锚点
 });
