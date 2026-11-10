@@ -245,6 +245,11 @@
 //!    order_id 不在 sales_orders 的行，命中即 RAISE EXCEPTION 中止后才恢复外键。置于链尾
 //!    为新的顶层条目（并入已应用域会被台账整体跳过、DROP 永不执行），依赖 business 建表
 //!    与 v15 加 order_type 列早于本域
+//! 41. m0126_add_audit_terminal_context_columns: 审计日志定位维度域（m0126）——给 audit_logs
+//!    补终端类型 操作页面 单据编号 变更原因 风险标记与操作人角色码六个可空列及按单号与角色码
+//!    的追溯索引，写入单点落库、读取侧列表详情导出出参补维并加等值筛选；探测式幂等加列（列已在
+//!    即 NOTICE 跳过可重跑），down 只回空壳不回填。置于链尾为新的顶层条目（并入已应用域会被台账
+//!    整体跳过、补列永不执行），依赖 system 与 business 建 audit_logs 早于本域
 
 pub use sea_orm_migration::prelude::*;
 
@@ -310,6 +315,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::product_grade_vocab_check::Migration),
             // 仓储两岗补授扫码入库细键，链尾独立域（roles 与 role_permissions 由 system 域先建）
             Box::new(domain::scan_receipt_grant::Migration),
+            // 审计日志表只追加约束，链尾独立域（两张表由 system 域先建，晚于它们的本域必然执行）
+            Box::new(domain::audit_append_only_guard::Migration),
             // 库存匹冗余库存状态列探测式下线，同上一条口径：本支已摘除该列全部读写与实体字段
             Box::new(domain::piece_inventory_status_drop::Migration),
             // 库存匹米数列扩位到 DECIMAL(18,4)，链尾独立域（建表与加列均早于本域，复用库上必然执行）
@@ -321,6 +328,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::quotation_discount_config_grant::Migration),
             // 运单 order_id 多态列的遗留单表外键下线，链尾独立域（建表与加列均早于本域，复用库上必然执行）
             Box::new(domain::logistics_waybill_order_fk_drop::Migration),
+            // 审计定位列（终端类型 操作页面 单据编号 变更原因 风险标记）与追溯索引，链尾独立域
+            Box::new(domain::m0126_add_audit_terminal_context_columns::Migration),
         ]
     }
 }

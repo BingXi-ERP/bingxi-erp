@@ -32,6 +32,7 @@ use serde_json::json;
 // 批次 389 P2-2：补充 warn/error 日志宏，关键操作失败场景补审计日志
 use tracing::{info, warn};
 
+use crate::middleware::audit_context::{RISK_REVERSE, mark_audit_high_risk, set_audit_doc_no};
 use crate::models::{ar_collection, ar_invoice, ar_reconciliation, ar_reconciliation_item};
 use crate::utils::error::AppError;
 use crate::utils::number_generator::DocumentNumberGenerator;
@@ -400,6 +401,17 @@ impl ArService {
         let txn = (*self.db).begin().await?;
         let reconciliation = Self::lock_reconciliation_for_cancel(&txn, verification_id).await?;
         Self::ensure_reconciliation_cancelable(&reconciliation, verification_id, user_id)?;
+        // 审计定位维度登记：单号取本次真正被冲销那张核销单的 ar_reconciliations.reconciliation_no
+        // 列（上一步行锁读出的这一行），不从路径 verification_id 反推、不用 ID 拼号。
+        // 登记点在本请求第一处审计落库（rollback_invoices 内的 update_with_audit）之前，
+        // 令发票金额回退行与核销单取消行都归到同一张被冲销的核销单上；写入单点从 task-local
+        // 活上下文取快照，本函数由 handlers/ar_verification_handler.rs::cancel_verification
+        // 在同一请求 task 内 await，task-local 不随 tokio::spawn 传播。
+        // 本端点请求体不承载原因（只有路径 id），change_reason 不在本腿登记，落库保持 NULL。
+        set_audit_doc_no(Some(reconciliation.reconciliation_no.clone()));
+        // 标记取 REVERSE：取消核销把已 closed 的核销反向冲销——逐张回退发票 received_amount
+        // 与 unpaid_amount 并按回退后的金额重定状态，属资金反向操作，不是把草稿单作废。
+        mark_audit_high_risk(RISK_REVERSE);
         let items = Self::load_cancel_invoice_items(&txn, verification_id).await?;
         let inv_ids: Vec<i32> = items.iter().filter_map(|i| i.document_id).collect();
         let mut inv_map = Self::lock_invoices_for_cancel(&txn, inv_ids).await?;

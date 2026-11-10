@@ -12,6 +12,9 @@ use sea_orm::{
 use std::sync::Arc;
 use tracing::info;
 
+use crate::middleware::audit_context::{
+    RISK_VOID, mark_audit_high_risk, set_audit_change_reason, set_audit_doc_no,
+};
 use crate::models::ar_invoice;
 // 行级数据权限工具
 use crate::utils::data_scope::{
@@ -538,7 +541,7 @@ impl ArInvoiceService {
     pub async fn cancel(
         &self,
         id: i32,
-        _reason: String,
+        reason: String,
         user_id: i32,
     ) -> Result<ar_invoice::Model, AppError> {
         // 批次 11（2026-06-28）：事务包裹"取消状态变更 + 审计日志"，保证原子性
@@ -560,6 +563,18 @@ impl ArInvoiceService {
         if invoice.status == crate::models::status::payment::PAYMENT_PAID {
             return Err(AppError::bad_request("已收讫的应收单不可取消"));
         }
+
+        // 审计定位维度登记：单号取本次真正被作废那张应收单的 ar_invoices.invoice_no 列
+        //（上一步行锁读出的这一行），不从路径 id 反推、不用 id 拼号；原因取请求体
+        // CancelReason.reason 原样透传（本表无取消原因专列，该值此前在 service 入口即被丢弃，
+        // 现在至少随审计行落进 audit_logs.change_reason，可追溯）。必须在 update_with_audit
+        // 之前调用——写入单点从 task-local 活上下文取快照，本函数由
+        // handlers/ar_invoice_handler.rs::cancel_ar_invoice 在同一请求 task 内 await；
+        // task-local 不随 tokio::spawn 传播，挪进子任务即失效。
+        set_audit_doc_no(Some(invoice.invoice_no.clone()));
+        set_audit_change_reason(Some(reason));
+        // 取消动作把应收单写进 CANCELLED 终态，语义是作废，标 VOID
+        mark_audit_high_risk(RISK_VOID);
 
         let mut active_invoice: ar_invoice::ActiveModel = invoice.into();
         active_invoice.status = Set(crate::models::status::common::STATUS_CANCELLED.to_string());
