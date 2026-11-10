@@ -175,3 +175,47 @@ batch/update、batch/delete 共 3 枚（基础档案批量写）。roles 6 枚�
 教训入规：量全量面底数与生成棘轮基线之前，必须先并基到主干顶点再跑，不能在
 落后主干的车道语料上量。本文第一稿的 606/167 与批一里的盘点明细两枚就此作废，
 以本节与 6.4 的修正值为准。
+
+## 七 三批落地实录与选题前必做的证伪
+
+三批均已并基到主干顶点 bef790c20 后开独立测试 PR，只新增 spec、不动共享 helpers
+与 route-snapshot，彼此及与在途审计域 BOM 域零文件交集：
+
+- 批一 库存细码写面五端点，483-inventory-batch-write-face.spec.ts 与
+  484-inventory-transfer-items-write-face.spec.ts，合九个 test。
+- 批二 产品批量写面三端点，485-product-batch-write-face.spec.ts，八个 test。
+  创建与更新事务整单回滚、删除按主键部分成功，三态更新与超上限拒皆有实断。
+- 批三 权限域两个改口，486-role-user-update-write-face.spec.ts，八个 test 四十二条断言。
+
+### 7.1 批三选题经过两次证伪
+
+第一次判色卡与打样域为缺口，核既有语料后证伪：23-color-card-full、
+110-color-card-stock-intake、113-color-card-maintenance-chain、
+114-color-card-issue-gate-chain、440-color-card-sample-proofing-chain、
+210-lab-dip-color-difference、446-sample-version-downgrade-and-production-transfer
+已把该族写面覆盖满，再写即重复用例。
+
+第二次判色价域为缺口，同样证伪：115-color-price-chain.spec.ts 覆盖建价改价审批
+批量调价软删五个写口，116-color-price-seasonal-tier.spec.ts 覆盖季节规则阶梯与
+客户特价。首版判缺口是因为 grep 只匹配了 color-card 族词形，没匹配 color-prices，
+属判定面过窄造成的假缺失。
+
+真缺口最终由宽模式实量确证：PUT /roles/* 与 PUT /users/* 两个改口在 e2e 零真实
+调用，所有 users 变量路径命中都是清理删除或 GET 回读。故批三取这两口。
+
+### 7.2 选题判据固化
+
+一，参照面必须是主干顶点的语料，不能是落后车道（第 6.6 节教训）。
+二，端点词形要按族枚举，不能只匹配一个近义拼法（本节 color-prices 教训）。
+三，命中要区分调用性质：清理腿的 DELETE 与回读的 GET 不算该写口被覆盖，
+只有对该端点发起目标方法并断言落库结果才算。
+四，判某端点已覆盖前要看它是否被断言链钉住，仅出现在注释或 CLEANUP 数组里不算。
+
+### 7.3 批三两条安全判据的取值依据
+
+UpdateRolePayload 刻意不含 code 列（禁止改角色编码防提权），故夹带 code=admin
+后回读 code 必须逐字符不变，这条是批三的安全核心而非装饰断言。
+
+update_user 内另有一道提权拦截，但它排在 require_admin_role 之后；非管理员会话
+在更早的门就被拒，该分支经 HTTP 不可达。故只断言真实管理员门回 403 与目标行不变，
+不断言那条不可达文案，避免写出恒过或恒红的假断言。
