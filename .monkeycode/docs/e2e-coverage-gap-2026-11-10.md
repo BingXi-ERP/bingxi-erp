@@ -319,6 +319,22 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 
 一条取证纪律再记。本轮扫开放八支红数皆零，但 1191、1192、1197 当时只有 17 到 19 格 check-runs，而全量面是 83 到 86 格，格数不足即全量矩阵尚未开跑，此时的零不是全绿证据，不得据此报可合并。
 
+## 十五 批七选题 textile-submissions 整族零断言（2026-11-10）
+
+取数口径先纠一处。配对门默认是增量模式，在干净的主干顶点车道上跑会得到 judged 0、debt 0、PAIRING_GREEN，这不是"没有漏配"，而是"本支相对基线无新增"。要取存量漏配必须显式加 --full-surface，此时门自报 reachableOrphans 155、deadOrphans 439、judged 1824、paired 1209、weak 21、debt 594、retired 12、corpusFiles 436、srcFiles 733。第六节与第十一节记的 590 是清档前的值，本轮主干顶点 565ff6b50 上重量为 594，差额来自此后合入的端点，底数必须以当轮主干顶点重量为准，不许沿用旧数。
+
+选题经过。四个候选域按 objective 三 的面料模块优先序核既有语料：quality-standards 已有 97-quality-standard-and-8d-chain、quality/01-standard、smoke 与 24-production-full 四处引用，bulk-color-approvals 已有 81-bulk-color-approval-sales-order-item、113-color-card-maintenance-chain、446 与 454 等八处引用，chemical-requisitions 已有 62-chemical-batch-chain 与 70-chemical-contract-gaps 两处引用，这三域都属"部分腿已钉、剩几条次腿"，按 7.1 的判据不能当整族缺口立项。textile-submissions 在全 e2e 语料里只出现在 traversal/modules.config.ts 一处（遍历清单登记，无断言），八条腿全在棘轮债内，整族零断言成立，选它。
+
+域归因纠一处。textile-submissions 不是委外染整送检，而是纺织品安全合规域的送检单面。路由文件 textile_safety.rs 头注释明写该域含送检单、第三方报告、主数据三张资源面，模型侧对应 textile_safety_submission、textile_safety_submission_item、textile_child_safety_check、textile_limit_rule、textile_test_item、textile_third_party_report、textile_export_market_requirement，业务上是生态纺织品安全指标限量判定与童装加考核查，对应 GB 18401 与 GB 31701 这条国标合规链，归质检域。按名字猜域会把它错挂到委外加工，进而错判与在途支的撞面。
+
+八条腿与路由事实。submission_routes 挂 GET 列表、POST 建单、GET 详情、PUT 要素修改、DELETE 草稿删除、PUT status（状态机白名单推进，撤回也走本面）、POST items（项目清单推导，重生成幂等）、PUT child-checks（童装加考核查登记，upsert 语义走集合面）、PUT judgement（整单判定，judged 态唯一产出口）。配对门债内是其中八条（DELETE 未在债内）。路由面不承载业务校验，状态推进、判定与完整性门的判据都在 textile_safety_submission_service.rs。该域 seg3 即权限资源名，登记在 utils/path_utils.rs 直接资源白名单与 init_service 的 PERMISSION_RESOURCES，未注册段会被权限中间件 fail-closed 403 含 admin，所以用例不能靠拼未注册段来造拒绝腿。
+
+号段与车道。全部工作树横扫 49x 只有 wt-fin-analysis-b6 占 490，主干顶点无 49x，批七取 491（489 仍留给暂缓的批色正向链）。车道 wt-qc-std-b7 基于主干顶点 565ff6b50，分支名沿用建车道时的 test/qc-standards-write-face-b7（选题改域后分支名与内容不再对应，推送前须改名或另建载体，不许把送检用例挂在质检标准名下误导评审）。node_modules 用目录联接借 wt-prod-batch-b2 的依赖，只读不改 donor。
+
+名额与推送档位。开放 PR 现取八支（1184、1191 至 1197），八支都有在跑矩阵，按"上限是同时八个在跑"的口径名额已满，批七本地压住不推，待某支全绿释放名额再开车。
+
+监控取数的一条教训。主干全量 run 42829801961 的阻塞式轮询器在 16:03 至 16:18 连续五轮 fetch failed 后按 TOOL_BUG 退出 9，而 run 本身一直在推进（重启后现取 85 枚 job、56 成功、1 跳过、28 在跑排队、0 失败）。五轮连败阈值约十五分钟，短于本机实测的网络抖动窗口，已放宽到十二轮。判"监控退出"必须先读它自己的日志区分连败退出与收口退出，不许把退出 9 读成 run 失败。
+
 
 
 
