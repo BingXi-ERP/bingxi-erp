@@ -64,8 +64,7 @@ pub async fn batch_create_products(
 
     let result = service
         .batch_create_products(auth.user_id, payload.products)
-        .await
-        .map_err(|e| AppError::bad_request(e.to_string()))?;
+        .await?;
 
     let data: Vec<serde_json::Value> = result
         .data
@@ -118,8 +117,7 @@ pub async fn batch_update_products(
 
     let result = service
         .batch_update_products(auth.user_id, payload.products)
-        .await
-        .map_err(|e| AppError::bad_request(e.to_string()))?;
+        .await?;
 
     let data: Vec<serde_json::Value> = result
         .data
