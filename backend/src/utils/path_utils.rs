@@ -154,6 +154,11 @@ const RESOURCE_NAME_MAP: &[(&str, &str, &str)] = &[
     ("sales", "returns", "sales-returns"),
     ("sales", "contracts", "sales-contracts"),
     ("sales", "prices", "sales-prices"),
+    // 超折扣审批阈值配置面挂在报价前缀下（/quotations/discount-config）。URL 段
+    // `discount-config` 单独作资源名过窄且与注册表权威名不同形，消歧为带域限定的
+    // `quotation-discount-config`；该字面量与 PERMISSION_RESOURCES 登记、角色矩阵授予、
+    // 存量库补授迁移 m0134 四处逐字符同源，任一侧改写即派生死键（非超管恒 403）。
+    ("quotations", "discount-config", "quotation-discount-config"),
     ("crm", "leads", "crm-leads"),
     ("crm", "opportunities", "crm-opportunities"),
     ("crm", "rfm", "customers"),
