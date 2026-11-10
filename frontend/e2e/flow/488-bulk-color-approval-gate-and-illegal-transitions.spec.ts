@@ -108,32 +108,29 @@ async function createSalesOrder(page: Page, productId: number): Promise<number> 
 async function readSalesOrderItem(page: Page, orderId: number): Promise<SalesOrderItemRow> {
   const detail = await apiCallRaw<SalesOrderDetailRow>(page, 'GET', `/sales/orders/${orderId}`);
   const items = detail?.items;
-  expect(Array.isArray(items), `销售订单详情应装配 items 明细数组，实际=${JSON.stringify(detail)}`).toBe(
+  expect(
+    Array.isArray(items),
+    `销售订单详情应装配 items 明细数组，实际=${JSON.stringify(detail)}`
+  ).toBe(true);
+  expect(items && items.length > 0, `销售订单应至少含一条明细行，实际行数=${items?.length}`).toBe(
     true
   );
-  expect(
-    items && items.length > 0,
-    `销售订单应至少含一条明细行，实际行数=${items?.length}`
-  ).toBe(true);
   return items![0];
 }
 
-/** 批色单建档：入参可覆盖，返回体断言交调用方（负例需断拒因，不在此处断成功） */
+/** 批色单建档：入参可覆盖，成功与否交调用方判（负例要钉拒因，不在此处断成功） */
 async function postCreate(
   page: Page,
   body: Record<string, unknown>
-): Promise<{ ok: boolean; row?: BcaRow; status: number; code?: string; message?: string }> {
+): Promise<{ ok: boolean; row?: BcaRow; code: number; message: string }> {
   const res = await apiCall<BcaRow>(page, 'POST', '/bulk-color-approvals', body);
-  return {
-    ok: res.status >= 200 && res.status < 300,
-    row: res.data,
-    status: res.status,
-    code: typeof res.code === 'number' ? String(res.code) : (res.code as unknown as string),
-    message: res.message,
-  };
+  return { ok: res.code === 200, row: res.data, code: res.code, message: res.message };
 }
 
-async function createApproval(page: Page, overrides: Record<string, unknown> = {}): Promise<BcaRow> {
+async function createApproval(
+  page: Page,
+  overrides: Record<string, unknown> = {}
+): Promise<BcaRow> {
   const ctx = getCtx();
   const body: Record<string, unknown> = {
     sales_order_id: ctx.salesOrderId,
@@ -146,16 +143,10 @@ async function createApproval(page: Page, overrides: Record<string, unknown> = {
     ...overrides,
   };
   const res = await postCreate(page, body);
-  expect(
-    res.ok,
-    `批色单建档应成功，实际 status=${res.status} code=${res.code} message=${res.message}`
-  ).toBe(true);
+  expect(res.ok, `批色单建档应成功，实际 code=${res.code} message=${res.message}`).toBe(true);
   const row = res.row;
   const id = row?.id;
-  expect(
-    typeof id,
-    `批色单建档应返回数字主键 id，实际响应=${JSON.stringify(row)}`
-  ).toBe('number');
+  expect(typeof id, `批色单建档应返回数字主键 id，实际响应=${JSON.stringify(row)}`).toBe('number');
   createdApprovalIds.push(id as number);
   return row as BcaRow;
 }
@@ -181,31 +172,26 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
     expect(row.approval_status, `新建批色单状态应为词表 pending，实际=${row.approval_status}`).toBe(
       'pending'
     );
-    expect(
-      row.delivery_blocking,
-      '新建批色单应默认阻断发货（delivery_blocking 恒为 true）'
-    ).toBe(true);
-    expect(
-      row.sample_type,
-      `样布类型缺省应归一为 cut_sample，实际=${row.sample_type}`
-    ).toBe('cut_sample');
+    expect(row.delivery_blocking, '新建批色单应默认阻断发货（delivery_blocking 恒为 true）').toBe(
+      true
+    );
+    expect(row.sample_type, `样布类型缺省应归一为 cut_sample，实际=${row.sample_type}`).toBe(
+      'cut_sample'
+    );
 
     const detail = await apiCallRaw<BcaRow>(page, 'GET', `/bulk-color-approvals/${id}`);
     expect(detail?.id, `详情读回主键应为 ${id}，实际=${detail?.id}`).toBe(id);
-    expect(
-      detail?.approval_status,
-      `详情读回应仍为 pending，实际=${detail?.approval_status}`
-    ).toBe('pending');
-    expect(
-      detail?.delivery_blocking,
-      '详情读回发货门禁应仍为阻断'
-    ).toBe(true);
+    expect(detail?.approval_status, `详情读回应仍为 pending，实际=${detail?.approval_status}`).toBe(
+      'pending'
+    );
+    expect(detail?.delivery_blocking, '详情读回发货门禁应仍为阻断').toBe(true);
     expect(detail?.sales_order_id, '详情读回父单应等于建档父单').toBe(row.sales_order_id);
 
     const list = await apiCallRaw<BcaListPage>(page, 'GET', '/bulk-color-approvals');
-    expect(Array.isArray(list?.items), `列表出参应为 items 数组，实际=${JSON.stringify(list)}`).toBe(
-      true
-    );
+    expect(
+      Array.isArray(list?.items),
+      `列表出参应为 items 数组，实际=${JSON.stringify(list)}`
+    ).toBe(true);
     expect(
       list?.items?.some(r => r.id === id),
       `新建批色单 ${id} 应出现在列表首屏，实际 total=${list?.total}`
@@ -321,12 +307,36 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
     const rejectBody = { reject_reason: 'E2E 色差偏差过大' };
     const cases: { label: string; method: 'POST'; path: string; body?: Record<string, unknown> }[] =
       [
-        { label: '发送客户批色', method: 'POST', path: `/bulk-color-approvals/${id}/send-to-customer` },
+        {
+          label: '发送客户批色',
+          method: 'POST',
+          path: `/bulk-color-approvals/${id}/send-to-customer`,
+        },
         { label: '客户批准', method: 'POST', path: `/bulk-color-approvals/${id}/approve` },
-        { label: '客户拒绝', method: 'POST', path: `/bulk-color-approvals/${id}/reject`, body: rejectBody },
-        { label: '客户返工', method: 'POST', path: `/bulk-color-approvals/${id}/rework`, body: rejectBody },
-        { label: '降级处理', method: 'POST', path: `/bulk-color-approvals/${id}/downgrade`, body: rejectBody },
-        { label: '报废', method: 'POST', path: `/bulk-color-approvals/${id}/scrap`, body: rejectBody },
+        {
+          label: '客户拒绝',
+          method: 'POST',
+          path: `/bulk-color-approvals/${id}/reject`,
+          body: rejectBody,
+        },
+        {
+          label: '客户返工',
+          method: 'POST',
+          path: `/bulk-color-approvals/${id}/rework`,
+          body: rejectBody,
+        },
+        {
+          label: '降级处理',
+          method: 'POST',
+          path: `/bulk-color-approvals/${id}/downgrade`,
+          body: rejectBody,
+        },
+        {
+          label: '报废',
+          method: 'POST',
+          path: `/bulk-color-approvals/${id}/scrap`,
+          body: rejectBody,
+        },
       ];
 
     for (const c of cases) {
@@ -352,7 +362,11 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
     const row = await createApproval(page);
     const id = row.id as number;
 
-    const before = await apiCallRaw<BcaHistoryRow[]>(page, 'GET', `/bulk-color-approvals/${id}/history`);
+    const before = await apiCallRaw<BcaHistoryRow[]>(
+      page,
+      'GET',
+      `/bulk-color-approvals/${id}/history`
+    );
     expect(Array.isArray(before), `history 应返回数组，实际=${JSON.stringify(before)}`).toBe(true);
 
     const fail = await apiCallExpectFail(page, 'POST', `/bulk-color-approvals/${id}/reject`, {
@@ -360,7 +374,11 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
     });
     expectBusinessRejection(fail, 'pending 态拒绝应被状态机拦下');
 
-    const after = await apiCallRaw<BcaHistoryRow[]>(page, 'GET', `/bulk-color-approvals/${id}/history`);
+    const after = await apiCallRaw<BcaHistoryRow[]>(
+      page,
+      'GET',
+      `/bulk-color-approvals/${id}/history`
+    );
     expect(
       Array.isArray(after) && after.length === (before as BcaHistoryRow[]).length,
       `被拒的跃迁不得写入审批时间线，前=${(before as BcaHistoryRow[]).length} 后=${after?.length}`
@@ -369,7 +387,11 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
     const report = await apiCallRaw<unknown[]>(page, 'GET', '/bulk-color-approvals/report');
     expect(Array.isArray(report), `report 应返回数组，实际类型=${typeof report}`).toBe(true);
 
-    const stats = await apiCallRaw<Record<string, unknown>>(page, 'GET', '/bulk-color-approvals/statistics');
+    const stats = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      '/bulk-color-approvals/statistics'
+    );
     expect(
       !!stats && typeof stats === 'object' && !Array.isArray(stats),
       `statistics 应返回聚合对象，实际=${JSON.stringify(stats)?.slice(0, 120)}`
@@ -381,7 +403,7 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
     const id = row.id as number;
 
     const deleted = await apiCall(page, 'DELETE', `/bulk-color-approvals/${id}`);
-    expect(deleted.status, `删除批色单应成功，实际=${deleted.status}`).toBeLessThan(300);
+    expect(deleted.code, `删除批色单应成功，实际=${deleted.code}`).toBe(200);
     const idx = createdApprovalIds.indexOf(id);
     if (idx >= 0) createdApprovalIds.splice(idx, 1);
 
@@ -405,7 +427,9 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
   test('488-07 不存在的批色单 id 在详情与跃迁与时间线上均判 404', async ({ page }) => {
     const detail = await apiCallExpectFail(page, 'GET', '/bulk-color-approvals/99999999');
     expect(detail.status, `不存在 id 的详情应 404，实际=${detail.status}`).toBe(404);
-    expect(failureCode(detail), `不存在 id 详情机器码应为 NOT_FOUND`).toBe(APP_ERROR_CODES.NOT_FOUND);
+    expect(failureCode(detail), `不存在 id 详情机器码应为 NOT_FOUND`).toBe(
+      APP_ERROR_CODES.NOT_FOUND
+    );
 
     const approve = await apiCallExpectFail(page, 'POST', '/bulk-color-approvals/99999999/approve');
     expect(approve.status, `不存在 id 的批准应 404，实际=${approve.status}`).toBe(404);

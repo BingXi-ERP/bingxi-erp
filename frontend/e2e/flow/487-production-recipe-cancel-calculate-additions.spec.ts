@@ -339,16 +339,18 @@ test.describe('487 大货处方取消与用量计算与加料流转', () => {
       'POST',
       `/production/production-recipes/${id}/cancel`
     );
-    expect(
-      cancelled?.status,
-      `取消腿返回状态应为词表 cancelled，实际=${cancelled?.status}`
-    ).toBe('cancelled');
+    expect(cancelled?.status, `取消腿返回状态应为词表 cancelled，实际=${cancelled?.status}`).toBe(
+      'cancelled'
+    );
 
-    const readback = await apiCallRaw<RecipeRow>(page, 'GET', `/production/production-recipes/${id}`);
-    expect(
-      readback?.status,
-      `取消后读回状态必须落库为 cancelled，实际=${readback?.status}`
-    ).toBe('cancelled');
+    const readback = await apiCallRaw<RecipeRow>(
+      page,
+      'GET',
+      `/production/production-recipes/${id}`
+    );
+    expect(readback?.status, `取消后读回状态必须落库为 cancelled，实际=${readback?.status}`).toBe(
+      'cancelled'
+    );
 
     const cancelAgain = await apiCallExpectFail(
       page,
@@ -383,10 +385,15 @@ test.describe('487 大货处方取消与用量计算与加料流转', () => {
     const draft = await createDraftRecipe(page);
     const id = draft.id as number;
 
-    const fail = await apiCallExpectFail(page, 'POST', `/production/production-recipes/${id}/additions`, {
-      production_recipe_id: id,
-      addition_reason: '助剂不足',
-    });
+    const fail = await apiCallExpectFail(
+      page,
+      'POST',
+      `/production/production-recipes/${id}/additions`,
+      {
+        production_recipe_id: id,
+        addition_reason: '助剂不足',
+      }
+    );
     expectBusinessRejection(fail, '草稿大货处方挂加料单应被前置门拒绝');
     expect(
       failureCode(fail),
@@ -409,10 +416,9 @@ test.describe('487 大货处方取消与用量计算与加料流转', () => {
     const parentId = parent.id as number;
     const decoy = await createDraftRecipe(page);
     const decoyId = decoy.id as number;
-    expect(
-      decoyId !== parentId,
-      `诱饵父单 id 必须与真实父单不同，实际两 id 均为 ${decoyId}`
-    ).toBe(true);
+    expect(decoyId !== parentId, `诱饵父单 id 必须与真实父单不同，实际两 id 均为 ${decoyId}`).toBe(
+      true
+    );
 
     const created = await createAddition(page, parentId, decoyId);
     const additionId = created?.id;
@@ -451,9 +457,10 @@ test.describe('487 大货处方取消与用量计算与加料流转', () => {
       'GET',
       `/production/production-recipes/${parentId}/additions`
     );
-    expect(Array.isArray(parentList), `父单子资源列表应返回数组，实际=${JSON.stringify(parentList)}`).toBe(
-      true
-    );
+    expect(
+      Array.isArray(parentList),
+      `父单子资源列表应返回数组，实际=${JSON.stringify(parentList)}`
+    ).toBe(true);
     expect(
       parentList?.some(r => r.id === additionId),
       `新建加料单 ${additionId} 应出现在父单 ${parentId} 的子资源列表中`
@@ -554,20 +561,18 @@ test.describe('487 大货处方取消与用量计算与加料流转', () => {
       `/production/production-recipes/additions/${additionId}/close`
     );
     expectBusinessRejection(fail, '草稿加料单跳过审核直接关闭应被状态机拒绝');
-    expect(
-      failureCode(fail),
-      `跳步关闭机器码应为 BUSINESS_ERROR，实际=${failureCode(fail)}`
-    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    expect(failureCode(fail), `跳步关闭机器码应为 BUSINESS_ERROR，实际=${failureCode(fail)}`).toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
 
     const readback = await apiCallRaw<AdditionRow>(
       page,
       'GET',
       `/production/production-recipes/additions/${additionId}`
     );
-    expect(
-      readback?.status,
-      `跳步被拒不进状态机，读回应仍为 draft，实际=${readback?.status}`
-    ).toBe('draft');
+    expect(readback?.status, `跳步被拒不进状态机，读回应仍为 draft，实际=${readback?.status}`).toBe(
+      'draft'
+    );
   });
 
   test.afterAll(async ({ browser }) => {
