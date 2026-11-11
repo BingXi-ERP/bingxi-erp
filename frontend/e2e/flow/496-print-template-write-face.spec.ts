@@ -26,7 +26,14 @@
  * 前置自建：每腿用 genCode 造唯一模板名与编码，afterAll 逐枚删除并留显式日志。
  */
 import { test, expect, type Page } from '../diagnose-fixture';
-import { APP_ERROR_CODES, apiCallExpectFail, apiCallRaw, failureCode, genCode } from './helpers';
+import {
+  APP_ERROR_CODES,
+  apiCallExpectFail,
+  apiCallRaw,
+  failureCode,
+  genCode,
+  loginViaUI,
+} from './helpers';
 
 interface PrintTemplate {
   id: number;
@@ -73,14 +80,22 @@ function baseBody(name: string): Record<string, unknown> {
 test.describe('496 打印模板写面', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test.afterAll(async ({ page }) => {
-    for (const id of createdIds) {
-      try {
-        await apiCallRaw<void>(page, 'DELETE', `/print-templates/${id}`);
-        console.info(`[496] 清理模板 ${id} 已删除`);
-      } catch (e) {
-        console.warn(`[496] 清理模板 ${id} 失败: ${(e as Error).message}`);
+  test.afterAll(async ({ browser }) => {
+    // page 是按用例创建的 fixture，afterAll 里拿不到；清理腿自建一次性会话登录后执行
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    try {
+      await loginViaUI(page);
+      for (const id of createdIds) {
+        try {
+          await apiCallRaw<void>(page, 'DELETE', `/print-templates/${id}`);
+          console.info(`[496] 清理模板 ${id} 已删除`);
+        } catch (e) {
+          console.warn(`[496] 清理模板 ${id} 失败: ${(e as Error).message}`);
+        }
       }
+    } finally {
+      await ctx.close();
     }
   });
 
