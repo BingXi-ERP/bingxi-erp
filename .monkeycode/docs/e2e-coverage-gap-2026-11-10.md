@@ -389,6 +389,18 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 
 收口面。1184 与 1191 与 1192 与 1193 与 1194 与 1195 与 1197 与 1198 八支 check-runs 全完成零红，待用户 UI 合并；1196 带修复重跑中；1199 新开。批八写作实例宿主侧中断零交付，按第二次零交付纪律改主编排自写，两枚 spec 均一次过门。
 
+## 二十一 批九财务主数据三面落地与两处详情路由修复（2026-11-11）
+
+批九选题。十九节排序的整族零断言段里取财务主数据三面：asset-categories 与 aging-grades 与 industry-benchmarks（各债 5、语料仅 traversal 一处）。locked-accounts（债 2）留待批十，因其解锁腿需 admin 门禁与失败登录夹具，单独成批更稳。
+
+落地。494-fin-master-data-write-face.spec.ts 十四腿，PR 1200（head d78656963）。资产分类覆盖建档回读、分页信封、is_active 过滤、详情按 id、更新三态（有值覆盖、显式 null 清空、缺席保持，double_option 语义）、软删除停用文案、分页夹紧口径（page 小于 1 夹到 1、page_size 夹到 100，不抛 400，与纺织域越界 400 口径不同，按各自 handler 实断）。账龄档位与行业基准覆盖建档回读、列表数组仅活跃行、详情按 id、部分更新、硬删除再删 404。三面悬空 id 修改与删除均 404。
+
+两处源码缺陷修复。aging-grades 与 industry-benchmarks 的 GET /{id} 原误挂各自列表 handler，返回整表且永不 404（REST 语义错）。补 get_aging_grade 与 get_industry_benchmark 按 id 取单行、悬空判 404，finance.rs 路由改挂新 handler。前端 grep 证实无消费点，列表与增改删腿不受影响。route-snapshot --check 路径与方法逐字节不变（仅 handler 名变，快照不录 handler）。
+
+配对门守恒。paired 1209 升 1224、debt 594 降 579、unpaired 恒 0、corpusFiles 436 升 437，棘轮摘 15 枚。本地 prettier 与 eslint 与 tsc 与 list 与 route-snapshot 与 route-mount 与配对双模式与注释门全绿。rustfmt 三处差异均为存量 use 排序（本地与 CI 钉版分歧），新增代码零差异，不动存量。
+
+待办。locked-accounts 两面（列表与 admin 解锁）排批十；八支全绿 PR 仍待用户 UI 合并，合并后按串行纪律并基其余载体。
+
 
 
 
