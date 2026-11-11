@@ -141,7 +141,7 @@ GET	/api/v1/erp/advanced/reports/templates	advanced::list_report_templates	analy
 GET	/api/v1/erp/aging-alert-rules	crate::handlers::aging_alert_rule_handler::list_rules	finance
 GET	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::get_rule	finance
 GET	/api/v1/erp/aging-grades	crate::handlers::aging_grade_handler::list_aging_grades	finance
-GET	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::list_aging_grades	finance
+GET	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::get_aging_grade	finance
 GET	/api/v1/erp/ai-models/accuracy-reports	ai_model_management_handler::list_accuracy_reports	ai_model
 GET	/api/v1/erp/ai-models/decisions	ai_model_management_handler::list_decision_logs	ai_model
 GET	/api/v1/erp/ai-models/evaluations/*	ai_model_management_handler::list_model_evaluations	ai_model
@@ -546,7 +546,7 @@ GET	/api/v1/erp/health/readiness	health_handler::readiness_check	system
 GET	/api/v1/erp/incoterms/quotations/*/price-composition	incoterms_handler::get_price_composition	incoterms
 GET	/api/v1/erp/incoterms/usage-report	incoterms_handler::monthly_usage_report	incoterms
 GET	/api/v1/erp/industry-benchmarks	crate::handlers::industry_benchmark_handler::list_industry_benchmarks	finance
-GET	/api/v1/erp/industry-benchmarks/*	crate::handlers::industry_benchmark_handler::list_industry_benchmarks	finance
+GET	/api/v1/erp/industry-benchmarks/*	crate::handlers::industry_benchmark_handler::get_industry_benchmark	finance
 GET	/api/v1/erp/init/status	init_handler::get_init_status	system
 GET	/api/v1/erp/init/task-status	init_handler::get_task_status	system
 GET	/api/v1/erp/inventory/adjustments	inventory_adjustment_handler::list_adjustments	inventory

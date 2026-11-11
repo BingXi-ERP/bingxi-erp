@@ -1201,7 +1201,7 @@ fn aging_grades() -> Router<AppState> {
         )
         .route(
             "/aging-grades/{id}",
-            get(crate::handlers::aging_grade_handler::list_aging_grades)
+            get(crate::handlers::aging_grade_handler::get_aging_grade)
                 .put(crate::handlers::aging_grade_handler::update_aging_grade)
                 .delete(crate::handlers::aging_grade_handler::delete_aging_grade),
         )
@@ -1217,7 +1217,7 @@ fn industry_benchmarks() -> Router<AppState> {
         )
         .route(
             "/industry-benchmarks/{id}",
-            get(crate::handlers::industry_benchmark_handler::list_industry_benchmarks)
+            get(crate::handlers::industry_benchmark_handler::get_industry_benchmark)
                 .put(crate::handlers::industry_benchmark_handler::update_industry_benchmark)
                 .delete(crate::handlers::industry_benchmark_handler::delete_industry_benchmark),
         )
