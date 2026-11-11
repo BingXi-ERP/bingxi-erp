@@ -575,11 +575,8 @@ async function seedApprovedOrder(
   const rawRows = await readOrderItems(page, poId);
   expect(rawRows.length, 'PO 明细行数应等于提交行数').toBe(lines.length);
 
-  // 后端明细返回顺序无契约保证：本文件收货明细断言早已按 line_no 归位，而订单
-  // 明细此前仍用 rows[i] 下标，行序一旦漂移就会把第 2 行的 20.0000 当成第 1 行
-  // 的 30 校验（CI run 43019300332 / 分片 14/20 的 461-04 实际失败形态）。
-  // 按产品主键把每行显式归位：夹具每行产品唯一，归位只重排、不改任何值，
-  // 若后端真把数量写错，下方逐字段断言依旧判红，不会掩盖真实缺陷。
+  // 明细接口不承诺返回顺序，按产品主键把每行归位后再逐字段校验；
+  // 夹具每行产品唯一，归位只重排、不改值。
   const rows = lines.map((l, i) => {
     const found = rawRows.find(r => Number(r.product_id) === l.product.id);
     expect(found, `PO 明细缺第 ${i + 1} 行（产品 ${l.product.code}）`).toBeTruthy();
