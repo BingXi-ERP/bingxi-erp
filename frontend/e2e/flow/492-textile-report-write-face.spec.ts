@@ -49,6 +49,12 @@ interface SubmissionRow {
   status: string;
 }
 
+/** 送检单详情出参是包装体，单本体挂 submission 键，报告集挂 reports 键 */
+interface SubmissionDetail {
+  submission: SubmissionRow;
+  reports: Array<{ id: number; report_no: string; acceptance_status: string }>;
+}
+
 /** 报告行（出参键 = models/textile_third_party_report.rs 字段） */
 interface ReportRow {
   id: number;
@@ -383,8 +389,18 @@ test.describe.serial('492 纺织品安全第三方报告写面', () => {
     expect(report.created_by, 'created_by 取会话不可伪造').toBe(s.userId);
     expect(report.report_no, '报告编号逐字符落库').toBeTruthy();
 
-    const subRow = await apiCallRaw<SubmissionRow>(page, 'GET', `/textile-submissions/${sub.id}`);
-    expect(subRow.status, 'sent 态登记报告后送检单自动推进 reported').toBe(STATUS.REPORTED);
+    const subDetail = await apiCallRaw<SubmissionDetail>(
+      page,
+      'GET',
+      `/textile-submissions/${sub.id}`
+    );
+    expect(subDetail.submission.status, 'sent 态登记报告后送检单自动推进 reported').toBe(
+      STATUS.REPORTED
+    );
+    expect(
+      subDetail.reports.some(r => r.id === report.id),
+      '送检单详情的报告集应含本次登记'
+    ).toBe(true);
 
     const detail = await apiCallRaw<ReportDetail>(page, 'GET', `/textile-reports/${report.id}`);
     expect(detail.report.id, '详情报告本体回读').toBe(report.id);
