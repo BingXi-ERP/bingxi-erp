@@ -14,8 +14,9 @@
  * 登录失败行的 user_id 写的是占位 0（登录未成功前不取主键），所以列表的 id 必须由 users
  * 表按用户名回查得出；回查不到（该用户名没有账号）时 id 为 null，按主键解锁不可达，
  * 只有的按用户名解锁腿能清理。
- * 列表对任何登录态可读（无角色门）；两条解锁腿先过 admin 门再查用户，
- * 故非 admin 打一个不存在的主键也得到 403 而不是 404。
+ * 列表腿同样受权限门控：鉴权键由 URL 段推导（middleware/permission.rs），非 admin 岗打列表得
+ * 403 而不是空数组；两条解锁腿在权限门之上再加 admin 角色门，故非 admin 打一个不存在的主键
+ * 也得到 403 而不是 404。
  * 非生产环境跳过 check_account_lockout（auth_handler_session.rs），所以本文件造失败登录
  * 不会锁住同源 IP 的其他用例，但 FAILED 行确实落库并被列表统计。
  *
@@ -59,7 +60,13 @@ interface RolePage {
 /** 后端阈值常量（login_security_handler.rs MAX_FAILED_ATTEMPTS） */
 const MAX_FAILED_ATTEMPTS = 9;
 
-const stamp = Date.now().toString(36);
+// 同一份文件会被 chromium 与 webkit 两个 worker 同时装配，只用毫秒时间戳作后缀会在同一毫秒
+// 撞名（撞名后一侧的解锁会删掉另一侧同名的失败行，锁定态随机消失），故再拼一段随机子串。
+const stamp =
+  Date.now().toString(36) +
+  Math.floor(Math.random() * 46656)
+    .toString(36)
+    .padStart(3, '0');
 const victimName = `e2elkvb${stamp}`;
 const underName = `e2elkub${stamp}`;
 const plainName = `e2elkpn${stamp}`;
@@ -259,18 +266,21 @@ test.describe('495 登录安全锁定与解锁面', () => {
     await apiCallRaw(page, 'POST', `/locked-accounts/${underId}/unlock`);
   });
 
-  test('495-09 列表对非 admin 可读（只有解锁腿设角色门）', async ({ browser }) => {
+  test('495-09 列表腿受权限门控，非 admin 被拒且不泄露锁定名单', async ({ browser }) => {
     const session = await loginInIsolatedContext(browser, plainName, testPassword());
     try {
-      const rows = await apiCallRaw<LockedRow[]>(session.page, 'GET', '/locked-accounts');
-      expect(Array.isArray(rows), '非 admin 也应拿到数组').toBe(true);
+      const denied = await apiCallExpectFail(session.page, 'GET', '/locked-accounts');
+      expect(denied.status, '非 admin 读锁定列表应 403').toBe(403);
+      expect(failureCode(denied), '机器码应为 FORBIDDEN').toBe(APP_ERROR_CODES.FORBIDDEN);
     } finally {
       await session.close();
     }
   });
 
   test('495-10 按用户名解锁清理无主键账号的失败行', async ({ page }) => {
-    expect(await findLocked(page, ghostName), '前置：ghost 仍应处于锁定态').not.toBeNull();
+    // 前置自建：锁定态是跨用例的全库聚合事实，不假定上一用例留下的状态仍成立
+    await fireFailedLogins(page, ghostName, MAX_FAILED_ATTEMPTS);
+    expect(await findLocked(page, ghostName), '前置：无账号用户名打满阈值应入列').not.toBeNull();
     const res = await apiCallRaw<unknown>(page, 'POST', '/unlock', { username: ghostName });
     console.log(`[495-10] 按名解锁出参=${JSON.stringify(res)}`);
     expect(await findLocked(page, ghostName), '按用户名解锁应清掉 ghost 的失败行').toBeNull();
