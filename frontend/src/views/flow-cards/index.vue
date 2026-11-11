@@ -61,10 +61,19 @@
         <el-table-column prop="dye_lot_no" :label="t('flowCards.index.colDyeLotNo')" width="130">
           <template #default="{ row }">{{ row.dye_lot_no || '-' }}</template>
         </el-table-column>
-        <el-table-column :label="t('common.operation')" width="260" fixed="right">
+        <el-table-column :label="t('common.operation')" width="330" fixed="right">
           <template #default="{ row }">
             <el-button size="small" link type="primary" @click="handleDetail(row)">
               {{ t('common.detail') }}
+            </el-button>
+            <el-button
+              v-permission="PERMISSIONS.FLOW_CARD_READ"
+              size="small"
+              link
+              type="primary"
+              @click="openMaterials(row)"
+            >
+              {{ t('flowCards.materials.buttonMaterials') }}
             </el-button>
             <el-button
               v-for="action in getNextActions(row)"
@@ -216,6 +225,231 @@
         <el-button @click="detailVisible = false">{{ t('common.close') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 投纱明细面板：纱批事实（什么纱／编号／批次）由流转卡的投纱行承载，按卡读写 -->
+    <el-card v-if="selectedCard" shadow="never" class="materials-panel">
+      <div class="page-header">
+        <h2>
+          {{ t('flowCards.materials.pageTitle') }}
+          <span class="materials-card-no">{{ selectedCard.card_no }}</span>
+        </h2>
+        <div class="header-actions">
+          <el-button
+            v-permission="PERMISSIONS.FLOW_CARD_CREATE"
+            type="primary"
+            @click="openMaterialCreate"
+          >
+            {{ t('flowCards.materials.buttonAdd') }}
+          </el-button>
+          <el-button @click="closeMaterials">{{ t('common.close') }}</el-button>
+        </div>
+      </div>
+
+      <el-table v-loading="materialsLoading" :data="materialList" border>
+        <el-table-column
+          prop="material_no"
+          :label="t('flowCards.materials.colMaterialNo')"
+          min-width="120"
+          show-overflow-tooltip
+        >
+          <template #default="{ row }">{{ row.material_no || '-' }}</template>
+        </el-table-column>
+        <el-table-column
+          prop="material_name"
+          :label="t('flowCards.materials.colMaterialName')"
+          min-width="140"
+          show-overflow-tooltip
+        >
+          <template #default="{ row }">{{ row.material_name || '-' }}</template>
+        </el-table-column>
+        <el-table-column
+          prop="batch_no"
+          :label="t('flowCards.materials.colBatchNo')"
+          min-width="110"
+        >
+          <template #default="{ row }">{{ row.batch_no || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="color_no" :label="t('flowCards.materials.colColorNo')" width="100">
+          <template #default="{ row }">{{ row.color_no || '-' }}</template>
+        </el-table-column>
+        <el-table-column
+          prop="dye_lot_no"
+          :label="t('flowCards.materials.colDyeLotNo')"
+          width="110"
+        >
+          <template #default="{ row }">{{ row.dye_lot_no || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="grade" :label="t('flowCards.materials.colGrade')" width="100">
+          <template #default="{ row }">{{ gradeText(row.grade) }}</template>
+        </el-table-column>
+        <el-table-column prop="quantity" :label="t('flowCards.materials.colQuantity')" width="110">
+          <template #default="{ row }">{{ row.quantity }}</template>
+        </el-table-column>
+        <el-table-column prop="unit" :label="t('flowCards.materials.colUnit')" width="80">
+          <template #default="{ row }">{{ unitText(row.unit) }}</template>
+        </el-table-column>
+        <el-table-column
+          prop="remark"
+          :label="t('flowCards.materials.colRemark')"
+          min-width="120"
+          show-overflow-tooltip
+        >
+          <template #default="{ row }">{{ row.remark || '-' }}</template>
+        </el-table-column>
+        <el-table-column :label="t('common.operation')" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              v-permission="PERMISSIONS.FLOW_CARD_UPDATE"
+              size="small"
+              link
+              type="primary"
+              @click="openMaterialEdit(row)"
+            >
+              {{ t('common.edit') }}
+            </el-button>
+            <el-button
+              v-permission="PERMISSIONS.FLOW_CARD_DELETE"
+              size="small"
+              link
+              type="danger"
+              @click="handleMaterialDelete(row)"
+            >
+              {{ t('common.delete') }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-dialog
+      v-model="materialDialogVisible"
+      :title="
+        materialEditId === null
+          ? t('flowCards.materials.titleCreate')
+          : t('flowCards.materials.titleEdit')
+      "
+      width="640px"
+      @closed="resetMaterialForm"
+    >
+      <el-form
+        ref="materialFormRef"
+        :model="materialForm"
+        :rules="materialFormRules"
+        label-width="110px"
+      >
+        <el-form-item :label="t('flowCards.materials.labelWarehouse')" prop="warehouse_id">
+          <el-select
+            v-model="materialForm.warehouse_id"
+            filterable
+            remote
+            clearable
+            :remote-show-suffix="true"
+            :loading="warehouseLoading"
+            :remote-method="searchWarehouses"
+            :placeholder="t('flowCards.materials.placeholderSearchWarehouse')"
+            :no-data-text="t('flowCards.picker.noData')"
+            style="width: 100%"
+            @change="onWarehouseChange"
+          >
+            <el-option
+              v-for="item in warehouseOptions"
+              :key="item.id"
+              :label="item.label"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('flowCards.materials.labelMaterial')" prop="material_id">
+          <el-select
+            v-model="materialForm.material_id"
+            filterable
+            remote
+            clearable
+            :remote-show-suffix="true"
+            :loading="yarnLoading"
+            :remote-method="searchYarns"
+            :placeholder="t('flowCards.materials.placeholderSearchYarn')"
+            :no-data-text="t('flowCards.picker.noData')"
+            style="width: 100%"
+            @change="onYarnChange"
+          >
+            <el-option
+              v-for="item in yarnOptions"
+              :key="item.id"
+              :label="item.label"
+              :value="item.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('flowCards.materials.colMaterialNo')">
+          <!-- 纱编号与纱名由所选纱线源数据带出，只读展示，不落库副本 -->
+          <el-input :model-value="materialDisplay.material_no" disabled style="width: 100%" />
+        </el-form-item>
+        <el-form-item :label="t('flowCards.materials.colMaterialName')">
+          <el-input :model-value="materialDisplay.material_name" disabled style="width: 100%" />
+        </el-form-item>
+        <el-form-item :label="t('flowCards.materials.colBatchNo')" prop="batch_no">
+          <el-input
+            v-model="materialForm.batch_no"
+            :placeholder="t('flowCards.materials.placeholderOptional')"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item :label="t('flowCards.materials.colColorNo')" prop="color_no">
+          <el-input
+            v-model="materialForm.color_no"
+            :placeholder="t('flowCards.materials.placeholderOptional')"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item :label="t('flowCards.materials.colDyeLotNo')" prop="dye_lot_no">
+          <el-input
+            v-model="materialForm.dye_lot_no"
+            :placeholder="t('flowCards.materials.placeholderOptional')"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item :label="t('flowCards.materials.colGrade')" prop="grade">
+          <!-- 等级词表唯一来源 constants/stock-grade.ts（一等品/二等品/等外品），value 为落库中文真相 -->
+          <el-select
+            v-model="materialForm.grade"
+            clearable
+            :placeholder="t('flowCards.materials.placeholderGrade')"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="g in STOCK_GRADE_VALUES"
+              :key="g"
+              :label="t(STOCK_GRADE_LABEL_KEY[g])"
+              :value="g"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('flowCards.materials.colQuantity')" prop="quantity">
+          <!-- 数量手写录入（禁步进控件），>0 与 4 位小数由校验器把关，非法值不发请求 -->
+          <el-input v-model="materialForm.quantity" inputmode="decimal" style="width: 100%" />
+        </el-form-item>
+        <el-form-item :label="t('flowCards.materials.colUnit')" prop="unit">
+          <el-select v-model="materialForm.unit" style="width: 100%">
+            <el-option
+              v-for="u in MATERIAL_UNIT_VALUES"
+              :key="u"
+              :label="t(MATERIAL_UNIT_LABEL_KEY[u])"
+              :value="u"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('flowCards.materials.colRemark')" prop="remark">
+          <el-input v-model="materialForm.remark" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="materialDialogVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="materialSubmitLoading" @click="submitMaterial">
+          {{ t('flowCards.index.buttonConfirm') }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -224,10 +458,26 @@ import { isDialogDismissal } from '@/utils/monitor';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
-import { numberInputRules, numericView } from '@/utils/number-input';
+import { numberInputRules, numericView, parseNumberText } from '@/utils/number-input';
 import { useI18n } from 'vue-i18n';
 import { getProductionOrderList, type ProductionOrder } from '@/api/production';
-import { logAuxLoadFailure } from '@/utils/logger';
+import { logAuxLoadFailure, logger } from '@/utils/logger';
+import { msg } from '@/utils/message';
+import { PERMISSIONS } from '@/constants/permissions';
+import {
+  MATERIAL_UNIT,
+  MATERIAL_UNIT_VALUES,
+  MATERIAL_UNIT_LABEL_KEY,
+  isMaterialUnit,
+} from '@/constants/yarn-input-unit';
+import { STOCK_GRADE_VALUES, STOCK_GRADE_LABEL_KEY } from '@/constants/stock-grade';
+import { getProductById, getProductList, type Product } from '@/api/product';
+import { getWarehouseById, getWarehouseList } from '@/api/warehouse';
+import {
+  useGreigePicker,
+  PICKER_PAGE_SIZE,
+  type PickerOption,
+} from '@/views/greige-fabrics/useGreigePicker';
 import {
   getFlowCardList,
   createFlowCard,
@@ -242,8 +492,15 @@ import {
   shipFlowCard,
   terminateFlowCard,
   reactivateFlowCard,
+  listFlowCardMaterials,
+  createFlowCardMaterial,
+  getFlowCardMaterial,
+  updateFlowCardMaterial,
+  deleteFlowCardMaterial,
   type FlowCard,
   type FlowCardStatus,
+  type FlowCardMaterialView,
+  type UpdateFlowCardMaterialPayload,
 } from '@/api/flow-card';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -555,6 +812,313 @@ const handleDelete = async (row: FlowCard) => {
 
 const canDelete = (row: FlowCard): boolean =>
   row.status === 'pending' || row.status === 'terminated';
+
+// ============================ 投纱明细面板 ============================
+/**
+ * 投纱行承载纱批事实（什么纱／编号／批次），读写面均按卡进行；
+ * 端点契约与信封形状逐字段对齐 handlers/flow_card_material_handler.rs（列出为裸数组 data，
+ * 写面回传实体行）。展示不含任何成本列：投纱表没有 unit_cost/total_cost，成本唯一真源不在这里。
+ */
+const selectedCard = ref<FlowCard | null>(null);
+const materialList = ref<FlowCardMaterialView[]>([]);
+const materialsLoading = ref(false);
+/** 请求序号：换卡后旧卡的迟到响应一律丢弃，不得覆盖新卡列表（竞态防线，与实体选择器同判据） */
+let materialsSeq = 0;
+
+const materialDialogVisible = ref(false);
+const materialSubmitLoading = ref(false);
+const materialFormRef = ref<FormInstance>();
+/** null 即建单态；非 null 为被编辑行的主键（PUT/DELETE 与单行回读都用它） */
+const materialEditId = ref<number | null>(null);
+
+const materialForm = reactive<{
+  warehouse_id: number | undefined;
+  material_id: number | undefined;
+  batch_no: string;
+  color_no: string;
+  dye_lot_no: string;
+  grade: string;
+  quantity: string;
+  unit: string;
+  remark: string;
+}>({
+  warehouse_id: undefined,
+  material_id: undefined,
+  batch_no: '',
+  color_no: '',
+  dye_lot_no: '',
+  grade: '',
+  quantity: '',
+  // 单位默认取受控词表常量本身（后端 UNIT_KG/UNIT_METER 同值），不是手抄字面量
+  unit: MATERIAL_UNIT.kilogram,
+  remark: '',
+});
+
+/** 选纱带出的只读展示（不落库副本，来自产品档案源数据） */
+const materialDisplay = reactive({ material_no: '', material_name: '' });
+
+const materialFormRules = computed<FormRules>(() => ({
+  warehouse_id: [
+    { required: true, message: t('flowCards.materials.ruleWarehouseRequired'), trigger: 'change' },
+  ],
+  material_id: [
+    { required: true, message: t('flowCards.materials.ruleMaterialRequired'), trigger: 'change' },
+  ],
+  quantity: numberInputRules({
+    label: t('flowCards.materials.colQuantity'),
+    required: true,
+    positive: true,
+    precision: 4,
+  }),
+  unit: [{ required: true, message: t('flowCards.materials.ruleUnitRequired'), trigger: 'change' }],
+}));
+
+/** 纱线主键 → 编号与名称的带出缓存：搜索命中即记录，供只读展示回查，不伪造名称 */
+const yarnInfoCache = new Map<number, { code: string; name: string }>();
+function cacheYarnInfo(items: Product[]): void {
+  for (const item of items) {
+    yarnInfoCache.set(item.id, { code: item.product_code, name: item.product_name });
+  }
+}
+
+const yarnPicker = useGreigePicker(
+  async (keyword): Promise<PickerOption[]> => {
+    const res = await getProductList({ search: keyword, page: 1, page_size: PICKER_PAGE_SIZE });
+    const items = res.data.items;
+    cacheYarnInfo(items);
+    return items.map(item => ({
+      id: item.id,
+      label: `${item.product_name}（${item.product_code}）`,
+    }));
+  },
+  async (id): Promise<PickerOption | null> => {
+    const res = await getProductById(id);
+    const row = res.data;
+    if (!row) return null;
+    cacheYarnInfo([row]);
+    return { id, label: `${row.product_name}（${row.product_code}）` };
+  }
+);
+const {
+  options: yarnOptions,
+  loading: yarnLoading,
+  search: searchYarns,
+  syncPinned: syncYarnPinned,
+  restore: restoreYarn,
+  reset: resetYarnPicker,
+} = yarnPicker;
+
+const warehousePicker = useGreigePicker(
+  async (keyword): Promise<PickerOption[]> => {
+    const res = await getWarehouseList({
+      search: keyword,
+      page: 1,
+      page_size: PICKER_PAGE_SIZE,
+    });
+    return res.data.items.map(item => ({
+      id: item.id,
+      label: `${item.warehouse_name}（${item.warehouse_code}）`,
+    }));
+  },
+  async (id): Promise<PickerOption | null> => {
+    const res = await getWarehouseById(id);
+    const row = res.data;
+    if (!row) return null;
+    return { id, label: `${row.warehouse_name}（${row.warehouse_code}）` };
+  }
+);
+const {
+  options: warehouseOptions,
+  loading: warehouseLoading,
+  search: searchWarehouses,
+  syncPinned: syncWarehousePinned,
+  restore: restoreWarehouse,
+  reset: resetWarehousePicker,
+} = warehousePicker;
+
+/** 选纱即从源数据带出编号与名称；缓存取不到属状态异常，记警告留空展示，不造名 */
+function onYarnChange(value: unknown): void {
+  syncYarnPinned(typeof value === 'number' ? value : undefined);
+  if (typeof value !== 'number') {
+    materialDisplay.material_no = '';
+    materialDisplay.material_name = '';
+    return;
+  }
+  const info = yarnInfoCache.get(value);
+  if (!info) {
+    logger.warn('[flowCards] 选中纱线不在带出缓存，编号与名称无法从源数据取回', { id: value });
+    materialDisplay.material_no = '';
+    materialDisplay.material_name = '';
+    return;
+  }
+  materialDisplay.material_no = info.code;
+  materialDisplay.material_name = info.name;
+}
+
+function onWarehouseChange(value: unknown): void {
+  syncWarehousePinned(typeof value === 'number' ? value : undefined);
+}
+
+function gradeText(grade: string): string {
+  if (grade === '') return t('flowCards.materials.gradeNone');
+  const labelKey = STOCK_GRADE_LABEL_KEY[grade];
+  return labelKey ? t(labelKey) : grade;
+}
+
+function unitText(unit: string): string {
+  return isMaterialUnit(unit) ? t(MATERIAL_UNIT_LABEL_KEY[unit]) : unit;
+}
+
+async function loadMaterials(flowCardId: number): Promise<void> {
+  const seq = ++materialsSeq;
+  materialsLoading.value = true;
+  try {
+    const res = await listFlowCardMaterials(flowCardId);
+    if (seq !== materialsSeq) return;
+    materialList.value = res.data;
+  } catch (error) {
+    if (seq !== materialsSeq) return;
+    materialList.value = [];
+    logAuxLoadFailure(t('flowCards.materials.messageFetchFailed'), error);
+    msg.error('loadFailed');
+  } finally {
+    if (seq === materialsSeq) materialsLoading.value = false;
+  }
+}
+
+function openMaterials(row: FlowCard): void {
+  selectedCard.value = row;
+  loadMaterials(row.id);
+}
+
+function closeMaterials(): void {
+  materialsSeq += 1;
+  selectedCard.value = null;
+  materialList.value = [];
+}
+
+function openMaterialCreate(): void {
+  materialEditId.value = null;
+  materialDialogVisible.value = true;
+}
+
+/** 编辑先按主键回读单行（PUT 是整行覆盖语义，必须拿最新落库值作底），取不到不开弹窗 */
+async function openMaterialEdit(row: FlowCardMaterialView): Promise<void> {
+  try {
+    const res = await getFlowCardMaterial(row.id);
+    const latest = res.data;
+    materialEditId.value = latest.id;
+    materialForm.warehouse_id = latest.warehouse_id;
+    materialForm.material_id = latest.material_id;
+    materialForm.batch_no = latest.batch_no;
+    materialForm.color_no = latest.color_no;
+    materialForm.dye_lot_no = latest.dye_lot_no ?? '';
+    materialForm.grade = latest.grade;
+    materialForm.quantity = String(latest.quantity);
+    materialForm.unit = latest.unit;
+    materialForm.remark = latest.remark ?? '';
+    // 编号与名称的展示真源取列表富化行（实体回传体不含这两键），主键一致才可用
+    materialDisplay.material_no = row.material_no ?? '';
+    materialDisplay.material_name = row.material_name ?? '';
+    materialDialogVisible.value = true;
+    void restoreYarn(latest.material_id);
+    void restoreWarehouse(latest.warehouse_id);
+  } catch (error) {
+    logAuxLoadFailure(t('flowCards.materials.messageFetchFailed'), error);
+    msg.error('loadFailed');
+  }
+}
+
+/** 弹窗关闭即复位表单与选择器，避免跨行串候选；由 @closed 触发，不在提交成功路径里抢跑 */
+function resetMaterialForm(): void {
+  materialEditId.value = null;
+  materialForm.warehouse_id = undefined;
+  materialForm.material_id = undefined;
+  materialForm.batch_no = '';
+  materialForm.color_no = '';
+  materialForm.dye_lot_no = '';
+  materialForm.grade = '';
+  materialForm.quantity = '';
+  materialForm.unit = MATERIAL_UNIT.kilogram;
+  materialForm.remark = '';
+  materialDisplay.material_no = '';
+  materialDisplay.material_name = '';
+  resetYarnPicker();
+  resetWarehousePicker();
+  materialFormRef.value?.clearValidate();
+}
+
+/**
+ * 表单控件态到契约值的显式映射：后端对 batch_no/color_no/grade 用空串表达"无"，
+ * 对 dye_lot_no/remark 用 null 表达"无"；清空控件回 undefined 一律映射为对应"无"值，
+ * 这是词表换算不是兜底掩盖（数量除外：非法值在 rules 判负，根本走不到发请求）。
+ * 返回值是更新契约的键集；新增契约只多一个 flow_card_id，由建单分支在调用点补上。
+ */
+function buildMaterialPayload(): UpdateFlowCardMaterialPayload {
+  return {
+    warehouse_id: materialForm.warehouse_id as number,
+    material_id: materialForm.material_id as number,
+    batch_no: materialForm.batch_no.trim(),
+    color_no: materialForm.color_no.trim(),
+    dye_lot_no: materialForm.dye_lot_no.trim() === '' ? null : materialForm.dye_lot_no.trim(),
+    grade: typeof materialForm.grade === 'string' ? materialForm.grade : '',
+    quantity: parseNumberText(materialForm.quantity.trim()) as number,
+    unit: materialForm.unit,
+    remark: materialForm.remark.trim() === '' ? null : materialForm.remark.trim(),
+  };
+}
+
+async function submitMaterial(): Promise<void> {
+  if (!materialFormRef.value || !selectedCard.value) return;
+  const valid = await materialFormRef.value.validate().catch(() => false);
+  if (!valid) return;
+  const card = selectedCard.value;
+  const quantity = parseNumberText(materialForm.quantity.trim());
+  // 校验器判负以外的最后一道门：主键与数量必须是真实取到的值才发请求
+  if (quantity === undefined || quantity <= 0) return;
+  materialSubmitLoading.value = true;
+  try {
+    if (materialEditId.value === null) {
+      await createFlowCardMaterial({ flow_card_id: card.id, ...buildMaterialPayload() });
+      msg.createOk();
+    } else {
+      await updateFlowCardMaterial(materialEditId.value, buildMaterialPayload());
+      msg.updateOk();
+    }
+    // 成功返回后才关弹窗并重拉列表（刷新即回读真实落库结果，不本地拼数组）
+    materialDialogVisible.value = false;
+    await loadMaterials(card.id);
+  } catch (error) {
+    logger.error('[flowCards] 投纱明细保存失败', error);
+    if (materialEditId.value === null) msg.createFail();
+    else msg.updateFail();
+  } finally {
+    materialSubmitLoading.value = false;
+  }
+}
+
+async function handleMaterialDelete(row: FlowCardMaterialView): Promise<void> {
+  if (!selectedCard.value) return;
+  const target = row.material_name || row.material_no || String(row.id);
+  try {
+    await ElMessageBox.confirm(
+      t('flowCards.materials.confirmDelete', { target }),
+      t('flowCards.index.titleDeleteConfirm'),
+      {
+        confirmButtonText: t('flowCards.index.buttonConfirmDelete'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning',
+      }
+    );
+    await deleteFlowCardMaterial(row.id);
+    msg.deleteOk();
+    await loadMaterials(selectedCard.value.id);
+  } catch (error) {
+    if (isDialogDismissal(error)) return;
+    logger.error('[flowCards] 投纱明细作废失败', error);
+    msg.deleteFail();
+  }
+}
 
 onMounted(() => {
   loadList();

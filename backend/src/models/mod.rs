@@ -62,10 +62,7 @@ pub mod user;
 pub mod user_behavior;
 // 批次 158 v11 真实接入：密码策略服务 - 密码历史持久化
 pub mod password_history;
-// MRP生产计划模块
-pub mod bom;
-pub mod bom_item;
-pub mod mrp_result;
+// 生产订单与排程模块
 pub mod production_order;
 pub mod scheduling_result;
 pub mod work_center;
@@ -192,14 +189,16 @@ pub mod process_route;
 pub mod process_step_record;
 pub mod process_quality_feedback;
 pub mod production_flow_card;
+// 流转卡投纱明细（一张卡实际投入的成品纱线：纱种/纱编号/纱批次/数量）
+pub mod flow_card_material;
 // v14 批次 426：验布打卷流程贯通（验布记录 + 疵点明细）
 pub mod fabric_inspection_record;
 pub mod fabric_defect_record;
-// v14 批次 427：产量工资核算贯通（工序工价 + 工资记录 + 工资明细）
+// 产量工资核算贯通（工序工价 + 工资记录 + 工资明细）
 pub mod process_wage_rate;
 pub mod wage_record;
 pub mod wage_record_detail;
-// v14 批次 428：能耗管理贯通（能源计量设备 + 能耗记录 + 能耗分摊规则 + 能耗分摊记录）
+// 能耗管理（能源计量设备 + 能耗记录 + 能耗分摊规则 + 能耗分摊记录）
 pub mod energy_meter;
 pub mod energy_consumption_record;
 pub mod energy_allocation_rule;

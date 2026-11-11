@@ -64,7 +64,7 @@ fn displayable_message(err: &AppError) -> String {
 // ---------------------------------------------------------------------------
 
 /// 词表内任意两个不同状态组合都注入 PUT 门，必须逐对被拒（含 draft 改 approved 这条
-/// 绕过 BPM 与 MRP 的原始非法跃迁）。同值幂等写必须放行（键在场但未改状态是合法语义）。
+/// 绕过 BPM 的原始非法跃迁）。同值幂等写必须放行（键在场但未改状态是合法语义）。
 #[test]
 fn so_edit_gate_rejects_every_cross_state_pair_and_allows_idempotent_write() {
     let mut injected_pairs = 0usize;

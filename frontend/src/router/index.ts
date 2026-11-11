@@ -746,29 +746,6 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'bom',
-        name: 'Bom',
-        component: () => import('@/views/bom/index.vue'),
-        meta: { title: 'BOM管理', icon: 'Cpu', permission: ['boms:read'], requiresAuth: true }, // 该入口要求下方 meta.permission 列出的模块读权限键
-      },
-      {
-        path: 'mrp',
-        name: 'Mrp',
-        component: () => import('@/views/mrp/index.vue'),
-        meta: { title: 'MRP计算', icon: 'Cpu', permission: ['mrp:read'], requiresAuth: true }, // 该入口要求下方 meta.permission 列出的模块读权限键
-      },
-      {
-        path: 'mrp/history',
-        name: 'MrpHistory',
-        component: () => import('@/views/mrp/history.vue'),
-        meta: {
-          title: 'MRP历史记录',
-          icon: 'Cpu',
-          permission: ['mrp:read'],
-          requiresAuth: true,
-        }, // 该入口要求下方 meta.permission 列出的模块读权限键
-      },
-      {
         path: 'capacity',
         name: 'Capacity',
         component: () => import('@/views/capacity/index.vue'),
@@ -1753,7 +1730,6 @@ const COARSE_DOMAIN_RESOURCES: Record<string, string[]> = {
   ],
   production: [
     'production-orders',
-    'boms',
     'process-routes',
     'production-recipes',
     'dye-batches',
@@ -1762,7 +1738,6 @@ const COARSE_DOMAIN_RESOURCES: Record<string, string[]> = {
     'greige-fabrics',
     'fabric-inspections',
     'flow-cards',
-    'mrp',
     'capacity',
     'scheduling',
     'outsourcing-orders',
