@@ -36,7 +36,8 @@ import {
  * （pending / sampled / sent_to_customer / approved / rejected / rework / downgraded /
  * scrapped，均小写）。终态为 approved 与 rejected 与 downgraded 与 scrapped；
  * 发货门禁仅 approved 解除，建单时 delivery_blocking 恒为 true。
- * 跃迁门：send_to_customer 要求当前为 sampled。
+ * 跃迁门：send_to_customer 要求当前为 sampled；scrap 允许 approved 与 pending 与
+ * sampled 三个来源（pending 与 sampled 属直接报废，不要求先剪样发送）。
  *
  * 拒因到 HTTP 的映射（handlers/bulk_color_approval_handler.rs 的 bca_err）：
  * Validation 族走 validation_displayable，出参 message 携带真实可操作拒因，
@@ -44,8 +45,9 @@ import {
  * InvalidState 族走脱敏的 AppError::business，出参 message 不外显真实文案，
  * 因此这些点只断 HTTP 400 与 BUSINESS_ERROR 机器码，不据文案判责。
  *
- * 本文件不覆盖剪大货样与四条反馈跃迁的正向路径：剪样要求大货已入库且质检通过且
- * 生产订单 completed 并联动扣减生成样品匹，前置链属另一条夹具通道，另文登记。
+ * 本文件不覆盖剪大货样与 approve 与 reject 与 rework 与 downgrade 的正向路径：剪样要求
+ * 大货已入库且质检通过且生产订单 completed 并联动扣减生成样品匹，前置链属另一条夹具通道，
+ * 另文登记；scrap 的 pending 直接报废正向已由 488-05d 覆盖。
  */
 
 interface BcaRow {
@@ -309,7 +311,7 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
     await tryCleanup(page, 'DELETE', `/sales/orders/${orderId}`, `sales-order#${orderId}`);
   });
 
-  test('488-05b 已剪样之前的六条跃迁在 pending 态全被状态机拒绝', async ({ page }) => {
+  test('488-05b 已剪样之前的五条跃迁在 pending 态全被状态机拒绝', async ({ page }) => {
     const row = await createApproval(page);
     const id = row.id as number;
 
@@ -340,12 +342,6 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
           path: `/bulk-color-approvals/${id}/downgrade`,
           body: rejectBody,
         },
-        {
-          label: '报废',
-          method: 'POST',
-          path: `/bulk-color-approvals/${id}/scrap`,
-          body: rejectBody,
-        },
       ];
 
     for (const c of cases) {
@@ -362,7 +358,7 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
     const after = await apiCallRaw<BcaRow>(page, 'GET', `/bulk-color-approvals/${id}`);
     expect(
       after?.approval_status,
-      `六条非法跃迁均不得改状态，读回应仍为 pending，实际=${after?.approval_status}`
+      `五条非法跃迁均不得改状态，读回应仍为 pending，实际=${after?.approval_status}`
     ).toBe('pending');
     expect(after?.delivery_blocking, '非法跃迁后发货门禁应仍为阻断').toBe(true);
   });
@@ -405,6 +401,24 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
       !!stats && typeof stats === 'object' && !Array.isArray(stats),
       `statistics 应返回聚合对象，实际=${JSON.stringify(stats)?.slice(0, 120)}`
     ).toBe(true);
+  });
+
+  test('488-05d pending 态直接报废是状态机明文允许的终态跃迁', async ({ page }) => {
+    // 服务层状态机把 pending 与 sampled 列为报废合法来源（直接报废），只有剪样发送后的
+    // 反馈跃迁才要求前置态；本腿钉合法跃迁真落库且终态仍阻断发货。
+    const row = await createApproval(page);
+    const id = row.id as number;
+
+    await apiCallRaw(page, 'POST', `/bulk-color-approvals/${id}/scrap`, {
+      reject_reason: 'E2E 胚布瑕疵直接报废',
+    });
+
+    const after = await apiCallRaw<BcaRow>(page, 'GET', `/bulk-color-approvals/${id}`);
+    expect(
+      after?.approval_status,
+      `pending 直接报废应落 scrapped 终态，实际=${after?.approval_status}`
+    ).toBe('scrapped');
+    expect(after?.delivery_blocking, 'scrapped 终态仍须阻断发货（需重新生产或换缸）').toBe(true);
   });
 
   test('488-06 删除腿生效后详情与再删均判 404', async ({ page }) => {
