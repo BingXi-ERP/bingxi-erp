@@ -216,11 +216,13 @@
         </el-table-column>
         <el-table-column :label="t('salesContract.form.colTolerance')" width="140">
           <template #default="{ row }">
+            <!-- 交货容差是三态字段，未填保持 undefined 提交不带该键；optional 让清空回到未填，不得塌成 0 假量 -->
             <NumericInput
               v-model="row.quantity_tolerance_pct"
               :min="0"
               :max="100"
               :precision="2"
+              :optional="true"
               size="small"
               :placeholder="t('salesContract.form.tolerancePlaceholder')"
               style="width: 100%"

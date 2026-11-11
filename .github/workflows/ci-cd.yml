@@ -623,6 +623,24 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: frontend
         run: node scripts/check-e2e-worker-account.mjs
+      # 禁步进数字控件门（用户 2026-10-25 硬口径 全项目禁止带加减按钮的数字输入框 数量
+      # 单价 税率 金额一律纯手写 el-input 加校验器）。判据 frontend/src 与 frontend/e2e
+      # 以及存在时的 mobile-app 内 步进控件名字面量零出现 注释 CSS 选择器 动态组件名
+      # e2e 定位器与 i18n 全算残留 自造点击加减步进交互同判红。判负口径 两类计数之和
+      # 非零或判定器自证失败即退码 1 阻断合并（本 job 在收尾门与打包门的 needs 链内）
+      # 判绿时打印 全库 0 出现 锁绿 一行 违规时逐条点名 文件 行号 命中行行首。
+      # 两步次序 先 --self-test 双向自证（正例必抓 反例必不报 判定器退化空转当场判红
+      # 防主门的 问题 0 是假绿）再跑主门。脚本按自身文件位置解析扫描根 任意 cwd 均可跑
+      # 这里与其它 node 族步骤一致 working-directory frontend。
+      - name: 禁步进判定器自证（内联夹具正例必抓 反例必不报）
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: node scripts/check-no-stepper-control.mjs --self-test
+
+      - name: 禁步进数字控件零出现门（主门 目标全库零出现 判绿）
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: node scripts/check-no-stepper-control.mjs
       # e2e 下拉面板裸词元棘轮（只准降不准升）：spec/fixture 里的下拉面板定位必须走
       # ui-helpers 的归属钉定 helper，裸写全局面板类名即阻断；清零文件必须同步下调基线。
       # 自证步骤（内联双向夹具：正例必抓、反例必不报、棘轮比较判红判下调）先于主门禁执行。
@@ -3320,7 +3338,7 @@ jobs:
           else
             # 分片 30-44，testMatch 内、但分片命令从不传的全部目录 ——
             # enhanced/purchase/sales/quality/finance/crm/bpm
-            # + e2e/ 根级 3 spec + ai/dashboard/fabric/inventory/mrp/production/
+            # + e2e/ 根级 3 spec + ai/dashboard/fabric/inventory/production/
             # quotations/system/fullflow。
             # 这批此前在 CI 里从未执行过：playwright.config.ts 的 chromium testMatch
             # 早早就把它们纳入（注释写着"去 mock 后全部进主 CI testMatch"），
@@ -3354,7 +3372,7 @@ jobs:
               34) SPEC_TARGETS="e2e/sales/ e2e/quality/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               35) SPEC_TARGETS="e2e/crm/ e2e/inventory/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               36) SPEC_TARGETS="e2e/enhanced/ e2e/production/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
-              37) SPEC_TARGETS="e2e/bpm/ e2e/fabric/ e2e/mrp/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
+              37) SPEC_TARGETS="e2e/bpm/ e2e/fabric/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               38) SPEC_TARGETS="e2e/ai/ e2e/quotations/ e2e/system/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               39) SPEC_TARGETS="e2e/dashboard/ e2e/color-card.spec.ts e2e/color-price.spec.ts e2e/custom-order.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               # fullflow（96 条契约链用例，此前从未被任何分片传入，任务 #306 静默丢覆盖）。
@@ -4063,7 +4081,7 @@ jobs:
           terms = open('frontend/src/views/legal/TermsView.vue', encoding='utf-8').read()
           declared = {
               '客户管理': 'customer', '供应商管理': 'supplier', '产品管理': 'product',
-              '染料配方': 'dye-recipe', '色卡': 'color-cards/list', 'BOM': 'bom',
+              '染料配方': 'dye-recipe', '色卡': 'color-cards/list',
               '采购管理': 'purchase', '销售管理': 'sales', '库存管理': 'inventory',
               '生产管理': 'production', '质量管理': 'quality', '财务核算': 'finance',
               '审批流程': 'bpm', '审计日志': 'system/audit-log', '系统管理': 'system',

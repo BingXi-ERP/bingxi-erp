@@ -75,7 +75,7 @@ export const E2E_SHARD_MATRIX = [
   { shard: 34, label: 'extras: sales+quality' },
   { shard: 35, label: 'extras: crm+inventory' },
   { shard: 36, label: 'extras: enhanced+production' },
-  { shard: 37, label: 'extras: bpm+fabric+mrp' },
+  { shard: 37, label: 'extras: bpm+fabric' },
   { shard: 38, label: 'extras: ai+quotations+system' },
   { shard: 39, label: 'extras: dashboard+e2e 根级 3 spec' },
   { shard: 40, label: 'extras: fullflow 1/5（按实测时长分组）' },

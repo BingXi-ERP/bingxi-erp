@@ -693,7 +693,7 @@ impl RolePermissionService {
                 "iam".to_string()
             }
             // 目录模块
-            "products" | "categories" | "warehouses" | "boms" => "catalog".to_string(),
+            "products" | "categories" | "warehouses" => "catalog".to_string(),
             // 销售模块
             "orders" | "fabric-orders" | "customers" | "customer-credits" | "sales-contracts"
             | "sales-prices" | "sales-returns" | "quotations" => "sales".to_string(),
@@ -719,7 +719,6 @@ impl RolePermissionService {
             | "outsourcing-orders"
             | "outsourcing-receipts"
             | "outsourcing-vouchers"
-            | "mrp"
             | "capacity"
             | "scheduling" => "production".to_string(),
             // 质量模块

@@ -2,11 +2,10 @@
 //!
 //! 本文件内的所有 API 端点均调用真实数据库 / 业务服务，**不再返回占位数据**。
 //!
-//! 涵盖 4 个子模块：
+//! 涵盖 3 个子模块：
 //! 1. 会计期间（CRUD + 关闭）— 复用 `accounting_period` 模型
-//! 2. MRP 计算历史 — 复用 `MrpEngineService`
-//! 3. 销售用户列表 — 复用 `user` 模型 + role 过滤
-//! 4. CRM 公海回收规则 — 数据库持久化（批次 23 v5 P0-4：迁移至 `crm_recycle_rules` 表）
+//! 2. 销售用户列表 — 复用 `user` 模型 + role 过滤
+//! 3. CRM 公海回收规则 — 数据库持久化（迁移至 `crm_recycle_rules` 表）
 
 use axum::{
     Json,
@@ -26,7 +25,6 @@ use crate::models::user;
 use crate::services::crm::recycle_rule::{
     CreateRecycleRulePayload, RecycleRule, RecycleRuleService, UpdateRecycleRulePayload,
 };
-use crate::services::mrp_engine_service::MrpEngineService;
 use crate::utils::error::AppError;
 use crate::utils::messages::biz_msg;
 use crate::utils::response::ApiResponse;
@@ -248,120 +246,7 @@ pub async fn delete_accounting_period(
 }
 
 // ============================================================================
-// 2. MRP 历史
-// ============================================================================
-
-/// MRP 历史列表响应
-#[allow(dead_code, reason = "序列化输出字段")]
-#[derive(Debug, Serialize)]
-pub struct MrpHistoryDto {
-    pub calculation_no: String,
-    pub product_id: i32,
-    pub required_quantity: rust_decimal::Decimal,
-    pub required_date: Option<chrono::NaiveDate>,
-    pub status: String,
-    pub created_at: DateTime<Utc>,
-}
-
-/// MRP 历史列表查询参数
-#[allow(dead_code, reason = "反序列化输入字段")]
-#[derive(Debug, Deserialize)]
-pub struct MrpHistoryListQuery {
-    pub calculation_no: Option<String>,
-    pub product_id: Option<i32>,
-    pub status: Option<String>,
-    pub page: Option<u64>,
-    pub page_size: Option<u64>,
-}
-
-/// 获取 MRP 计算历史列表
-pub async fn get_mrp_history(
-    State(state): State<AppState>,
-    _auth: AuthContext,
-    axum::extract::Query(params): axum::extract::Query<MrpHistoryListQuery>,
-) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
-    let page = params.page.unwrap_or(1).clamp(1, 1000);
-    let page_size = params.page_size.unwrap_or(20).clamp(1, 100);
-
-    let mrp_service = MrpEngineService::new(state.db.clone());
-    let (results, total) = mrp_service
-        .get_results(
-            params.calculation_no,
-            params.product_id,
-            params.status,
-            page,
-            page_size,
-        )
-        .await?;
-
-    let dtos: Vec<MrpHistoryDto> = results
-        .into_iter()
-        .map(|r| MrpHistoryDto {
-            calculation_no: r.calculation_no,
-            product_id: r.product_id,
-            required_quantity: r.required_quantity,
-            required_date: r.required_date,
-            status: r.status,
-            created_at: r.created_at,
-        })
-        .collect();
-
-    let response = serde_json::json!({
-        "items": dtos,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-    });
-    Ok(Json(ApiResponse::success(response)))
-}
-
-/// MRP 历史详情响应
-#[allow(dead_code, reason = "序列化输出字段")]
-#[derive(Debug, Serialize)]
-pub struct MrpHistoryDetailDto {
-    pub calculation_no: String,
-    pub product_id: i32,
-    pub required_quantity: rust_decimal::Decimal,
-    pub required_date: Option<chrono::NaiveDate>,
-    pub source_type: String,
-    pub source_id: Option<i32>,
-    pub planned_order_quantity: Option<rust_decimal::Decimal>,
-    pub planned_order_date: Option<chrono::NaiveDate>,
-    pub status: String,
-    pub remarks: Option<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-/// 获取 MRP 历史详情
-pub async fn get_mrp_history_detail(
-    State(state): State<AppState>,
-    Path(id): Path<i32>,
-    _auth: AuthContext,
-) -> Result<Json<ApiResponse<MrpHistoryDetailDto>>, AppError> {
-    // 直接查询 mrp_result 模型
-    let result = crate::models::mrp_result::Entity::find_by_id(id)
-        .one(state.db.as_ref())
-        .await?
-        .ok_or_else(|| AppError::not_found(format!("MRP 历史 {} 不存在", id)))?;
-
-    let dto = MrpHistoryDetailDto {
-        calculation_no: result.calculation_no,
-        product_id: result.product_id,
-        required_quantity: result.required_quantity,
-        required_date: result.required_date,
-        source_type: result.source_type,
-        source_id: result.source_id,
-        planned_order_quantity: result.planned_order_quantity,
-        planned_order_date: result.planned_order_date,
-        status: result.status,
-        remarks: result.remarks,
-        created_at: result.created_at,
-    };
-    Ok(Json(ApiResponse::success(dto)))
-}
-
-// ============================================================================
-// 3. 销售用户列表
+// 2. 销售用户列表
 // ============================================================================
 
 /// 销售用户 DTO
@@ -416,7 +301,7 @@ pub async fn get_sales_users(
 }
 
 // ============================================================================
-// 4. CRM 公海回收规则（数据库持久化）
+// 3. CRM 公海回收规则（数据库持久化）
 // ============================================================================
 // 批次 23 v5 P0-4 修复：原 `static RECYCLE_RULES: LazyLock<RwLock<Vec<RecycleRule>>>`
 // 内存存储会导致进程重启后丢失运行时修改，已迁移至数据库 `crm_recycle_rules` 表。

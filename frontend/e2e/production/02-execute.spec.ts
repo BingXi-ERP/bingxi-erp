@@ -2,10 +2,18 @@
 // 覆盖范围：开始生产、完成生产、状态标签验证
 import { test, expect, type Page } from '../diagnose-fixture';
 import { applyAuthMocks } from '../smoke/_helpers';
-import { apiCall, ensureTestEntities, getCtx } from '../flow/helpers';
+import {
+  apiCall,
+  apiCallRaw,
+  ensureTestEntities,
+  genCode,
+  getCtx,
+  tryCleanup,
+} from '../flow/helpers';
 import { pickSelect, elSelectByLabel } from '../flow/ui-helpers';
-// 产品类型单源常量（与后端 product_type 词表同源）：建品夹具取值必须经成员引用。
+// 产品类型与库存等级单源常量（与后端词表同源）：夹具取值必须经成员引用，不写字面量。
 import { PRODUCT_TYPE } from '../../src/constants/product-type';
+import { STOCK_GRADE } from '../../src/constants/stock-grade';
 
 async function filterByStatus(page: Page, statusLabel: string): Promise<void> {
   await expect(page.getByRole('table').first()).toBeVisible({ timeout: 30000 });
@@ -14,8 +22,9 @@ async function filterByStatus(page: Page, statusLabel: string): Promise<void> {
 }
 
 /**
- * 造一张无默认 BOM 的新产品（避免完成时走原料库存扣减而受种子数据干扰），
- * 再建 DRAFT 工单并按状态机推进到 targetStatus（PUT /status 走后端白名单校验）。
+ * 造一张工单宿主产品，再建 DRAFT 工单并按状态机推进到 targetStatus（PUT /status 走后端白名单校验）。
+ * 完工扣料从该订单名下流转卡的投纱明细取数，投纱为空显式拒绝完工，
+ * 因此要推到可完工状态的工单须另走 seedCompletionFeed 补投纱前置。
  */
 async function createOrderInStatus(page: Page, targetStatus: string): Promise<number> {
   const ctx = getCtx();
@@ -59,6 +68,92 @@ async function createOrderInStatus(page: Page, targetStatus: string): Promise<nu
   return id;
 }
 
+/**
+ * 给一张在产工单补齐完工扣料前置：专属纱线产品、挂单流转卡、够扣的纱线库存行与投纱行。
+ * 完工按 仓库×纱线×批次×色号×等级 命中唯一库存行，故投纱行与库存行的四维取值逐字符相同；
+ * 缺一维则扣料命不中该行而拒绝完工，多行同键则扣错行。等级取库存等级词表内值。
+ * 纱线自建而不复用种子产品，避免并发用例在同一维度上互扣造成数量歧义。
+ */
+async function seedCompletionFeed(page: Page, orderId: number): Promise<void> {
+  const ctx = getCtx();
+  const categoryId = ctx.productCategoryIds[0];
+  const warehouseId = ctx.warehouseIds[0];
+  expect(categoryId, '前置：需要产品分类（建纱线用）').toBeTruthy();
+  expect(warehouseId, '前置：需要可用仓库（投纱与库存的定位维度）').toBeTruthy();
+
+  const yarnCode = genCode('E2E-PRD-Y');
+  const yarn = await apiCallRaw<{ id?: number }>(page, 'POST', '/products', {
+    code: yarnCode,
+    name: `E2E生产完工纱线${yarnCode}`,
+    unit: '公斤',
+    category_id: categoryId,
+    product_type: PRODUCT_TYPE.auxiliary,
+  });
+  const yarnId = yarn?.id;
+  if (!yarnId) throw new Error(`完工前置纱线产品创建失败：${JSON.stringify(yarn).slice(0, 200)}`);
+  CLEANUP.push({ path: `/products/${yarnId}`, label: '[02-execute] 纱线产品' });
+
+  const card = await apiCallRaw<{ id?: number }>(page, 'POST', '/production/flow-cards', {
+    production_order_id: orderId,
+  });
+  const cardId = card?.id;
+  if (!cardId) throw new Error(`完工前置流转卡创建失败：${JSON.stringify(card).slice(0, 200)}`);
+  CLEANUP.push({ path: `/production/flow-cards/${cardId}`, label: '[02-execute] 流转卡' });
+
+  const batchNo = genCode('E2E-PRD-B');
+  const colorNo = genCode('E2E-PRD-C');
+  const dyeLotNo = genCode('E2E-PRD-L');
+
+  const stock = await apiCallRaw<{ id?: number }>(page, 'POST', '/inventory/stock/fabric', {
+    warehouse_id: warehouseId,
+    product_id: yarnId,
+    batch_no: batchNo,
+    color_no: colorNo,
+    dye_lot_no: dyeLotNo,
+    grade: STOCK_GRADE.first,
+    quantity_meters: '200',
+    quantity_kg: '100',
+  });
+  const stockId = stock?.id;
+  if (!stockId)
+    throw new Error(`完工前置纱线库存行创建失败：${JSON.stringify(stock).slice(0, 200)}`);
+  CLEANUP.push({ path: `/inventory/stock/${stockId}`, label: '[02-execute] 纱线库存行' });
+
+  const material = await apiCallRaw<{ id?: number }>(
+    page,
+    'POST',
+    '/production/flow-cards/materials',
+    {
+      flow_card_id: cardId,
+      warehouse_id: warehouseId,
+      material_id: yarnId,
+      batch_no: batchNo,
+      color_no: colorNo,
+      dye_lot_no: dyeLotNo,
+      grade: STOCK_GRADE.first,
+      quantity: '10',
+      unit: 'kg',
+    }
+  );
+  const materialId = material?.id;
+  if (!materialId)
+    throw new Error(`完工前置投纱行登记失败：${JSON.stringify(material).slice(0, 200)}`);
+  CLEANUP.push({
+    path: `/production/flow-cards/materials/${materialId}`,
+    label: '[02-execute] 投纱行',
+  });
+}
+
+const CLEANUP: Array<{ path: string; label: string }> = [];
+
+test.afterEach(async ({ page }) => {
+  if (CLEANUP.length === 0) return;
+  for (const c of CLEANUP.reverse()) {
+    await tryCleanup(page, 'DELETE', c.path, c.label);
+  }
+  CLEANUP.length = 0;
+});
+
 test.describe('生产计划 - 02 生产执行', () => {
   test.beforeEach(async ({ page, context }) => {
     await applyAuthMocks(context);
@@ -84,8 +179,9 @@ test.describe('生产计划 - 02 生产执行', () => {
 
   test('生产中工单可完成（IN_PROGRESS → 已完成）', async ({ page }) => {
     await ensureTestEntities(page);
-    // 用无 BOM 的新产品，确保"完成"仅入成品、不触发原料扣减，状态变更稳定成功
-    await createOrderInStatus(page, 'IN_PROGRESS');
+    // 完工必然扣流转卡投纱对应的纱线库存，投纱为空被显式拒绝，故先补投纱与够扣库存前置
+    const orderId = await createOrderInStatus(page, 'IN_PROGRESS');
+    await seedCompletionFeed(page, orderId);
 
     await page.goto('/production');
     await filterByStatus(page, '生产中');
