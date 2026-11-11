@@ -623,6 +623,23 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: frontend
         run: node scripts/check-e2e-worker-account.mjs
+
+      # e2e 全量钩子形参门（纯 Node 零依赖）。Playwright 的 page 与 context 是按用例创建的对象
+      # 在 beforeAll 与 afterAll 的形参里解构它们会让整份用例文件在收集阶段直接抛错 一条都不跑
+      # 而 e2e 类型门与用例枚举门都看不出这个问题 只有分片真跑起来才暴露 现象是一枚失败加一串
+      # did not run。本步只解析钩子紧跟的那一个解构块 钩子体内的同名局部变量与逐用例钩子里的
+      # page 都不算命中 命中时逐条点名 文件 行号 钩子名 被绑的 fixture 名。
+      # 两步次序 先 --self-test 双向自证（内联正例必抓 反例必不报 判定器退化空转当场判红
+      # 防主门的 违规 0 处是假绿）再跑主门。脚本按自身文件位置解析扫描根 任意 cwd 均可跑
+      # 这里与其它 node 族步骤一致 working-directory frontend。
+      - name: e2e 全量钩子形参判定器自证（内联正例必抓 反例必不报）
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: node scripts/check-e2e-hook-fixture.mjs --self-test
+      - name: e2e 全量钩子禁绑用例作用域 fixture（beforeAll 与 afterAll 拿不到 page）
+        if: ${{ !cancelled() }}
+        working-directory: frontend
+        run: node scripts/check-e2e-hook-fixture.mjs
       # 禁步进数字控件门（用户 2026-10-25 硬口径 全项目禁止带加减按钮的数字输入框 数量
       # 单价 税率 金额一律纯手写 el-input 加校验器）。判据 frontend/src 与 frontend/e2e
       # 以及存在时的 mobile-app 内 步进控件名字面量零出现 注释 CSS 选择器 动态组件名
