@@ -394,9 +394,29 @@ test.describe.serial('122 数据导入任务生命周期与模板契约', () => 
     expect(dlPost.status(), `POST 下载应 200，实际 ${dlPost.status()}`).toBe(200);
     expect(dlPost.headers()['content-type']).toContain('spreadsheetml.sheet');
     const postBody = await dlPost.body();
+    // 两条腿各现生成一份 xlsx，生成器把当刻写进包内属性，压缩后字节数可差 1 枚，
+    // 拿裸字节数相等当同源判据属时序假红。同源只钉语义面：同一附件文件名、同一媒体类型、
+    // 两侧都是完整 zip 且非空，且每侧 Content-Length 与自身实际字节数一致（防半截流）。
     expect(
-      postBody.byteLength,
-      `POST 下载字节数应与 GET 同模板同源，实际 GET ${getBody.byteLength} POST ${postBody.byteLength}`
+      dlPost.headers()['content-disposition'],
+      `POST 与 GET 必须落同一模板文件名，实际 POST ${dlPost.headers()['content-disposition']} GET ${
+        dlGet.headers()['content-disposition']
+      }`
+    ).toBe(dlGet.headers()['content-disposition']);
+    expect(postBody.byteLength, `POST 下载字节应非空（xlsx 至少含 zip 魔数）`).toBeGreaterThan(0);
+    expect(postBody[0], `xlsx 魔数字节 1`).toBe(0x50);
+    expect(postBody[1], `xlsx 魔数字节 2`).toBe(0x4b);
+    expect(
+      Number(dlPost.headers()['content-length']),
+      `POST 侧 Content-Length 应等于实际字节数，实际头 ${
+        dlPost.headers()['content-length']
+      } 体 ${postBody.byteLength}`
+    ).toBe(postBody.byteLength);
+    expect(
+      Number(dlGet.headers()['content-length']),
+      `GET 侧 Content-Length 应等于实际字节数，实际头 ${
+        dlGet.headers()['content-length']
+      } 体 ${getBody.byteLength}`
     ).toBe(getBody.byteLength);
 
     // 未知模板三条读腿各钉 404（not_found 脱敏）
