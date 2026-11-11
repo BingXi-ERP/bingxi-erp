@@ -8180,6 +8180,7 @@ export default {
       title: 'Locked Account Management',
       ariaLabel: 'Locked Account Management Table',
       confirmUnlock: 'Unlock account {username}?',
+      unlockNoAccount: 'No account for username {username}, cannot unlock by id',
       column: {
         index: 'Index',
         username: 'Username',
