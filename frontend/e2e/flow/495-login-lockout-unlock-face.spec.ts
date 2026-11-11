@@ -29,6 +29,7 @@ import {
   apiCallRaw,
   failureCode,
   loginInIsolatedContext,
+  loginViaUI,
   testPassword,
   tryCleanup,
 } from './helpers';
@@ -97,7 +98,11 @@ test.describe('495 登录安全锁定与解锁面', () => {
   let plainId = 0;
   const createdUserIds: number[] = [];
 
-  test.beforeAll(async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
+    // page 是按用例创建的 fixture，beforeAll 里拿不到；前置账号在本 worker 首个用例里懒建一次
+    if (createdUserIds.length > 0) {
+      return;
+    }
     const rolePage = await apiCallRaw<RolePage>(page, 'GET', '/roles?page=1&page_size=50');
     const nonAdmin = rolePage.roles.find(r => r.code !== 'admin');
     if (!nonAdmin) {
@@ -129,15 +134,23 @@ test.describe('495 登录安全锁定与解锁面', () => {
     );
   });
 
-  test.afterAll(async ({ page }) => {
-    // 先按主键清 FAILED 行再删账号：FAILED 行按用户名挂账，不删要留到 30 分钟窗口自己过期
-    for (const id of [victimId, underId, plainId]) {
-      if (id) {
-        await tryCleanup(page, 'POST', `/locked-accounts/${id}/unlock`, `495 unlock ${id}`);
+  test.afterAll(async ({ browser }) => {
+    // afterAll 同样拿不到 page fixture，自建一次性会话走清理腿
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    try {
+      await loginViaUI(page);
+      // 先按主键清 FAILED 行再删账号：FAILED 行按用户名挂账，不删要留到 30 分钟窗口自己过期
+      for (const id of [victimId, underId, plainId]) {
+        if (id) {
+          await tryCleanup(page, 'POST', `/locked-accounts/${id}/unlock`, `495 unlock ${id}`);
+        }
       }
-    }
-    for (const id of createdUserIds) {
-      await tryCleanup(page, 'DELETE', `/users/${id}`, `495 user ${id}`);
+      for (const id of createdUserIds) {
+        await tryCleanup(page, 'DELETE', `/users/${id}`, `495 user ${id}`);
+      }
+    } finally {
+      await ctx.close();
     }
   });
 
