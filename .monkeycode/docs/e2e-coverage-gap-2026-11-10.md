@@ -379,6 +379,28 @@ production-recipes 写面共 15 腿（route-snapshot）。主腿已断言级覆�
 
 一处配对门待查候选。491 第 605、620、633、638 行确实调用了 POST /textile-reports、POST /textile-reports/{id}/results、PUT /{id}/acceptance、PUT /{id}/judgement，但全量面仍把这四腿列为 PAIRING_DEBT；同文件不带泛型实参的送检单腿则被正确配对并摘出基线。差异形态是这四腿都写成 apiCallRaw 带泛型实参（如 apiCallRaw<{ id: number }>）。方向是"多报债"而不是假绿，故不紧急、不据此改门；登记为待查，核门体的调用点提取是否被泛型实参或 helper 函数体位置挡住。按既有纪律，改判定器前必须先造反向夹具证明它当前确实漏检，且改后通过集合只许扩大不许缩小。
 
+## 二十 批八落地与配对门候选证伪（2026-11-11）
+
+1196 分片红定性。flow(17/20) 的 488-05b 断"pending 态报废应 400"实际 200。判责取证：本支对 backend 零 diff，主干 bulk_color_approval_service.rs 的 scrap 门明文允许 approved 与 pending 与 sampled 三来源（状态机第九号跃迁"直接报废"），是用例前提造错，测试错改测试。修法：非法跃迁清单收窄为五条，另起 488-05d 正向腿钉 pending 直接报废落 scrapped 终态且 delivery_blocking 仍 true。本地五门加注释门全绿后推 2e7b478ae，1196 重跑。
+
+批八落地。492 第三方报告面十二腿与 493 主数据三面十二腿同车道（test/e2e-textile-report-write-face），PR 1199（head f3b184c5e）。492 覆盖登记前提门、受理态不可直填与 sent 自动 reported、完整性门十缺项逐条点名（顺序与门体一致）、判定 pass 与重录复位改判 fail、修正复位与撤回封账、三型录入互斥矩阵（等级 3-4 编码 3.5）、有效期三档、批次口径、资质至少一枚、检验依据格式、五端点 404、同单多报告隔离。493 覆盖项目词表门与编码封账与引用守卫、限值四维唯一与比较器形态门十连拒与修订撞维、出口要求市场过滤（dom 拒收）与校验矩阵、三面悬空 id 404。前置全自建，493 项目一律 CUSTOMER 基组不污染他单清单推导。配对门全量守恒：paired 1209 升 1228、debt 594 降 575、unpaired 恒 0、corpusFiles 436 升 438，棘轮摘 19 枚。
+
+十九节候选证伪。真因不是泛型实参：matchNeedles 对一级路径段端点只发快照整串针（去前缀串短于两段不发），491 头注只写了送检单面的整串路径，报告面四腿在语料里没有任何整串出现点，故判债。492 初版同样踩中（头注只写相对路径），补整串调用面注释后七腿全配对。结论：判定器无盲区，是"头注按快照整串登记调用面"的既有约定（491 已示范）；不改门体，候选关闭。
+
+收口面。1184 与 1191 与 1192 与 1193 与 1194 与 1195 与 1197 与 1198 八支 check-runs 全完成零红，待用户 UI 合并；1196 带修复重跑中；1199 新开。批八写作实例宿主侧中断零交付，按第二次零交付纪律改主编排自写，两枚 spec 均一次过门。
+
+## 二十一 批九财务主数据三面落地与两处详情路由修复（2026-11-11）
+
+批九选题。十九节排序的整族零断言段里取财务主数据三面：asset-categories 与 aging-grades 与 industry-benchmarks（各债 5、语料仅 traversal 一处）。locked-accounts（债 2）留待批十，因其解锁腿需 admin 门禁与失败登录夹具，单独成批更稳。
+
+落地。494-fin-master-data-write-face.spec.ts 十四腿，PR 1200（head d78656963）。资产分类覆盖建档回读、分页信封、is_active 过滤、详情按 id、更新三态（有值覆盖、显式 null 清空、缺席保持，double_option 语义）、软删除停用文案、分页夹紧口径（page 小于 1 夹到 1、page_size 夹到 100，不抛 400，与纺织域越界 400 口径不同，按各自 handler 实断）。账龄档位与行业基准覆盖建档回读、列表数组仅活跃行、详情按 id、部分更新、硬删除再删 404。三面悬空 id 修改与删除均 404。
+
+两处源码缺陷修复。aging-grades 与 industry-benchmarks 的 GET /{id} 原误挂各自列表 handler，返回整表且永不 404（REST 语义错）。补 get_aging_grade 与 get_industry_benchmark 按 id 取单行、悬空判 404，finance.rs 路由改挂新 handler。前端 grep 证实无消费点，列表与增改删腿不受影响。route-snapshot --check 路径与方法逐字节不变（仅 handler 名变，快照不录 handler）。
+
+配对门守恒。paired 1209 升 1224、debt 594 降 579、unpaired 恒 0、corpusFiles 436 升 437，棘轮摘 15 枚。本地 prettier 与 eslint 与 tsc 与 list 与 route-snapshot 与 route-mount 与配对双模式与注释门全绿。rustfmt 三处差异均为存量 use 排序（本地与 CI 钉版分歧），新增代码零差异，不动存量。
+
+待办。locked-accounts 两面（列表与 admin 解锁）排批十；八支全绿 PR 仍待用户 UI 合并，合并后按串行纪律并基其余载体。
+
 
 
 
