@@ -19,7 +19,8 @@
  * 拒因原文：doc_type 空为"打印模板必须指定单据类型（doc_type），否则渲染链路无法命中该模板"，
  * 词表外为"打印模板单据类型非法（须为打印链路支持的单据类型）：{doc_type}"，
  * 份数越界为"打印模板缺省份数须在 1-99 之间：{v}"，名称长度为 1-100 字符。
- * 三者都是 400 VALIDATION_ERROR，模板不存在是 404 NOT_FOUND 且拒因含 id。
+ * 三者都是 400 VALIDATION_ERROR 且外显可操作文案；主键查不到是 404 NOT_FOUND，但该面走脱敏
+ * 通路，出参文案恒为公共常量「资源未找到」，含 id 的真实原因只进日志，不得指望界面点名。
  * 默认位互斥按 doc_type 而非 module：同 doc_type 下另一行升位时本行必降位。
  * 可空列 default_target_name 三态为 键缺席保持、显式 null 清空、有值覆盖。
  * 预览面出三层防护：模板名与请求体变量值一律 HTML 转义，页面带 CSP 禁脚本执行。
@@ -155,7 +156,7 @@ test.describe('496 打印模板写面', () => {
     expect(overFail.message, '上界同样逐值点名，不只拦下界').toContain('：100');
   });
 
-  test('496-05 详情按主键回读建档本体，不存在的主键 404 含 id', async ({ page }) => {
+  test('496-05 详情按主键回读建档本体，不存在的主键 404 且不泄露主键', async ({ page }) => {
     const row = await createTemplate(page, baseBody(genCode('E2E-PTPL-DETAIL')));
     const again = await apiCallRaw<PrintTemplate>(page, 'GET', `/print-templates/${row.id}`);
 
@@ -166,7 +167,9 @@ test.describe('496 打印模板写面', () => {
     const miss = await apiCallExpectFail(page, 'GET', '/print-templates/99999999');
     expect(miss.status).toBe(404);
     expect(failureCode(miss)).toBe(APP_ERROR_CODES.NOT_FOUND);
-    expect(miss.message, '拒因点名查不到的主键').toContain('99999999');
+    // 脱敏判据：404 面只出公共文案，被查主键不得原样回显（防用 404 文案探测存在的模板 id）
+    expect(miss.message, '脱敏文案非空').not.toBe('');
+    expect(miss.message, '不得把被查主键外显给调用方').not.toContain('99999999');
   });
 
   test('496-06 列表出参是裸数组且每行都带 type 与 doc_type 两键', async ({ page }) => {
