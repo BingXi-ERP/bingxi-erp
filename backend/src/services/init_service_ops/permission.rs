@@ -963,10 +963,6 @@ impl InitService {
                     ("outsourcing-orders", "*"),
                     ("outsourcing-receipts", "*"),
                     ("business-modes", "read"),
-                    // 生产经理要能查物料清单（/bom 页路由门是 boms:read，工单用料也以 BOM 为据），
-                    // 而生产域此前没有任何 boms 授权 ⇒ 该页对本岗恒被守卫拦成 403。只授读。
-                    ("boms", "read"),
-                    ("mrp", "*"),
                     ("capacity", "*"),
                     ("scheduling", "*"),
                     ("material-shortage", "read"),

@@ -168,7 +168,7 @@ fn ts(k: i32) -> chrono::DateTime<Utc> {
 }
 
 /// 采购单头播种：Entity::insert_many 按 500 分块（Postgres 单语句 65535 参数上限，
-/// 一万行必须分块；全仓 tests 无 insert_many 先例，src 侧见 bom_ops/crud.rs）
+/// 一万行必须分块）
 async fn seed_po(
     db: &sea_orm::DatabaseConnection,
     supplier_id: i32,

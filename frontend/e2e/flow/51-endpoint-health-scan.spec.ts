@@ -100,10 +100,6 @@ const ROUTES: string[] = [
   '/login-logs',
   '/inventory/logistics',
   '/auth/me',
-  '/production/mrp-history',
-  '/production/mrp/products',
-  '/production/mrp/requirements',
-  '/production/mrp/results',
   '/purchase/orders',
   '/production/outsourcing-orders',
   // 原 '/production/outsourcing-orders/items'（C 类，移出）：集合上无 GET——快照里

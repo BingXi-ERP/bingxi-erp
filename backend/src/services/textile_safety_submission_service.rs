@@ -212,6 +212,7 @@ impl TextileSafetySubmissionService {
         }
         let now = chrono::Utc::now();
         let tags = Self::join_exemption_tags(&req.exemption_tags)?;
+        let submission_no = req.submission_no.clone();
         let active = ActiveModel {
             submission_no: ActiveValue::Set(req.submission_no),
             product_id: ActiveValue::Set(req.product_id),
@@ -233,7 +234,18 @@ impl TextileSafetySubmissionService {
             updated_at: ActiveValue::Set(now),
             ..Default::default()
         };
-        Ok(active.insert(self.db.as_ref()).await?)
+        // 单号唯一约束在库侧，前置查重挡不住并发建单，故归口点放在插入结果上：
+        // 唯一冲突是用户改个单号就能过的业务拒绝，其余数据库错原样上抛不被掩码吞掉。
+        active.insert(self.db.as_ref()).await.map_err(|e| {
+            if matches!(
+                e.sql_err(),
+                Some(sea_orm::SqlErr::UniqueConstraintViolation(_))
+            ) {
+                AppError::business_displayable(format!("送检单号 {} 已存在", submission_no))
+            } else {
+                AppError::from(e)
+            }
+        })
     }
 
     /// 分页列表（品种、状态、市场过滤）。分页语义与全仓一致：page 1-based，越界 400 不夹紧。
