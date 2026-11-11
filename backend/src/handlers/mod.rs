@@ -96,6 +96,7 @@ pub mod greige_fabric_handler;
 pub mod lab_dip_handler;
 // v14 批次 425：流转卡条码与车间工序流转
 pub mod flow_card_handler;
+pub mod flow_card_material_handler;
 // v14 批次 426：验布打卷流程贯通
 pub mod fabric_inspection_handler;
 // v14 批次 427：产量工资核算贯通
@@ -110,11 +111,9 @@ pub mod outsourcing_handler;
 pub mod production_recipe_handler;
 pub mod sales_return_handler;
 pub mod system_update_handler;
-// MRP生产计划模块
+// 生产计划与扫码/物流/切箱 handler 组
 pub mod barcode_scanner_handler;
-pub mod bom_handler;
 pub mod logistics_handler;
-pub mod mrp_handler;
 pub mod piece_split_handler;
 pub mod production_order_handler;
 // 扩展能力模块
@@ -140,7 +139,7 @@ pub mod data_permission_handler;
 pub mod advanced;
 // 多币种增强模块
 pub mod currency_enhanced_handler;
-// MRP产能和缺料模块
+// 产能核算与物料缺料预警模块
 pub mod capacity_handler;
 pub mod material_shortage_handler;
 // 报表和导入导出模块

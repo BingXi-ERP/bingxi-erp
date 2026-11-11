@@ -191,31 +191,7 @@ test.describe('生产模块全量：API 端点 + 真实 UI 交互', () => {
     }
   });
 
-  test('MRP 计算+历史+需求+转单', async ({ page }) => {
-    await verifyEndpointHealthy(page, '/production/mrp/products');
-    await verifyEndpointHealthy(page, '/production/mrp/results');
-    await verifyEndpointHealthy(page, '/production/mrp/requirements');
-    await verifyEndpointHealthy(page, '/production/mrp-history?page=1&page_size=5');
-    const list = await apiCallRaw<{ items: Array<{ id: number }> }>(
-      page,
-      'GET',
-      '/production/mrp-history?page=1&page_size=1'
-    );
-    if (list.items?.[0]?.id)
-      await apiCallRaw(page, 'GET', `/production/mrp-history/${list.items?.[0].id}`);
-    await safePostAction(page, '/production/mrp/calculate', {
-      // MrpCalculatePayload: items 必填（product_id/required_quantity/required_date）
-      items: [
-        {
-          product_id: 1,
-          required_quantity: 100,
-          required_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-        },
-      ],
-    });
-  });
-
-  test('产能分析+排程+质量标准+质量检验+BOM+打样+缺料+缸号状态机+委外', async ({ page }) => {
+  test('产能分析+排程+质量标准+质量检验+打样+缺料+缸号状态机+委外', async ({ page }) => {
     // 产能（overview/bottlenecks/load-analysis/overload-check 为 BI 统计类增强端点，后端已注册）
     await verifyEndpointHealthy(page, '/production/capacity/overview');
     await verifyEndpointHealthy(page, '/production/capacity/bottlenecks');
@@ -238,27 +214,6 @@ test.describe('生产模块全量：API 端点 + 真实 UI 交互', () => {
     );
     await verifyEndpointHealthy(page, '/production/quality-inspection/records?page=1&page_size=5');
     await verifyEndpointHealthy(page, '/production/quality-inspection/defects?page=1&page_size=5');
-    // BOM
-    await verifyEndpointHealthy(page, '/boms?page=1&page_size=5');
-    const bomList = await apiCallRaw<{ items: Array<{ id: number }> }>(
-      page,
-      'GET',
-      '/boms?page=1&page_size=1'
-    );
-    // 显式前置（D-1 Q3 数据面判据）：seed 来源 id 参与 strict 探针时，空清单不许整段
-    // if 静默跳过（零覆盖假绿），必须 fail-visible 判红点名数据面缺前置。
-    // BOM 行由 beforeEach ensureTestEntities（helpers.ts 第 13 步，createBomUI 造数）保证；
-    // 走到空分支即 seed 真缺陷，归因数据面而非注册面。
-    const bomId = bomList.items?.[0]?.id;
-    if (!bomId) {
-      throw new Error(
-        `GET /boms?page=1&page_size=1 返回 items=${JSON.stringify(bomList.items)}——无一条 BOM 行：数据面缺前置（ensureTestEntities 未真实落 BOM），/boms/{id}/tree 等 strict 探针拒绝空转，禁静默跳过`
-      );
-    }
-    await apiCallRaw(page, 'GET', `/boms/${bomId}`);
-    await verifyEndpointHealthy(page, `/boms/${bomId}/tree`);
-    await safePostAction(page, `/boms/${bomId}/requirements`, { quantity: 100 });
-    await safePostAction(page, `/boms/${bomId}/copy`);
     // 打样
     await verifyEndpointHealthy(page, '/production/lab-dip/requests?page=1&page_size=5');
     const ldList = await apiCallRaw<{ items: Array<{ id: number }> }>(
@@ -297,67 +252,6 @@ test.describe('生产模块全量：API 端点 + 真实 UI 交互', () => {
   });
 
   // ===== 真实 UI 交互验证 =====
-  test('BOM 列表 UI：搜索+新建弹窗+表单', async ({ page }) => {
-    await page.goto(`${BASE_URL}/bom`);
-    await page.waitForTimeout(3000);
-    await page
-      .locator('.el-table, .el-table-v2, [role="table"], .v2-table-wrapper, .el-card, .el-empty')
-      .first()
-      .waitFor({ state: 'visible', timeout: 30_000 });
-    // 搜索
-    const searchInput = page
-      .locator('input[placeholder*="产品名称"], input[placeholder*="产品"]')
-      .first();
-    await searchInput.waitFor({ state: 'visible', timeout: 5000 });
-    const searchVisible = await searchInput.isVisible();
-    if (searchVisible) {
-      await searchInput.fill('测试');
-      const queryBtn = page.locator('button:has-text("查询")').first();
-      await queryBtn.waitFor({ state: 'visible', timeout: 3000 });
-      const btnVisible = await queryBtn.isVisible();
-      if (btnVisible) {
-        await queryBtn.click();
-        await page.waitForTimeout(2000);
-      }
-      const tableOk = await page
-        .locator(
-          '.el-table, .el-table-v2, [role="table"], .v2-table-wrapper, .el-table-v2, [role="table"], .v2-table-wrapper'
-        )
-        .first()
-        .isVisible();
-      expect(tableOk).toBe(true);
-    }
-    // 新建 BOM
-    const newBtn = page.locator('button:has-text("新建 BOM"), button:has-text("新建BOM")').first();
-    await newBtn.waitFor({ state: 'visible', timeout: 5000 });
-    const newBtnVisible = await newBtn.isVisible();
-    if (newBtnVisible) {
-      await newBtn.click();
-      await page.waitForTimeout(1000);
-      const dialog = page.locator('.el-dialog').first();
-      await dialog.waitFor({ state: 'visible', timeout: 5000 });
-      const dialogVisible = await dialog.isVisible();
-      expect(dialogVisible).toBe(true);
-      await page.locator('.el-dialog__headerbtn').first().click();
-    }
-  });
-
-  test('MRP 计算 UI：表单+计算按钮', async ({ page }) => {
-    await page.goto(`${BASE_URL}/mrp`);
-    await page.waitForTimeout(3000);
-    await page
-      .locator('.el-card, .el-form, .el-table')
-      .first()
-      .waitFor({ state: 'visible', timeout: 30_000 });
-    // 验证计算按钮存在
-    const calcBtn = page.locator('button:has-text("开始计算")').first();
-    await calcBtn.waitFor({ state: 'visible', timeout: 5000 });
-    const btnVisible = await calcBtn.isVisible();
-    if (btnVisible) {
-      // 验证按钮可点击（不实际计算，避免产生数据）
-      expect(btnVisible).toBe(true);
-    }
-  });
 
   test('产能分析 UI：筛选+图表', async ({ page }) => {
     await page.goto(`${BASE_URL}/capacity`);

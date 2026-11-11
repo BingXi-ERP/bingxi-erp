@@ -19,7 +19,6 @@ import {
 import {
   createColorCardUI,
   createDyeRecipeUI,
-  createBomUI,
   createCustomOrderUI,
   pickListArray,
   readFirstEntityId,
@@ -210,7 +209,6 @@ export interface EntityContext {
   dyeLotNo?: string;
   dyeRecipeId?: number;
   productionRecipeId?: number;
-  bomId?: number;
   purchaseOrderId?: number;
   salesOrderId?: number;
   quotationId?: number;
@@ -370,8 +368,6 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     ctx.productIds = [];
   }
   // 夹具基数假设：消费用例要求 ctx.productIds 至少 3 个——
-  // 03-production「3-8 创建 BOM」用 items: productIds.slice(1)（需 ≥2 才非空，
-  // 否则后端 bom_handler.rs:33 items min=1 合法 400）；
   // 01-p2p「1-6b」用 ctx.productIds[1] 作「产品对不上」负例（需 ≥2 才不 undefined）。
   // 跨分片共库下 readEntityIds 可能读到 1~2 个现有产品（含 global-setup 全局种子先建的），
   // 故无条件补齐到至少 3：读到的现有 id（含 seed 产品）全部保留并计入基数，
@@ -844,26 +840,6 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   } catch (e) {
     console.error('[ensureTestEntities] productionRecipeId 创建失败:', (e as Error).message);
     ctx.productionRecipeId = undefined;
-  }
-
-  // ---- 13. BOM（UI 创建）----
-  try {
-    const boms = await apiCallRaw<{ items: Array<{ id: number }> }>(
-      page,
-      'GET',
-      '/boms?page=1&page_size=1'
-    );
-    ctx.bomId = boms.items?.[0]?.id;
-  } catch (e) {
-    console.error('[ensureTestEntities] 查找失败:', (e as Error).message);
-  }
-  if (!ctx.bomId) {
-    const id = await uiCreateWithRetry(page, createBomUI);
-    ctx.bomId = id;
-    if (!id)
-      console.error(
-        '[ensureTestEntities] BOM UI 创建失败: 返回 undefined（详见 ui-helpers 截图诊断）'
-      );
   }
 
   // ---- 14. 生产订单（保留 API 查找，暂无创建需求）----

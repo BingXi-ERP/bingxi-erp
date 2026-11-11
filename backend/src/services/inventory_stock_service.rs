@@ -1011,14 +1011,18 @@ impl InventoryStockService {
             .await
             .map_err(|e| AppError::database(format!("获取批次失败：{}", e)))?
             .ok_or_else(|| AppError::not_found("源批次不存在"))?;
-        if source.quantity_available < transfer_meters {
+        if source.quantity_available < transfer_meters || source.quantity_kg < transfer_kg {
             return Err(AppError::bad_request("库存数量不足"));
         }
 
         // 2. 扣减源批次
+        // 建档时 quantity_on_hand/quantity_available 与 quantity_meters/quantity_kg 写成同值，
+        // 转移必须四列同笔扣减；只扣前两列会让主辅计量列停在转移前的旧值，读面米数与在库数从此分叉。
         let mut source_am: inventory_stock::ActiveModel = source.clone().into();
         source_am.quantity_on_hand = Set(source.quantity_on_hand - transfer_meters);
         source_am.quantity_available = Set(source.quantity_available - transfer_meters);
+        source_am.quantity_meters = Set(source.quantity_meters - transfer_meters);
+        source_am.quantity_kg = Set(source.quantity_kg - transfer_kg);
         source_am.updated_at = Set(Utc::now());
         source_am
             .update(&txn)
@@ -1040,6 +1044,8 @@ impl InventoryStockService {
                 let mut t: inventory_stock::ActiveModel = existing.clone().into();
                 t.quantity_on_hand = Set(existing.quantity_on_hand + transfer_meters);
                 t.quantity_available = Set(existing.quantity_available + transfer_meters);
+                t.quantity_meters = Set(existing.quantity_meters + transfer_meters);
+                t.quantity_kg = Set(existing.quantity_kg + transfer_kg);
                 t.updated_at = Set(Utc::now());
                 t.update(&txn)
                     .await

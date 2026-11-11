@@ -1,6 +1,6 @@
 //! 供应商对照表服务真实 DB 集成测试（需已迁移 PostgreSQL）
 //!
-//! 沿用仓库既有 `#[ignore]` 真库用例范式（见 services_bom_service_test.rs）：
+//! 沿用仓库既有 `#[ignore]` 真库用例范式：
 //! 无 schema harness（sqlite::memory 无业务表），故这些用例标注 `#[ignore]`，
 //! 仅在 `TEST_DATABASE_URL` 指向已 `bingxi migrate run` 的 PostgreSQL 时手动/CI 运行。
 //!
