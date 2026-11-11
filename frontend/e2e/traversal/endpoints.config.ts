@@ -26,7 +26,6 @@ export const PRINT_ENDPOINTS: string[] = [
   '/ap/reconciliations/{id}/print',
   '/ar-reconciliations/{id}/print',
   '/ar/collections/{id}/print',
-  '/boms/{id}/print',
   '/export-inspections/certificates/{id}/print',
   '/chemical-requisitions/{id}/print',
   '/crm/customer-credits/{id}/print',
@@ -146,7 +145,6 @@ export const NON_SENSITIVE_EXPORT_ENDPOINTS: string[] = [
  * method：审批 HTTP 方法，缺省 POST（矩阵绝大多数为 POST）。
  * 少数端点后端注册为 PUT，统一 POST 会命中 axum 的 405（方法不匹配），
  * 被误判成"路由未注册/路径写错"。据后端 routes 显式标注真实方法：
- * - /boms/{id}/approve                                → PUT（catalog.rs:133）
  * - /budgets/versions/{id}/approve                    → PUT（finance.rs:392）
  * - /fixed-assets/impairment-tests/{id}/approve       → PUT（finance.rs:290）
  * - /fixed-assets/depreciation-policy-changes/{id}/approve → PUT（finance.rs:303）
@@ -165,7 +163,6 @@ export const APPROVE_ENDPOINTS: Array<{
   { path: '/ap/payment-requests/{id}/approve', entity: 'ap_payment_request', createApi: '/ap/payment-requests' },
   { path: '/ap/payment-requests/{id}/reject', entity: 'ap_payment_request', createApi: '/ap/payment-requests' },
   { path: '/ar/invoices/{id}/approve', entity: 'ar_invoice', createApi: '/ar/invoices' },
-  { path: '/boms/{id}/approve', entity: 'bom', method: 'PUT', createApi: '/boms' },
   { path: '/bpm/tasks/approve', entity: 'bpm_task' },
   { path: '/budgets/adjust/{id}/approve', entity: 'budget_adjust' },
   { path: '/budgets/adjust/{id}/reject', entity: 'budget_adjust' },

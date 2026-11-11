@@ -90,10 +90,6 @@ test.describe('100% 前端路由 UI 交互全覆盖', () => {
     await visitPage(page, '/production');
     await verifyTable(page);
   });
-  test('MRP历史 /mrp/history', async ({ page }) => {
-    await visitPage(page, '/mrp/history');
-    await verifyTable(page);
-  });
   test('质量标准 /quality-standards', async ({ page }) => {
     await visitPage(page, '/quality-standards');
     await verifyTable(page);

@@ -3338,7 +3338,7 @@ jobs:
           else
             # 分片 30-44，testMatch 内、但分片命令从不传的全部目录 ——
             # enhanced/purchase/sales/quality/finance/crm/bpm
-            # + e2e/ 根级 3 spec + ai/dashboard/fabric/inventory/mrp/production/
+            # + e2e/ 根级 3 spec + ai/dashboard/fabric/inventory/production/
             # quotations/system/fullflow。
             # 这批此前在 CI 里从未执行过：playwright.config.ts 的 chromium testMatch
             # 早早就把它们纳入（注释写着"去 mock 后全部进主 CI testMatch"），
@@ -3372,7 +3372,7 @@ jobs:
               34) SPEC_TARGETS="e2e/sales/ e2e/quality/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               35) SPEC_TARGETS="e2e/crm/ e2e/inventory/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               36) SPEC_TARGETS="e2e/enhanced/ e2e/production/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
-              37) SPEC_TARGETS="e2e/bpm/ e2e/fabric/ e2e/mrp/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
+              37) SPEC_TARGETS="e2e/bpm/ e2e/fabric/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               38) SPEC_TARGETS="e2e/ai/ e2e/quotations/ e2e/system/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               39) SPEC_TARGETS="e2e/dashboard/ e2e/color-card.spec.ts e2e/color-price.spec.ts e2e/custom-order.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               # fullflow（96 条契约链用例，此前从未被任何分片传入，任务 #306 静默丢覆盖）。
@@ -4081,7 +4081,7 @@ jobs:
           terms = open('frontend/src/views/legal/TermsView.vue', encoding='utf-8').read()
           declared = {
               '客户管理': 'customer', '供应商管理': 'supplier', '产品管理': 'product',
-              '染料配方': 'dye-recipe', '色卡': 'color-cards/list', 'BOM': 'bom',
+              '染料配方': 'dye-recipe', '色卡': 'color-cards/list',
               '采购管理': 'purchase', '销售管理': 'sales', '库存管理': 'inventory',
               '生产管理': 'production', '质量管理': 'quality', '财务核算': 'finance',
               '审批流程': 'bpm', '审计日志': 'system/audit-log', '系统管理': 'system',
