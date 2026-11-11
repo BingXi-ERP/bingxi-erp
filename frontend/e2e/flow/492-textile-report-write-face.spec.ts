@@ -1,13 +1,14 @@
 /**
  * 492 纺织品安全第三方报告写面：登记、要素修正、完整性门、逐项目结果录入、报告级判定。
  *
- * 调用面（backend/src/routes/textile_safety.rs 注册，前缀 /api/v1/erp）：
- * GET /textile-reports?submission_id= 按送检单列报告（出参 {reports}）、
- * POST /textile-reports 登记（出参报告本体）、GET /textile-reports/{id} 详情
- * （出参 {report, results}）、PUT /textile-reports/{id} 修正要素（改后复位 pending）、
- * PUT /textile-reports/{id}/acceptance 完整性门（出参 {report, missing_elements}）、
- * POST /textile-reports/{id}/results 逐项目结果 upsert（出参结果行数组）、
- * PUT /textile-reports/{id}/judgement 报告级判定（出参结果行数组，报告必须已受理）。
+ * 调用面（backend/src/routes/textile_safety.rs 注册）：
+ *   GET    /api/v1/erp/textile-reports?submission_id= 按送检单列报告（出参 {reports}）
+ *   POST   /api/v1/erp/textile-reports 登记（出参报告本体）
+ *   GET    /api/v1/erp/textile-reports/{id} 详情（出参 {report, results}）
+ *   PUT    /api/v1/erp/textile-reports/{id} 修正要素（改后复位 pending）
+ *   PUT    /api/v1/erp/textile-reports/{id}/acceptance 完整性门（出参 {report, missing_elements}）
+ *   POST   /api/v1/erp/textile-reports/{id}/results 逐项目结果 upsert（出参结果行数组）
+ *   PUT    /api/v1/erp/textile-reports/{id}/judgement 报告级判定（出参结果行数组，报告必须已受理）
  *
  * 判据单源：services/textile_safety_report_service.rs 与 models/status/textile_safety.rs。
  * 受理态词表 pending / accepted / rejected；缺项代号 cma / cnas / sample_name /
