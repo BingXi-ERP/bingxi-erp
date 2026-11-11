@@ -132,6 +132,9 @@ function yesterday(): string {
 function tomorrow(): string {
   return new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 }
+function lastYear(): string {
+  return new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+}
 
 /**
  * 自建前置：专属产品 + GB18401 数值项（挂 lte 75 限值行，判定器有矩阵可查）+
@@ -616,7 +619,11 @@ test.describe.serial('492 纺织品安全第三方报告写面', () => {
     expect(g1.report.acceptance_status).toBe(ACCEPT.REJECTED);
     expect(g1.missing_elements, '缺有效期无法核验只记 expired 一枚').toEqual(['expired']);
 
-    const expired = await registerReport(page, sub, { valid_until: yesterday() });
+    // 库侧 chk_textile_report_valid_window 要求 valid_until >= issue_date，过期档必须把出具日一并推到过去
+    const expired = await registerReport(page, sub, {
+      issue_date: lastYear(),
+      valid_until: yesterday(),
+    });
     await upsertNumeric(page, s, expired.id, 20);
     const g2 = await runGate(page, expired.id);
     expect(g2.missing_elements, '已超有效期只记 expired 一枚').toEqual(['expired']);
