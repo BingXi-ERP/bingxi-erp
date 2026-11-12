@@ -8124,6 +8124,7 @@ export default {
       title: '锁定账户管理',
       ariaLabel: '锁定账户管理表',
       confirmUnlock: '确定解锁账户 {username} 吗？',
+      unlockNoAccount: '用户名 {username} 无对应账号，不能按主键解锁',
       column: {
         index: '序号',
         username: '用户名',
