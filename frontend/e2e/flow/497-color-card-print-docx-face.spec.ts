@@ -280,9 +280,16 @@ test.describe('497 色卡打印 docx 下载面', () => {
       body.includes(str(row.status)),
       `发放状态必须随渲染落进正文，实际状态 ${str(row.status)} 未出现`
     ).toBe(true);
+    // 渲染侧把发放时刻按年月日投影落表，整串微秒时间戳不外显；
+    // 断言取读回值的同一段投影，既不放宽成"正文非空"也不按整串硬碰。
+    const issuedDate = str(row.issued_at).slice(0, 10);
     expect(
-      body.includes(String(row.issued_at ?? '')),
-      `发放日期必须随渲染落进正文，实际 ${str(row.issued_at)}`
+      /^\d{4}-\d{2}-\d{2}$/.test(issuedDate),
+      `发放日期取号必须落在年月日投影上，实际读回 ${str(row.issued_at)}`
+    ).toBe(true);
+    expect(
+      body.includes(issuedDate),
+      `发放日期必须按年月日投影落进正文，实际正文未出现 ${issuedDate}，读回值 ${str(row.issued_at)}`
     ).toBe(true);
     expect(body).toContain(purposeTag);
 
