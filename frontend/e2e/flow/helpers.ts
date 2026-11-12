@@ -1505,7 +1505,8 @@ export async function apiCall<T = unknown>(
   page: Page,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
-  body?: ApiRequestBody
+  body?: ApiRequestBody,
+  extraHeaders?: Record<string, string>
 ): Promise<ApiResponse<T>> {
   const csrfToken =
     (await getCsrfToken(page).catch(e => {
@@ -1535,6 +1536,8 @@ export async function apiCall<T = unknown>(
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
         'X-CSRF-Token': token,
+        // 调用方自带的额外头（如写请求的 Idempotency-Key），缺省时不产生任何影响
+        ...(extraHeaders ?? {}),
       },
       data: dataPayload,
       // CI 16+ 分片并发时后端偶发响应超 30s（Playwright API 默认超时），
@@ -1625,9 +1628,10 @@ export async function apiCallRaw<T = unknown>(
   page: Page,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
-  body?: ApiRequestBody
+  body?: ApiRequestBody,
+  extraHeaders?: Record<string, string>
 ): Promise<T> {
-  const res = await apiCall<T>(page, method, path, body);
+  const res = await apiCall<T>(page, method, path, body, extraHeaders);
   return res.data;
 }
 
@@ -1635,7 +1639,8 @@ export async function apiCallExpectFail(
   page: Page,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
-  body?: ApiRequestBody
+  body?: ApiRequestBody,
+  extraHeaders?: Record<string, string>
 ): Promise<ApiFailureResult> {
   const url = `${API_BASE}${API_PREFIX}${path}`;
   const csrfToken =
@@ -1651,6 +1656,7 @@ export async function apiCallExpectFail(
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
         'X-CSRF-Token': token,
+        ...(extraHeaders ?? {}),
       },
       // 负例专用：body 缺省仍发无体(不补 {}),让真实缺参/非法前置的失败如实暴露,
       // 仅供 apiCallExpectFail 断言业务错误码用,不改动既有期望。
