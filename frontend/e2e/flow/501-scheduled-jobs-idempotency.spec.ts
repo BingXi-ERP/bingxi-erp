@@ -62,6 +62,8 @@ import {
 
 /** 本用例在启用规则里声明的收件岗位码；与 loginAsRole 入参同源，不复用其它用例的岗位 */
 const NOTIFY_ROLE = 'warehouse_keeper';
+/** 手工触发预警扫描的岗位：财务主管，启用规则的收件岗位集里没有它 */
+const TRIGGER_ROLE = 'finance_manager';
 
 /** 用于反向判不可见的岗位码：必须不在任何启用规则的 notify_roles 并集里，用例内先实证再断 */
 const NON_RECIPIENT_ROLE = 'report_viewer';
@@ -378,6 +380,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     });
     await apiCallRaw(page, 'POST', `/ar/invoices/${invoice.id}/approve`);
 
+    await loginAsRole(page, TRIGGER_ROLE);
     const scan1 = await apiCallRaw<ScanResult>(page, 'POST', '/finance-alerts/trigger-scan', {
       alert_type: 'ar_overdue',
     });
@@ -411,6 +414,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     );
     expect(hit1!.content, '501-02 通知正文应逐字等于预警正文').toBe(alert.content);
 
+    await loginAsRole(page, TRIGGER_ROLE);
     const scan2 = await apiCallRaw<ScanResult>(page, 'POST', '/finance-alerts/trigger-scan', {
       alert_type: 'ar_overdue',
     });
