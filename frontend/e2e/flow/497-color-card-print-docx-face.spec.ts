@@ -195,18 +195,43 @@ test.describe('497 色卡打印 docx 下载面', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('发放单打印出 docx 正文八列按字典序落表且种子用途与库内值逐条一致', async ({ page }) => {
-    await ensureTestEntities(page);
-    const ctx = getCtx();
-    if (!ctx.customerId) {
-      throw new Error('前置不成立：夹具未产出客户主键，无法自建发放记录');
-    }
     const tag = genCode('CC497A');
     const purposeTag = `497发放用途${tag}`;
     const { id: cardId } = await seedCardWithStock(page, tag);
 
+    // 发放口有五道闸门，闸门 3 要客户信用额度为正、闸门 5 要客户状态逐字符等于 active，
+    // 两道门被拒时出参都脱敏成同一枚 BUSINESS_ERROR，共用夹具的这两列不可假设，
+    // 所以本用例自建客户并把两道门的输入读回自证，再拿这张客户去发放。
+    const customer = await apiCallRaw<{ id?: unknown; status?: unknown; credit_limit?: unknown }>(
+      page,
+      'POST',
+      '/crm/customers',
+      {
+        customer_name: `497发放客户${tag}`,
+        contact_person: `497联系${tag}`,
+        contact_phone: `139${Date.now().toString().slice(-8)}`,
+        customer_type: 'retail',
+        status: 'active',
+        credit_limit: '50000.00',
+      }
+    );
+    const customerId = Number(customer.id);
+    expect(
+      Number.isInteger(customerId) && customerId > 0,
+      `建客户必须回真实主键，实际 ${JSON.stringify(customer)}`
+    ).toBe(true);
+    expect(
+      str(customer.status),
+      `发放闸门 5 的输入必须成立，客户状态须逐字符等于 active，实际 ${str(customer.status)}`
+    ).toBe('active');
+    expect(
+      Number(customer.credit_limit) > 0,
+      `发放闸门 3 的输入必须成立，客户信用额度须为正数，实际 ${str(customer.credit_limit)}`
+    ).toBe(true);
+
     const issued = await apiCallRaw<{ id?: unknown }>(page, 'POST', '/color-cards/issues', {
       color_card_id: cardId,
-      customer_id: ctx.customerId,
+      customer_id: customerId,
       issue_qty: 1,
       purpose: purposeTag,
       remark: purposeTag,
@@ -228,8 +253,8 @@ test.describe('497 色卡打印 docx 下载面', () => {
     ).toBe(cardId);
     expect(
       toNum(row.customer_id),
-      `发放记录必须挂回夹具客户，实际 ${str(row.customer_id)} 期望 ${str(ctx.customerId)}`
-    ).toBe(Number(ctx.customerId));
+      `发放记录必须挂回本用例自建客户，实际 ${str(row.customer_id)} 期望 ${customerId}`
+    ).toBe(customerId);
     expect(str(row.purpose), `发放用途必须原样落库，实际 ${str(row.purpose)}`).toBe(purposeTag);
     expect(toNum(row.issue_qty), `发放数量必须落库为 1，实际 ${str(row.issue_qty)}`).toBe(1);
 
@@ -268,6 +293,8 @@ test.describe('497 色卡打印 docx 下载面', () => {
 
     // 发放行没有删除口，收尾走损坏口把已发放量退回，色卡才可能归档；
     // 残留行靠 purpose 与 remark 里的本用例标记在库里定位，不假装删干净。
+    // 自建客户同样留着：客户挂了真实发放行后硬删会被引用挡住还是软删未实量到，
+    // 同目录的发放链用例只在全部被拒的腿上删过客户，不拿那条先例外推到这里。
     await apiCall(page, 'POST', `/color-cards/issues/${issueId}/damaged`, {
       remark: `497收尾损坏${tag}`,
     });
