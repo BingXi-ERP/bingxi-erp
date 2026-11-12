@@ -233,9 +233,16 @@ test.describe('缸号并发锁库与并发单据号', () => {
     expect(loser.status, `超卖拒绝应为 400，实际 status=${loser.status}，原文=${loser.text}`).toBe(
       400
     );
-    expect(loser.text, `超卖拒绝应带业务族机器码与四维不足文案，原文=${loser.text}`).toMatch(
-      new RegExp(`code=${APP_ERROR_CODES.BUSINESS_ERROR}.*小于出库数量`)
+    // 超卖拒因在服务端按四维口径生成，携带产品主键、色号、批次与可用与要求数量，
+    // 属内部状态 ⇒ 出参走脱敏常量与业务族机器码，真实文案只落日志不外显。
+    // 因此这里断的是"业务族机器码"加"内部数量不得外显"，不去断具体不足文案。
+    expect(loser.text, `超卖拒绝必须走业务族机器码，原文=${loser.text}`).toContain(
+      `code=${APP_ERROR_CODES.BUSINESS_ERROR}`
     );
+    expect(
+      /100|120|小于出库数量|款号|缸号|批次/.test(loser.text),
+      `超卖拒绝不得把内部数量与维度值外显到出参，原文=${loser.text}`
+    ).toBe(false);
 
     const winnerOrder = shipA.ok ? orderA : orderB;
     const loserOrder = shipA.ok ? orderB : orderA;
