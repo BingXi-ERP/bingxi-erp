@@ -512,6 +512,17 @@ impl SalesService {
         // 检查订单是否存在（加 lock_exclusive 串行化并发修改，防止基于过期状态写入）
         let order = Self::fetch_order_for_update(order_id, &txn).await?;
 
+        // 并发编辑冲突门：令牌由调用方从上一次读回的更新时刻原样带回，
+        // 在排他锁之后、任何写入之前比对，不等即拒绝，阻止后保存一方静默覆盖前保存一方。
+        // 外显文案是纯公开业务规则，不含主键、行数或金额，走可外显构造器。
+        if let Some(expected) = request.expected_updated_at {
+            if expected != order.updated_at {
+                return Err(AppError::business_displayable(
+                    "该订单已被其他操作修改，请刷新后重新编辑",
+                ));
+            }
+        }
+
         // 检查订单状态
         Self::validate_order_status_for_update(&order)?;
 

@@ -286,6 +286,9 @@ pub struct UpdateSalesOrderRequest {
     pub shipping_address: Option<String>,
     pub billing_address: Option<String>,
     pub notes: Option<String>,
+    /// 乐观并发令牌：客户端把上次读到的该行更新时刻原样回填。缺省即不带门（兼容既有调用方），
+    /// 带值时与事务内加锁读到的当前值比对，不等即拒绝且零写入。
+    pub expected_updated_at: Option<chrono::DateTime<chrono::Utc>>,
     #[validate(nested)]
     pub items: Option<Vec<SalesOrderItemRequest>>,
 }
