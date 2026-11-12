@@ -97,14 +97,19 @@ async function assertDocxResponse(
 ): Promise<string> {
   expect(response.status(), `${leg} 打印必须 200，实际 ${response.status()}`).toBe(200);
   const ctype = response.headers()['content-type'] ?? '';
-  expect(ctype, `${leg} 的 content-type 必须是 docx 流，实际 ${ctype}`).toContain('wordprocessingml');
+  expect(ctype, `${leg} 的 content-type 必须是 docx 流，实际 ${ctype}`).toContain(
+    'wordprocessingml'
+  );
   const disposition = response.headers()['content-disposition'] ?? '';
   expect(
     disposition,
     `${leg} 的下载名必须含单据类型与本单主键，期望片段 ${expectedFilename}，实际 ${disposition}`
   ).toContain(expectedFilename);
   const bytes = await response.body();
-  expect(bytes.byteLength, `${leg} 的 docx 体必须非空，实际 ${bytes.byteLength} 字节`).toBeGreaterThan(0);
+  expect(
+    bytes.byteLength,
+    `${leg} 的 docx 体必须非空，实际 ${bytes.byteLength} 字节`
+  ).toBeGreaterThan(0);
   expect(bytes[0], `${leg} 的 docx 首字节必须是 0x50，实际 ${bytes[0]}`).toBe(0x50);
   expect(bytes[1], `${leg} 的 docx 次字节必须是 0x4b，实际 ${bytes[1]}`).toBe(0x4b);
   return docxBodyText(bytes, leg);
@@ -118,14 +123,24 @@ async function assertDocxResponse(
  */
 async function seedCardWithStock(page: Page, tag: string): Promise<{ id: number; cardNo: string }> {
   const cardNo = `CC497${tag}`;
-  const created = await apiCallRaw<{ id?: unknown; card_no?: unknown }>(page, 'POST', '/color-cards', {
-    card_no: cardNo,
-    card_name: `497色卡${tag}`,
-    card_type: 'PANTONE',
-  });
+  const created = await apiCallRaw<{ id?: unknown; card_no?: unknown }>(
+    page,
+    'POST',
+    '/color-cards',
+    {
+      card_no: cardNo,
+      card_name: `497色卡${tag}`,
+      card_type: 'PANTONE',
+    }
+  );
   const id = Number(created.id);
-  expect(Number.isInteger(id) && id > 0, `建卡必须回真实主键，实际 ${JSON.stringify(created)}`).toBe(true);
-  expect(str(created.card_no), `建卡回显卡号必须等于提交值，实际 ${str(created.card_no)}`).toBe(cardNo);
+  expect(
+    Number.isInteger(id) && id > 0,
+    `建卡必须回真实主键，实际 ${JSON.stringify(created)}`
+  ).toBe(true);
+  expect(str(created.card_no), `建卡回显卡号必须等于提交值，实际 ${str(created.card_no)}`).toBe(
+    cardNo
+  );
 
   await apiCall(page, 'PUT', `/color-cards/${id}`, { stock_quantity: 1 });
   const stocked = await apiCallRaw<{ stock_quantity?: unknown; issued_quantity?: unknown }>(
@@ -151,11 +166,7 @@ async function seedCardWithStock(page: Page, tag: string): Promise<{ id: number;
  * 存哪里：print_templates 一行。module 取本用例私有值，默认位只清同 module 的行，
  * 去抢别的模块已有的默认模板会把别人的用例改掉。
  */
-async function createDefaultTemplate(
-  page: Page,
-  docType: string,
-  tag: string
-): Promise<number> {
+async function createDefaultTemplate(page: Page, docType: string, tag: string): Promise<number> {
   const tpl = await apiCallRaw<PrintTemplateRow>(page, 'POST', '/print-templates', {
     template_name: `497${docType}模板${tag}`,
     template_code: genCode('TPL497'),
@@ -169,8 +180,12 @@ async function createDefaultTemplate(
     status: 'active',
   });
   const id = Number(tpl.id);
-  expect(Number.isInteger(id) && id > 0, `模板建行必须回主键，实际 ${JSON.stringify(tpl)}`).toBe(true);
-  expect(str(tpl.doc_type), `模板回显 doc_type 必须等于提交值，实际 ${str(tpl.doc_type)}`).toBe(docType);
+  expect(Number.isInteger(id) && id > 0, `模板建行必须回主键，实际 ${JSON.stringify(tpl)}`).toBe(
+    true
+  );
+  expect(str(tpl.doc_type), `模板回显 doc_type 必须等于提交值，实际 ${str(tpl.doc_type)}`).toBe(
+    docType
+  );
   expect(str(tpl.status), `模板回显启用态必须为 active，实际 ${str(tpl.status)}`).toBe('active');
   expect(tpl.is_default === true, '模板回显默认位必须为真').toBe(true);
   return id;
@@ -202,7 +217,11 @@ test.describe('497 色卡打印 docx 下载面', () => {
       `登记库存后向客户发放必须回记录主键，实际 ${JSON.stringify(issued)}`
     ).toBe(true);
 
-    const row = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/color-cards/issues/${issueId}`);
+    const row = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/color-cards/issues/${issueId}`
+    );
     expect(
       toNum(row.color_card_id),
       `发放记录必须挂回本用例色卡，实际 ${str(row.color_card_id)} 期望 ${cardId}`
@@ -249,7 +268,9 @@ test.describe('497 色卡打印 docx 下载面', () => {
 
     // 发放行没有删除口，收尾走损坏口把已发放量退回，色卡才可能归档；
     // 残留行靠 purpose 与 remark 里的本用例标记在库里定位，不假装删干净。
-    await apiCall(page, 'POST', `/color-cards/issues/${issueId}/damaged`, { remark: `497收尾损坏${tag}` });
+    await apiCall(page, 'POST', `/color-cards/issues/${issueId}/damaged`, {
+      remark: `497收尾损坏${tag}`,
+    });
     await apiCall(page, 'PUT', `/color-cards/${cardId}`, { stock_quantity: 0 });
     await apiCall(page, 'DELETE', `/color-cards/${cardId}`);
     const cardGone = await apiCallExpectFail(page, 'GET', `/color-cards/${cardId}`);
@@ -257,16 +278,21 @@ test.describe('497 色卡打印 docx 下载面', () => {
   });
 
   test('两条打印腿对无行主键同码 404 且拒因走统一信封不外显内文', async ({ page }) => {
-    const issueProbe = await apiCallExpectFail(page, 'GET', `/color-cards/issues/${ABSENT_PROBE_ID}`);
+    const issueProbe = await apiCallExpectFail(
+      page,
+      'GET',
+      `/color-cards/issues/${ABSENT_PROBE_ID}`
+    );
     expect(
       issueProbe.status,
       `探测主键在发放表必须无行，有行说明探针值失效，实际 ${issueProbe.status}`
     ).toBe(404);
-    const bulkProbe = await apiCallExpectFail(page, 'GET', `/bulk-color-approvals/${ABSENT_PROBE_ID}`);
-    expect(
-      bulkProbe.status,
-      `探测主键在批色表必须无行，实际 ${bulkProbe.status}`
-    ).toBe(404);
+    const bulkProbe = await apiCallExpectFail(
+      page,
+      'GET',
+      `/bulk-color-approvals/${ABSENT_PROBE_ID}`
+    );
+    expect(bulkProbe.status, `探测主键在批色表必须无行，实际 ${bulkProbe.status}`).toBe(404);
 
     const legs: Array<[string, string]> = [
       ['发放单', `/color-cards/${ABSENT_PROBE_ID}/issue/print`],
@@ -274,7 +300,10 @@ test.describe('497 色卡打印 docx 下载面', () => {
     ];
     for (const [legName, path] of legs) {
       const response = await page.request.get(printUrl(path));
-      expect(response.status(), `${legName}打印口对无行单据必须 404，实际 ${response.status()}`).toBe(404);
+      expect(
+        response.status(),
+        `${legName}打印口对无行单据必须 404，实际 ${response.status()}`
+      ).toBe(404);
       const envelope = await response.json();
       expect(
         failureCode(envelope),
@@ -324,10 +353,9 @@ test.describe('497 色卡打印 docx 下载面', () => {
       'GET',
       `/bulk-color-approvals/${approvalId}`
     );
-    expect(
-      toNum(row.id),
-      `批色单对象口必须命中本单，实际 ${str(row.id)} 期望 ${approvalId}`
-    ).toBe(approvalId);
+    expect(toNum(row.id), `批色单对象口必须命中本单，实际 ${str(row.id)} 期望 ${approvalId}`).toBe(
+      approvalId
+    );
 
     const tplId = await createDefaultTemplate(page, 'bulk_color_approval', tag);
     const body = await assertDocxResponse(
