@@ -31,6 +31,7 @@ export interface SalesOrder {
   /** 后端 SalesOrderDetail 未返回创建人名称（仅 created_by id），需后端 JOIN users 补 creator_name */
   creator_name: string | null;
   created_at?: string;
+  /** 后端列表与详情出参都返回该键（UTC 串）；编辑保存时原样回填为并发令牌 */
   updated_at?: string;
   items: SalesOrderItem[];
 }
@@ -117,6 +118,8 @@ export interface CreateSalesOrderPayload {
  * 更新销售订单载荷 —— 对齐 services/so/mod.rs::UpdateSalesOrderRequest（全部 Option）。
  * 注意：后端更新契约不含 customer_id/order_date/contact_*（编辑这些字段需后端支持，属既有缺口），
  * 前端不发送后端不读的键。
+ * expected_updated_at 是乐观并发令牌：把上一次读回该行的更新时刻原样带回，当前值不等时后端
+ * 拒绝整次保存且零写入；不带该键即不参与并发比对，既有调用方行为不变。
  */
 export interface UpdateSalesOrderPayload {
   required_date?: string;
@@ -125,6 +128,7 @@ export interface UpdateSalesOrderPayload {
   billing_address?: string;
   notes?: string;
   items?: SalesOrderItemPayload[];
+  expected_updated_at?: string;
 }
 
 /**
