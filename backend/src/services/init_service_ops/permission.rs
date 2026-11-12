@@ -1168,6 +1168,9 @@ impl InitService {
                     ("period-report-snapshots", "read"),
                     ("period-report-snapshots", "create"),
                     ("aging-alert-rules", "*"),
+                    // 财务预警台账与手工触发扫描同属财务岗职责，此前整段资源名在矩阵里无一行授权，
+                    // 除超管外任何岗位都碰不到，触发口等于不可委派。
+                    ("finance-alerts", "*"),
                     ("aging-grades", "*"),
                     ("asset-categories", "*"),
                     ("industry-benchmarks", "read"),
