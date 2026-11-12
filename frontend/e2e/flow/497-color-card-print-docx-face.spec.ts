@@ -118,7 +118,7 @@ async function assertDocxResponse(
  */
 async function seedCardWithStock(page: Page, tag: string): Promise<{ id: number; cardNo: string }> {
   const cardNo = `CC497${tag}`;
-  const created = await apiCallRaw<{ id?: unknown }>(page, 'POST', '/color-cards', {
+  const created = await apiCallRaw<{ id?: unknown; card_no?: unknown }>(page, 'POST', '/color-cards', {
     card_no: cardNo,
     card_name: `497色卡${tag}`,
     card_type: 'PANTONE',
