@@ -65,8 +65,11 @@ impl AuditCleanupService {
     /// 清理过期的审计日志（分级保留）
     ///
     /// audit_logs 与 omni_audit_logs 上挂着只追加触发器，DELETE 默认被拒；
-    /// 本函数是唯一的保留期清理通道：四张表的删除共处一个事务，事务内先
+    /// 本函数是唯一的保留期清理通道：四张审计表的删除共处一个事务，事务内先
     /// SET LOCAL app.audit_purge = 'on' 声明通道，事务结束即失效，不外泄到连接池。
+    /// 请求级幂等去重表 http_request_dedupe 随本任务一并做保留期清理：它是日周期
+    /// 定时分支里已有的唯一按时间删除通道，复用而不另起一条调度，本表无只追加
+    /// 触发器，声明通道对它不起作用（放行与否都删得掉）。
     /// 调用方为 start_cleanup_task 的日周期定时分支，返回值汇总进清理日志。
     pub async fn cleanup_expired_logs(&self) -> Result<u64, AppError> {
         let mut total_deleted = 0u64;
@@ -141,6 +144,26 @@ impl AuditCleanupService {
             );
         }
         total_deleted += deleted_count4;
+
+        // http_request_dedupe: 请求级幂等占位。键的判据价值只覆盖到 claimed 存活时限
+        // 那个量级，保留 7 天足以拦住背靠背的重放与重试，再老的同名键复用属于新意图，
+        // 由客户端换新键承担；不做保留期清理则该表随带键提交单调增长。
+        const HTTP_DEDUPE_RETENTION_DAYS: u64 = 7;
+        let stmt = Statement::from_sql_and_values(
+            DatabaseBackend::Postgres,
+            "DELETE FROM http_request_dedupe WHERE created_at < NOW() - ($1 * INTERVAL '1 day')",
+            [HTTP_DEDUPE_RETENTION_DAYS.into()],
+        );
+        let result = txn.execute_raw(stmt).await?;
+        let deleted_count5 = result.rows_affected();
+        if deleted_count5 > 0 {
+            tracing::info!(
+                "已清理 {} 条过期 http_request_dedupe 幂等占位（保留 {} 天）",
+                deleted_count5,
+                HTTP_DEDUPE_RETENTION_DAYS
+            );
+        }
+        total_deleted += deleted_count5;
 
         txn.commit().await?;
         tracing::info!(
