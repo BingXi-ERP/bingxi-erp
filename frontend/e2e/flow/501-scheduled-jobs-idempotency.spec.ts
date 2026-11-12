@@ -17,47 +17,47 @@ import {
  * 501 定时任务与后台作业：预警推送对象正确性与重复触发的幂等守恒
  *
  * 覆盖两条判据：
- *   - 库存预警、账期预警、审批超时提醒各自"推给谁、不该推给谁"；
- *   - 同一触发重复执行时，服务端真实行数与关键字段守恒（不靠放宽阈值消红）。
+ * - 库存预警、账期预警、审批超时提醒各自"推给谁、不该推给谁"；
+ * - 同一触发重复执行时，服务端真实行数与关键字段守恒（不靠放宽阈值消红）。
  * e2e 无法等待真实 cron 到点，本文件只走在册的立即执行端点与读台账/读站内信两条可验证面。
  * 每个端点都先在 frontend/scripts/route-snapshot.txt 与 backend/src/routes 取到"方法 + 路径"才写进用例。
  *
  * 契约事实（比较值一律照抄写入方源码）：
  *
- * 1. 账期预警（财务预警台账）services/finance_alert_service.rs + handlers/finance_alert_handler.rs：
- *    POST /finance-alerts/trigger-scan 入参 alert_type（可选），出参 {created, created_count}；
- *    ar_overdue 的候选是按客户聚合的应收发票，落库行带 target_module='customer' 与 target_id=客户 id。
- *    幂等只对未处理态生效：同 alert_type + target_module + target_id 且状态属
- *    {active, acknowledged} 时跳过建行（services/finance_alert_service.rs::alert_already_exists），
- *    故重复触发不得为该客户再开第二张预警单。
- *    状态词表为小写 active / acknowledged / resolved / expired；单号 FA-{YYYYMMDD}{4 位流水}。
- *    GET /finance-alerts/{id} 与 GET /finance-alerts（PaginatedResponse{items,total,page,page_size}）
- *    支持 alert_type / target_module / status 过滤；预警行没有删除路由，终结只能 acknowledge + resolve。
+ * 1. 账期预警（财务预警台账）服务端实现 + 服务端实现：
+ * POST /finance-alerts/trigger-scan 入参 alert_type（可选），出参 {created, created_count}；
+ * ar_overdue 的候选是按客户聚合的应收发票，落库行带 target_module='customer' 与 target_id=客户 id。
+ * 幂等只对未处理态生效：同 alert_type + target_module + target_id 且状态属
+ * {active, acknowledged} 时跳过建行（服务端实现 的 alert_already_exists），
+ * 故重复触发不得为该客户再开第二张预警单。
+ * 状态词表为小写 active / acknowledged / resolved / expired；单号 FA-{YYYYMMDD}{4 位流水}。
+ * GET /finance-alerts/{id} 与 GET /finance-alerts（PaginatedResponse{items,total,page,page_size}）
+ * 支持 alert_type / target_module / status 过滤；预警行没有删除路由，终结只能 acknowledge + resolve。
  *
- * 2. 账期预警的收件人：services/finance_alert_service.rs::resolve_recipient_users 是唯一解析点，
- *    取全部 is_active=true 的账龄规则 notify_roles 的角色码并集，映射到在册且启用的用户 id 后逐人投递；
- *    标题前缀 [财务预警]、正文逐字等于预警正文，dedup_key 为空（去重完全靠第 1 条的建行幂等）。
- *    触发者本人不在角色集内时收不到，手工触发不会降级成发给点击者。
- *    规则本身：POST /aging-alert-rules 必填 rule_name / rule_code / aging_bucket / threshold_days /
- *    alert_level / notify_method，可选 notify_roles；GET 列表页码基数为 0；DELETE /aging-alert-rules/{id} 在册。
+ * 2. 账期预警的收件人：服务端实现 的 resolve_recipient_users 是唯一解析点，
+ * 取全部 is_active=true 的账龄规则 notify_roles 的角色码并集，映射到在册且启用的用户 id 后逐人投递；
+ * 标题前缀 [财务预警]、正文逐字等于预警正文，dedup_key 为空（去重完全靠第 1 条的建行幂等）。
+ * 触发者本人不在角色集内时收不到，手工触发不会降级成发给点击者。
+ * 规则本身：POST /aging-alert-rules 必填 rule_name / rule_code / aging_bucket / threshold_days /
+ * alert_level / notify_method，可选 notify_roles；GET 列表页码基数为 0；DELETE /aging-alert-rules/{id} 在册。
  *
- * 3. 审批超时提醒 services/bulk_color_approval_service.rs::send_pending_reminders：
- *    POST /bulk-color-approvals/reminders/send-pending?threshold_hours=N 返回 data=本轮投递成功条数；
- *    提醒对象取 record.approver_id，投递标题为 `批色待剪样超时提醒 #{id}`、dedup_key
- *    =bca_pending_reminder_{id}_{YYYYMMDDHH}（services/notification_service.rs::check_dedup 的窗口是
- *    DEDUP_WINDOW_SECS=300 秒，故同一次用例内的连发必然被去重，跨 5 分钟的同小时连发会重复投递——该缺口只登记不设阈值放行）。
- *    GET /bulk-color-approvals/reminders/pending?threshold_hours=N 出参
- *    {items,total,page,page_size} 且按登录人数据范围下推；提醒本身不改单据状态，也不生成新单据。
+ * 3. 审批超时提醒 服务端实现 的 send_pending_reminders：
+ * POST /bulk-color-approvals/reminders/send-pending?threshold_hours=N 返回 data=本轮投递成功条数；
+ * 提醒对象取 record.approver_id，投递标题为 `批色待剪样超时提醒 #{id}`、dedup_key
+ * =bca_pending_reminder_{id}_{YYYYMMDDHH}（服务端实现 的 check_dedup 的窗口是
+ * DEDUP_WINDOW_SECS=300 秒，故同一次用例内的连发必然被去重，跨 5 分钟的同小时连发会重复投递——该缺口只登记不设阈值放行）。
+ * GET /bulk-color-approvals/reminders/pending?threshold_hours=N 出参
+ * {items,total,page,page_size} 且按登录人数据范围下推；提醒本身不改单据状态，也不生成新单据。
  *
- * 4. 库存预警：派生词表 services/stock_alert.rs::AlertType::code（out_of_stock / low_stock /
- *    over_stock / expiring / slow_moving / discrepancy）与无告警值 ALERT_TYPE_NORMAL='normal'，
- *    由 services/inventory_stock_query.rs::compute_alert_type 派生，GET /inventory/stock/alerts
- *    出参 PaginatedResponse<StockAlertRow>{items,total,page,page_size}，纯读、不落单据。
- *    推送腿有两条且不同源：worker services/stock_alert_notification_scheduler.rs 每 6 小时扫一次并
- *    投给角色码 admin / manager / warehouse_manager 的在册用户（HTTP 侧无触发入口，只能等周期），
- *    而 GET /inventory/stock 的 handlers/inventory_stock_handler.rs::send_inventory_alerts 把收件人
- *    写成常量 0。故本文件对库存预警只能断"重复触发不新增站内信"与"不该收到的人确实收不到"，
- *    正向投递无法从 HTTP 证明，缺口在交付报告里点名。
+ * 4. 库存预警：派生词表 服务端实现 的 AlertType::code（out_of_stock / low_stock /
+ * over_stock / expiring / slow_moving / discrepancy）与无告警值 ALERT_TYPE_NORMAL='normal'，
+ * 由 服务端实现 的 compute_alert_type 派生，GET /inventory/stock/alerts
+ * 出参 PaginatedResponse<StockAlertRow>{items,total,page,page_size}，纯读、不落单据。
+ * 推送腿有两条且不同源：worker 服务端实现 每 6 小时扫一次并
+ * 投给角色码 admin / manager / warehouse_manager 的在册用户（HTTP 侧无触发入口，只能等周期），
+ * 而 GET /inventory/stock 的 服务端实现 的 send_inventory_alerts 把收件人
+ * 写成常量 0。故本文件对库存预警只能断"重复触发不新增站内信"与"不该收到的人确实收不到"，
+ * 正向投递无法从 HTTP 证明，缺口在交付报告里点名。
  */
 
 /** 本用例在启用规则里声明的收件岗位码；与 loginAsRole 入参同源，不复用其它用例的岗位 */
@@ -68,7 +68,7 @@ const NON_RECIPIENT_ROLE = 'report_viewer';
 
 const FINANCE_ALERT_TITLE_PREFIX = '[财务预警] ';
 
-/** 库存告警类型词表，逐字符照抄 services/stock_alert.rs::AlertType::code 的返回值 */
+/** 库存告警类型词表，逐字符照抄 服务端实现 的 AlertType::code 的返回值 */
 const STOCK_ALERT_TYPES = [
   'out_of_stock',
   'low_stock',
@@ -138,7 +138,7 @@ function requireItems<T>(data: { items?: T[] } | null | undefined, where: string
  * 功能：读回当前会话的未读站内信全集，作为命中数守恒与"不该推给谁"的计数面。
  * 调用方：账期预警投递腿、审批超时提醒反向腿与库存预警触发腿。
  * 入参：page 为当前已登录会话；端点 GET /notifications?status=UNREAD&page=1&page_size=100
- * （后端 handlers/notification_handler.rs 把 page_size clamp 到 100，收件人取登录态 user_id）。
+ * （后端 服务端实现 把 page_size clamp 到 100，收件人取登录态 user_id）。
  * 传给谁：仅用例内 expect 判据与 console 取证行。
  * 存什么/存哪里：不落库；判据行来自 notifications 表。
  * 只取本页会低估命中数，故带回的 total 大于本页行数即点名抛出，不把"没读到"当成"没有"。
@@ -437,7 +437,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
       `501-02 ${NON_RECIPIENT_ROLE} 不在任何启用规则的角色集内，不应收到预警 id=${alert.id}`
     ).toBe(0);
 
-    // 站内信删除权只属收件人（services/notification_service.rs::delete_notification 逐条比 user_id），
+    // 站内信删除权只属收件人（服务端实现 的 delete_notification 逐条比 user_id），
     // 故回收要回到收件岗位会话里当场执行，不进跨会话的延迟队列。
     await loginAsRole(page, NOTIFY_ROLE);
     const inboxForClean = await readInbox(page);
