@@ -1752,6 +1752,9 @@ jobs:
           echo "DISK_WATERMARK stage=pre partition=${{ matrix.partition }}/10 free_kb=${PRE_AVAIL_KB}"
           df -h / /tmp
           df -i / /tmp
+          # 配额（EDQUOT，os error 122）不体现在 df 与 df -i 上，能取到就一并打出来，
+          # 取不到也留下一行自述，避免后面只看 df 有余量就把 122 判成"不可能是写盘失败"。
+          quota -s 2>/dev/null || echo "DISK_QUOTA_READABLE=0 本机无 quota 命令，EDQUOT 类失败只认 nextest 报错原文"
           du -sh /tmp/nextest-archive-* 2>/dev/null || echo "无 /tmp/nextest-archive-* 残留"
           rm -rf /tmp/nextest-archive-* || true
           sudo apt-get clean || true
@@ -1816,13 +1819,25 @@ jobs:
           fi
 
           # 三态归因（只认 nextest 自己的输出，不认外层退出码）：
-          # ENV_DISK_FULL = 解包写盘失败，0 个测试执行，属 runner 环境；
+          # ENV_DISK_FULL = 写盘失败，0 个测试执行，属 runner 环境；
           # TEST_FAILURE  = 有 Summary 且有 FAIL，属被测代码；
           # PROCESS_ABNORMAL_EXIT / NO_SUMMARY = 其它未归因的进程级异常。
+          # 两种写盘失败都要认：os error 28 是分区写满，df 看得见；os error 122 是执行体
+          # 配额耗尽（EDQUOT），df 与 df -i 都显示有余量，只有 nextest 自己的报错行能证明，
+          # 漏认它就把环境故障读成"分片进程异常退出"，逼人回日志里手工找真因。
           DISK_FULL_HIT=0
-          if [ "$EXIT_CODE" -eq "96" ] && grep -q "os error 28" reports/nextest-output.clean.txt 2>/dev/null; then
-            DISK_FULL_HIT=1
-            echo "ENV_DISK_FULL partition=${{ matrix.partition }}/10 exit_code=$EXIT_CODE cause=nextest_archive_unpack_no_space"
+          DISK_FULL_CAUSE=''
+          if [ "$EXIT_CODE" -eq "96" ]; then
+            if grep -q -E "os error 122|Disk quota exceeded" reports/nextest-output.clean.txt 2>/dev/null; then
+              DISK_FULL_HIT=1
+              DISK_FULL_CAUSE=nextest_unpack_edquot
+            elif grep -q "os error 28" reports/nextest-output.clean.txt 2>/dev/null; then
+              DISK_FULL_HIT=1
+              DISK_FULL_CAUSE=nextest_unpack_no_space
+            fi
+          fi
+          if [ "$DISK_FULL_HIT" -eq "1" ]; then
+            echo "ENV_DISK_FULL partition=${{ matrix.partition }}/10 exit_code=$EXIT_CODE cause=$DISK_FULL_CAUSE"
           fi
           if [ "$DISK_FULL_HIT" -eq "1" ]; then
             VERDICT=ENV_DISK_FULL
@@ -1852,13 +1867,14 @@ jobs:
             echo "**Summary 可信**: $([ "$HAS_SUMMARY" = "1" ] && echo yes || echo 'no（无 Summary 行，以下数字仅按状态行粗估）')  "
             echo ""
             if [ "$DISK_FULL_HIT" -eq "1" ]; then
-              echo "## ❌ ENV_DISK_FULL：执行体磁盘写满导致 nextest 解包失败（EXIT_CODE=$EXIT_CODE，os error 28），本分片一个测试都没跑"
+              echo "## ❌ ENV_DISK_FULL：执行体写盘失败导致 nextest 解包中断（EXIT_CODE=$EXIT_CODE，cause=$DISK_FULL_CAUSE），本分片一个测试都没跑"
               echo ""
               echo "这是 runner 环境问题，不是被测代码失败。判红归因以本行哨兵为准，禁止把 '进程异常退出' 读成测试红。"
+              echo "os error 122 是配额耗尽：df 与 df -i 都会显示有余量，只有下一节的报错原文能证明，别据水位表下结论。"
               echo ""
               echo "### 解包失败原文"
               echo ""
-              { grep -m 10 -E "Extracting |error extracting archive|No space left on device|os error 28" reports/nextest-output.clean.txt || true; }
+              { grep -m 10 -E "Extracting |error extracting archive|No space left on device|Disk quota exceeded|os error 28|os error 122" reports/nextest-output.clean.txt || true; }
               echo ""
               echo "### 当时的磁盘水位"
               echo ""
@@ -1911,7 +1927,7 @@ jobs:
             echo "**判定**: $VERDICT"
             echo ""
             if [ "$DISK_FULL_HIT" -eq "1" ]; then
-              echo "❌ ENV_DISK_FULL（EXIT_CODE=$EXIT_CODE，os error 28）：解包写盘失败，0 个测试执行，属执行体磁盘环境问题"
+              echo "❌ ENV_DISK_FULL（EXIT_CODE=$EXIT_CODE，cause=$DISK_FULL_CAUSE）：写盘失败，0 个测试执行，属执行体环境问题"
             elif [ "$HAS_SUMMARY" != "1" ]; then
               echo "❌ 无 Summary（编译失败或进程异常退出，EXIT_CODE=$EXIT_CODE）"
             elif [ "$FAILED" -gt "0" ]; then
@@ -1921,10 +1937,10 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-          # 零容忍（顺序即归因：环境盘满必须先于"测试失败"与"进程异常退出"判定）
+          # 零容忍（顺序即归因：环境写盘失败必须先于"测试失败"与"进程异常退出"判定）
           if [ "$DISK_FULL_HIT" -eq "1" ]; then
-            echo "❌ ENV_DISK_FULL 分片 ${{ matrix.partition }}：/tmp 写满导致 nextest 解包失败（os error 28），一个测试都没跑"
-            echo "::error::ENV_DISK_FULL 分片 ${{ matrix.partition }}/10 归因=执行体磁盘写满（非测试失败，EXIT_CODE=$EXIT_CODE）"
+            echo "❌ ENV_DISK_FULL 分片 ${{ matrix.partition }}：nextest 解包写盘失败（cause=$DISK_FULL_CAUSE），一个测试都没跑"
+            echo "::error::ENV_DISK_FULL 分片 ${{ matrix.partition }}/10 归因=执行体写盘失败 cause=$DISK_FULL_CAUSE（非测试失败，EXIT_CODE=$EXIT_CODE）"
             exit 1
           fi
           if [ "$FAILED" -gt "0" ]; then
@@ -2121,11 +2137,21 @@ jobs:
             exit 1
           fi
 
-          # 三态归因（与分片同款判据：只认 nextest 输出里的 os error 28，不认外层退出码）
+          # 三态归因（与分片同款判据，两种写盘失败都要认：os error 28 分区写满、
+          # os error 122 执行体配额耗尽；后者 df 看不见，只认 nextest 输出原文）
           DISK_FULL_HIT=0
-          if [ "$EXIT_CODE" -eq "96" ] && grep -q "os error 28" reports/nextest-ignored-output.clean.txt 2>/dev/null; then
-            DISK_FULL_HIT=1
-            echo "ENV_DISK_FULL scope=ignored exit_code=$EXIT_CODE cause=nextest_archive_unpack_no_space"
+          DISK_FULL_CAUSE=''
+          if [ "$EXIT_CODE" -eq "96" ]; then
+            if grep -q -E "os error 122|Disk quota exceeded" reports/nextest-ignored-output.clean.txt 2>/dev/null; then
+              DISK_FULL_HIT=1
+              DISK_FULL_CAUSE=nextest_unpack_edquot
+            elif grep -q "os error 28" reports/nextest-ignored-output.clean.txt 2>/dev/null; then
+              DISK_FULL_HIT=1
+              DISK_FULL_CAUSE=nextest_unpack_no_space
+            fi
+          fi
+          if [ "$DISK_FULL_HIT" -eq "1" ]; then
+            echo "ENV_DISK_FULL scope=ignored exit_code=$EXIT_CODE cause=$DISK_FULL_CAUSE"
           fi
           if [ "$DISK_FULL_HIT" -eq "1" ]; then
             VERDICT=ENV_DISK_FULL
@@ -2153,11 +2179,11 @@ jobs:
             echo "**Summary 可信**: $([ "$HAS_SUMMARY" = "1" ] && echo yes || echo 'no（无 Summary 行，以下数字仅按状态行粗估）')  "
             echo ""
             if [ "$DISK_FULL_HIT" -eq "1" ]; then
-              echo "## ❌ ENV_DISK_FULL：执行体磁盘写满导致 nextest 解包失败（EXIT_CODE=$EXIT_CODE，os error 28），0 个测试执行"
+              echo "## ❌ ENV_DISK_FULL：nextest 解包写盘失败（EXIT_CODE=$EXIT_CODE，cause=$DISK_FULL_CAUSE），0 个测试执行"
               echo ""
               echo "属 runner 环境问题，不是被测代码失败。判红归因以本行哨兵为准。"
               echo ""
-              { grep -m 10 -E "Extracting |error extracting archive|No space left on device|os error 28" reports/nextest-ignored-output.clean.txt || true; }
+              { grep -m 10 -E "Extracting |error extracting archive|No space left on device|Disk quota exceeded|os error 28|os error 122" reports/nextest-ignored-output.clean.txt || true; }
               echo ""
               { df -h / /tmp || true; }
               echo ""
