@@ -2,15 +2,15 @@
 //
 // 功能，覆盖并发与多端一致性的两条判据。一、两笔订单对同一缸号的同一库存行并发出库，
 // 出库量合计大于可用量时，服务端必须只放行一笔、拒掉另一笔，库存不得被扣成负数；
-// 拦截点在 services/so/delivery_ops/inventory.rs 的 reduce_inventory_four_dim
+// 拦截点在 服务端实现 的 reduce_inventory_four_dim
 // （FOR UPDATE 行锁 + plan_deduction 四维规划），拒绝出参为 HTTP 400 + BUSINESS_ERROR，
 // 染色布拒绝文案含「小于出库数量」（insufficient_error 的染色分支原文）。
 // 二、同一订单同一产品并发创建两笔库存预留（quantity 各 60，合计超过任何可用量）时，
-// 服务端当前实现 services/inventory_reservation_service.rs::create_reservation 只做
+// 服务端当前实现 服务端实现 的 create_reservation 只做
 // 订单/产品/仓库三个外键存在性预检，不做任何库存数量门、不扣减 inventory_stocks——
 // 本用例把这一真实行为逐条钉住（两笔均 200 落 pending、库存快照零变化），
 // 作为「预留侧无超卖拦截」的功能缺失取证，真实拦截口径由第一条用例在出库扣减侧钉死。
-// 三、五笔销售订单并发创建，单据号由 utils/number_generator.rs::DocumentNumberGenerator
+// 三、五笔销售订单并发创建，单据号由 服务端实现 的 DocumentNumberGenerator
 // 以 pg_advisory_xact_lock 同前缀同日串行取号 + insert_with_no_retry 兜底，
 // 判据为：号两两不同、无复用，且逐单读回落库恰各一张（重复/漏单在此判据下必红）。
 // 调用方，frontend e2e flow 分片；打真实端点 POST /sales/orders/{id}/ship、
@@ -349,7 +349,7 @@ test.describe('缸号并发锁库与并发单据号', () => {
       }),
     ]);
 
-    // 当前实现 services/inventory_reservation_service.rs::create_reservation 只有
+    // 当前实现 服务端实现 的 create_reservation 只有
     // 订单/产品/仓库存在性预检，无库存数量门：两笔并发均应 200 落 pending——
     // 这一行为即「预留侧无超卖拦截」的取证判据，若后端补上数量门此断言会红并回派更新。
     expect(resA.ok, `并发预留 A 应如实落库（实际=${JSON.stringify(resA)}）`).toBe(true);
