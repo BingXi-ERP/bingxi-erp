@@ -78,7 +78,7 @@ type SettledCall =
 
 async function settleCall(
   page: import('@playwright/test').Page,
-  method: 'POST',
+  method: 'POST' | 'DELETE',
   path: string,
   body: Record<string, unknown>
 ): Promise<SettledCall> {
