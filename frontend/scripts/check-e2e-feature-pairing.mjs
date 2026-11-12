@@ -252,18 +252,44 @@ const PATH_LITERAL = /(`[^`\r\n]*`|'[^'\r\n]*'|"[^"\r\n]*")/.source;
 const METHOD_TOKEN = /(GET|POST|PUT|PATCH|DELETE|HEAD)/.source;
 
 /**
- * 抽取一个文件里的全部调用点键，键形如 "GET /api/v1/erp/users/*"，与判定集同形可直接查表。
- * 覆盖三族写法（按语料实测量级取，漏一族就有一片端点白配）：
- *   - 请求助手族 apiCall / apiCallRaw / apiCallExpectFail / tryCleanup / deferCleanup：
- *     方法是第 2 个实参字面量、路径是第 3 个，故按 `, QUOTE METHOD QUOTE , 路径字面量` 的形状取，
- *     实参跨行也取（helper 的泛型实参与 page 句柄都不参与匹配，只认这层逗号形状）。
- *   - page.request.<method>(url, opts?)：方法取属性名，路径取第 1 个实参。
- *   - page.request.fetch(url, opts?)：路径取第 1 个实参，方法取 opts.method 字面量，缺省 GET。
- * 对象字面量里的 method 与 path 两个键不匹配（方法字面量前面是冒号不是逗号），
- * 语料里那份把端点抄成清单的枚举文件因此不会被误当成调用点。
- * 调用方是 judge()（每份语料文件只算一次，结果随 body 一起存进 texts）与自证探针。
+ * 去注释：把源码里的注释行换成空行，代码行原样保留（行数不变，便于报错回指行号）。
+ * 入参是语料文件正文，返回给 extractCallKeys 与"方法记号"判定用的纯代码文本。
+ * 按行判形而不是逐字符扫描：本仓库用例的注释只有三种形态——整行双斜杠、JSDoc 与端点清单的
+ * 整行星号开头、以及跨多行的块注释；行尾追加的尾随注释不动（那种行的主体是真代码，检索串本
+ * 就该算）。手写词法扫描要同时认字符串、模板串、正则字面量里的引号，一处判错就把整段代码
+ * 当成字符串吞掉，实测会让调用点抽取凭空多配或少配，得不偿失。
  */
-function extractCallKeys(text) {
+function maskComments(src) {
+  let inBlock = false;
+  return String(src)
+    .split('\n')
+    .map(line => {
+      const t = line.replace(/^\s+/, '');
+      if (inBlock) {
+        const end = t.indexOf('*/');
+        if (end < 0) return '';
+        inBlock = false;
+        return t.slice(end + 2);
+      }
+      if (t.startsWith('//')) return '';
+      if (t.startsWith('*')) return '';
+      if (t.startsWith('/*')) {
+        if (t.includes('*/')) return '';
+        inBlock = true;
+        return '';
+      }
+      return line;
+    })
+    .join('\n');
+}
+
+/**
+ * 抽取一个文件里的全部调用点键（不看注释的版本）：把源码原样喂进来，
+ * 注释里抄的调用形状同样会产出键。只给自证当对照面用，判定主体一律走
+ * extractCallKeys（先屏蔽注释再抽）。为什么不能直接用它判定，见自证的
+ * commentedCallSiteMustNotPair 探针。
+ */
+function collectCallKeys(text) {
   const out = new Set();
   const unquote = lit => lit.slice(1, -1);
   const push = (method, lit) => {
@@ -287,6 +313,27 @@ function extractCallKeys(text) {
     push(opts ? opts[1] : 'GET', m[1]);
   }
   return out;
+}
+
+/**
+ * 一份正文的"可判定的代码面"：callText 是去注释后的文本，callKeys 是从它抽出的调用点键。
+ * 两者必须同源——方法记号的判定也读 callText，否则会出现"键是屏蔽注释后抽的、方法名却是
+ * 在注释里找到的"这种自相矛盾的口径。判定主体与自证都只经这里取用，不各写一遍组合。
+ */
+function fileCallSurface(body) {
+  const callText = maskComments(body);
+  return { callText, callKeys: collectCallKeys(callText) };
+}
+
+/**
+ * 判定主体用的调用点抽取：先屏蔽注释再抽，注释里的路径字面量与调用形状一律不算配对证据。
+ * 入参是语料文件正文，返回该文件的调用点键集合。
+ * 不屏蔽会漏判到什么程度：实测有 22 枚端点现在只靠文件头那份"本用例覆盖哪些端点"的
+ * 清单行过门，真实调用要么写成相对路径抽不出、要么把路径存在局部常量里静态不可知。
+ * 清单类注释正是这道门要防的"抄一张表当引用"的形态，让它继续算证据就等于把门交给注释。
+ */
+function extractCallKeys(text) {
+  return fileCallSurface(text).callKeys;
 }
 
 function loadExempt(file) {
@@ -420,12 +467,14 @@ function judge(over = {}) {
   }
   const texts = files.map(f => {
     const body = readFileSync(f, 'utf8');
-    // 调用点键每份文件只解析一次：端点循环要拿一千八百多枚键来查表，
+    // 调用点键与去注释文本每份文件只算一次：端点循环要拿一千八百多枚键来查表，
     // 在循环里对每枚端点把整份语料重扫一遍会让这道门慢到没人愿意跑。
+    const surface = fileCallSurface(body);
     return {
       rel: relative(corpusDir, f).replace(/\\/g, '/'),
       body,
-      callKeys: extractCallKeys(body),
+      callText: surface.callText,
+      callKeys: surface.callKeys,
     };
   });
   const srcFiles = sourceFiles(srcDir);
@@ -457,9 +506,13 @@ function judge(over = {}) {
     const needles = matchNeedles(path);
     const hits = texts.filter(t => filePairsEndpoint(t, key, needles));
     if (hits.length > 0) {
-      // 调用点命中的那个文件本身就把方法名写在实参里（抽取形状要求 `, 'METHOD', 路径`），
-      // 不必再回正文找方法记号；正文检索串命中的仍按原口径区分 paired 与 weak。
-      if (hits.some(t => t.callKeys.has(key) || new RegExp('\\b' + method + '\\b').test(t.body)))
+      // 调用点命中的那个文件本身就把方法名写在实参里（抽取形状要求 `, METHOD , 路径`），
+      // 不必再回正文找方法记号。找记号只看去注释文本：文件头的端点清单会写满
+      // "DELETE /api/v1/erp/..." 这类行，拿原文找会让一次真 GET 调用被判成 WEAK，
+      // 反过来也能让只抄了清单的文件蒙成 paired。
+      if (
+        hits.some(t => t.callKeys.has(key) || new RegExp('\\b' + method + '\\b').test(t.callText))
+      )
         paired += 1;
       else {
         weak += 1;
@@ -842,7 +895,81 @@ function selfTest() {
       );
   }
 
-  // 基线取提交树那条腿也得真解析出东西：读回来的端点数与已提交快照同量才算通。
+  // 反向夹具两面包订注释这一条：夹具只用函数级断言，不看语料当前是不是孤儿，
+  // 也不做"从 uncovered 里挑一枚"的运行时搜索——那种写法会因为别人补了用例而随机失效。
+  // 两面各自先证明"不屏蔽注释的缺陷版本会放过它"，再证明屏蔽后不放，缺对照就等于没自证。
+  const commentPick = pickEndpoint('DELETE', 2, true);
+  if (!commentPick)
+    return {
+      code: 9,
+      head: 'TOOL_BUG 注释自证夹具前置不成立：端点集里没有 /资源/{id} 形态的 DELETE 端点，注释里的调用形状无从验证',
+    };
+  {
+    const key = commentPick.key;
+    const staticRel = commentPick.rel.slice(0, -1);
+    const commented =
+      "  // 早期版本这样删：await apiCall(page, 'DELETE', '" +
+      staticRel +
+      "7', body);\n" +
+      '/*\n' +
+      "  await tryCleanup(page, 'DELETE', '" +
+      staticRel +
+      "7', '清理');\n" +
+      '*/\n';
+    const defectPairs = collectCallKeys(commented).has(key);
+    const maskedPairs = extractCallKeys(commented).has(key);
+    probes.push(['commentedCallSiteMustNotPair', defectPairs && !maskedPairs ? 0 : 1, 0]);
+    if (!defectPairs || maskedPairs)
+      say(
+        '  SELFTEST_COMMENT commentedCallSiteMustNotPair key=' +
+          key +
+          ' 不屏蔽注释配上=' +
+          defectPairs +
+          ' 屏蔽后配上=' +
+          maskedPairs
+      );
+  }
+  {
+    const info = commentPick.info;
+    const needle = matchNeedles(info.path)[0];
+    const docHeader = ' * - DELETE ' + info.path + ' 删档位（本用例覆盖的端点清单）\n';
+    const masked = maskComments(docHeader);
+    // 清单行同时供两样东西：整串检索串与方法记号。两者都必须只从注释里消失，
+    // 否则"抄一行端点清单"就能把 WEAK 洗成 paired。
+    const defectFeedsNeedle = docHeader.includes(needle);
+    const defectFeedsMethod = new RegExp('\\bDELETE\\b').test(docHeader);
+    const maskedFeedsNeedle = masked.includes(needle);
+    const maskedFeedsMethod = new RegExp('\\bDELETE\\b').test(masked);
+    probes.push([
+      'docCommentMustNotFeedCallSurface',
+      defectFeedsNeedle &&
+        defectFeedsMethod &&
+        !maskedFeedsNeedle &&
+        !maskedFeedsMethod
+        ? 0
+        : 1,
+      0,
+    ]);
+    if (
+      !defectFeedsNeedle ||
+      !defectFeedsMethod ||
+      maskedFeedsNeedle ||
+      maskedFeedsMethod
+    )
+      say(
+        '  SELFTEST_COMMENT docCommentMustNotFeedCallSurface needle=' +
+          needle +
+          ' 原文含检索串=' +
+          defectFeedsNeedle +
+          ' 原文含方法记号=' +
+          defectFeedsMethod +
+          ' 屏蔽后含检索串=' +
+          maskedFeedsNeedle +
+          ' 屏蔽后含方法记号=' +
+          maskedFeedsMethod
+      );
+  }
+
   // 工作树里这份快照若有未提交改动会让两条不同量，此时判 9 并要求先提交再跑门。
   const refBase = readBaselineFromRef('HEAD', BASELINE);
   probes.push([
