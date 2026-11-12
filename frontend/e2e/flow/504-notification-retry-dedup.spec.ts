@@ -13,33 +13,33 @@ import {
  *
  * 后端事实基线（写面与读面逐一核对过源码）：
  * - 写面（HTTP 直达腿）POST /api/v1/erp/notifications/announcement
- *   （routes/analytics.rs:423 挂载 → handlers/notification_handler.rs::create_announcement）：
- *   入参 { user_ids, title, content }，user_ids 先 sort_unstable+dedup 再投递
- *   （notification_handler.rs:258-261），逐用户调
- *   services/event_notification_service.rs::send_system_announcement（:794），
- *   每用户落一行 notifications：notification_type=SYSTEM、business_type=SYSTEM、
- *   sender_name=系统管理员、dedup_key=None（event_notification_service.rs:817-830）。
- *   出参 { delivered_count }。
- * - 读面 GET /api/v1/erp/notifications（notification_handler.rs::list_notifications）：
- *   按当前会话 user_id 过滤且排除 status=DELETED（notification_service.rs:395-396），
- *   出参 data = { list, total, page, page_size }，list 每行 = notifications 表实体全列
- *   （models/notification.rs:99-137），键名即库列名（snake_case）。
- *   GET /notifications/{id} 与 DELETE /notifications/{id} 均做 owner 校验，
- *   非本人 403（notification_service.rs:495-537）。DELETE 是软删（status→DELETED）。
+ * （服务端实现 挂载 → 服务端实现 的 create_announcement）：
+ * 入参 { user_ids, title, content }，user_ids 先 sort_unstable+dedup 再投递
+ * （服务端实现），逐用户调
+ * 服务端实现 的 send_system_announcement（:794），
+ * 每用户落一行 notifications：notification_type=SYSTEM、business_type=SYSTEM、
+ * sender_name=系统管理员、dedup_key=None（服务端实现）。
+ * 出参 { delivered_count }。
+ * - 读面 GET /api/v1/erp/notifications（服务端实现 的 list_notifications）：
+ * 按当前会话 user_id 过滤且排除 status=DELETED（服务端实现），
+ * 出参 data = { list, total, page, page_size }，list 每行 = notifications 表实体全列
+ * （服务端实现），键名即库列名（snake_case）。
+ * GET /notifications/{id} 与 DELETE /notifications/{id} 均做 owner 校验，
+ * 非本人 403（服务端实现）。DELETE 是软删（status→DELETED）。
  * - notifications 表列全集（去重/收件人断言的判据来源）：
- *   id, user_id, notification_type, title, content, priority, status,
- *   business_type, business_id, action_url, sender_id, sender_name,
- *   read_at, processed_at, created_at, updated_at, dedup_key。
+ * id, user_id, notification_type, title, content, priority, status,
+ * business_type, business_id, action_url, sender_id, sender_name,
+ * read_at, processed_at, created_at, updated_at, dedup_key。
  *
  * 能力盘点结论（两种互不依赖口径交叉核对，本文件只断真实存在的腿）：
  * - 站内通知"失败重试"腿不存在：handlers 目录扫描（retry|wechat|订阅消息）命中文件均为
- *   webhook/import/print 域，notification 相关 handler 零命中；route-snapshot.txt 中
- *   retry 端点仅 data-import tasks 下 retry 与 webhooks 下 retry 两支，notifications
- *   前缀下无任何 retry 路由；notifications 表实体无 retry_count/next_retry_at 列。
- *   邮件重试在 email_log 域（SMTP 队列）、Webhook 重试在 webhooks 域，均非站内通知腿。
+ * webhook/import/print 域，notification 相关 handler 零命中；route-snapshot.txt 中
+ * retry 端点仅 data-import tasks 下 retry 与 webhooks 下 retry 两支，notifications
+ * 前缀下无任何 retry 路由；notifications 表实体无 retry_count/next_retry_at 列。
+ * 邮件重试在 email_log 域（SMTP 队列）、Webhook 重试在 webhooks 域，均非站内通知腿。
  * - "同事件去重"腿在 HTTP 同步面只有 announcement 的 user_ids 去重；
- *   dedup_key 5 分钟/24h 窗口（notification_service.rs::check_dedup）只由事件监听与
- *   库存预警调度器触达，announcement 传 dedup_key=None，HTTP 面无法同步驱动该窗口。
+ * dedup_key 5 分钟/24h 窗口（服务端实现 的 check_dedup）只由事件监听与
+ * 库存预警调度器触达，announcement 传 dedup_key=None，HTTP 面无法同步驱动该窗口。
  *
  * 敏感数据断言口径：通知读面出参键集恰好等于上列 notifications 表 17 列白名单
  * （无 phone/mobile/email/cost/margin 类键），文本面（title/content/action_url/
@@ -47,13 +47,13 @@ import {
  *
  * 账号：默认会话 = 本 worker 管理员账号 A（收公告的对照收件人）；
  * B 取 role-credentials.json 中与 A 不同的独立身份账号
- * （helpers.ts::pickDifferentUserCredential），口令经该凭证只读取得，源码不拼字面量。
+ * （既有测试工具 的 pickDifferentUserCredential），口令经该凭证只读取得，源码不拼字面量。
  */
 
 /** 发布走 handler 同步落库（await create_notification 后才返回），仍留窗口防读写连接池时差 */
 const NOTIF_SETTLE_MS = 3000;
 
-/** notifications 表实体全列（models/notification.rs:101-137），读面出参键集的白名单基准 */
+/** notifications 表实体全列（服务端实现），读面出参键集的白名单基准 */
 const NOTIFICATION_COLUMNS = [
   'id',
   'user_id',
@@ -280,7 +280,7 @@ test.describe.serial('4.7 通知链路：收件人隔离 / 敏感面 / 防重复
       const title = `504防轰炸-${tag}`;
 
       // 同一请求把 B 重复列三人次：handler 在投递前 sort_unstable+dedup
-      // （notification_handler.rs:258-261），delivered_count 与真实落库行数都必须守恒为 1
+      // （服务端实现），delivered_count 与真实落库行数都必须守恒为 1
       const sent = await apiCallRaw<{ delivered_count?: number }>(
         page,
         'POST',
