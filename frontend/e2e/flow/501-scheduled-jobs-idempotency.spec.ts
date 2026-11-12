@@ -8,7 +8,6 @@ import {
   flushDeferredCleanups,
   ensureTestEntities,
   getCtx,
-  listNotifications,
   loginAsRole,
   loginViaUI,
   type DeferredCleanup,
@@ -79,6 +78,8 @@ const STOCK_ALERT_TYPES = [
   'discrepancy',
 ] as const;
 
+type InboxRow = { id: number; title: string; content?: string };
+
 type AlertRule = {
   id: number;
   rule_code: string;
@@ -134,20 +135,46 @@ function requireItems<T>(data: { items?: T[] } | null | undefined, where: string
 }
 
 /**
- * 功能：按标题逐字统计收件箱命中条数，作为"次数守恒"的真实计数列。
- * 调用方：账期预警投递腿与审批超时提醒反向腿。
- * 入参：inbox 来自 listNotifications（GET /notifications 的 data.list），title 是写入方拼出的完整标题。
- * 传给谁：expect 判据与 console 取证行。
- * 存什么/存哪里：不落库。
- * 收件箱被后端 page_size 上限截到 50 行时，命中数会被低估，故行数触顶即点名抛出而不是继续比数。
+ * 功能：读回当前会话的未读站内信全集，作为命中数守恒与"不该推给谁"的计数面。
+ * 调用方：账期预警投递腿、审批超时提醒反向腿与库存预警触发腿。
+ * 入参：page 为当前已登录会话；端点 GET /notifications?status=UNREAD&page=1&page_size=100
+ * （后端 handlers/notification_handler.rs 把 page_size clamp 到 100，收件人取登录态 user_id）。
+ * 传给谁：仅用例内 expect 判据与 console 取证行。
+ * 存什么/存哪里：不落库；判据行来自 notifications 表。
+ * 只取本页会低估命中数，故带回的 total 大于本页行数即点名抛出，不把"没读到"当成"没有"。
  */
-function countTitle(inbox: { title: string }[], title: string, where: string): number {
-  if (inbox.length >= 50) {
+async function readInbox(page: Page): Promise<InboxRow[]> {
+  const body = await apiCallRaw<{ list?: InboxRow[]; total?: number }>(
+    page,
+    'GET',
+    '/notifications?status=UNREAD&page=1&page_size=100'
+  );
+  if (!Array.isArray(body?.list)) {
     throw new Error(
-      `${where} 收件箱本页返回 ${inbox.length} 行已到读取上限，命中数判据失去守恒意义（需换更小的读取窗口）`
+      `GET /notifications 响应缺少 list 数组，实际 keys=${JSON.stringify(Object.keys(body ?? {}))}`
     );
   }
-  return inbox.filter(n => n.title === title).length;
+  if (typeof body.total !== 'number') {
+    throw new Error(`GET /notifications 响应缺少 total 数值，实际 ${String(body.total)}`);
+  }
+  if (body.list.length < body.total) {
+    throw new Error(
+      `GET /notifications 未读列表只带回 ${body.list.length}/${body.total} 行，命中数判据失去守恒意义`
+    );
+  }
+  return body.list;
+}
+
+/**
+ * 功能：按标题逐字统计命中条数，并把命中数与全集行数打进日志留证。
+ * 调用方：本文件全部收件箱判据，rows 一律来自 readInbox（已保证覆盖 total）。
+ * 入参：rows 是收件箱全集，title 是写入方拼出的完整标题，where 是点名标签。
+ * 传给谁：expect 判据。存什么/存哪里：不落库。
+ */
+function countTitle(rows: InboxRow[], title: string, where: string): number {
+  const hit = rows.filter(n => n.title === title).length;
+  console.log(`[${where}] 标题「${title}」命中 ${hit} 条，收件箱全集 ${rows.length} 行`);
+  return hit;
 }
 
 /**
@@ -365,7 +392,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     const notifTitle = `${FINANCE_ALERT_TITLE_PREFIX}${alert.title}`;
 
     // 触发者本人的会话：手工触发不得把投递降级给点击者
-    const triggerInbox = await listNotifications(page, 'UNREAD');
+    const triggerInbox = await readInbox(page);
     expect(
       countTitle(triggerInbox, notifTitle, '501-02 触发者收件箱'),
       `501-02 触发者岗位不在启用规则角色集内，不应收到预警 id=${alert.id} 的站内信`
@@ -373,7 +400,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
 
     // 声明岗位的正向投递；重复触发后同一标题命中数仍为 1
     await loginAsRole(page, NOTIFY_ROLE);
-    const inbox1 = await listNotifications(page, 'UNREAD');
+    const inbox1 = await readInbox(page);
     const hit1 = inbox1.find(n => n.title === notifTitle);
     expect(
       hit1,
@@ -393,7 +420,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     ).toBe(0);
 
     await loginAsRole(page, NOTIFY_ROLE);
-    const inbox2 = await listNotifications(page, 'UNREAD');
+    const inbox2 = await readInbox(page);
     expect(
       countTitle(inbox2, notifTitle, '501-02 重复触发后'),
       `501-02 重复触发后该标题的投递条数应守恒为 1，实际 ${countTitle(
@@ -404,7 +431,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     ).toBe(1);
 
     await loginAsRole(page, NON_RECIPIENT_ROLE);
-    const otherInbox = await listNotifications(page, 'UNREAD');
+    const otherInbox = await readInbox(page);
     expect(
       countTitle(otherInbox, notifTitle, '501-02 非声明岗位收件箱'),
       `501-02 ${NON_RECIPIENT_ROLE} 不在任何启用规则的角色集内，不应收到预警 id=${alert.id}`
@@ -413,7 +440,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     // 站内信删除权只属收件人（services/notification_service.rs::delete_notification 逐条比 user_id），
     // 故回收要回到收件岗位会话里当场执行，不进跨会话的延迟队列。
     await loginAsRole(page, NOTIFY_ROLE);
-    const inboxForClean = await listNotifications(page, 'UNREAD');
+    const inboxForClean = await readInbox(page);
     for (const row of inboxForClean.filter(n => n.title === notifTitle)) {
       await apiCall(page, 'DELETE', `/notifications/${row.id}`);
     }
@@ -501,7 +528,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     // 提醒对象是各单的 approver 而非点击者：approver_id 为空时投递落到写死的收件人，
     // 触发者会话必须读不到本单的提醒标题（标题由写入方拼成 `批色待剪样超时提醒 #{id}`）。
     const reminderTitle = `批色待剪样超时提醒 #${id}`;
-    const triggerInbox = await listNotifications(page, 'UNREAD');
+    const triggerInbox = await readInbox(page);
     expect(
       countTitle(triggerInbox, reminderTitle, '501-03 触发者收件箱'),
       `501-03 触发者两次发起提醒后仍不应收到本单提醒（send1=${send1} send2=${send2}）`
@@ -560,7 +587,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     }
 
     // 触发面：GET /inventory/stock 每页都会走 send_inventory_alerts；连续两次读取即两次触发
-    const inboxBefore = await listNotifications(page, 'UNREAD');
+    const inboxBefore = await readInbox(page);
     const stock1 = await apiCallRaw<{ items?: unknown[]; total?: number }>(
       page,
       'GET',
@@ -578,16 +605,14 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     ).toEqual(rows1.map(r => r.id));
     expect(alerts2.data.total, '501-04 重复读取的告警总数应守恒').toBe(total1);
 
-    const inboxAfter = await listNotifications(page, 'UNREAD');
+    const inboxAfter = await readInbox(page);
     const before = countTitle(inboxBefore, '库存预警', '501-04 触发前收件箱');
     const after = countTitle(inboxAfter, '库存预警', '501-04 两次触发后收件箱');
     expect(after, `501-04 两次触发之间本会话的库存预警站内信应守恒，实际 ${before}→${after}`).toBe(
       before
     );
 
-    const warehouseInbox = await loginAsRole(page, 'warehouse_manager').then(() =>
-      listNotifications(page, 'UNREAD')
-    );
+    const warehouseInbox = await loginAsRole(page, 'warehouse_manager').then(() => readInbox(page));
     expect(
       countTitle(warehouseInbox, '库存预警', '501-04 仓库管理员收件箱'),
       '501-04 HTTP 触发腿的收件人被写成常量 0，仓库管理员会话不应读到任何库存预警站内信'
