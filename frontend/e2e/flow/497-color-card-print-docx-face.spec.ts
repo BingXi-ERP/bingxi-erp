@@ -306,9 +306,14 @@ test.describe('497 色卡打印 docx 下载面', () => {
       remark: `497收尾损坏${tag}`,
     });
     await apiCall(page, 'PUT', `/color-cards/${cardId}`, { stock_quantity: 0 });
-    await apiCall(page, 'DELETE', `/color-cards/${cardId}`);
-    const cardGone = await apiCallExpectFail(page, 'GET', `/color-cards/${cardId}`);
-    expect(cardGone.status, `色卡归档后按 id 回读必须 404，实际 ${cardGone.status}`).toBe(404);
+    // 归档口是携带请求体的删除方法：入参只有可选的归档原因一列，但抽取器要求合法 JSON 体，
+    // 空体在请求体族被拒；归档是软状态跃迁不是行消失，所以读回断的是状态词而非 404。
+    await apiCall(page, 'DELETE', `/color-cards/${cardId}`, { reason: `497收尾归档${tag}` });
+    const archived = await apiCallRaw<{ status?: unknown }>(page, 'GET', `/color-cards/${cardId}`);
+    expect(
+      str(archived.status),
+      `色卡归档后状态列必须逐字符等于写入方的归档词，实际 ${str(archived.status)}`
+    ).toBe('archived');
   });
 
   test('两条打印腿对无行主键同码 404 且拒因走统一信封不外显内文', async ({ page }) => {
