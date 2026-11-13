@@ -19,59 +19,59 @@ import {
  *
  * 覆盖面取证（写断言前逐字对过 backend 源码，非设想）：
  * - POST /api/v1/erp/sales/sales-contracts/from-order/{order_id}
- *   路由 routes/sales.rs:148-151（`sales_contracts()` merge 进 `sales::routes()`，
- *   nest 前缀 `/api/v1/erp/sales` 见 routes/mod.rs:497）→ handler
- *   handlers/sales_contract_handler.rs:486-521 `convert_from_order`。
- *   入参 DTO ConvertFromOrderDto（handler:229-246）+ ConvertItemDto（:206-224）：
- *   表头 contract_name 必填且 1..=200；明细 items 全量一一对应订单行，行内只接受
- *   order_item_id / quantity / unit_price / delivery_date / color_no /
- *   quantity_tolerance_pct / remarks 七个键，金额、折扣率、税率**不在 DTO 内**，
- *   客户端即便构造这些键也被 serde 丢弃（服务端回读订单行经 amounts 重算）。
- *   客户不可改派：合同 customer_id 直取来源订单（convert_service:395）。
+ * 路由 routes/sales.rs（`sales_contracts()` merge 进 `sales::routes()`，
+ * nest 前缀 `/api/v1/erp/sales` 见 routes/mod.rs）→ handler
+ * handlers/sales_contract_handler.rs `convert_from_order`。
+ * 入参 DTO ConvertFromOrderDto（handler）+ ConvertItemDto：
+ * 表头 contract_name 必填且 1..=200；明细 items 全量一一对应订单行，行内只接受
+ * order_item_id / quantity / unit_price / delivery_date / color_no /
+ * quantity_tolerance_pct / remarks 七个键，金额、折扣率、税率**不在 DTO 内**，
+ * 客户端即便构造这些键也被 serde 丢弃（服务端回读订单行经 amounts 重算）。
+ * 客户不可改派：合同 customer_id 直取来源订单（convert_service）。
  * - PUT /api/v1/erp/sales/sales-prices/{id}
- *   路由 routes/sales.rs:205-210（`get_price().put(update_price).delete(delete_price)`）
- *   → handlers/sales_price_handler.rs:249-262 → services/sales_price_service.rs:519-597。
- *   UpdateSalesPriceInput（service:148-167）全字段 Option；effective_date/expiry_date 走
- *   double_option 三态（键缺席=不改、显式 null、有值=覆盖），price_level 是单层 Option
- *   透传通道（显式 null 等同键缺席，**不支持**清空回标准价，源码注释 self 声明）。
+ * 路由 routes/sales.rs（`get_price().put(update_price).delete(delete_price)`）
+ * → handlers/sales_price_handler.rs → services/sales_price_service.rs。
+ * UpdateSalesPriceInput（service）全字段 Option；effective_date/expiry_date 走
+ * double_option 三态（键缺席=不改、显式 null、有值=覆盖），price_level 是单层 Option
+ * 透传通道（显式 null 等同键缺席，**不支持**清空回标准价，源码注释 self 声明）。
  *
  * 出参形态（断言回读用的真实序列化键，snake_case）：
  * - 合同详情 GET /sales/sales-contracts/{id} 直接序列化 models/sales_contract.rs::Model
- *   （id/contract_no/contract_name/status/customer_id/source_order_id/total_amount/...）；
- *   合同明细 GET /sales/sales-contracts/{id}/items 序列化 sales_contract_item::Model 裸数组
- *   （contract_id/source_order_item_id/quantity/unit_price/sort_order/...）。
+ * （id/contract_no/contract_name/status/customer_id/source_order_id/total_amount/...）；
+ * 合同明细 GET /sales/sales-contracts/{id}/items 序列化 sales_contract_item::Model 裸数组
+ * （contract_id/source_order_item_id/quantity/unit_price/sort_order/...）。
  * - 价格 GET /sales/sales-prices/{id} 序列化 models/sales_price.rs::Model
- *   （price/currency/unit/min_order_qty/price_level/effective_date/expiry_date/status）。
- *   合同状态词表唯一来源 models/status/bpm_crm_contract.rs:35-50 `contract`（小写
- *   draft/active/cancelled/rejected）；销售订单状态词表 models/status/sales.rs:14-30
- *   `sales_order`（小写 draft/pending/approved/...，可转放行集 approved/partial_shipped/
- *   shipped/completed 见 convert_service:182-202）。
+ * （price/currency/unit/min_order_qty/price_level/effective_date/expiry_date/status）。
+ * 合同状态词表唯一来源 models/status/bpm_crm_contract.rs `contract`（小写
+ * draft/active/cancelled/rejected）；销售订单状态词表 models/status/sales.rs
+ * `sales_order`（小写 draft/pending/approved/...，可转放行集 approved/partial_shipped/
+ * shipped/completed 见 convert_service）。
  *
  * 失败信封的可外显性差异是本 spec 断言强度的关键，逐条按源码取真值（禁止臆造文案）：
- * - 可转状态门（未审核源单）走 `AppError::business`（convert_service:192-197）——**非**
- *   Displayable 变体，出参 message 恒为脱敏常量 "业务处理失败"（utils/messages.rs:43 +
- *   utils/error.rs:843-862），真实原因「…尚未审核通过，不能转销售合同…」只进服务端日志。
- *   故本腿只钉 HTTP 400 + code=BUSINESS_ERROR（共用判据 expectStateGateRejection），
- *   并反向钉「脱敏常量、内部文案不外泄」，不去断言不可达的文案内容。
- * - 重复转换门走 `business_displayable`（convert_service:349-354）→ message 逐字可断。
- * - 明细归属/全量覆盖门走 `AppError::validation`（:517-540，非 Displayable）
- *   → 400 + VALIDATION_ERROR + message 恒 "请求参数验证失败"。
+ * - 可转状态门（未审核源单）走 `AppError::business`（convert_service）——**非**
+ * Displayable 变体，出参 message 恒为脱敏常量 "业务处理失败"（utils/messages.rs +
+ * utils/error.rs），真实原因「…尚未审核通过，不能转销售合同…」只进服务端日志。
+ * 故本腿只钉 HTTP 400 + code=BUSINESS_ERROR（共用判据 expectStateGateRejection），
+ * 并反向钉「脱敏常量、内部文案不外泄」，不去断言不可达的文案内容。
+ * - 重复转换门走 `business_displayable`（convert_service）→ message 逐字可断。
+ * - 明细归属/全量覆盖门走 `AppError::validation`（，非 Displayable）
+ * → 400 + VALIDATION_ERROR + message 恒 "请求参数验证失败"。
  * - 不存在订单：handler 在 DTO 校验之后、service 之前由行级归属门
- *   `SalesService::assert_order_ownership`（services/so/order_query.rs:433-444）抛
- *   `AppError::not_found`（非 Displayable）→ 404 + NOT_FOUND + message 恒 "资源未找到"。
- * - 价格侧三条拒绝全是 Displayable（生效日期清空 :529-533、等级越界 :46-57、
- *   日期格式 :576-591、坏产品引用 :199-217）→ message 逐字可断。
+ * `SalesService::assert_order_ownership`（services/so/order_query.rs）抛
+ * `AppError::not_found`（非 Displayable）→ 404 + NOT_FOUND + message 恒 "资源未找到"。
+ * - 价格侧三条拒绝全是 Displayable（生效日期清空、等级越界、
+ * 日期格式、坏产品引用）→ message 逐字可断。
  *
  * 前置数据自建自清：approved 源单走「建单 → submit → approve」既有 URL 序列
- * （同 452/108 用例，审批回读小写 approved）；草稿源单只建单不提交。合同与价格行
+ * （既有同类用例，审批回读小写 approved）；草稿源单只建单不提交。合同与价格行
  * 用后即删（tryCleanup，源单为 approved 态、服务端删除门只拦 shipped/completed，
- * 见 services/so/order_crud.rs:748-754，故可清；清理次序先合同后订单，避免
+ * 见 services/so/order_crud.rs，故可清；清理次序先合同后订单，避免
  * sales_contract_items → sales_order_items 溯源外键先断主表）。
  */
 
 type Row = Record<string, unknown>;
 
-/** GET /sales/orders/{id} 出参切片：SalesOrderDto + items（SalesOrderItemDetail，services/so/mod.rs:100-102，无 rename_all） */
+/** GET /sales/orders/{id} 出参切片：SalesOrderDto + items（SalesOrderItemDetail，services/so/mod.rs，无 rename_all） */
 interface OrderLine {
   id: number;
   product_id: number;
@@ -240,7 +240,7 @@ test.describe('507 销售审批写面：订单转合同 与 客户价格改单�
       )}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
     // 源码真值：该门用非 Displayable 的 AppError::business，出参 message 恒为脱敏常量
-    // "业务处理失败"（utils/error.rs public_message + utils/messages.rs:43），
+    // "业务处理失败"（utils/error.rs public_message + utils/messages.rs），
     // 内部原因只进日志。本断言把这条安全边界钉住：改回外显内部文案即红。
     expect(
       fail.message,
@@ -274,7 +274,7 @@ test.describe('507 销售审批写面：订单转合同 与 客户价格改单�
     const order = await seedSalesOrder(page, '已审核', true);
     const contractEp = `/sales/sales-contracts/from-order/${order.id}`;
 
-    // —— 负腿 1：明细含非本订单的行（order_item_id 归属门，convert_service:517-522）
+    // —— 负腿 1：明细含非本订单的行（order_item_id 归属门，convert_service）
     const foreignBody: Row = {
       contract_name: `507非本单行_${genCode('C507F')}`,
       items: [{ order_item_id: IMPOSSIBLE_ID, quantity: '1.00', unit_price: '1.00' }],
@@ -290,7 +290,7 @@ test.describe('507 销售审批写面：订单转合同 与 客户价格改单�
     ).toBe('请求参数验证失败');
     console.log(`[507-02] 非本单行拒绝：status=${foreign.status} code=${foreign.code}`);
 
-    // —— 负腿 2：只送其中一行（整单转换要求全量一一对应，convert_service:530-540）
+    // —— 负腿 2：只送其中一行（整单转换要求全量一一对应，convert_service）
     const partialLineId = order.items[0].id;
     const partial = await apiCallExpectFail(
       page,
