@@ -36,7 +36,9 @@ use axum::http::{Method, Request, header::HeaderName};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ActiveValue, EntityTrait, IntoActiveModel, QueryFilter, SqlErr};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, SqlErr,
+};
 use sha2::{Digest, Sha256};
 
 /// 幂等键请求头名（小写形态，HeaderMap 查找按大小写不敏感）
