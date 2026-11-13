@@ -187,8 +187,8 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
     // 回读：新值生效
     const got = await apiCall<ProductRead>(page, 'GET', `/products/${pid}`);
     expect(got.data.name, '[508-03] 回读 name 应为新值').toBe(newName);
-    expect(String(got.data.gram_weight ?? ''), '[508-03] 回读 gram_weight 应为覆盖值 250').toBe(
-      '250'
+    expect(String(got.data.gram_weight ?? ''), '[508-03] 回读 gram_weight 应为覆盖值 250.00').toBe(
+      '250.00'
     );
     expect(got.data.code, '[508-03] 未触碰的 code 不应被洗掉').toBe(seed.code);
 
