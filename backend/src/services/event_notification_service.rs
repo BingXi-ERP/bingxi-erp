@@ -3,14 +3,17 @@
 //! 将业务事件与通知系统集成，在关键业务节点自动触发通知
 //! 支持订单状态变更、审批提醒、库存预警等业务场景
 
+use crate::config::settings::WechatMpTemplateKind;
 use crate::models::notification::{NotificationPriority, NotificationType};
 use crate::models::user;
+use crate::models::wechat_mp_binding;
 use crate::services::email_service::{EmailService, EmailTemplate};
 use crate::services::notification_service::{CreateNotificationRequest, NotificationService};
 use crate::services::user_notification_setting_service::UserNotificationSettingService;
+use crate::services::wechat_mp_service::{NotificationOutcome, TemplateField, WechatMpService};
 use crate::utils::error::AppError;
 use crate::utils::html_escape::escape_html;
-use sea_orm::{DatabaseConnection, EntityTrait};
+use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder};
 use std::sync::Arc;
 
 /// 多用户通知发送参数对象（批次 413 技术债务清理：引入参数对象消除 notify_multiple_users 的 too_many_arguments 警告。；聚合多用户通知所需的全部字段，避免函数签名携带 7 个参数。）
@@ -37,6 +40,7 @@ pub struct EventNotificationService {
     notification_service: NotificationService,
     email_service: Option<Arc<EmailService>>,
     setting_service: UserNotificationSettingService,
+    wechat_mp_service: Option<Arc<WechatMpService>>,
 }
 
 impl EventNotificationService {
@@ -45,7 +49,8 @@ impl EventNotificationService {
         Self {
             notification_service: NotificationService::new(db.clone()),
             email_service: None,
-            setting_service: UserNotificationSettingService::new(db),
+            setting_service: UserNotificationSettingService::new(db.clone()),
+            wechat_mp_service: None,
         }
     }
 
@@ -54,8 +59,15 @@ impl EventNotificationService {
         Self {
             notification_service: NotificationService::new(db.clone()),
             email_service: Some(email_service),
-            setting_service: UserNotificationSettingService::new(db),
+            setting_service: UserNotificationSettingService::new(db.clone()),
+            wechat_mp_service: None,
         }
+    }
+
+    /// 挂载微信公众号通知腿（调用方在凭证可用时装配，内部发送前仍按 is_available 复判）。
+    pub fn with_wechat_mp(mut self, wechat_mp_service: Arc<WechatMpService>) -> Self {
+        self.wechat_mp_service = Some(wechat_mp_service);
+        self
     }
 
     /// 构造库存预警通知请求体（批次 409 提取：原 notify_inventory_alert 方法内联的 CreateNotificationRequest 构造逻辑，；提取为独立纯函数便于单元测试通知字段完整性。）
@@ -179,6 +191,104 @@ impl EventNotificationService {
                 }
             }
         }
+    }
+
+    /// 发送微信模板消息（辅助方法）。
+    ///
+    /// 入参：`user_id` 收件用户、`kind` 事件类型、`business_key` 业务对象标识、`jump_url`
+    /// 跳转目标、`fields` 模板字段集合。出件链路：按 user_id 反查绑定表取 openid（无绑定
+    /// 即显式日志后跳过，不算失败）→ is_available 复判凭证（未配置返回 SERVICE_UNAVAILABLE，
+    /// 与"未配置不是成功"口径一致）→ 交给 WechatMpService::notify_template（自带去重与
+    /// 失败回收占位）。失败打显式 WARN 不影响主业务流（与 send_email_notification 同口径）。
+    async fn send_wechat_notification(
+        &self,
+        user_id: i32,
+        kind: WechatMpTemplateKind,
+        business_key: &str,
+        jump_url: Option<&str>,
+        fields: &[TemplateField<'_>],
+    ) {
+        let Some(wechat_mp_service) = &self.wechat_mp_service else {
+            return;
+        };
+        if !WechatMpService::is_available() {
+            tracing::warn!(
+                user_id = user_id,
+                kind = kind.code(),
+                "公众号通知腿不可用：接口凭证未配置，本次模板消息不发送"
+            );
+            return;
+        }
+        let binding = wechat_mp_binding::Entity::find()
+            .filter(wechat_mp_binding::Column::UserId.eq(user_id))
+            .order_by_asc(wechat_mp_binding::Column::Id)
+            .all(self.notification_service.db().as_ref())
+            .await;
+        let openids: Vec<String> = match binding {
+            Ok(rows) => rows.into_iter().map(|r| r.openid).collect(),
+            Err(e) => {
+                tracing::warn!(
+                    user_id = user_id,
+                    error = %e,
+                    "公众号绑定查询失败，本次模板消息不发送"
+                );
+                return;
+            }
+        };
+        if openids.is_empty() {
+            tracing::info!(
+                user_id = user_id,
+                kind = kind.code(),
+                business_key = business_key,
+                "目标用户未绑定公众号 openid，跳过微信模板消息"
+            );
+            return;
+        }
+        for openid in &openids {
+            match wechat_mp_service
+                .notify_template(kind, openid, business_key, jump_url, fields)
+                .await
+            {
+                Ok(NotificationOutcome::Sent) => {
+                    tracing::info!(
+                        user_id = user_id,
+                        kind = kind.code(),
+                        business_key = business_key,
+                        "微信模板消息发送成功"
+                    );
+                }
+                Ok(NotificationOutcome::SkippedDuplicate) => {}
+                Err(e) => {
+                    tracing::warn!(
+                        user_id = user_id,
+                        kind = kind.code(),
+                        business_key = business_key,
+                        error = %e,
+                        "微信模板消息发送失败（best-effort，不影响主业务流）"
+                    );
+                }
+            }
+        }
+    }
+
+    /// 报价结果微信模板消息（业务事件方专用包装）。
+    ///
+    /// 固定 `QuotationResult` 事件类型与报价单号作业务对象标识；字段集合由调用方按
+    /// 公众号后台模板占位符传入。出件链路与失败口径见 [`Self::send_wechat_notification`]。
+    pub async fn send_quotation_result_wechat(
+        &self,
+        user_id: i32,
+        quotation_no: &str,
+        fields: &[TemplateField<'_>],
+    ) {
+        self.send_wechat_notification(
+            user_id,
+            WechatMpTemplateKind::QuotationResult,
+            quotation_no,
+            Some(&format!("/quotations/detail/{}", quotation_no)),
+            fields,
+        )
+        .await;
     }
 
     /// 销售订单创建通知（草稿态）

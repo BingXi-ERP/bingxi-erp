@@ -19,7 +19,9 @@ use crate::models::quotation_response_dto::{
     QuotationItemResponseDto, QuotationResponseDto, QuotationTermResponseDto,
 };
 use crate::models::quotation_update_dto::UpdateQuotationDto;
+use crate::models::sales_quotation;
 use crate::models::status::approval;
+use crate::services::event_notification_service::EventNotificationService;
 use crate::services::quotation_approval_service::QuotationApprovalService;
 use crate::services::quotation_convert_service::QuotationConvertService;
 use crate::services::quotation_discount_service::QuotationDiscountService;
@@ -252,6 +254,52 @@ pub async fn submit_quotation(
     )))
 }
 
+/// 报价审批结果双通道通知（站内 + 微信公众号报价结果模板）。
+///
+/// 收件人为报价单创建人（`created_by`）；站内走 `notify_approval_result`（既有
+/// 去重键与词表不变），微信走 `QuotationResult` 模板（字段集合按公众号后台模板
+/// 占位符约定，business_key 用报价单号保证同一单据同一类通知只轰炸一次）。
+/// 两条腿都是 best-effort：失败只记日志，不回滚已完成的审批动作。
+async fn notify_quotation_result(
+    state: &AppState,
+    model: &sales_quotation::Model,
+    auth: &AuthContext,
+    approved: bool,
+    comment: Option<&str>,
+) {
+    let Some(ref event_service) = state.event_notification_service else {
+        return;
+    };
+    let recipient = i32::try_from(model.created_by).unwrap_or(0);
+    if recipient <= 0 {
+        return;
+    }
+    if let Err(e) = event_service
+        .notify_approval_result(
+            recipient,
+            &model.quotation_no,
+            approved,
+            auth.user_id,
+            &auth.username,
+            comment,
+        )
+        .await
+    {
+        tracing::warn!(error = %e, quotation_no = %model.quotation_no, "报价审批结果站内通知发送失败");
+    }
+    let fields = vec![
+        crate::services::wechat_mp_service::TemplateField::new("business_no", &model.quotation_no),
+        crate::services::wechat_mp_service::TemplateField::new(
+            "result",
+            if approved { "通过" } else { "拒绝" },
+        ),
+        crate::services::wechat_mp_service::TemplateField::new("operator", &auth.username),
+    ];
+    event_service
+        .send_quotation_result_wechat(recipient, &model.quotation_no, &fields)
+        .await;
+}
+
 /// POST /api/v1/erp/quotations/:id/approve
 // 审批拆为「通过 / 拒绝」两条动作：本端点只处理通过，通过理由必填并真实落
 // `approval_reason` 列；拒绝动作在 /reject（理由落既有专列 `rejection_reason`）。
@@ -280,6 +328,7 @@ pub async fn approve_quotation(
 
     let service = QuotationApprovalService::from_state(&state);
     let model = service.approve(id, auth.user_id, approval_reason).await?;
+    notify_quotation_result(&state, &model, &auth, true, None).await;
     Ok(Json(ApiResponse::success_with_message(
         QuotationResponseDto::from(model),
         "报价单已批准",
@@ -307,6 +356,7 @@ pub async fn reject_quotation(
     }
     let service = QuotationApprovalService::from_state(&state);
     let model = service.reject(id, auth.user_id, reason).await?;
+    notify_quotation_result(&state, &model, &auth, false, Some(&body.reason)).await;
     Ok(Json(ApiResponse::success_with_message(
         QuotationResponseDto::from(model),
         "报价单已拒绝",
