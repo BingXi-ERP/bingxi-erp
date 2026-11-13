@@ -357,8 +357,8 @@ test.describe('497 色卡打印 docx 下载面', () => {
         `${legName}信封必须带非空 trace_id 供追溯，实际 ${JSON.stringify(envelope.trace_id)}`
       ).toBe(true);
       expect(
-        typeof envelope.timestamp === 'string' && envelope.timestamp.length > 0,
-        `${legName}信封必须带时间戳，实际 ${JSON.stringify(envelope.timestamp)}`
+        typeof envelope.timestamp === 'number' && Number.isFinite(envelope.timestamp),
+        `${legName}信封必须带秒级时间戳（契约是 i64 数字），实际 ${JSON.stringify(envelope.timestamp)}`
       ).toBe(true);
       expect(
         envelope.message,
