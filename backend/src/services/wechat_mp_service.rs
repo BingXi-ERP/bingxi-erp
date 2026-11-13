@@ -85,6 +85,21 @@ const ACCESS_TOKEN_INVALID_ERRCODES: [i64; 4] = [40001, 40002, 40014, 42001];
 /// 单飞语义由这把异步锁提供（见模块头"单飞取号"）。
 static ACCESS_TOKEN_CACHE: Lazy<Mutex<Option<CachedAccessToken>>> = Lazy::new(|| Mutex::new(None));
 
+/// 进程级共享出站客户端：取号链（静态关联函数）与模板消息发送腿共用一份连接池，
+/// 固定请求超时、连接超时与禁重定向，不按服务实例各自新建。
+static HTTP_CLIENT: Lazy<Client> = Lazy::new(|| {
+    Client::builder()
+        .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
+        .connect_timeout(std::time::Duration::from_secs(CONNECT_TIMEOUT_SECS))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| {
+            error!("公众号通知腿 HTTP 客户端构建失败: {}", e);
+            e
+        })
+        .expect("公众号通知腿 HTTP 客户端参数均为固定值，构建不应失败")
+});
+
 /// 缓存中的一枚接口调用令牌及其到期时刻。
 #[derive(Debug, Clone)]
 struct CachedAccessToken {
@@ -149,25 +164,12 @@ pub enum NotificationOutcome {
 /// 微信公众号通知腿。
 pub struct WechatMpService {
     db: Arc<DatabaseConnection>,
-    http: Client,
 }
 
 impl WechatMpService {
-    /// 以共享的数据库连接与固定超时的出站客户端建服务实例。
+    /// 以共享的数据库连接建服务实例；出站客户端为进程级共享的 `HTTP_CLIENT`。
     pub fn new(db: Arc<DatabaseConnection>) -> Self {
-        let http = Client::builder()
-            .timeout(std::time::Duration::from_secs(REQUEST_TIMEOUT_SECS))
-            .connect_timeout(std::time::Duration::from_secs(CONNECT_TIMEOUT_SECS))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|e| {
-                // 客户端建不起来属于部署级缺陷，后续每次出站都会失败；这里先记显式错误，
-                // 让日志里能看到成因（而不是等到第一次发送时才发现是 builder 就挂了）。
-                error!("公众号通知腿 HTTP 客户端构建失败: {}", e);
-                e
-            })
-            .expect("公众号通知腿 HTTP 客户端参数均为固定值，构建不应失败");
-        Self { db, http }
+        Self { db }
     }
 
     /// 通知腿当前是否可用：接口凭证齐备即可用。
@@ -248,8 +250,7 @@ impl WechatMpService {
         appid: &str,
         secret: &str,
     ) -> Result<reqwest::Response, AppError> {
-        let response = self
-            .http()
+        let response = Self::http()
             .get(url)
             .query(&[
                 ("grant_type", "client_credential"),
@@ -266,8 +267,8 @@ impl WechatMpService {
     }
 
     /// 出站客户端（进程内共享一份连接池）。
-    fn http(&self) -> &Client {
-        &self.http
+    fn http() -> &'static Client {
+        &HTTP_CLIENT
     }
 
     /// 把取号响应判成"令牌 + 到期时刻"或显式失败。
@@ -340,8 +341,7 @@ impl WechatMpService {
             WECHAT_MP_API_HOST, TEMPLATE_SEND_PATH, token
         );
 
-        let response = self
-            .http
+        let response = Self::http()
             .post(&url)
             .header("Content-Type", "application/json")
             .json(&payload)
