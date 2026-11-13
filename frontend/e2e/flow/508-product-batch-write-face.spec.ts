@@ -12,7 +12,7 @@ import { loginViaUI, apiCall, apiCallExpectFail, genCode, tryCleanup } from './h
  * - 入参：三个 Payload 的容器键分别为 products/products/ids，数组上限 500 条，
  *   validator length 门在 handler 层先跑，超限 `AppError::bad_request`
  *   → 400 + VALIDATION_ERROR + message 恒 "请求参数验证失败"（非 Displayable 脱敏）。
- * - 创建行 BatchCreateProductRequest（services/batch_service.rs:46）：name/code 必填，
+ * - 创建行 BatchCreateProductRequest（services/batch_service.rs）：name/code 必填，
  *   product_type 与幅宽克重成分走 validate_product_create_fields 必录门，取值域走
  *   validate_product_numeric_domains（词表外类型、负幅宽、负价格均拒）。价格两列
  *   是字符串形态（DECIMAL 线上形态），先十进制解析再判域，解析不了点名拒绝。
@@ -26,7 +26,7 @@ import { loginViaUI, apiCall, apiCallExpectFail, genCode, tryCleanup } from './h
  * - 出参 BatchResponse（handler :44）字段：success/total/created/updated/deleted/
  *   failed/data/errors，包在 ApiResponse.data 里；errors 元素形态「索引 {i}: {文案}」。
  * - data（创建/更新）元素键：id/name/code/category_id/status（handler 序列化四键
- *   加 category_id，见 bulk_product_handler.rs:76-83）。
+ *   加 category_id，见 bulk_product_handler.rs）。
  * - 鉴权：AuthContext 必登；创建/更新落库后逐条 GET /products/{id} 回读
  *   （product::Model 裸序列化，name/code/status/standard_price 等键为 snake_case）。
  *
@@ -159,7 +159,7 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
     });
     expect(tooMany.status, '[508-02] 超 500 条应 400').toBe(400);
     expect(
-      JSON.stringify(tooMany.body ?? tooMany).includes('批量创建产品数量不能超过 500 条'),
+      JSON.stringify(tooMany).includes('批量创建产品数量不能超过 500 条'),
       '[508-02] 长度门文案应外显（validator 消息透传）'
     ).toBe(true);
   });

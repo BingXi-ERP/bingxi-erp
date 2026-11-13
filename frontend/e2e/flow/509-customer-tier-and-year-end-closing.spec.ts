@@ -7,15 +7,15 @@ import { loginViaUI, apiCall, apiCallExpectFail, genCode, tryCleanup } from './h
  *
  * 覆盖面取证（写断言前逐字对过 backend 源码，非设想；本批候选由端点级扫描
  * 加模板串复核两道工序筛出，非陈旧清单转抄）：
- * - PUT /customers/{id}/tier：routes/crm.rs:54（tier 列唯一 HTTP 入口）→
+ * - PUT /customers/{id}/tier：routes/crm.rs（tier 列唯一 HTTP 入口）→
  *   handlers/customer_handler.rs::update_customer_tier。读门与整行更新腿同源
  *   （get_customer 行级数据范围 + crm_write_guard::ensure_cross_owner_write_allowed
- *   跨 owner 写门），值域门在服务写口 services/customer_ops/update.rs:323：
+ *   跨 owner 写门），值域门在服务写口 services/customer_ops/update.rs：
  *   词表外档位走 business_displayable，文案外显列可选档位（VIP/GOLD/SILVER/
  *   NORMAL 四值，constants/customer_tier.rs::ALLOWED，与 DB CHECK
  *   chk_customers_tier 逐值同源；NULL 是未定档不是档位，不在词表）。
  *   出参收口只回 id 与 tier 两键（handler 注释明写不复刻整实体序列化形态）。
- * - POST /accounting-periods/year-end-closing：routes/finance.rs:97 →
+ * - POST /accounting-periods/year-end-closing：routes/finance.rs →
  *   handlers/accounting_period_handler.rs::year_end_closing，Query 参数 year。
  *   service 门（accounting_period_service.rs::year_end_closing）第一道确定性拒绝：
  *   年度期间不足 12 个 → AppError::business（文案外显「年结失败：年度 N 仅有
@@ -102,11 +102,14 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
     ).toContain('年结失败');
     expect(String(fail.message)).toContain('1999');
     // 零副作用自证：1999 年的期间数在调用前后不变（门在事务内，拒绝即回滚）
-    const list =
-      (await apiCall) <
-      { items: Array < { year: number } } >>
-        (page, 'GET', '/accounting-periods?page=1&page_size=100');
-    const in1999 = (list.data.items ?? []).filter(p => p.year === 1999);
+    const list = await apiCall<{ items: Array<{ year: number }> }>(
+      page,
+      'GET',
+      '/accounting-periods?page=1&page_size=100'
+    );
+    const in1999 = ((list.data?.items ?? []) as Array<{ year: number }>).filter(
+      (p: { year: number }) => p.year === 1999
+    );
     expect(in1999.length, '[509-02] 被拒年结不得新造期间').toBe(0);
   });
 });
