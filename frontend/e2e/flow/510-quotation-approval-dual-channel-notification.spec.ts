@@ -111,7 +111,12 @@ async function createSelfQuotation(page: Page, tag: string): Promise<{ id: numbe
   return { id: id as number, no: quotationNo as string };
 }
 
+// 本 describe 每条链含 ensureTestEntities（UI 建 10+ 实体，慢环境可达 140s+）与
+// 两次 loginViaUI 角色切换（单次最多 120s），CI 慢环境单腿真实耗时超全局 420s，
+// 超时杀页后 waitForTimeout 抛 page closed 连锁失败（与 config 300s 时代同症状）；
+// 按 config 提升先例单独放宽到 600s，不动全局。
 test.describe('510 报价审批双通道通知腿（真实契约正腿）', () => {
+  test.describe.configure({ timeout: 600_000 });
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
   });
