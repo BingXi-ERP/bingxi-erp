@@ -67,7 +67,7 @@ function makeRow(prefix: string, overrides: Record<string, unknown> = {}): Recor
   return {
     name: `${prefix}-名`,
     code: genCode(prefix),
-    product_type: 'finished_fabric',
+    product_type: '成品布',
     width: 150,
     gram_weight: 200,
     fabric_composition: '棉 100%',

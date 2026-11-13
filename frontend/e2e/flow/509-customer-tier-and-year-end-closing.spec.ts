@@ -1,5 +1,5 @@
 import { test, expect } from '../diagnose-fixture';
-import { loginViaUI, apiCall, apiCallExpectFail, genCode, tryCleanup } from './helpers';
+import { loginViaUI, apiCall, apiCallRaw, apiCallExpectFail, genCode, tryCleanup } from './helpers';
 
 /**
  * 509 批十五两枚「前端可达 + 全仓零覆盖」写面端点：
@@ -43,15 +43,15 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
     page,
   }) => {
     // 前置：自建客户（最小必填集）
-    const created = await apiCall<{ id: number }>(page, 'POST', '/customers', {
-      name: `分层夹具-${genCode('C9')}`,
-      code: genCode('C9'),
+    const created = await apiCall<{ id: number }>(page, 'POST', '/crm/customers', {
+      customer_name: `分层夹具-${genCode('C9')}`,
+      customer_code: genCode('C9'),
     });
     const cid = created.data.id;
     expect(cid, '[509-01] 前置建客户应拿到 id').toBeGreaterThan(0);
 
     // 正腿：NORMAL → GOLD
-    const put = await apiCall<TierOut>(page, 'PUT', `/customers/${cid}/tier`, {
+    const put = await apiCall<TierOut>(page, 'PUT', `/crm/customers/${cid}/tier`, {
       tier: 'GOLD',
     });
     expect(put.data, '[509-01] 改档应 200').toBeTruthy();
@@ -67,12 +67,12 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
     const got = await apiCall<{ id: number; tier: string | null }>(
       page,
       'GET',
-      `/customers/${cid}`
+      `/crm/customers/${cid}`
     );
     expect(got.data.tier, '[509-01] 详情回读 tier 应为 GOLD').toBe('GOLD');
 
     // 负腿：词表外档位（词表只有 VIP/GOLD/SILVER/NORMAL）
-    const bad = await apiCallExpectFail(page, 'PUT', `/customers/${cid}/tier`, {
+    const bad = await apiCallExpectFail(page, 'PUT', `/crm/customers/${cid}/tier`, {
       tier: 'DIAMOND',
     });
     expect(bad.status, '[509-01] 词表外档位应 400').toBe(400);
@@ -81,10 +81,10 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
       `[509-01] business_displayable 文案应外显可选档位，实际 ${JSON.stringify(bad.message)}`
     ).toContain('VIP');
     // 被拒不落库
-    const got2 = await apiCall<{ tier: string | null }>(page, 'GET', `/customers/${cid}`);
+    const got2 = await apiCall<{ tier: string | null }>(page, 'GET', `/crm/customers/${cid}`);
     expect(got2.data.tier, '[509-01] 被拒后 tier 不应被改写').toBe('GOLD');
 
-    await tryCleanup(page, 'DELETE', `/customers/${cid}`, '[509-01] 删夹具客户');
+    await tryCleanup(page, 'DELETE', `/crm/customers/${cid}`, '[509-01] 删夹具客户');
   });
 
   test('509-02 POST accounting-periods/year-end-closing：无 12 期间年份被确定性拒 400 且文案点名年度与期间数，零副作用', async ({
@@ -93,7 +93,7 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
     const fail = await apiCallExpectFail(
       page,
       'POST',
-      '/accounting-periods/year-end-closing?year=1999'
+      '/finance/accounting-periods/year-end-closing?year=1999'
     );
     expect(fail.status, '[509-02] 期间不足年应被拒 400').toBe(400);
     expect(
@@ -102,14 +102,17 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
     ).toContain('年结失败');
     expect(String(fail.message)).toContain('1999');
     // 零副作用自证：1999 年的期间数在调用前后不变（门在事务内，拒绝即回滚）
-    const list = await apiCall<{ items: Array<{ year: number }> }>(
+    // 列表端点出参是裸数组，用 apiCallRaw 取 data 本体并守卫数组形状，不用 items 兜底
+    const periods = await apiCallRaw<Array<{ year: number }>>(
       page,
       'GET',
-      '/accounting-periods?page=1&page_size=100'
+      '/finance/accounting-periods'
     );
-    const in1999 = ((list.data?.items ?? []) as Array<{ year: number }>).filter(
-      (p: { year: number }) => p.year === 1999
-    );
+    expect(
+      Array.isArray(periods),
+      `[509-02] 期间列表应为数组，实际 ${JSON.stringify(periods).slice(0, 120)}`
+    ).toBe(true);
+    const in1999 = periods.filter((p: { year: number }) => p.year === 1999);
     expect(in1999.length, '[509-02] 被拒年结不得新造期间').toBe(0);
   });
 });
