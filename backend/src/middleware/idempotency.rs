@@ -27,12 +27,12 @@ use crate::constants::MAX_HTTP_BODY_BYTES;
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use crate::models::http_request_dedupe::{
-    ActiveModel as DedupeActiveModel, Column as DedupeColumn, Entity as DedupeEntity,
-    DEDUPE_STATUS_CLAIMED, DEDUPE_STATUS_COMPLETED, DEDUPE_STATUS_FAILED,
+    ActiveModel as DedupeActiveModel, Column as DedupeColumn, DEDUPE_STATUS_CLAIMED,
+    DEDUPE_STATUS_COMPLETED, DEDUPE_STATUS_FAILED, Entity as DedupeEntity,
 };
 use crate::utils::error::AppError;
 use axum::extract::State;
-use axum::http::{header::HeaderName, Method, Request};
+use axum::http::{Method, Request, header::HeaderName};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use chrono::Utc;
