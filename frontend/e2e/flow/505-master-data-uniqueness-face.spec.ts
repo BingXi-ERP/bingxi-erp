@@ -197,7 +197,15 @@ test.describe('505 主数据唯一性面', () => {
     expect(rows.length, `客户编码 ${code} 在库里必须只有一行，实际 ${rows.length} 行`).toBe(1);
 
     await apiCall(page, 'DELETE', `/crm/customers/${customerId}`);
-    const gone = await apiCallExpectFail(page, 'GET', `/crm/customers/${customerId}`);
-    expect(gone.status, `客户删除后按 id 回读必须 404，实际 ${gone.status}`).toBe(404);
+    // 客户删除是软删除（status 置 inactive），对象口仍可读回，故以状态回读证明删除生效。
+    const afterDelete = await apiCallRaw<{ status?: unknown }>(
+      page,
+      'GET',
+      `/crm/customers/${customerId}`
+    );
+    expect(
+      String(afterDelete.status),
+      `客户软删后状态必须落 inactive，实际 ${JSON.stringify(afterDelete)}`
+    ).toBe('inactive');
   });
 });
