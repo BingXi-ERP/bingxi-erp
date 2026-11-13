@@ -164,7 +164,9 @@ impl WechatMpNotificationOutboxWorker {
                 .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
                 .unwrap_or(true);
             if !enabled {
-                info!("公众号通知重试 Worker：环境变量 WECHAT_MP_OUTBOX_WORKER_ENABLED=false，跳过启动");
+                info!(
+                    "公众号通知重试 Worker：环境变量 WECHAT_MP_OUTBOX_WORKER_ENABLED=false，跳过启动"
+                );
                 return;
             }
 

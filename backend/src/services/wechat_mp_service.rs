@@ -48,11 +48,11 @@ use once_cell::sync::Lazy;
 use reqwest::Client;
 use sea_orm::DatabaseConnection;
 use serde::Deserialize;
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
-use crate::config::settings::{global_wechat_mp_config, WechatMpTemplateKind};
+use crate::config::settings::{WechatMpTemplateKind, global_wechat_mp_config};
 use crate::services::event_idempotency_service::EventIdempotencyService;
 use crate::utils::error::AppError;
 
@@ -194,8 +194,12 @@ impl WechatMpService {
             )));
         }
         // 上一步已确认两枚都在，此处取值必然成功
-        let appid = cfg.appid.expect("missing_credential_env_names 已确认 WECHAT_MP_APPID 在场");
-        let secret = cfg.secret.expect("missing_credential_env_names 已确认 WECHAT_MP_SECRET 在场");
+        let appid = cfg
+            .appid
+            .expect("missing_credential_env_names 已确认 WECHAT_MP_APPID 在场");
+        let secret = cfg
+            .secret
+            .expect("missing_credential_env_names 已确认 WECHAT_MP_SECRET 在场");
         Ok((appid, secret))
     }
 
@@ -246,7 +250,11 @@ impl WechatMpService {
     ) -> Result<reqwest::Response, AppError> {
         let response = Self::http()
             .get(url)
-            .query(&[("grant_type", "client_credential"), ("appid", appid), ("secret", secret)])
+            .query(&[
+                ("grant_type", "client_credential"),
+                ("appid", appid),
+                ("secret", secret),
+            ])
             .send()
             .await
             .map_err(|e| {
@@ -347,10 +355,9 @@ impl WechatMpService {
             })?;
 
         let status = response.status().as_u16();
-        let body: SendResponse = response
-            .json()
-            .await
-            .map_err(|e| AppError::service_unavailable(format!("公众号模板消息响应解析失败: {}", e)))?;
+        let body: SendResponse = response.json().await.map_err(|e| {
+            AppError::service_unavailable(format!("公众号模板消息响应解析失败: {}", e))
+        })?;
 
         if body.errcode == 0 {
             info!(
@@ -438,10 +445,7 @@ impl WechatMpService {
             .try_mark_processed(NOTIFICATION_CONSUMER_ID, &event_key, kind.code())
             .await?;
         if !claimed {
-            info!(
-                "公众号通知去重命中，跳过重复轰炸: event_key={}",
-                event_key
-            );
+            info!("公众号通知去重命中，跳过重复轰炸: event_key={}", event_key);
             return Ok(NotificationOutcome::SkippedDuplicate);
         }
 

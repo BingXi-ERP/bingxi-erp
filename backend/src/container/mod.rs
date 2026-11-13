@@ -20,7 +20,6 @@ use crate::services::custom_order_state_service::CustomOrderStateService;
 use crate::services::data_permission_service::DataPermissionService;
 use crate::services::email_service::EmailService;
 use crate::services::event_notification_service::EventNotificationService;
-use crate::services::wechat_mp_service::WechatMpService;
 use crate::services::metrics_service::MetricsService;
 use crate::services::notification_service::NotificationService;
 use crate::services::omni_audit_service::OmniAuditEngine;
@@ -28,6 +27,7 @@ use crate::services::quotation_approval_service::QuotationApprovalService;
 use crate::services::quotation_convert_service::QuotationConvertService;
 use crate::services::quotation_pricing_service::QuotationPricingService;
 use crate::services::quotation_service::QuotationService;
+use crate::services::wechat_mp_service::WechatMpService;
 use crate::utils::cache::AppCache;
 use crate::utils::di_container::DIContainer;
 

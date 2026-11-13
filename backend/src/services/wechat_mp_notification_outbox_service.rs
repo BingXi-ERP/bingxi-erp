@@ -9,7 +9,9 @@ use sea_orm::{
 };
 use std::sync::Arc;
 
-use crate::models::wechat_mp_notification_outbox::{ActiveModel, Entity, Model as OutboxModel};
+use crate::models::wechat_mp_notification_outbox::{
+    ActiveModel, Column, Entity, Model as OutboxModel,
+};
 use crate::utils::error::AppError;
 
 /// 最大重试次数（与邮件腿同口径,超过转 FAILED 死信）
