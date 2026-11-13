@@ -641,12 +641,18 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
       '库存预警',
       '501-04 仓库管理员基线收件箱'
     );
+    // 触发腿必须切回管理员会话：warehouse_manager 无库存列表读权限，在仓管会话里
+    // 调 /inventory/stock 只会得到 FORBIDDEN，触发根本没发生，差值守恒会退化成假绿。
+    // 收件人常量 0 与触发者角色无关，管理员触发后再切仓管读收件箱等价。
+    await loginViaUI(page, undefined, undefined, true);
     await apiCallRaw<{ items?: unknown[]; total?: number }>(
       page,
       'GET',
       '/inventory/stock?page=1&page_size=20'
     );
-    const warehouseInboxAfter = await readInbox(page);
+    const warehouseInboxAfter = await loginAsRole(page, 'warehouse_manager').then(() =>
+      readInbox(page)
+    );
     const warehouseAfterCount = countTitle(
       warehouseInboxAfter,
       '库存预警',
