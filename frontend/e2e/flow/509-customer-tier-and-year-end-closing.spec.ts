@@ -29,12 +29,6 @@ import { loginViaUI, apiCall, apiCallExpectFail, genCode, tryCleanup } from './h
  * year-end 腿零前置（用一个确定无 12 个期间的年份，如 1999）。
  */
 
-interface Envelope<T> {
-  code: string;
-  message: string;
-  data: T;
-}
-
 interface TierOut {
   id: number;
   tier: string;
@@ -49,7 +43,7 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
     page,
   }) => {
     // 前置：自建客户（最小必填集）
-    const created = await apiCall<Envelope<{ id: number }>>(page, 'POST', '/customers', {
+    const created = await apiCall<{ id: number }>(page, 'POST', '/customers', {
       name: `分层夹具-${genCode('C9')}`,
       code: genCode('C9'),
     });
@@ -57,7 +51,7 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
     expect(cid, '[509-01] 前置建客户应拿到 id').toBeGreaterThan(0);
 
     // 正腿：NORMAL → GOLD
-    const put = await apiCall<Envelope<TierOut>>(page, 'PUT', `/customers/${cid}/tier`, {
+    const put = await apiCall<TierOut>(page, 'PUT', `/customers/${cid}/tier`, {
       tier: 'GOLD',
     });
     expect(put.data, '[509-01] 改档应 200').toBeTruthy();
@@ -70,7 +64,7 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
     ).toBe('id,tier');
 
     // 回读复核：客户详情 tier 列落库
-    const got = await apiCall<Envelope<{ id: number; tier: string | null }>>(
+    const got = await apiCall<{ id: number; tier: string | null }>(
       page,
       'GET',
       `/customers/${cid}`
@@ -87,7 +81,7 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
       `[509-01] business_displayable 文案应外显可选档位，实际 ${JSON.stringify(bad.message)}`
     ).toContain('VIP');
     // 被拒不落库
-    const got2 = await apiCall<Envelope<{ tier: string | null }>>(page, 'GET', `/customers/${cid}`);
+    const got2 = await apiCall<{ tier: string | null }>(page, 'GET', `/customers/${cid}`);
     expect(got2.data.tier, '[509-01] 被拒后 tier 不应被改写').toBe('GOLD');
 
     await tryCleanup(page, 'DELETE', `/customers/${cid}`, '[509-01] 删夹具客户');
@@ -108,11 +102,10 @@ test.describe('509 客户分层改单与年度结账两枚写面（真实契约�
     ).toContain('年结失败');
     expect(String(fail.message)).toContain('1999');
     // 零副作用自证：1999 年的期间数在调用前后不变（门在事务内，拒绝即回滚）
-    const list = await apiCall<Envelope<{ items: Array<{ year: number }> }>>(
-      page,
-      'GET',
-      '/accounting-periods?page=1&page_size=100'
-    );
+    const list =
+      (await apiCall) <
+      { items: Array < { year: number } } >>
+        (page, 'GET', '/accounting-periods?page=1&page_size=100');
     const in1999 = (list.data.items ?? []).filter(p => p.year === 1999);
     expect(in1999.length, '[509-02] 被拒年结不得新造期间').toBe(0);
   });

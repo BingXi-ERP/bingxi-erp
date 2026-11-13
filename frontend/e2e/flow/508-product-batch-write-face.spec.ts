@@ -52,12 +52,6 @@ interface BatchEnvelope {
   errors: string[] | null;
 }
 
-interface Envelope<T> {
-  code: string;
-  message: string;
-  data: T;
-}
-
 /** 单条产品详情出参切片（product::Model 裸序列化，断言只取回读相关列） */
 interface ProductRead {
   id: number;
@@ -90,7 +84,7 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
     page,
   }) => {
     const rows = [makeRow('P8A'), makeRow('P8A'), makeRow('P8A')];
-    const res = await apiCall<Envelope<BatchEnvelope>>(page, 'POST', '/products/batch/create', {
+    const res = await apiCall<BatchEnvelope>(page, 'POST', '/products/batch/create', {
       products: rows,
     });
     expect(res.data, '[508-01] 批量创建应 200 且带 BatchResponse 信封').toBeTruthy();
@@ -109,7 +103,7 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
     }
 
     // 落库复核：任取一行单条 GET，主档列逐字对齐
-    const got = await apiCall<Envelope<ProductRead>>(page, 'GET', `/products/${b.data![0].id}`);
+    const got = await apiCall<ProductRead>(page, 'GET', `/products/${b.data![0].id}`);
     expect(got.data, '[508-01] 单条回读应命中').toBeTruthy();
     expect(got.data.code, '[508-01] 回读 code 应一致').toBe(rows[0].code);
     expect(got.data.name, '[508-01] 回读 name 应一致').toBe(rows[0].name);
@@ -122,7 +116,7 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
       '[508-01] 批量删除三行（用端点自身收尾）'
     );
     // 兜底清理（若批量删除已被上一腿消费则逐条兜底）
-    for (const d of b.data!) {
+    for (const d of b.data as Array<{ id: number }>) {
       await tryCleanup(page, 'DELETE', `/products/${d.id}`, `[508-01] 兜底删产品 ${d.id}`);
     }
   });
@@ -132,7 +126,7 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
   }) => {
     // 腿一：面料类产品缺 fabric_composition —— validate_product_create_fields 点名拒
     const missRow = makeRow('P8B', { fabric_composition: undefined });
-    const miss = await apiCall<Envelope<BatchEnvelope>>(page, 'POST', '/products/batch/create', {
+    const miss = await apiCall<BatchEnvelope>(page, 'POST', '/products/batch/create', {
       products: [missRow],
     });
     expect(miss.data, '[508-02] 缺必录列应仍回 200 信封（服务端按行计数拒）').toBeTruthy();
@@ -147,7 +141,7 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
 
     // 腿二：负幅宽 —— validate_product_numeric_domains 拒
     const negRow = makeRow('P8B', { width: -10 });
-    const neg = await apiCall<Envelope<BatchEnvelope>>(page, 'POST', '/products/batch/create', {
+    const neg = await apiCall<BatchEnvelope>(page, 'POST', '/products/batch/create', {
       products: [negRow],
     });
     expect(neg.data, '[508-02] 负幅宽应回信封').toBeTruthy();
@@ -156,9 +150,9 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
     expect(neg.data.failed, '[508-02] 负幅宽 failed 应为 1').toBe(1);
 
     // 腿三：501 条超长度门 —— handler 层 validator 先拒，应 400 且非 BatchResponse 形态
-    const many = Array.from({ length: 501 }, (_, i) => makeRow('P8B')).map(r => ({
-      ...r,
-      code: `${r.code}-${i}`,
+    const many = Array.from({ length: 501 }, (_, i) => ({
+      ...makeRow('P8B'),
+      code: `${genCode('P8B')}-${i}`,
     }));
     const tooMany = await apiCallExpectFail(page, 'POST', '/products/batch/create', {
       products: many,
@@ -175,14 +169,14 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
   }) => {
     // 先批量创建一行产物
     const seed = makeRow('P8C');
-    const created = await apiCall<Envelope<BatchEnvelope>>(page, 'POST', '/products/batch/create', {
+    const created = await apiCall<BatchEnvelope>(page, 'POST', '/products/batch/create', {
       products: [seed],
     });
     expect(created.data && created.data.created === 1, '[508-03] 前置批量建一行应成功').toBe(true);
     const pid = created.data!.data![0].id;
 
     const newName = `${seed.name}-改`;
-    const upd = await apiCall<Envelope<BatchEnvelope>>(page, 'POST', '/products/batch/update', {
+    const upd = await apiCall<BatchEnvelope>(page, 'POST', '/products/batch/update', {
       products: [{ id: pid, name: newName, gram_weight: 250 }],
     });
     expect(upd.data, '[508-03] 批量更新应 200 信封').toBeTruthy();
@@ -191,7 +185,7 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
     expect(upd.data.failed, '[508-03] failed 应为 0').toBe(0);
 
     // 回读：新值生效
-    const got = await apiCall<Envelope<ProductRead>>(page, 'GET', `/products/${pid}`);
+    const got = await apiCall<ProductRead>(page, 'GET', `/products/${pid}`);
     expect(got.data.name, '[508-03] 回读 name 应为新值').toBe(newName);
     expect(String(got.data.gram_weight ?? ''), '[508-03] 回读 gram_weight 应为覆盖值 250').toBe(
       '250'
@@ -199,7 +193,7 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
     expect(got.data.code, '[508-03] 未触碰的 code 不应被洗掉').toBe(seed.code);
 
     // 不存在 id 计入 failed 且 errors 带索引
-    const updBad = await apiCall<Envelope<BatchEnvelope>>(page, 'POST', '/products/batch/update', {
+    const updBad = await apiCall<BatchEnvelope>(page, 'POST', '/products/batch/update', {
       products: [{ id: 99999999, name: '不存在行' }],
     });
     expect(updBad.data, '[508-03] 不存在 id 应回信封').toBeTruthy();
@@ -218,13 +212,13 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
     page,
   }) => {
     const rows = [makeRow('P8D'), makeRow('P8D')];
-    const created = await apiCall<Envelope<BatchEnvelope>>(page, 'POST', '/products/batch/create', {
+    const created = await apiCall<BatchEnvelope>(page, 'POST', '/products/batch/create', {
       products: rows,
     });
     expect(created.data && created.data.created === 2, '[508-04] 前置批量建两行应成功').toBe(true);
-    const ids = created.data!.data!.map(d => d.id);
+    const ids = created.data!.data!.map((d: { id: number }) => d.id);
 
-    const del = await apiCall<Envelope<BatchEnvelope>>(page, 'POST', '/products/batch/delete', {
+    const del = await apiCall<BatchEnvelope>(page, 'POST', '/products/batch/delete', {
       ids,
     });
     expect(del.data, '[508-04] 批量删除应 200 信封').toBeTruthy();
@@ -240,7 +234,7 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
     }
 
     // 不存在 id 的批量删除：failed 计数语义（deleted=0，errors 带索引）
-    const delBad = await apiCall<Envelope<BatchEnvelope>>(page, 'POST', '/products/batch/delete', {
+    const delBad = await apiCall<BatchEnvelope>(page, 'POST', '/products/batch/delete', {
       ids: [99999999],
     });
     expect(delBad.data, '[508-04] 不存在 id 删除应回信封').toBeTruthy();
