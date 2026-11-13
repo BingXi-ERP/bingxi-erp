@@ -42,7 +42,8 @@ import {
  * alert_level / notify_method，可选 notify_roles；GET 列表页码基数为 0；DELETE /aging-alert-rules/{id} 在册。
  *
  * 3. 审批超时提醒 服务端实现 的 send_pending_reminders：
- * POST /bulk-color-approvals/reminders/send-pending?threshold_hours=N 返回 data=本轮投递成功条数；
+ * POST /bulk-color-approvals/reminders/send-pending?threshold_hours=N 返回
+ * data=ReminderSendResult{sent_count,threshold_hours}，sent_count 为本轮投递成功条数；
  * 提醒对象取 record.approver_id，投递标题为 `批色待剪样超时提醒 #{id}`、dedup_key
  * =bca_pending_reminder_{id}_{YYYYMMDDHH}（服务端实现 的 check_dedup 的窗口是
  * DEDUP_WINDOW_SECS=300 秒，故同一次用例内的连发必然被去重，跨 5 分钟的同小时连发会重复投递——该缺口只登记不设阈值放行）。
@@ -516,20 +517,30 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
         '非空说明提醒收件人已不再是 approver_id 兜底路径，本用例的反向判据需重取'
     ).toBeNull();
 
-    const send1 = await apiCallRaw<number>(
+    type ReminderSendResult = { sent_count?: unknown; threshold_hours?: unknown };
+    const send1 = await apiCallRaw<ReminderSendResult>(
       page,
       'POST',
       '/bulk-color-approvals/reminders/send-pending?threshold_hours=0'
     );
-    const send2 = await apiCallRaw<number>(
+    const send2 = await apiCallRaw<ReminderSendResult>(
       page,
       'POST',
       '/bulk-color-approvals/reminders/send-pending?threshold_hours=0'
     );
-    if (typeof send1 !== 'number' || typeof send2 !== 'number') {
-      throw new Error(
-        `501-03 send-pending 出参应为投递条数，实际 send1=${JSON.stringify(send1)} send2=${JSON.stringify(send2)}`
-      );
+    for (const [label, send] of [
+      ['send1', send1],
+      ['send2', send2],
+    ] as const) {
+      if (
+        !send ||
+        typeof send.sent_count !== 'number' ||
+        typeof send.threshold_hours !== 'number'
+      ) {
+        throw new Error(
+          `501-03 send-pending 出参应为 ReminderSendResult{sent_count,threshold_hours} 对象，实际 ${label}=${JSON.stringify(send)}`
+        );
+      }
     }
 
     // 提醒对象是各单的 approver 而非点击者：approver_id 为空时投递落到写死的收件人，
@@ -538,7 +549,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     const triggerInbox = await readInbox(page);
     expect(
       countTitle(triggerInbox, reminderTitle, '501-03 触发者收件箱'),
-      `501-03 触发者两次发起提醒后仍不应收到本单提醒（send1=${send1} send2=${send2}）`
+      `501-03 触发者两次发起提醒后仍不应收到本单提醒（send1.sent_count=${String(send1.sent_count)} send2.sent_count=${String(send2.sent_count)}）`
     ).toBe(0);
 
     // 提醒只投递、不改态、不生成单据：两次发送后本单仍在待提醒集合且状态与提醒前一致
@@ -564,7 +575,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     console.log(
       `501-03 提醒面取证：单 id=${id} 审批态=${mine.approval_status} approver_id=${String(
         mine.approver_id
-      )} send1=${send1} send2=${send2}（收件人为写死的兜底用户，正向投递无法从 HTTP 证明）`
+      )} send1.sent_count=${String(send1.sent_count)} send2.sent_count=${String(send2.sent_count)}（收件人为写死的兜底用户，正向投递无法从 HTTP 证明）`
     );
   });
 
