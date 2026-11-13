@@ -630,11 +630,32 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
       before
     );
 
-    const warehouseInbox = await loginAsRole(page, 'warehouse_manager').then(() => readInbox(page));
+    // 仓库管理员腿按差值守恒断言：定时扫描腿的收件人角色集合法含 warehouse_manager
+    // （stock_alert_notification_scheduler 拉收件人），共享库上绝对零会被定时信假红；
+    // HTTP 触发腿的收件人写常量 0，两次读之间只触发 HTTP 腿，仓库管理员站内信不应增。
+    const warehouseInboxBefore = await loginAsRole(page, 'warehouse_manager').then(() =>
+      readInbox(page)
+    );
+    const warehouseBaseline = countTitle(
+      warehouseInboxBefore,
+      '库存预警',
+      '501-04 仓库管理员基线收件箱'
+    );
+    await apiCallRaw<{ items?: unknown[]; total?: number }>(
+      page,
+      'GET',
+      '/inventory/stock?page=1&page_size=20'
+    );
+    const warehouseInboxAfter = await readInbox(page);
+    const warehouseAfterCount = countTitle(
+      warehouseInboxAfter,
+      '库存预警',
+      '501-04 仓库管理员触发后收件箱'
+    );
     expect(
-      countTitle(warehouseInbox, '库存预警', '501-04 仓库管理员收件箱'),
-      '501-04 HTTP 触发腿的收件人被写成常量 0，仓库管理员会话不应读到任何库存预警站内信'
-    ).toBe(0);
+      warehouseAfterCount,
+      `501-04 两次读之间只触发了 HTTP 库存预警腿（收件人常量 0），仓库管理员站内信应守恒，实际 ${warehouseBaseline}→${warehouseAfterCount}`
+    ).toBe(warehouseBaseline);
 
     console.log(
       `501-04 取证：告警行数 ${rows1.length}/${total1}→${rows2.length}/${alerts2.data.total} ` +
