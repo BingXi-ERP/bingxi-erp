@@ -20,7 +20,14 @@
  * 不给库里留残留，也不依赖库里恰好有什么。
  */
 import { test, expect } from '../diagnose-fixture';
-import { APP_ERROR_CODES, apiCall, apiCallExpectFail, apiCallRaw, genCode } from './helpers';
+import {
+  APP_ERROR_CODES,
+  apiCall,
+  apiCallExpectFail,
+  apiCallRaw,
+  genCode,
+  type ApiFailureResult,
+} from './helpers';
 
 type ProductRow = { id?: unknown; code?: unknown; name?: unknown };
 
@@ -53,23 +60,26 @@ function productBody(code: string, name: string): CreateProductBody {
  * 存哪里：无写入。
  */
 function expectIdempotencyRejected(
-  result: { status: number; code: string; message: string },
+  result: ApiFailureResult,
   idempotencyKey: string,
   mustContain: string,
   context: string
 ): void {
   expect(result.status, `${context}：幂等门应拒在分发之前，给 400 而不是 500`).toBe(400);
+  // 失败体的 code / message 在未收窄的 ApiFailureBody 里是可选字段：缺键时必须判红，
+  // 所以这里只把值读成字符串参与比较，缺键会落成 "undefined" 让下面的断言自然失败。
+  const code = String(result.code);
+  const message = String(result.message);
+  expect(code, `${context}：拒因应走业务族机器码，实际 code=${code} message=${message}`).toBe(
+    APP_ERROR_CODES.BUSINESS_ERROR
+  );
   expect(
-    result.code,
-    `${context}：拒因应走业务族机器码，实际 code=${result.code} message=${result.message}`
-  ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
-  expect(
-    result.message,
-    `${context}：拒因应点名幂等键 ${idempotencyKey}，实际 message=${result.message}`
+    message,
+    `${context}：拒因应点名幂等键 ${idempotencyKey}，实际 message=${message}`
   ).toContain(idempotencyKey);
   expect(
-    result.message,
-    `${context}：拒因应含判据词「${mustContain}」，实际 message=${result.message}`
+    message,
+    `${context}：拒因应含判据词「${mustContain}」，实际 message=${message}`
   ).toContain(mustContain);
 }
 
