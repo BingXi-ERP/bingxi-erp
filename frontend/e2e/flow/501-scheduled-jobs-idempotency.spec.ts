@@ -449,6 +449,9 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
       await apiCall(page, 'DELETE', `/notifications/${row.id}`);
     }
 
+    // 发票作废与规则回收要落在基础管理员权限，先切回本 worker 的管理员会话。
+    await loginViaUI(page, undefined, undefined, true);
+
     await apiCall(page, 'POST', `/ar/invoices/${invoice.id}/cancel`, { reason: '501 用例回收' });
     await apiCall(page, 'DELETE', `/aging-alert-rules/${rule.id}`);
     const ruleGone = await apiCallExpectFail(page, 'GET', `/aging-alert-rules/${rule.id}`);
