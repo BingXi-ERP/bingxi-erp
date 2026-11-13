@@ -201,13 +201,17 @@ test.describe('474 请求级幂等重放防护面', () => {
     const idempotencyKey = genCode('K474D');
     const otherKey = genCode('K474E');
 
-    const missingName = { code: badCode, product_type: '辅料', unit: '米' };
-    const rejected = await apiCallExpectFail(page, 'POST', '/products', missingName, {
+    const missingProductType = {
+      code: badCode,
+      name: `474丙缺类型${badCode}`,
+      unit: '米',
+    };
+    const rejected = await apiCallExpectFail(page, 'POST', '/products', missingProductType, {
       'Idempotency-Key': idempotencyKey,
     });
     expect(
       rejected.status,
-      `前置不成立：缺品名的建档本应被服务端拒，实际 status=${rejected.status} message=${rejected.message}`
+      `前置不成立：缺产品类型的建档本应被服务端拒，实际 status=${rejected.status} message=${rejected.message}`
     ).toBe(400);
     expect(
       (await countProductsByCode(page, badCode)).length,
