@@ -156,7 +156,6 @@ async function createDraftSalesOrder(
 ): Promise<number> {
   const so = await apiCall<{ id?: number }>(page, 'POST', '/sales/orders', {
     customer_id: customerId,
-    order_date: new Date().toISOString().slice(0, 10),
     items: [{ product_id: productId, quantity: 5, unit_price: '20.00' }],
   });
   const soId = so.data?.id;
