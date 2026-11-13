@@ -122,7 +122,11 @@ pub async fn idempotency_middleware(
 
     let path = request.uri().path().to_string();
     if path.len() > DEDUPE_PATH_MAX_LEN {
-        tracing::warn!(user_id = auth.user_id, path_len = path.len(), "幂等门跳过：路径超出列宽，本请求不做去重");
+        tracing::warn!(
+            user_id = auth.user_id,
+            path_len = path.len(),
+            "幂等门跳过：路径超出列宽，本请求不做去重"
+        );
         return next.run(request).await;
     }
 
@@ -249,7 +253,8 @@ async fn claim_slot(
     match active.insert(&*state.db).await {
         Ok(_) => Ok(ClaimOutcome::Claimed),
         Err(err) => {
-            let unique_conflict = matches!(err.sql_err(), Some(SqlErr::UniqueConstraintViolation(_)));
+            let unique_conflict =
+                matches!(err.sql_err(), Some(SqlErr::UniqueConstraintViolation(_)));
             if !unique_conflict {
                 return Err(AppError::from(err));
             }

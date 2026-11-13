@@ -28,12 +28,16 @@ impl MigrationName for Migration {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        m0137_create_http_request_dedupe::Migration.up(manager).await?;
+        m0137_create_http_request_dedupe::Migration
+            .up(manager)
+            .await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        m0137_create_http_request_dedupe::Migration.down(manager).await?;
+        m0137_create_http_request_dedupe::Migration
+            .down(manager)
+            .await?;
         Ok(())
     }
 }
