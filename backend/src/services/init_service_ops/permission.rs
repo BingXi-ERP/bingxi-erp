@@ -52,7 +52,13 @@ type RoleResourceGroups = Vec<RoleResourceSlice>;
 ///   handler 只按 `auth.user_id` 取该用户自己的通知行。
 ///
 /// 缺码的角色登录后会被路由守卫送到 /403，或每次进主页都在控制台抛 403。
-const SHELL_PERMISSIONS: &[PermPair] = &[("dashboard", "read"), ("notifications", "read")];
+// 通知软删是所有者对自身收件箱的操作，归属校验在服务层（非本人拒），
+// 故按应用外壳码逐角色必授；此前该动作键不在任何角色分组里，删除端点对非超管恒拒。
+const SHELL_PERMISSIONS: &[PermPair] = &[
+    ("dashboard", "read"),
+    ("notifications", "read"),
+    ("notifications", "delete"),
+];
 
 /// 库里"已经算授权到位"的 role_permission 索引（按角色归组的 (resource,action) 集合）。
 ///
