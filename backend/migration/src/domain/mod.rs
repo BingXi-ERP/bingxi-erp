@@ -198,3 +198,6 @@ pub mod bom_mrp_table_drop;
 // BOM/MRP 撤权域：撤销 boms 与 mrp 两枚资源的全岗位历史授权，链尾独立域（与初始化矩阵的
 // 同源摘除为跨写点依赖；roles 与 role_permissions 及权限唯一索引均早于本域）。
 pub mod bom_mrp_permission_withdrawal;
+// HTTP 请求级幂等去重域：建 http_request_dedupe 表，链尾独立域（不给 user_id 加外键，
+// users 表不由迁移创建；独立域才能在复用库上落到 pending 段必然执行）。
+pub mod http_idempotency_guard;

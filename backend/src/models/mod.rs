@@ -85,6 +85,8 @@ pub mod voucher;
 pub mod voucher_item;
 // 批次 365 v13 复审 B-P1-8：事件幂等去重表
 pub mod processed_event;
+// HTTP 请求级幂等去重表（中间件在分发前占位，拦截同账号同键的重复提交）
+pub mod http_request_dedupe;
 // 批次 384 v13 复审 B-P1-7：事件死信队列
 pub mod event_dead_letter;
 // 辅助核算模块

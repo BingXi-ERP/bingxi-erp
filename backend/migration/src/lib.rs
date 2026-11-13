@@ -362,6 +362,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::bom_mrp_table_drop::Migration),
             // BOM/MRP 撤权，链尾独立域（boms/mrp 两枚资源的全岗位授权撤回；与 init 矩阵同源摘除待主编排对齐）
             Box::new(domain::bom_mrp_permission_withdrawal::Migration),
+            // HTTP 请求级幂等去重表：链尾独立域，存量复用库上属 pending 必然执行。
+            Box::new(domain::http_idempotency_guard::Migration),
         ]
     }
 }

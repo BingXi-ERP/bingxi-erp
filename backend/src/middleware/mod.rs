@@ -8,6 +8,8 @@ pub mod csrf;
 pub mod deprecation;
 // V15 P2 20.6-A：API 网关动态路由中间件
 pub mod dynamic_router;
+// 请求级幂等重放防护（带 Idempotency-Key 的写请求在分发前原子占位）
+pub mod idempotency;
 pub mod metrics;
 pub mod omni_audit;
 pub mod permission;
