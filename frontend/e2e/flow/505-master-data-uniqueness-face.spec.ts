@@ -169,7 +169,7 @@ test.describe('505 主数据唯一性面', () => {
     await ensureTestEntities(page);
     const code = genCode('CU505');
 
-    const created = await apiCall<{ id?: unknown }>(page, 'POST', '/customers', {
+    const created = await apiCall<{ id?: unknown }>(page, 'POST', '/crm/customers', {
       customer_name: `505唯一性客户${code}`,
       customer_code: code,
     });
@@ -178,7 +178,7 @@ test.describe('505 主数据唯一性面', () => {
       throw new Error(`前置不成立：自建客户未回真实主键，实际 ${JSON.stringify(created)}`);
     }
 
-    const dup = await apiCallExpectFail(page, 'POST', '/customers', {
+    const dup = await apiCallExpectFail(page, 'POST', '/crm/customers', {
       customer_name: `505重复编码探针${code}`,
       customer_code: code,
     });
@@ -187,7 +187,7 @@ test.describe('505 主数据唯一性面', () => {
     const list = await apiCallRaw<{ items?: CustomerRow[]; total?: number }>(
       page,
       'GET',
-      '/customers?page=1&page_size=200'
+      '/crm/customers?page=1&page_size=200'
     );
     const total = Number(list.total ?? -1);
     if (total < 0 || total > 200) {
@@ -196,8 +196,8 @@ test.describe('505 主数据唯一性面', () => {
     const rows = (list.items ?? []).filter(r => String(r.customer_code) === code);
     expect(rows.length, `客户编码 ${code} 在库里必须只有一行，实际 ${rows.length} 行`).toBe(1);
 
-    await apiCall(page, 'DELETE', `/customers/${customerId}`);
-    const gone = await apiCallExpectFail(page, 'GET', `/customers/${customerId}`);
+    await apiCall(page, 'DELETE', `/crm/customers/${customerId}`);
+    const gone = await apiCallExpectFail(page, 'GET', `/crm/customers/${customerId}`);
     expect(gone.status, `客户删除后按 id 回读必须 404，实际 ${gone.status}`).toBe(404);
   });
 });
