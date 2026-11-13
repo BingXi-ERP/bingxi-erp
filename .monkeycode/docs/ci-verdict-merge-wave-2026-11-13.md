@@ -88,3 +88,36 @@ ci-e2e 结论=skipped（E2E 根本没执行）的连带，收尾清理为聚合�
   同错再现两次以上，升级为工装确定性缺陷，改走关 configuration cache 的
   主干侧最小解锁支，不再原地重跑。
 - 判据与日志落盘 E:/logs/ci/2026-11-13/（六枚红 job 全量日志）。
+
+## 七、批十四落地与批二候选全核销（13:25 到 13:31 取证）
+
+### 7.1 批十四落地
+
+按漏测清单 6.4 节批二首选落地 508 号 spec（frontend/e2e/flow/
+508-product-batch-write-face.spec.ts，四腿）：products/batch/create 成功腿
+（三行逐列计数加单条 GET 落库回读）加三条负腿（面料缺成分必录门、负幅宽
+取值域门、501 条超长度门 400），batch/update 覆盖与三态与不存在 id 计入
+failed，batch/delete 删除计数加 404 回读。断言全部按 batch_service.rs 源码
+逐字取真值。车道 wt-docs-1113（基于主干顶点 8cf2e3b49）本地 prettier 与
+esbuild 语法转译零错；车道无 node_modules，eslint 与 vue-tsc 与 playwright
+--list 未跑，类型与实跑结论留给 CI。已推分支
+test/e2e-product-batch-write-508（提交 50d9ad916）并开 PR 1219。
+
+### 7.2 漏测清单 6.4 节批二候选全部核销（第三次陈旧语料证伪）
+
+- production-recipes/additions 三枚（approve/close/calculate）：e2e 全库
+  additions 19 处引用、production-recipes/calculate 6 处引用，BOM 下线合入
+  后路由存活（production.rs 190 到 215 行），覆盖已在——假漏配，不写。
+- roles 写面：POST /roles 有 7 处真实调用（含 47 号重复名拒绝腿），
+  PUT /roles/{id}/permissions 有覆盖，486 号 spec 文件名即 role-user-update
+  -write-face——假漏配。DELETE /roles/{id} 与 PUT /roles/{id} 基本信息改单
+  待 486 号内容核实后终判，不在本轮写。
+- users 写面：POST /users 7 处、PUT /users/{id} 486 号在用——假漏配。
+
+结论：漏测清单 6.4 节的批二候选已全部核销，与 6.6 节盘点明细假漏配同型
+（首版判零引用是陈旧语料造成的假漏配）。下一批选题不再按 6.4 节清单排，
+改按逐端点 grep 真实调用点核验后再选题；本轮批十四（products 批量写三枚）
+是 6.4 节批二首选中唯一经真实核验确认可达漏配的域，已落地。
+另外：11-10 文档 6.1 节记录的判定器 --emit-gap-json 参数在当前判定器里
+不存在（临时改造已回退基线版），全量 uncovered 面不可再由该参数导出，
+选题判据回归逐端点 grep 真实调用点。
