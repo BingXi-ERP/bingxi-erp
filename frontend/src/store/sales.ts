@@ -75,7 +75,13 @@ export const useSalesStore = defineStore('sales', () => {
 
   const updateOrder = async (id: number, data: UpdateSalesOrderPayload) => {
     try {
-      const res = await updateSalesOrder(id, data);
+      const payload: UpdateSalesOrderPayload = { ...data };
+      // 并发令牌只取 getOrderById 读回的同一行更新时刻：未读回、或读回的不是这一行即不带门，
+      // 绝不用当前时间或别处的值凑一个令牌
+      if (!payload.expected_updated_at && currentOrder.value?.id === id) {
+        payload.expected_updated_at = currentOrder.value.updated_at;
+      }
+      const res = await updateSalesOrder(id, payload);
       await fetchOrders();
       return res;
     } catch (error) {
