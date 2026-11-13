@@ -84,9 +84,11 @@ async function createSelfQuotation(page: Page, tag: string): Promise<{ id: numbe
       {
         product_id: ctx.quotationProductId,
         unit: ctx.quotationProductUnit,
-        quantity: '5',
-        unit_price: '2',
-        unit_price_with_tax: '2',
+        // 合计 12.5 万须落 10 到 50 万主管审批档：10 万以下 submit 走销售员自批腿
+        // 直接 approved，主管的 approve/reject 会撞"不在待审批状态"状态门
+        quantity: '500',
+        unit_price: '250',
+        unit_price_with_tax: '250',
       },
     ],
     notes: `${tag}-${genCode('QT')}`,
@@ -126,6 +128,13 @@ test.describe('510 报价审批双通道通知腿（真实契约正腿）', () =
     const tag = '510-01';
     const { id, no: quotationNo } = await createSelfQuotation(page, tag);
     await apiCallRaw(page, 'POST', `/quotations/${id}/submit`);
+    // 金额落主管审批档的直接证据：submit 后必须 pending_approval，若 approved 即自批腿
+    // 生效（金额档选错或阈值调整），主管 approve 必撞状态门，前置当场判红便于归因
+    const submitted = await apiCallRaw<{ status?: string }>(page, 'GET', `/quotations/${id}`);
+    expect(
+      submitted.status,
+      `[510-01] 提交后应落 pending_approval（主管审批档），实际 ${submitted.status}`
+    ).toBe('pending_approval');
     const inboxBefore = await readInbox(page, '触发前');
     const baseline = countApproval(inboxBefore, quotationNo, '基线');
 
@@ -154,6 +163,12 @@ test.describe('510 报价审批双通道通知腿（真实契约正腿）', () =
     const tag = '510-02';
     const { id, no: quotationNo } = await createSelfQuotation(page, tag);
     await apiCallRaw(page, 'POST', `/quotations/${id}/submit`);
+    // 同 510-01：submit 后必须 pending_approval，approved 即自批腿生效需查金额档
+    const submitted = await apiCallRaw<{ status?: string }>(page, 'GET', `/quotations/${id}`);
+    expect(
+      submitted.status,
+      `[510-02] 提交后应落 pending_approval（主管审批档），实际 ${submitted.status}`
+    ).toBe('pending_approval');
     const inboxBefore = await readInbox(page, '触发前');
     const baseline = countApproval(inboxBefore, quotationNo, '基线');
 
