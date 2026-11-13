@@ -43,15 +43,15 @@ function isoDate(offsetDays: number): string {
 }
 
 async function readInbox(page: Page, tag: string): Promise<NotificationRow[]> {
-  const res = await apiCall<{ items?: NotificationRow[] }>(
+  const res = await apiCall<{ list?: NotificationRow[] }>(
     page,
     'GET',
     '/notifications?page=1&page_size=50'
   );
-  const rows = res.data?.items;
+  const rows = res.data?.list;
   expect(
     Array.isArray(rows),
-    `[510] ${tag} 通知列表应带 items 数组，实际 ${JSON.stringify(res.data)}`
+    `[510] ${tag} 通知列表应带 list 数组，实际 ${JSON.stringify(res.data)}`
   ).toBe(true);
   return rows as NotificationRow[];
 }
