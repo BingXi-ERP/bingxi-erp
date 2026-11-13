@@ -2,7 +2,7 @@
  * 增强客户列表幽灵聚合键形状锁（后端出参载体 ↔ 前端声明 ↔ 视图绑定三向互证）。
  * 功能：
  * 1) GET /crm/customers/enhanced 的行载荷是后端 crm_lead 模型整行直序列化
- *    （services/crm/lead.rs::list_leads 组 json!{"data": items}，出口仅做掩码/删键
+ *    （services/crm/lead.rs::list_leads 组 PaginatedResponse 的 items 键，出口仅做掩码/删键
  *    不补键），出参键集恒 ⊆ backend/src/models/crm_lead.rs 的 Model 字段名集；
  * 2) 前端 CustomerWithTags 不得声明后端该端点从不输出的聚合键
  *    （total_amount/total_orders/last_follow_up/contacts），消费视图
@@ -103,9 +103,9 @@ const frontendKeys = tsInterfaceKeys(CRM_ENHANCED_SRC, 'CustomerWithTags');
 
 describe('增强客户列表幽灵聚合键形状锁（后端载体 ↔ 前端声明 ↔ 视图绑定）', () => {
   it('后端事实基准：端点行载荷 = crm_lead::Model 整行直序列化，出口不补键', () => {
-    // 服务层：分页元素是模型本体，信封 data 键直接装 Vec<crm_lead::Model>
+    // 服务层：分页元素是模型本体，PaginatedResponse 的 items 键直接装 Vec<crm_lead::Model>
     expect(LEAD_SERVICE_SRC).toContain('let items: Vec<crm_lead::Model> = paginator');
-    expect(LEAD_SERVICE_SRC).toMatch(/"data": items,/);
+    expect(LEAD_SERVICE_SRC).toMatch(/"items": items,/);
     // 路由处理层：增强列表复用同一 list_leads，之后仅套字段级掩码（只删键/改值，不补键）
     expect(ENHANCED_HANDLER_SRC).toContain('service.list_leads(query, Some(&data_scope_ctx))');
     expect(ENHANCED_HANDLER_SRC).toContain('apply_customer_field_permission');

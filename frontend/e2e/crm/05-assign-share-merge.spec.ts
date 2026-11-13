@@ -13,31 +13,66 @@
 //   - 线索合并后回读副线索 lead_status='lost'（lost_reason 落库）。
 import { test, expect } from '../diagnose-fixture';
 import { applyAuthMocks } from '../smoke/_helpers';
-import { apiCall, apiCallRaw, genCode, tryCleanup, verifyEndpointHealthy } from '../flow/helpers';
+import {
+  apiCall,
+  apiCallRaw,
+  baseAdminPassword,
+  genCode,
+  tryCleanup,
+  verifyEndpointHealthy,
+} from '../flow/helpers';
 
 const LEAD_STATUS_ASSIGNED = 'assigned';
 const LEAD_STATUS_LOST = 'lost';
 
-/** 取两个与当前登录用户不同的活跃用户 id（分配/共享的目标人） */
-async function pickTwoOtherUserIds(
-  page: import('@playwright/test').Page,
-  selfId: number
-): Promise<[number, number]> {
-  // GET /users 契约（handlers/user_handler.rs:392-397 UserListResponse）：
-  // data = { users: UserResponse[], total, page, page_size }，users 必为数组——
-  // 不做 `?? []` 兜底，缺键/形状漂移立即判红。且该端点仅限 admin（非 admin 403），
-  // 本 spec 全部以默认 e2e_admin 上下文运行，满足前置。
-  const res = await apiCallRaw<{ users: Array<{ id: number; is_active: boolean }> }>(
-    page,
-    'GET',
-    '/users?page=1&page_size=100'
-  );
-  expect(Array.isArray(res.users), `GET /users 响应缺 data.users 数组`).toBe(true);
-  const ids = res.users.filter(u => u.id !== selfId && u.is_active).map(u => u.id);
-  if (ids.length < 2) {
-    throw new Error(`可用第二/第三用户不足（需 >=2 个非自身活跃用户，实际 ${ids.length}）`);
+/** 本腿自建的两个专属目标账号（分配/共享的目标人），用后软删清理 */
+interface ExclusiveTargets {
+  ids: [number, number];
+  cleanup: () => Promise<void>;
+}
+
+/** 建两个本腿专属的活跃用户作分配/共享目标。
+ * 目标人必须本腿自建：全局 GET /users 按 created_at 倒序取人会选中同库并发腿
+ * 刚建的独占账号（如 workload 链的 e2e_wl_ 账号），该账号随并发腿收尾被软删
+ * is_active=false，本腿选人后再用即命中认领/转移的停用门。自建账号生命周期
+ * 完全由本腿持有，并发腿无法改写。角色复制会话用户的 role_id，保证目标人
+ * 具备与历史全局池用户同级的业务权限。 */
+async function createExclusiveTargets(
+  page: import('@playwright/test').Page
+): Promise<ExclusiveTargets> {
+  const me = await apiCallRaw<{ id: number; role_id?: number | null }>(page, 'GET', '/users/me');
+  const seedRoleId = Number(me.role_id);
+  if (!Number.isInteger(seedRoleId) || seedRoleId <= 0) {
+    throw new Error(
+      `前置不成立：当前会话用户未挂角色（role_id=${me.role_id}），无法复制出专属目标账号`
+    );
   }
-  return [ids[0], ids[1]];
+  const password = baseAdminPassword();
+  const createdIds: number[] = [];
+  const cleanup = async () => {
+    for (const id of createdIds.reverse()) {
+      await tryCleanup(page, 'DELETE', `/users/${id}`, `清理专属目标账号 ${id}`);
+    }
+  };
+  try {
+    for (let i = 0; i < 2; i++) {
+      const username = `e2e_tg_${genCode('05T')}`.slice(0, 50);
+      const created = await apiCall<{ id?: number }>(page, 'POST', '/users', {
+        username,
+        password,
+        role_id: seedRoleId,
+      });
+      const id = Number(created.data?.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new Error(`专属目标账号建立失败，未返回真实主键：${JSON.stringify(created.data)}`);
+      }
+      createdIds.push(id);
+    }
+    return { ids: [createdIds[0], createdIds[1]], cleanup };
+  } catch (e) {
+    await cleanup();
+    throw e;
+  }
 }
 
 test.describe('CRM 分配·共享·合并流程', () => {
@@ -48,7 +83,8 @@ test.describe('CRM 分配·共享·合并流程', () => {
 
   test('线索转移(transfer)与认领(claim)后回读 owner_id 真实变更', async ({ page }) => {
     const me = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
-    const [assigneeA, assigneeB] = await pickTwoOtherUserIds(page, me.id);
+    const targets = await createExclusiveTargets(page);
+    const [assigneeA, assigneeB] = targets.ids;
 
     // 建一条 new 线索（owner=当前用户）
     const leadNo = genCode('E2E-ASG');
@@ -115,12 +151,13 @@ test.describe('CRM 分配·共享·合并流程', () => {
       ).toBeGreaterThanOrEqual(1);
     } finally {
       await tryCleanup(page, 'DELETE', `/crm/leads/${leadId}`, 'crm_lead');
+      await targets.cleanup();
     }
   });
 
   test('assign_customer 置 assigned 状态；claim 认领 new 线索落库 owner 变更', async ({ page }) => {
-    const me = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
-    const [assigneeA] = await pickTwoOtherUserIds(page, me.id);
+    const targets = await createExclusiveTargets(page);
+    const [assigneeA] = targets.ids;
 
     const leadNo = genCode('E2E-CLAIM');
     const created = await apiCall<{ id?: number }>(page, 'POST', '/crm/leads', {
@@ -163,6 +200,35 @@ test.describe('CRM 分配·共享·合并流程', () => {
       });
       const claimId = claimLead.data?.id;
       expect(claimId, '建第二条线索失败').toBeTruthy();
+      // 取证探针：认领请求返回脱敏 business。该文案在认领链路上只有两处能产出
+      // （services/crm/assign.rs），逐处以源码事实排除后只剩一处，故现查该行的认领前现场值：
+      // - 认领人已停用被排除：本腿的认领目标是自建的新专属账号（建后即为启用态）；
+      //   未改写的版本里认领人由 pickTwoOtherUserIds 选出，也已按 is_active 过滤并排除会话自身。
+      //   两种取源下停用分支都不成立。
+      // - 状态不会因取数缺键落成 NULL：models/dto/crm_dto.rs 的 CreateLeadRequest
+      //   无 rename_all，请求键名与字段名逐字相同；services/crm/lead.rs 的 create_lead
+      //   按请求值原样落 lead_status，且与认领门控同引 models/status/crm_lead 这一套词表
+      //   （NEW 即小写 new），不存在大小写分歧。
+      // - 认领人即归属人被排除：create_lead 把 owner_id 落为建单会话用户，
+      //   而 crm_assignment_handler.rs 的 claim_lead 只把会话身份当操作人，
+      //   不用它覆盖请求体里的认领人。
+      // 现查走详情读面，其掩码函数 mask_lead_pii_defaults 对 admin 原值返回、
+      // 非 admin 也只剔地址与联系方式类列，故 updated_by 一定能读出，可把改写归因到用户。
+      // 只加一次读，不改原请求、断言与执行次序；根因定位后撤除本探针。
+      // 打印项只取探针自己读到的字段，不引用本测试的局部变量：本文件在其它在途支上
+      // 有一版把认领目标改为本腿自建专属账号的重写，那一版里会话用户与认领人的局部名
+      // 都不存在，引用它们会让探针在并基后抛出 ReferenceError 并把用例本身打死。
+      const probe = await apiCallRaw<{
+        lead_status: string | null;
+        owner_id: number;
+        updated_by: number | null;
+        updated_at: string | null;
+      }>(page, 'GET', `/crm/leads/${claimId}`);
+      console.log(
+        `[crm-05 probe] 认领前现场 lead#${claimId} status=${probe.lead_status} ` +
+          `owner=${probe.owner_id} updated_by=${probe.updated_by} ` +
+          `updated_at=${probe.updated_at}`
+      );
       try {
         await apiCall(page, 'POST', '/crm/assignments/claim', {
           user_id: assigneeA,
@@ -185,6 +251,7 @@ test.describe('CRM 分配·共享·合并流程', () => {
       }
     } finally {
       await tryCleanup(page, 'DELETE', `/crm/leads/${leadId}`, 'crm_lead');
+      await targets.cleanup();
     }
   });
 
@@ -339,8 +406,8 @@ test.describe('CRM 分配·共享·合并流程', () => {
   });
 
   test('客户共享：share→by-customer 回读→revoke 状态回读；团队成员增删回读', async ({ page }) => {
-    const me = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
-    const [shareTo, teammate] = await pickTwoOtherUserIds(page, me.id);
+    const targets = await createExclusiveTargets(page);
+    const [shareTo, teammate] = targets.ids;
 
     const cust = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
       customer_name: `E2E 共享客户 ${genCode('SH')}`,
@@ -436,6 +503,7 @@ test.describe('CRM 分配·共享·合并流程', () => {
       ).toBe(false);
     } finally {
       await tryCleanup(page, 'DELETE', `/crm/customers/${customerId}`, 'customer_share');
+      await targets.cleanup();
     }
   });
 });

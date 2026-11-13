@@ -1,7 +1,8 @@
 {
   "role": "color_card_manager",
   "reachableRoutes": [
-    "/dashboard"
+    "/dashboard",
+    "/notification"
   ],
   "provenance": "ci-mirrored"
 }

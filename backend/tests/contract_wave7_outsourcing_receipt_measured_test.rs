@@ -438,7 +438,6 @@ async fn seed_parent(db: &Arc<sea_orm::DatabaseConnection>, s: ParentSeed) {
         gram_weight: Set(s.gram_weight),
         weight: Set(s.weight),
         quality_status: Set(Some("合格".to_string())),
-        inventory_status: Set(Some("available".to_string())),
         barcode: Set(Some(s.piece_no.to_string())),
         warehouse_in_at: Set(Some(now())),
         created_at: Set(now()),

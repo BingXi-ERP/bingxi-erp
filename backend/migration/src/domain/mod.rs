@@ -176,5 +176,8 @@ pub mod product_grade_vocab_check;
 // 仓储两岗补授扫码入库细键的存量库通道。独立顶层域，理由与 purchase_greige_read_grant 一致
 // （并入已应用域会在复用库被整体跳过，补授永不执行）。
 pub mod scan_receipt_grant;
+// HTTP 请求级幂等去重域：建 http_request_dedupe 表，链尾独立域（不给 user_id 加外键，
+// users 表不由迁移创建；独立域才能在复用库上落到 pending 段必然执行）。
+pub mod http_idempotency_guard;
 // 用户与公众号 openid 绑定关系表。独立顶层域，理由见域头（并入已应用域会在复用库被整体跳过）。
 pub mod wechat_mp_binding;

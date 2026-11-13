@@ -170,8 +170,9 @@ impl CrmService {
             .fetch_page(page.clamp(1, 1000).saturating_sub(1))
             .await?;
 
+        // 分页信封唯一形状 PaginatedResponse{items,total,page,page_size}（utils/response.rs）
         Ok(serde_json::json!({
-            "data": items,
+            "items": items,
             "total": total,
             "page": page,
             "page_size": page_size,

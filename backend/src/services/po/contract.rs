@@ -3,6 +3,9 @@
 //! 包含采购订单的提交、审批、拒绝等审批工作流方法。
 //! 拆分自原 `purchase_order_service.rs`。
 
+use crate::middleware::audit_context::{
+    RISK_VOID, mark_audit_high_risk, set_audit_change_reason, set_audit_doc_no,
+};
 use crate::models::{purchase_order, purchase_order_item, status};
 use crate::services::bpm_ops::{bpm_start_failure_error, process_key};
 use crate::utils::error::AppError;
@@ -379,6 +382,16 @@ impl PurchaseOrderService {
 
         // 4. 更新状态为 CANCELLED，取消原因落 cancel_reason 专列（不再挪用 rejected_reason）
         let now = chrono::Utc::now();
+        // 审计定位维度登记：单号取本次真正被作废那张采购单的 purchase_orders.order_no 列
+        //（上一步行锁读出的这一行），原因取请求 DTO CancelOrderRequest.reason 原样透传
+        //（同写进 cancel_reason 的那枚，不改写、不拼默认文案）。必须在 update_with_audit 之前调用
+        // ——写入单点从 task-local 活上下文取快照，本函数由
+        // handlers/purchase_order_handler.rs::cancel_order 在同一请求 task 内 await；
+        // task-local 不随 tokio::spawn 传播，挪进子任务即失效。
+        set_audit_doc_no(Some(order.order_no.clone()));
+        set_audit_change_reason(Some(reason.clone()));
+        // 取消动作把采购单写进 CANCELLED 终态并释放预算占用，语义是作废，标 VOID
+        mark_audit_high_risk(RISK_VOID);
         let mut order_active: purchase_order::ActiveModel = order.into();
         order_active.order_status = Set(status::purchase_order::CANCELLED.to_string());
         order_active.cancel_reason = Set(Some(reason));

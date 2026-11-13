@@ -1,9 +1,9 @@
 //! 产品目录域路由
 //!
-//! 处理产品、产品类别、仓库、BOM 物料清单等目录相关接口。
+//! 处理产品、产品类别、仓库等目录相关接口。
 //!
 //! 路由设计说明：所有子 router 内部 path 都已加上各自独立前缀
-//!（`/products`、`/categories`、`/warehouses`、`/boms`），这样
+//!（`/products`、`/categories`、`/warehouses`），这样
 //! `routes()` 入口用 `merge` 组合时不会出现 path+method 重叠，
 //! 避免 axum 0.7 `Overlapping method route` panic。
 
@@ -14,7 +14,7 @@ use axum::{
 };
 
 use crate::handlers::{
-    bom_handler, bulk_product_handler, chemical_handler, product_category_handler, product_handler,
+    bulk_product_handler, chemical_handler, product_category_handler, product_handler,
     warehouse_handler,
 };
 
@@ -111,40 +111,6 @@ pub fn warehouses() -> Router<AppState> {
         .route(
             "/warehouses/locations/{id}",
             delete(warehouse_handler::delete_location),
-        )
-}
-
-/// BOM 物料清单路由（path 前缀 /boms）
-pub fn boms() -> Router<AppState> {
-    Router::new()
-        .route(
-            "/boms",
-            get(bom_handler::list_boms).post(bom_handler::create_bom),
-        )
-        // 导出端点必须在 /{id} 之前注册，避免 axum matchit 把 "export" 当 {id} 匹配
-        .route("/boms/export", get(bom_handler::export_boms))
-        .route(
-            "/boms/{id}",
-            get(bom_handler::get_bom)
-                .put(bom_handler::update_bom)
-                .delete(bom_handler::delete_bom),
-        )
-        .route("/boms/{id}/copy", post(bom_handler::copy_bom))
-        .route("/boms/{id}/default", put(bom_handler::set_default_bom))
-        .route("/boms/{id}/submit", put(bom_handler::submit_bom))
-        .route("/boms/{id}/approve", put(bom_handler::approve_bom))
-        .route("/boms/{id}/tree", get(bom_handler::get_bom_tree))
-        .route(
-            "/boms/{id}/requirements",
-            post(bom_handler::calculate_bom_requirements),
-        )
-        .route(
-            "/boms/versions/{product_id}",
-            get(bom_handler::get_bom_versions),
-        )
-        .route(
-            "/boms/{id}/print",
-            get(crate::handlers::print_handler::bom_print_docx),
         )
 }
 
@@ -271,11 +237,15 @@ pub fn chemicals() -> Router<AppState> {
 }
 
 /// 目录域统一入口：子 router path 已加独立前缀，merge 时 path+method 互不重叠
+///
+/// `/boms` 路由族不在此挂载：该族读写 boms 与 bom_items 两表，两表已下线（迁移 m0132），
+/// 权限键 `boms:*` 已从注册表与角色矩阵撤回。未挂载即 matchit 无该段，请求落 404，
+/// 与"资源不存在"的真实语义一致；保留挂载但让 handler 返回空集合会把已撤销的资源
+/// 伪装成仍在。纱线编号与用量改由生产流转卡投纱明细承载，入口见 routes/production.rs。
 pub fn routes() -> Router<AppState> {
     Router::new()
         .merge(products())
         .merge(product_categories())
         .merge(warehouses())
-        .merge(boms())
         .merge(chemicals())
 }

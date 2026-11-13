@@ -67,9 +67,6 @@ pub struct Model {
     /// 质检状态（pending/inspecting/passed/failed）
     pub quality_status: Option<String>,
 
-    /// 库存状态（AVAILABLE/UNAVAILABLE/RESERVED/SHIPPED/DEFECT/SAMPLE，大写权威词表）
-    pub inventory_status: Option<String>,
-
     /// 仓库 ID（外键）
     pub warehouse_id: i32,
 

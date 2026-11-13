@@ -67,7 +67,9 @@ impl ArReconciliationService {
             .ok_or_else(|| AppError::not_found("对账单不存在"))?;
 
         if model.reconciliation_status.as_deref() != Some(ar_status::RECONCILIATION_DRAFT) {
-            return Err(AppError::business(
+            // 发送腿状态门：仅草稿可发送，前置状态未满足，归业务族；
+            // 文案点名唯一合法前置，公开规则、不含标识，可外显
+            return Err(AppError::business_displayable(
                 "只有草稿状态的对账单可以发送".to_string(),
             ));
         }
@@ -134,7 +136,9 @@ impl ArReconciliationService {
         if status != ar_status::RECONCILIATION_CONFIRMED
             && status != ar_status::RECONCILIATION_DISPUTED
         {
-            return Err(AppError::business(
+            // 关闭腿状态门：仅已确认或有争议可关闭，前置状态未满足，归业务族；
+            // 文案点名两条合法前置，公开规则、不含标识，可外显
+            return Err(AppError::business_displayable(
                 "只有已确认或有争议的对账单可以关闭".to_string(),
             ));
         }
@@ -236,7 +240,7 @@ impl ArReconciliationService {
             .await?
             .ok_or_else(|| AppError::not_found("对账单不存在"))?;
 
-        // 状态白名单：仅允许合法的状态值
+        // 取值白名单：先挡住词表外字面量（大小写与拼写逐字符比对，本域状态词为小写）
         let allowed_statuses = [
             ar_status::RECONCILIATION_DRAFT,
             ar_status::RECONCILIATION_SENT,
@@ -246,15 +250,32 @@ impl ArReconciliationService {
             ar_status::RECONCILIATION_CANCELLED,
         ];
         if !allowed_statuses.contains(&status) {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "非法的对账单状态：{}，允许的状态：{:?}",
                 status, allowed_statuses
             )));
         }
 
+        // 迁移白名单：取值合法不等于路径合法。前态按本域既有口径取
+        // （reconciliation_status 为 NULL 时视同 draft，与 vfy_ops/confirm.rs、本模块 close 门同源）
+        let from_status = model
+            .reconciliation_status
+            .as_deref()
+            .unwrap_or(ar_status::RECONCILIATION_DRAFT);
+        Self::check_status_transition(from_status, status)?;
+
         let mut active_model: ActiveModel = model.into();
         active_model.reconciliation_status = Set(Some(status.to_string()));
         active_model.updated_at = Set(Utc::now());
+
+        // 落入 confirmed 的同批写入客户确认三列：confirmed_by_customer 是开票前置门读的唯一事实，
+        // 只改状态词而留下 NULL 就是伪造确认态（状态已 confirmed 而门永远读不到确认）。
+        // 确认腿 vfy_ops/confirm.rs::customer_confirm 写的是同一组列，两条腿口径必须一致。
+        if status == ar_status::RECONCILIATION_CONFIRMED {
+            active_model.confirmed_by_customer = Set(Some(true));
+            active_model.confirmed_by = Set(Some(user_id));
+            active_model.confirmed_at = Set(Some(Utc::now()));
+        }
 
         // 批次 109 P3：remark 写入 notes 字段（原 UpdateConfirmationStatusRequest.remark 未使用）
         if let Some(remark) = remark {
@@ -273,5 +294,57 @@ impl ArReconciliationService {
         txn.commit().await?;
 
         Ok(updated)
+    }
+
+    /// 对账单状态迁移门（纯判定，不触 DB）：只认合法前态→后态边，其余一律业务错误。
+    ///
+    /// 边集逐条取自写入方（状态词表唯一事实来源 `models/status/finance.rs` 的 ar 组，全小写）：
+    /// - draft 由 `recon_ops/crud.rs::create` 与 `vfy_ops/match.rs`、`vfy_ops/reconciliation.rs`
+    ///   三处初始化写入，是唯一的起手态；
+    /// - draft→sent 由本模块 `send` 写；draft→confirmed、draft→disputed 与 sent→ 各态
+    ///   由 `vfy_ops/confirm.rs` 的 customer_confirm / customer_dispute 写（两门的放行集）；
+    /// - →closed 由本模块 `close` 写，前置只放 confirmed 与 disputed；
+    /// - →cancelled 只由本方法的通用改状态写（无专用腿）；
+    /// - closed 与 cancelled 是终态，无出边；自跃迁（前后同值）不构成迁移，按非法拒。
+    ///
+    /// 拒绝走 `AppError::business_displayable`（BUSINESS_ERROR 且出参携带真实文案），
+    /// 文案点名前态、后态与该前态允许的下一态集合；文案只含用户提交的状态词与公开词表，
+    /// 满足可外显安全边界。若用脱敏的 business，出参恒为固定常量，点名落不到操作人眼前。
+    /// 与同域「拒绝应点名可关闭的前置状态」的既有外显口径一致。
+    pub fn check_status_transition(from: &str, to: &str) -> Result<(), AppError> {
+        let allowed_next: &[&str] = match from {
+            ar_status::RECONCILIATION_DRAFT => &[
+                ar_status::RECONCILIATION_SENT,
+                ar_status::RECONCILIATION_CONFIRMED,
+                ar_status::RECONCILIATION_DISPUTED,
+                ar_status::RECONCILIATION_CANCELLED,
+            ],
+            ar_status::RECONCILIATION_SENT => &[
+                ar_status::RECONCILIATION_CONFIRMED,
+                ar_status::RECONCILIATION_DISPUTED,
+                ar_status::RECONCILIATION_CANCELLED,
+            ],
+            ar_status::RECONCILIATION_CONFIRMED => &[ar_status::RECONCILIATION_CLOSED],
+            ar_status::RECONCILIATION_DISPUTED => &[
+                ar_status::RECONCILIATION_CONFIRMED,
+                ar_status::RECONCILIATION_CLOSED,
+                ar_status::RECONCILIATION_CANCELLED,
+            ],
+            ar_status::RECONCILIATION_CLOSED | ar_status::RECONCILIATION_CANCELLED => &[],
+            // 库中出现词表外前态（历史脏值）时不放行任何迁移，点名后拒绝
+            other => {
+                return Err(AppError::business_displayable(format!(
+                    "对账单当前状态 {} 不在状态词表内，不允许任何状态迁移",
+                    other
+                )));
+            }
+        };
+        if to == from || !allowed_next.contains(&to) {
+            return Err(AppError::business_displayable(format!(
+                "对账单状态不允许从 {} 迁移到 {}，{} 可迁移到的状态：{:?}",
+                from, to, from, allowed_next
+            )));
+        }
+        Ok(())
     }
 }

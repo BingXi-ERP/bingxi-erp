@@ -228,15 +228,6 @@ pub async fn bad_debt_writeoff_print_docx(
     record_print_audit(&state, &auth, "bad_debt_writeoff", doc_id as i32);
     Ok(resp)
 }
-pub async fn bom_print_docx(
-    Path(doc_id): Path<i32>,
-    State(state): State<AppState>,
-    auth: AuthContext,
-) -> Result<Response, AppError> {
-    let resp = render_print_docx(&state, &auth, "bom", doc_id).await?;
-    record_print_audit(&state, &auth, "bom", doc_id);
-    Ok(resp)
-}
 pub async fn bulk_color_approval_print_docx(
     Path(doc_id): Path<i64>,
     State(state): State<AppState>,
@@ -805,14 +796,6 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
         },
         PrintTemplateDto {
             id: 15,
-            name: "BOM物料清单打印模板".to_string(),
-            doc_type: "bom".to_string(),
-            template_content: "BOM物料清单打印模板（含物料组成、用量）".to_string(),
-            is_default: true,
-            created_at: "2026-01-01T00:00:00Z".to_string(),
-        },
-        PrintTemplateDto {
-            id: 16,
             name: "大货色审批单打印模板".to_string(),
             doc_type: "bulk_color_approval".to_string(),
             template_content: "大货色审批单打印模板（含审批流程、色差数据）".to_string(),
@@ -820,7 +803,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 17,
+            id: 16,
             name: "原产地证书打印模板".to_string(),
             doc_type: "certificate_of_origin".to_string(),
             template_content: "原产地证书打印模板（含原产地信息、签发机构）".to_string(),
@@ -828,7 +811,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 18,
+            id: 17,
             name: "化工领料单打印模板".to_string(),
             doc_type: "chemical_requisition".to_string(),
             template_content: "化工领料单打印模板（含领用物料、用途说明）".to_string(),
@@ -836,7 +819,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 19,
+            id: 18,
             name: "色卡发放单打印模板".to_string(),
             doc_type: "color_card_issue".to_string(),
             template_content: "色卡发放单打印模板（含客户信息、色号、发放记录）".to_string(),
@@ -844,7 +827,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 20,
+            id: 19,
             name: "来样定制单打印模板".to_string(),
             doc_type: "custom_order".to_string(),
             template_content: "来样定制单打印模板（含客户需求、工艺要求）".to_string(),
@@ -852,7 +835,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 21,
+            id: 20,
             name: "客户信用额度打印模板".to_string(),
             doc_type: "customer_credit".to_string(),
             template_content: "客户信用额度打印模板（含信用额度、账期）".to_string(),
@@ -860,7 +843,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 22,
+            id: 21,
             name: "染色批次卡打印模板".to_string(),
             doc_type: "dye_batch_card".to_string(),
             template_content: "染色批次卡打印模板（含配方、工艺参数、色号）".to_string(),
@@ -868,7 +851,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 23,
+            id: 22,
             name: "染色批次返工打印模板".to_string(),
             doc_type: "dye_batch_rework".to_string(),
             template_content: "染色批次返工打印模板（含返工原因、处理方案）".to_string(),
@@ -876,7 +859,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 24,
+            id: 23,
             name: "能源消耗记录打印模板".to_string(),
             doc_type: "energy_consumption_record".to_string(),
             template_content: "能源消耗记录打印模板（含能耗数据、分析结果）".to_string(),
@@ -884,7 +867,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 25,
+            id: 24,
             name: "出口报关单打印模板".to_string(),
             doc_type: "export_customs_declaration".to_string(),
             template_content: "出口报关单打印模板（含报关信息、HS编码）".to_string(),
@@ -892,7 +875,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 26,
+            id: 25,
             name: "出口报检单打印模板".to_string(),
             doc_type: "export_inspection".to_string(),
             template_content: "出口报检单打印模板（含报检信息、检验检疫要求）".to_string(),
@@ -900,7 +883,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 27,
+            id: 26,
             name: "出口退税申报打印模板".to_string(),
             doc_type: "export_refund_declaration".to_string(),
             template_content: "出口退税申报打印模板（含退税明细、申报信息）".to_string(),
@@ -908,7 +891,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 28,
+            id: 27,
             name: "验布记录打印模板".to_string(),
             doc_type: "fabric_inspection".to_string(),
             template_content: "验布记录打印模板（含疵点记录、检验结果）".to_string(),
@@ -916,7 +899,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 29,
+            id: 28,
             name: "固定资产打印模板".to_string(),
             doc_type: "fixed_asset".to_string(),
             template_content: "固定资产打印模板（含资产信息、折旧方法）".to_string(),
@@ -924,7 +907,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 30,
+            id: 29,
             name: "固定资产盘点打印模板".to_string(),
             doc_type: "fixed_asset_count".to_string(),
             template_content: "固定资产盘点打印模板（含盘点明细、差异记录）".to_string(),
@@ -932,7 +915,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 31,
+            id: 30,
             name: "外汇核销打印模板".to_string(),
             doc_type: "foreign_exchange_verification".to_string(),
             template_content: "外汇核销打印模板（含核销明细、收汇信息）".to_string(),
@@ -940,7 +923,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 32,
+            id: 31,
             name: "库存调整单打印模板".to_string(),
             doc_type: "inventory_adjustment".to_string(),
             template_content: "库存调整单打印模板（含调整原因、调整明细）".to_string(),
@@ -948,7 +931,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 33,
+            id: 32,
             name: "库存减值打印模板".to_string(),
             doc_type: "inventory_write_down".to_string(),
             template_content: "库存减值打印模板（含减值原因、减值金额）".to_string(),
@@ -956,7 +939,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 34,
+            id: 33,
             name: "打样申请单打印模板".to_string(),
             doc_type: "lab_dip_request".to_string(),
             template_content: "打样申请单打印模板（含客户色号、打样要求）".to_string(),
@@ -964,7 +947,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 35,
+            id: 34,
             name: "劳动合同打印模板".to_string(),
             doc_type: "labor_contract".to_string(),
             template_content: "劳动合同打印模板（含合同条款、双方信息）".to_string(),
@@ -972,7 +955,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 36,
+            id: 35,
             name: "物流运单打印模板".to_string(),
             doc_type: "logistics_waybill".to_string(),
             template_content: "物流运单打印模板（含收发货人、货物信息）".to_string(),
@@ -980,7 +963,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 37,
+            id: 36,
             name: "物料短缺报告打印模板".to_string(),
             doc_type: "material_shortage".to_string(),
             template_content: "物料短缺报告打印模板（含短缺物料、影响分析）".to_string(),
@@ -988,7 +971,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 38,
+            id: 37,
             name: "职业危害监测打印模板".to_string(),
             doc_type: "occupational_hazard_monitoring".to_string(),
             template_content: "职业危害监测打印模板（含监测数据、结论）".to_string(),
@@ -996,7 +979,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 39,
+            id: 38,
             name: "职业健康检查打印模板".to_string(),
             doc_type: "occupational_health_exam".to_string(),
             template_content: "职业健康检查打印模板（含体检项目、结果）".to_string(),
@@ -1004,7 +987,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 40,
+            id: 39,
             name: "委外订单打印模板".to_string(),
             doc_type: "outsourcing_order".to_string(),
             template_content: "委外订单打印模板（含委外工序、供应商信息）".to_string(),
@@ -1012,7 +995,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 41,
+            id: 40,
             name: "委外收货单打印模板".to_string(),
             doc_type: "outsourcing_receipt".to_string(),
             template_content: "委外收货单打印模板（含收货明细、质检结果）".to_string(),
@@ -1020,7 +1003,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 42,
+            id: 41,
             name: "排污许可证打印模板".to_string(),
             doc_type: "pollution_permit".to_string(),
             template_content: "排污许可证打印模板（含许可排放量、有效期）".to_string(),
@@ -1028,7 +1011,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 43,
+            id: 42,
             name: "劳保用品发放打印模板".to_string(),
             doc_type: "ppe_distribution".to_string(),
             template_content: "劳保用品发放打印模板（含发放明细、签收记录）".to_string(),
@@ -1036,7 +1019,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 44,
+            id: 43,
             name: "工艺路线打印模板".to_string(),
             doc_type: "process_route".to_string(),
             template_content: "工艺路线打印模板（含工序步骤、工艺参数）".to_string(),
@@ -1044,7 +1027,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 45,
+            id: 44,
             name: "生产流转卡打印模板".to_string(),
             doc_type: "production_flow_card".to_string(),
             template_content: "生产流转卡打印模板（含工序流转、质量记录）".to_string(),
@@ -1052,7 +1035,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 46,
+            id: 45,
             name: "生产工单打印模板".to_string(),
             doc_type: "production_order".to_string(),
             template_content: "生产工单打印模板（含产品信息、数量、交期）".to_string(),
@@ -1060,7 +1043,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 47,
+            id: 46,
             name: "生产配方打印模板".to_string(),
             doc_type: "production_recipe".to_string(),
             template_content: "生产配方打印模板（含染料配方、工艺参数）".to_string(),
@@ -1068,7 +1051,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 48,
+            id: 47,
             name: "采购合同打印模板".to_string(),
             doc_type: "purchase_contract".to_string(),
             template_content: "采购合同打印模板（含合同条款、供应商信息）".to_string(),
@@ -1076,7 +1059,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 49,
+            id: 48,
             name: "采购质检单打印模板".to_string(),
             doc_type: "purchase_inspection".to_string(),
             template_content: "采购质检单打印模板（含检验项目、合格率）".to_string(),
@@ -1084,7 +1067,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 50,
+            id: 49,
             name: "采购退货单打印模板".to_string(),
             doc_type: "purchase_return".to_string(),
             template_content: "采购退货单打印模板（含退货原因、退货明细）".to_string(),
@@ -1092,7 +1075,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 51,
+            id: 50,
             name: "8D质量报告打印模板".to_string(),
             doc_type: "quality_8d_report".to_string(),
             template_content: "8D质量报告打印模板（含问题分析、纠正措施）".to_string(),
@@ -1100,7 +1083,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 52,
+            id: 51,
             name: "质检记录打印模板".to_string(),
             doc_type: "quality_inspection_record".to_string(),
             template_content: "质检记录打印模板（含检验项目、评分结果）".to_string(),
@@ -1108,7 +1091,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 53,
+            id: 52,
             name: "质量问题单打印模板".to_string(),
             doc_type: "quality_issue".to_string(),
             template_content: "质量问题单打印模板（含问题描述、处理方案）".to_string(),
@@ -1116,7 +1099,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 54,
+            id: 53,
             name: "安全事故报告打印模板".to_string(),
             doc_type: "safety_accident_report".to_string(),
             template_content: "安全事故报告打印模板（含事故经过、处理措施）".to_string(),
@@ -1124,7 +1107,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 55,
+            id: 54,
             name: "销售发货单打印模板".to_string(),
             doc_type: "sales_delivery".to_string(),
             template_content: "销售发货单打印模板（含发货明细、物流信息）".to_string(),
@@ -1132,7 +1115,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 56,
+            id: 55,
             name: "销售报价单打印模板".to_string(),
             doc_type: "sales_quotation".to_string(),
             template_content: "销售报价单打印模板（含报价明细、有效期）".to_string(),
@@ -1140,7 +1123,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 57,
+            id: 56,
             name: "销售退货单打印模板".to_string(),
             doc_type: "sales_return".to_string(),
             template_content: "销售退货单打印模板（含退货原因、退货明细）".to_string(),
@@ -1148,7 +1131,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 58,
+            id: 57,
             name: "排程结果打印模板".to_string(),
             doc_type: "scheduling_result".to_string(),
             template_content: "排程结果打印模板（含排产计划、资源分配）".to_string(),
@@ -1156,7 +1139,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 59,
+            id: 58,
             name: "社保缴纳记录打印模板".to_string(),
             doc_type: "social_insurance_record".to_string(),
             template_content: "社保缴纳记录打印模板（含缴费基数、险种明细）".to_string(),
@@ -1164,7 +1147,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 60,
+            id: 59,
             name: "固废处置打印模板".to_string(),
             doc_type: "solid_waste_disposal".to_string(),
             template_content: "固废处置打印模板（含处置方式、合规记录）".to_string(),
@@ -1172,7 +1155,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 61,
+            id: 60,
             name: "供应商评级打印模板".to_string(),
             doc_type: "supplier_evaluation_record".to_string(),
             template_content: "供应商评级打印模板（含评分指标、评级结果）".to_string(),
@@ -1180,7 +1163,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 62,
+            id: 61,
             name: "不合格品处理打印模板".to_string(),
             doc_type: "unqualified_product".to_string(),
             template_content: "不合格品处理打印模板（含处置方式、原因分析）".to_string(),
@@ -1188,7 +1171,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 63,
+            id: 62,
             name: "工资记录打印模板".to_string(),
             doc_type: "wage_record".to_string(),
             template_content: "工资记录打印模板（含计件工资、工序明细）".to_string(),
@@ -1196,7 +1179,7 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
         PrintTemplateDto {
-            id: 64,
+            id: 63,
             name: "成品布入库标签打印模板".to_string(),
             doc_type: "inventory_piece_label".to_string(),
             template_content: "成品布入库标签打印模板（含款号、品名、缸号、色号、批次、匹号、米数、重量、幅宽、克重、等级、条码）".to_string(),

@@ -746,29 +746,6 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
-        path: 'bom',
-        name: 'Bom',
-        component: () => import('@/views/bom/index.vue'),
-        meta: { title: 'BOM管理', icon: 'Cpu', permission: ['boms:read'], requiresAuth: true }, // 该入口要求下方 meta.permission 列出的模块读权限键
-      },
-      {
-        path: 'mrp',
-        name: 'Mrp',
-        component: () => import('@/views/mrp/index.vue'),
-        meta: { title: 'MRP计算', icon: 'Cpu', permission: ['mrp:read'], requiresAuth: true }, // 该入口要求下方 meta.permission 列出的模块读权限键
-      },
-      {
-        path: 'mrp/history',
-        name: 'MrpHistory',
-        component: () => import('@/views/mrp/history.vue'),
-        meta: {
-          title: 'MRP历史记录',
-          icon: 'Cpu',
-          permission: ['mrp:read'],
-          requiresAuth: true,
-        }, // 该入口要求下方 meta.permission 列出的模块读权限键
-      },
-      {
         path: 'capacity',
         name: 'Capacity',
         component: () => import('@/views/capacity/index.vue'),
@@ -824,7 +801,12 @@ const routes: RouteRecordRaw[] = [
         path: 'notification',
         name: 'Notification',
         component: () => import('@/views/notification/index.vue'),
-        meta: { title: '通知中心', icon: 'Setting', permission: 'users:read', requiresAuth: true }, // 该入口要求下方 meta.permission 列出的模块读权限键
+        meta: {
+          title: '通知中心',
+          icon: 'Setting',
+          permission: 'notifications:read',
+          requiresAuth: true,
+        }, // 通知中心读面端点 GET /notifications 的鉴权键即 notifications:read，路由入口与读面同源
       },
       {
         path: 'data-permission',
@@ -1252,6 +1234,10 @@ const routes: RouteRecordRaw[] = [
         }, // 该入口要求下方 meta.permission 列出的模块读权限键
       },
       // 报价单模块 - 列表 + 新建
+      // 键取细资源 quotations：后端把本族端点挂在 /api/v1/erp/quotations 下，派生鉴权键即
+      // quotations 加动作；此前写粗域键 sales:read 会让持 sales 域任一细资源读权的岗位
+      // （如只持 pieces 与 reports 读权的仓储岗）在侧栏看见报价单入口，而点进去必被后端
+      // 鉴权判 403，属展示面与鉴权面口径不一致，不是放宽权限。
       {
         path: 'quotations',
         name: 'QuotationList',
@@ -1259,7 +1245,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '报价单管理',
           icon: 'ShoppingCart',
-          permission: 'sales:read',
+          permission: 'quotations:read',
           requiresAuth: true,
         },
       },
@@ -1270,7 +1256,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '新建报价单',
           icon: 'ShoppingCart',
-          permission: 'sales:read',
+          permission: 'quotations:read',
           requiresAuth: true,
           hidden: true,
         },
@@ -1282,7 +1268,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '报价单详情',
           icon: 'ShoppingCart',
-          permission: 'sales:read',
+          permission: 'quotations:read',
           requiresAuth: true,
           hidden: true,
         },
@@ -1294,7 +1280,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '编辑报价单',
           icon: 'ShoppingCart',
-          permission: 'sales:read',
+          permission: 'quotations:read',
           requiresAuth: true,
           hidden: true,
         },
@@ -1306,7 +1292,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '报价单审批',
           icon: 'ShoppingCart',
-          permission: 'sales:read',
+          permission: 'quotations:read',
           requiresAuth: true,
           hidden: true,
         },
@@ -1744,7 +1730,6 @@ const COARSE_DOMAIN_RESOURCES: Record<string, string[]> = {
   ],
   production: [
     'production-orders',
-    'boms',
     'process-routes',
     'production-recipes',
     'dye-batches',
@@ -1753,7 +1738,6 @@ const COARSE_DOMAIN_RESOURCES: Record<string, string[]> = {
     'greige-fabrics',
     'fabric-inspections',
     'flow-cards',
-    'mrp',
     'capacity',
     'scheduling',
     'outsourcing-orders',

@@ -152,6 +152,15 @@ export const PERMISSIONS = {
   PRODUCTION_ORDER_UPDATE: 'production-orders:update',
   PRODUCTION_ORDER_DELETE: 'production-orders:delete',
 
+  // 流转卡与投纱明细（后端资源：flow-cards；URL /production/flow-cards/...，
+  // production 是模块前缀、第四段 flow-cards 即权威资源名（消歧映射表无此组合、保留原名），
+  // 动作按方法派生。投纱子资源 /flow-cards/{id}/materials 与 /flow-cards/materials/{id}
+  // 复用同一资源名，后端未为投纱新增权限键，前端也不得自造）
+  FLOW_CARD_READ: 'flow-cards:read',
+  FLOW_CARD_CREATE: 'flow-cards:create',
+  FLOW_CARD_UPDATE: 'flow-cards:update',
+  FLOW_CARD_DELETE: 'flow-cards:delete',
+
   // 采购收货（后端资源：purchase-receipts）的两个处置动作键：由 URL 末段派生
   // （POST /purchase/receipts/{id}/concession|rejudge），与建单/审批权互不覆盖；
   // 受授岗位集合见迁移 business/m0090_grant_purchase_receipt_concession_rejudge.rs

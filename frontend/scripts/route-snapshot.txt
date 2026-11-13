@@ -1,4 +1,4 @@
-# layers=8 endpoints=1822
+# layers=8 endpoints=1805
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -9,7 +9,6 @@ DELETE	/api/v1/erp/api-gateway/endpoints/*	api_gateway_handler::delete_api_endpo
 DELETE	/api/v1/erp/ar-reconciliations/*	ar_reconciliation_handler::delete_reconciliation	finance
 DELETE	/api/v1/erp/ar/invoices/*	ar_invoice_handler::delete_ar_invoice	finance
 DELETE	/api/v1/erp/asset-categories/*	crate::handlers::asset_category_handler::delete_category	finance
-DELETE	/api/v1/erp/boms/*	bom_handler::delete_bom	catalog
 DELETE	/api/v1/erp/bpm/definitions/*	bpm_definition_handler::delete_process_definition	system
 DELETE	/api/v1/erp/bpm/templates/*	bpm_definition_handler::delete_template	system
 DELETE	/api/v1/erp/budgets/*	budget_management_handler::delete_budget	finance
@@ -83,6 +82,7 @@ DELETE	/api/v1/erp/production/energy-rules/*	energy_handler::delete_energy_rule	
 DELETE	/api/v1/erp/production/fabric-defects/*	fabric_inspection_handler::delete_defect	production
 DELETE	/api/v1/erp/production/fabric-inspections/*	fabric_inspection_handler::delete_inspection	production
 DELETE	/api/v1/erp/production/flow-cards/*	flow_card_handler::delete_flow_card	production
+DELETE	/api/v1/erp/production/flow-cards/materials/*	flow_card_material_handler::delete_material	production
 DELETE	/api/v1/erp/production/greige-fabrics/*	greige_fabric_handler::delete_greige_fabric	production
 DELETE	/api/v1/erp/production/lab-dip/requests/*	lab_dip_handler::delete_request	production
 DELETE	/api/v1/erp/production/lab-dip/samples/*	lab_dip_handler::delete_sample	production
@@ -141,7 +141,7 @@ GET	/api/v1/erp/advanced/reports/templates	advanced::list_report_templates	analy
 GET	/api/v1/erp/aging-alert-rules	crate::handlers::aging_alert_rule_handler::list_rules	finance
 GET	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::get_rule	finance
 GET	/api/v1/erp/aging-grades	crate::handlers::aging_grade_handler::list_aging_grades	finance
-GET	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::list_aging_grades	finance
+GET	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::get_aging_grade	finance
 GET	/api/v1/erp/ai-models/accuracy-reports	ai_model_management_handler::list_accuracy_reports	ai_model
 GET	/api/v1/erp/ai-models/decisions	ai_model_management_handler::list_decision_logs	ai_model
 GET	/api/v1/erp/ai-models/evaluations/*	ai_model_management_handler::list_model_evaluations	ai_model
@@ -246,12 +246,6 @@ GET	/api/v1/erp/bi/sales/drilldown/year-to-month	crate::handlers::bi_handler::dr
 GET	/api/v1/erp/bi/sales/kpi	crate::handlers::bi_handler::kpi_summary	analytics
 GET	/api/v1/erp/bi/sales/profit	crate::handlers::bi_handler::profit_analysis	analytics
 GET	/api/v1/erp/bi/sales/trend	crate::handlers::bi_handler::sales_trend	analytics
-GET	/api/v1/erp/boms	bom_handler::list_boms	catalog
-GET	/api/v1/erp/boms/*	bom_handler::get_bom	catalog
-GET	/api/v1/erp/boms/*/print	crate::handlers::print_handler::bom_print_docx	catalog
-GET	/api/v1/erp/boms/*/tree	bom_handler::get_bom_tree	catalog
-GET	/api/v1/erp/boms/export	bom_handler::export_boms	catalog
-GET	/api/v1/erp/boms/versions/*	bom_handler::get_bom_versions	catalog
 GET	/api/v1/erp/bpm/business-relation	bpm_handler::get_business_relation	system
 GET	/api/v1/erp/bpm/definitions	bpm_definition_handler::list_process_definitions	system
 GET	/api/v1/erp/bpm/definitions/*	bpm_definition_handler::get_process_definition	system
@@ -552,7 +546,7 @@ GET	/api/v1/erp/health/readiness	health_handler::readiness_check	system
 GET	/api/v1/erp/incoterms/quotations/*/price-composition	incoterms_handler::get_price_composition	incoterms
 GET	/api/v1/erp/incoterms/usage-report	incoterms_handler::monthly_usage_report	incoterms
 GET	/api/v1/erp/industry-benchmarks	crate::handlers::industry_benchmark_handler::list_industry_benchmarks	finance
-GET	/api/v1/erp/industry-benchmarks/*	crate::handlers::industry_benchmark_handler::list_industry_benchmarks	finance
+GET	/api/v1/erp/industry-benchmarks/*	crate::handlers::industry_benchmark_handler::get_industry_benchmark	finance
 GET	/api/v1/erp/init/status	init_handler::get_init_status	system
 GET	/api/v1/erp/init/task-status	init_handler::get_task_status	system
 GET	/api/v1/erp/inventory/adjustments	inventory_adjustment_handler::list_adjustments	inventory
@@ -723,10 +717,12 @@ GET	/api/v1/erp/production/fabric-inspections/by-no/*	fabric_inspection_handler:
 GET	/api/v1/erp/production/flow-cards	flow_card_handler::list_flow_cards	production
 GET	/api/v1/erp/production/flow-cards/*	flow_card_handler::get_flow_card	production
 GET	/api/v1/erp/production/flow-cards/*/feedbacks	flow_card_handler::list_feedbacks_by_card	production
+GET	/api/v1/erp/production/flow-cards/*/materials	flow_card_material_handler::list_materials_by_card	production
 GET	/api/v1/erp/production/flow-cards/*/print	print_handler::production_flow_card_print_docx	production
 GET	/api/v1/erp/production/flow-cards/*/steps	flow_card_handler::list_steps_by_card	production
 GET	/api/v1/erp/production/flow-cards/by-barcode	flow_card_handler::get_by_barcode	production
 GET	/api/v1/erp/production/flow-cards/feedbacks/*	flow_card_handler::get_feedback	production
+GET	/api/v1/erp/production/flow-cards/materials/*	flow_card_material_handler::get_material	production
 GET	/api/v1/erp/production/flow-cards/steps/*	flow_card_handler::get_step	production
 GET	/api/v1/erp/production/greige-fabrics	greige_fabric_handler::list_greige_fabrics	production
 GET	/api/v1/erp/production/greige-fabrics/*	greige_fabric_handler::get_greige_fabric	production
@@ -737,13 +733,6 @@ GET	/api/v1/erp/production/lab-dip/resamples/*	lab_dip_handler::get_resample	pro
 GET	/api/v1/erp/production/lab-dip/resamples/by-request/*	lab_dip_handler::list_resamples_by_request	production
 GET	/api/v1/erp/production/lab-dip/samples/*	lab_dip_handler::get_sample	production
 GET	/api/v1/erp/production/lab-dip/samples/by-request/*	lab_dip_handler::list_samples_by_request	production
-GET	/api/v1/erp/production/mrp-history	missing_handlers::get_mrp_history	production
-GET	/api/v1/erp/production/mrp-history/*	missing_handlers::get_mrp_history_detail	production
-GET	/api/v1/erp/production/mrp-history/*/export	mrp_handler::export_calculation	production
-GET	/api/v1/erp/production/mrp-history/*/materials/*	mrp_handler::get_material_detail	production
-GET	/api/v1/erp/production/mrp/products	mrp_handler::list_products_for_mrp	production
-GET	/api/v1/erp/production/mrp/requirements	mrp_handler::get_mrp_requirements	production
-GET	/api/v1/erp/production/mrp/results	mrp_handler::get_mrp_results	production
 GET	/api/v1/erp/production/outsourcing-orders	outsourcing_handler::list_outsourcing_orders	production
 GET	/api/v1/erp/production/outsourcing-orders/*	outsourcing_handler::get_outsourcing_order	production
 GET	/api/v1/erp/production/outsourcing-orders/*/print	print_handler::outsourcing_order_print_docx	production
@@ -866,6 +855,7 @@ GET	/api/v1/erp/quotations/*	quotation_handler::get_quotation	quotations
 GET	/api/v1/erp/quotations/*/print	crate::handlers::print_handler::sales_quotation_print_docx	quotations
 GET	/api/v1/erp/quotations/*/terms	quotation_handler::get_quotation_terms	quotations
 GET	/api/v1/erp/quotations/color-prices/*	quotation_handler::list_color_prices	quotations
+GET	/api/v1/erp/quotations/discount-config	quotation_handler::get_discount_config	quotations
 GET	/api/v1/erp/quotations/expired	quotation_handler::list_expired	quotations
 GET	/api/v1/erp/quotations/expiring	quotation_handler::list_expiring	quotations
 GET	/api/v1/erp/recommendations	ai_analysis_handler::get_recommendations	analytics
@@ -1079,9 +1069,6 @@ POST	/api/v1/erp/bi/sales/dice	crate::handlers::bi_handler::dice	analytics
 POST	/api/v1/erp/bi/sales/pivot	crate::handlers::bi_handler::pivot	analytics
 POST	/api/v1/erp/bi/sales/rollup	crate::handlers::bi_handler::rollup	analytics
 POST	/api/v1/erp/bi/sales/slice	crate::handlers::bi_handler::slice	analytics
-POST	/api/v1/erp/boms	bom_handler::create_bom	catalog
-POST	/api/v1/erp/boms/*/copy	bom_handler::copy_bom	catalog
-POST	/api/v1/erp/boms/*/requirements	bom_handler::calculate_bom_requirements	catalog
 POST	/api/v1/erp/bpm/approval/execute	bpm_handler::execute_approval	system
 POST	/api/v1/erp/bpm/definitions	bpm_definition_handler::create_process_definition	system
 POST	/api/v1/erp/bpm/definitions/*/template	bpm_definition_handler::save_as_template	system
@@ -1426,6 +1413,7 @@ POST	/api/v1/erp/production/flow-cards/*/terminate	flow_card_handler::terminate_
 POST	/api/v1/erp/production/flow-cards/feedbacks	flow_card_handler::create_feedback	production
 POST	/api/v1/erp/production/flow-cards/feedbacks/*/close	flow_card_handler::close_feedback	production
 POST	/api/v1/erp/production/flow-cards/feedbacks/*/handle	flow_card_handler::handle_feedback	production
+POST	/api/v1/erp/production/flow-cards/materials	flow_card_material_handler::create_material	production
 POST	/api/v1/erp/production/flow-cards/steps/*/complete	flow_card_handler::complete_step	production
 POST	/api/v1/erp/production/flow-cards/steps/*/rework	flow_card_handler::create_rework_step	production
 POST	/api/v1/erp/production/flow-cards/steps/start	flow_card_handler::start_step	production
@@ -1444,8 +1432,6 @@ POST	/api/v1/erp/production/lab-dip/resamples/*/result	lab_dip_handler::record_r
 POST	/api/v1/erp/production/lab-dip/resamples/*/tech-card	lab_dip_handler::issue_tech_card	production
 POST	/api/v1/erp/production/lab-dip/samples	lab_dip_handler::create_sample	production
 POST	/api/v1/erp/production/lab-dip/samples/*/matching	lab_dip_handler::record_matching_result	production
-POST	/api/v1/erp/production/mrp/calculate	mrp_handler::calculate_mrp	production
-POST	/api/v1/erp/production/mrp/convert-orders	mrp_handler::convert_to_orders	production
 POST	/api/v1/erp/production/outsourcing-orders	outsourcing_handler::create_outsourcing_order	production
 POST	/api/v1/erp/production/outsourcing-orders/*/cancel	outsourcing_handler::cancel_outsourcing_order	production
 POST	/api/v1/erp/production/outsourcing-orders/*/close	outsourcing_handler::close_outsourcing_order	production
@@ -1662,10 +1648,6 @@ PUT	/api/v1/erp/ar-reconciliations/*/status	ar_reconciliation_handler::update_re
 PUT	/api/v1/erp/ar/invoices/*	ar_invoice_handler::update_ar_invoice	finance
 PUT	/api/v1/erp/ar/payments/*	ar_payment_handler::update_payment	finance
 PUT	/api/v1/erp/asset-categories/*	crate::handlers::asset_category_handler::update_category	finance
-PUT	/api/v1/erp/boms/*	bom_handler::update_bom	catalog
-PUT	/api/v1/erp/boms/*/approve	bom_handler::approve_bom	catalog
-PUT	/api/v1/erp/boms/*/default	bom_handler::set_default_bom	catalog
-PUT	/api/v1/erp/boms/*/submit	bom_handler::submit_bom	catalog
 PUT	/api/v1/erp/bpm/definitions/*	bpm_definition_handler::update_process_definition	system
 PUT	/api/v1/erp/budgets/*	budget_management_handler::update_budget	finance
 PUT	/api/v1/erp/budgets/items/*	budget_management_handler::update_budget_item	finance
@@ -1750,10 +1732,10 @@ PUT	/api/v1/erp/production/energy-meters/*	energy_handler::update_energy_meter	p
 PUT	/api/v1/erp/production/energy-rules/*	energy_handler::update_energy_rule	production
 PUT	/api/v1/erp/production/fabric-inspections/*	fabric_inspection_handler::update_inspection	production
 PUT	/api/v1/erp/production/flow-cards/*	flow_card_handler::update_flow_card	production
+PUT	/api/v1/erp/production/flow-cards/materials/*	flow_card_material_handler::update_material	production
 PUT	/api/v1/erp/production/greige-fabrics/*	greige_fabric_handler::update_greige_fabric	production
 PUT	/api/v1/erp/production/lab-dip/requests/*	lab_dip_handler::update_request	production
 PUT	/api/v1/erp/production/lab-dip/samples/*	lab_dip_handler::update_sample	production
-PUT	/api/v1/erp/production/mrp-history/*/cancel	mrp_handler::cancel_calculation	production
 PUT	/api/v1/erp/production/outsourcing-orders/*	outsourcing_handler::update_outsourcing_order	production
 PUT	/api/v1/erp/production/outsourcing-orders/items/*	outsourcing_handler::update_outsourcing_item	production
 PUT	/api/v1/erp/production/outsourcing-receipts/*	outsourcing_handler::update_outsourcing_receipt	production
@@ -1788,6 +1770,7 @@ PUT	/api/v1/erp/purchase/suppliers/*/qualifications/*	supplier_handler::update_s
 PUT	/api/v1/erp/quality-standards/*	quality_standard_handler::update_standard	mod
 PUT	/api/v1/erp/quotations/*	quotation_handler::update_quotation	quotations
 PUT	/api/v1/erp/quotations/*/terms	quotation_handler::set_quotation_terms	quotations
+PUT	/api/v1/erp/quotations/discount-config	quotation_handler::update_discount_config	quotations
 PUT	/api/v1/erp/reports/enhanced/subscriptions/*	report_enhanced_handler::subscriptions::update	analytics
 PUT	/api/v1/erp/reports/enhanced/templates/*	report_enhanced_handler::update_report_template	analytics
 PUT	/api/v1/erp/roles/*	role_handler::update_role	iam

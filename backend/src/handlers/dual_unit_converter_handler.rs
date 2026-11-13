@@ -40,7 +40,9 @@ pub async fn convert_dual_unit(
     // 验证单位参数
     let from_unit = req.from_unit.to_lowercase();
     if from_unit != "meters" && from_unit != "kg" {
-        return Err(AppError::bad_request("无效的单位，必须是 'meters' 或 'kg'"));
+        return Err(AppError::validation_displayable(
+            "无效的单位，必须是 'meters' 或 'kg'",
+        ));
     }
 
     // 执行换算
@@ -48,7 +50,7 @@ pub async fn convert_dual_unit(
         "meters" => {
             // 米数转公斤数
             let kg = DualUnitConverter::meters_to_kg(req.value, req.gram_weight, req.width_cm)
-                .map_err(AppError::bad_request)?;
+                .map_err(AppError::validation_displayable)?;
             ConvertUnitResponse {
                 converted_value: kg,
                 to_unit: "kg".to_string(),
@@ -69,7 +71,7 @@ pub async fn convert_dual_unit(
         "kg" => {
             // 公斤数转米数
             let meters = DualUnitConverter::kg_to_meters(req.value, req.gram_weight, req.width_cm)
-                .map_err(AppError::bad_request)?;
+                .map_err(AppError::validation_displayable)?;
             ConvertUnitResponse {
                 converted_value: meters,
                 to_unit: "meters".to_string(),
@@ -87,9 +89,13 @@ pub async fn convert_dual_unit(
                 .unwrap_or(rust_decimal::Decimal::ZERO),
             }
         }
-        // 批次 252 修复：原 unreachable!() 在校验逻辑被重构后可能 panic 崩溃，
-        // 改为防御性返回 bad_request 错误
-        _ => return Err(AppError::bad_request("无效的单位，必须是 'meters' 或 'kg'")),
+        // 分支穷尽兜底：单位已在入口校验，未知值只可能来自后续重构，
+        // 此处不 panic，返回参数校验错误并外显原因。
+        _ => {
+            return Err(AppError::validation_displayable(
+                "无效的单位，必须是 'meters' 或 'kg'",
+            ));
+        }
     };
 
     Ok(Json(ApiResponse::success(result)))
@@ -138,7 +144,7 @@ pub async fn validate_dual_unit(
         req.width_cm,
         req.tolerance,
     )
-    .map_err(AppError::bad_request)?;
+    .map_err(AppError::validation_displayable)?;
 
     // 计算详细信息
     let calculated_kg =

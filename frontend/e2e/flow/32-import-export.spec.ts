@@ -261,35 +261,4 @@ test.describe.serial('P0 导入导出：真实 UI 点击验证', () => {
     expect(['.xlsx', '.csv', '.json', '.xls']).toContain(ext);
     console.log(`[P0-导出-仓库] ✅ 文件类型: ${ext}`);
   });
-
-  // ===== 6. BOM 导出 =====
-  test('BOM：UI 导出→下载文件验证', async ({ page }) => {
-    test.setTimeout(120_000);
-    await page.goto(`${BASE_URL}/bom`);
-    await page.waitForLoadState('networkidle', { timeout: 15000 });
-    await page.waitForTimeout(1000);
-
-    // 原实现在找不到导出按钮时 test.skip()（记为“功能未实现”）→ 该用例每轮静默跳过、
-    // 从不真正验证。按“前置缺失即显式失败”改造：导出入口/下载事件/文件内容全部硬断言。
-    // 若 BOM 导出确未实现（前端 views/bom 无按钮 + 后端无 /boms/export 路由），本用例
-    // 将以真实红灯暴露该功能缺口，而不是把缺失伪装成通过（见汇报/doto 待办登记）。
-    const exportBtn = page.getByRole('button', { name: /导出|export|下载/i }).first();
-    expect(
-      await exportBtn.isVisible({ timeout: 5000 }),
-      '[P0-导出-BOM] BOM 列表页未渲染导出按钮（入口缺失，见 views/bom + routes/catalog.rs 无 /boms/export）'
-    ).toBe(true);
-
-    const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
-    await exportBtn.click();
-    const download = await downloadPromise;
-
-    const filename = download.suggestedFilename();
-    const dlPath = await download.path();
-    const size = dlPath ? fs.statSync(dlPath).size : 0;
-    console.log(`[P0-导出-BOM] ✅ 文件名=${filename} 大小=${size}B`);
-    expect(size, '导出文件应 >512B').toBeGreaterThan(512);
-    const ext = path.extname(filename).toLowerCase();
-    expect(['.xlsx', '.csv', '.json', '.xls']).toContain(ext);
-    console.log('[P0-导出-BOM] ✅ 导出验证完成');
-  });
 });

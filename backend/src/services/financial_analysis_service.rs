@@ -219,6 +219,7 @@ impl FinancialAnalysisService {
         _user_id: i32,
     ) -> Result<financial_analysis::Model, AppError> {
         info!("正在创建财务指标：{}", req.indicator_code);
+        let code = req.indicator_code.clone();
 
         let active_indicator = financial_analysis::ActiveModel {
             indicator_name: Set(req.indicator_name),
@@ -231,7 +232,17 @@ impl FinancialAnalysisService {
             ..Default::default()
         };
 
-        let indicator = active_indicator.insert(&*self.db).await?;
+        // 编码列带 UNIQUE，撞约束是可预期的重复提交，归口业务拒绝而不是裸数据库错
+        let indicator = active_indicator.insert(&*self.db).await.map_err(|e| {
+            if matches!(
+                e.sql_err(),
+                Some(sea_orm::SqlErr::UniqueConstraintViolation(_))
+            ) {
+                AppError::business_displayable(format!("指标编码 {} 已存在", code))
+            } else {
+                AppError::from(e)
+            }
+        })?;
         info!("财务指标创建成功：{}", indicator.indicator_code);
         Ok(indicator)
     }

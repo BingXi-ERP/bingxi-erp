@@ -55,6 +55,8 @@ pub mod production_recipe_ops;
 pub mod flow_card_service;
 // 批次 491 D10-5 拆分：flow_card_service.rs facade 的业务实现子模块（route/card_crud/card_state/step/feedback）
 pub mod flow_card_ops;
+// 流转卡投纱明细：完工扣料的落库来源，读写面自成一个 service
+pub mod flow_card_material_service;
 // v14 批次 426：验布打卷流程贯通
 pub mod fabric_inspection_service;
 // v14 批次 427：产量工资核算贯通
@@ -195,6 +197,8 @@ pub mod sales_price_service;
 pub mod sales_return_service;
 // 销售报价单 Service（P12 批 1 P0 port PR-2：DTO + 基础 Service）
 pub mod quotation_pricing_service;
+// 报价超折扣审批门：阈值单行配置读取与折扣判定单点（提交腿与阈值配置面共用）
+pub mod quotation_discount_service;
 pub mod quotation_service;
 // D11 拆分：quotation_service.rs facade 的业务实现子模块（crud/update/lifecycle/calc/types）
 pub mod quotation_ops;
@@ -206,13 +210,10 @@ pub mod system_update_ops;
 pub mod totp_service;
 // v11 批次 143 P1-2：用户行为追踪分析服务
 pub mod tracking_service;
-// MRP生产计划模块
-pub mod bom_service;
-// 批次 D10 拆分：bom_service.rs facade 的业务实现子模块（crud/state/tree）
-pub mod bom_ops;
-pub mod mrp_engine_service;
-// 批次 490 D10-3b 拆分：mrp_engine_service 业务实现子模块
-pub mod mrp_engine_ops;
+// BOM 与 MRP 服务面不注册：bom_service / bom_ops 读写 boms 与 bom_items 两表，
+// mrp_engine_service / mrp_engine_ops 读写 mrp_results 表并以默认 BOM 展开需求源；
+// 三张表已由迁移 m0132 下线，纱线需求与扣料的单一来源改为生产流转卡投纱明细
+// （flow_card_material_service），本 crate 不再有该两表的写入方。
 pub mod production_order_service;
 // 批次 488 D10-2 拆分：production_order_service 业务实现子模块
 pub mod production_order_ops;

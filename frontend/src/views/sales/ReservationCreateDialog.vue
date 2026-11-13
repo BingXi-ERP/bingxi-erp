@@ -47,11 +47,13 @@
         </el-select>
       </el-form-item>
       <el-form-item :label="t('sales.reservation.quantity')" required prop="quantity">
+        <!-- 预留数量未填保持 undefined，由提交校验显式点名；清空回到未填，不得塌成 0 假量 -->
         <NumericInput
           v-model="form.quantity"
           :min="0.01"
           :max="selectedMax ?? undefined"
           :precision="2"
+          :optional="true"
         />
       </el-form-item>
       <el-form-item :label="t('sales.reservation.remark')" prop="notes">

@@ -13,6 +13,7 @@ import {
   BASE_URL,
   seedInspectionPass,
   failureCode,
+  genCode,
   APP_ERROR_CODES,
   type ApiFailureResult,
 } from './helpers';
@@ -356,8 +357,17 @@ test.describe.serial('44f 真实实体全流转链', () => {
   test('44f-5 销售发货全链+shipped 后修改被拒', async ({ page }) => {
     await ensureTestEntities(page);
     const ctx = getCtx();
+    // 信用门按客户授信额度判定（handlers/customer_handler.rs 建客户时 credit_limit 缺省或
+    // 空串落 Decimal::ZERO），夹具客户的额度为零，本腿订单必然被拒。门是正确契约，
+    // 故前置改为自建一户带足额授信额度的客户，不放宽门也不改订单金额语义。
+    const creditCust = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
+      customer_name: `E2E44F5授信客户${genCode('CR')}`,
+      credit_limit: '100000.00',
+    });
+    const creditCustomerId = creditCust.data?.id;
+    expect(creditCustomerId, `自建授信客户失败：${JSON.stringify(creditCust)}`).toBeTruthy();
     const so = await apiCall<{ id?: number }>(page, 'POST', '/sales/orders', {
-      customer_id: ctx.customerId,
+      customer_id: creditCustomerId,
       order_date: new Date().toISOString(),
       // SO 明细字段名是 product_id（后端 422 明示 items[0]: missing field `product_id`），
       // 原实现写 material_id 属字段名错用
@@ -366,6 +376,11 @@ test.describe.serial('44f 真实实体全流转链', () => {
     const soId = so?.data?.id;
     expect(soId, 'SO 创建失败').toBeTruthy();
     CLEANUP.push({ path: `/sales/orders/${soId}`, label: '[44f-5] SO' });
+    // 授信客户排在订单之后回收：订单行仍引用该客户，先删订单才删得掉客户。
+    CLEANUP.push({
+      path: `/crm/customers/${creditCustomerId}`,
+      label: '[44f-5] 授信客户',
+    });
     await apiCall(page, 'POST', `/sales/orders/${soId}/submit`);
     await apiCall(page, 'POST', `/sales/orders/${soId}/approve`);
 

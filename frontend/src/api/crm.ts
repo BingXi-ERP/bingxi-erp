@@ -101,11 +101,11 @@ export interface LeadQueryParams {
   page_size?: number;
 }
 
-// 后端 crm_handler::list_leads 构造 json!({ "data": [...], "total", "page", "page_size" })，
-// 经 crm_handler::list_leads 原样返回，真实列表键为 data（非裸数组）。
+// 后端 crm_handler::list_leads 出参为 PaginatedResponse 分页信封
+// {items,total,page,page_size}（utils/response.rs），列表键为 items（非裸数组）。
 export function getLeadList(
   params?: LeadQueryParams
-): Promise<ApiResponse<{ data: Lead[]; total: number; page: number; page_size: number }>> {
+): Promise<ApiResponse<{ items: Lead[]; total: number; page: number; page_size: number }>> {
   return request.get('/crm/leads', { params });
 }
 

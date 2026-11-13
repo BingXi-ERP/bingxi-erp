@@ -16,8 +16,8 @@
 
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, NotSet, Order, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, FromQueryResult, NotSet, Order,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 
 use crate::models::product::{self, Entity as ProductEntity};
@@ -308,14 +308,13 @@ impl ProductService {
     /// 删除产品
     pub async fn delete_product(&self, id: i32, user_id: i32) -> Result<(), AppError> {
         // 引用预检与删除在同一事务、且在父行 lock_exclusive 之后执行
-        //（通道与措辞形状照 warehouse_service::delete 先例）：迁移
-        // migration::domain::price_fk 已给 sales_prices.product_id /
-        // purchase_prices.product_id 施加指向 products.id 的 NO ACTION 外键，
-        // 若无预检，删除被价目行引用的产品会撞 SQLSTATE 23503，经
-        // utils::error::From<DbErr> 归类成 DatabaseError(DB_RELATION) 裸落 500
-        //（出参脱敏为固定文案，用户不知道被谁引用）。并发窗口封堵原理：
+        //（通道与措辞形状照 warehouse_service::delete 先例）：全库对 products(id)
+        // 建外键的下游表清单及其口径见 find_product_references，任一张表存在引用行时
+        // 删除都会撞 SQLSTATE 23503，经 utils::error::From<DbErr> 归类成
+        // DatabaseError(DB_RELATION)（出参脱敏为固定文案，用户不知道被谁引用），
+        // 故先按外键面逐表计数并显式拒绝。并发窗口封堵原理：
         // 子表插入引用行会对父行取 FOR KEY SHARE，与本轮 FOR UPDATE 互斥，
-        // 并发"插入价目行"要么先提交被本轮 COUNT 看到、要么阻塞到产品已删后
+        // 并发"插入引用行"要么先提交被本轮 COUNT 看到、要么阻塞到产品已删后
         // 其 FK 校验自然失败，"预检→删除"之间的 TOCTOU 窗口就此关闭。
         let txn = (*self.db).begin().await?;
 
@@ -327,12 +326,19 @@ impl ProductService {
             .await?
             .ok_or_else(|| AppError::not_found(format!("产品 ID {} 不存在", id)))?;
 
-        // 引用存在性预检：只统计与拒绝，绝不级联删除/软删价目行（FK 删除行为
+        // 引用存在性预检：只统计与拒绝，绝不级联删除/软删下游引用行（FK 删除行为
         // 属迁移既定口径，见 migration::domain::price_fk 文件头"删除行为说明"）。
-        // 文案只给"数量 + 业务名"，不输出表名/约束名/行 ID 列表（防出参泄露面）。
-        if let Some((label, count)) = Self::find_product_price_references(id, &txn).await? {
+        // 文案一次点名每个阻塞面的业务可读名称与行数（名称与物理表的对照写在
+        // find_product_references 的注释里，物理表名不进文案，防出参泄露面）。
+        let blockers = Self::find_product_references(id, &txn).await?;
+        if !blockers.is_empty() {
+            let detail = blockers
+                .iter()
+                .map(|(label, count)| format!("{count} 条{label}"))
+                .collect::<Vec<_>>()
+                .join("、");
             return Err(AppError::business_displayable(format!(
-                "该产品已被 {count} 条{label}引用，无法删除，请先处理关联价目数据"
+                "该产品已被{detail}引用，无法删除，请先处理上述关联业务数据后再试"
             )));
         }
 
@@ -372,36 +378,260 @@ impl ProductService {
         Ok(())
     }
 
-    /// 功能：枚举对 products(id) 建外键的价目表，返回首个存在引用位的
-    /// (业务可读名称, 引用行数)。入参：id=待删产品主键；db=与删除同事务的连接
-    /// （由 delete_product 传入，预检必须先于 DELETE 且共享行锁窗口）。
-    /// 清单与迁移 migration::domain::price_fk 的 `REFERENCES "products" ("id")`
-    /// 逐一对齐：sales_prices.product_id / purchase_prices.product_id。
-    /// FK 不区分价目状态（pending/approved/inactive）与 customer/supplier 归属，
-    /// 计数口径与 FK 对齐：只要存在任意引用行删除即会被数据库拒绝，一律计入。
-    async fn find_product_price_references<C: ConnectionTrait>(
+    /// 功能：枚举对 products(id) 建外键的全部下游表，返回所有存在引用行的
+    /// (业务可读名称, 引用行数) 清单；空清单即无阻塞，非空时一次列全所有挡住
+    /// 删除的面，而不是只报第一面。
+    /// 调用方：delete_product 的引用预检（与删除同事务、且在父行 lock_exclusive 之后）。
+    /// 入参：id=待删产品主键；db=与删除同事务的连接（预检必须先于 DELETE 且共享行锁窗口）。
+    /// 传给谁：清单交 delete_product 拼 AppError::business_displayable 的拒绝文案。
+    /// 清单口径 = 两种互不依赖取数的并集：①迁移串搜 REFERENCES "products" ("id")
+    /// 的出现点（domain/price_fk、business m0008/m0009/m0010/m0011/m0013、production
+    /// m0044、system m0001_initial_schema、sales_crm、textile_safety m0110）；②models 内
+    /// 产品外键字段反查实体。业务可读名称与物理表一一对应（对应关系只留在本注释，
+    /// 不进文案，避免表名外泄）：销售价目记录=sales_prices、采购价目记录=purchase_prices、
+    /// 产品色号=product_colors、产品编码映射=product_code_mapping、
+    /// 供应商产品对照=product_supplier_mappings、库存台账=inventory_stocks、
+    /// 出入库流水=inventory_transactions、库存预留=inventory_reservations、
+    /// 布片库存=inventory_piece、销售订单明细=sales_order_items、
+    /// 采购订单明细=purchase_order_items、发货单明细=sales_delivery_item、
+    /// 销售退货明细=sales_return_item、采购收货明细=purchase_receipt_item、
+    /// 采购退货明细=purchase_return_item、报价单明细=sales_quotation_items、
+    /// 色号阶梯价=product_color_prices、客户色号价=customer_color_prices、
+    /// 染色缸批=batch_dye_lot、定制订单=custom_orders、
+    /// 纺织品安全送检=textile_safety_submission、AI 质量预测=ai_quality_predictions。
+    /// 差集登记：m0008 为 piece_mapping 建的产品外键已由 v15 的 up 段 DROP TABLE
+    /// 删表（models 侧亦无该实体，改用 inventory_piece.parent_piece_id），故不构成引用面；
+    /// 只持 product_id 列而未对 products(id) 建外键的表（如 bom、production_order、
+    /// outsourcing_order_item、inventory_count_item、quality_inspection_record）
+    /// 不会产生 foreign key 违规，不列入预检；这类面若在 DELETE 阶段真的挡住删除，
+    /// 由 map_product_fk_error 兜底显形为同族可外显拒绝。
+    /// 计数口径与外键对齐：不区分价目状态、审批态、归属与 is_active，
+    /// 存在任意引用行即会计入。存什么/存哪里：只读计数，不落任何列。
+    async fn find_product_references<C: ConnectionTrait>(
         id: i32,
         db: &C,
-    ) -> Result<Option<(&'static str, u64)>, AppError> {
-        use crate::models::{purchase_price, sales_price};
+    ) -> Result<Vec<(&'static str, u64)>, AppError> {
+        use crate::models::{
+            ai_quality_prediction, batch_dye_lot, custom_order, customer_color_price,
+            inventory_piece, inventory_reservation, inventory_stock, inventory_transaction,
+            product_code_mapping, product_color, product_color_price, product_supplier_mapping,
+            purchase_order_item, purchase_price, purchase_receipt_item, purchase_return_item,
+            sales_delivery_item, sales_order_item, sales_price, sales_quotation_item,
+            sales_return_item, textile_safety_submission,
+        };
 
-        let sales = sales_price::Entity::find()
-            .filter(sales_price::Column::ProductId.eq(id))
-            .count(db)
-            .await?;
-        if sales > 0 {
-            return Ok(Some(("销售价目记录", sales)));
+        let mut blockers: Vec<(&'static str, u64)> = Vec::new();
+
+        Self::record_product_ref::<sales_price::Entity, _>(
+            &mut blockers,
+            db,
+            sales_price::Column::ProductId,
+            "销售价目记录",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<purchase_price::Entity, _>(
+            &mut blockers,
+            db,
+            purchase_price::Column::ProductId,
+            "采购价目记录",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<product_color::Entity, _>(
+            &mut blockers,
+            db,
+            product_color::Column::ProductId,
+            "产品色号",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<product_code_mapping::Entity, _>(
+            &mut blockers,
+            db,
+            product_code_mapping::Column::ProductId,
+            "产品编码映射",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<product_supplier_mapping::Entity, _>(
+            &mut blockers,
+            db,
+            product_supplier_mapping::Column::ProductId,
+            "供应商产品对照",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<product_color_price::Entity, _>(
+            &mut blockers,
+            db,
+            product_color_price::Column::ProductId,
+            "色号阶梯价",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<customer_color_price::Entity, _>(
+            &mut blockers,
+            db,
+            customer_color_price::Column::ProductId,
+            "客户色号价",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<sales_order_item::Entity, _>(
+            &mut blockers,
+            db,
+            sales_order_item::Column::ProductId,
+            "销售订单明细",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<purchase_order_item::Entity, _>(
+            &mut blockers,
+            db,
+            purchase_order_item::Column::ProductId,
+            "采购订单明细",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<sales_quotation_item::Entity, _>(
+            &mut blockers,
+            db,
+            sales_quotation_item::Column::ProductId,
+            "报价单明细",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<sales_delivery_item::Entity, _>(
+            &mut blockers,
+            db,
+            sales_delivery_item::Column::ProductId,
+            "发货单明细",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<sales_return_item::Entity, _>(
+            &mut blockers,
+            db,
+            sales_return_item::Column::ProductId,
+            "销售退货明细",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<purchase_receipt_item::Entity, _>(
+            &mut blockers,
+            db,
+            purchase_receipt_item::Column::ProductId,
+            "采购收货明细",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<purchase_return_item::Entity, _>(
+            &mut blockers,
+            db,
+            purchase_return_item::Column::ProductId,
+            "采购退货明细",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<custom_order::Entity, _>(
+            &mut blockers,
+            db,
+            custom_order::Column::ProductId,
+            "定制订单",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<inventory_stock::Entity, _>(
+            &mut blockers,
+            db,
+            inventory_stock::Column::ProductId,
+            "库存台账",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<inventory_transaction::Entity, _>(
+            &mut blockers,
+            db,
+            inventory_transaction::Column::ProductId,
+            "出入库流水",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<inventory_reservation::Entity, _>(
+            &mut blockers,
+            db,
+            inventory_reservation::Column::ProductId,
+            "库存预留",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<inventory_piece::Entity, _>(
+            &mut blockers,
+            db,
+            inventory_piece::Column::ProductId,
+            "布片库存",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<batch_dye_lot::Entity, _>(
+            &mut blockers,
+            db,
+            batch_dye_lot::Column::ProductId,
+            "染色缸批",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<textile_safety_submission::Entity, _>(
+            &mut blockers,
+            db,
+            textile_safety_submission::Column::ProductId,
+            "纺织品安全送检",
+            id,
+        )
+        .await?;
+        Self::record_product_ref::<ai_quality_prediction::Entity, _>(
+            &mut blockers,
+            db,
+            ai_quality_prediction::Column::ProductId,
+            "AI 质量预测",
+            id,
+        )
+        .await?;
+
+        Ok(blockers)
+    }
+
+    /// 功能：统计单张下游表按产品外键列的引用行数，命中（大于零）即把
+    /// (业务可读名称, 引用行数) 追加进阻塞清单；零行不追加。
+    /// 调用方：find_product_references 的每个引用面，逐面累加、绝不短路。
+    /// 入参：blockers=阻塞清单累加器；db=与删除同事务的连接；column=该表指向
+    /// products(id) 的外键列；label=该表的业务可读名称（对照表见调用方注释）；
+    /// id=待删产品主键。
+    /// 传给谁：结果只写进 blockers 累加器，由 find_product_references 统一返回。
+    /// 存什么：不落库，只按外键列等值计数；等值比较用整型，不引入字符串隐式
+    /// 转换而让索引失效。
+    /// 存哪里：不写存储位置；行数取自入参 column 所属的表。
+    /// 约束：`Select<E>` 的 `count` 来自 SeaORM 对 `PaginatorTrait` 的实现，该实现
+    /// 额外要求 `E::Model` 满足 `FromQueryResult + Send + Sync + 'db`；缺这三条时
+    /// 方法解析会退到 `Iterator::count` 并报 E0599。
+    async fn record_product_ref<'db, E, C>(
+        blockers: &mut Vec<(&'static str, u64)>,
+        db: &'db C,
+        column: E::Column,
+        label: &'static str,
+        id: i32,
+    ) -> Result<(), AppError>
+    where
+        E: EntityTrait,
+        E::Model: FromQueryResult + Send + Sync + 'db,
+        C: ConnectionTrait,
+    {
+        let count = E::find().filter(column.eq(id)).count(db).await?;
+        if count > 0 {
+            blockers.push((label, count));
         }
-
-        let purchase = purchase_price::Entity::find()
-            .filter(purchase_price::Column::ProductId.eq(id))
-            .count(db)
-            .await?;
-        if purchase > 0 {
-            return Ok(Some(("采购价目记录", purchase)));
-        }
-
-        Ok(None)
+        Ok(())
     }
 
     /// 功能：把删除阶段命中的外键/关联类数据库错误（`AppError::DatabaseError(DB_RELATION)`，

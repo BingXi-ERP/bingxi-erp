@@ -106,7 +106,7 @@ function toScaled(v: unknown, scale: number, label: string): bigint {
   if (frac.length > scale && frac.slice(scale).replace(/0+$/, '') !== '') {
     throw new Error(`${label}：出参标度超出分位精度且非零，raw="${s}"`);
   }
-  const padded = (intPart + frac).padEnd(intPart.length + scale, '0');
+  const padded = (intPart + frac.slice(0, scale)).padEnd(intPart.length + scale, '0');
   const value = BigInt(padded);
   return sign === '-' ? -value : value;
 }

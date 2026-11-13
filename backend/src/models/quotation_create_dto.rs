@@ -41,7 +41,7 @@ pub struct CreateQuotationDto {
     pub notes: Option<String>,
 
     /// 明细（1-100 条）
-    #[validate(length(min = 1, max = 100))]
+    #[validate(length(min = 1, max = 100, message = "报价明细条数必须在1到100条之间"))]
     pub items: Vec<CreateQuotationItemDto>,
 
     /// 贸易条款（可选）

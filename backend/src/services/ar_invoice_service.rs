@@ -12,6 +12,9 @@ use sea_orm::{
 use std::sync::Arc;
 use tracing::info;
 
+use crate::middleware::audit_context::{
+    RISK_VOID, mark_audit_high_risk, set_audit_change_reason, set_audit_doc_no,
+};
 use crate::models::ar_invoice;
 // 行级数据权限工具
 use crate::utils::data_scope::{
@@ -86,6 +89,19 @@ impl ArInvoiceService {
             .await?
             .ok_or_else(|| AppError::not_found(format!("客户 {} 不存在", customer_id)))?;
 
+        // 开票前置门：开票日期先按落库口径算出来，再用同一个日期过门，避免"门按今天判、
+        // 单按请求日期落"的漂移；该客户存在覆盖本次开票日期且尚未取得客户确认的对账单时
+        // 直接拒绝（取号与插入都不执行，事务随 ? 回滚）。
+        let invoice_date = req
+            .invoice_date
+            .unwrap_or_else(|| chrono::Utc::now().date_naive());
+        crate::services::ar::ArReconciliationService::ensure_customer_statement_confirmed(
+            &txn,
+            customer_id,
+            invoice_date,
+        )
+        .await?;
+
         // 在应收事务内取号，锁随本事务提交才释放，与下方 active_model.insert(&txn) 同临界区
         let invoice_no = self.generate_invoice_no(&txn).await?;
         let active_model = Self::build_ar_invoice_active_model(
@@ -93,6 +109,7 @@ impl ArInvoiceService {
             invoice_no,
             customer_id,
             invoice_amount,
+            invoice_date,
             user_id,
         );
         let result = active_model.insert(&txn).await?;
@@ -126,19 +143,20 @@ impl ArInvoiceService {
     }
 
     /// 构建应收单 ActiveModel
+    ///
+    /// invoice_date 由 `create` 按落库口径算出（请求缺省则取当日）并同源用于开票前置门判定，
+    /// 本方法不再自行取当日，避免门判的日期与落库的日期不是同一天。
     fn build_ar_invoice_active_model(
         req: CreateArInvoiceRequest,
         invoice_no: String,
         customer_id: i32,
         invoice_amount: Decimal,
+        invoice_date: chrono::NaiveDate,
         user_id: i32,
     ) -> ar_invoice::ActiveModel {
         ar_invoice::ActiveModel {
             invoice_no: sea_orm::Set(invoice_no),
-            invoice_date: sea_orm::Set(
-                req.invoice_date
-                    .unwrap_or_else(|| chrono::Utc::now().date_naive()),
-            ),
+            invoice_date: sea_orm::Set(invoice_date),
             due_date: sea_orm::Set(
                 req.due_date
                     .unwrap_or_else(|| chrono::Utc::now().date_naive()),
@@ -523,7 +541,7 @@ impl ArInvoiceService {
     pub async fn cancel(
         &self,
         id: i32,
-        _reason: String,
+        reason: String,
         user_id: i32,
     ) -> Result<ar_invoice::Model, AppError> {
         // 批次 11（2026-06-28）：事务包裹"取消状态变更 + 审计日志"，保证原子性
@@ -545,6 +563,18 @@ impl ArInvoiceService {
         if invoice.status == crate::models::status::payment::PAYMENT_PAID {
             return Err(AppError::bad_request("已收讫的应收单不可取消"));
         }
+
+        // 审计定位维度登记：单号取本次真正被作废那张应收单的 ar_invoices.invoice_no 列
+        //（上一步行锁读出的这一行），不从路径 id 反推、不用 id 拼号；原因取请求体
+        // CancelReason.reason 原样透传（本表无取消原因专列，该值此前在 service 入口即被丢弃，
+        // 现在至少随审计行落进 audit_logs.change_reason，可追溯）。必须在 update_with_audit
+        // 之前调用——写入单点从 task-local 活上下文取快照，本函数由
+        // handlers/ar_invoice_handler.rs::cancel_ar_invoice 在同一请求 task 内 await；
+        // task-local 不随 tokio::spawn 传播，挪进子任务即失效。
+        set_audit_doc_no(Some(invoice.invoice_no.clone()));
+        set_audit_change_reason(Some(reason));
+        // 取消动作把应收单写进 CANCELLED 终态，语义是作废，标 VOID
+        mark_audit_high_risk(RISK_VOID);
 
         let mut active_invoice: ar_invoice::ActiveModel = invoice.into();
         active_invoice.status = Set(crate::models::status::common::STATUS_CANCELLED.to_string());

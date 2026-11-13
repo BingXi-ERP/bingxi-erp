@@ -6,6 +6,7 @@
 use chrono::Utc;
 use sea_orm::{DatabaseTransaction, EntityTrait, QuerySelect, Set, TransactionTrait};
 
+use crate::middleware::audit_context::{RISK_VOID, mark_audit_high_risk, set_audit_doc_no};
 use crate::models::sales_quotation::{
     self, ActiveModel as QuotationActive, Entity as QuotationEntity,
 };
@@ -33,6 +34,15 @@ impl QuotationService {
         if existing.status == quotation_status::CANCELLED {
             return Ok(existing);
         }
+
+        // 审计定位维度登记：单号取本次真正被作废那张报价单的 sales_quotations.quotation_no 列
+        //（行锁读出的这一行），不从路径 id 反推、不用 id 拼号。调用点必须在 update_with_audit
+        // 之前——写入单点从 task-local 活上下文取快照，本函数由
+        // handlers/quotation_handler.rs::cancel_quotation 在同一请求 task 内 await，
+        // 值才随该次落库一起读到；跨 tokio::spawn 不传播，挪进子任务即失效。
+        // 报价单取消端点无原因入参（handler 只有路径 id），变更原因不在本腿登记，落库保持 NULL。
+        set_audit_doc_no(Some(existing.quotation_no.clone()));
+        mark_audit_high_risk(RISK_VOID);
 
         let mut active: QuotationActive = existing.into();
         active.status = Set(quotation_status::CANCELLED.to_string());

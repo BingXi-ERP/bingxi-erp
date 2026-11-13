@@ -33,7 +33,8 @@ export interface LoginLog {
 }
 
 export interface LockedAccount {
-  id: number;
+  /** 用户主键，供按主键解锁腿使用；该用户名在 users 无对应账号时为 null */
+  id: number | null;
   username: string;
   lock_reason: string;
   locked_at: string;

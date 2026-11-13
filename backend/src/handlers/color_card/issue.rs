@@ -149,8 +149,25 @@ pub fn issue_err(e: IssueError) -> AppError {
 
 // ==================== V15 P1 10.4-1：权限校验辅助 ====================
 
-/// 校验当前用户是否持有 color_card_issue:<action> 权限
-/// admin 角色由 RolePermissionService.check_permission 内部绕过
+/// 校验当前用户是否持有 color-cards:<action> 权限
+///
+/// 功能：色卡发放面与色卡报表面端点的第二道权限门，判定本次动作是否获授权。
+/// 调用方：本文件的发放、归还、遗失、损坏、取消、列表、详情、导出端点，以及
+/// analytics.rs 的报表、预警、成本、统计端点。
+/// 入参：应用状态、会话上下文、端点声明的动作 token
+/// （read / create / return / lost / damaged / cancel / export）。
+/// 传给谁：归一后的资源名与动作交 RolePermissionService::check_role_action_covering_wildcard
+/// 判定，拒绝时以 AppError 的权限族交调用方向上返回。
+/// 存什么：不写库，只读 role_permissions 表的授权行。
+/// 存哪里：不适用。
+///
+/// 资源名取权限注册表在册的 `color-cards`，与 URL 派生出的第一道门同名；旧写法
+/// `color_card_issue` 既不在册也不在任何角色授权分组里，用它判定等于对非超管恒拒。
+///
+/// 动作归一：`return` / `lost` / `damaged` 三枚末段不在中间件 PATH_ACTION_KEYWORDS
+/// 词表内，第一道门对 POST /color-cards/issues/{id}/return|lost|damaged 实际派生的动作
+/// 是 create，故本门把它们按 create 判定，不给第二道门引入一枚权限目录里勾不出来的动作键。
+/// admin 角色由 check_role_action_covering_wildcard 内部绕过。
 pub(crate) async fn require_issue_permission(
     state: &AppState,
     auth: &AuthContext,
@@ -159,27 +176,42 @@ pub(crate) async fn require_issue_permission(
     let role_id = auth
         .role_id
         .ok_or_else(|| AppError::permission_denied("用户未分配角色，无法执行色卡发放操作"))?;
+    let granted_action = match action {
+        "return" | "lost" | "damaged" => "create",
+        other => other,
+    };
     let svc = RolePermissionService::new(state.db.clone());
     let allowed = svc
-        .check_permission(role_id, "color_card_issue", action, None)
+        .check_role_action_covering_wildcard(role_id, "color-cards", granted_action)
         .await?;
     if !allowed {
         return Err(AppError::permission_denied(format!(
-            "没有 color_card_issue:{} 权限",
-            action
+            "没有 color-cards:{} 权限",
+            granted_action
         )));
     }
     Ok(())
 }
 
-/// V15 P1 10.4-2：判定用户是否可查看成本字段（compensation_amount）
-/// 持有 color_card_issue:export 视为可查看成本（admin 自动通过）
+/// 判定用户是否可查看成本字段（compensation_amount）
+///
+/// 功能：决定发放记录列表与详情出参里成本列出原文还是被剔除。
+/// 调用方：本文件的 list_issues 与 get_issue。
+/// 入参：应用状态、会话上下文。
+/// 传给谁：资源名 `color-cards` 与动作 `export` 交
+/// RolePermissionService::check_role_action_covering_wildcard 判定，布尔结果交
+/// ColorCardIssueService::mask_cost_amount 与详情出参的剔除分支消费。
+/// 存什么：不写库，只读 role_permissions 表的授权行。
+/// 存哪里：不适用。
+///
+/// 持有 color-cards:export 视为可查看成本（admin 自动通过）；通配授权行同样命中，
+/// 与第一道门 matches_permission 的口径一致。
 async fn can_view_cost_amount(state: &AppState, auth: &AuthContext) -> bool {
     let Some(role_id) = auth.role_id else {
         return false;
     };
     let svc = RolePermissionService::new(state.db.clone());
-    svc.check_permission(role_id, "color_card_issue", "export", None)
+    svc.check_role_action_covering_wildcard(role_id, "color-cards", "export")
         .await
         .unwrap_or(false)
 }

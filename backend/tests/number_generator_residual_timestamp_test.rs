@@ -1,9 +1,6 @@
-//! 契约锁：残余 4 处手写时间戳拼号收口到 `DocumentNumberGenerator`。
+//! 契约锁：残余手写时间戳拼号收口到 `DocumentNumberGenerator`。
 //!
 //! 覆盖点位（前缀常量 → 落库列 → UNIQUE 证据）：
-//! - `services/mrp_engine_ops/calculation.rs`：`MRP`（单次计算行号=单据号）、
-//!   `MRPB`（批次号，行号 `{批次号}-{行序}`）→ `mrp_results.calculation_no`
-//!   UNIQUE（migration/src/domain/business/m0007_add_mrp_production_bom.rs:105）；
 //! - `services/warehouse_service.rs`：`WH` → `warehouses.warehouse_code`
 //!   UNIQUE（migration/src/domain/system/m0001_initial_schema.rs:281），
 //!   人工传入码原样保留、仅缺省自动取号；
@@ -20,9 +17,6 @@
 //!    排程批次号取号格式。sqlite::memory: 无法承载 `pg_advisory_xact_lock`，
 //!    取号机制本身的行为契约由 number_generator_*_test.rs 在活库覆盖。
 
-use bingxi_backend::services::mrp_engine_ops::calculation::{
-    MRP_BATCH_NO_PREFIX, MRP_LINE_NO_PREFIX,
-};
 use bingxi_backend::services::scheduling_auto::SCHEDULE_BATCH_NO_PREFIX;
 use bingxi_backend::services::warehouse_service::WAREHOUSE_CODE_NO_PREFIX;
 use std::path::PathBuf;
@@ -38,7 +32,6 @@ fn leading_alpha(s: &str) -> String {
     s.chars().take_while(|c| c.is_ascii_uppercase()).collect()
 }
 
-const MRP_CALC: &str = "src/services/mrp_engine_ops/calculation.rs";
 const WHS: &str = "src/services/warehouse_service.rs";
 const SCH_AUTO: &str = "src/services/scheduling_auto.rs";
 const GEN: &str = "src/utils/number_generator.rs";
@@ -46,40 +39,6 @@ const GEN: &str = "src/utils/number_generator.rs";
 // =========================================================
 // 静态层 1：时间戳拼号形态必须已消失，且取号在调用方事务内
 // =========================================================
-
-#[test]
-fn mrp_calculation_no_longer_concatenates_timestamp() {
-    let src = read(MRP_CALC);
-    assert!(
-        !src.contains("timestamp_millis"),
-        "calculation.rs 仍残留毫秒时间戳拼号（本批要消灭的形态）"
-    );
-    assert!(
-        !src.contains("format!(\"MRP{}\")") && !src.contains("format!(\"MRPB{}\")"),
-        "calculation.rs 不得再有 MRP/MRPB 手写拼号"
-    );
-    // 取号与 INSERT 同事务：两个入口都必须在 begin 后经 generate_no_with_txn 取号
-    assert!(
-        src.contains("(*self.db).begin()")
-            && src.contains("DocumentNumberGenerator::generate_no_with_txn("),
-        "MRP 行号/批次号必须在调用方事务内经生成器取号（advisory lock 持到提交）"
-    );
-    let begin_pos = src.find("(*self.db).begin()").expect("缺少 begin");
-    let gen_pos = src
-        .find("DocumentNumberGenerator::generate_no_with_txn(")
-        .expect("缺少事务内取号");
-    assert!(
-        gen_pos > begin_pos,
-        "取号必须发生在 begin 之后（先开事务再取号，保证锁持有到提交）"
-    );
-    // 失败路径显式报错可外显，禁止退化回时间戳
-    assert!(
-        src.contains("AppError::business_displayable(\"MRP计算单号生成失败，请稍后重试\")")
-            && src
-                .contains("AppError::business_displayable(\"MRP计算批次号生成失败，请稍后重试\")"),
-        "MRP 取号失败必须 business_displayable 外显，且绝不兜底成时间戳号"
-    );
-}
 
 #[test]
 fn warehouse_code_no_longer_concatenates_timestamp_and_keeps_manual_code() {
@@ -136,12 +95,7 @@ fn scheduling_batch_no_longer_concatenates_timestamp_second_format() {
 
 #[test]
 fn prefix_constants_are_pure_uppercase_and_match_legacy_prefixes() {
-    for prefix in [
-        MRP_LINE_NO_PREFIX,
-        MRP_BATCH_NO_PREFIX,
-        WAREHOUSE_CODE_NO_PREFIX,
-        SCHEDULE_BATCH_NO_PREFIX,
-    ] {
+    for prefix in [WAREHOUSE_CODE_NO_PREFIX, SCHEDULE_BATCH_NO_PREFIX] {
         assert!(!prefix.is_empty(), "前缀常量不得为空");
         assert!(
             leading_alpha(prefix) == prefix,
@@ -149,45 +103,22 @@ fn prefix_constants_are_pure_uppercase_and_match_legacy_prefixes() {
         );
     }
     // 业务识别键不许改名（原手写格式即以这些字母段开头）
-    assert_eq!(MRP_LINE_NO_PREFIX, "MRP");
-    assert_eq!(MRP_BATCH_NO_PREFIX, "MRPB");
     assert_eq!(WAREHOUSE_CODE_NO_PREFIX, "WH");
     assert_eq!(SCHEDULE_BATCH_NO_PREFIX, "SCH");
 }
 
 #[test]
-fn mrp_line_and_batch_prefixes_do_not_cross_match() {
-    // 生成器按 starts_with("{prefix}{YYYYMMDD}") 计数取基数：
-    // 若 MRPB 号段落在 MRP 前缀匹配内（反之亦然），两类单据会互相污染基数。
-    let date = "20260101";
-    let line_seg = format!("{MRP_LINE_NO_PREFIX}{date}");
-    let batch_seg = format!("{MRP_BATCH_NO_PREFIX}{date}");
-    assert!(
-        !batch_seg.starts_with(&line_seg),
-        "MRPB 号段不得被 MRP 前缀计数命中（否则基数互相污染、探测依赖被打穿）"
-    );
-    assert!(
-        !line_seg.starts_with(&batch_seg),
-        "MRP 号段不得被 MRPB 前缀计数命中"
-    );
-}
-
-#[test]
 fn registry_registers_new_unique_document_no_columns() {
     let src = read(GEN);
-    for (doc_type, col_expr) in [
-        ("mrp_result", "mrp_result::Column::CalculationNo.eq(no)"),
-        ("warehouse", "warehouse::Column::WarehouseCode.eq(no)"),
-    ] {
-        assert!(
-            src.contains(&format!("\"{doc_type}\" =>")),
-            "带 UNIQUE 的新收口单据号列必须登记 is_document_no_taken：缺 {doc_type}"
-        );
-        assert!(
-            src.contains(col_expr),
-            "注册表 {doc_type} 必须指向真实实体真实列 {col_expr}"
-        );
-    }
+    let (doc_type, col_expr) = ("warehouse", "warehouse::Column::WarehouseCode.eq(no)");
+    assert!(
+        src.contains(&format!("\"{doc_type}\" =>")),
+        "带 UNIQUE 的新收口单据号列必须登记 is_document_no_taken：缺 {doc_type}"
+    );
+    assert!(
+        src.contains(col_expr),
+        "注册表 {doc_type} 必须指向真实实体真实列 {col_expr}"
+    );
 }
 
 // =========================================================
@@ -197,13 +128,9 @@ fn registry_registers_new_unique_document_no_columns() {
 
 #[test]
 fn ddl_evidence_for_unique_and_non_unique_columns_unchanged() {
-    let mrp_ddl = read("migration/src/domain/business/m0007_add_mrp_production_bom.rs");
+    let m0007_ddl = read("migration/src/domain/business/m0007_add_mrp_production_bom.rs");
     assert!(
-        mrp_ddl.contains("\"calculation_no\" VARCHAR(50) NOT NULL UNIQUE"),
-        "mrp_results.calculation_no 的 UNIQUE 判定依据（m0007:105）与迁移原文不符"
-    );
-    assert!(
-        mrp_ddl.contains("\"batch_no\" VARCHAR(50) NOT NULL,"),
+        m0007_ddl.contains("\"batch_no\" VARCHAR(50) NOT NULL,"),
         "scheduling_result.batch_no 必须维持无 UNIQUE（m0007:129）；若迁移侧新增约束，\
         本测试变红并要求把取号路径升级为 insert_with_no_retry"
     );
@@ -221,15 +148,12 @@ fn ddl_evidence_for_unique_and_non_unique_columns_unchanged() {
 
 #[cfg(test)]
 mod live_pg {
-    use super::{
-        MRP_BATCH_NO_PREFIX, MRP_LINE_NO_PREFIX, SCHEDULE_BATCH_NO_PREFIX, WAREHOUSE_CODE_NO_PREFIX,
-    };
+    use super::{SCHEDULE_BATCH_NO_PREFIX, WAREHOUSE_CODE_NO_PREFIX};
     use bingxi_backend::handlers::warehouse_handler::CreateWarehouseRequest;
-    use bingxi_backend::models::{mrp_result, scheduling_result, warehouse};
+    use bingxi_backend::models::{scheduling_result, warehouse};
     use bingxi_backend::services::warehouse_service::WarehouseService;
     use bingxi_backend::utils::number_generator::DocumentNumberGenerator;
     use chrono::Utc;
-    use rust_decimal::Decimal;
     use sea_orm::{
         ActiveModelTrait, ColumnTrait, EntityTrait, ExprTrait, PaginatorTrait, QueryFilter, Set,
         TransactionTrait,
@@ -262,89 +186,6 @@ mod live_pg {
             seq_part.len() == 3 && seq_part.chars().all(|c| c.is_ascii_digit()),
             "{no} 流水段应为 3 位数字，实际 {seq_part}"
         );
-    }
-
-    fn make_mrp_row(no: String) -> mrp_result::ActiveModel {
-        let now = Utc::now();
-        mrp_result::ActiveModel {
-            calculation_no: Set(no),
-            product_id: Set(999_999), // mrp_results.product_id 无 FK 约束（m0007:103-117 仅索引）
-            required_quantity: Set(Decimal::ONE),
-            source_type: Set("MANUAL".to_string()),
-            status: Set("PLANNED".to_string()),
-            created_at: Set(now),
-            updated_at: Set(now),
-            ..Default::default()
-        }
-    }
-
-    /// MRP：事务内取号后落「主行 + 派生子行」，第二轮取号必须避开第一轮全部行
-    /// （派生子行 `{行号}-{序}` 也在 starts_with 计数内，基数膨胀但探测会跳过——
-    /// 这是本接入点相对 customers 纯单行场景的特有风险，必须活库实证不撞 UNIQUE）。
-    #[tokio::test]
-    #[ignore = "需已迁移 PG（pg_advisory_xact_lock + mrp_results UNIQUE），由 ci-test-rust-ignored 执行"]
-    async fn live_pg_mrp_txn_no_accommodates_derived_subrows() {
-        let db = live_db().await;
-        let day_seg = format!("{}{}", MRP_LINE_NO_PREFIX, today());
-        let batch_day_seg = format!("{}{}", MRP_BATCH_NO_PREFIX, today());
-
-        let txn = db.begin().await.expect("开启事务失败");
-        let mut got = Vec::new();
-        for round in 1..=2 {
-            let line_no = DocumentNumberGenerator::generate_no_with_txn(
-                &txn,
-                MRP_LINE_NO_PREFIX,
-                mrp_result::Entity,
-                mrp_result::Column::CalculationNo,
-            )
-            .await
-            .unwrap_or_else(|e| panic!("第 {round} 轮事务内取号失败: {e:?}"));
-            assert_standard_format(&line_no, MRP_LINE_NO_PREFIX);
-            make_mrp_row(line_no.clone())
-                .insert(&txn)
-                .await
-                .unwrap_or_else(|e| panic!("主行 {line_no} 插入失败: {e}"));
-            for idx in 0..2 {
-                let sub_no = format!("{line_no}-{idx}");
-                make_mrp_row(sub_no.clone())
-                    .insert(&txn)
-                    .await
-                    .unwrap_or_else(|e| panic!("子行 {sub_no} 插入失败（撞派生号）: {e}"));
-            }
-            got.push(line_no);
-        }
-        assert_ne!(got[0], got[1], "两轮取号不得相同");
-        // 第二轮基数 = 第一轮号数(1)+子行(2)+1 → 必然大于第一轮流水号（探测保证不撞）
-
-        // MRPB 批次段与 MRP 行号段互不污染基数（starts_with 号段互斥，见
-        // mrp_line_and_batch_prefixes_do_not_cross_match 静态断言）：
-        // 上面已落 MRP 主行/子行，此刻 MRPB 取号仍应得到标准格式号，批次派生行可共存
-        let batch_no = DocumentNumberGenerator::generate_no_with_txn(
-            &txn,
-            MRP_BATCH_NO_PREFIX,
-            mrp_result::Entity,
-            mrp_result::Column::CalculationNo,
-        )
-        .await
-        .expect("MRPB 批次号取号失败");
-        assert_standard_format(&batch_no, MRP_BATCH_NO_PREFIX);
-        let batch_line = format!("{batch_no}-0");
-        make_mrp_row(batch_line.clone())
-            .insert(&txn)
-            .await
-            .unwrap_or_else(|e| panic!("批次行 {batch_line} 插入失败: {e}"));
-        txn.rollback().await.expect("回滚失败（用例不落残留）");
-
-        let leftover = mrp_result::Entity::find()
-            .filter(
-                mrp_result::Column::CalculationNo
-                    .starts_with(&day_seg)
-                    .or(mrp_result::Column::CalculationNo.starts_with(&batch_day_seg)),
-            )
-            .count(&db)
-            .await
-            .expect("查残留失败");
-        assert_eq!(leftover, 0, "回滚后当日 MRP/MRPB 探针行不得残留");
     }
 
     fn make_schedule_row(batch_no: String) -> scheduling_result::ActiveModel {
