@@ -13,7 +13,7 @@ use crate::services::user_notification_setting_service::UserNotificationSettingS
 use crate::services::wechat_mp_service::{NotificationOutcome, TemplateField, WechatMpService};
 use crate::utils::error::AppError;
 use crate::utils::html_escape::escape_html;
-use sea_orm::{DatabaseConnection, EntityTrait, QueryOrder};
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryOrder};
 use std::sync::Arc;
 
 /// 多用户通知发送参数对象（批次 413 技术债务清理：引入参数对象消除 notify_multiple_users 的 too_many_arguments 警告。；聚合多用户通知所需的全部字段，避免函数签名携带 7 个参数。）
@@ -282,7 +282,7 @@ impl EventNotificationService {
                                 crate::services::wechat_mp_notification_outbox_service::EnqueueRequest {
                                     user_id,
                                     kind: kind.code().to_string(),
-                                    openid: openid.clone(),
+                                    openid: openid.to_string(),
                                     business_key: business_key.to_string(),
                                     jump_url: jump_url.map(|u| u.to_string()),
                                     fields: fields_json,

@@ -4,8 +4,8 @@
 
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set,
 };
 use std::sync::Arc;
 
@@ -83,9 +83,9 @@ impl WechatMpNotificationOutboxService {
             .filter(Column::Status.eq("PENDING"))
             .filter(Column::RetryCount.lt(OUTBOX_MAX_RETRY_COUNT))
             .filter(
-                Column::NextRetryAt
-                    .is_null()
-                    .or(Column::NextRetryAt.lte(now)),
+                Condition::any()
+                    .add(Column::NextRetryAt.is_null())
+                    .add(Column::NextRetryAt.lte(now)),
             )
             .order_by_asc(Column::CreatedAt)
             .limit(MAX_ROWS_PER_SCAN)

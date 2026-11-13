@@ -78,7 +78,7 @@ impl WechatMpNotificationOutboxWorker {
                 // 未知事件类型无法反解模板,永远发不出,直接按死信调度终结
                 let msg = format!("未知事件类型 code={}，无法反解模板，直接转死信", row.kind);
                 warn!(outbox_id = row.id, "{}", msg);
-                if let Err(e) = outbox.increment_retry(&row.id, &msg).await {
+                if let Err(e) = outbox.increment_retry(row.id, &msg).await {
                     warn!(error = %e, outbox_id = row.id, "未知事件类型行转死信失败");
                 }
                 return Ok(true);
@@ -92,7 +92,7 @@ impl WechatMpNotificationOutboxWorker {
                 Err(e) => {
                     let msg = format!("模板字段反序列化失败：{}", e);
                     warn!(outbox_id = row.id, "{}", msg);
-                    outbox.increment_retry(&row.id, &msg).await?;
+                    outbox.increment_retry(row.id, &msg).await?;
                     return Ok(true);
                 }
             };

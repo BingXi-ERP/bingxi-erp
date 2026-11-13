@@ -248,7 +248,8 @@ impl WechatMpService {
         appid: &str,
         secret: &str,
     ) -> Result<reqwest::Response, AppError> {
-        let response = Self::http()
+        let response = self
+            .http()
             .get(url)
             .query(&[
                 ("grant_type", "client_credential"),
