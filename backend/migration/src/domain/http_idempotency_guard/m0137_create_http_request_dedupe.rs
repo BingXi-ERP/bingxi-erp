@@ -14,9 +14,10 @@
 //! 请求体是重放，带不同请求体是键复用，两种情形拒因不同，必须都能分辨，
 //! 因此只存键不存指纹不够。
 //!
-//! status 列记录占位态：claimed 表示请求已进门但结果未知，succeeded 表示下游已成功，
-//! 中间件对 5xx 会删除占位（删除即释放），使真实重试不被挡；释放动作失败只记日志，
-//! 不改写原始响应，避免把真实的 5xx 掩盖成幂等层的错误。
+//! status 列记录占位态，词表与写入方逐字符相同：claimed 表示请求已进门但结果未知，
+//! completed 表示下游已受理（2xx 与 3xx），failed 表示未被受理（4xx 与 5xx）。
+//! 未受理的占位改写为 failed 而不是删除，同一把键改完内容即可重试；claimed 超过保留
+//! 窗口视为被放弃，由后续请求接管，避免进程被杀后键被永久锁死。
 //!
 //! 不加外键：users 表不由迁移创建（初始化服务晚于 migrate 建用户），给 user_id 加
 //! FK 会让存量库上的建表直接失败，这是仓内既有的同一口径。
@@ -46,23 +47,14 @@ CREATE TABLE IF NOT EXISTS http_request_dedupe (
 CREATE INDEX IF NOT EXISTS idx_http_request_dedupe_created_at
     ON http_request_dedupe(created_at);
 "#;
-        manager
-            .get_connection()
-            .execute(Statement::from_string(
-                sea_orm::DatabaseBackend::Postgres,
-                sql.to_string(),
-            ))
-            .await?;
+        manager.get_connection().execute_unprepared(sql).await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .get_connection()
-            .execute(Statement::from_string(
-                sea_orm::DatabaseBackend::Postgres,
-                "DROP TABLE IF EXISTS http_request_dedupe;".to_string(),
-            ))
+            .execute_unprepared("DROP TABLE IF EXISTS http_request_dedupe;")
             .await?;
         Ok(())
     }
