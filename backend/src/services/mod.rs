@@ -405,3 +405,6 @@ pub mod textile_safety_limit_judge;
 pub mod textile_safety_submission_service;
 pub mod textile_safety_report_service;
 pub mod textile_safety_master_service;
+// 公众号通知失败重试队列（直发失败入队,后台 worker 指数退避重投,3 次死信）
+pub mod wechat_mp_notification_outbox_service;
+pub mod wechat_mp_notification_outbox_worker;

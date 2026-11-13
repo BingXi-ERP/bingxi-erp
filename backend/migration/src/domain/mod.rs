@@ -208,3 +208,5 @@ pub mod bom_mrp_permission_withdrawal;
 pub mod http_idempotency_guard;
 // 用户与公众号 openid 绑定关系表。独立顶层域，理由见域头（并入已应用域会在复用库被整体跳过）。
 pub mod wechat_mp_binding;
+// 公众号通知失败重试队列表。独立顶层域,理由同绑定域（并入已应用域会在复用库被整体跳过）。
+pub mod wechat_mp_notification_outbox;

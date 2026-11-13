@@ -266,6 +266,46 @@ impl EventNotificationService {
                         error = %e,
                         "微信模板消息发送失败（best-effort，不影响主业务流）"
                     );
+                    // 失败入重试队列:fields 序列化进 JSONB,后台 worker 按指数退避重投
+                    let fields_json = serde_json::to_value(
+                        fields
+                            .iter()
+                            .map(|f| serde_json::json!({"key": f.key, "value": f.value}))
+                            .collect::<Vec<_>>(),
+                    );
+                    match fields_json {
+                        Ok(fields_json) => {
+                            let outbox = crate::services::wechat_mp_notification_outbox_service::WechatMpNotificationOutboxService::new(
+                                self.notification_service.db().clone(),
+                            );
+                            let req =
+                                crate::services::wechat_mp_notification_outbox_service::EnqueueRequest {
+                                    user_id,
+                                    kind: kind.code().to_string(),
+                                    openid: openid.clone(),
+                                    business_key: business_key.to_string(),
+                                    jump_url: jump_url.map(|u| u.to_string()),
+                                    fields: fields_json,
+                                };
+                            if let Err(enqueue_err) = outbox.enqueue(req).await {
+                                tracing::warn!(
+                                    user_id = user_id,
+                                    kind = kind.code(),
+                                    business_key = business_key,
+                                    error = %enqueue_err,
+                                    "发送失败的微信模板消息入重试队列也失败（本条通知只能丢弃）"
+                                );
+                            }
+                        }
+                        Err(ser_err) => {
+                            tracing::warn!(
+                                user_id = user_id,
+                                kind = kind.code(),
+                                error = %ser_err,
+                                "发送失败的微信模板消息字段序列化失败,无法入重试队列"
+                            );
+                        }
+                    }
                 }
             }
         }

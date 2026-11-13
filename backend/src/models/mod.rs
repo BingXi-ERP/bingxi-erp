@@ -485,3 +485,4 @@ pub mod clause_library;
 pub mod contract_template_clause;
 pub mod contract_clause;
 pub mod wechat_mp_binding;
+pub mod wechat_mp_notification_outbox;

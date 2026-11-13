@@ -368,6 +368,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::http_idempotency_guard::Migration),
             // 用户与公众号 openid 绑定关系表，链尾独立域（users 由 system 域 m0001 先建）
             Box::new(domain::wechat_mp_binding::Migration),
+            // 公众号通知失败重试队列表，链尾独立域（无外键依赖,通知腿旁路数据地基）
+            Box::new(domain::wechat_mp_notification_outbox::Migration),
         ]
     }
 }
