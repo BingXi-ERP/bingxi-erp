@@ -1,6 +1,7 @@
 import { test, expect } from '../diagnose-fixture';
 import type { Page } from '@playwright/test';
 import {
+  loginAsRole,
   loginViaUI,
   ensureTestEntities,
   getCtx,
@@ -112,11 +113,9 @@ async function createSelfQuotation(page: Page, tag: string): Promise<{ id: numbe
 }
 
 // 本 describe 每条链含 ensureTestEntities（UI 建 10+ 实体，慢环境可达 140s+）与
-// 两次 loginViaUI 角色切换（单次最多 120s），CI 慢环境单腿真实耗时超全局 420s，
-// 超时杀页后 waitForTimeout 抛 page closed 连锁失败（与 config 300s 时代同症状）；
-// 按 config 提升先例单独放宽到 600s，不动全局。
+// 两次角色切换登录（单次最多 120s），CI 慢环境单腿真实耗时可能逼近全局 420s；
+// 若确有超时迹象按 config 提升先例单独放宽，不动全局。
 test.describe('510 报价审批双通道通知腿（真实契约正腿）', () => {
-  test.describe.configure({ timeout: 600_000 });
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
   });
@@ -130,7 +129,7 @@ test.describe('510 报价审批双通道通知腿（真实契约正腿）', () =
     const inboxBefore = await readInbox(page, '触发前');
     const baseline = countApproval(inboxBefore, quotationNo, '基线');
 
-    await loginViaUI(page, 'sales_manager', undefined, true);
+    await loginAsRole(page, 'sales_manager');
     await apiCallRaw(page, 'POST', `/quotations/${id}/approve`, {
       approval_reason: `${tag} 审批通过`,
     });
@@ -158,7 +157,7 @@ test.describe('510 报价审批双通道通知腿（真实契约正腿）', () =
     const inboxBefore = await readInbox(page, '触发前');
     const baseline = countApproval(inboxBefore, quotationNo, '基线');
 
-    await loginViaUI(page, 'sales_manager', undefined, true);
+    await loginAsRole(page, 'sales_manager');
     await apiCallRaw(page, 'POST', `/quotations/${id}/reject`, {
       reason: `${tag} 拒绝原因`,
     });
