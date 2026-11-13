@@ -56,7 +56,7 @@ impl WechatMpNotificationOutboxService {
             openid: Set(req.openid),
             business_key: Set(req.business_key),
             jump_url: Set(req.jump_url),
-            fields: Set(req.fields.into()),
+            fields: Set(req.fields),
             status: Set("PENDING".to_string()),
             error_message: Set(None),
             retry_count: Set(0),
