@@ -289,6 +289,9 @@ async fn seed(db: &sea_orm::DatabaseConnection) {
         created_by: Set(OWNER_A),
         created_at: Set(Utc::now()),
         updated_at: Set(Utc::now()),
+        delivered_at: Set(None),
+        signed_by: Set(None),
+        signed_at: Set(None),
     }
     .insert(db)
     .await
