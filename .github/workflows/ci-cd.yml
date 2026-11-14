@@ -1536,7 +1536,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgres://bingxi:bingxi_test@localhost:5432/bingxi_test
-      AUDIT_SECRET_KEY: ci-only-audit-signing-key-do-not-use-in-prod-32b
+      AUDIT_SECRET_KEY: ${{ secrets.CI_AUDIT_SECRET_KEY != '' && secrets.CI_AUDIT_SECRET_KEY || 'ci-only-audit-signing-key-do-not-use-in-prod-32b' }}
       # CARGO_BUILD_JOBS/CARGO_JOBS 由 setup-rust action 智能探测写入 GITHUB_ENV（防 OOM，不硬编码）
     steps:
       - name: 检出代码
@@ -1672,7 +1672,7 @@ jobs:
       # 夹具 connect_empty_schema_db() 连它；本 job 建库但**不跑迁移**，与已迁移库互不污染。
       # 缺失时夹具直接 panic（禁止静默跳过/回退 sqlite）。
       TEST_EMPTY_DATABASE_URL: postgres://bingxi:bingxi_test@localhost:5432/bingxi_empty
-      AUDIT_SECRET_KEY: ci-only-audit-signing-key-do-not-use-in-prod-32b
+      AUDIT_SECRET_KEY: ${{ secrets.CI_AUDIT_SECRET_KEY != '' && secrets.CI_AUDIT_SECRET_KEY || 'ci-only-audit-signing-key-do-not-use-in-prod-32b' }}
       # CARGO_BUILD_JOBS/CARGO_JOBS 由 setup-rust 智能探测写入 GITHUB_ENV（防 OOM，用满最大上限）
     steps:
       - name: 检出代码
@@ -1999,12 +1999,12 @@ jobs:
       # 夹具 connect_empty_schema_db() 连它；本 job 建库但**不跑迁移**，与已迁移库互不污染。
       # 缺失时夹具直接 panic（禁止静默跳过/回退 sqlite）。
       TEST_EMPTY_DATABASE_URL: postgres://bingxi:bingxi_test@localhost:5432/bingxi_empty
-      AUDIT_SECRET_KEY: ci-only-audit-signing-key-do-not-use-in-prod-32b
+      AUDIT_SECRET_KEY: ${{ secrets.CI_AUDIT_SECRET_KEY != '' && secrets.CI_AUDIT_SECRET_KEY || 'ci-only-audit-signing-key-do-not-use-in-prod-32b' }}
       # 部分 ignored 用例（websocket/bi e2e）会拉起 axum server，Settings::from_env
       # 需要与 e2e job 同款的 CI 专用占位密钥（非真实密钥），否则以配置错误失败
-      JWT_SECRET: ci-only-jwt-signing-key-do-not-use-in-prod-32b
-      COOKIE_SECRET: ci-only-cookie-secret-do-not-use-in-prod-32b
-      WEBHOOK_SECRET: ci-only-webhook-secret-do-not-use-in-prod-32b
+      JWT_SECRET: ${{ secrets.CI_JWT_SECRET != '' && secrets.CI_JWT_SECRET || 'ci-only-jwt-signing-key-do-not-use-in-prod-32b' }}
+      COOKIE_SECRET: ${{ secrets.CI_COOKIE_SECRET != '' && secrets.CI_COOKIE_SECRET || 'ci-only-cookie-secret-do-not-use-in-prod-32b' }}
+      WEBHOOK_SECRET: ${{ secrets.CI_WEBHOOK_SECRET != '' && secrets.CI_WEBHOOK_SECRET || 'ci-only-webhook-secret-do-not-use-in-prod-32b' }}
       APP_ENV: development
       ENV: development
       KAFKA_ENABLED: "false"
@@ -3207,13 +3207,13 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgres://bingxi:bingxi_test@localhost:5432/bingxi_test
-      JWT_SECRET: ci-e2e-jwt-secret-32bytes-do-not-use-in-prod-abc
-      COOKIE_SECRET: ci-e2e-cookie-secret-32bytes-do-not-use-in-prod-xyz
-      WEBHOOK_SECRET: ci-e2e-webhook-secret-32bytes-do-not-use-in-prod-q
-      AUDIT_SECRET_KEY: e2e-only-audit-signing-key-do-not-use-in-prod-32b
-      INIT_TOKEN: ci-e2e-seeding-token-only-32bytes-do-not-use!
+      JWT_SECRET: ${{ secrets.CI_E2E_JWT_SECRET != '' && secrets.CI_E2E_JWT_SECRET || 'ci-e2e-jwt-secret-32bytes-do-not-use-in-prod-abc' }}
+      COOKIE_SECRET: ${{ secrets.CI_E2E_COOKIE_SECRET != '' && secrets.CI_E2E_COOKIE_SECRET || 'ci-e2e-cookie-secret-32bytes-do-not-use-in-prod-xyz' }}
+      WEBHOOK_SECRET: ${{ secrets.CI_E2E_WEBHOOK_SECRET != '' && secrets.CI_E2E_WEBHOOK_SECRET || 'ci-e2e-webhook-secret-32bytes-do-not-use-in-prod-q' }}
+      AUDIT_SECRET_KEY: ${{ secrets.CI_E2E_AUDIT_SECRET_KEY != '' && secrets.CI_E2E_AUDIT_SECRET_KEY || 'e2e-only-audit-signing-key-do-not-use-in-prod-32b' }}
+      INIT_TOKEN: ${{ secrets.CI_E2E_INIT_TOKEN != '' && secrets.CI_E2E_INIT_TOKEN || 'ci-e2e-seeding-token-only-32bytes-do-not-use!' }}
       TEST_USERNAME: e2e_admin
-      TEST_PASSWORD: "Xk9#mQ2$vL8pW4nR"
+      TEST_PASSWORD: ${{ secrets.CI_E2E_TEST_PASSWORD != '' && secrets.CI_E2E_TEST_PASSWORD || 'Xk9#mQ2$vL8pW4nR' }}
       APP_ENV: development
       ENV: development
       KAFKA_ENABLED: "false"
@@ -3679,13 +3679,13 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgres://bingxi:bingxi_test@localhost:5432/bingxi_test
-      JWT_SECRET: ci-e2e-jwt-secret-32bytes-do-not-use-in-prod-abc
-      COOKIE_SECRET: ci-e2e-cookie-secret-32bytes-do-not-use-in-prod-xyz
-      WEBHOOK_SECRET: ci-e2e-webhook-secret-32bytes-do-not-use-in-prod-q
-      AUDIT_SECRET_KEY: e2e-only-audit-signing-key-do-not-use-in-prod-32b
-      INIT_TOKEN: ci-e2e-seeding-token-only-32bytes-do-not-use!
+      JWT_SECRET: ${{ secrets.CI_E2E_JWT_SECRET != '' && secrets.CI_E2E_JWT_SECRET || 'ci-e2e-jwt-secret-32bytes-do-not-use-in-prod-abc' }}
+      COOKIE_SECRET: ${{ secrets.CI_E2E_COOKIE_SECRET != '' && secrets.CI_E2E_COOKIE_SECRET || 'ci-e2e-cookie-secret-32bytes-do-not-use-in-prod-xyz' }}
+      WEBHOOK_SECRET: ${{ secrets.CI_E2E_WEBHOOK_SECRET != '' && secrets.CI_E2E_WEBHOOK_SECRET || 'ci-e2e-webhook-secret-32bytes-do-not-use-in-prod-q' }}
+      AUDIT_SECRET_KEY: ${{ secrets.CI_E2E_AUDIT_SECRET_KEY != '' && secrets.CI_E2E_AUDIT_SECRET_KEY || 'e2e-only-audit-signing-key-do-not-use-in-prod-32b' }}
+      INIT_TOKEN: ${{ secrets.CI_E2E_INIT_TOKEN != '' && secrets.CI_E2E_INIT_TOKEN || 'ci-e2e-seeding-token-only-32bytes-do-not-use!' }}
       TEST_USERNAME: e2e_admin
-      TEST_PASSWORD: "Xk9#mQ2$vL8pW4nR"
+      TEST_PASSWORD: ${{ secrets.CI_E2E_TEST_PASSWORD != '' && secrets.CI_E2E_TEST_PASSWORD || 'Xk9#mQ2$vL8pW4nR' }}
       E2E_BASE_USERNAME: e2e_admin
       APP_ENV: development
       ENV: development
@@ -3994,13 +3994,13 @@ jobs:
       SETUP_E2E_PORT: 8083
       SETUP_E2E_DB: bingxi_setup_test
       SETUP_E2E_ADMIN: setup_admin
-      SETUP_E2E_PASS: "Setup@E2E2026!x"
-      SETUP_E2E_INIT_TOKEN: ci-setup-wizard-real-token-0123456789abcdef
+      SETUP_E2E_PASS: ${{ secrets.CI_SETUP_E2E_PASS != '' && secrets.CI_SETUP_E2E_PASS || 'Setup@E2E2026!x' }}
+      SETUP_E2E_INIT_TOKEN: ${{ secrets.CI_SETUP_E2E_INIT_TOKEN != '' && secrets.CI_SETUP_E2E_INIT_TOKEN || 'ci-setup-wizard-real-token-0123456789abcdef' }}
       # 后端启动所需密钥（CI 测试专用，禁止用于生产）
-      JWT_SECRET: ci-e2e-jwt-secret-32bytes-do-not-use-in-prod-abc
-      COOKIE_SECRET: ci-e2e-cookie-secret-32bytes-do-not-use-in-prod-xyz
-      WEBHOOK_SECRET: ci-e2e-webhook-secret-32bytes-do-not-use-in-prod-q
-      AUDIT_SECRET_KEY: e2e-only-audit-signing-key-do-not-use-in-prod-32b
+      JWT_SECRET: ${{ secrets.CI_E2E_JWT_SECRET != '' && secrets.CI_E2E_JWT_SECRET || 'ci-e2e-jwt-secret-32bytes-do-not-use-in-prod-abc' }}
+      COOKIE_SECRET: ${{ secrets.CI_E2E_COOKIE_SECRET != '' && secrets.CI_E2E_COOKIE_SECRET || 'ci-e2e-cookie-secret-32bytes-do-not-use-in-prod-xyz' }}
+      WEBHOOK_SECRET: ${{ secrets.CI_E2E_WEBHOOK_SECRET != '' && secrets.CI_E2E_WEBHOOK_SECRET || 'ci-e2e-webhook-secret-32bytes-do-not-use-in-prod-q' }}
+      AUDIT_SECRET_KEY: ${{ secrets.CI_E2E_AUDIT_SECRET_KEY != '' && secrets.CI_E2E_AUDIT_SECRET_KEY || 'e2e-only-audit-signing-key-do-not-use-in-prod-32b' }}
       APP_ENV: development
       ENV: development
       KAFKA_ENABLED: "false"

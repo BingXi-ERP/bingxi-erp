@@ -29,6 +29,8 @@
 //!   → flow_card_material_input
 //!   → bom_mrp_table_drop
 //!   → bom_mrp_permission_withdrawal
+//!   → http_idempotency_guard
+//!   → wechat_mp_binding
 //!
 //! 迁移名: m_system_domain / m_business_domain / m_sales_crm_domain /
 //!         m_production_domain / m_finance_domain / m_v15_domain / m_rls_dept_domain /
@@ -364,6 +366,10 @@ impl MigratorTrait for Migrator {
             Box::new(domain::bom_mrp_permission_withdrawal::Migration),
             // HTTP 请求级幂等去重表：链尾独立域，存量复用库上属 pending 必然执行。
             Box::new(domain::http_idempotency_guard::Migration),
+            // 用户与公众号 openid 绑定关系表，链尾独立域（users 由 system 域 m0001 先建）
+            Box::new(domain::wechat_mp_binding::Migration),
+            // 公众号通知失败重试队列表，链尾独立域（无外键依赖,通知腿旁路数据地基）
+            Box::new(domain::wechat_mp_notification_outbox::Migration),
         ]
     }
 }
