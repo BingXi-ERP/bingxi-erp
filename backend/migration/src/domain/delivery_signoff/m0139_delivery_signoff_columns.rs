@@ -16,7 +16,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Alias::new("sales_delivery"))
-                    .add_column(ColumnDef::new(Alias::new("delivered_at")).timestamp().null())
+                    .add_column(
+                        ColumnDef::new(Alias::new("delivered_at"))
+                            .timestamp()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;
