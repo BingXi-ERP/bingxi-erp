@@ -418,24 +418,35 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   }
 
   // ---- 3. 产品色号（仍用 API，因为色号在详情页创建且依赖 product_id）----
+  // ---- 3. 产品色号（自建专属产品承载，不复用共享行）----
+  // 共享产品（readEntityIds 读到的列表行，如 seed id=2）可能在本 worker 建色时
+  // 已被并行 worker 的收尾清理，POST /products/{id}/colors 会撞
+  // fk_product_colors_product 外键违例回 500 DATABASE_ERROR（三 run 同文红实证）。
+  // 故建色一律打本 worker 刚自建的产品（补齐段末位必存在且归属本 worker），
+  // 与供应商段"自建自持不复用共享行"同范式。
   try {
+    const ownProductId = ctx.productIds[ctx.productIds.length - 1];
+    if (!ownProductId) {
+      throw new Error('自建产品不存在：补齐段应保证至少一支本 worker 专属产品');
+    }
     // 真实端点：GET /products/{id}/colors（返回数组，非分页包装）
     const colors = await apiCallRaw<Array<{ id: number; color_no: string }>>(
       page,
       'GET',
-      `/products/${ctx.productIds[0]}/colors`
+      `/products/${ownProductId}/colors`
     );
     ctx.productColorIds = colors?.map(c => c.id) || [];
-    ctx.colorNos = colors?.map(c => c.color_no) || ['TEST-COLOR'];
+    ctx.colorNos = colors?.map(c => c.color_no) || [];
   } catch (e) {
     throw new Error(`[ensureTestEntities] 色号查询失败: ${(e as Error).message}`);
   }
   if (ctx.colorNos.length === 0) {
     // 新建产品天然无色号——真实创建一个（CreateProductColorRequest），非占位兜底
+    const ownProductId = ctx.productIds[ctx.productIds.length - 1];
     const created = await apiCall<{ id?: number }>(
       page,
       'POST',
-      `/products/${ctx.productIds[0]}/colors`,
+      `/products/${ownProductId}/colors`,
       {
         color_no: `E2E-C${Date.now().toString().slice(-6)}`,
         color_name: 'E2E色号',
