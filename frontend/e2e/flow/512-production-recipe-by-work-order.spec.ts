@@ -36,7 +36,7 @@ test('512-01 悬空 work_order_id 返回 200 与 data null', async ({ page }) =>
   ).toBeNull();
 });
 
-test('512-02 悬空 work_order_id 的信封形状仍是 code 0 的成功信封', async ({ page }) => {
+test('512-02 悬空 work_order_id 的信封形状仍是 code 200 的成功信封', async ({ page }) => {
   const tag = '512-02';
   const danglingId = 999999998;
   const resp = await apiCall<{ code: number; data: unknown; message?: string }>(
@@ -44,6 +44,6 @@ test('512-02 悬空 work_order_id 的信封形状仍是 code 0 的成功信封',
     'GET',
     `/production/production-recipes/by-work-order/${danglingId}`
   );
-  expect(resp.code, `[${tag}] 悬空工单仍是成功信封 code 0，实际 ${resp.code}`).toBe(0);
+  expect(resp.code, `[${tag}] 悬空工单仍是成功信封 code 200，实际 ${resp.code}`).toBe(200);
   expect(resp.data, `[${tag}] data 应为 null，实际 ${JSON.stringify(resp.data)}`).toBeNull();
 });
