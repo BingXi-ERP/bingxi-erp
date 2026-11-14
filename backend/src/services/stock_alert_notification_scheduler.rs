@@ -236,4 +236,8 @@ impl Scheduler for StockAlertNotificationScheduler {
             .map(|_| ())
             .map_err(|e| e.to_string())
     }
+    async fn run_once_counted(&self) -> (Result<(), String>, Option<i64>) {
+        let r = self.scan_once().await.map_err(|e| e.to_string());
+        (r.map(|_| ()), r.ok().map(|n| n as i64))
+    }
 }

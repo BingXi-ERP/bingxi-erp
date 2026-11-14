@@ -87,7 +87,7 @@ async fn run_once_recorded(
     };
 
     let started = std::time::Instant::now();
-    let result = scheduler.run_once().await;
+    let (result, affected) = scheduler.run_once_counted().await;
     let elapsed = started.elapsed();
 
     if let (Some(db), Some(id)) = (db, run_id) {
@@ -97,7 +97,7 @@ async fn run_once_recorded(
         match &result {
             Ok(()) => {
                 active.status = Set(STATUS_SUCCESS.to_string());
-                active.affected = Set(scheduler.last_affected());
+                active.affected = Set(affected);
                 active.error_message = Set(None);
             }
             Err(e) => {
@@ -115,7 +115,7 @@ async fn run_once_recorded(
             scheduler = scheduler.name(),
             trigger = trigger,
             elapsed_ms = elapsed.as_millis() as u64,
-            affected = scheduler.last_affected().unwrap_or(0),
+            affected = affected.unwrap_or(0),
             "调度器本轮执行成功"
         ),
         Err(e) => {
@@ -154,10 +154,11 @@ pub trait Scheduler: Send + Sync {
     /// 实现方负责具体业务逻辑，返回 Err 时记录日志但不中断调度循环。
     async fn run_once(&self) -> Result<(), String>;
 
-    /// 最近一轮执行的处理条数（执行历史 affected 列来源），默认无计数。
-    /// 实现方在 run_once 内自行更新内部计数。
-    fn last_affected(&self) -> Option<i64> {
-        None
+    /// 执行一次并返回处理条数（执行历史 affected 列来源）。
+    /// 默认转发 [`Scheduler::run_once`] 无计数；任务语义是"处理条数"的
+    /// 实现方覆写此方法把条数上抛，包装层落 affected 列。
+    async fn run_once_counted(&self) -> (Result<(), String>, Option<i64>) {
+        (self.run_once().await, None)
     }
 }
 

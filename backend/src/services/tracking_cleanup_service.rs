@@ -279,4 +279,12 @@ impl crate::utils::scheduler_framework::Scheduler for TrackingCleanupService {
             .map(|_| ())
             .map_err(|e| e.to_string())
     }
+    async fn run_once_counted(&self) -> (Result<(), String>, Option<i64>) {
+        let r = self.run_cleanup_once().await.map_err(|e| e.to_string());
+        (
+            r.map(|_| ()),
+            r.ok()
+                .map(|st| st.page_view_archived + st.user_behavior_archived),
+        )
+    }
 }

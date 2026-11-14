@@ -88,4 +88,8 @@ impl crate::utils::scheduler_framework::Scheduler for LaborContractExpirySchedul
     async fn run_once(&self) -> Result<(), String> {
         self.scan_once().await.map(|_| ())
     }
+    async fn run_once_counted(&self) -> (Result<(), String>, Option<i64>) {
+        let r = self.scan_once().await;
+        (r.clone().map(|_| ()), r.ok().map(|n| n as i64))
+    }
 }
