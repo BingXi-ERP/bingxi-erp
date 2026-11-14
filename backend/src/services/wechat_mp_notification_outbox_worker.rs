@@ -34,7 +34,7 @@ impl WechatMpNotificationOutboxWorker {
     }
 
     /// 执行一次扫描：查询到期队列行并逐条重投（返回本次处理的行数）。
-    pub async fn run_once(&self) -> Result<u64, AppError> {
+    pub async fn dispatch_pending_batch(&self) -> Result<u64, AppError> {
         let outbox = WechatMpNotificationOutboxService::new(self.db.clone());
         let rows = outbox.list_pending_for_retry().await?;
         if rows.is_empty() {
@@ -196,7 +196,7 @@ impl crate::utils::scheduler_framework::Scheduler for WechatMpNotificationOutbox
     }
 
     async fn run_once(&self) -> Result<(), String> {
-        Self::run_once(self)
+        self.dispatch_pending_batch()
             .await
             .map(|_| ())
             .map_err(|e| e.to_string())

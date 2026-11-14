@@ -54,7 +54,7 @@ impl EmailQueueWorker {
     }
 
     /// 执行一次扫描：查询到期邮件并逐个发送（返回本次扫描处理的邮件数量。）
-    pub async fn run_once(&self) -> Result<u64, AppError> {
+    pub async fn process_pending_batch(&self) -> Result<u64, AppError> {
         let log_service = EmailLogService::new(self.db.clone());
 
         // 查询待发送邮件：PENDING + retry_count < MAX + (next_retry_at IS NULL OR <= now)
@@ -261,7 +261,7 @@ impl crate::utils::scheduler_framework::Scheduler for EmailQueueWorker {
     }
 
     async fn run_once(&self) -> Result<(), String> {
-        Self::run_once(self)
+        self.process_pending_batch()
             .await
             .map(|_| ())
             .map_err(|e| e.to_string())

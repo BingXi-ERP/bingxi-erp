@@ -46,7 +46,7 @@ impl TrackingCleanupService {
     }
 
     /// 单轮清理：依次归档并删除 page_views 与 user_behaviors 过期明细
-    pub async fn run_once(&self) -> Result<CleanupStats, AppError> {
+    pub async fn run_cleanup_once(&self) -> Result<CleanupStats, AppError> {
         let page_view_archived = self.archive_page_views().await?;
         let user_behavior_archived = self.archive_user_behaviors().await?;
 
@@ -274,7 +274,7 @@ impl crate::utils::scheduler_framework::Scheduler for TrackingCleanupService {
     }
 
     async fn run_once(&self) -> Result<(), String> {
-        Self::run_once(self)
+        self.run_cleanup_once()
             .await
             .map(|_| ())
             .map_err(|e| e.to_string())
