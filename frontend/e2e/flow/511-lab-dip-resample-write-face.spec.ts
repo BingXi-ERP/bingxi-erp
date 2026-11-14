@@ -388,5 +388,177 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
     }
   });
 
-  // 以下用例随后补齐：511-04 录结果、511-05 发工艺卡、511-06 悬空详情、511-07 悬空列举、511-08 failed 线
+  test('511-04 录复样结果：色差 4 级判 passed 且复核三列与色差两列落库', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const { requestId, okId } = await createApprovedChain(page, stamp);
+    const created = await createResample(page, requestId, okId, stamp, 'D');
+    const id = Number(created.id);
+    const recorded = await apiCallRaw<Row>(
+      page,
+      'POST',
+      `${LIP}/resamples/${id}/result`,
+      {
+        color_difference_grade: 4,
+        color_difference_value: '0.85',
+        review_comment: '达判定线可投产',
+      }
+    );
+    expect(
+      recorded.result,
+      `[511-04] 色差 4 级应判 passed（判定线上，resample.rs 判定线取 4），实际 ${str(recorded.result)}`
+    ).toBe('passed');
+    expect(Number(recorded.color_difference_grade), '[511-04] 色差等级应落提交值 4').toBe(4);
+    expect(
+      num(recorded.color_difference_value),
+      '[511-04] Delta E 应落库 0.85（DECIMAL 出参为字符串）'
+    ).toBe(0.85);
+    expect(str(recorded.review_comment), '[511-04] 复核意见应原样落库').toBe('达判定线可投产');
+    expect(
+      recorded.reviewed_by,
+      `[511-04] 复核人应取会话身份（handler 不收请求体身份），实际 ${JSON.stringify(recorded.reviewed_by)}`
+    ).not.toBeNull();
+    expect(
+      isRealTimestamp(recorded.reviewed_at),
+      `[511-04] 复核时间应落库为可解析时间串，实际 ${JSON.stringify(recorded.reviewed_at)}`
+    ).toBe(true);
+    // 独立详情口回读，确认落库而非仅响应体携带
+    const readBack = await apiCallRaw<Row>(page, 'GET', `${LIP}/resamples/${id}`);
+    expect(readBack.result, `[511-04] 详情回读结果应为 passed，实际 ${str(readBack.result)}`).toBe(
+      'passed'
+    );
+    expect(Number(readBack.color_difference_grade), '[511-04] 详情回读色差等级应为 4').toBe(4);
+    expect(num(readBack.color_difference_value), '[511-04] 详情回读 Delta E 应为 0.85').toBe(0.85);
+    expect(str(readBack.review_comment), '[511-04] 详情回读复核意见应一致').toBe('达判定线可投产');
+    expect(
+      readBack.reviewed_by,
+      `[511-04] 详情回读复核人应与会话一致，实际 ${JSON.stringify(readBack.reviewed_by)}`
+    ).toEqual(recorded.reviewed_by);
+    // 通过后源样复样状态联动为 resampled（resample.rs record_result 同事务联动）
+    const okRead = await apiCallRaw<Row>(page, 'GET', `${LIP}/samples/${okId}`);
+    expect(
+      str(okRead.resample_status),
+      `[511-04] 复样通过应把源样复样状态联动为 resampled，实际 ${str(okRead.resample_status)}`
+    ).toBe('resampled');
+  });
+
+  test('511-05 发染色技术卡：passed 复样开卡成功且卡号与开卡人时间落库', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const { requestId, okId } = await createApprovedChain(page, stamp);
+    const created = await createResample(page, requestId, okId, stamp, 'E');
+    const id = Number(created.id);
+    await apiCallRaw<Row>(page, 'POST', `${LIP}/resamples/${id}/result`, {
+      color_difference_grade: 5,
+      color_difference_value: '0.50',
+      review_comment: '色差优秀可投产',
+    });
+    const card = await apiCallRaw<Row>(page, 'POST', `${LIP}/resamples/${id}/tech-card`);
+    const techCardNo = str(card.tech_card_no);
+    expect(
+      techCardNo.startsWith('TC-'),
+      `[511-05] 技术卡号应由服务端生成 TC 前缀（resample.rs issue_tech_card），实际 ${techCardNo}`
+    ).toBe(true);
+    expect(
+      techCardNo.endsWith(`-${String(id).padStart(6, '0')}`),
+      `[511-05] 卡号应含复样主键六位补零段，实际 ${techCardNo}`
+    ).toBe(true);
+    expect(
+      card.tech_card_issued_by,
+      `[511-05] 开卡人应取会话身份（handler 不绑定请求体），实际 ${JSON.stringify(card.tech_card_issued_by)}`
+    ).not.toBeNull();
+    expect(
+      isRealTimestamp(card.tech_card_issued_at),
+      `[511-05] 开卡时间应落库为可解析时间串，实际 ${JSON.stringify(card.tech_card_issued_at)}`
+    ).toBe(true);
+    expect(
+      card.result,
+      `[511-05] 开卡不改复样结果，仍应为 passed，实际 ${str(card.result)}`
+    ).toBe('passed');
+    // 独立详情口回读技术卡三列
+    const readBack = await apiCallRaw<Row>(page, 'GET', `${LIP}/resamples/${id}`);
+    expect(str(readBack.tech_card_no), '[511-05] 详情回读卡号应与开卡响应一致').toBe(techCardNo);
+    expect(
+      readBack.tech_card_issued_by,
+      `[511-05] 详情回读开卡人应非空，实际 ${JSON.stringify(readBack.tech_card_issued_by)}`
+    ).not.toBeNull();
+    expect(
+      isRealTimestamp(readBack.tech_card_issued_at),
+      `[511-05] 详情回读开卡时间应为可解析时间串，实际 ${JSON.stringify(readBack.tech_card_issued_at)}`
+    ).toBe(true);
+  });
+
+  test('511-06 悬空复样主键详情回 404 加机器码 NOT_FOUND', async ({ page }) => {
+    const failed = await apiCallExpectFail(page, 'GET', `${LIP}/resamples/99999999`);
+    expect(
+      failed.status,
+      `[511-06] 悬空复样详情应恰为 HTTP 404（AppError::not_found），实际 ${failed.status}`
+    ).toBe(404);
+    expect(
+      failureCode(failed),
+      `[511-06] 失败信封机器码应为 NOT_FOUND（helpers APP_ERROR_CODES），实际 ${JSON.stringify(failureCode(failed))}`
+    ).toBe(APP_ERROR_CODES.NOT_FOUND);
+  });
+
+  test('511-07 悬空申请单列举复样回空数组不报错', async ({ page }) => {
+    const data = await apiCallRaw<unknown>(
+      page,
+      'GET',
+      `${LIP}/resamples/by-request/99999999`
+    );
+    const rows = pickListArray<Row>(data, 'bare', '[511-07] 悬空申请单的复样列表');
+    expect(
+      rows.length,
+      `[511-07] 悬空申请单应回空数组（list_by_request 仅按 request_id 过滤），实际 ${rows.length}`
+    ).toBe(0);
+  });
+
+  test('511-08 录复样结果：色差 3 级低于判定线判 failed 且详情回读一致', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const { requestId, okId } = await createApprovedChain(page, stamp);
+    const created = await createResample(page, requestId, okId, stamp, 'H');
+    const id = Number(created.id);
+    const recorded = await apiCallRaw<Row>(
+      page,
+      'POST',
+      `${LIP}/resamples/${id}/result`,
+      {
+        color_difference_grade: 3,
+        color_difference_value: '4.80',
+        review_comment: '低于判定线不可投产',
+      }
+    );
+    expect(
+      recorded.result,
+      `[511-08] 色差 3 级应判 failed（低于判定线 4），实际 ${str(recorded.result)}`
+    ).toBe('failed');
+    expect(Number(recorded.color_difference_grade), '[511-08] 色差等级应落提交值 3').toBe(3);
+    expect(num(recorded.color_difference_value), '[511-08] Delta E 应落库 4.80').toBe(4.8);
+    // 详情口独立回读
+    const readBack = await apiCallRaw<Row>(page, 'GET', `${LIP}/resamples/${id}`);
+    expect(readBack.result, `[511-08] 详情回读结果应为 failed，实际 ${str(readBack.result)}`).toBe(
+      'failed'
+    );
+    expect(str(readBack.review_comment), '[511-08] 详情回读复核意见应一致').toBe(
+      '低于判定线不可投产'
+    );
+    // 失败后源样复样状态联动为 failed
+    const okRead = await apiCallRaw<Row>(page, 'GET', `${LIP}/samples/${okId}`);
+    expect(
+      str(okRead.resample_status),
+      `[511-08] 复样失败应把源样复样状态联动为 failed，实际 ${str(okRead.resample_status)}`
+    ).toBe('failed');
+    // failed 复样不可开技术卡（仅 passed 可开，resample.rs issue_tech_card 门）
+    const cardOnFailed = await apiCallExpectFail(
+      page,
+      'POST',
+      `${LIP}/resamples/${id}/tech-card`
+    );
+    expect(
+      cardOnFailed.status,
+      `[511-08] failed 复样开卡应被业务门拒为 400，实际 ${cardOnFailed.status}`
+    ).toBe(400);
+    expect(
+      failureCode(cardOnFailed),
+      `[511-08] 开卡拒绝应带字符串机器码（AppError::business 族），实际 ${JSON.stringify(failureCode(cardOnFailed))}`
+    ).toBeTruthy();
+  });
 });
