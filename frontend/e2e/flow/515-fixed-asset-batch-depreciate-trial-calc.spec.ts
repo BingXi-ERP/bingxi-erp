@@ -2,8 +2,8 @@
 //
 // 判据全部来自源码实核：
 // - 端点：POST /fixed-assets/batch-depreciate
-//   （backend/src/routes/finance.rs:272-275 → handlers/fixed_asset_handler.rs:299-313 →
-//   services/fixed_asset_service.rs:891-954 batch_calculate_depreciation）
+//   （backend/src/routes/finance.rs → handlers/fixed_asset_handler.rs →
+//   services/fixed_asset_service.rs batch_calculate_depreciation）
 // - 入参 BatchDepreciateRequest{asset_ids, calculation_date}（handler:319-323；无 user_id 字段，
 //   操作人取鉴权上下文——固定资产折旧接口的既有语义，请求体伪造 user_id 不可达）。
 // - 出参键 = DepreciationResult 七键 snake_case（service:1547-1556）：
@@ -17,7 +17,7 @@
 // - 守卫族（service:898-912）：空数组 → 200 且 data=[]（不是错误）；len>10000 → validation 拒绝；
 //   calculation_date 非 ISO 日期 → parse::<NaiveDate>() 失败 → validation("日期格式错误")。
 //   两者均为 AppError::validation → HTTP 400、code=VALIDATION_ERROR、出参 message 脱敏
-//   （utils/error.rs:378 非 Displayable 族），故断言只钉 status+机器码，不断中文文案。
+//   （utils/error.rs 非 Displayable 族），故断言只钉 status+机器码，不断中文文案。
 // - 未知 asset_id → AppError::not_found("固定资产") → 404、code=NOT_FOUND（同样脱敏，service:936-938）；
 //   混合请求（已知+未知）在循环处整体失败 → 原子性：拿不到部分结果。
 // - 名实锁：service 体内 batch_calculate_depreciation 全程无 update/save（对比 per-asset
