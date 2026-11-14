@@ -40,3 +40,9 @@
 - 「拒因写进服务端日志」这一改进方向已被统一错误框架自动满足：`AppError::respond()` 对每个错误先 `log_error()` 再构造出参，tracing WARN 行携带真实文案与完整 detail（含 trace_id）。闸门拒因在日志侧从不缺，可按 trace_id 全量回查。
 - `CardNotIssuable` 走 `business_displayable` 外显「只有草稿态色卡可以发放」，因该文案是纯公开业务规则不携带内部数值——与同文件注释声明的设计一致。
 - 结论：原登记把「日志侧也缺」误判为缺口实态；实态是「日志侧已有、HTTP 侧故意不外显」。登记转为已复核结案，后续不再作为待办跟踪。
+
+## 七、HTTP 幂等重放防护复核结案（2026-11-14）
+
+第四节第一条登记作废：HTTP 幂等重放防护已由 #1216 补齐（提交 8ab81cf00，已并入主干）——实现落点为 `backend/src/middleware/idempotency.rs`（去重表 + 中间件，挂鉴权链内侧，`middleware_bootstrap.rs` 注册），配套用例 `frontend/e2e/flow/474-http-idempotency-replay-guard.spec.ts` 在册，另有 47 号与 501 号钉定时任务幂等。4.2 缺口清零。
+
+至此 11-12 台账第四节三条「仍缺的功能面」复核完毕：幂等重放已补齐（本节）、闸门拒因无缺口（第六节）、微信订阅消息出站腿属凭证环境实测边界（维持原登记，非 e2e 可达），存活待办仅此一条。
