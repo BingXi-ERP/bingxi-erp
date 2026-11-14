@@ -437,6 +437,11 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     );
     ctx.productColorIds = colors?.map(c => c.id) || [];
     ctx.colorNos = colors?.map(c => c.color_no) || [];
+    if (ctx.colorNos.length > 0) {
+      // 与建色段同一契约锚点：colorNos 挂在本专属产品上，把该产品提到
+      // productIds[0]，保住「productIds[0] 拥有 colorNos[0]」配对假设。
+      ctx.productIds = [ownProductId, ...ctx.productIds.filter(id => id !== ownProductId)];
+    }
   } catch (e) {
     throw new Error(`[ensureTestEntities] 色号查询失败: ${(e as Error).message}`);
   }
