@@ -124,8 +124,6 @@ impl SalesService {
         let order_id = self
             .update_order_totals(order_entity, totals, user_id, &txn)
             .await?;
-        self.occupy_credit_and_warn(customer_id, order_amount, user_id)
-            .await?;
         self.writeback_opportunity(opportunity_id, total_amount_for_writeback, &txn)
             .await?;
         txn.commit().await?;
@@ -202,26 +200,24 @@ impl SalesService {
         order_amount
     }
 
-    /// 信用额度校验：调用 CustomerCreditService 检查可用额度
+    /// 信用额度校验：调用 CustomerCreditService 检查可用额度。
+    ///
+    /// 功能：建单侧的信用门控——超额度拒绝建单，无评级客户视为未启用信用控制放行。
+    /// 调用方：同文件 create_order。
+    /// 入参：customer_id——订单客户；_txn——外层事务（当前 check 走独立查询）；order_amount——建单金额。
+    /// 传给谁：拒绝经 create_order 透传给 sales_order_handler 出参。
+    /// 存什么·存哪里：只读校验，不落数据。
     async fn check_credit_available(
         &self,
         customer_id: i32,
         _txn: &sea_orm::DatabaseTransaction,
         order_amount: rust_decimal::Decimal,
     ) -> Result<(), AppError> {
-        // 非生产环境跳过信用检查（CI 测试环境无信用额度数据，强制检查会导致订单创建失败）
-        if !crate::utils::config::is_production() {
-            return Ok(());
-        }
-
-        // 使用信用服务检查额度
         let credit_service =
             crate::services::customer_credit_service::CustomerCreditService::new(self.db.clone());
         let credit_available = credit_service
             .check_credit_available(customer_id, order_amount)
             .await
-            // 系统失败族：透传信用服务内部错误原文（可能含评级/额度详情），
-            // 且非用户可自行解决的拒绝，按安全边界保持脱敏
             .map_err(|err| AppError::business(format!("信用检查失败: {}", err)))?;
         if !credit_available {
             tracing::warn!(
@@ -450,40 +446,19 @@ impl SalesService {
         Ok(order_id)
     }
 
-    /// 占用信用额度 + 信用预警检查
-    async fn occupy_credit_and_warn(
-        &self,
-        customer_id: i32,
-        order_amount: rust_decimal::Decimal,
-        user_id: i32,
-    ) -> Result<(), AppError> {
-        // 非生产环境跳过信用占用（与 check_credit_available 跳过逻辑一致；
-        // CI 测试环境无信用评级数据，强制占用会报“客户 X 的信用评级不存在”）
-        if !crate::utils::config::is_production() {
-            return Ok(());
-        }
-
-        // 占用信用额度
+    /// 信用预警检查（占用成功后调用，仅记日志不阻断流程）。
+    ///
+    /// 功能：占用完成后检查使用率是否超 80%，超则落 warn 日志供运维告警消费。
+    /// 调用方：services/so/order_workflow.rs submit_order。
+    /// 入参：customer_id——订单客户。
+    /// 传给谁：只写日志，不返回错误。
+    /// 存什么·存哪里：不落数据。
+    pub(crate) async fn check_credit_warning(&self, customer_id: i32) {
         let credit_service =
             crate::services::customer_credit_service::CustomerCreditService::new(self.db.clone());
-        credit_service
-            .occupy_credit(customer_id, order_amount, user_id)
-            .await
-            .map_err(|e| {
-                tracing::error!("信用额度占用失败，事务回滚: {}", e);
-                // 系统失败族：透传信用服务内部错误原文（可能含额度数据），
-                // 且非用户可自行解决的拒绝，按安全边界保持脱敏
-                AppError::business(format!("信用额度占用失败: {}", e))
-            })?;
-        tracing::info!(
-            "客户 {} 信用额度占用成功，金额: {}",
-            customer_id,
-            order_amount
-        );
         if let Ok(Some(warning)) = credit_service.check_credit_warning(customer_id).await {
             tracing::warn!("信用预警: {}", warning);
         }
-        Ok(())
     }
 
     /// 订单回写商机（actual_amount / actual_close_date / stage=CLOSED_WON / status=CLOSED_WON）
@@ -536,6 +511,17 @@ impl SalesService {
 
         // 检查订单是否存在（加 lock_exclusive 串行化并发修改，防止基于过期状态写入）
         let order = Self::fetch_order_for_update(order_id, &txn).await?;
+
+        // 并发编辑冲突门：令牌由调用方从上一次读回的更新时刻原样带回，
+        // 在排他锁之后、任何写入之前比对，不等即拒绝，阻止后保存一方静默覆盖前保存一方。
+        // 外显文案是纯公开业务规则，不含主键、行数或金额，走可外显构造器。
+        if let Some(expected) = request.expected_updated_at {
+            if expected != order.updated_at {
+                return Err(AppError::business_displayable(
+                    "该订单已被其他操作修改，请刷新后重新编辑",
+                ));
+            }
+        }
 
         // 检查订单状态
         Self::validate_order_status_for_update(&order)?;

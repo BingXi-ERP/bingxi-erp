@@ -400,21 +400,30 @@ async fn map_product_fk_error_keeps_non_fk_database_errors_as_500() {
 // ---------------------------------------------------------------------------
 // ③-c 源码扫描锁（无 DB）：产品删除落点不得回潮
 //     AppError::internal / AppError::database 手工重包装（wave4 internal_flatten
-//     与 wave8 价目引用锁同族口径），且预检必须位于删除审计调用之前
+//     与 wave8 价目引用锁同族口径），且预检必须位于删除审计调用之前，
+//     预检面必须至少覆盖销售价目、采购价目、色号阶梯价、客户色号价四面
 // ---------------------------------------------------------------------------
 #[test]
 fn source_scan_delete_product_precheck_precedes_delete_and_no_flatten() {
     let src = include_str!("../src/services/product_ops/crud.rs").replace('\r', "");
     let delete_at = src
-        .find("Self::find_product_price_references(id, &txn)")
-        .expect("产品删除的价目引用预检不得丢失");
+        .find("Self::find_product_references(id, &txn)")
+        .expect("产品删除的全库外键引用预检不得丢失");
     let delete_exec_at = src
         .find("\"product\", id, Some(user_id)")
         .expect("delete_with_audit 锚点不得消失");
-    assert!(
-        delete_at < delete_exec_at,
-        "价目引用预检必须位于删除写库之前"
-    );
+    assert!(delete_at < delete_exec_at, "引用预检必须位于删除写库之前");
+    for anchor in [
+        "sales_price::Column::ProductId",
+        "purchase_price::Column::ProductId",
+        "product_color_price::Column::ProductId",
+        "customer_color_price::Column::ProductId",
+    ] {
+        assert!(
+            src.contains(anchor),
+            "引用预检必须覆盖价目外键面 {anchor}，禁止收窄回仅软删或漏面"
+        );
+    }
     assert!(
         src.contains("Self::map_product_fk_error(e)"),
         "删除阶段 23503 兜底映射不得丢失"

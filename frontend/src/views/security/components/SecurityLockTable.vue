@@ -55,6 +55,7 @@
             type="primary"
             link
             size="small"
+            :disabled="(row as LockedAccount).id === null"
             @click="emit('unlock', row as LockedAccount)"
             >{{ t('security.lockTable.button.unlock') }}</el-button
           >

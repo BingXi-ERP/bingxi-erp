@@ -24,6 +24,8 @@ paths = [
   '''backend/config\.yaml$''',
   '''backend/out\.txt$''',
   '''debug_request\.js$''',
+  # 小程序门禁自检脚本，内含文档保留段 IP（203.0.113.0/24）与合成 appSecret 夹具
+  '''scripts/ci/miniprogram-checks\.sh$''',
 ]
 regexes = [
   '''REDACTED''',

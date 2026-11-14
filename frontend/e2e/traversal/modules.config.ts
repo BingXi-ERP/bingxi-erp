@@ -185,9 +185,6 @@ export const TRAVERSAL_MODULES: TraversalModule[] = [
 
   // ===== production 域 =====
   { id: 'production', route: '/production', domain: 'production', tier: 'C', noCreate: true },
-  { id: 'bom', route: '/bom', domain: 'production', tier: 'A', listApi: '/boms' },
-  { id: 'mrp', route: '/mrp', domain: 'production', tier: 'C', noCreate: true },
-  { id: 'mrp-history', route: '/mrp/history', domain: 'production', tier: 'C', noCreate: true },
   { id: 'capacity', route: '/capacity', domain: 'production', tier: 'C', noCreate: true },
   { id: 'material-shortage', route: '/material-shortage', domain: 'production', tier: 'C', noCreate: true },
   { id: 'scheduling', route: '/scheduling', domain: 'production', tier: 'C', noCreate: true },

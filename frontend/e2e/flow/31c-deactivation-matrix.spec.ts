@@ -1,5 +1,6 @@
 import { test, expect } from '../diagnose-fixture';
 import { loginViaUI, apiCall, apiCallRaw, tryCleanup, getCtx, ensureTestEntities } from './helpers';
+import { testPassword } from './helpers';
 import { safeGoto, findTableRow, formItemByExactLabel, pickSelectIn } from './ui-helpers';
 // 产品类型单源常量（与后端 product_type 词表同源）：建品夹具取值必须经成员引用。
 import { PRODUCT_TYPE } from '../../src/constants/product-type';
@@ -237,7 +238,7 @@ test.describe.serial('P0 停用矩阵：编辑弹窗 UI 切状态→API 回读�
     const roleId = rolesResp?.roles?.[0]?.id;
     const r = await apiCall<{ id?: number }>(page, 'POST', '/users', {
       username,
-      password: 'P0Test!2026dE',
+      password: testPassword(),
       email: `${username}@test.com`,
       phone: '13600000002',
       role_id: roleId,

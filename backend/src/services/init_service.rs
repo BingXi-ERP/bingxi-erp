@@ -45,7 +45,6 @@ pub const PERMISSION_RESOURCES: &[&str] = &[
     // 必须授此键（CI 矩阵 purchaser 真缺口，裁定 R-6）。
     "product-categories",
     "warehouses",
-    "boms",
     "chemicals",
     "chemical-categories",
     "chemical-lots",
@@ -84,6 +83,10 @@ pub const PERMISSION_RESOURCES: &[&str] = &[
     "custom-orders",
     "color-cards",
     "color-prices",
+    // 超折扣审批阈值配置面：`GET|PUT /api/v1/erp/quotations/discount-config` 的运行时键
+    // 由 URL 第四段经 utils/path_utils.rs::RESOURCE_NAME_MAP 消歧为本名，与角色矩阵授予
+    // 及存量库补授迁移 m0134 逐字符同源。未登记即目录勾不到、种子授不了、存量授权行永不命中。
+    "quotation-discount-config",
     // ===== 采购域 =====
     "purchase-orders",
     "purchase-receipts",
@@ -119,8 +122,6 @@ pub const PERMISSION_RESOURCES: &[&str] = &[
     "outsourcing-vouchers",
     "business-modes",
     "business-mode-links",
-    "mrp",
-    "mrp-history",
     "capacity",
     "scheduling",
     "material-shortage",

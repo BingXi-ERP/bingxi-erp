@@ -14,6 +14,7 @@
 
 use super::SalesOrderDetail;
 use super::order::SalesService;
+use crate::middleware::audit_context::{RISK_VOID, mark_audit_high_risk, set_audit_doc_no};
 use crate::models::sales_order;
 use crate::models::sales_order::Entity as SalesOrderEntity;
 use crate::models::status::sales_order as so_status;
@@ -27,26 +28,26 @@ impl SalesService {
     // cancel_order / submit_order / approve_order / complete_order
     // 内容来自原 order.rs L815-840 + L898-978 + L979-1013 + L1014-1029
 
+    /// 取消销售订单，事务内释放已占用的信用额度。
+    ///
+    /// 功能：行锁读单→状态门→若 credit 已占用则事务内释放→写 CANCELLED→commit→发事件。
+    /// 调用方：handlers/sales_order_handler.rs cancel 端点。
+    /// 入参：order_id——待取消订单；user_id——操作人。
+    /// 传给谁：拒绝经 AppError 透传；成功后发布 SalesOrderCancelled 事件。
+    /// 存什么·存哪里：sales_orders.status→cancelled；customer_credit_ratings.used_credit/available_credit 归还。
     pub async fn cancel_order(
         &self,
         order_id: i32,
         user_id: i32,
     ) -> Result<SalesOrderDetail, AppError> {
-        // 批次 18（2026-06-28）：补全事务边界 + 审计日志 + lock_exclusive。
-        // 原实现完全无事务、无审计日志（直接 .update）、状态查询无锁，并发取消可能基于过期状态。
         let txn = (*self.db).begin().await?;
 
-        // 获取订单（加 lock_exclusive 串行化并发取消）
         let order = SalesOrderEntity::find_by_id(order_id)
             .lock_exclusive()
             .one(&txn)
             .await?
             .ok_or_else(|| AppError::not_found("订单不存在"))?;
 
-        // 检查订单状态是否允许取消
-        // 批次 13（2026-06-28）：补 partial_shipped 状态，防止部分发货订单无法取消（死锁）。
-        // 已发货部分需通过退货流程处理，取消仅作用于剩余未发货部分。
-        // 批次 158 v11 真实接入：引用 status::sales_order 常量替代字符串字面量（规则 0）
         if ![
             so_status::DRAFT,
             so_status::PENDING,
@@ -55,17 +56,37 @@ impl SalesService {
         ]
         .contains(&order.status.as_str())
         {
-            // 拒绝原因可外显：只点名业务动作与允许取消的订单状态集合（公开业务规则），
-            // 不含订单号、金额与任何记录 ID，满足 utils/error.rs 安全边界；
-            // 口径与同文件提交状态门的 business_displayable 先例一致，操作员需要知道
-            // 为什么不能取消、以及单据要处于什么状态才能取消。
             return Err(AppError::business_displayable(
                 "当前状态不允许取消，只有草稿、待审批、已审批或部分发货状态的订单可以取消",
             ));
         }
 
+        // 信用释放：仅 PENDING/APPROVED/PARTIAL_SHIPPED 有占用（占用发生在 submit）
+        if order.status != so_status::DRAFT {
+            let total_amount = order
+                .total_amount
+                .to_string()
+                .parse::<rust_decimal::Decimal>()
+                .unwrap_or_else(|_| rust_decimal::Decimal::from(0));
+            let credit_service =
+                crate::services::customer_credit_service::CustomerCreditService::new(
+                    self.db.clone(),
+                );
+            credit_service
+                .release_credit_txn(&txn, order.customer_id, total_amount, user_id)
+                .await?;
+        }
+
         // 更新订单状态（改用 update_with_audit 写入审计日志，传 &txn 纳入事务保证原子性）
-        let customer_id_for_event = order.customer_id;
+        let customer_id = order.customer_id;
+        // 审计定位维度登记：单号取本次真正被作废那张单的 sales_orders.order_no 列（就是上面
+        // 行锁读出的这一行），不从路径 ID 反推、不用 ID 拼号。必须在 update_with_audit 之前调用
+        // ——写入单点从 task-local 的活上下文取快照，本函数由 handlers/sales_order_handler.rs
+        // 在同一请求 task 内 await（不经 tokio::spawn），故此处写入的值即落库时读到的值；
+        // 一旦把落库挪进 spawn 子任务，task-local 不随任务传播，本登记会静默失效。
+        set_audit_doc_no(Some(order.order_no.clone()));
+        // 取消动作把订单写进 cancelled 终态，语义是作废而非删除，标 VOID
+        mark_audit_high_risk(RISK_VOID);
         let mut order_update: sales_order::ActiveModel = order.into();
         order_update.status = sea_orm::ActiveValue::Set(so_status::CANCELLED.to_string());
         order_update.updated_at = sea_orm::ActiveValue::Set(chrono::Utc::now());
@@ -80,11 +101,10 @@ impl SalesService {
 
         txn.commit().await?;
 
-        // B-P1-4 修复（批次 361 v13 复审）：commit 后发布 SalesOrderCancelled 事件
         crate::services::event_bus::EVENT_BUS.publish(
             crate::services::event_bus::BusinessEvent::SalesOrderCancelled {
                 order_id,
-                customer_id: customer_id_for_event,
+                customer_id,
                 user_id,
             },
         );
@@ -92,7 +112,13 @@ impl SalesService {
         self.get_order_detail(order_id, None).await
     }
 
-    /// 提交销售订单（草稿→待审），信用额度与客户启用状态均在提交事务内门控。
+    /// 提交销售订单（草稿→待审），信用额度校验与占用均在提交事务内完成。
+    ///
+    /// 功能：行锁读单→状态门→信用门检查→事务内占用→客户启用门→写状态→commit。
+    /// 调用方：handlers/sales_order_handler.rs submit 端点。
+    /// 入参：order_id——待提交订单；user_id——操作人。
+    /// 传给谁：拒绝经 AppError 透传给出参；成功后触发 BPM 审批与提交事件。
+    /// 存什么·存哪里：sales_orders.status→pending；customer_credit_ratings.used_credit/available_credit 更新。
     pub async fn submit_order(
         &self,
         order_id: i32,
@@ -113,9 +139,16 @@ impl SalesService {
         self.validate_customer_active(&txn, order.customer_id)
             .await?;
 
+        let credit_service =
+            crate::services::customer_credit_service::CustomerCreditService::new(self.db.clone());
+        credit_service
+            .occupy_credit_txn(&txn, order.customer_id, total_amount_decimal, user_id)
+            .await?;
+
         let order = self.update_order_to_pending(&txn, order, user_id).await?;
         txn.commit().await?;
 
+        self.check_credit_warning(order.customer_id).await;
         self.start_bpm_process(order_id, user_id, &order.order_no)
             .await?;
         self.publish_submitted_event(order_id, order.customer_id, user_id);
@@ -296,7 +329,7 @@ impl SalesService {
     async fn rollback_order_to_draft(&self, order_id: i32, user_id: i32) -> Result<(), AppError> {
         tracing::error!(
             order_id = order_id,
-            "BPM 启动销售订单审批流程失败，开始补偿回滚订单状态"
+            "BPM 启动销售订单审批流程失败，开始补偿回滚订单状态与信用占用"
         );
 
         let compensating_txn = (*self.db).begin().await?;
@@ -307,6 +340,14 @@ impl SalesService {
             .ok_or_else(|| {
                 AppError::not_found(format!("补偿回滚时销售订单 {} 不存在", order_id))
             })?;
+
+        let customer_id = order_for_rollback.customer_id;
+        let total_amount = order_for_rollback
+            .total_amount
+            .to_string()
+            .parse::<rust_decimal::Decimal>()
+            .unwrap_or_else(|_| rust_decimal::Decimal::from(0));
+
         let mut rollback_model: sales_order::ActiveModel = order_for_rollback.into();
         rollback_model.status = sea_orm::ActiveValue::Set(so_status::DRAFT.to_string());
         rollback_model.updated_at = sea_orm::ActiveValue::Set(chrono::Utc::now());
@@ -317,6 +358,13 @@ impl SalesService {
             Some(user_id),
         )
         .await?;
+
+        let credit_service =
+            crate::services::customer_credit_service::CustomerCreditService::new(self.db.clone());
+        credit_service
+            .release_credit_txn(&compensating_txn, customer_id, total_amount, user_id)
+            .await?;
+
         compensating_txn.commit().await?;
 
         Ok(())
@@ -371,12 +419,6 @@ impl SalesService {
 
         // B-P1-4 修复（批次 361 v13 复审）：commit 后发布 SalesOrderApproved 事件
         self.publish_approval_event(order_id, order.customer_id, user_id);
-
-        // 批次 356 v13 复审 B-P0-1 + A5 决策：审批后不再创建库存预留（可用量门控仅在发货时生效）
-        let order_items = self.fetch_order_items_for_approval(order_id).await?;
-
-        // B-P2-4 修复（批次 386 v13 复审）：commit 后对每个订单明细调用 MRP 计算
-        self.run_mrp_for_order_items(order_id, &order_items).await;
 
         Ok(order)
     }
@@ -451,51 +493,6 @@ impl SalesService {
                 user_id,
             },
         );
-    }
-
-    async fn fetch_order_items_for_approval(
-        &self,
-        order_id: i32,
-    ) -> Result<Vec<crate::models::sales_order_item::Model>, AppError> {
-        use sea_orm::{ColumnTrait, QueryFilter};
-        crate::models::sales_order_item::Entity::find()
-            .filter(crate::models::sales_order_item::Column::OrderId.eq(order_id))
-            .all(&*self.db)
-            .await
-            .map_err(AppError::from)
-    }
-
-    /// B-P2-4 修复（批次 386 v13 复审）：销售订单审批后触发 MRP 物料需求计算
-    /// 原实现 approve_order 仅做库存预留，不调用 MrpEngineService，；导致销售→MRP 物料需求链路断开，采购计划无法基于销售订单自动生成。；失败时 tracing::warn 不阻塞主流程（订单已审批，MRP 可后续重算）。
-    async fn run_mrp_for_order_items(
-        &self,
-        order_id: i32,
-        order_items: &[crate::models::sales_order_item::Model],
-    ) {
-        let mrp_service =
-            crate::services::mrp_engine_service::MrpEngineService::new(self.db.clone());
-        let required_date = chrono::Utc::now().date_naive() + chrono::Duration::days(7);
-        for item in order_items {
-            if let Err(e) = mrp_service
-                .run_mrp_calculation(crate::services::mrp_engine_service::MrpCalculationQuery {
-                    product_id: item.product_id,
-                    required_quantity: item.quantity,
-                    required_date,
-                    source_type: "SALES_ORDER".to_string(),
-                    source_id: Some(order_id),
-                    consider_safety_stock: true,
-                    consider_in_transit: true,
-                })
-                .await
-            {
-                tracing::warn!(
-                    order_id,
-                    product_id = item.product_id,
-                    error = %e,
-                    "销售订单审批后 MRP 计算失败，请人工检查物料需求"
-                );
-            }
-        }
     }
 
     /// 完成订单（P1-11 修复（2026-06-25 综合审计）：新增 user_id 参数，；原 Some(0) 硬编码导致审计日志无法追溯完成操作人。）

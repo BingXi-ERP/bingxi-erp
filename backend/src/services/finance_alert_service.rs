@@ -23,6 +23,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::container::AppState;
+use crate::models::aging_alert_rule;
 use crate::models::ar_invoice;
 use crate::models::budget_execution;
 use crate::models::finance_alert::{self, ActiveModel, Entity};
@@ -33,6 +34,7 @@ use crate::models::finance_alert_dto::{
 use crate::models::fund_account;
 use crate::models::inventory_stock;
 use crate::models::notification::{NotificationPriority, NotificationType};
+use crate::models::role;
 use crate::models::status::common;
 use crate::services::notification_service::{CreateNotificationRequest, NotificationService};
 use crate::utils::error::AppError;
@@ -176,9 +178,7 @@ impl FinanceAlertService {
                 let alert_no = Self::generate_alert_no_txn(&txn).await?;
                 let active = Self::build_alert_active(&cand, &alert_no, now, triggered_by);
                 let model = active.insert(&txn).await?;
-                let model = self
-                    .attach_notification(&txn, model, now, triggered_by)
-                    .await?;
+                let model = self.attach_notification(&txn, model, now).await?;
                 created.push(model);
             }
         }
@@ -280,40 +280,125 @@ impl FinanceAlertService {
         }
     }
 
-    /// 创建通知并回填 notification_id（如有触发人）
+    /// 财务预警的通知投递：收件人由启用中账龄规则的 notify_roles 角色集合在本解析点唯一决定，
+    /// 逐人扇出，notification_id 存主通知（本轮第一条）语义；角色集合为空即显式不投递，
+    /// 不回落成点击者或任一兜底收件人。
     async fn attach_notification(
         &self,
         txn: &sea_orm::DatabaseTransaction,
         model: finance_alert::Model,
         now: chrono::DateTime<Utc>,
-        triggered_by: Option<i32>,
     ) -> Result<finance_alert::Model, FinanceAlertError> {
-        let Some(user_id) = triggered_by else {
+        let recipient_ids = Self::resolve_recipient_users(txn).await?;
+        if recipient_ids.is_empty() {
+            // 角色集为空或被通知服务整轮拒收：显式告警，主通知号保持为空。
+            // 手工触发与定时触发同走此路，不因"有人点了按钮"就降级成发给点击者本人。
+            tracing::warn!(
+                alert_id = model.id,
+                "财务预警无可投递收件人（启用规则的 notify_roles 未解析到任何在册用户），本轮不建通知"
+            );
+            return Ok(model);
+        }
+
+        let notif_service = NotificationService::new(self.db.clone());
+        let recipient_count = recipient_ids.len();
+        let mut primary_notif_id: Option<i32> = None;
+        for user_id in recipient_ids {
+            let req = CreateNotificationRequest {
+                user_id,
+                notification_type: NotificationType::System,
+                title: format!("[财务预警] {}", model.title),
+                content: model.content.clone(),
+                priority: alert_level_to_priority(&model.alert_level),
+                business_type: Some("finance_alert".to_string()),
+                business_id: Some(model.id),
+                action_url: Some(format!("/finance/alerts/{}", model.id)),
+                sender_id: None,
+                sender_name: Some("系统财务预警".to_string()),
+                dedup_key: None,
+            };
+            match notif_service.create_notification(req).await {
+                Ok(notif) => {
+                    if primary_notif_id.is_none() {
+                        primary_notif_id = Some(notif.id);
+                    }
+                }
+                Err(err) => tracing::warn!(
+                    alert_id = model.id,
+                    user_id,
+                    error = %err,
+                    "财务预警逐人投递中某一人失败，其余收件人不受影响"
+                ),
+            }
+        }
+
+        let Some(notif_id) = primary_notif_id else {
+            tracing::warn!(
+                alert_id = model.id,
+                "财务预警的{}个收件人全部投递失败，主通知号保持为空",
+                recipient_count
+            );
             return Ok(model);
         };
-        let notif_req = CreateNotificationRequest {
-            user_id,
-            notification_type: NotificationType::System,
-            title: format!("[财务预警] {}", model.title),
-            content: model.content.clone(),
-            priority: alert_level_to_priority(&model.alert_level),
-            business_type: Some("finance_alert".to_string()),
-            business_id: Some(model.id),
-            action_url: Some(format!("/finance/alerts/{}", model.id)),
-            sender_id: None,
-            sender_name: Some("系统财务预警".to_string()),
-            dedup_key: None,
+
+        let mut active: ActiveModel = model.into();
+        active.notification_id = Set(Some(notif_id));
+        active.updated_at = Set(now);
+        Ok(active.update(txn).await?)
+    }
+
+    /// 唯一的收件人解析点：启用中的账龄规则里声明的角色码，映射到在册用户的 id 集。
+    /// 角色无成员或规则未声明角色时结果为空，由调用方显式不投递。
+    async fn resolve_recipient_users(
+        txn: &sea_orm::DatabaseTransaction,
+    ) -> Result<Vec<i32>, FinanceAlertError> {
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+        let rules = aging_alert_rule::Entity::find()
+            .filter(aging_alert_rule::Column::IsActive.eq(true))
+            .all(txn)
+            .await?;
+        let role_codes: Vec<String> = {
+            let mut codes: Vec<String> = rules
+                .iter()
+                .flat_map(|r| {
+                    r.notify_roles
+                        .clone()
+                        .map(|codes| codes.0)
+                        .unwrap_or_default()
+                })
+                .collect();
+            codes.sort();
+            codes.dedup();
+            codes
         };
-        let notif_service = NotificationService::new(self.db.clone());
-        match notif_service.create_notification(notif_req).await {
-            Ok(notif) => {
-                let mut active: ActiveModel = model.into();
-                active.notification_id = Set(Some(notif.id));
-                active.updated_at = Set(now);
-                Ok(active.update(txn).await?)
-            }
-            Err(_) => Ok(model),
+        if role_codes.is_empty() {
+            return Ok(Vec::new());
         }
+
+        let role_ids: Vec<i32> = role::Entity::find()
+            .filter(role::Column::Code.is_in(role_codes))
+            .all(txn)
+            .await?
+            .into_iter()
+            .map(|r| r.id)
+            .collect();
+        if role_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let users = crate::models::user::Entity::find()
+            .filter(crate::models::user::Column::RoleId.is_in(role_ids))
+            .all(txn)
+            .await?;
+        let mut ids: Vec<i32> = users
+            .into_iter()
+            .filter(|u| u.is_active)
+            .map(|u| u.id)
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        Ok(ids)
     }
 
     /// 扫描指定类型的候选预警
@@ -336,10 +421,18 @@ impl FinanceAlertService {
         txn: &sea_orm::DatabaseTransaction,
     ) -> Result<Vec<AlertCandidate>, FinanceAlertError> {
         let today = Utc::now().date_naive();
+        // 候选谓词：未收金额大于零 + 到期日已过（UTC 口径）+ 审批态 APPROVED，
+        // 并剔除已作废单。作废腿（services/ar_invoice_service.rs 的 cancel）只把 status
+        // 置 common::STATUS_CANCELLED，既不回退 approval_status 也不清零 unpaid_amount，
+        // 因此不加这一列过滤，作废单就永久留在逾期候选里：按客户聚合时会抬高
+        // max 逾期天数、虚增未收金额合计，并让定时扫描天天为作废单开催收通知。
+        // 比较值与写入方取同一常量（models/status 的 common::STATUS_CANCELLED），
+        // status 列非空，故 ne 不会因 NULL 把合法单一并排除。
         let invoices = ar_invoice::Entity::find()
             .filter(ar_invoice::Column::UnpaidAmount.gt(Decimal::ZERO))
             .filter(ar_invoice::Column::DueDate.lt(today))
             .filter(ar_invoice::Column::ApprovalStatus.eq(common::STATUS_APPROVED))
+            .filter(ar_invoice::Column::Status.ne(common::STATUS_CANCELLED))
             .all(txn)
             .await?;
 

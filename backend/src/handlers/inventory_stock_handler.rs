@@ -326,6 +326,10 @@ fn to_stock_response(stock: InventoryStock) -> StockResponse {
         reorder_point: stock.reorder_point,
         max_stock_point: stock.max_stock_point,
         bin_location: stock.bin_location,
+        // 库位事实（货架号/层号）由细码录入面写入，列表与详情同走本投影：投影不带，
+        // 用户保存后就再也看不见自己填的架号层号，编辑回显也取不到原值（DB 可空列直映）
+        shelf_no: stock.shelf_no,
+        layer_no: stock.layer_no,
         batch_no: stock.batch_no,
         color_no: stock.color_no,
         dye_lot_no: stock.dye_lot_no,
@@ -334,6 +338,10 @@ fn to_stock_response(stock: InventoryStock) -> StockResponse {
         quality_status: stock.quality_status,
         quantity_meters: stock.quantity_meters,
         quantity_kg: stock.quantity_kg,
+        // 克重与幅宽由细码录入面写入，列表与详情同走本投影：投影不带，用户保存后就再也
+        // 读不回自己录入的克重门幅（DB 可空列直映，不做米/公斤换算、不给默认值）
+        gram_weight: stock.gram_weight,
+        width: stock.width,
         product_code: None,
         product_name: None,
         warehouse_name: None,

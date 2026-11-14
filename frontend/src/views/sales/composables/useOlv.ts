@@ -92,6 +92,8 @@ export interface OrderForm {
   notes: string;
   items: OrderItemForm[];
   total_amount?: number;
+  /** 并发编辑令牌：装载表单时从该行读回的更新时刻，保存时原样回传 */
+  expected_updated_at?: string;
 }
 
 /**
@@ -360,6 +362,7 @@ export function useOlv() {
     Object.assign(formData, {
       id: row.id,
       customer_id: row.customer_id,
+      expected_updated_at: row.updated_at,
       customer_name: row.customer_name,
       order_date: row.order_date,
       required_date: row.required_date || '',

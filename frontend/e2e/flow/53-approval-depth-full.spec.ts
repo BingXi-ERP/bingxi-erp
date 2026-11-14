@@ -12,6 +12,7 @@ import {
   failureCode,
   APP_ERROR_CODES,
 } from './helpers';
+import { testPassword } from './helpers';
 
 /**
  * 53 L4 审批纵深完整版（跨用户装置）
@@ -128,7 +129,13 @@ test.describe.serial('53 审批纵深：防自审批+双人约束（跨用户）
   // 审批人是整个 describe 的共享前置账号，必须活到最后一个用例；
   // 放进逐用例 CLEANUP 会被 afterEach 删掉，后续用例登录 401（CI 53-1 之因）
   let approverUserId: number | undefined;
-  const APPROVER = { username: `approver53`, password: 'Appr53!Sec#2026x' };
+  // 口令只能惰性取：在 describe 体顶层直接求值会让 playwright --list 在收集期就要求 worker 环境变量，整份文件收集失败
+  const APPROVER = {
+    username: `approver53`,
+    get password(): string {
+      return testPassword();
+    },
+  };
 
   test.beforeAll(async ({ browser: b }) => {
     browser = b;

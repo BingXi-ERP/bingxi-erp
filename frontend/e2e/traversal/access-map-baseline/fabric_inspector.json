@@ -3,6 +3,7 @@
   "reachableRoutes": [
     "/dashboard",
     "/dye-batch",
+    "/notification",
     "/product",
     "/purchase",
     "/purchase-contract",
@@ -12,8 +13,6 @@
     "/purchase-return",
     "/quality",
     "/quality-standards",
-    "/quotations",
-    "/quotations/new",
     "/sales",
     "/sales-analysis",
     "/sales-contract",

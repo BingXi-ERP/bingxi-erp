@@ -50,6 +50,10 @@ const SEALED_REFERENCE_TABLES: &[&str] = &[
     "dye_batch_state_rule",
     "failover_status",
     "material_shortage_threshold_configs",
+    // 报价超折扣审批阈值配置（m0129 建表即播种 id=1 单行）：与
+    // material_shortage_threshold_configs 同判据——迁移 INSERT 播种的参照行，
+    // 清掉会让读阈值的提交腿在“配置行缺失”上 fail-closed，把夹具缺陷伪装成业务拒绝。
+    "quotation_discount_approval_configs",
     "role_conflicts",
     "role_permissions",
     "role_relations",

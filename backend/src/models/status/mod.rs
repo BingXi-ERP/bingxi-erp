@@ -19,10 +19,10 @@
 //! `crate::models::status::<sub>::<CONST>` 不变。
 //! 分组文件：
 //! - general：common/payment/master_data/import_task/login_log/email_log/active_status/audit_message/health_check/reconcile_result/failover
-//! - production：production/scheduling/process_node/mrp/work_center/flow_card/step_record
+//! - production：production/scheduling/process_node/work_center/flow_card/step_record
 //! - sales：sales_order/sales_delivery/sales_return/quotation/custom_order/quotation_ext/price_approval/custom_order_ext/sales_fabric_order/fulfillment_source
 //! - purchase_inventory：purchase_order/purchase_receipt/inventory_reservation/inventory_transfer/inventory_count/purchase_return/purchase_inspection/purchase_inspection_result/inventory_adjustment/inventory_piece/purchase_receipt_inspection
-//! - finance：ar/ap_invoice/ap_payment_request/voucher/accounting_period/finance_invoice/finance_payment/ap_reconciliation/ap_verification/fixed_asset/cost_collection/accounting_period_closing
+//! - finance：ar/ap_invoice/ap_payment_request/voucher/accounting_period/finance_invoice/finance_payment/ap_reconciliation/ap_verification/fixed_asset/cost_collection/accounting_period_closing/bad_debt_provision_status/bad_debt_writeoff_status/aging_alert_bucket/aging_alert_level/aging_notify_method
 //! - bpm_crm_contract：approval/budget/contract/logistics_waybill/bpm_instance/bpm_task/crm_lead/crm_opportunity
 //! - quality_dyeing：quality_standard/quality_handling/dye_recipe/lab_dip_request/lab_dip_sample/lab_dip_resample/production_recipe/production_recipe_addition/quality_feedback/fabric_inspection/fabric_scoring/fabric_grade/dye_batch_*
 //! - wage_energy_chemical_business：wage_*/energy_*/color_card/chemical_*/outsourcing_*/business_*

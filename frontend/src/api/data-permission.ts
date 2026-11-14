@@ -49,10 +49,10 @@ export interface ScopeType {
 export const getDataPermissionList = () =>
   request.get<ApiResponse<DataPermissionRole[]>>('/data-permissions');
 
-// GET /data-permissions/{id}：后端 get_data_permission 经可见性过滤后可能返回 null
-// （仅 is_enabled=true 或 admin 可见），读取处必须判 null。
+// GET /data-permissions/{id}：后端 get_data_permission 的可见性过滤（非 admin 角色且
+// is_enabled=false）与缺行同为 404，读取处不需要也不应该判 null；不可访问由 request reject。
 export const getDataPermission = (id: number) =>
-  request.get<ApiResponse<DataPermissionRole | null>>(`/data-permissions/${id}`);
+  request.get<ApiResponse<DataPermissionRole>>(`/data-permissions/${id}`);
 
 // 数据权限 upsert 走 set_data_permission（POST /，按 role_id+resource_type 幂等），
 // 后端 POST /data-permissions 的 DTO 为 SetDataPermissionRequest{role_id,resource_type,scope_type,...}，

@@ -70,6 +70,23 @@ impl ProductService {
         crate::services::product_service::validate_product_color_fastness_grade(
             input.color_fastness_grade.as_deref(),
         )?;
+        // 色号唯一性前置判据：product_colors 建表只有 product_id 索引，库级没有
+        // (product_id, color_no) 唯一约束，服务层此前也不查重，同一产品下重复色号会静默落多行。
+        // 表无约束则按仓内既有范式在服务层前置查重（供应商色号同范式），冲突点名色号外显；
+        // 不在这里补 DB 约束，存量重复行会把建约束的迁移直接挡在建库期。
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+        let color_no = input.color_no.clone();
+        let existing = product_color::Entity::find()
+            .filter(product_color::Column::ProductId.eq(product_id))
+            .filter(product_color::Column::ColorNo.eq(&color_no))
+            .one(&*self.db)
+            .await?;
+        if existing.is_some() {
+            return Err(AppError::business_displayable(format!(
+                "色号 {} 在该产品下已存在",
+                color_no
+            )));
+        }
         let active_model = product_color::ActiveModel {
             id: Default::default(),
             product_id: Set(product_id),
@@ -78,7 +95,9 @@ impl ProductService {
             pantone_code: Set(input.pantone_code),
             color_type: Set(input.color_type),
             dye_formula: Set(input.dye_formula),
-            extra_cost: Set(Decimal::from_f64_retain(input.extra_cost).unwrap_or(Decimal::ZERO)),
+            extra_cost: Set(
+                crate::utils::decimal::from_f64(input.extra_cost).unwrap_or(Decimal::ZERO)
+            ),
             // 色牢度等级（GB 18401 九档，m0106 加列、m0108 收 CHECK），未录入落 NULL
             color_fastness_grade: Set(input.color_fastness_grade),
             is_active: Set(true),
@@ -145,7 +164,7 @@ impl ProductService {
             color.dye_formula = Set(Some(df));
         }
         if let Some(ec) = extra_cost {
-            color.extra_cost = Set(Decimal::from_f64_retain(ec).unwrap_or(Decimal::ZERO));
+            color.extra_cost = Set(crate::utils::decimal::from_f64(ec).unwrap_or(Decimal::ZERO));
         }
         if let Some(active) = is_active {
             color.is_active = Set(active);

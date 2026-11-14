@@ -70,7 +70,7 @@ export function isDialogDismissal(reason: unknown): boolean {
  * 必须留痕（logger.error）+ 外显（msg.operationFail）后再原样上抛，交 window unhandledrejection
  * 上报监控，绝不能被冒充成「用户跳过了操作」而静默吞掉（外在表现为按钮点击无任何反应）。
  *
- * @param context 站点/采集器标识，用于日志归属（如 'bom.submitApprove'）
+ * @param context 站点/采集器标识，用于日志归属（如 'ap.PaymentTab.confirmPayment'）
  * @param error   捕获到的非取消 rejection
  */
 export function rethrowNonDismissal(context: string, error: unknown): never {

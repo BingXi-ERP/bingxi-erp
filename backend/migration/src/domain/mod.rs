@@ -116,6 +116,10 @@
 //!   schema，export_approval 流程定义行由 services/bpm_definition_seed.rs 出厂种子登记；
 //!   依赖 system 建的 bpm_process_instance、v15 建的 export_approval_request 与
 //!   download_token 等既有列，故必须排全链尾为新的顶层条目，复用库上也必然执行）
+//! - wechat_mp_binding: 用户与微信公众号 openid 绑定关系表（user_wechat_mp_binding，user_id
+//!   外键引用 system 域建的 users 并级联回收、openid 具名唯一索引固化一个 openid 只绑一个用户；
+//!   域内不播种数据行，users 的初始用户由 init 写入且晚于 migrate；置于链尾为新的顶层条目，
+//!   复用库上也必然执行）
 
 pub mod system;
 pub mod business;
@@ -172,3 +176,37 @@ pub mod product_grade_vocab_check;
 // 仓储两岗补授扫码入库细键的存量库通道。独立顶层域，理由与 purchase_greige_read_grant 一致
 // （并入已应用域会在复用库被整体跳过，补授永不执行）。
 pub mod scan_receipt_grant;
+// HTTP 请求级幂等去重域：建 http_request_dedupe 表，链尾独立域（不给 user_id 加外键，
+// users 表不由迁移创建；独立域才能在复用库上落到 pending 段必然执行）。
+// （并入已应用域会在复用库被整体跳过，建门语句永不执行）。
+pub mod audit_append_only_guard;
+// 库存匹冗余库存状态列探测式下线域，同上一条口径：晚于代码面摘除读写，先改代码再收列形态。
+pub mod piece_inventory_status_drop;
+// 库存匹米数列扩位域：把 length 列型对齐收回数量的计量口径，链尾独立域（建表与加列均早于本域）。
+pub mod piece_length_scale_widen;
+// 报价超折扣审批门数据地基域（单行阈值配置表 + 报价主表提交人列）。独立顶层域，理由见域头
+// （并入已应用域会在复用库被整体跳过，建表与加列永不落地）。
+pub mod quotation_discount_gate;
+// 报价超折扣阈值配置面补授键的存量库通道。独立顶层域，与 scan_receipt_grant 同口径；
+// 必须晚于 quotation_discount_gate（补授的判权键对应那两个读写端点所在的配置面）。
+pub mod quotation_discount_config_grant;
+// 运单多态订单列遗留单表外键下线域：order_id 指向哪张表由 order_type 决定，只指 sales_orders
+// 的旧外键拒绝采购单关联写入；链尾独立域（并入已应用域会被台账整体跳过，DROP 永不执行）。
+pub mod logistics_waybill_order_fk_drop;
+// 审计日志补定位列（终端类型 操作页面 单据编号 变更原因 风险标记）与追溯索引，链尾独立域
+pub mod m0126_add_audit_terminal_context_columns;
+// 流转卡投纱明细建表域：为完工扣料换源提供落库表，链尾独立域（production_flow_card 与 products 建表均早于本域）。
+pub mod flow_card_material_input;
+// BOM/MRP 表下线域：DROP boms/bom_items/mrp_results 三表，链尾独立域（三表由 business 域先建；
+// 并入已应用域会被台账整体跳过、DROP 永不执行）。
+pub mod bom_mrp_table_drop;
+// BOM/MRP 撤权域：撤销 boms 与 mrp 两枚资源的全岗位历史授权，链尾独立域（与初始化矩阵的
+// 同源摘除为跨写点依赖；roles 与 role_permissions 及权限唯一索引均早于本域）。
+pub mod bom_mrp_permission_withdrawal;
+// HTTP 请求级幂等去重域：建 http_request_dedupe 表，链尾独立域（不给 user_id 加外键，
+// users 表不由迁移创建；独立域才能在复用库上落到 pending 段必然执行）。
+pub mod http_idempotency_guard;
+// 用户与公众号 openid 绑定关系表。独立顶层域，理由见域头（并入已应用域会在复用库被整体跳过）。
+pub mod wechat_mp_binding;
+// 公众号通知失败重试队列表。独立顶层域,理由同绑定域（并入已应用域会在复用库被整体跳过）。
+pub mod wechat_mp_notification_outbox;

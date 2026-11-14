@@ -253,7 +253,6 @@ fn build_new_piece(
         // 母卷已判定则子卷同一判定，否则同一匹布会出现母卷"合格"、子卷"待检"两个结论。
         // 母卷未验（NULL）时子卷同为 NULL，不写死"待检"也不回落默认值。
         quality_status: Set(parent.quality_status.clone()),
-        inventory_status: sea_orm::ActiveValue::NotSet,
         created_by: sea_orm::ActiveValue::NotSet,
         updated_by: sea_orm::ActiveValue::NotSet,
         // 拆匹后子匹必须继承母卷的 color_no/dye_lot_no 字符串字段

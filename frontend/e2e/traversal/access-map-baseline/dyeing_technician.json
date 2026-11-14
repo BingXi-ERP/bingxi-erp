@@ -1,7 +1,8 @@
 {
   "role": "dyeing_technician",
   "reachableRoutes": [
-    "/dashboard"
+    "/dashboard",
+    "/notification"
   ],
   "provenance": "ci-mirrored"
 }

@@ -154,9 +154,23 @@ const RESOURCE_NAME_MAP: &[(&str, &str, &str)] = &[
     ("sales", "returns", "sales-returns"),
     ("sales", "contracts", "sales-contracts"),
     ("sales", "prices", "sales-prices"),
+    // 超折扣审批阈值配置面挂在报价前缀下（/quotations/discount-config）。URL 段
+    // `discount-config` 单独作资源名过窄且与注册表权威名不同形，消歧为带域限定的
+    // `quotation-discount-config`；该字面量与 PERMISSION_RESOURCES 登记、角色矩阵授予、
+    // 存量库补授迁移 m0134 四处逐字符同源，任一侧改写即派生死键（非超管恒 403）。
+    ("quotations", "discount-config", "quotation-discount-config"),
     ("crm", "leads", "crm-leads"),
     ("crm", "opportunities", "crm-opportunities"),
     ("crm", "rfm", "customers"),
+    // 色卡扫码面 GET/POST /color-cards/scan/… 与色卡列表、详情同属一张色卡的读面，
+    // 资源名对齐 init_service 注册的权威名 color-cards，供持色卡读面的岗位命中既有授权键
+    ("color-cards", "scan", "color-cards"),
+    // 色卡发放面 GET/POST /color-cards/issues 与 /color-cards/issues/{id} 与 issues/export：
+    // 处理器同在 color_card 模块（handlers/color_card/list_issues 等），登记的权威资源名只有
+    // color-cards 而没有 issues。不登记本条时第四段 issues 会被当成资源名，派生出 issues:read
+    // 这类注册表外、任何角色都授予不了的死键——通配超管照常可用，持色卡读面的岗位一律 403，
+    // 前端色卡发放页对非超管恒不可达。与 scan 同一判据对齐到 color-cards。
+    ("color-cards", "issues", "color-cards"),
     ("production", "orders", "production-orders"),
     ("production", "quality-inspection", "quality-inspections"),
     ("system-update", "update", "system-update-update"),
@@ -270,7 +284,6 @@ fn is_core_direct_resource(part: &str) -> bool {
             | "categories"
             | "product-categories"
             | "warehouses"
-            | "boms"
             | "chemicals"
             | "chemical-categories"
             | "chemical-lots"
@@ -463,8 +476,6 @@ fn is_misc_direct_resource(part: &str) -> bool {
         | "lab-dip"
         | "logistics"
         | "me"
-        | "mrp"
-        | "mrp-history"
         | "orders"
         | "outsourcing-vouchers"
         | "payments"

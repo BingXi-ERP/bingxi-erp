@@ -52,7 +52,13 @@ type RoleResourceGroups = Vec<RoleResourceSlice>;
 ///   handler 只按 `auth.user_id` 取该用户自己的通知行。
 ///
 /// 缺码的角色登录后会被路由守卫送到 /403，或每次进主页都在控制台抛 403。
-const SHELL_PERMISSIONS: &[PermPair] = &[("dashboard", "read"), ("notifications", "read")];
+// 通知软删是所有者对自身收件箱的操作，归属校验在服务层（非本人拒），
+// 故按应用外壳码逐角色必授；此前该动作键不在任何角色分组里，删除端点对非超管恒拒。
+const SHELL_PERMISSIONS: &[PermPair] = &[
+    ("dashboard", "read"),
+    ("notifications", "read"),
+    ("notifications", "delete"),
+];
 
 /// 库里"已经算授权到位"的 role_permission 索引（按角色归组的 (resource,action) 集合）。
 ///
@@ -475,6 +481,11 @@ impl InitService {
             (
                 "gm",
                 &[
+                    // 超折扣审批阈值：总经理既是审批链上的读取方（要知道多少折扣要经审批），
+                    // 也是政策参数的写入方之一（阈值决定"多少折扣必须经主管审批"，属管理侧
+                    // 政策参数）。两枚键与 m0134 存量库补授的角色集逐字符同源。
+                    ("quotation-discount-config", "read"),
+                    ("quotation-discount-config", "update"),
                     // 经营分析入口要读期末报表快照与行业基准对标；`/period-report-snapshots`、
                     // `/industry-benchmarks` 的 seg3 即资源码，只授 read，写面归财务责任岗。
                     ("period-report-snapshots", "read"),
@@ -589,8 +600,14 @@ impl InitService {
                     ("quotations", "read"),
                     ("quotations", "approve"),
                     ("quotations", "reject"),
+                    // 超折扣审批阈值只读：审批人必须看得到"多少折扣要经我批"这条规则值，
+                    // 但写权不给执行审批的岗（放宽约束自己的门等于自签扩权）。
+                    ("quotation-discount-config", "read"),
                     ("custom-orders", "*"),
                     ("color-cards", "*"),
+                    // 大货批色单读面：批色审批由主管岗推进，读权限与色卡读面同归销售主管；
+                    // 只给 read，降等与发送客户等写面仍不在本岗授权内。
+                    ("bulk-color-approvals", "read"),
                     ("color-prices", "*"),
                     ("customers", "*"),
                     ("customer-credits", "read"),
@@ -639,6 +656,9 @@ impl InitService {
                     ("fabric-orders", "create"),
                     ("quotations", "read"),
                     ("quotations", "create"),
+                    // 超折扣审批阈值只读：建单岗要在提交前看到本行折扣是否已超阈（阈值是
+                    // 提交被强制进审批流的规则值），写权归管理侧政策岗，不给建单岗。
+                    ("quotation-discount-config", "read"),
                     // 报价单流转：改单、提交、撤销都是建单人推进自身草稿的动作，
                     // 三个端点（PUT /quotations/{id}、POST /{id}/submit、POST /{id}/cancel）
                     // 在 handler 内先经 get_by_id_scoped 证归属再触达 service，
@@ -949,10 +969,6 @@ impl InitService {
                     ("outsourcing-orders", "*"),
                     ("outsourcing-receipts", "*"),
                     ("business-modes", "read"),
-                    // 生产经理要能查物料清单（/bom 页路由门是 boms:read，工单用料也以 BOM 为据），
-                    // 而生产域此前没有任何 boms 授权 ⇒ 该页对本岗恒被守卫拦成 403。只授读。
-                    ("boms", "read"),
-                    ("mrp", "*"),
                     ("capacity", "*"),
                     ("scheduling", "*"),
                     ("material-shortage", "read"),
@@ -1158,6 +1174,9 @@ impl InitService {
                     ("period-report-snapshots", "read"),
                     ("period-report-snapshots", "create"),
                     ("aging-alert-rules", "*"),
+                    // 财务预警台账与手工触发扫描同属财务岗职责，此前整段资源名在矩阵里无一行授权，
+                    // 除超管外任何岗位都碰不到，触发口等于不可委派。
+                    ("finance-alerts", "*"),
                     ("aging-grades", "*"),
                     ("asset-categories", "*"),
                     ("industry-benchmarks", "read"),
@@ -1480,6 +1499,10 @@ impl InitService {
             (
                 "system_admin",
                 &[
+                    // 超折扣审批阈值配置面：系统管理岗负责政策参数的落地维护，读写两枚键
+                    // 与 m0134 存量库补授的角色集逐字符同源（update 只给 gm 与本岗）。
+                    ("quotation-discount-config", "read"),
+                    ("quotation-discount-config", "update"),
                     ("users", "*"),
                     ("roles", "*"),
                     ("departments", "*"),

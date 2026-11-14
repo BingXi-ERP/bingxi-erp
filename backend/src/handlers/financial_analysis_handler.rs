@@ -17,6 +17,7 @@ use crate::services::financial_analysis_service::{
     CreateIndicatorRequest, FinancialAnalysisService, IndicatorQueryParams,
 };
 use crate::utils::error::AppError;
+use crate::utils::number_generator::DocumentNumberGenerator;
 use crate::utils::response::ApiResponse;
 
 /// 创建财务指标请求 DTO
@@ -76,16 +77,21 @@ pub struct TrendQueryParams {
 
 /// 创建报告请求
 #[allow(dead_code, reason = "反序列化输入字段")]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Validate)]
 pub struct CreateReportRequest {
+    #[validate(length(min = 1, max = 100, message = "报告名称长度必须在1到100字符之间"))]
     pub name: String,
+    #[validate(length(min = 1, max = 50, message = "报告类型长度必须在1到50字符之间"))]
     pub report_type: String,
     /// 报告期间起始（YYYY-MM-DD），写入 remark 字段作为报告期间元数据
+    #[validate(length(min = 1, max = 10, message = "报告期间起始长度必须在1到10字符之间"))]
     pub period_start: String,
     /// 报告期间结束（YYYY-MM-DD），写入 remark 字段作为报告期间元数据
+    #[validate(length(min = 1, max = 10, message = "报告期间结束长度必须在1到10字符之间"))]
     pub period_end: String,
     /// 关联指标 ID 列表（写入 remark 字段作为关联指标元数据）
     pub indicators: Option<Vec<i32>>,
+    #[validate(length(max = 500, message = "描述长度不能超过500字符"))]
     pub description: Option<String>,
 }
 
@@ -141,10 +147,20 @@ pub async fn create_indicator(
 
     let service = FinancialAnalysisService::new(state.db.clone());
 
-    // code 缺失时由 service 层自动生成（保持原逻辑）
-    let indicator_code = req
-        .code
-        .unwrap_or_else(|| format!("IND_{}", chrono::Utc::now().timestamp()));
+    // code 缺席时走仓内取号器（前缀加日期加流水，事务咨询锁串行化并发取号）：
+    // 秒级时间戳在同秒两次建档时会撞 indicator_code 列的 UNIQUE 约束。
+    let indicator_code = match req.code {
+        Some(code) => code,
+        None => {
+            DocumentNumberGenerator::generate_no(
+                &*state.db,
+                "IND",
+                financial_analysis::Entity,
+                financial_analysis::Column::IndicatorCode,
+            )
+            .await?
+        }
+    };
     let indicator_type = req.indicator_type.unwrap_or_else(|| "ratio".to_string());
 
     let create_req = CreateIndicatorRequest {
@@ -284,7 +300,8 @@ pub async fn list_reports(
     let page_size = params.page_size.unwrap_or(20).clamp(1, 100); // page_size 钳位 1..=100
 
     let query_params = IndicatorQueryParams {
-        page: page.saturating_sub(1),
+        // 服务层按一基页号自行减一算 offset，这里再减一会让第二页起整页错位
+        page,
         page_size,
         ..Default::default()
     };
@@ -324,6 +341,7 @@ pub async fn create_report(
     auth: AuthContext,
     Json(req): Json<CreateReportRequest>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    req.validate().map_err(AppError::from)?;
     let service = FinancialAnalysisService::new(state.db.clone());
 
     // 将 period_start/period_end/indicators/description 组合写入 remark 字段，
@@ -341,9 +359,18 @@ pub async fn create_report(
     }
     let remark = Some(remark_parts.join(" | "));
 
+    // 报告编码走取号器：秒级时间戳在同秒建两份报告时会撞 indicator_code 的 UNIQUE 约束
+    let report_code = DocumentNumberGenerator::generate_no(
+        &*state.db,
+        "RPT",
+        financial_analysis::Entity,
+        financial_analysis::Column::IndicatorCode,
+    )
+    .await?;
+
     let indicator_req = CreateIndicatorRequest {
         indicator_name: req.name.clone(),
-        indicator_code: format!("RPT-{}", chrono::Utc::now().timestamp()),
+        indicator_code: report_code,
         indicator_type: req.report_type.clone(),
         formula: None,
         unit: None,

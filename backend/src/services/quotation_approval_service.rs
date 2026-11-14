@@ -5,6 +5,9 @@
 //!   - < 10万：销售员自行审批
 //!   - 10万 ~ 50万：销售经理审批
 //!   - > 50万：总经理审批
+//! - 超折扣审批门（与金额阶梯并列的强制条件，取更严者）：任一明细行折扣率严格大于
+//!   配置表阈值时，报价单**不得**由自批腿进入可下发状态，必须提交主管审批；阈值与实际
+//!   折扣的读取与判定单点在 `services/quotation_discount_service.rs`
 //! - BPM 集成（提交 / 完成审批实例）
 //!
 //! Week 2 任务 7 - 销售报价单模块
@@ -37,6 +40,7 @@ use crate::models::status::quotation_ext as quotation_ext_status;
 use crate::services::bpm_ops::task::{APPROVE_ACTION, REJECT_ACTION};
 use crate::services::bpm_ops::{bpm_start_failure_error, process_key};
 use crate::services::bpm_service::BpmService;
+use crate::services::quotation_discount_service::QuotationDiscountService;
 use crate::utils::error::AppError;
 
 /// 金额阶梯常量
@@ -101,8 +105,15 @@ impl QuotationApprovalService {
         }
     }
 
-    /// 提交报价单进入审批流
-    /// 流程：1. 检查当前状态（仅 draft / rejected 可提交）；2. 根据金额选择审批角色；3. 自批：直接 approved；4. 否则：创建 BPM 流程实例 + 更新状态为 pending_approval；批次 85 v2 复审 P1-9 说明：submit 的状态门为预检查 + 金额判定（事务外查询），；真正的状态变更在 self_approve / submit_to_bpm 内各自的事务中完成：self_approve：lock_exclusive + 状态检查（P1-9 修复）；submit_to_bpm：lock_exclusive + 状态检查（已有）；因此 submit 的预检查无 lock 是可接受的，最终一致性由子方法保证
+    /// 提交报价单进入审批流。
+    ///
+    /// 流程：1. 状态预检查（仅 draft / rejected 可提交）；2. 按金额定审批角色；
+    /// 3. 读阈值并按行折扣率判超折扣门；4. 金额可自批**且**折扣未超阈 → 自批腿直接
+    /// approved；其余任一情形 → 创建 BPM 流程实例并把状态写 pending_approval。
+    ///
+    /// 并发口径：本方法是事务外的预检查 + 路由决策；真正的状态变更各自在
+    /// `self_approve` / `submit_to_bpm` 的事务内以 lock_exclusive 复查状态后完成，
+    /// 超折扣的硬断言也在 `self_approve` 加锁后重算一次，最终一致性由子方法保证。
     pub async fn submit(
         &self,
         quotation_id: i64,
@@ -116,7 +127,9 @@ impl QuotationApprovalService {
         if ![quotation_status::DRAFT, quotation_status::REJECTED]
             .contains(&quotation.status.as_str())
         {
-            return Err(AppError::business(format!(
+            // 提交腿状态门：仅草稿与被拒的可提交，拒绝点名行自身当前态供提交人自查；
+            // 公开规则、不含标识，走可外显通道，机器码仍是 BUSINESS_ERROR
+            return Err(AppError::business_displayable(format!(
                 "报价单当前状态不允许提交：{}",
                 quotation.status
             )));
@@ -124,17 +137,34 @@ impl QuotationApprovalService {
 
         let role = ApproverRole::from_amount(quotation.total_amount);
 
-        if role == ApproverRole::Salesperson {
+        // 超折扣门与金额阶梯门取更严者：折扣超阈时强制走主管审批腿，金额再小也不自批——
+        // 自批腿写入的 approved 就是"可下发客户"的外部态，那正是本门要拦的去向。
+        // 判定读的是单据明细已落库的折扣事实（discount_rate），阈值读单行配置表，缺行 fail-closed。
+        let discount_service = QuotationDiscountService::new(self.db.clone());
+        let verdict = discount_service.evaluate(&*self.db, quotation_id).await?;
+        tracing::info!(
+            quotation_id,
+            approver_role = role.code(),
+            threshold_pct = %verdict.threshold_pct,
+            max_discount_pct = %verdict.max_discount_pct,
+            over_threshold = verdict.over_threshold,
+            "报价提交路由判定完成：按金额阶梯与超折扣门取更严者"
+        );
+
+        if role == ApproverRole::Salesperson && !verdict.over_threshold {
             // 小额自批：直接 approved
             self.self_approve(quotation_id, user_id).await
         } else {
-            // 中大额：提交 BPM
+            // 中大额，或折扣超阈：提交 BPM 走主管审批
             self.submit_to_bpm(quotation, user_id, role).await
         }
     }
 
-    /// 自批：直接标记为 approved
-    /// 批次 85 v2 复审 P1-9 修复：在 lock 后补状态检查；原实现有 lock_exclusive 但无状态检查，submit 预检查后到 self_approve 加锁期间，；报价单可能已被并发修改（如取消），self_approve 会直接覆盖为 approved
+    /// 自批：直接把状态标记为 approved（仅金额可自批**且**折扣未超阈时由 submit 路由到此）。
+    ///
+    /// 事务内先 lock_exclusive 再复查状态，避免 submit 预检查到加锁之间单据被并发改动
+    /// （如已取消）后被本方法覆盖为 approved；随后在锁内重算超折扣门作硬断言——
+    /// approved 是"可下发客户"的外部态且全仓只此一处写入点，超阈一律拒绝。
     async fn self_approve(
         &self,
         quotation_id: i64,
@@ -161,6 +191,26 @@ impl QuotationApprovalService {
             )));
         }
 
+        // 超折扣硬断言：在已持有排他锁的事务内重算，折扣事实与阈值同快照读数。
+        // submit 的路由决策已把超阈单据送去主管审批，还能走到这里说明行折扣率或阈值
+        // 在预检查之后变过，锁内重算是唯一能钉住"未经审批不得进入可下发态"的位置。
+        let verdict = QuotationDiscountService::new(self.db.clone())
+            .evaluate(&txn, quotation_id)
+            .await?;
+        if verdict.over_threshold {
+            tracing::warn!(
+                quotation_id,
+                operator_user_id = user_id,
+                threshold_pct = %verdict.threshold_pct,
+                max_discount_pct = %verdict.max_discount_pct,
+                "报价自批被拒：折扣率超阈，状态未改动，必须改走主管审批"
+            );
+            return Err(AppError::business_displayable(format!(
+                "报价折扣率 {} % 已超过超折扣审批阈值 {} %，须经主管审批通过后方可下发客户",
+                verdict.max_discount_pct, verdict.threshold_pct
+            )));
+        }
+
         let mut active: QuotationActive = quotation.into();
         active.status = Set(quotation_status::APPROVED.to_string());
         active.approved_by = Set(Some(user_id as i64));
@@ -179,7 +229,8 @@ impl QuotationApprovalService {
         Ok(updated)
     }
 
-    /// 提交至 BPM 流程
+    /// 提交至 BPM 流程：状态写 pending_approval，并把当前操作人写进 `submitted_by`
+    /// 作为提交留痕（审批腿判定"谁提交的"的唯一依据）。
     async fn submit_to_bpm(
         &self,
         quotation: sales_quotation::Model,
@@ -245,7 +296,9 @@ impl QuotationApprovalService {
 
         if ![quotation_status::DRAFT, quotation_status::REJECTED].contains(&latest.status.as_str())
         {
-            return Err(AppError::business(format!(
+            // 提交腿事务内状态门（并发提交串行化后的终判）：拒绝点名行自身当前态；
+            // 公开规则、不含标识，走可外显通道，机器码仍是 BUSINESS_ERROR
+            return Err(AppError::business_displayable(format!(
                 "报价单当前状态不允许提交：{}",
                 latest.status
             )));
@@ -254,6 +307,9 @@ impl QuotationApprovalService {
         let mut active: QuotationActive = latest.into();
         active.status = Set(quotation_ext_status::PENDING_APPROVAL.to_string());
         active.approval_instance_id = Set(bpm_instance_id.map(|i| i as i64));
+        // 提交留痕：状态跃迁到待审批时记录提交人，与状态写入同一条 update_with_audit，
+        // 审计行的 before/after 快照同时覆盖状态与提交人两列。
+        active.submitted_by = Set(Some(user_id as i64));
         active.updated_at = Set(Utc::now());
 
         let updated = crate::services::audit_log_service::AuditLogService::update_with_audit(
@@ -265,6 +321,12 @@ impl QuotationApprovalService {
         .await?;
 
         txn.commit().await?;
+        tracing::info!(
+            quotation_id = updated.id,
+            submitted_by = ?updated.submitted_by,
+            approval_instance_id = ?updated.approval_instance_id,
+            "报价单已提交审批：状态写 pending_approval、提交人已留痕并经审计单点落快照"
+        );
         Ok(updated)
     }
 
@@ -280,7 +342,9 @@ impl QuotationApprovalService {
             .await?
             .ok_or_else(|| AppError::not_found("报价单不存在"))?;
         if quotation.status != quotation_ext_status::PENDING_APPROVAL {
-            return Err(AppError::business(format!(
+            // 审批腿状态门：批准与拒绝的唯一前置都是待审批，拒绝点名行自身当前态；
+            // 公开规则、不含标识，走可外显通道，机器码仍是 BUSINESS_ERROR
+            return Err(AppError::business_displayable(format!(
                 "报价单不在待审批状态：{}",
                 quotation.status
             )));

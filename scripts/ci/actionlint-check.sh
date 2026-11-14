@@ -263,14 +263,20 @@ ensure_actionlint() {
     ls -A . > "$ROOT_SNAPSHOT"
     (
         cd "$WORK_DIR" || exit 1
-        curl -sSfL --retry 3 -o "$TGZ" "$BASE/$TGZ" \
-            || { echo "::error::actionlint 下载失败（固定版本 $VER），拒绝跳过检查"; exit 1; }
-        curl -sSfL --retry 3 -o actionlint-checksums.txt "$BASE/actionlint_${VER}_checksums.txt" \
-            || { echo "::error::actionlint 校验清单下载失败，拒绝跳过检查"; exit 1; }
-        sha256sum --ignore-missing -c actionlint-checksums.txt \
-            || { echo "::error::actionlint 产物 sha256 完整性校验未通过"; exit 1; }
-        tar -xzf "$TGZ" actionlint \
-            || { echo "::error::actionlint 归档提取失败"; exit 1; }
+        if (
+            curl -sSfL --retry 3 -o "$TGZ" "$BASE/$TGZ" &&
+            curl -sSfL --retry 3 -o actionlint-checksums.txt "$BASE/actionlint_${VER}_checksums.txt" &&
+            sha256sum --ignore-missing -c actionlint-checksums.txt &&
+            tar -xzf "$TGZ" actionlint
+        ); then
+            :
+        else
+            # release 资产或校验清单中断时回退钉版本源码构建：模块版本加 sumdb 校验提供
+            # 完整性，仍 fail-closed，构建失败即判红，绝不退化成取不到就跳过检查。
+            echo "actionlint release 资产下载或校验失败，回退 go install 钉版本 v${VER}"
+            GOBIN="$WORK_DIR" go install "github.com/rhysd/actionlint/cmd/actionlint@v${VER}" \
+                || { echo "::error::actionlint 下载与源码构建均失败（固定版本 $VER），拒绝跳过检查"; exit 1; }
+        fi
         chmod +x ./actionlint
     ) || return 1
     ACTIONLINT_BIN="$WORK_DIR/actionlint"

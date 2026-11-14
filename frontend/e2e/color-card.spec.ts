@@ -52,11 +52,14 @@ test.describe('色卡仓储管理 E2E 业务流程', () => {
     // 点击第一行的详情入口（不硬编码 id=1）
     const firstDetail = page.locator('a:has-text("详情"), button:has-text("详情")').first();
     await expect(firstDetail, '列表应有可进入详情的入口').toBeVisible({ timeout: 30000 });
-    await firstDetail.click();
-    const detailRes = await page.waitForResponse(
+    // 同列表腿：waitForResponse 必须注册在 click 前，详情接口同机响应快，
+    // click 之后再注册会漏接该请求恒 30s 超时。先建 promise，再 click，最后 await。
+    const detailResp = page.waitForResponse(
       resp => /\/color-cards\/\d+/.test(resp.url()) && resp.request().method() === 'GET',
       { timeout: 30000 }
     );
+    await firstDetail.click();
+    const detailRes = await detailResp;
     expect(
       detailRes.status(),
       `GET /color-cards/{id} 应 200（404=路由漂移/403=权限拒，均不得当"详情已开"放过），实际 ${detailRes.status()} ${(await detailRes.text()).slice(0, 200)}`

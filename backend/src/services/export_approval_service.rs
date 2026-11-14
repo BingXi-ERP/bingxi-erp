@@ -690,7 +690,7 @@ impl ExportApprovalService {
             AppError::internal(format!("导出审批状态值不可解析: {}", model.status))
         })?;
         if status != ApprovalStatus::Approved {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "审批请求状态为 {}，仅已批准的申请可查看令牌",
                 status.as_str()
             )));
