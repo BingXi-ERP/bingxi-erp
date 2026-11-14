@@ -4,9 +4,9 @@ use std::sync::{Mutex, OnceLock};
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
+    Registry,
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
-    Registry,
 };
 
 /// 全部日志 writer 的 WorkerGuard 容器。
