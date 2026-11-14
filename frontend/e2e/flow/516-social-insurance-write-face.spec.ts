@@ -10,7 +10,7 @@ import {
 import { pickListArray } from './ui-helpers';
 
 /**
- * 社保公积金缴纳记录全生命周期写面与读面 — 514。
+ * 社保公积金缴纳记录全生命周期写面与读面 — 516。
  *
  * 覆盖面。社保公积金域（V15 P1 batch-08 缺陷 23 落地的域）端点在配对门棘轮基线里
  * 全部孤儿：POST/GET 列表与详情、按工人按期间查询、确认缴纳、撤销、打印共 11 条
@@ -66,6 +66,7 @@ type Row = Record<string, unknown>;
 const SI = '/social-insurance';
 
 const num = (v: unknown): number => Number(String(v));
+const str = (v: unknown): string => String(v);
 
 /**
  * 功能 判定时间列出参是真实时间字符串且可解析。
@@ -116,5 +117,404 @@ test.describe.serial('社保公积金缴纳记录写面：建单计算、确认�
     await ensureTestEntities(page);
   });
 
-  // 以下用例随后补齐：建单全列计算回读、确认缴纳、撤销、唯一在缴门、基数越界门、期间越界门、按工人查询与悬空读面
+  test('516-01 建社保记录：五险一金按费率自动计算且全列逐列回读', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const workerId = await currentWorkerId(page, '516-01');
+    // 基数 5000 落在合规区间 [4250, 31884]（InsuranceRateConfig::default）
+    const created = await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 3,
+      base_amount: '5000.00',
+      remarks: `E2E社保${stamp}`,
+    });
+    const id = Number(created.id);
+    expect(
+      Number.isFinite(id),
+      `[516-01] 建社保记录未回主键 id，实际 ${JSON.stringify(created)}`
+    ).toBe(true);
+    expect(Number(created.worker_id), '[516-01] worker_id 应落提交值（当前会话用户）').toBe(
+      workerId
+    );
+    expect(Number(created.period_year), '[516-01] period_year 应落提交值 2031').toBe(2031);
+    expect(Number(created.period_month), '[516-01] period_month 应落提交值 3').toBe(3);
+    expect(num(created.base_amount), '[516-01] 缴费基数应落库 5000').toBe(5000);
+    // 五险一金数值契约（social_insurance_service.rs calculate_insurance 纯函数，
+    // 费率常数 InsuranceRateConfig::default，基数 5000 逐项乘费率）：
+    expect(num(created.pension_employer), '[516-01] 养老单位应 5000 的 16% = 800').toBe(800);
+    expect(num(created.pension_employee), '[516-01] 养老个人应 5000 的 8% = 400').toBe(400);
+    expect(num(created.medical_employer), '[516-01] 医疗单位应 5000 的 8% = 400').toBe(400);
+    expect(num(created.medical_employee), '[516-01] 医疗个人应 5000 的 2% = 100').toBe(100);
+    expect(num(created.unemployment_employer), '[516-01] 失业单位应 5000 的 0.5% = 25').toBe(25);
+    expect(num(created.unemployment_employee), '[516-01] 失业个人应 5000 的 0.5% = 25').toBe(25);
+    expect(num(created.work_injury_employer), '[516-01] 工伤单位应 5000 的 0.4% = 20').toBe(20);
+    expect(num(created.maternity_employer), '[516-01] 生育单位应 5000 的 1% = 50').toBe(50);
+    expect(num(created.housing_fund_employer), '[516-01] 公积金单位应 5000 的 12% = 600').toBe(600);
+    expect(num(created.housing_fund_employee), '[516-01] 公积金个人应 5000 的 12% = 600').toBe(600);
+    // 合计列：单位 = 五险单位 + 公积金单位，个人 = 养老/医疗/失业/公积金个人之和
+    expect(num(created.total_employer), '[516-01] 单位合计应 800+400+25+20+50+600 = 1895').toBe(
+      1895
+    );
+    expect(num(created.total_employee), '[516-01] 个人合计应 400+100+25+600 = 1125').toBe(1125);
+    // 无 payment_date 建单落词表 pending（service :201-205 条件）
+    expect(
+      created.status,
+      `[516-01] 无缴纳日期建单应落词表 pending，实际 ${str(created.status)}`
+    ).toBe('pending');
+    expect(
+      created.payment_date,
+      `[516-01] 未确认缴纳时缴纳日期应为 NULL，实际 ${JSON.stringify(created.payment_date)}`
+    ).toBeNull();
+    expect(str(created.remarks), '[516-01] 备注应原样落库').toBe(`E2E社保${stamp}`);
+    expect(
+      created.created_by,
+      `[516-01] 建单人应取服务端会话身份（handler 不收请求体身份），实际 ${JSON.stringify(created.created_by)}`
+    ).not.toBeNull();
+    expect(
+      isRealTimestamp(created.created_at),
+      `[516-01] 创建时间应落库为可解析时间串，实际 ${JSON.stringify(created.created_at)}`
+    ).toBe(true);
+  });
+
+  test('516-02 详情与按工人按期间查询：自建行双路回读一致', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const workerId = await currentWorkerId(page, '516-02');
+    const created = await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 4,
+      base_amount: '6000.00',
+      remarks: `E2E社保${stamp}`,
+    });
+    const id = Number(created.id);
+    // 详情路
+    const detail = await apiCallRaw<Row>(page, 'GET', `${SI}/${id}`);
+    expect(
+      Number(detail.id),
+      `[516-02] 详情应回同一主键 ${id}，实际 ${JSON.stringify(detail.id)}`
+    ).toBe(id);
+    expect(num(detail.base_amount), '[516-02] 详情缴费基数应落库 6000').toBe(6000);
+    expect(num(detail.total_employer), '[516-02] 详情单位合计应 6000 基数费率合计 2274').toBe(2274);
+    expect(num(detail.total_employee), '[516-02] 详情个人合计应 6000 基数费率合计 1350').toBe(1350);
+    expect(str(detail.remarks), '[516-02] 详情备注应与创建行一致').toBe(`E2E社保${stamp}`);
+    // 按工人按期间路（worker_id + period_year + period_month 三键过滤）
+    const byWorker = await apiCallRaw<Row>(
+      page,
+      'GET',
+      `${SI}/by-worker/${workerId}?period_year=2031&period_month=4`
+    );
+    expect(
+      Number(byWorker.id),
+      `[516-02] 按工人按期间应命中本行，实际 ${JSON.stringify(byWorker)}`
+    ).toBe(id);
+    expect(num(byWorker.base_amount), '[516-02] 按工人路缴费基数应一致 6000').toBe(6000);
+  });
+
+  test('516-03 确认缴纳：pending 转 paid 且缴纳日期落提交值', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const workerId = await currentWorkerId(page, '516-03');
+    const created = await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 5,
+      base_amount: '4250.00',
+      remarks: `E2E社保${stamp}`,
+    });
+    const id = Number(created.id);
+    expect(created.status, `[516-03] 建单初值应为 pending，实际 ${str(created.status)}`).toBe(
+      'pending'
+    );
+    const paidDate = today();
+    const paid = await apiCallRaw<Row>(page, 'POST', `${SI}/${id}/mark-paid`, {
+      payment_date: paidDate,
+    });
+    expect(paid.status, `[516-03] 确认缴纳后状态应为词表 paid，实际 ${str(paid.status)}`).toBe(
+      'paid'
+    );
+    expect(str(paid.payment_date), '[516-03] 缴纳日期应落提交值').toBe(paidDate);
+    // 独立详情回读
+    const readBack = await apiCallRaw<Row>(page, 'GET', `${SI}/${id}`);
+    expect(readBack.status, `[516-03] 详情回读状态应为 paid，实际 ${str(readBack.status)}`).toBe(
+      'paid'
+    );
+    expect(str(readBack.payment_date), '[516-03] 详情回读缴纳日期应一致').toBe(paidDate);
+  });
+
+  test('516-04 撤销：pending 转 cancelled 且撤销后详情回读一致', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const workerId = await currentWorkerId(page, '516-04');
+    const created = await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 6,
+      base_amount: '10000.00',
+      remarks: `E2E社保${stamp}`,
+    });
+    const id = Number(created.id);
+    const cancelled = await apiCallRaw<Row>(page, 'POST', `${SI}/${id}/cancel`);
+    expect(
+      cancelled.status,
+      `[516-04] 撤销后状态应为词表 cancelled，实际 ${str(cancelled.status)}`
+    ).toBe('cancelled');
+    const readBack = await apiCallRaw<Row>(page, 'GET', `${SI}/${id}`);
+    expect(
+      readBack.status,
+      `[516-04] 详情回读状态应为 cancelled，实际 ${str(readBack.status)}`
+    ).toBe('cancelled');
+    expect(
+      readBack.payment_date,
+      `[516-04] 撤销不写缴纳日期，应为 NULL，实际 ${JSON.stringify(readBack.payment_date)}`
+    ).toBeNull();
+  });
+
+  test('516-05 唯一在缴门：同工人同期间已有 pending 或 paid 记录再建被拒', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const workerId = await currentWorkerId(page, '516-05');
+    await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 7,
+      base_amount: '5000.00',
+      remarks: `E2E社保${stamp}`,
+    });
+    // pending 在缴记录挡住第二笔同期间建单（service :162-178 is_in pending/paid 门）
+    const dupPending = await apiCallExpectFail(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 7,
+      base_amount: '5000.00',
+      remarks: `E2E社保重复${stamp}`,
+    });
+    expect(
+      dupPending.status,
+      `[516-05] 同工人同期间重复建单应被业务门拒为 400，实际 ${dupPending.status}`
+    ).toBe(400);
+    expect(
+      failureCode(dupPending),
+      `[516-05] 重复建单机器码应为 BUSINESS_ERROR（AppError::business），实际 ${JSON.stringify(failureCode(dupPending))}`
+    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    // paid 后同样挡（撤掉第一笔的门不成立：mark-paid 后仍 is_in 集合）
+    const second = await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 8,
+      base_amount: '5000.00',
+      remarks: `E2E社保${stamp}-8月`,
+    });
+    const secondId = Number(second.id);
+    await apiCallRaw(page, 'POST', `${SI}/${secondId}/mark-paid`, { payment_date: today() });
+    const dupPaid = await apiCallExpectFail(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 8,
+      base_amount: '5000.00',
+      remarks: `E2E社保已缴重复${stamp}`,
+    });
+    expect(
+      dupPaid.status,
+      `[516-05] 同期间已有 paid 记录再建也应被拒 400，实际 ${dupPaid.status}`
+    ).toBe(400);
+    expect(
+      failureCode(dupPaid),
+      `[516-05] paid 挡门机器码应为 BUSINESS_ERROR，实际 ${JSON.stringify(failureCode(dupPaid))}`
+    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    // cancelled 不挡：撤销后同期间可再建（is_in 只含 pending/paid）
+    const blocked = await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 9,
+      base_amount: '5000.00',
+      remarks: `E2E社保${stamp}-9月`,
+    });
+    const blockedId = Number(blocked.id);
+    await apiCallRaw(page, 'POST', `${SI}/${blockedId}/cancel`);
+    const reCreated = await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 9,
+      base_amount: '5000.00',
+      remarks: `E2E社保撤销后重建${stamp}`,
+    });
+    expect(
+      Number.isFinite(Number(reCreated.id)),
+      `[516-05] cancelled 后同期间重建应放行（is_in 门只含 pending/paid），实际 ${JSON.stringify(reCreated)}`
+    ).toBe(true);
+    expect(
+      str(reCreated.status),
+      `[516-05] 重建行应为新 pending 记录，实际 ${str(reCreated.status)}`
+    ).toBe('pending');
+  });
+
+  test('516-06 基数越界门：低于下限与高于上限都在写库前拒绝', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const workerId = await currentWorkerId(page, '516-06');
+    // 低于下限 4250（service :151 非正与 :156-159 区间校验）
+    const belowMin = await apiCallExpectFail(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 10,
+      base_amount: '4249.99',
+      remarks: `E2E社保低${stamp}`,
+    });
+    expect(
+      belowMin.status,
+      `[516-06] 基数低于下限应被业务门拒为 400，实际 ${belowMin.status}`
+    ).toBe(400);
+    expect(
+      failureCode(belowMin),
+      `[516-06] 基数下限机器码应为 BUSINESS_ERROR（AppError::business），实际 ${JSON.stringify(failureCode(belowMin))}`
+    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    // 高于上限 31884
+    const aboveMax = await apiCallExpectFail(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 10,
+      base_amount: '31884.01',
+      remarks: `E2E社保高${stamp}`,
+    });
+    expect(
+      aboveMax.status,
+      `[516-06] 基数高于上限应被业务门拒为 400，实际 ${aboveMax.status}`
+    ).toBe(400);
+    expect(
+      failureCode(aboveMax),
+      `[516-06] 基数上限机器码应为 BUSINESS_ERROR，实际 ${JSON.stringify(failureCode(aboveMax))}`
+    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    // 边界值本身合法：恰 4250 可建
+    const atMin = await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 10,
+      base_amount: '4250.00',
+      remarks: `E2E社保边界${stamp}`,
+    });
+    expect(
+      Number.isFinite(Number(atMin.id)),
+      `[516-06] 基数恰为下限 4250 应放行，实际 ${JSON.stringify(atMin)}`
+    ).toBe(true);
+    expect(num(atMin.base_amount), '[516-06] 边界行基数应落库 4250').toBe(4250);
+  });
+
+  test('516-07 期间越界门：月份出 1-12 与年份出 2000-2100 都拒为 400', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const workerId = await currentWorkerId(page, '516-07');
+    // 月份 13（service validate_period :419-427 bad_request 族）
+    const badMonth = await apiCallExpectFail(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 13,
+      base_amount: '5000.00',
+      remarks: `E2E社保月${stamp}`,
+    });
+    expect(badMonth.status, `[516-07] 月份 13 应被拒为 400，实际 ${badMonth.status}`).toBe(400);
+    expect(
+      failureCode(badMonth),
+      `[516-07] 月份越界机器码应为 BAD_REQUEST（AppError::bad_request），实际 ${JSON.stringify(failureCode(badMonth))}`
+    ).toBe(APP_ERROR_CODES.BAD_REQUEST);
+    // 年份 1999
+    const badYear = await apiCallExpectFail(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 1999,
+      period_month: 3,
+      base_amount: '5000.00',
+      remarks: `E2E社保年${stamp}`,
+    });
+    expect(badYear.status, `[516-07] 年份 1999 应被拒为 400，实际 ${badYear.status}`).toBe(400);
+    expect(
+      failureCode(badYear),
+      `[516-07] 年份越界机器码应为 BAD_REQUEST，实际 ${JSON.stringify(failureCode(badYear))}`
+    ).toBe(APP_ERROR_CODES.BAD_REQUEST);
+  });
+
+  test('516-08 状态门与悬空读面：paid 不可再确认再撤销，悬空 id 详情 404', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const workerId = await currentWorkerId(page, '516-08');
+    const created = await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2031,
+      period_month: 11,
+      base_amount: '31884.00',
+      remarks: `E2E社保${stamp}`,
+    });
+    const id = Number(created.id);
+    await apiCallRaw(page, 'POST', `${SI}/${id}/mark-paid`, { payment_date: today() });
+    // paid 后再确认（service mark_paid :299 仅 pending 门）
+    const rePaid = await apiCallExpectFail(page, 'POST', `${SI}/${id}/mark-paid`, {
+      payment_date: today(),
+    });
+    expect(rePaid.status, `[516-08] paid 后再确认应被状态门拒为 400，实际 ${rePaid.status}`).toBe(
+      400
+    );
+    expect(
+      failureCode(rePaid),
+      `[516-08] 再确认机器码应为 BUSINESS_ERROR（AppError::business），实际 ${JSON.stringify(failureCode(rePaid))}`
+    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    // paid 后再撤销（service cancel :317 仅 pending 门）
+    const reCancel = await apiCallExpectFail(page, 'POST', `${SI}/${id}/cancel`);
+    expect(
+      reCancel.status,
+      `[516-08] paid 后再撤销应被状态门拒为 400，实际 ${reCancel.status}`
+    ).toBe(400);
+    expect(
+      failureCode(reCancel),
+      `[516-08] 再撤销机器码应为 BUSINESS_ERROR，实际 ${JSON.stringify(failureCode(reCancel))}`
+    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    // 悬空 id 详情（service get_by_id not_found）
+    const missing = await apiCallExpectFail(page, 'GET', `${SI}/99999999`);
+    expect(
+      missing.status,
+      `[516-08] 悬空社保详情应恰为 HTTP 404（AppError::not_found），实际 ${missing.status}`
+    ).toBe(404);
+    expect(
+      failureCode(missing),
+      `[516-08] 悬空详情机器码应为 NOT_FOUND，实际 ${JSON.stringify(failureCode(missing))}`
+    ).toBe(APP_ERROR_CODES.NOT_FOUND);
+  });
+
+  test('516-09 列表读面：分页信封四键与自建行按期间过滤命中', async ({ page }) => {
+    const stamp = String(Date.now()).slice(-6);
+    const workerId = await currentWorkerId(page, '516-09');
+    const created = await apiCallRaw<Row>(page, 'POST', `${SI}`, {
+      worker_id: workerId,
+      period_year: 2032,
+      period_month: 1,
+      base_amount: '5000.00',
+      remarks: `E2E社保${stamp}`,
+    });
+    const id = Number(created.id);
+    const data = await apiCallRaw<Row>(
+      page,
+      'GET',
+      `${SI}?worker_id=${workerId}&period_year=2032&period_month=1&page=1&page_size=20`
+    );
+    expect(
+      Array.isArray(data.items),
+      `[516-09] 列表 items 应为数组（PaginatedResponse 信封），实际 ${JSON.stringify(Object.keys(data))}`
+    ).toBe(true);
+    expect(typeof data.total, `[516-09] total 应为 number，实际 ${typeof data.total}`).toBe(
+      'number'
+    );
+    expect(data.page, `[516-09] page 应回显 1，实际 ${JSON.stringify(data.page)}`).toBe(1);
+    expect(
+      data.page_size,
+      `[516-09] page_size 应回显 20，实际 ${JSON.stringify(data.page_size)}`
+    ).toBe(20);
+    const rows = pickListArray<Row>(
+      data,
+      'items',
+      `[516-09] 社保列表 worker_id=${workerId} 期间 2032-1`
+    );
+    expect(
+      rows.length,
+      `[516-09] 三键过滤应至少命中本行，实际 ${rows.length}`
+    ).toBeGreaterThanOrEqual(1);
+    const mine = rows.find(r => Number(r.id) === id);
+    expect(
+      mine,
+      `[516-09] 本行 ${id} 应在过滤结果内，实际主键集 ${JSON.stringify(rows.map(r => Number(r.id)))}`
+    ).toBeTruthy();
+    expect(mine.status, `[516-09] 过滤行状态应为 pending，实际 ${str(mine.status)}`).toBe(
+      'pending'
+    );
+  });
 });
