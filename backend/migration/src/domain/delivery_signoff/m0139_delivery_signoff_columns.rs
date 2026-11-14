@@ -11,7 +11,7 @@ pub struct Migration;
 /// 词表同步扩 DELIVERED（已签收），写入方在 services/so/delivery.rs 签收端点。
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
-    async fn up(&self, manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .alter_table(
                 Table::alter()
@@ -43,7 +43,7 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 
-    async fn down(&self, manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .alter_table(
                 Table::alter()
