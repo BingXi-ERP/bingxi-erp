@@ -5,7 +5,7 @@
 //   （backend/src/routes/finance.rs:272-275 → handlers/fixed_asset_handler.rs:299-313 →
 //   services/fixed_asset_service.rs:891-954 batch_calculate_depreciation）
 // - 入参 BatchDepreciateRequest{asset_ids, calculation_date}（handler:319-323；无 user_id 字段，
-//   操作人取鉴权上下文——批次 94 P2-9 语义，请求体伪造 user_id 不可达）。
+//   操作人取鉴权上下文——固定资产折旧接口的既有语义，请求体伪造 user_id 不可达）。
 // - 出参键 = DepreciationResult 七键 snake_case（service:1547-1556）：
 //   asset_id/asset_no/original_value/accumulated_depreciation/current_depreciation/net_value/depreciation_method；
 //   结果顺序 = 请求 asset_ids 的迭代顺序（service:933-950 for 循环逐 id 产出）。
