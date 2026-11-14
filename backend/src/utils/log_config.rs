@@ -4,9 +4,9 @@ use std::sync::{Mutex, OnceLock};
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
-    Registry,
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
+    Registry,
 };
 
 /// 全部日志 writer 的 WorkerGuard 容器。
@@ -99,7 +99,13 @@ fn create_env_filter(config: &LogConfig) -> tracing_subscriber::EnvFilter {
         // target=level 形式且缺少默认指令时，未匹配的 target 以 TRACE 全放行，
         // 导致 axum::serve 的连接 TRACE 与内部 DEBUG 洪水式输出（日志量放大
         // 数量级，加剧磁盘 IO 压力）。
-        format!("info,bingxi_backend={},tower_http=debug", config.log_level).into()
+        // 追加 sqlx=debug：让 SQL 语句（target sqlx::query）进后端日志，
+        // e2e 分片红位取证时可直接按语句定位污染源，不再依赖推断。
+        format!(
+            "info,bingxi_backend={},tower_http=debug,sqlx=debug",
+            config.log_level
+        )
+        .into()
     })
 }
 
