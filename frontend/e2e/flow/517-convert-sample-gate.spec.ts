@@ -23,14 +23,14 @@ import {
  * 全链命中且 OK 样未确认才拒绝。
  *
  * 拒绝形状（逐条读后端源非推测）：AppError::business_displayable
- * → utils/error.rs:384 映射 HTTP 400 + error_code() "BUSINESS_ERROR"（:824-825），
- * message 走 Displayable 直通（:851）外显中文文案「该报价关联的打样单尚未确认
+ * → utils/error.rs 的映射返回 HTTP 400 + error_code() "BUSINESS_ERROR"，
+ * message 走 Displayable 直通，外显中文文案「该报价关联的打样单尚未确认
  * OK 样，不能转大货订单」。三判据（status=400 + code∈状态门拒绝族 + 中文文案）
  * 全部真实断言，缺一即红，无恒过假绿。
  *
  * 前置造数形态（照抄 511 号已钉的真实链路，非虚构）：打样腿
  * POST /production/lab-dip/requests → start-sampling → samples ×2 → matching ×2
- * → submit → approve {sample_id}；approve_ok_sample（lab_dip_ops/request.rs:328）
+ * → submit → approve {sample_id}；approve_ok_sample（见 lab_dip_ops/request.rs）
  * 置 approved_sample_id，受状态机保护不可伪造，是全仓唯一写点。
  *
  * 关联链路事实：custom_orders.quotation_id / lab_dip_request_id 两列在此基线
@@ -213,11 +213,7 @@ async function seedLabDipChain(page: Page, stamp: string, confirmOk: boolean): P
  * customer_id 取报价行自证归属，product_id 取报价明细首行，不写死 id。
  * 插入后直连回读 lab_dip_request_id 取证，关联未生效即判红（前置造假零容忍）。
  */
-function linkQuotationToChain(
-  quotationId: number,
-  labDipRequestId: number,
-  tag: string
-): void {
+function linkQuotationToChain(quotationId: number, labDipRequestId: number, tag: string): void {
   psqlExec(
     `INSERT INTO custom_orders (order_no, customer_id, product_id, spec, quantity, unit, ` +
       `custom_requirements, status, currency, created_at, updated_at, lab_dip_request_id, quotation_id) ` +
@@ -253,16 +249,14 @@ test('517-01 常规报价（无定制订单关联）转单不拦：200 回销售
     str(order.order_no).startsWith('SO'),
     `[${tag}] 转出订单号应以 SO 前缀（统一取号器），实际 ${str(order.order_no)}`
   ).toBe(true);
-  expect(
-    str(order.status),
-    `[${tag}] 转出销售订单应为词表 draft，实际 ${str(order.status)}`
-  ).toBe('draft');
+  expect(str(order.status), `[${tag}] 转出销售订单应为词表 draft，实际 ${str(order.status)}`).toBe(
+    'draft'
+  );
 
   const q = await apiCallRaw<Row>(page, 'GET', `/quotations/${quotationId}`);
-  expect(
-    str(q.status),
-    `[${tag}] 放行后报价单应推进 converted，实际 ${str(q.status)}`
-  ).toBe('converted');
+  expect(str(q.status), `[${tag}] 放行后报价单应推进 converted，实际 ${str(q.status)}`).toBe(
+    'converted'
+  );
 });
 
 test('517-02 关联打样单未确认 OK 样：转单被拒 400 BUSINESS_ERROR + 中文文案', async ({ page }) => {
@@ -318,22 +312,17 @@ test('517-03 确认 OK 样后同链转单放行：200 回销售订单草稿', as
   linkQuotationToChain(quotationId, labDipId, tag);
 
   const order = await apiCallRaw<Row>(page, 'POST', `/quotations/${quotationId}/convert`);
-  expect(
-    num(order.id),
-    `[${tag}] OK 样已确认的关联报价转单应放行并返回销售订单 id`
-  ).toBeTruthy();
+  expect(num(order.id), `[${tag}] OK 样已确认的关联报价转单应放行并返回销售订单 id`).toBeTruthy();
   expect(
     str(order.order_no).startsWith('SO'),
     `[${tag}] 转出订单号应以 SO 前缀，实际 ${str(order.order_no)}`
   ).toBe(true);
-  expect(
-    str(order.status),
-    `[${tag}] 转出销售订单应为词表 draft，实际 ${str(order.status)}`
-  ).toBe('draft');
+  expect(str(order.status), `[${tag}] 转出销售订单应为词表 draft，实际 ${str(order.status)}`).toBe(
+    'draft'
+  );
 
   const q = await apiCallRaw<Row>(page, 'GET', `/quotations/${quotationId}`);
-  expect(
-    str(q.status),
-    `[${tag}] 放行后报价单应推进 converted，实际 ${str(q.status)}`
-  ).toBe('converted');
+  expect(str(q.status), `[${tag}] 放行后报价单应推进 converted，实际 ${str(q.status)}`).toBe(
+    'converted'
+  );
 });
