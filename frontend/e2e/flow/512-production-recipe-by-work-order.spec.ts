@@ -1,5 +1,5 @@
 import { test, expect } from '../diagnose-fixture';
-import { apiCallRaw } from './helpers';
+import { apiCall } from './helpers';
 
 /**
  * 生产大货处方按工单查询面（by-work-order）。
@@ -25,7 +25,7 @@ import { apiCallRaw } from './helpers';
 test('512-01 悬空 work_order_id 返回 200 与 data null', async ({ page }) => {
   const tag = '512-01';
   const danglingId = 999999999;
-  const resp = await apiCallRaw<{ data: unknown }>(
+  const resp = await apiCall<{ data: unknown }>(
     page,
     'GET',
     `/production/production-recipes/by-work-order/${danglingId}`
@@ -39,7 +39,7 @@ test('512-01 悬空 work_order_id 返回 200 与 data null', async ({ page }) =>
 test('512-02 悬空 work_order_id 的信封形状仍是 code 0 的成功信封', async ({ page }) => {
   const tag = '512-02';
   const danglingId = 999999998;
-  const resp = await apiCallRaw<{ code: number; data: unknown; message?: string }>(
+  const resp = await apiCall<{ code: number; data: unknown; message?: string }>(
     page,
     'GET',
     `/production/production-recipes/by-work-order/${danglingId}`
