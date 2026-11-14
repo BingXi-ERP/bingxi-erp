@@ -49,3 +49,11 @@
 3. 测试面。482 一支 spec 断三档。admin 发公告成功且收件人解析出的通知逐条落库。admin_assistant 发公告同样成功（这是本裁定的行为变更点，必须实测，不能只删门不验）。无 notifications:create 的岗位卡片不可达且直接 POST 得 4xx 且小于 500，覆盖 4.1 第 A 节“不能只靠前端隐藏按钮”与第 P 节“地址栏直接输入敏感接口 URL”。
 4. 联动门。岗位基线双向全等门与路由权限快照门本轮不改授予矩阵，预期输出不变；若第 3 档用例的岗位键与矩阵不一致，按门报的红先判责再动文件。
 5. 号段。482 划拨给本条，473 至 479 已划拨小程序域，480 挂在投纱驱动缺料前提上（结论十二已证不在主干），481 已划拨通知入口权限修复，本条不与其合并，避免一支内两枚入口改动互相掩盖。
+
+## 6 结案记录（2026-11-14 复核）
+
+本裁定已由 PR #1190（bef790c20，2026-11-10 合并入主干）完整落地，第 3 节三个未验项逐条转验：
+
+1. 键派生已验：announcement 不在 PATH_ACTION_KEYWORDS 与 PATH_ACTION_SEGMENT_MAP 两表内，按方法派生（POST→create），资源段 notifications，运行期键恰为 notifications:create，第 3 节未验 1 成立。
+2. 测试面采用比 admin_assistant 更普适的形态：482 用 beforeAll 自建 scratch role（seedGrant notifications:read + notifications:create）与 scratch user 验证持码放行（482-01），不依赖矩阵镜像表；482-04 断只持 read 的岗位卡片不渲染且直连 POST 得 4xx；482-05 断超管回归放行。第 3 节未验 2 与 3 以"自建岗位持码"形态闭合，行为变更点已实测。
+3. 第 5 节落地清单三面对照：handler 内 is_admin_role 与 admin_checker 引用零残留（grep 空）；前端卡片键保持 notifications:create 且注释已按键口径改写；482 五档断言在册。裁定闭环，本文档转存档态。

@@ -112,6 +112,12 @@
 2. 配套 e2e 断两向：持 notifications:create 的非 admin 岗位公告卡不可达（或点发送得到与后端一致的拒绝文案），admin 岗位发送成功且 delivered_count 由库里回读。
 3. 不许用前端隐藏代替后端判定，也不许把后端判定放宽成权限键而矩阵仍发给非 admin，那样会把拒绝变成真发送。
 
+### D-61 / D-65 结案记录 2026-11-14（#1190 已合并，2026-11-10T09:40Z 入主干）
+
+- D-61 修复载体 PR #1190（提交 bef790c20「fix(通知): 公告发送门与前端权限键同源并配套 482 五断言」）已合并入主干：受理判定弃 is_admin_role 角色码门，改按鉴权中间件 URL 段派生的 notifications:create 键（POST 方法派生 create 动作）；矩阵侧 admin_assistant 持 notifications:create（init_service_ops/permission.rs），通知中心入口与页内腿按 users:read 收口。配套 481、482 用例钉双向。
+- D-65 的假可供性前提随同源修法消解：持码岗位（admin_assistant）现在发公告可达且能真实受理，「前端摆出不可用能力」的形态不复存在；原登记第 1 条修法建议（权限键判定为唯一口径）正是最终落地方案。结案。
+- 备注：本地支 fix/notification-entry-permission-same-source 上的 4 笔未进主干提交（481/482 用例钉面、角色基线 provenance、安卓镜像与重试）属该支与主干并行演化的余量，功能面已由 #1190 覆盖主干侧；该支不删留证，待批量回收窗口按 blob 对比裁定。
+
 ## D-66 取档回来的小程序源码缺四张页面，11 处跳转是死链（P1，功能缺失）
 
 实证（同日实测，工作树 wt-mp-land 分支 feat/wechat-miniprogram-domain）：门禁 `bash scripts/ci/miniprogram-checks.sh` 首轮真跑 rc 1，第七道报 `MP_ROUTE_RED 有 11 处跳转路由落不到 app.json 声明页`。11 处调用点去重成 10 个"调用点文件 加 跳转目标"键，归并为 4 个落点页。双口径逐条核存在性：一是查页面上的 wxml 与 json 文件，二是查 app.json 的 pages 与 subPackages 声明，四个落点两口径全为零。
