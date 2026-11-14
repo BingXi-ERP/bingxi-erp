@@ -194,8 +194,13 @@ test('513-01 签收事实三列落库，状态列不动', async ({ page }) => {
   expectStatusChar(signed.status, 'shipped', '签收后送货单状态列不动');
 
   // 读回路径二次确认（不采信签收响应自带值）
-  const after = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${orderId}/deliveries`);
-  const afterRow = after.items?.find(d => Number(d.id) === deliveryId);
+  const after = await apiCallRaw<{ items: Array<Row> }>(
+    page,
+    'GET',
+    `/sales/orders/${orderId}/deliveries`
+  );
+  const afterRow = after.items.find(d => Number(d.id) === deliveryId);
+  if (!afterRow) throw new Error('签收后送货单行不存在');
   expect(afterRow.delivered_at, '读回 delivered_at 已落值').toBeTruthy();
   expect(afterRow.signed_at, '读回 signed_at 已落值').toBeTruthy();
 });
