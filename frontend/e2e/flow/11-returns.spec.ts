@@ -26,10 +26,22 @@ test.describe('采购退货完整流程', () => {
     const poId = ctx.purchaseOrderId;
     expect(poId).toBeDefined();
 
+    // 退货明细的产品必须与关联采购单的明细行同源：approve 时回写退货已收货量
+    // 按「PO 明细行存在该产品」校验（purchase_return_service），夹具共享行错配
+    // 会正当拒批（实测拒因「采购订单 N 无产品 M 的订单明细行」）。读 PO 详情取
+    // 首明细行的真实产品 id，造库存与明细都锚它，不回退 ctx.productIds[0]。
+    const poDetail = await apiCallRaw<{ items?: Array<{ material_id: number }> }>(
+      page,
+      'GET',
+      `/purchase/orders/${poId}`
+    );
+    const poMaterialId = Number(poDetail.items?.[0]?.material_id);
+    expect(poMaterialId, `[11] 采购单 ${poId} 明细行 material_id 缺失`).toBeGreaterThan(0);
+
     // 退货入库依赖库存：以实际库存行为准（修 ctx.warehouseIds 漂移）
     const stockRow = await ensureStockInWarehouse(
       page,
-      ctx.productIds[0] || 1,
+      poMaterialId,
       ctx.warehouseIds[0],
       ctx.colorNos[0]
     );
@@ -66,7 +78,7 @@ test.describe('采购退货完整流程', () => {
     const stockBatchNo = String(stockRow.batch_no ?? '');
     await apiCall(page, 'POST', `/purchase/returns/${returnId}/items`, {
       line_no: 1,
-      material_id: Number(stockRow.product_id) || ctx.productIds[0] || 1,
+      material_id: Number(stockRow.product_id),
       quantity_returned: '10',
       unit_price: '15.50',
       color_no: stockColorNo,
