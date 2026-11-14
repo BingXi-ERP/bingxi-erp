@@ -96,14 +96,16 @@ function dateInDays(daysFromNow: number): string {
 /**
  * 功能 从零建一条已审批的打样通知单链，返回通知单主键与 selected 状态的 OK 样主键。
  * 调用方 本文件全部正向用例的链路前置（复样门要求通知单 approved 且源样 selected）。
- * 入参 page 会话页；stamp 当日用例时间戳后缀，用于单号与批号唯一化。
+ * 入参 page 会话页；stamp 当日用例时间戳后缀，用于单号与批号唯一化；
+ *       tag 调用用例的编号（如 511-01），进断言消息前缀。
  * 传给谁 返回的 requestId 与 okId 交 createResample 与各用例的回读断言。
  * 存什么 不存储，链路数据全部落库，靠 stamp 隔离不同用例与并发 worker。
  * 存哪里 lab_dip_request 与 lab_dip_sample 表。
  */
 async function createApprovedChain(
   page: Page,
-  stamp: string
+  stamp: string,
+  tag: string
 ): Promise<{ requestId: number; okId: number }> {
   const created = await apiCallRaw<Row>(page, 'POST', `${LIP}/requests`, {
     light_source: 'D65',
@@ -114,7 +116,7 @@ async function createApprovedChain(
   const requestId = Number(created.id);
   expect(
     Number.isFinite(requestId),
-    `[511 链] 建打样通知单未回主键 id，实际 ${JSON.stringify(created)}`
+    `[${tag}] 建打样通知单未回主键 id，实际 ${JSON.stringify(created)}`
   ).toBe(true);
   await apiCallRaw(page, 'POST', `${LIP}/requests/${requestId}/start-sampling`);
   const sampleOk = await apiCallRaw<Row>(page, 'POST', `${LIP}/samples`, {
@@ -131,7 +133,7 @@ async function createApprovedChain(
   const altId = Number(sampleAlt.id);
   expect(
     Number.isFinite(okId) && Number.isFinite(altId) && okId !== altId,
-    `[511 链] 两版小样应各自回主键，实际 OK=${JSON.stringify(sampleOk.id)} ALT=${JSON.stringify(sampleAlt.id)}`
+    `[${tag}] 两版小样应各自回主键，实际 OK=${JSON.stringify(sampleOk.id)} ALT=${JSON.stringify(sampleAlt.id)}`
   ).toBe(true);
   await apiCallRaw(page, 'POST', `${LIP}/samples/${okId}/matching`, {
     color_difference_grade: 4,
@@ -148,12 +150,12 @@ async function createApprovedChain(
   });
   expect(
     approved.status,
-    `[511 链] 客户确认后通知单状态应为 approved，实际 ${str(approved.status)}`
+    `[${tag}] 客户确认后通知单状态应为 approved，实际 ${str(approved.status)}`
   ).toBe('approved');
   const okRead = await apiCallRaw<Row>(page, 'GET', `${LIP}/samples/${okId}`);
   expect(
     okRead.matching_result,
-    `[511 链] 被选中 OK 样对色结果应为 selected，实际 ${str(okRead.matching_result)}`
+    `[${tag}] 被选中 OK 样对色结果应为 selected，实际 ${str(okRead.matching_result)}`
   ).toBe('selected');
   return { requestId, okId };
 }
@@ -189,7 +191,8 @@ async function createResample(
   });
 }
 
-test.describe.serial('打样复样族写面：建复样回读、详情、按单列举、录结果、发工艺卡与悬空读面', () => {
+test.describe
+  .serial('打样复样族写面：建复样回读、详情、按单列举、录结果、发工艺卡与悬空读面', () => {
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
     await ensureTestEntities(page);
@@ -197,7 +200,7 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
 
   test('511-01 建复样记录：请求体全字段落库与创建响应逐列回读', async ({ page }) => {
     const stamp = String(Date.now()).slice(-6);
-    const { requestId, okId } = await createApprovedChain(page, stamp);
+    const { requestId, okId } = await createApprovedChain(page, stamp, '511-01');
     const fabricBatch = `E2E-WIP-${stamp}-A`;
     const created = await apiCallRaw<Row>(page, 'POST', `${LIP}/resamples`, {
       request_id: requestId,
@@ -230,9 +233,7 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
       fabricBatch
     );
     expect(str(created.dye_batch_no), '[511-01] 染料批号应原样落库').toBe(`E2E-DB-${stamp}`);
-    expect(str(created.auxiliary_batch_no), '[511-01] 助剂批号应原样落库').toBe(
-      `E2E-AUX-${stamp}`
-    );
+    expect(str(created.auxiliary_batch_no), '[511-01] 助剂批号应原样落库').toBe(`E2E-AUX-${stamp}`);
     expect(str(created.adjusted_formula), '[511-01] 调整后处方应原样落库').toBe('加成 5% 冲减 1%');
     expect(
       num(created.adjustment_factor),
@@ -282,9 +283,10 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
       created.tech_card_issued_at,
       `[511-01] 开卡前开卡时间应为 NULL，实际 ${JSON.stringify(created.tech_card_issued_at)}`
     ).toBeNull();
-    expect(created.is_deleted, `[511-01] 新建行软删标记应为 false，实际 ${created.is_deleted}`).toBe(
-      false
-    );
+    expect(
+      created.is_deleted,
+      `[511-01] 新建行软删标记应为 false，实际 ${created.is_deleted}`
+    ).toBe(false);
     expect(
       created.created_by,
       `[511-01] 登记人应取服务端会话身份（handler 不收请求体身份字段），实际 ${JSON.stringify(created.created_by)}`
@@ -301,13 +303,14 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
 
   test('511-02 复样详情按主键回读与创建行逐列一致', async ({ page }) => {
     const stamp = String(Date.now()).slice(-6);
-    const { requestId, okId } = await createApprovedChain(page, stamp);
+    const { requestId, okId } = await createApprovedChain(page, stamp, '511-02');
     const created = await createResample(page, requestId, okId, stamp, 'B');
     const id = Number(created.id);
     const detail = await apiCallRaw<Row>(page, 'GET', `${LIP}/resamples/${id}`);
-    expect(Number(detail.id), `[511-02] 详情应回同一主键 ${id}，实际 ${JSON.stringify(detail.id)}`).toBe(
-      id
-    );
+    expect(
+      Number(detail.id),
+      `[511-02] 详情应回同一主键 ${id}，实际 ${JSON.stringify(detail.id)}`
+    ).toBe(id);
     expect(Number(detail.request_id), '[511-02] 详情 request_id 应与创建行一致').toBe(requestId);
     expect(Number(detail.source_sample_id), '[511-02] 详情 source_sample_id 应与创建行一致').toBe(
       okId
@@ -316,14 +319,12 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
       str(detail.resample_no),
       `[511-02] 详情单号应与创建响应一致，实际 ${str(detail.resample_no)}`
     ).toBe(str(created.resample_no));
-    expect(
-      detail.result,
-      `[511-02] 详情结果应为词表 pending，实际 ${str(detail.result)}`
-    ).toBe('pending');
-    expect(
-      str(detail.workshop_fabric_batch),
-      '[511-02] 详情车间半制品布批号应与创建行一致'
-    ).toBe(str(created.workshop_fabric_batch));
+    expect(detail.result, `[511-02] 详情结果应为词表 pending，实际 ${str(detail.result)}`).toBe(
+      'pending'
+    );
+    expect(str(detail.workshop_fabric_batch), '[511-02] 详情车间半制品布批号应与创建行一致').toBe(
+      str(created.workshop_fabric_batch)
+    );
     expect(str(detail.dye_batch_no), '[511-02] 详情染料批号应与创建行一致').toBe(
       str(created.dye_batch_no)
     );
@@ -346,7 +347,7 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
 
   test('511-03 按打样申请单列举复样：自建两行全部命中且行数恰为二', async ({ page }) => {
     const stamp = String(Date.now()).slice(-6);
-    const { requestId, okId } = await createApprovedChain(page, stamp);
+    const { requestId, okId } = await createApprovedChain(page, stamp, '511-03');
     const first = await createResample(page, requestId, okId, stamp, 'C1');
     const second = await createResample(page, requestId, okId, stamp, 'C2');
     const idFirst = Number(first.id);
@@ -355,22 +356,17 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
       Number.isFinite(idFirst) && Number.isFinite(idSecond) && idFirst !== idSecond,
       `[511-03] 两笔复样应各自回主键，实际 ${JSON.stringify(first.id)} 与 ${JSON.stringify(second.id)}`
     ).toBe(true);
-    const data = await apiCallRaw<unknown>(
-      page,
-      'GET',
-      `${LIP}/resamples/by-request/${requestId}`
-    );
+    const data = await apiCallRaw<unknown>(page, 'GET', `${LIP}/resamples/by-request/${requestId}`);
     const rows = pickListArray<Row>(data, 'bare', `[511-03] 通知单 ${requestId} 的复样列表`);
     expect(
       rows.length,
       `[511-03] 新建通知单下应恰有两笔复样（出参为裸数组），实际 ${rows.length}`
     ).toBe(2);
-    const ids = rows.map((r) => Number(r.id)).sort((a, b) => a - b);
-    expect(
-      ids,
-      `[511-03] 两笔复样主键都应在列表中，实际 ${JSON.stringify(ids)}`
-    ).toEqual([idFirst, idSecond].sort((a, b) => a - b));
-    const batches = rows.map((r) => str(r.workshop_fabric_batch)).sort();
+    const ids = rows.map(r => Number(r.id)).sort((a, b) => a - b);
+    expect(ids, `[511-03] 两笔复样主键都应在列表中，实际 ${JSON.stringify(ids)}`).toEqual(
+      [idFirst, idSecond].sort((a, b) => a - b)
+    );
+    const batches = rows.map(r => str(r.workshop_fabric_batch)).sort();
     expect(
       batches,
       `[511-03] 两笔复样的车间半制品布批号都应原样在列，实际 ${JSON.stringify(batches)}`
@@ -390,19 +386,14 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
 
   test('511-04 录复样结果：色差 4 级判 passed 且复核三列与色差两列落库', async ({ page }) => {
     const stamp = String(Date.now()).slice(-6);
-    const { requestId, okId } = await createApprovedChain(page, stamp);
+    const { requestId, okId } = await createApprovedChain(page, stamp, '511-04');
     const created = await createResample(page, requestId, okId, stamp, 'D');
     const id = Number(created.id);
-    const recorded = await apiCallRaw<Row>(
-      page,
-      'POST',
-      `${LIP}/resamples/${id}/result`,
-      {
-        color_difference_grade: 4,
-        color_difference_value: '0.85',
-        review_comment: '达判定线可投产',
-      }
-    );
+    const recorded = await apiCallRaw<Row>(page, 'POST', `${LIP}/resamples/${id}/result`, {
+      color_difference_grade: 4,
+      color_difference_value: '0.85',
+      review_comment: '达判定线可投产',
+    });
     expect(
       recorded.result,
       `[511-04] 色差 4 级应判 passed（判定线上，resample.rs 判定线取 4），实际 ${str(recorded.result)}`
@@ -443,7 +434,7 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
 
   test('511-05 发染色技术卡：passed 复样开卡成功且卡号与开卡人时间落库', async ({ page }) => {
     const stamp = String(Date.now()).slice(-6);
-    const { requestId, okId } = await createApprovedChain(page, stamp);
+    const { requestId, okId } = await createApprovedChain(page, stamp, '511-05');
     const created = await createResample(page, requestId, okId, stamp, 'E');
     const id = Number(created.id);
     await apiCallRaw<Row>(page, 'POST', `${LIP}/resamples/${id}/result`, {
@@ -469,10 +460,9 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
       isRealTimestamp(card.tech_card_issued_at),
       `[511-05] 开卡时间应落库为可解析时间串，实际 ${JSON.stringify(card.tech_card_issued_at)}`
     ).toBe(true);
-    expect(
-      card.result,
-      `[511-05] 开卡不改复样结果，仍应为 passed，实际 ${str(card.result)}`
-    ).toBe('passed');
+    expect(card.result, `[511-05] 开卡不改复样结果，仍应为 passed，实际 ${str(card.result)}`).toBe(
+      'passed'
+    );
     // 独立详情口回读技术卡三列
     const readBack = await apiCallRaw<Row>(page, 'GET', `${LIP}/resamples/${id}`);
     expect(str(readBack.tech_card_no), '[511-05] 详情回读卡号应与开卡响应一致').toBe(techCardNo);
@@ -499,11 +489,7 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
   });
 
   test('511-07 悬空申请单列举复样回空数组不报错', async ({ page }) => {
-    const data = await apiCallRaw<unknown>(
-      page,
-      'GET',
-      `${LIP}/resamples/by-request/99999999`
-    );
+    const data = await apiCallRaw<unknown>(page, 'GET', `${LIP}/resamples/by-request/99999999`);
     const rows = pickListArray<Row>(data, 'bare', '[511-07] 悬空申请单的复样列表');
     expect(
       rows.length,
@@ -513,19 +499,14 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
 
   test('511-08 录复样结果：色差 3 级低于判定线判 failed 且详情回读一致', async ({ page }) => {
     const stamp = String(Date.now()).slice(-6);
-    const { requestId, okId } = await createApprovedChain(page, stamp);
+    const { requestId, okId } = await createApprovedChain(page, stamp, '511-08');
     const created = await createResample(page, requestId, okId, stamp, 'H');
     const id = Number(created.id);
-    const recorded = await apiCallRaw<Row>(
-      page,
-      'POST',
-      `${LIP}/resamples/${id}/result`,
-      {
-        color_difference_grade: 3,
-        color_difference_value: '4.80',
-        review_comment: '低于判定线不可投产',
-      }
-    );
+    const recorded = await apiCallRaw<Row>(page, 'POST', `${LIP}/resamples/${id}/result`, {
+      color_difference_grade: 3,
+      color_difference_value: '4.80',
+      review_comment: '低于判定线不可投产',
+    });
     expect(
       recorded.result,
       `[511-08] 色差 3 级应判 failed（低于判定线 4），实际 ${str(recorded.result)}`
@@ -547,11 +528,7 @@ test.describe.serial('打样复样族写面：建复样回读、详情、按单�
       `[511-08] 复样失败应把源样复样状态联动为 failed，实际 ${str(okRead.resample_status)}`
     ).toBe('failed');
     // failed 复样不可开技术卡（仅 passed 可开，resample.rs issue_tech_card 门）
-    const cardOnFailed = await apiCallExpectFail(
-      page,
-      'POST',
-      `${LIP}/resamples/${id}/tech-card`
-    );
+    const cardOnFailed = await apiCallExpectFail(page, 'POST', `${LIP}/resamples/${id}/tech-card`);
     expect(
       cardOnFailed.status,
       `[511-08] failed 复样开卡应被业务门拒为 400，实际 ${cardOnFailed.status}`
