@@ -2,7 +2,7 @@
 
 本文档提供了 Bingxi Management Platform 系统的完整技术文档，包括系统架构、接口规范、开发指南和核心概念。文档面向开发人员、系统管理员和运维工程师。
 
-**项目状态**：V15 P1 修复阶段 — P0 17/17 完成 + P1 已合并 11 批到 main（2026-07-28）
+**项目状态**：E2E 补测专项维护态 — 目标四 4.1-4.13 逐条实量全部闭合（2026-11-14），606 枚零引用底数经批一至批十七消化，补测选题进入"先实量再立题"阶段；功能面缺陷登记与结案随缺陷台账分册（backend-defect-register 系列）滚动。
 
 **快速链接**: [架构](./ARCHITECTURE.md) | [接口](./INTERFACES.md) | [开发者指南](./DEVELOPER_GUIDE.md) | [安全](./SECURITY.md) | [健康报告](./PROJECT_HEALTH_REPORT.md)
 
