@@ -693,7 +693,7 @@ impl RolePermissionService {
                 "iam".to_string()
             }
             // 目录模块
-            "products" | "categories" | "warehouses" | "boms" => "catalog".to_string(),
+            "products" | "categories" | "warehouses" => "catalog".to_string(),
             // 销售模块
             "orders" | "fabric-orders" | "customers" | "customer-credits" | "sales-contracts"
             | "sales-prices" | "sales-returns" | "quotations" => "sales".to_string(),
@@ -719,7 +719,6 @@ impl RolePermissionService {
             | "outsourcing-orders"
             | "outsourcing-receipts"
             | "outsourcing-vouchers"
-            | "mrp"
             | "capacity"
             | "scheduling" => "production".to_string(),
             // 质量模块
@@ -1235,5 +1234,53 @@ impl RolePermissionService {
             // 默认拒绝
             Ok(false)
         }
+    }
+
+    /// 检查权限（通配感知）
+    ///
+    /// 功能：判定角色是否持有某资源与动作的授权，授权行的 resource_type 或 action
+    /// 写作 `*` 时视为覆盖任意具体值。
+    /// 调用方：色卡发放面 handler 内的第二道权限门（require_issue_permission 与
+    /// can_view_cost_amount）。
+    /// 入参：角色 id、资源类型、动作；不接收 resource_id 维度，只按角色级授权判定。
+    /// 传给谁：结果以布尔值交调用方决定放行或拒绝，本方法不产出错误文案。
+    /// 存什么：只读 role_permissions 表的 role_id、resource_type、action、allowed 四列。
+    /// 存哪里：不写库。
+    ///
+    /// 为什么不改 `check_permission` 本体而是并存：`check_permission` 是精确匹配，
+    /// `("erp","cross_owner_write")` 一类代操作键依赖"授权行与请求键逐字符相同才算命中"
+    /// 的语义，把它改成通配匹配等于给所有持 `resource:*` 的岗位发代操作权。
+    /// 本方法的通配口径与权限中间件的 `matches_permission` 对齐（middleware/permission.rs），
+    /// 让同一 URL 面在两道门上同键同语义。
+    /// 命中判定取「任一 allowed 为真的授权行即放行」：通配行与精确行同时在场时，
+    /// 逐字符相同的那行必然也在集合内，因此该口径与中间件「只加载 allowed 为真的行再逐个
+    /// 匹配」的结果一致，且不像「取第一条」那样把结论交给数据库返回次序。
+    pub async fn check_role_action_covering_wildcard(
+        &self,
+        role_id: i32,
+        resource_type: &str,
+        action: &str,
+    ) -> Result<bool, AppError> {
+        // Admin 角色绕过所有权限检查（与 check_permission 同一短路口径）
+        if self.is_admin_role(role_id).await? {
+            return Ok(true);
+        }
+
+        let permissions = RolePermissionEntity::find()
+            .filter(role_permission::Column::RoleId.eq(role_id))
+            .filter(
+                role_permission::Column::ResourceType
+                    .eq(resource_type)
+                    .or(role_permission::Column::ResourceType.eq("*")),
+            )
+            .filter(
+                role_permission::Column::Action
+                    .eq(action)
+                    .or(role_permission::Column::Action.eq("*")),
+            )
+            .all(&*self.db)
+            .await?;
+
+        Ok(permissions.into_iter().any(|perm| perm.allowed))
     }
 }

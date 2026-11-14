@@ -5,11 +5,11 @@
 use bingxi_backend::handlers::print_handler::*;
 use std::collections::HashSet;
 
-/// test_builtin_print_templatesfh6gmb；验证内置打印模板数量为 6（对应 6 种单据类型）
+/// test_builtin_print_templatesfh6gmb；验证内置打印模板数量为 63（对应 63 种单据类型）
 #[test]
 fn test_builtin_print_templatesfh6gmb() {
     let templates = builtin_print_templates();
-    assert_eq!(templates.len(), 64, "应有 64 个内置打印模板");
+    assert_eq!(templates.len(), 63, "应有 63 个内置打印模板");
 }
 
 /// test_builtin_print_templates_idwyqlx；验证所有模板的 id 为 1-N，唯一且连续

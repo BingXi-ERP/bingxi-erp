@@ -34,8 +34,6 @@ pub mod indices {
     pub const COLOR_CARDS: &str = "color_cards";
     /// 色号价格索引
     pub const COLOR_PRICES: &str = "color_prices";
-    /// BOM 索引
-    pub const BOMS: &str = "boms";
     /// 定制订单索引
     pub const CUSTOM_ORDERS: &str = "custom_orders";
     /// 财务凭证索引
@@ -65,7 +63,6 @@ pub mod indices {
         DYE_RECIPES,
         COLOR_CARDS,
         COLOR_PRICES,
-        BOMS,
         CUSTOM_ORDERS,
         VOUCHERS,
         AR_INVOICES,
@@ -91,7 +88,6 @@ pub enum DocType {
     DyeRecipe,
     ColorCard,
     ColorPrice,
-    Bom,
     CustomOrder,
     Voucher,
     ArInvoice,

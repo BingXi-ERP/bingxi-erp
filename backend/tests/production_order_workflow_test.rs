@@ -214,9 +214,7 @@ async fn test_productionorderservice_approve_order_kdbfherr() {
 /// = 本轮 CI 红因原文）→ `validate_work_center_exists`（:76-88，work_centers 空表
 /// ⇒ ValidationError("工作中心ID 1 不存在")），故必须种 **products(1) 与
 /// work_centers(1)** 两父行。列形态按真表 DDL：products(code/name NOT NULL，
-/// 范式同 contract_wave5_receipt_return_three_state_test.rs:154）、
-/// work_centers(code UNIQUE NOT NULL / name NOT NULL，
-/// migration/src/domain/business/m0007_add_mrp_production_bom.rs:56-66）。
+/// 范式同 contract_wave5_receipt_return_three_state_test.rs:154）、work_centers(code UNIQUE NOT NULL / name NOT NULL）。
 /// 走 `setup_test_db()`（已迁移 PG + TRUNCATE + RESTART IDENTITY）使显式 id=1 与
 /// `sample_create_request()` 的引用恒对齐；ignored lane `--test-threads=1` 串行，
 /// 无同库竞态。
@@ -241,15 +239,55 @@ async fn test_productionorderservice_approve_order_kdbfherr() {
 /// `true` 命中判据；`is_default`/`is_deleted`/`created_at`/`updated_at` 均有库默认值，
 /// 无需显式给。该仓供成品入库联动使用，取成品仓词值 `warehouse_type='finished'`
 /// （表无 CHECK 约束，且完工链路不按仓库类型过滤，此值仅为语义标注）。
+///
+/// 完工扣料的取数口径与本用例的新增前置：完工时从该生产订单名下**全部流转卡**的
+/// 投纱明细行逐行扣减纱线库存，投纱为空显式拒绝完工（判据读函数体
+/// `production_order_ops/completion.rs` 的 `deduct_raw_materials_txn` →
+/// `flow_card_material_service::collect_for_order`），故开工之后、完工之前必须补
+/// 四张前置行：
+/// - `products(2)`：纱线产品行，投纱行 material_id 的回指目标。扣料侧 `load_yarn_codes`
+///   只按 material_id 回 products.code 取纱线编号，**不判 product_type**；产品类型权威
+///   词表（`models/status/general.rs` product_type：坯布/成品布/辅料，本列无 DB CHECK）
+///   没有纱线档，纱线属"非面料物料"，取词表内既有值 `辅料`。
+/// - `production_flow_card(1)`：挂在测试订单名下（production_order_id=订单 id）。
+///   NOT NULL 无默认列（建表见 migration v15 域该表 DDL）逐列显式给值：card_no、
+///   barcode、production_order_id、current_step_seq、status、priority、is_deleted、
+///   created_at、updated_at；status 取流转卡词表小写值 `preparing`
+///   （`models/status/production.rs` flow_card::PREPARING，扣料链路不读该列）。
+/// - `flow_card_materials(1)`：投纱行，四维（batch_no/color_no/grade 与两侧皆 NULL 的
+///   dye_lot_no）与纱线库存行逐字符同构——投纱行未登记缸号时，`take_stock_row` 要求
+///   该定位键下只剩唯一一行；unit 取受控两值 `kg`（DDL CHECK chk_flow_card_materials_unit），
+///   quantity=100 即本次被扣掉的公斤数。
+/// - `inventory_stocks` 纱线库存行：扣料定位键 = 仓库 × 纱线 × 批次 × 色号 × 等级
+///   （completion.rs 的 YarnStockLocator），五列必须与投纱行完全一致；公斤列 500 够扣
+///   100，米数列 1200 供等比核算（`calculate_deduct_qty`：unit=kg 扣 quantity_kg，
+///   quantity_meters 按被命中行自身米公斤比值等比随行）。库存装载走
+///   `InventoryStockEntity::find().all()` 整行解码，inventory_stock::Model 的全部非
+///   Option 列必须非 NULL，故 quantity_on_hand/quantity_available/quantity_reserved/
+///   quantity_incoming/quantity_shipped/reorder_point/max_stock_point/reorder_quantity/
+///   batch_no/color_no/grade/quantity_meters/quantity_kg/stock_status/quality_status/
+///   version/replenishment_strategy 逐列显式给值；状态两列取中文权威词值
+///   `正常`/`合格`（status_vocab_check 对这两列施加了 CHECK）。**主键 id 不显式给**，
+///   让 SERIAL 前进：成品入库腿随后经 `create_stock_fabric_txn` 插入新行，显式 id
+///   会与之撞主键。
+/// 完工断言之后按同一定位键回读该库存行，钉真实扣减：quantity_kg 恰为 500-100=400，
+/// quantity_meters 恰为 1200×400/500=960——只断状态翻转不能证明扣料发生。
 #[tokio::test]
-#[ignore = "需要 PostgreSQL 测试数据库 + 前置产品/工作中心/可用仓库数据"]
+#[ignore = "需要 PostgreSQL 测试数据库 + 前置产品/工作中心/可用仓库/BPM 定义/流转卡投纱与纱线库存数据"]
 async fn test_scddqlc_cjdwc() {
     let db = setup_test_db().await;
+    // 完工扣料造数与库存回读需要在 svc 拿连接之后继续用同一夹具连接，先包 Arc
+    let db = Arc::new(db);
     for (sql, what) in [
         (
             "INSERT INTO products (id, code, name, unit, status, product_type) VALUES \
              (1, 'PT-WF-P1', '生产全流程测试面料', '米', 'active', '成品布')",
             "products 父行",
+        ),
+        (
+            "INSERT INTO products (id, code, name, unit, status, product_type) VALUES \
+             (2, 'PT-WF-Y1', '生产全流程测试纱线', 'kg', 'active', '辅料')",
+            "products 纱线行（投纱行 material_id 回指目标；扣料侧只按 id 回 code，不判 product_type）",
         ),
         (
             "INSERT INTO work_centers (id, code, name) VALUES \
@@ -282,7 +320,7 @@ async fn test_scddqlc_cjdwc() {
         .await
         .unwrap_or_else(|e| panic!("种子 {what} 写入失败: {e}\nSQL: {sql}"));
     }
-    let svc = ProductionOrderService::new(Arc::new(db));
+    let svc = ProductionOrderService::new(Arc::clone(&db));
 
     // 1. 创建（DRAFT）
     let req = sample_create_request();
@@ -321,6 +359,46 @@ async fn test_scddqlc_cjdwc() {
         .expect("开工失败");
     assert_eq!(order.status, production::PRODUCTION_IN_PROGRESS);
 
+    // 完工扣料前置造数：一张挂在订单名下的流转卡 + 一条投纱行 + 一条够扣的纱线库存行。
+    // 库存行不显式给 id（SERIAL 前进，成品入库腿随后 insert 新行不撞主键）；
+    // 投纱行与库存行的定位五元组（仓库/纱线/批次/色号/等级）逐字符一致，缸号两侧皆 NULL。
+    db.execute_raw(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "INSERT INTO production_flow_card (id, card_no, barcode, production_order_id, \
+         current_step_seq, status, priority, is_deleted, created_at, updated_at) \
+         VALUES (1, 'FC-WF-001', 'BC-WF-001', $1, 1, 'preparing', 1, false, NOW(), NOW())",
+        vec![order.id.into()],
+    ))
+    .await
+    .unwrap_or_else(|e| panic!("种子 production_flow_card 卡行写入失败: {e}"));
+    db.execute_raw(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "INSERT INTO flow_card_materials (id, flow_card_id, warehouse_id, material_id, \
+         batch_no, color_no, grade, quantity, unit, is_deleted) \
+         VALUES (1, 1, 1, 2, 'YB-2601', 'YCN-01', '一等品', 100, 'kg', false)",
+        Vec::<sea_orm::Value>::new(),
+    ))
+    .await
+    .unwrap_or_else(|e| panic!("种子 flow_card_materials 投纱行写入失败: {e}"));
+    db.execute_raw(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "INSERT INTO inventory_stocks (warehouse_id, product_id, \
+         batch_no, color_no, grade, \
+         quantity_meters, quantity_kg, quantity_on_hand, quantity_available, \
+         quantity_reserved, quantity_incoming, quantity_shipped, \
+         reorder_point, max_stock_point, reorder_quantity, \
+         stock_status, quality_status, version, replenishment_strategy) \
+         VALUES (1, 2, \
+         'YB-2601', 'YCN-01', '一等品', \
+         1200, 500, 1200, 1200, \
+         0, 0, 0, \
+         0, 0, 0, \
+         '正常', '合格', 0, 'reorder_point')",
+        Vec::<sea_orm::Value>::new(),
+    ))
+    .await
+    .unwrap_or_else(|e| panic!("种子 inventory_stocks 纱线库存行写入失败: {e}"));
+
     // 6. 完工（IN_PROGRESS → COMPLETED，需 actual_quantity）
     let order = svc
         .update_status(
@@ -331,4 +409,35 @@ async fn test_scddqlc_cjdwc() {
         .await
         .expect("完工失败");
     assert_eq!(order.status, common::STATUS_COMPLETED);
+
+    // 7. 扣料回读：按定位键读回纱线库存行，钉扣减真实发生——unit='kg' 的投纱 100
+    //    扣公斤列 500-100=400；米数列按被命中行自身米公斤比值等比随行
+    //    1200×400/500=960（completion.rs calculate_deduct_qty 的 round_dp(4) 整值）。
+    let stock_row = db
+        .query_one_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT quantity_kg, quantity_meters FROM inventory_stocks \
+              WHERE product_id = 2 AND warehouse_id = 1 AND batch_no = 'YB-2601' \
+                AND color_no = 'YCN-01' AND grade = '一等品'",
+            Vec::<sea_orm::Value>::new(),
+        ))
+        .await
+        .expect("回读纱线库存行失败")
+        .expect("完工扣料按定位键必须命中纱线库存行（扣料不删行）");
+    let quantity_kg: Decimal = stock_row
+        .try_get::<Decimal>("", "quantity_kg")
+        .expect("读取 quantity_kg 失败");
+    let quantity_meters: Decimal = stock_row
+        .try_get::<Decimal>("", "quantity_meters")
+        .expect("读取 quantity_meters 失败");
+    assert_eq!(
+        quantity_kg,
+        Decimal::new(400, 0),
+        "公斤列必须恰好扣掉投纱量 100（500 - 100）"
+    );
+    assert_eq!(
+        quantity_meters,
+        Decimal::new(960, 0),
+        "米数列必须按被命中行自身米公斤比值等比随行（1200 × 400 / 500）"
+    );
 }

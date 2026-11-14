@@ -204,13 +204,13 @@ async fn get_json(app: &Router, uri: &str) -> (StatusCode, Value) {
 }
 
 /// 列表可见集锚点：`data.total` + 公司名集合（services/crm/lead.rs 出参
-/// `{data:[...],total,page,page_size}`，handler 用 list/data 双键兼容取列表）
+/// PaginatedResponse `{items,total,page,page_size}`，列表数组只在 items 键）
 async fn list_visible(app: &Router) -> (u64, Vec<String>) {
     let (status, v) = get_json(app, "/erp/crm/leads?page=1&page_size=100").await;
     assert_eq!(status, StatusCode::OK, "列表 200 契约: {v}");
-    let items = v["data"]["data"]
+    let items = v["data"]["items"]
         .as_array()
-        .unwrap_or_else(|| panic!("分页列表形状漂移（期望 data.data 数组）: {v}"));
+        .unwrap_or_else(|| panic!("分页列表形状漂移（期望 data.items 数组）: {v}"));
     let names = items
         .iter()
         .map(|i| i["company_name"].as_str().unwrap_or_default().to_string())

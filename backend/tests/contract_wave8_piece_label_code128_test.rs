@@ -236,7 +236,6 @@ async fn seed_piece(db: &Arc<sea_orm::DatabaseConnection>, s: PieceSeed) {
         gram_weight: Set(Some(dec("200.00"))),
         weight: Set(Some(dec("21.50"))),
         quality_status: Set(Some("合格".to_string())),
-        inventory_status: Set(Some("available".to_string())),
         barcode: Set(s.barcode.map(|b| b.to_string())),
         warehouse_in_at: Set(Some(now())),
         supplier_piece_no: Set(Some("SUP-SECRET-W221".to_string())),

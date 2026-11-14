@@ -56,10 +56,12 @@ fn test_build_active_model_without_ctx() {
 #[test]
 fn test_build_active_model_with_ctx() {
     let event = AuditEvent::new(OperationType::Login, "auth");
+    // 其余定位维度按 empty() 缺省（终端 UNKNOWN 与其余 None），本用例只锁 request_id 与 ip
     let ctx = AuditContext {
         request_id: "req-123".to_string(),
         ip_address: "192.168.1.1".to_string(),
         user_agent: "Mozilla/5.0".to_string(),
+        ..AuditContext::empty()
     };
     let model = build_active_model(&event, Some(&ctx));
     if let ActiveValue::Set(rid) = model.request_id {
@@ -71,6 +73,49 @@ fn test_build_active_model_with_ctx() {
         assert_eq!(ip, Some("192.168.1.1".to_string()));
     } else {
         panic!("ip_address 应为 Set");
+    }
+}
+
+/// 写入单点把会话角色码原样传给 ActiveModel：上下文带角色码时该列必须是 Set(Some(码))，
+/// 不带时必须是 Set(None)——落 NULL 而不是空串或任何占位角色，缺值不许冒充有值。
+#[test]
+fn test_build_active_model_carries_session_role_code_or_leaves_null() {
+    let event = AuditEvent::new(OperationType::Update, "order");
+
+    let with_role = AuditContext {
+        role_code: Some("finance".to_string()),
+        ..AuditContext::empty()
+    };
+    let model_with_role = build_active_model(&event, Some(&with_role));
+    if let ActiveValue::Set(code) = model_with_role.role_code {
+        assert_eq!(
+            code.as_deref(),
+            Some("finance"),
+            "上下文带会话角色码时写入单点必须原样落该码"
+        );
+    } else {
+        panic!("role_code 应为 Set");
+    }
+
+    let without_role = AuditContext::empty();
+    let model_without_role = build_active_model(&event, Some(&without_role));
+    if let ActiveValue::Set(code) = model_without_role.role_code {
+        assert!(
+            code.is_none(),
+            "上下文无角色码时该列必须落 NULL，不得兜底成空串或占位角色，实际 {code:?}"
+        );
+    } else {
+        panic!("role_code 应为 Set");
+    }
+
+    let model_no_ctx = build_active_model(&event, None);
+    if let ActiveValue::Set(code) = model_no_ctx.role_code {
+        assert!(
+            code.is_none(),
+            "完全没有上下文时该列同样落 NULL，实际 {code:?}"
+        );
+    } else {
+        panic!("role_code 应为 Set");
     }
 }
 

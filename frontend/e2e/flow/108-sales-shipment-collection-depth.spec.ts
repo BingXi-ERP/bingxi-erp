@@ -35,6 +35,7 @@
 // 属未修复缺陷，已另行登记跟进。本用例对发货单只断数量维与状态维，
 // 金额同源断言走应收发票与订单头 total_amount 这条链路，不拿缺陷列凑断言。
 import { test, expect } from '../diagnose-fixture';
+import JSZip from 'jszip';
 import {
   loginViaUI,
   ensureTestEntities,
@@ -45,6 +46,8 @@ import {
   seedGreigeStockIn,
   failureCode,
   APP_ERROR_CODES,
+  API_BASE,
+  API_PREFIX,
 } from './helpers';
 import { pickListArray } from './ui-helpers';
 
@@ -811,4 +814,170 @@ test.describe('销售发货到收款深度链路', () => {
     );
     expectStatusChar(paymentReadBack.status, 'pending', '核销完成后的收款单状态');
   });
+
+  test('发货单打印件按档案名称出栏，主键不外显，同一单据两次渲染栏次逐字符一致', async ({
+    page,
+  }) => {
+    const ctx = getCtx();
+    const productId = ctx.productIds[0];
+    const warehouseId = ctx.warehouseIds[0];
+    const customerId = ctx.customerId;
+    expect(productId, '前置产品缺失').toBeTruthy();
+    expect(warehouseId, '前置仓库缺失').toBeTruthy();
+    expect(customerId, '前置客户缺失').toBeTruthy();
+
+    const chain = await runShipChain(page, {
+      productId: productId!,
+      customerId: customerId!,
+      warehouseId: warehouseId!,
+      orderQty: 30,
+      shipQty: 30,
+      unitPrice: 18.75,
+    });
+
+    const deliveries = await readDeliveries(page, chain.orderId);
+    expect(deliveries.length, `动作发货应只生成一张发货单，实际 ${deliveries.length} 张`).toBe(1);
+    const delivery = deliveries[0]!;
+    const deliveryId = readNumber(delivery, 'id', '发货单主键');
+    const deliveryNo = readText(delivery, 'delivery_no', '发货单号');
+
+    // 打印件里应当出现的事实值从档案侧读回，与打印装配分属两条读路径，比对才有判别力
+    const customer = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/crm/customers/${customerId}`
+    );
+    const product = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/products/${productId}`);
+    const customerName = readText(customer, 'customer_name', '客户档案');
+    const productName = readText(product, 'name', '产品档案');
+    const productCode = readText(product, 'code', '产品档案编号');
+    const productUnit = readText(product, 'unit', '产品档案计量单位');
+
+    const firstText = await fetchDeliveryPrintText(page, chain.orderId, deliveryId);
+    const secondText = await fetchDeliveryPrintText(page, chain.orderId, deliveryId);
+
+    const mainLabels = [
+      '单号',
+      '送货日期',
+      '客户名称',
+      '送货地址',
+      '发货仓库',
+      '来源销售订单号',
+      '状态',
+      '总数量',
+      '总金额(元)',
+      '制单人',
+      '备注',
+    ];
+    for (const label of mainLabels) {
+      expect(firstText, `打印正文应出现主表栏名 ${label}`).toContain(label);
+    }
+
+    const itemLabels = [
+      '品名',
+      '编号',
+      '规格',
+      '计量单位',
+      '批次',
+      '色号',
+      '颜色',
+      '缸号',
+      '卷号',
+      '单价(元)',
+      '金额(元)',
+    ];
+    for (const label of itemLabels) {
+      expect(firstText, `打印正文应出现明细栏名 ${label}`).toContain(label);
+    }
+
+    // 明细的 数量 列与主表的 总数量 是两个栏位，只出现一次说明明细表没出栏
+    const quantityHits = firstText.split('数量').length - 1;
+    expect(quantityHits, '明细列名 数量 应与主表栏名 总数量 同时出现').toBeGreaterThanOrEqual(2);
+
+    for (const fact of [
+      { label: '发货单号', value: deliveryNo },
+      { label: '来源销售订单号', value: chain.orderNo },
+      { label: '客户名称', value: customerName },
+      { label: '品名', value: productName },
+      { label: '编号', value: productCode },
+      { label: '计量单位', value: productUnit },
+    ]) {
+      expect(firstText, `打印正文应出现${fact.label}的档案实际值 ${fact.value}`).toContain(
+        fact.value
+      );
+    }
+
+    // 动作发货的发货单状态小写 shipped，打印件不得改写词表取值
+    expect(firstText, '打印正文应出现发货单状态原值 shipped').toContain('shipped');
+
+    const bareKeys = [
+      'customer_id',
+      'product_id',
+      'warehouse_id',
+      'order_id',
+      'created_by',
+      'delivery_no',
+      'batch_no',
+      'color_no',
+      'dye_lot_no',
+      'unit_price',
+      'total_quantity',
+      'total_amount',
+    ];
+    for (const key of bareKeys) {
+      const leaked = firstText.includes(key);
+      expect(
+        leaked,
+        `打印正文不应出现裸字段名 ${key}，栏名应取档案名称口径出栏`
+      ).toBe(false);
+    }
+
+    const identical = secondText === firstText;
+    expect(
+      identical,
+      '同一发货单两次打印的正文应逐字符一致（栏次不得随 HashMap 迭代次序漂移）'
+    ).toBe(true);
+  });
 });
+
+/** 读回响应里的一个文本键，键缺席或非字符串直接抛错，不用空串掩盖缺键。 */
+function readText(obj: Record<string, unknown>, key: string, label: string): string {
+  if (!Object.prototype.hasOwnProperty.call(obj, key)) {
+    throw new Error(`${label} 响应缺少后端真实键 ${key}，实际键=${Object.keys(obj).join(',')}`);
+  }
+  const value = obj[key];
+  if (typeof value !== 'string') {
+    throw new Error(`${label} 键 ${key} 不是字符串，raw=${String(value)}`);
+  }
+  return value;
+}
+
+/**
+ * 取发货单打印件的正文纯文本。二进制端点不走 JSON 助手（会把字节当文本解，假红），
+ * docx 按 zip 容器校验后解 word/document.xml，剥标签得正文。
+ */
+async function fetchDeliveryPrintText(
+  page: import('@playwright/test').Page,
+  orderId: number,
+  deliveryId: number
+): Promise<string> {
+  const url = `${API_BASE}${API_PREFIX}/sales/orders/${orderId}/deliveries/${deliveryId}/print`;
+  const resp = await page.request.get(url);
+  const status = resp.status();
+  console.log(`[108-print] GET /sales/orders/${orderId}/deliveries/${deliveryId}/print → ${status}`);
+  expect(status, `有效发货单 ${deliveryId} 打印应 200，实际 ${status}`).toBe(200);
+  const body = await resp.body();
+  expect(body.length, `打印 docx 应为非空二进制容器（>1KB），实际 ${body.length}B`).toBeGreaterThan(
+    1024
+  );
+  expect(body[0], 'docx 应为 zip 容器（PK magic [0]）').toBe(0x50);
+  expect(body[1], 'docx 应为 zip 容器（PK magic [1]）').toBe(0x4b);
+  const zip = await JSZip.loadAsync(body);
+  const docXml = await zip.file('word/document.xml')?.async('string');
+  if (!docXml) {
+    throw new Error(
+      `打印件缺少 word/document.xml，实际 zip 条目=${Object.keys(zip.files).join(',')}`
+    );
+  }
+  return docXml.replace(/<[^>]+>/g, '');
+}

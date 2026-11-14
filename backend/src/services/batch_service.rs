@@ -98,6 +98,10 @@ pub struct BatchUpdateProductRequest {
     pub cost_price: Option<String>,
     pub description: Option<String>,
     pub status: Option<String>,
+    // 克重（g/m²，DECIMAL(10,2) 列），三态部分更新。键缺席保持原值、显式 null 清空为
+    // NULL、有值覆盖；语义与校验同单条更新链路（值必须大于 0），清空不取旧值兜底。
+    #[serde(default, deserialize_with = "double_option")]
+    pub gram_weight: Option<Option<rust_decimal::Decimal>>,
     // 每匹米数换算元数据，三态部分更新。键缺席保持原值、显式 null 清空为 NULL、
     // 有值覆盖（一卷即一匹，按卷换算共用此列；与单条更新链路同一语义，
     // 清空走显式置空，不取旧值兜底）。
@@ -388,11 +392,13 @@ impl BatchService {
                 match product_map.get(&req.id).cloned() {
                     Some(product_model) => {
                         let product: product::ActiveModel = product_model.into();
-                        let product = Self::apply_incremental_updates(product, req);
-                        product
-                            .update(&txn)
-                            .await
-                            .map_err(|e| (e.to_string(), false))
+                        match Self::apply_incremental_updates(product, req) {
+                            Ok(product) => product
+                                .update(&txn)
+                                .await
+                                .map_err(|e| (e.to_string(), false)),
+                            Err(e) => Err((e.public_message(), false)),
+                        }
                     }
                     None => Err((format!("产品 ID {} 不存在", req.id), true)),
                 };
@@ -455,7 +461,7 @@ impl BatchService {
     fn apply_incremental_updates(
         mut product: product::ActiveModel,
         req: &BatchUpdateProductRequest,
-    ) -> product::ActiveModel {
+    ) -> Result<product::ActiveModel, AppError> {
         // 增量更新
         if let Some(name) = &req.name {
             product.name = Set(name.clone());
@@ -488,6 +494,16 @@ impl BatchService {
         if let Some(status) = &req.status {
             product.status = Set(status.clone());
         }
+        // 克重三态落库：键缺席保持原值、显式 null 清空为 NULL、有值覆盖。
+        // 值域校验与单条更新链路同一文案（必须大于 0），拒绝即该行计入 failed。
+        if let Some(gw) = req.gram_weight {
+            if gw.is_some_and(|g| g <= rust_decimal::Decimal::ZERO) {
+                return Err(AppError::validation_displayable(
+                    "克重（单位 g/m²）必须大于 0",
+                ));
+            }
+            product.gram_weight = Set(gw);
+        }
         // 每匹米数按三态落库（一卷即一匹，按卷换算共用此列）。
         // 外层 None 即键缺席、保持原值。外层 Some 时内层值原样 Set，内层 None 清空为 NULL，
         // 内层 Some(v) 覆盖为该值。与单条更新链路同一判据，清空不取旧值兜底。
@@ -495,7 +511,7 @@ impl BatchService {
             product.meters_per_piece = Set(piece);
         }
         product.updated_at = Set(chrono::Utc::now());
-        product
+        Ok(product)
     }
 
     /// 构建批量更新失败回滚上下文（批次 488 D08-1 拆分：复用两种失败场景（更新失败/产品不存在），；is_not_found=true 使用"已回滚-产品不存在"描述，否则使用"已回滚"描述。）

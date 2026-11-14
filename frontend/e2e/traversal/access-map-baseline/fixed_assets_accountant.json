@@ -1,7 +1,8 @@
 {
   "role": "fixed_assets_accountant",
   "reachableRoutes": [
-    "/dashboard"
+    "/dashboard",
+    "/notification"
   ],
   "provenance": "ci-mirrored"
 }

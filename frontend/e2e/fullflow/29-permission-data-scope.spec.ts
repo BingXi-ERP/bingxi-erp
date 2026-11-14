@@ -151,13 +151,13 @@ async function seedLeadAsAdmin(page: Page, tag: string): Promise<number> {
   return id;
 }
 
-/** 读 /crm/leads 的 data 数组（形状：lead.rs:163-168 手搓 {data,total,page,page_size}） */
+/** 读 /crm/leads 的 items 数组（形状：PaginatedResponse{items,total,page,page_size}） */
 async function listLeadsRaw(
   page: Page,
   params = '?page=1&page_size=100'
 ): Promise<Record<string, unknown>[]> {
   const res = await apiCallRaw<unknown>(page, 'GET', `/crm/leads${params}`);
-  return pickListArray<Record<string, unknown>>(res, 'data', 'F29 /crm/leads 列表');
+  return pickListArray<Record<string, unknown>>(res, 'items', 'F29 /crm/leads 列表');
 }
 
 test.describe('29 权限键与数据范围契约链', () => {

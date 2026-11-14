@@ -44,6 +44,7 @@ import {
   apiCall,
   apiCallRaw,
   apiCallExpectFail,
+  baseAdminPassword,
   failureCode,
   genCode,
   tryCleanup,
@@ -100,20 +101,27 @@ async function selfUserId(page: import('@playwright/test').Page): Promise<number
   return me.id;
 }
 
-/** 取一个非自身的活跃用户 id 作转移目标（GET /users 仅 admin 可用，本 worker 即 admin 会话） */
-async function pickOtherUserId(
-  page: import('@playwright/test').Page,
-  selfId: number
-): Promise<number> {
-  const res = await apiCallRaw<{ users: Array<{ id: number; is_active: boolean }> }>(
-    page,
-    'GET',
-    '/users?page=1&page_size=100'
-  );
-  expect(Array.isArray(res.users), 'GET /users 响应缺 data.users 数组').toBe(true);
-  const candidate = res.users.find(u => u.id !== selfId && u.is_active);
-  if (!candidate) throw new Error('库内没有可用作转移目标的活跃用户');
-  return candidate.id;
+/** 自建专属转移目标账号：全局活跃用户池会混入并发腿的独占账号，取池内目标会把
+ *  审批通过后的线索转给别腿账号，破坏其按 owner 聚合的计数断言；目标改为本腿自建，
+ *  角色复制会话用户以保证可受理，收尾按主键回收。 */
+async function pickOtherUserId(page: import('@playwright/test').Page): Promise<number> {
+  const me = await apiCallRaw<{ id: number; role_id?: number | null }>(page, 'GET', '/users/me');
+  const seedRoleId = Number(me.role_id);
+  if (!Number.isInteger(seedRoleId) || seedRoleId <= 0) {
+    throw new Error(`前置不成立：会话用户未挂角色（role_id=${me.role_id}），无法复制转移目标账号`);
+  }
+  const username = `e2e_tt_${genCode('06T')}`.slice(0, 50);
+  const created = await apiCall<{ id?: number }>(page, 'POST', '/users', {
+    username,
+    password: baseAdminPassword(),
+    role_id: seedRoleId,
+  });
+  const id = Number(created.data?.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    throw new Error(`专属转移目标账号建立失败，未返回真实主键：${JSON.stringify(created.data)}`);
+  }
+  CLEANUP.push({ path: `/users/${id}`, label: 'transfer_target_user' });
+  return id;
 }
 
 /**
@@ -173,7 +181,7 @@ test.describe('06 客户转移审批流契约', () => {
 
   test('06-01 创建转移审批落库 pending/一级，GET 详情逐字段回读一致', async ({ page }) => {
     const me = await selfUserId(page);
-    const other = await pickOtherUserId(page, me);
+    const other = await pickOtherUserId(page);
     const { id: leadId, leadNo } = await seedLead(page, 'E2E-TA');
     const reason = `E2E 转移申请原因 ${leadNo}`;
 
@@ -221,7 +229,7 @@ test.describe('06 客户转移审批流契约', () => {
 
   test('06-02 申请人取消 pending 审批，回读 cancelled 且线索归属未被转移', async ({ page }) => {
     const me = await selfUserId(page);
-    const other = await pickOtherUserId(page, me);
+    const other = await pickOtherUserId(page);
     const { id: leadId, leadNo } = await seedLead(page, 'E2E-TA');
 
     const created = await seedApproval(page, leadId, other, `E2E 取消用例原因 ${leadNo}`);
@@ -264,7 +272,7 @@ test.describe('06 客户转移审批流契约', () => {
     page,
   }) => {
     const me = await selfUserId(page);
-    const other = await pickOtherUserId(page, me);
+    const other = await pickOtherUserId(page);
     const { id: leadId, leadNo } = await seedLead(page, 'E2E-TA');
 
     const created = await seedApproval(page, leadId, other, `E2E 拒绝用例原因 ${leadNo}`);
@@ -311,7 +319,7 @@ test.describe('06 客户转移审批流契约', () => {
 
   test('06-04 空白申请原因被拒 400 VALIDATION_ERROR 外显原文，且零审批单落库', async ({ page }) => {
     const me = await selfUserId(page);
-    const other = await pickOtherUserId(page, me);
+    const other = await pickOtherUserId(page);
     const { id: leadId } = await seedLead(page, 'E2E-TA');
 
     const before = await listMyPending(page, me);
@@ -345,7 +353,7 @@ test.describe('06 客户转移审批流契约', () => {
     page,
   }) => {
     const me = await selfUserId(page);
-    const other = await pickOtherUserId(page, me);
+    const other = await pickOtherUserId(page);
     const { id: leadId, leadNo } = await seedLead(page, 'E2E-TA');
 
     const first = await seedApproval(page, leadId, other, `E2E 重复申请首单 ${leadNo}`);

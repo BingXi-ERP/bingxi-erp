@@ -1,7 +1,14 @@
 {
   "role": "salesperson",
   "reachableRoutes": [
+    "/crm-enhanced",
+    "/crm/assignment",
+    "/crm/leads",
+    "/crm/opportunities",
+    "/crm/pool",
+    "/customer",
     "/dashboard",
+    "/notification",
     "/quotations",
     "/quotations/new",
     "/sales",

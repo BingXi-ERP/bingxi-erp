@@ -174,6 +174,7 @@ fn test_salesquotationmodel_mrzdz() {
         duty_cost: None,
         status: "draft".to_string(),
         approval_instance_id: None,
+        submitted_by: None,
         approved_by: None,
         approved_at: None,
         approval_reason: None,

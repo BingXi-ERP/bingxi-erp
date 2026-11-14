@@ -19,9 +19,11 @@ use crate::models::quotation_response_dto::{
     QuotationItemResponseDto, QuotationResponseDto, QuotationTermResponseDto,
 };
 use crate::models::quotation_update_dto::UpdateQuotationDto;
+use crate::models::sales_quotation;
 use crate::models::status::approval;
 use crate::services::quotation_approval_service::QuotationApprovalService;
 use crate::services::quotation_convert_service::QuotationConvertService;
+use crate::services::quotation_discount_service::QuotationDiscountService;
 use crate::services::quotation_pricing_service::{PricingContext, QuotationPricingService};
 use crate::services::quotation_service::{QuotationService, ServiceError};
 use crate::utils::error::AppError;
@@ -251,6 +253,52 @@ pub async fn submit_quotation(
     )))
 }
 
+/// 报价审批结果双通道通知（站内 + 微信公众号报价结果模板）。
+///
+/// 收件人为报价单创建人（`created_by`）；站内走 `notify_approval_result`（既有
+/// 去重键与词表不变），微信走 `QuotationResult` 模板（字段集合按公众号后台模板
+/// 占位符约定，business_key 用报价单号保证同一单据同一类通知只轰炸一次）。
+/// 两条腿都是 best-effort：失败只记日志，不回滚已完成的审批动作。
+async fn notify_quotation_result(
+    state: &AppState,
+    model: &sales_quotation::Model,
+    auth: &AuthContext,
+    approved: bool,
+    comment: Option<&str>,
+) {
+    let Some(ref event_service) = state.event_notification_service else {
+        return;
+    };
+    let recipient = i32::try_from(model.created_by).unwrap_or(0);
+    if recipient <= 0 {
+        return;
+    }
+    if let Err(e) = event_service
+        .notify_approval_result(
+            recipient,
+            &model.quotation_no,
+            approved,
+            auth.user_id,
+            &auth.username,
+            comment,
+        )
+        .await
+    {
+        tracing::warn!(error = %e, quotation_no = %model.quotation_no, "报价审批结果站内通知发送失败");
+    }
+    let fields = vec![
+        crate::services::wechat_mp_service::TemplateField::new("business_no", &model.quotation_no),
+        crate::services::wechat_mp_service::TemplateField::new(
+            "result",
+            if approved { "通过" } else { "拒绝" },
+        ),
+        crate::services::wechat_mp_service::TemplateField::new("operator", &auth.username),
+    ];
+    event_service
+        .send_quotation_result_wechat(recipient, &model.quotation_no, &fields)
+        .await;
+}
+
 /// POST /api/v1/erp/quotations/:id/approve
 // 审批拆为「通过 / 拒绝」两条动作：本端点只处理通过，通过理由必填并真实落
 // `approval_reason` 列；拒绝动作在 /reject（理由落既有专列 `rejection_reason`）。
@@ -279,6 +327,7 @@ pub async fn approve_quotation(
 
     let service = QuotationApprovalService::from_state(&state);
     let model = service.approve(id, auth.user_id, approval_reason).await?;
+    notify_quotation_result(&state, &model, &auth, true, None).await;
     Ok(Json(ApiResponse::success_with_message(
         QuotationResponseDto::from(model),
         "报价单已批准",
@@ -306,6 +355,7 @@ pub async fn reject_quotation(
     }
     let service = QuotationApprovalService::from_state(&state);
     let model = service.reject(id, auth.user_id, reason).await?;
+    notify_quotation_result(&state, &model, &auth, false, Some(&body.reason)).await;
     Ok(Json(ApiResponse::success_with_message(
         QuotationResponseDto::from(model),
         "报价单已拒绝",
@@ -326,6 +376,62 @@ pub async fn cancel_quotation(
     Ok(Json(ApiResponse::success_with_message(
         QuotationResponseDto::from(model),
         "报价单已取消",
+    )))
+}
+
+// ----------------------------------------------------------------------
+// 超折扣审批阈值配置面
+// ----------------------------------------------------------------------
+
+/// 阈值配置出参（单行配置的对外投影）
+#[derive(Debug, Serialize)]
+pub struct DiscountConfigResponse {
+    /// 超折扣阈值（百分点）：行折扣率严格大于此值即必须经主管审批后才能下发客户
+    pub over_discount_threshold_pct: rust_decimal::Decimal,
+    /// 最近一次修改阈值的时间
+    pub updated_at: chrono::DateTime<Utc>,
+}
+
+/// 阈值写入请求体。字段为必填 `Decimal`（无默认值）：缺键由解码层直接拒绝，
+/// 服务端不用任何代码内阈值补算，取值域与列刻度在 service 侧点名校验。
+#[derive(Debug, Deserialize)]
+pub struct DiscountConfigUpdateRequest {
+    pub over_discount_threshold_pct: rust_decimal::Decimal,
+}
+
+/// GET /api/v1/erp/quotations/discount-config
+/// 读超折扣审批阈值。权限键 `quotation-discount-config:read`（URL 第四段 discount-config
+/// 经 utils/path_utils.rs::RESOURCE_NAME_MAP 消歧为权威资源名，与 m0134 补授键逐字符一致）。
+pub async fn get_discount_config(
+    _auth: AuthContext,
+    State(state): State<AppState>,
+) -> Result<Json<ApiResponse<DiscountConfigResponse>>, AppError> {
+    let service = QuotationDiscountService::from_state(&state);
+    let config = service.get_config().await?;
+    Ok(Json(ApiResponse::success(DiscountConfigResponse {
+        over_discount_threshold_pct: config.over_discount_threshold_pct,
+        updated_at: config.updated_at,
+    })))
+}
+
+/// PUT /api/v1/erp/quotations/discount-config
+/// 写超折扣审批阈值。权限键 `quotation-discount-config:update`（PUT 按方法派生）；
+/// 操作人取服务端会话（AuthContext.user_id），请求体不承载身份，写入经审计单点留痕。
+pub async fn update_discount_config(
+    auth: AuthContext,
+    State(state): State<AppState>,
+    Json(payload): Json<DiscountConfigUpdateRequest>,
+) -> Result<Json<ApiResponse<DiscountConfigResponse>>, AppError> {
+    let service = QuotationDiscountService::from_state(&state);
+    let updated = service
+        .save_threshold(payload.over_discount_threshold_pct, auth.user_id)
+        .await?;
+    Ok(Json(ApiResponse::success_with_message(
+        DiscountConfigResponse {
+            over_discount_threshold_pct: updated.over_discount_threshold_pct,
+            updated_at: updated.updated_at,
+        },
+        "超折扣审批阈值已更新",
     )))
 }
 

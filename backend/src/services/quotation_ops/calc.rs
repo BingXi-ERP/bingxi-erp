@@ -10,11 +10,18 @@ use crate::services::quotation_service::{QuotationService, ServiceError};
 
 impl QuotationService {
     /// 计算小计/税额/总金额
+    ///
+    /// 调用方：quotation_ops/crud.rs 的 create_draft，结果写入 sales_quotations 的
+    /// subtotal / tax_amount / total_amount 三列。
+    /// 入参：CreateQuotationDto，消费其 items（数量、净单价、含税单价）、tax_inclusive、tax_rate。
+    /// 含税态：含税总额是行腿录入事实（数量乘含税单价）的聚合，税额取含税总额减净额小计
+    /// 的差额，保证单头三键与报价明细无分差；表达式与行腿落库口径同源。
+    /// 不含税态：维持小计乘税率加计的既有口径。
     pub fn calculate_totals(
         &self,
         dto: &CreateQuotationDto,
     ) -> Result<(Decimal, Decimal, Decimal), ServiceError> {
-        // 批次 87：金额计算补 round_dp(2) 精度归一化
+        // 金额聚合按 round_dp(2) 精度归一化，与行腿落库口径一致
         let subtotal: Decimal = dto
             .items
             .iter()
@@ -22,15 +29,21 @@ impl QuotationService {
             .sum::<Decimal>()
             .round_dp(2);
 
-        let tax_amount = if dto.tax_inclusive {
-            // 含税：报价单小计已含税，差额为 0
-            Decimal::ZERO
+        let (tax_amount, total_amount) = if dto.tax_inclusive {
+            // 含税：总额聚合行腿含税事实，税额取差额，不用乘法造含税
+            let total_with_tax: Decimal = dto
+                .items
+                .iter()
+                .map(|i: &CreateQuotationItemDto| (i.quantity * i.unit_price_with_tax).round_dp(2))
+                .sum::<Decimal>()
+                .round_dp(2);
+            ((total_with_tax - subtotal).round_dp(2), total_with_tax)
         } else {
-            // 不含税：税额 = 小计 * 税率
-            (subtotal * dto.tax_rate / Decimal::from(100)).round_dp(2)
+            // 不含税：税额 = 小计 * 税率，总额 = 小计 + 税额
+            let tax = (subtotal * dto.tax_rate / Decimal::from(100)).round_dp(2);
+            (tax, (subtotal + tax).round_dp(2))
         };
 
-        let total_amount = (subtotal + tax_amount).round_dp(2);
         Ok((subtotal, tax_amount, total_amount))
     }
 

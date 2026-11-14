@@ -39,6 +39,11 @@ export const useSecProc = () => {
 
   // 解锁账户
   const handleUnlock = async (row: LockedAccount, sec: SecContext) => {
+    // 该用户名在 users 无对应账号时无主键可解锁，按钮已置灰，此处为直调路径的显式拒绝
+    if (row.id === null) {
+      logger.warn(t('security.lockTable.unlockNoAccount', { username: row.username }));
+      return;
+    }
     try {
       await ElMessageBox.confirm(
         t('security.lockTable.confirmUnlock', { username: row.username }),

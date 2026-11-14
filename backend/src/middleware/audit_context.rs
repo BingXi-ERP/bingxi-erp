@@ -5,6 +5,8 @@
 //! 2. 提取客户端 IP（X-Real-IP / X-Forwarded-For / `ConnectInfo<SocketAddr>` 三级降级）
 //! 3. 提取 `User-Agent` header
 //! 4. 把结果打包成 `AuditContext` 写入 `Request::extensions()`，供 audit_log_service 异步落库
+//! 5. 从会话扩展取 auth 已加载的操作人角色码（`SessionRoleCode`），随同一枚上下文交给审计
+//!    写入单点；本中间件挂在 auth 内层，扩展对内层可见，角色维度不产生任何额外查询
 //!
 //! 与 `trace_context` 的关系：
 //! - `trace_context` 在最外层生成 W3C `traceparent`，设置 `TraceContext`
@@ -21,6 +23,7 @@ use axum::{
 use std::net::SocketAddr;
 use uuid::Uuid;
 
+use crate::middleware::auth_context::SessionRoleCode;
 use crate::observability::trace_context::TraceContext;
 
 /// 写入 `Request::extensions()` 的审计上下文（service 直接读取）
@@ -32,16 +35,202 @@ pub struct AuditContext {
     pub ip_address: String,
     /// User-Agent 原始字符串
     pub user_agent: String,
+    /// 操作终端类型（PC / H5 / MINIPROGRAM / UNKNOWN），中间件按请求头与 UA 判定，取不到记 UNKNOWN
+    pub terminal_type: String,
+    /// 操作页面标识（优先 X-Page-Path，回退 Referer 的片段或路径），取不到为 None
+    pub operation_page: Option<String>,
+    /// 单据编号（业务单号），业务侧经 set_audit_doc_no 登记，未登记为 None
+    pub doc_no: Option<String>,
+    /// 变更原因备注，业务侧经 set_audit_change_reason 登记，未登记为 None
+    pub change_reason: Option<String>,
+    /// 高风险操作标记，业务侧经 mark_audit_high_risk 登记；删除由写入单点自动补 DELETE
+    pub risk_flag: Option<String>,
+    /// 操作人角色码（roles.code，非中文展示名），由 auth 中间件按会话已加载的角色行注入
+    /// SessionRoleCode 扩展带出；未认证（公开路径）或角色行缺失为 None，绝不兜底成占位值
+    pub role_code: Option<String>,
 }
 
+/// 终端类型取值（读取侧过滤与写入判定共用同一词表，避免三端漂移）
+pub const TERMINAL_PC: &str = "PC";
+/// 移动端浏览器与 App WebView 内的 H5 页面
+pub const TERMINAL_H5: &str = "H5";
+/// 微信小程序端（带 terminalSource 或 terminalSourceV2 或 App-User-Agent 自定义头）
+pub const TERMINAL_MINIPROGRAM: &str = "MINIPROGRAM";
+/// 三档都判不出时的如实取值，禁止用它兜底成 PC
+pub const TERMINAL_UNKNOWN: &str = "UNKNOWN";
+
+/// 高风险操作标记取值（单独可筛维度，不只靠 operation_type 文案匹配）
+pub const RISK_DELETE: &str = "DELETE";
+/// 红冲
+pub const RISK_REVERSE: &str = "REVERSE";
+/// 作废
+pub const RISK_VOID: &str = "VOID";
+
 impl AuditContext {
-    /// 构造空上下文（缺省值，避免 service 调用时 unwrap）
+    /// 构造空上下文（缺省值，避免 service 调用时 unwrap）；终端记 UNKNOWN（不默认 PC）
     pub fn empty() -> Self {
         Self {
             request_id: String::new(),
             ip_address: String::new(),
             user_agent: String::new(),
+            terminal_type: TERMINAL_UNKNOWN.to_string(),
+            operation_page: None,
+            doc_no: None,
+            change_reason: None,
+            risk_flag: None,
+            role_code: None,
         }
+    }
+}
+
+// 请求级审计上下文（task-local，同步写入单点与异步发送点共用）。
+//
+// 生命周期：由 `audit_context_middleware` 在解析出终端类型与页面之后用
+// `AUDIT_REQUEST_CTX.scope(RefCell::new(ctx), next.run(req)).await` 绑定，覆盖整个请求
+// future。业务侧在受理请求的 handler 内可按需把本张单的单据编号与变更原因与风险标记
+// 写进这枚活对象（RefCell），同步写入点与异步发送点都能读到最新值。
+//
+// 形态：`RefCell` 只在同步临界区借用（borrow 不跨 await），随请求 task 移动要求
+// `Send`，AuditContext 各字段皆 String 与 Option<String>，满足 Send。
+tokio::task_local! {
+    pub static AUDIT_REQUEST_CTX: std::cell::RefCell<AuditContext>;
+}
+
+/// 读取当前请求的审计上下文快照（含业务侧已登记的单号与原因与风险与会话角色码）。
+/// 未绑定（后台任务 / spawn 旁路 / 位于 audit_context 中间件外层）返回 None，
+/// 由调用方按 UNKNOWN 终端如实落库，绝不臆造。
+pub fn current_audit_request_ctx() -> Option<AuditContext> {
+    AUDIT_REQUEST_CTX
+        .try_with(|cell| cell.borrow().clone())
+        .ok()
+}
+
+impl AuditContext {
+    /// 同步写入单点（update_with_audit 与 delete_with_audit 的构造器不接收 ctx 入参）取当前
+    /// 请求作用域的活上下文。请求作用域内返回含终端与页面与单号与原因与风险与角色码的实时快照；
+    /// 不在请求作用域（后台维护任务）时返回 UNKNOWN 终端与空维度的兜底，绝不默认 PC。
+    pub fn current_for_sync_write() -> Self {
+        current_audit_request_ctx().unwrap_or_else(AuditContext::empty)
+    }
+}
+
+/// 业务侧登记本次操作的单据编号（同一请求多次调用以最后一次为准）；未在请求作用域内调用为无害空操作。
+pub fn set_audit_doc_no(doc_no: Option<String>) {
+    let _ = AUDIT_REQUEST_CTX.try_with(|cell| cell.borrow_mut().doc_no = doc_no);
+}
+
+/// 业务侧登记本次操作的变更原因；调用方没给就不调用，落库保持 NULL（禁止默认文案）。
+pub fn set_audit_change_reason(reason: Option<String>) {
+    let _ = AUDIT_REQUEST_CTX.try_with(|cell| cell.borrow_mut().change_reason = reason);
+}
+
+/// 业务侧标记本次为高风险操作（红冲 REVERSE 或作废 VOID 等）；删除由写入单点自动补，不在此重复。
+pub fn mark_audit_high_risk(flag: &str) {
+    let _ = AUDIT_REQUEST_CTX.try_with(|cell| {
+        cell.borrow_mut().risk_flag = Some(flag.to_string());
+    });
+}
+
+/// 判定终端类型：小程序自定义头优先（Web 与 H5 不带这三枚头），其次 User-Agent。
+/// 三档都判不出记 UNKNOWN，绝不默认 PC。
+pub fn detect_terminal_type(headers: &header::HeaderMap) -> &'static str {
+    // 微信小程序网关固定附带 terminalSource 与 terminalSourceV2 与 App-User-Agent（见小程序 request.js）
+    let from_miniprogram = headers
+        .get("terminalsource")
+        .or_else(|| headers.get("terminalsourcev2"))
+        .or_else(|| headers.get("app-user-agent"))
+        .is_some();
+    if from_miniprogram {
+        return TERMINAL_MINIPROGRAM;
+    }
+
+    let ua = headers
+        .get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if ua.is_empty() || ua == "unknown" {
+        return TERMINAL_UNKNOWN;
+    }
+
+    // 移动端浏览器与 Android 与 iOS 设备与 App 内 WebView（UA 含 android 或 mobile）归 H5
+    if ua.contains("android")
+        || ua.contains("mobile")
+        || ua.contains("iphone")
+        || ua.contains("ipad")
+        || ua.contains("ipod")
+    {
+        return TERMINAL_H5;
+    }
+
+    // 桌面浏览器特征归 PC
+    if ua.contains("windows nt")
+        || ua.contains("macintosh")
+        || ua.contains("cros")
+        || ua.contains("x11")
+        || ua.contains("linux x86_64")
+    {
+        return TERMINAL_PC;
+    }
+
+    TERMINAL_UNKNOWN
+}
+
+/// 判定操作页面：优先请求头 X-Page-Path（前端待接显式页面标识），回退 Referer。
+/// Referer 里 hash 路由的片段（# 之后）才是 SPA 真实页面，无片段取路径；两者都取不到记 None。
+pub fn detect_operation_page(headers: &header::HeaderMap) -> Option<String> {
+    if let Some(page) = headers
+        .get("x-page-path")
+        .and_then(|v| v.to_str().ok())
+        .filter(|s| !s.is_empty())
+    {
+        return Some(page.to_string());
+    }
+    let referer = headers
+        .get(header::REFERER)
+        .and_then(|v| v.to_str().ok())
+        .filter(|s| !s.is_empty())?;
+    // hash 路由优先
+    if let Some(hash_pos) = referer.find('#') {
+        let fragment = &referer[hash_pos + 1..];
+        if !fragment.is_empty() {
+            return Some(fragment.to_string());
+        }
+    }
+    // 无片段则取 URL 的路径部分（scheme://host 之后、?query 之前的完整路径）
+    let after_scheme = referer
+        .find("://")
+        .map(|i| &referer[i + 3..])
+        .unwrap_or(referer);
+    let path = after_scheme
+        .find('/')
+        .map(|i| &after_scheme[i..])
+        .unwrap_or("");
+    let path = path.split('?').next().unwrap_or(path);
+    if path.is_empty() || path == "/" {
+        None
+    } else {
+        Some(path.to_string())
+    }
+}
+
+/// 存证列 operation_page 的字符上限，与迁移 m0126 里该列的 VARCHAR(500) 同值。
+const OPERATION_PAGE_MAX_CHARS: usize = 500;
+
+/// 页面标识取自请求头 X-Page-Path 与 Referer，长度由客户端决定。超过存证列宽度会让这条
+/// 审计写入直接报 22001 并打断被审计的业务写，所以在边界处按长度判空，而不是截断存半成品。
+/// 入参是 detect_operation_page 的取值，产出交给 audit_context_middleware 写进上下文。
+fn bound_operation_page(page: Option<String>) -> Option<String> {
+    match page {
+        Some(raw) if raw.chars().count() > OPERATION_PAGE_MAX_CHARS => {
+            tracing::warn!(
+                page_chars = raw.chars().count(),
+                limit = OPERATION_PAGE_MAX_CHARS,
+                "操作页面标识超出存证列宽度，本条审计的页面维度记空"
+            );
+            None
+        }
+        other => other,
     }
 }
 
@@ -140,13 +329,42 @@ pub async fn audit_context_middleware(mut request: Request<Body>, next: Next) ->
 
     let ip_address = extract_client_ip(&request);
     let user_agent = extract_user_agent(&request);
+    let terminal_type = detect_terminal_type(request.headers()).to_string();
+    let operation_page = bound_operation_page(detect_operation_page(request.headers()));
+    // 角色维度只消费 auth 已查出的角色行（SessionRoleCode 扩展由 auth 中间件注入，本中间件
+    // 挂在其内层，扩展随请求流向内可见），本层不查库。取不到如实记 None：公开路径未认证、
+    // 用户未分配角色、角色行缺失或查询失败都落 NULL，不写空串也不写占位角色冒充有值。
+    let role_code = request
+        .extensions()
+        .get::<SessionRoleCode>()
+        .map(|role| role.code.clone());
+    match &role_code {
+        Some(code) => {
+            tracing::debug!(role_code = %code, "审计上下文已带操作人角色维度")
+        }
+        None => {
+            tracing::debug!(
+                "审计上下文未带操作人角色维度（本路径未认证或会话角色行缺失），角色列按 NULL 落库"
+            )
+        }
+    }
 
     let audit_ctx = AuditContext {
         request_id,
         ip_address,
         user_agent,
+        terminal_type,
+        operation_page,
+        doc_no: None,
+        change_reason: None,
+        risk_flag: None,
+        role_code,
     };
 
-    request.extensions_mut().insert(audit_ctx);
-    next.run(request).await
+    // 活上下文交给 task-local，供同步写入单点（update_with_audit 等不接收 ctx 的调用）与
+    // 业务侧 set_* 登记单号与原因与风险共享同一份；extensions 里的快照供 handler 显式取用。
+    request.extensions_mut().insert(audit_ctx.clone());
+    AUDIT_REQUEST_CTX
+        .scope(std::cell::RefCell::new(audit_ctx), next.run(request))
+        .await
 }

@@ -38,6 +38,16 @@ export interface InventoryStock {
   quantity_meters: string;
   quantity_kg: string;
   /**
+   * 克重（g/m²）：后端 StockResponse 直映 inventory_stocks.gram_weight（Option<Decimal>），
+   * 出参为 string|null——未录入即 null，展示前 Number() 归一，不得当作 0 参与换算。
+   */
+  gram_weight?: string | null;
+  /**
+   * 幅宽（cm）：后端 StockResponse 直映 inventory_stocks.width（Option<Decimal>），
+   * 出参为 string|null——未录入即 null，展示前 Number() 归一。
+   */
+  width?: string | null;
+  /**
    * 乐观锁版本号（NOT NULL 列 inventory_stocks.version，StockResponse 直映输出）——
    * PUT /inventory/stock/{id} 必带的 version 唯一合法来源，缺它编辑链路不可达，禁止假值。
    */
@@ -415,7 +425,8 @@ export interface CreateStockRequest {
 }
 
 /** 库存基础响应（对应后端 inventory_stock_handler_dto.rs::StockResponse）。
- *  数量/阈值列后端为 Rust Decimal，序列化为 JSON 字符串，渲染处需显式 Number() 转换。 */
+ *  数量/阈值列后端为 Rust Decimal，序列化为 JSON 字符串；克重/门幅后端为 Option<Decimal>，
+ *  序列化为 string|null。渲染处需显式 Number() 转换。 */
 export interface StockResponse {
   id: number;
   warehouse_id: number;
@@ -426,6 +437,14 @@ export interface StockResponse {
   reorder_point: string;
   max_stock_point: string;
   bin_location?: string;
+  /** 货架号：inventory_stocks.shelf_no 可空列（细码录入面提交），未录入为 null */
+  shelf_no?: string | null;
+  /** 层号：inventory_stocks.layer_no 可空列（细码录入面提交），未录入为 null */
+  layer_no?: string | null;
+  /** 克重（g/m²）：inventory_stocks.gram_weight 可空列（Option<Decimal> 出参 string|null） */
+  gram_weight?: string | null;
+  /** 幅宽（cm）：inventory_stocks.width 可空列（Option<Decimal> 出参 string|null） */
+  width?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -449,6 +468,10 @@ export interface StockFabricResponse {
   gram_weight?: string | null;
   width?: string | null;
   bin_location?: string;
+  /** 货架号：inventory_stocks.shelf_no 可空列（录入面 CreateStockRequest 提交），未录入为 null */
+  shelf_no?: string | null;
+  /** 层号：inventory_stocks.layer_no 可空列（录入面 CreateStockRequest 提交），未录入为 null */
+  layer_no?: string | null;
   created_at: string;
   updated_at: string;
 }

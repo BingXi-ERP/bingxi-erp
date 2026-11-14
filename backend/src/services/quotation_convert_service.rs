@@ -4,7 +4,7 @@
 //! - 校验报价单状态（仅 approved 可转）
 //! - 事务化复制明细到 sales_order_items
 //! - 创建 sales_orders 草稿
-//! - 更新报价单状态为 converted，记录 converted_sales_order_id
+//! - 更新报价单状态为 converted，记录 converted_sales_order_id，并沿审计写入单点留下这次跃迁
 //!
 //! Week 2 任务 8 - 销售报价单模块
 //! 创建时间: 2026-06-16
@@ -20,6 +20,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::container::AppState;
+use crate::models::custom_order;
+use crate::models::lab_dip_request;
 use crate::models::product;
 use crate::models::sales_order::{self, ActiveModel as OrderActive, Entity as OrderEntity};
 use crate::models::sales_order_item::ActiveModel as OrderItemActive;
@@ -103,8 +105,8 @@ impl QuotationConvertService {
         // 6. 复制明细
         Self::copy_quotation_items_to_order(&items, &quotation, order.id, now, &txn).await?;
 
-        // 7. 更新报价单状态为 converted
-        Self::update_quotation_to_converted(&quotation, order.id, now, &txn).await?;
+        // 7. 更新报价单状态为 converted，并沿审计写入单点留下这次跃迁（同事务）
+        Self::update_quotation_to_converted(&quotation, order.id, now, user_id, &txn).await?;
 
         txn.commit().await?;
 
@@ -119,7 +121,9 @@ impl QuotationConvertService {
         C: sea_orm::ConnectionTrait,
     {
         if quotation.status != "approved" {
-            return Err(AppError::business(format!(
+            // 转单腿状态门：唯一合法前置是 approved，拒绝文案点名该前置与行自身当前态；
+            // 公开状态词表、不含标识，走可外显通道，机器码仍是 BUSINESS_ERROR
+            return Err(AppError::business_displayable(format!(
                 "报价单状态不允许转订单：{}（仅 approved 状态可转换）",
                 quotation.status
             )));
@@ -130,6 +134,52 @@ impl QuotationConvertService {
             active.updated_at = Set(Utc::now());
             active.update(txn).await?;
             return Err(AppError::business("报价单已过期，无法转订单"));
+        }
+        Self::validate_sample_confirmed_for_convert(quotation, txn).await
+    }
+
+    /// 报价转单的客户确认样门（R 节第 6 条时序约束的转单腿）
+    ///
+    /// 功能：报价关联了定制订单（custom_orders.quotation_id 反查命中）且该定制订单
+    /// 关联了打样通知单（lab_dip_request_id）时，打样通知单必须已确认 OK 样
+    /// （approved_sample_id 非空）才允许转大货订单；常规大货报价（无定制订单关联）
+    /// 不受此门约束，避免误伤正常路径。
+    /// 调用方：validate_quotation_for_convert（转单事务内的状态校验一步）。
+    /// 入参：quotation 待转的报价行（用其 id 反查定制订单）、txn 转单事务连接。
+    /// 传给谁：SeaORM find（custom_order 实体 → lab_dip_request 实体），同事务不新开连接。
+    /// 存什么：不落库，只读判定；拒绝时经 AppError::business_displayable 外显中文文案。
+    /// 存哪里：无写入，错误沿调用链上抛给转单 handler。
+    async fn validate_sample_confirmed_for_convert<C>(
+        quotation: &sales_quotation::Model,
+        txn: &C,
+    ) -> Result<(), AppError>
+    where
+        C: sea_orm::ConnectionTrait,
+    {
+        // 同一报价可能被多笔定制订单引用（历史重复转单），find one 命中任一行即视为关联
+        let custom_order = custom_order::Entity::find()
+            .filter(custom_order::Column::QuotationId.eq(quotation.id))
+            .one(txn)
+            .await?;
+        let Some(custom_order) = custom_order else {
+            return Ok(());
+        };
+        let Some(lab_dip_id) = custom_order.lab_dip_request_id else {
+            return Ok(());
+        };
+        let lab_dip = lab_dip_request::Entity::find_by_id(lab_dip_id)
+            .one(txn)
+            .await?
+            .ok_or_else(|| {
+                AppError::business(format!(
+                    "该报价关联的打样通知单 {} 不存在，不能转大货订单",
+                    lab_dip_id
+                ))
+            })?;
+        if lab_dip.approved_sample_id.is_none() {
+            return Err(AppError::business_displayable(
+                "该报价关联的打样单尚未确认 OK 样，不能转大货订单",
+            ));
         }
         Ok(())
     }
@@ -382,10 +432,25 @@ impl QuotationConvertService {
         Ok((quantity_meters, quantity_kg))
     }
 
+    /// 把报价单推进到 converted 终态，并沿仓库既有审计写入单点留下这次状态跃迁
+    ///
+    /// 调用方：`convert` 在转单事务内的收尾一步，与主表插入、明细复制共用同一枚事务连接。
+    /// 入参：`quotation` 本次转单读到的报价行（供取更新前整行与主键）、`order_id` 新建销售
+    /// 订单主键、`now` 跃迁时间戳、`user_id` 已认证操作人（由 handler 侧 AuthContext 传入，
+    /// 本函数不自造操作人）、`txn` 转单事务连接。
+    /// 传给谁：`AuditLogService::update_with_audit`——与报价提交/批准/拒绝各腿同一个写入单点，
+    /// 不另开第二条审计通道；操作人姓名由该单点反查 users 补全。
+    /// 存什么：sales_quotations 行的 status（approved 到 converted）、converted_sales_order_id、
+    /// converted_at、updated_at；audit_logs 行的 resource_type（报价实体的存储表名）、resource_id
+    /// （报价主键）、user_id 与 username、action 与 operation_type（UPDATE）、severity、
+    /// before_snapshot 与 after_snapshot（跃迁前后整行序列化，内含 status 两值）、created_at。
+    /// 存哪里：业务列落 sales_quotations，跃迁留痕落 audit_logs；两次写入同处转单事务，
+    /// 与转单结果同提交、同回滚，不留「单转了但审计没落」的半态。
     async fn update_quotation_to_converted<C>(
         quotation: &sales_quotation::Model,
         order_id: i32,
         now: chrono::DateTime<Utc>,
+        user_id: i32,
         txn: &C,
     ) -> Result<(), AppError>
     where
@@ -396,7 +461,37 @@ impl QuotationConvertService {
         active.converted_sales_order_id = Set(Some(order_id as i64));
         active.converted_at = Set(Some(now));
         active.updated_at = Set(now);
-        active.update(txn).await?;
+        let audited = crate::services::audit_log_service::AuditLogService::update_with_audit(
+            txn,
+            "auto_audit",
+            active,
+            Some(user_id),
+        )
+        .await;
+        match audited {
+            Ok(updated) => tracing::info!(
+                quotation_id = updated.id,
+                quotation_no = %updated.quotation_no,
+                sales_order_id = order_id,
+                operator_user_id = user_id,
+                from_status = %quotation.status,
+                to_status = %updated.status,
+                "报价转单收尾完成：状态已置 converted，跃迁前后快照与操作人已落审计"
+            ),
+            Err(e) => {
+                tracing::error!(
+                    error = %e,
+                    quotation_id = quotation.id,
+                    quotation_no = %quotation.quotation_no,
+                    sales_order_id = order_id,
+                    operator_user_id = user_id,
+                    from_status = %quotation.status,
+                    to_status = "converted",
+                    "报价转单收尾失败：状态跃迁与审计留痕同事务写入未成，整笔转单随事务回滚"
+                );
+                return Err(e);
+            }
+        }
         Ok(())
     }
 

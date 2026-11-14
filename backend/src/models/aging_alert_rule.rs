@@ -2,8 +2,13 @@
 //! 账龄预警规则 Entity
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
+use sea_orm::FromJsonQueryResult;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
+
+/// 通知角色列表的 JSON 包装（库列为 JSONB，用 New Type 避免 SeaORM 把 Vec 推断成 PG 数组）
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, FromJsonQueryResult)]
+pub struct NotifyRoles(pub Vec<String>);
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "aging_alert_rules")]
@@ -25,10 +30,9 @@ pub struct Model {
     pub alert_level: String,
     /// 通知方式（system/email/sms）
     pub notify_method: String,
-    /// 通知角色列表（生效 DDL 为 JSONB，migration v15/mod.rs:2231；无 column_type
-    /// 属性时 SeaORM 按 Vec<String> 推断为 PG 数组，写非 NULL 即崩、读即 ColumnDecode）
+    /// 通知角色列表：存 JSONB 列，出参仍是字符串数组
     #[sea_orm(column_type = "JsonBinary", nullable)]
-    pub notify_roles: Option<Vec<String>>,
+    pub notify_roles: Option<NotifyRoles>,
     /// 是否启用
     pub is_active: bool,
     /// 备注

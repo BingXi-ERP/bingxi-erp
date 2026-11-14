@@ -88,8 +88,9 @@ impl InventoryStockService {
             shelf_no,
             layer_no,
         } = args;
-        let _final_quantity_kg =
-            Self::calculate_quantity_kg(quantity_meters, gram_weight, width, quantity_kg);
+        // 公斤数按调用方提交的事实原样落库（下方 ActiveModel 直接用 quantity_kg），
+        // 不做 米×克重×门幅 反算：与非事务版 `create_stock_fabric` 同口径，两条建库
+        // 路径必须对同一入参算出同一个值。
 
         let active_stock = inventory_stock::ActiveModel {
             id: Default::default(),

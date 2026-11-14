@@ -309,7 +309,9 @@ async fn assert_code_free(
         .await?;
     if let Some(row) = existing {
         if Some(row.id) != exclude_id {
-            return Err(AppError::bad_request("目标编码已存在，请更换一个唯一编码"));
+            return Err(AppError::validation_displayable(
+                "目标编码已存在，请更换一个唯一编码",
+            ));
         }
     }
     Ok(())

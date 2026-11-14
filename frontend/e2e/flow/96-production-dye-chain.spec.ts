@@ -1,4 +1,4 @@
-// 生产链深度契约 E2E — BOM 用量 → 排程确认 → 染色批次 → 验布打卷 → 质检报废审批
+// 生产链深度契约 E2E — 排程确认 → 染色批次 → 验布打卷 → 质检报废审批
 //
 // 本文件守的是同一族缺陷：**结果写了但没人推进、维度跨环漂移、数量口径混用、
 // 审批门可被跳过**。与既有用例的分工：既有生产用例多为端点可达性与状态标签校验，
@@ -170,122 +170,10 @@ async function readDefectRow(
   return hit;
 }
 
-test.describe('96 生产链深度契约：BOM 用量 / 排程确认 / 验布跨环维度 / 报废二级审批', () => {
+test.describe('96 生产链深度契约：排程确认 / 验布跨环维度 / 报废二级审批', () => {
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
     await ensureTestEntities(page);
-  });
-
-  test('96-01 BOM 用量到领料需求：计划量×单耗×(1+损耗率) 逐值精确，损耗率写入/回显同口径，越界与精度非法值点名原因', async ({
-    page,
-  }) => {
-    const finished = await ownProduct(page, 'FG');
-    const material = await ownProduct(page, 'MT');
-
-    // 单耗 2.5、损耗率按 API 百分比口径送 4（=4%）
-    const perUnit = '2.5';
-    const scrapPercent = '4';
-    const bom = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/boms', {
-      product_id: finished.id,
-      version: 1,
-      is_default: true,
-      remarks: `E2E-F96-BOM-${finished.code}`,
-      items: [
-        {
-          material_id: material.id,
-          quantity: perUnit,
-          unit: material.unit,
-          scrap_rate: scrapPercent,
-          sort_order: 1,
-        },
-      ],
-    });
-    const bomObj = bom.bom as Record<string, unknown> | undefined;
-    const items = pickListArray<Record<string, unknown>>(bom, 'items', 'BOM 创建回显明细');
-    expect(items.length, 'BOM 明细应落 1 行').toBe(1);
-    const bomId = requireId(bomObj ?? {}, 'BOM 主表 id');
-    CLEANUP.push({ path: `/boms/${bomId}`, label: `bom#${bomId}` });
-    expect(bomObj!.product_id, 'BOM 头产品锚定').toBe(finished.id);
-
-    // 写后必回读：单耗逐值、明细物料锚定、损耗率回显必须与提交口径同为百分比（同一字段禁止两口径）
-    const detail = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/boms/${bomId}`);
-    const detailItems = pickListArray<Record<string, unknown>>(
-      { items: detail.items },
-      'items',
-      `BOM ${bomId} 详情明细`
-    );
-    expect(detailItems.length, '详情明细行数').toBe(1);
-    expect(detailItems[0].material_id, '明细物料 id 回读').toBe(material.id);
-    expectDecimalString(detailItems[0].quantity, 'BOM 单耗');
-    expectDecEquals(
-      detailItems[0].quantity,
-      decLiteral(perUnit, '提交单耗'),
-      '单耗必须逐值落库（领料量算错的源头）'
-    );
-    expectDecimalString(detailItems[0].scrap_rate, 'BOM 损耗率');
-    expectDecEquals(
-      detailItems[0].scrap_rate,
-      decLiteral(scrapPercent, '提交损耗率'),
-      '损耗率回显口径必须与提交口径一致（同为百分比数值，禁一侧比率一侧百分比）'
-    );
-
-    // 领料需求 = 计划量 × 单耗 × (1+损耗率)，按十进制手算后逐值比对
-    const planQty = decLiteral('100', '计划产量');
-    const expected = decMul(
-      decMul(planQty, decLiteral(perUnit, '单耗')),
-      decLiteral('1.04', '1+损耗率')
-    );
-    const reqBody = await apiCallRaw<Record<string, unknown>>(
-      page,
-      'POST',
-      `/boms/${bomId}/requirements`,
-      { quantity: '100' }
-    );
-    const requirements = reqBody.requirements;
-    if (!Array.isArray(requirements)) {
-      throw new Error(
-        `领料需求端点出参缺 requirements 数组，实际键=${Object.keys(reqBody).join(',')}`
-      );
-    }
-    expect(requirements.length, '需求行数应等于叶子物料数').toBe(1);
-    const reqRow = requirements[0] as Record<string, unknown>;
-    expect(reqRow.product_id, '需求行物料 id').toBe(material.id);
-    expect(reqRow.unit, '需求行单位取明细单位（口径不得由测试自造）').toBe(material.unit);
-    expectDecimalString(reqRow.required_quantity, '需求数量');
-    expectDecEquals(
-      reqRow.required_quantity,
-      expected,
-      `计划量 100 × 单耗 ${perUnit} × (1+${scrapPercent}%) 的领料需求必须逐值命中`
-    );
-
-    // 非法损耗率：越界与超精度都必须 400 + 点名提交字段（可外显站点逐字符锁文案）
-    const outOfRange = await apiCallExpectFail(page, 'POST', '/boms', {
-      product_id: finished.id,
-      items: [{ material_id: material.id, quantity: perUnit, scrap_rate: 150 }],
-    });
-    expect(outOfRange.status, `损耗率越界应 400，实际=${outOfRange.status}`).toBe(400);
-    expect(failureCode(outOfRange), '损耗率越界机器码').toBe(APP_ERROR_CODES.VALIDATION_ERROR);
-    expect(outOfRange.message, '损耗率越界可外显文案').toBe(
-      'BOM 损耗率（百分比数值）必须在 0–100 范围内，实际: 150'
-    );
-    const tooPrecise = await apiCallExpectFail(page, 'POST', '/boms', {
-      product_id: finished.id,
-      items: [{ material_id: material.id, quantity: perUnit, scrap_rate: 1.234 }],
-    });
-    expect(tooPrecise.status, `损耗率超精度应 400，实际=${tooPrecise.status}`).toBe(400);
-    expect(failureCode(tooPrecise), '损耗率超精度机器码').toBe(APP_ERROR_CODES.VALIDATION_ERROR);
-    expect(tooPrecise.message, '损耗率超精度可外显文案').toBe(
-      'BOM 损耗率最多保留两位小数（0.01% 粒度），实际: 1.234'
-    );
-
-    // 空明细不是"参数缺省"而是契约违约：必须被拒而不是建出无明细的 BOM
-    const emptyItems = await apiCallExpectFail(page, 'POST', '/boms', {
-      product_id: finished.id,
-      items: [],
-    });
-    expect(emptyItems.status, `空明细建 BOM 应 400，实际=${emptyItems.status}`).toBe(400);
-    expect(failureCode(emptyItems), '空明细机器码').toBe(APP_ERROR_CODES.VALIDATION_ERROR);
-    expect(emptyItems.message, '空明细可外显文案').toBe('BOM明细不能为空');
   });
 
   test('96-02 排程结果确认闭环：未确认时工单原地不动，确认后状态与工单推进逐字段落库，重复确认被状态门拒且无漂移', async ({
@@ -838,10 +726,7 @@ test.describe('96 生产链深度契约：BOM 用量 / 排程确认 / 验布跨�
     // 中文结论原样落库（禁止被转写为英文码）
     const recC = await mkRecord('RC', '不合格', '60');
     const recCId = requireId(recC, '建 C 级质检记录');
-    CLEANUP.push({
-      path: `/production/quality-inspection/records/${recCId}`,
-      label: `quality_inspection_record#${recCId}`,
-    });
+    // 通用质检记录域没有删除路由，靠 mkRecord 的 genCode 唯一 inspection_no 隔离，本用例只按 id 回读。
     const recCReadBack = await apiCallRaw<Record<string, unknown>>(
       page,
       'GET',
@@ -902,10 +787,7 @@ test.describe('96 生产链深度契约：BOM 用量 / 排程确认 / 验布跨�
 
     const recA = await mkRecord('RA', '合格', '100');
     const recAId = requireId(recA, '建 A 级质检记录');
-    CLEANUP.push({
-      path: `/production/quality-inspection/records/${recAId}`,
-      label: `quality_inspection_record#${recAId}`,
-    });
+    // 通用质检记录域没有删除路由，靠 mkRecord 的 genCode 唯一 inspection_no 隔离，本用例只按 id 回读。
     const aGradeFail = await apiCallExpectFail(
       page,
       'POST',
@@ -1073,10 +955,7 @@ test.describe('96 生产链深度契约：BOM 用量 / 排程确认 / 验布跨�
     // 非报废处理方式不得进报废审批流
     const recC2 = await mkRecord('RB', '不合格', '70');
     const recC2Id = requireId(recC2, '建第二张 C 级记录');
-    CLEANUP.push({
-      path: `/production/quality-inspection/records/${recC2Id}`,
-      label: `quality_inspection_record#${recC2Id}`,
-    });
+    // 通用质检记录域没有删除路由，靠 mkRecord 的 genCode 唯一 inspection_no 隔离，本用例只按 id 回读。
     const rework = await apiCallRaw<Record<string, unknown>>(
       page,
       'POST',

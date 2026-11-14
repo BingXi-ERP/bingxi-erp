@@ -61,6 +61,8 @@ pub struct ColorCardDetail {
 #[derive(Debug, Serialize, Clone, Deserialize)]
 pub struct ColorItemInfo {
     pub id: i64,
+    /// 所属色卡主键（对应 color_card_item.color_card_id，非空列必须出参）
+    pub color_card_id: i64,
     pub color_code: String,
     pub color_name: String,
     pub rgb_r: i32,

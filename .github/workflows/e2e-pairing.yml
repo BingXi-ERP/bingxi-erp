@@ -3,16 +3,21 @@
 #
 # 功能：把"新增后端端点必须配套 E2E 用例"这条 PR 门禁规则落成可执行检查——
 #       本支新增的端点在 frontend/e2e 的真用例文件里零引用即判负，禁止合并。
+#       另有一条定期腿把同一判据跑在全量面上：判当前全部端点，按棘轮基线只对新漏配判红。
 # 调用方：改动 backend 路由与 handler、改动 frontend/e2e 用例面、改动路由基线、
-#       改本门禁取基线的脚本或改本工作流定义时触发；也可 workflow_dispatch 手工跑一次看数。
-# 入参：工作流向判定脚本传两样，--baseline-ref 指向分支起点的提交，
-#       --require-baseline-ref 钉住"基线不许退回工作树那份快照"；判据阈值
-#       （端点地板、语料根、前端源码根、豁免台账路径）由脚本自身常量与命令行参数决定。
-# 传给谁：frontend/scripts/pairing-fetch-base.sh 取分支起点的提交，再由
+#       改本门禁取基线的脚本、判定脚本、棘轮基线或本工作流定义时触发；
+#       每日 02:37 UTC 的 schedule 腿走全量面；workflow_dispatch 可用 mode 输入自选两面。
+# 入参：增量面向判定脚本传两样，--baseline-ref 指向分支起点的提交，
+#       --require-baseline-ref 钉住"基线不许退回工作树那份快照"；全量面传 --full-surface
+#       加 --ratchet-baseline 指向棘轮基线文件。判据阈值（端点地板、语料根、前端源码根、
+#       豁免台账路径）由脚本自身常量与命令行参数决定。
+# 传给谁：frontend/scripts/pairing-fetch-base.sh 取分支起点的提交（仅增量面），再由
 #       frontend/scripts/check-e2e-feature-pairing.mjs 判定，其内部复用
 #       check-api-paths.mjs 的 walkBackendRoutes()（与 route-snapshot 同一谓词）
-# 存什么：不落仓库文件；结论写进 $GITHUB_STEP_SUMMARY 供人读。
-# 存哪里：仅 Actions 运行摘要与日志
+# 存什么：棘轮基线 frontend/scripts/e2e-feature-pairing-ratchet.json 存全量面当前真判红
+#       的零引用端点清单（生成方式是跑 --emit-ratchet），只减不增：补上用例或端点下线后
+#       删条目，禁止往里加新债。结论写进 $GITHUB_STEP_SUMMARY 供人读。
+# 存哪里：棘轮基线在仓库内随代码评审；运行摘要与日志只在 Actions 侧。
 #
 # 为什么单独一支工作流而不是往 ci-cd.yml 里加步骤：ci-cd.yml 是在途改动最密集的
 #   hub 文件，多支并行改它必然互相撞冲突；本门禁只需 Node 与仓库源码（脚本零依赖，
@@ -32,6 +37,12 @@
 name: 新增功能与 E2E 用例配对门
 
 on:
+  # 定期腿只跑全量面（判"当前全部端点是否都有用例"，按棘轮基线只对新漏配判红）。
+  # 缺这一腿的后果：本门只有增量语义，删用例文件而不动路由的改动、或判定器自身作用面
+  # 变窄，都不会被任何定期机制再查一遍，功能与用例的映射关系会无声漂移。
+  # 时刻与既有两枚定期（每日漏洞扫描约 09:43 UTC、Rust 覆盖率）错开。
+  schedule:
+    - cron: "37 2 * * *"
   pull_request:
     paths:
       - "backend/src/routes/**"
@@ -41,6 +52,7 @@ on:
       - "frontend/scripts/check-e2e-feature-pairing.mjs"
       - "frontend/scripts/pairing-fetch-base.sh"
       - "frontend/scripts/e2e-feature-pairing-exempt.json"
+      - "frontend/scripts/e2e-feature-pairing-ratchet.json"
       - ".github/workflows/e2e-pairing.yml"
   push:
     branches:
@@ -53,8 +65,20 @@ on:
       - "frontend/scripts/check-e2e-feature-pairing.mjs"
       - "frontend/scripts/pairing-fetch-base.sh"
       - "frontend/scripts/e2e-feature-pairing-exempt.json"
+      - "frontend/scripts/e2e-feature-pairing-ratchet.json"
       - ".github/workflows/e2e-pairing.yml"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: >-
+          判定面。incremental 只判本支相对起点新增的端点（PR 门禁语义，判负即禁合并）；
+          full 判全量面并按 e2e-feature-pairing-ratchet.json 只对新漏配判红（定期语义）。
+        required: false
+        default: incremental
+        type: choice
+        options:
+          - incremental
+          - full
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -82,10 +106,31 @@ jobs:
         working-directory: frontend
         run: node scripts/check-e2e-feature-pairing.mjs --self-test
 
+      - name: 定判定面（定期腿走全量面，PR 与 push 走增量面）
+        id: surface
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_MODE: ${{ github.event.inputs.mode }}
+        run: |
+          case "$EVENT_NAME" in
+            schedule) mode=full ;;
+            workflow_dispatch)
+              case "$DISPATCH_MODE" in
+                full) mode=full ;;
+                *) mode=incremental ;;
+              esac
+              ;;
+            *) mode=incremental ;;
+          esac
+          echo "value=$mode" >> "$GITHUB_OUTPUT"
+          echo "判定面 $mode（event=$EVENT_NAME，dispatch 输入=${DISPATCH_MODE:-未给}）"
+
       # PR 以 base 提交为起点，push 以推送前的 main 为起点；两条腿共用同一取法与
       # 同一套校验（含空值与全零 sha），只有真取到提交才写 PAIRING_BASE_REF。
+      # 全量面不比差集，因此这两步与下面的增量判定在 full 面整体跳过，不误报"缺起点"。
       - name: 取 PR 分支起点的路由基线
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && steps.surface.outputs.value != 'full' }}
         shell: bash
         working-directory: frontend
         env:
@@ -93,15 +138,15 @@ jobs:
         run: bash scripts/pairing-fetch-base.sh "$PAIRING_BASE_SHA"
 
       - name: 取 push 前主干的路由基线
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' && steps.surface.outputs.value != 'full' }}
         shell: bash
         working-directory: frontend
         env:
           PAIRING_BASE_SHA: ${{ github.event.before }}
         run: bash scripts/pairing-fetch-base.sh "$PAIRING_BASE_SHA"
 
-      - name: 配对判定（基线只认分支起点那一版快照）
-        if: ${{ env.PAIRING_BASE_REF != '' }}
+      - name: 配对判定（增量面，基线只认分支起点那一版快照）
+        if: ${{ steps.surface.outputs.value != 'full' && env.PAIRING_BASE_REF != '' }}
         shell: bash
         working-directory: frontend
         run: |
@@ -109,7 +154,17 @@ jobs:
             --baseline-ref "$PAIRING_BASE_REF" \
             --require-baseline-ref | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: 配对判定（全量面，按棘轮基线只对新漏配判红）
+        if: ${{ steps.surface.outputs.value == 'full' }}
+        shell: bash
+        working-directory: frontend
+        run: |
+          node scripts/check-e2e-feature-pairing.mjs \
+            --full-surface \
+            --ratchet-baseline scripts/e2e-feature-pairing-ratchet.json \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: 缺分支起点时点名跳过（跳过不等于通过）
-        if: ${{ env.PAIRING_BASE_REF == '' }}
+        if: ${{ steps.surface.outputs.value != 'full' && env.PAIRING_BASE_REF == '' }}
         shell: bash
         run: echo "::notice::没有可用的分支起点，配对判定未执行，本道结论不算通过"

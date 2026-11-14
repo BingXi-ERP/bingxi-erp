@@ -10,19 +10,22 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, QueryFilter,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, Order, QueryFilter,
     QueryOrder, Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::models::bom::{Column as BomColumn, Entity as BomEntity};
-use crate::models::bom_item::{Column as BomItemColumn, Entity as BomItemEntity};
+use crate::models::flow_card_material::{
+    Column as FlowCardMaterialColumn, Entity as FlowCardMaterialEntity,
+    Model as FlowCardMaterialModel,
+};
 use crate::models::inventory_stock::{Column as StockColumn, Entity as InventoryStockEntity};
 use crate::models::material_shortage as alert_model;
 use crate::models::material_shortage::threshold_config as threshold_model;
 use crate::models::product::{Column as ProductColumn, Entity as ProductEntity};
+use crate::models::production_flow_card::{Column as CardColumn, Entity as CardEntity};
 use crate::models::production_order::{
     Column as ProductionOrderColumn, Entity as ProductionOrderEntity,
 };
@@ -193,9 +196,7 @@ pub struct MaterialShortageService {
 }
 
 type ProductionOrderModel = crate::models::production_order::Model;
-type BomModel = crate::models::bom::Model;
-type BomItemModel = crate::models::bom_item::Model;
-type MaterialReq = (Decimal, Option<String>, Vec<(i32, Decimal)>);
+type MaterialReq = (Decimal, Option<String>);
 
 /// 构造空缺料汇总（无活跃订单时返回）
 fn empty_shortage_summary() -> ShortageSummary {
@@ -210,76 +211,65 @@ fn empty_shortage_summary() -> ShortageSummary {
     }
 }
 
-/// 按产品聚合订单需求量与受影响订单清单
-fn aggregate_product_demands(
-    orders: &[ProductionOrderModel],
-) -> (HashMap<i32, Decimal>, HashMap<i32, Vec<AffectedOrder>>) {
-    let mut product_demands: HashMap<i32, Decimal> = HashMap::new();
-    let mut product_orders: HashMap<i32, Vec<AffectedOrder>> = HashMap::new();
-    for order in orders {
-        *product_demands
-            .entry(order.product_id)
-            .or_insert(Decimal::ZERO) += order.planned_quantity;
-        product_orders
-            .entry(order.product_id)
-            .or_default()
-            .push(AffectedOrder {
-                order_id: order.id,
-                order_no: order.order_no.clone(),
-                demand_quantity: order.planned_quantity,
-                planned_end_date: order.planned_end_date,
-            });
-    }
-    (product_demands, product_orders)
-}
-
-/// 按 BOM 物料行汇总每种物料的总需求量（含废品率）
+/// 按流转卡投纱明细汇总每种纱线的总需求量。
+/// 入参 yarn_rows 为 (生产订单 ID, 投纱行) 对（fetch_flow_card_yarn_rows 产出）；
+/// 投纱数量是绝对投入量，不乘生产订单计划数量；出参键为 material_id，值为 (总需求, 计量单位)。
+/// 同一物料跨订单多行直接累加；单位取首个命中行，同物料混用 kg 与 m 时显式告警，不静默折平。
+/// 调用方：detect_shortages；产出传给 build_shortage_items 参与缺口计算。
 fn compute_material_requirements(
-    bom_items: &[BomItemModel],
-    product_to_bom: &HashMap<i32, i32>,
-    product_demands: &HashMap<i32, Decimal>,
+    yarn_rows: &[(i32, FlowCardMaterialModel)],
 ) -> HashMap<i32, MaterialReq> {
     let mut material_requirements: HashMap<i32, MaterialReq> = HashMap::new();
-    for item in bom_items {
-        for (product_id, bom_id) in product_to_bom {
-            if *bom_id == item.bom_id {
-                if let Some(&demand) = product_demands.get(product_id) {
-                    let scrap_rate = item.scrap_rate.unwrap_or(Decimal::ZERO);
-                    // 批次 97 P1-9 修复（v5 复审）：数量计算补 round_dp(4) 防止精度漂移
-                    let qty_per_unit = (item.quantity * (Decimal::ONE + scrap_rate)).round_dp(4);
-                    let total_for_product = (qty_per_unit * demand).round_dp(4);
-                    let entry = material_requirements.entry(item.material_id).or_insert((
-                        Decimal::ZERO,
-                        item.unit.clone(),
-                        vec![],
-                    ));
-                    entry.0 += total_for_product;
-                    entry.2.push((*product_id, qty_per_unit));
-                }
+    for (_, row) in yarn_rows {
+        let entry = material_requirements
+            .entry(row.material_id)
+            .or_insert((Decimal::ZERO, Some(row.unit.clone())));
+        if let Some(existing_unit) = &entry.1 {
+            if *existing_unit != row.unit {
+                tracing::warn!(
+                    material_id = row.material_id,
+                    kept_unit = %existing_unit,
+                    seen_unit = %row.unit,
+                    "缺料需求汇总：同一物料混用两种投纱计量单位，需求量按首行单位口径累加"
+                );
             }
         }
+        entry.0 += row.quantity;
     }
     material_requirements
 }
 
-/// 汇总每种物料受影响的生产订单（按 BOM 行反查产品订单）
+/// 汇总每种物料受影响的生产订单：投纱行按 (物料, 订单) 聚合，
+/// demand_quantity 为该订单为该物料登记的投纱量合计（绝对投入量，单位口径见
+/// compute_material_requirements）；同一订单同物料多行只出一条。
+/// 入参 orders_by_id 由活跃生产订单构造；出参键为 material_id。
+/// 调用方：detect_shortages；产出填进 MaterialShortageItem.affected_orders。
 fn aggregate_material_affected_orders(
-    bom_items: &[BomItemModel],
-    product_to_bom: &HashMap<i32, i32>,
-    product_orders: &HashMap<i32, Vec<AffectedOrder>>,
+    yarn_rows: &[(i32, FlowCardMaterialModel)],
+    orders_by_id: &HashMap<i32, &ProductionOrderModel>,
 ) -> HashMap<i32, Vec<AffectedOrder>> {
+    let mut per_material_order: HashMap<i32, HashMap<i32, Decimal>> = HashMap::new();
+    for (order_id, row) in yarn_rows {
+        *per_material_order
+            .entry(row.material_id)
+            .or_default()
+            .entry(*order_id)
+            .or_insert(Decimal::ZERO) += row.quantity;
+    }
     let mut material_affected_orders: HashMap<i32, Vec<AffectedOrder>> = HashMap::new();
-    for item in bom_items {
-        for (product_id, bom_id) in product_to_bom {
-            if *bom_id == item.bom_id {
-                if let Some(orders) = product_orders.get(product_id) {
-                    material_affected_orders
-                        .entry(item.material_id)
-                        .or_default()
-                        .extend(orders.clone());
-                }
-            }
-        }
+    for (material_id, order_qtys) in per_material_order {
+        let affected = order_qtys
+            .into_iter()
+            .filter_map(|(order_id, qty)| {
+                orders_by_id.get(&order_id).map(|order| AffectedOrder {
+                    order_id,
+                    order_no: order.order_no.clone(),
+                    demand_quantity: qty,
+                    planned_end_date: order.planned_end_date,
+                })
+            })
+            .collect();
+        material_affected_orders.insert(material_id, affected);
     }
     material_affected_orders
 }
@@ -401,17 +391,16 @@ impl MaterialShortageService {
         if orders.is_empty() {
             return Ok(empty_shortage_summary());
         }
-        let (product_demands, product_orders) = aggregate_product_demands(&orders);
-        let product_ids: Vec<i32> = product_demands.keys().cloned().collect();
-        let (boms, bom_items) = self.fetch_boms_and_items(&product_ids).await?;
-        let product_to_bom: HashMap<i32, i32> = boms.iter().map(|b| (b.product_id, b.id)).collect();
-        let material_requirements =
-            compute_material_requirements(&bom_items, &product_to_bom, &product_demands);
+        let order_ids: Vec<i32> = orders.iter().map(|o| o.id).collect();
+        let yarn_rows = self.fetch_flow_card_yarn_rows(&order_ids).await?;
+        let material_requirements = compute_material_requirements(&yarn_rows);
         let material_ids: Vec<i32> = material_requirements.keys().cloned().collect();
         let stock_map = self.get_material_stock_map(&material_ids).await?;
         let material_names = self.get_product_names(&material_ids).await?;
+        let orders_by_id: HashMap<i32, &ProductionOrderModel> =
+            orders.iter().map(|o| (o.id, o)).collect();
         let material_affected_orders =
-            aggregate_material_affected_orders(&bom_items, &product_to_bom, &product_orders);
+            aggregate_material_affected_orders(&yarn_rows, &orders_by_id);
         let mut items = self
             .build_shortage_items(
                 &material_requirements,
@@ -559,27 +548,55 @@ impl MaterialShortageService {
         Ok(order_query.all(&*self.db).await?)
     }
 
-    /// 查询产品默认 BOM 及其物料行
-    async fn fetch_boms_and_items(
+    /// 查询活跃生产订单名下流转卡的投纱行，返回 (生产订单 ID, 投纱行) 对。
+    /// 流转卡与投纱行都排除软删；卡片到订单的映射在内存完成，不逐卡再查。
+    /// 入参 order_ids 来自 fetch_active_orders；出参喂给需求与受影响订单两个聚合函数。
+    /// 调用方：detect_shortages。
+    async fn fetch_flow_card_yarn_rows(
         &self,
-        product_ids: &[i32],
-    ) -> Result<(Vec<BomModel>, Vec<BomItemModel>), AppError> {
-        let boms = BomEntity::find()
-            .filter(BomColumn::ProductId.is_in(product_ids.to_vec()))
-            .filter(BomColumn::IsDefault.eq(true))
-            .filter(BomColumn::Status.eq("ACTIVE"))
+        order_ids: &[i32],
+    ) -> Result<Vec<(i32, FlowCardMaterialModel)>, AppError> {
+        if order_ids.is_empty() {
+            return Ok(vec![]);
+        }
+        let cards = CardEntity::find()
+            .filter(CardColumn::ProductionOrderId.is_in(order_ids.to_vec()))
+            .filter(CardColumn::IsDeleted.eq(false))
             .all(&*self.db)
             .await?;
-        let bom_ids: Vec<i32> = boms.iter().map(|b| b.id).collect();
-        let bom_items = if bom_ids.is_empty() {
-            vec![]
-        } else {
-            BomItemEntity::find()
-                .filter(BomItemColumn::BomId.is_in(bom_ids))
-                .all(&*self.db)
-                .await?
-        };
-        Ok((boms, bom_items))
+        let card_to_order: HashMap<i32, i32> = cards
+            .iter()
+            .map(|c| (c.id, c.production_order_id))
+            .collect();
+        let card_ids: Vec<i32> = card_to_order.keys().cloned().collect();
+        if card_ids.is_empty() {
+            tracing::warn!(
+                orders = order_ids.len(),
+                "缺料需求源：活跃生产订单名下没有流转卡，物料需求为空，需先建卡投纱"
+            );
+            return Ok(vec![]);
+        }
+        let rows = FlowCardMaterialEntity::find()
+            .filter(FlowCardMaterialColumn::FlowCardId.is_in(card_ids))
+            .filter(FlowCardMaterialColumn::IsDeleted.eq(false))
+            .order_by(FlowCardMaterialColumn::Id, Order::Asc)
+            .all(&*self.db)
+            .await?;
+        let yarn_rows: Vec<(i32, FlowCardMaterialModel)> = rows
+            .into_iter()
+            .filter_map(|row| {
+                card_to_order
+                    .get(&row.flow_card_id)
+                    .map(|order_id| (*order_id, row.clone()))
+            })
+            .collect();
+        tracing::info!(
+            orders = order_ids.len(),
+            cards = card_to_order.len(),
+            yarn_rows = yarn_rows.len(),
+            "缺料需求源：流转卡投纱行聚合完成"
+        );
+        Ok(yarn_rows)
     }
 
     /// 由物料需求与库存生成缺料清单（并发布缺料事件）
@@ -592,7 +609,7 @@ impl MaterialShortageService {
         thresholds: &ShortageThresholdConfig,
     ) -> Vec<MaterialShortageItem> {
         let mut items = Vec::new();
-        for (material_id, (required, unit, _)) in material_requirements {
+        for (material_id, (required, unit)) in material_requirements {
             let available = stock_map.get(material_id).copied().unwrap_or(Decimal::ZERO);
             let shortage = if *required > available {
                 *required - available

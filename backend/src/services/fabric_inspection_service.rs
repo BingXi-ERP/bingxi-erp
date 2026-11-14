@@ -353,7 +353,7 @@ impl FabricInspectionService {
     ) -> Result<InspectionModel, AppError> {
         let model = self.get_by_id(id).await?;
         if model.status != inspection_status::PENDING {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅待验布(pending)状态可更新，当前状态: {}",
                 model.status
             )));
@@ -469,7 +469,7 @@ impl FabricInspectionService {
     pub async fn start_inspection(&self, id: i32) -> Result<InspectionModel, AppError> {
         let model = self.get_by_id(id).await?;
         if model.status != inspection_status::PENDING {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅待验布(pending)状态可开始验布，当前状态: {}",
                 model.status
             )));
@@ -489,7 +489,7 @@ impl FabricInspectionService {
     ) -> Result<InspectionModel, AppError> {
         let model = self.get_by_id(id).await?;
         if model.status != inspection_status::INSPECTING {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅验布中(inspecting)状态可评级，当前状态: {}",
                 model.status
             )));
@@ -660,7 +660,7 @@ impl FabricInspectionService {
         req: &RollFabricRequest,
     ) -> Result<(), AppError> {
         if model.status != inspection_status::GRADED {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅已评级(graded)状态可打卷入库，当前状态: {}",
                 model.status
             )));
@@ -781,8 +781,6 @@ impl FabricInspectionService {
             production_date: Default::default(),
             shelf_life: Default::default(),
             quality_status: Set(Some(quality_status::PASS.to_string())),
-            // 库存状态与上一行 status 列同源，取权威大写词表常量，不写字面量
-            inventory_status: Set(Some(piece_status::AVAILABLE.to_string())),
             created_by: Default::default(),
             updated_by: Default::default(),
             color_no: match model.color_no.clone() {
@@ -827,7 +825,7 @@ impl FabricInspectionService {
     pub async fn close_inspection(&self, id: i32) -> Result<InspectionModel, AppError> {
         let model = self.get_by_id(id).await?;
         if model.status != inspection_status::GRADED && model.status != inspection_status::ROLLED {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅已评级(graded)或已打卷(rolled)状态可关闭归档，当前状态: {}",
                 model.status
             )));
@@ -906,7 +904,7 @@ impl FabricDefectService {
             .ok_or_else(|| AppError::not_found(format!("验布记录 {} 不存在", req.inspection_id)))?;
 
         if inspection.status != inspection_status::INSPECTING {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅验布中(inspecting)状态可添加疵点，当前状态: {}",
                 inspection.status
             )));
@@ -1096,7 +1094,7 @@ impl FabricPhysicalTestService {
         if inspection.status != inspection_status::INSPECTING
             && inspection.status != inspection_status::GRADED
         {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "仅验布中(inspecting)或已评级(graded)状态可录入物理指标，当前状态: {}",
                 inspection.status
             )));

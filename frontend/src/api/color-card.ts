@@ -92,6 +92,8 @@ export interface ColorCardListItem {
 
 export interface ColorItemInfo {
   id: number;
+  /** 所属色卡主键，后端非空列出参，前端不得标可选 */
+  color_card_id: number;
   color_code: string;
   color_name: string;
   rgb_r: number;

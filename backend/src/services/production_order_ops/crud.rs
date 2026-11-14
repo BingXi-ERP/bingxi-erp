@@ -12,8 +12,6 @@
 //! - 两条建单腿（create 前缀 PO、create_rework_order 前缀 RW）的单号都在写入事务内
 //!   取号并插入（`DocumentNumberGenerator::insert_with_no_retry`：advisory lock 串行化
 //!   + order_no UNIQUE 兜底 + 撞唯一约束在保存点内重取重试），不存在"取号后另发 INSERT"
-//! - 创建订单后触发 MRP 物料需求计算（失败 warn 不阻塞）
-//! - 返工订单使用 RW 前缀，不触发 MRP
 //! - 状态转换校验基于状态机白名单（validate_status_transition）
 //! - COMPLETED 状态走 complete_production_order 专用路径（completion 子模块）
 //! - 排产状态变更走 check_capacity_for_scheduling 产能校验（completion 子模块）
@@ -37,7 +35,6 @@ use crate::utils::error::AppError;
 use crate::utils::number_generator::DocumentNumberGenerator;
 use crate::utils::pagination::paginate_with_total;
 
-use crate::models::bom::{Column as BomColumn, Entity as BomEntity};
 use crate::models::product::{Column as ProductColumn, Entity as ProductEntity};
 use crate::models::sales_order::Entity as SalesOrderEntity;
 use crate::models::work_center::Entity as WorkCenterEntity;
@@ -156,7 +153,7 @@ impl ProductionOrderService {
         }
     }
 
-    /// 创建生产订单（校验引用 → 写入事务内取号并插入 → 触发 MRP 计算，失败 warn 不阻塞）
+    /// 创建生产订单（校验引用 → 写入事务内取号并插入）
     ///
     /// 调用方：`handlers/production_order_handler.rs::create_production_order`。
     /// 入参 `req` 为服务层创建请求（类型上不存在 `order_no` 字段，单号禁手输在编译期成立），
@@ -189,30 +186,15 @@ impl ProductionOrderService {
         })?;
         txn.commit().await?;
 
-        self.trigger_mrp_for_order(&model, req.planned_end_date)
-            .await;
         Ok(model)
     }
 
-    /// 校验创建生产订单的关联引用：产品/销售订单/工作中心存在性 + BOM 缺失告警
+    /// 校验创建生产订单的关联引用：产品/销售订单/工作中心存在性
     async fn validate_create_references(
         &self,
         req: &CreateProductionOrderRequest,
     ) -> Result<(), AppError> {
         self.validate_product_exists(req.product_id).await?;
-        let has_bom = BomEntity::find()
-            .filter(BomColumn::ProductId.eq(req.product_id))
-            .filter(BomColumn::IsDefault.eq(true))
-            .filter(BomColumn::Status.eq(crate::models::status::common::STATUS_ACTIVE))
-            .one(&*self.db)
-            .await?
-            .is_some();
-        if !has_bom {
-            tracing::warn!(
-                "产品ID {} 没有默认BOM，生产完成时将无法自动扣减原材料",
-                req.product_id
-            );
-        }
         if let Some(sales_order_id) = req.sales_order_id {
             self.validate_sales_order_exists(sales_order_id).await?;
         }
@@ -262,39 +244,8 @@ impl ProductionOrderService {
         active_model
     }
 
-    /// 触发 MRP 物料需求计算（失败 warn 不阻塞主流程，订单已创建可后续重算）
-    async fn trigger_mrp_for_order(
-        &self,
-        model: &ProductionOrderModel,
-        planned_end_date: Option<chrono::NaiveDate>,
-    ) {
-        let mrp_service =
-            crate::services::mrp_engine_service::MrpEngineService::new(self.db.clone());
-        let required_date = planned_end_date
-            .unwrap_or_else(|| chrono::Utc::now().date_naive() + chrono::Duration::days(7));
-        if let Err(e) = mrp_service
-            .run_mrp_calculation(crate::services::mrp_engine_service::MrpCalculationQuery {
-                product_id: model.product_id,
-                required_quantity: model.planned_quantity,
-                required_date,
-                source_type: "PRODUCTION_ORDER".to_string(),
-                source_id: Some(model.id),
-                consider_safety_stock: true,
-                consider_in_transit: true,
-            })
-            .await
-        {
-            tracing::warn!(
-                order_id = model.id,
-                product_id = model.product_id,
-                error = %e,
-                "生产订单创建后 MRP 计算失败，请人工检查物料需求"
-            );
-        }
-    }
-
     /// V15 Batch 479 P0-F21：创建返工生产订单
-    /// 业务背景：bulk_color_approval customer_rework 触发，返工必须走生产订单流程；（审计报告 P0-F21：返工无工单跟踪，返工成本无法归集到原缸号）；与普通 create() 的差异：order_type = 'rework'（标记为返工订单）；original_batch_id 指向原 dye_batch（返工成本归集锚点）；不触发 MRP 物料需求计算（返工使用已有物料，不产生新采购计划）；订单号 RW{YYYYMMDD}{3位流水} 与 create() 同形态取号（写入事务内 insert_with_no_retry）
+    /// 业务背景：bulk_color_approval customer_rework 触发，返工必须走生产订单流程；（审计报告 P0-F21：返工无工单跟踪，返工成本无法归集到原缸号）；与普通 create() 的差异：order_type = 'rework'（标记为返工订单）；original_batch_id 指向原 dye_batch（返工成本归集锚点）；订单号 RW{YYYYMMDD}{3位流水} 与 create() 同形态取号（写入事务内 insert_with_no_retry）
     pub async fn create_rework_order(
         &self,
         product_id: i32,
@@ -347,9 +298,6 @@ impl ProductionOrderService {
             AppError::business_displayable("返工订单号生成失败，请稍后重试")
         })?;
         txn.commit().await?;
-
-        // 注意：返工订单不触发 MRP 计算（返工使用已有物料，不产生新采购计划）
-        // 如需物料调整，由配方调整流程单独处理
 
         Ok(model)
     }

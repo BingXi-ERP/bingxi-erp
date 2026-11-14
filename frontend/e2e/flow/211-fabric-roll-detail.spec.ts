@@ -65,7 +65,7 @@ import { columnIndex, rowByText, rowCellText, waitFirstRow } from './table-colum
  * 假绿防线。每步写后按主键独立回读逐列比对；打卷产匹除 API 回读外，另开成品布入库标签
  * 对话框按卷号定位行、逐格读米数/重量/幅宽/克重/色号与实测入参比对；
  * 负例一律钉 HTTP 400 + 状态门或校验门机器码族（403/404/5xx 都不算门生效），
- * 并在被拒后回读原值确认零写入；卷号与 piece_seq 按写入方算式钉死（同缸第二匹必为 -002），
+ * 并在被拒后回读原值确认零写入；卷号与 piece_seq 按写入方算式钉死（同缸现有最大 seq 加一，
  * 不写成「非空即可」；时间列断为可解析的非空字符串，不接受 null 被转成 "null" 蒙过。
  */
 
@@ -211,6 +211,24 @@ async function readRollsOfInspection(
   return pieces
     .filter(p => Number(p.inspection_id) === inspectionId)
     .sort((a, b) => num(a.piece_seq) - num(b.piece_seq));
+}
+
+/**
+ * 功能 按写入方算式算出该缸下一匹细码应有的 piece_seq，即同缸现有最大 seq 加一。
+ * 调用方 本文件钉卷号与卷序号的各处断言。
+ * 入参 page 会话页；dyeLotNo 缸号；出参 交调用方拼 {缸号}-{seq:03} 并与产出行逐字段比对的正整数。
+ * 传给谁 只交给本文件的 toBe 判据，不落库不外传。
+ * 存什么 不存储。必须在打卷请求发出前实时取数：同一缸会被本文件多条用例先后打卷，序号取决于
+ *   届时已落库的匹数，写死某个定值会随用例执行次序与重跑次数变化而假红。
+ * 存哪里 无。
+ */
+async function nextLotPieceSeq(page: Page, dyeLotNo: string): Promise<number> {
+  const pieces = await readDyedPiecesByLot(page, dyeLotNo);
+  return pieces.reduce((max, p) => Math.max(max, num(p.piece_seq) || 0), 0) + 1;
+}
+
+function lotPieceNo(dyeLotNo: string, seq: number): string {
+  return `${dyeLotNo}-${String(seq).padStart(3, '0')}`;
 }
 
 /**
@@ -423,6 +441,9 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
     expect(gradeReadBack.abc_grade, '合格率 95 且无物理指标未通过项应为 A 级').toBe('A');
     expect(num(gradeReadBack.qualification_rate), '合格率应落提交值 95').toBe(95);
 
+    // 打卷前先取该缸下一序号：卷号与卷序号由届时同缸已落库的匹数决定，不能写死
+    const expectedSeq = await nextLotPieceSeq(page, lot.dyeLotNo);
+
     // 打卷：实测四列入卷
     const rolled = await apiCallRaw<Row>(page, 'POST', `${FI}/${id}/roll`, {
       warehouse_id: lot.warehouseId,
@@ -443,11 +464,15 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
     const rolls = await readRollsOfInspection(page, lot.dyeLotNo, id);
     expect(rolls.length, `本次打卷应产出 1 卷细码，实际 ${rolls.length}`).toBe(1);
     const rollPiece = rolls[0];
-    // 播种链已在该缸产出 1 匹（piece_seq=1），本卷按同缸序号递增口径应为 -002
-    expect(str(rollPiece.piece_no), '卷号必须按写入方口径为 {缸号}-{seq:03} 的同缸第二匹').toBe(
-      `${lot.dyeLotNo}-002`
-    );
-    expect(Number(rollPiece.piece_seq), '卷序号应为同缸递增后的 2').toBe(2);
+    // 卷号等于写入方算式的 {缸号}-{seq:03}，seq 为打卷前同缸最大序号加一
+    expect(
+      str(rollPiece.piece_no),
+      `卷号必须按写入方口径等于同缸递增序号 ${expectedSeq}，实际 ${JSON.stringify(rollPiece.piece_no)}`
+    ).toBe(lotPieceNo(lot.dyeLotNo, expectedSeq));
+    expect(
+      Number(rollPiece.piece_seq),
+      `卷序号应为同缸递增后的 ${expectedSeq}，实际 ${JSON.stringify(rollPiece.piece_seq)}`
+    ).toBe(expectedSeq);
     expect(str(rollPiece.barcode), '卷条码应与卷号同源').toBe(str(rollPiece.piece_no));
     expect(str(rollPiece.batch_no), '卷批次应回落缸号本身').toBe(lot.dyeLotNo);
     expect(str(rollPiece.dye_lot_no), '卷缸号应落真实缸号').toBe(lot.dyeLotNo);
@@ -475,7 +500,7 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
     await expect(dialog, '打卷后未打开成品布入库标签对话框').toBeVisible({ timeout: 30_000 });
     const labelTable = dialog.locator('.el-table').first();
     await waitFirstRow(labelTable);
-    const pieceNo = `${lot.dyeLotNo}-002`;
+    const pieceNo = lotPieceNo(lot.dyeLotNo, expectedSeq);
     expect(
       (await columnCellTextsIn(labelTable, await columnIndex(labelTable, '匹号'))).includes(
         pieceNo
@@ -528,6 +553,8 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
 
     await startInspection(page, id);
     await gradeInspection(page, id, { inspected_yards: '50.00' });
+    // 首卷卷号取决于本用例打卷前同缸已落库的匹数，先实量再打卷
+    const firstSeq = await nextLotPieceSeq(page, lot.dyeLotNo);
     await apiCallRaw(page, 'POST', `${FI}/${id}/roll`, {
       warehouse_id: lot.warehouseId,
       roll_length: '123.45',
@@ -575,10 +602,13 @@ test.describe.serial('验布打卷库存细码：逐卷出值、米数合计与�
       )}`
     ).toBe(true);
 
-    // 细码侧同样零新增：本单只产出一卷，卷号按同缸序号落 -002 且米数重量为打卷实测值
+    // 细码侧同样零新增：本单只产出一卷，卷号按同缸递增序号且米数重量为打卷实测值
     const rolls = await readRollsOfInspection(page, lot.dyeLotNo, id);
     expect(rolls.length, `本单应只产出 1 卷细码，实际 ${rolls.length}`).toBe(1);
-    expect(str(rolls[0].piece_no), '首卷卷号应为同缸 -002').toBe(`${lot.dyeLotNo}-002`);
+    expect(
+      str(rolls[0].piece_no),
+      `首卷卷号应为同缸递增序号 ${firstSeq}，实际 ${JSON.stringify(rolls[0].piece_no)}`
+    ).toBe(lotPieceNo(lot.dyeLotNo, firstSeq));
     expect(num(rolls[0].length), '首卷米数应独立保真').toBe(123.45);
     expect(num(rolls[0].weight), '首卷重量应独立保真').toBe(30.5);
 

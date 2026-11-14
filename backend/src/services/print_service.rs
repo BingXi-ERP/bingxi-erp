@@ -25,6 +25,19 @@ pub struct PrintData {
     pub image: Option<crate::utils::docx_export::DocxImage>,
 }
 
+/// 销售发货单打印上下文：聚合单据主体、客户/仓库/来源订单/制单人四个档案、
+/// 明细行、按行下标对齐的产品档案，以及 (产品编号, 色号) 到色号名称的字典
+struct SalesDeliveryPrintRelations {
+    record: crate::models::sales_delivery::Model,
+    customer: crate::models::customer::Model,
+    warehouse: crate::models::warehouse::Model,
+    order: crate::models::sales_order::Model,
+    creator: crate::models::user::Model,
+    items: Vec<crate::models::sales_delivery_item::Model>,
+    products: Vec<crate::models::product::Model>,
+    color_names: HashMap<(i32, String), String>,
+}
+
 /// 打印服务（V15 P0-S17：持有数据库连接，6 个 get_*_print_data 方法真实查询数据库）
 pub struct PrintService {
     db: Arc<DatabaseConnection>,
@@ -106,7 +119,6 @@ pub const SUPPORTED_DOC_TYPES: &[&str] = &[
     "ap_reconciliation",
     "purchase_inspection",
     "inventory_adjustment",
-    "bom",
     "material_shortage",
     "quality_8d_report",
     "labor_contract",
@@ -220,7 +232,6 @@ pub const PRINT_SCOPE_PENDING: &[&str] = &[
     "chemical_requisition",
     "export_inspection",
     "inventory_adjustment",
-    "bom",
     "labor_contract",
     "wage_record",
     "energy_consumption_record",
@@ -385,7 +396,6 @@ impl PrintService {
             "ap_reconciliation" => self.get_ap_reconciliation_print_data(doc_id).await,
             "purchase_inspection" => self.get_purchase_inspection_print_data(doc_id).await,
             "inventory_adjustment" => self.get_inventory_adjustment_print_data(doc_id).await,
-            "bom" => self.get_bom_print_data(doc_id).await,
             "material_shortage" => self.get_material_shortage_print_data(doc_id).await,
             "quality_8d_report" => self.get_quality_8d_report_print_data(doc_id).await,
             "labor_contract" => self.get_labor_contract_print_data(doc_id).await,
@@ -1986,90 +1996,257 @@ impl PrintService {
     }
 
     /// 销售发货单打印数据
+    ///
+    /// 出参键即 docx 正文栏名与明细表头。主表取客户、仓库、来源销售订单、制单人四个档案，
+    /// 明细取产品档案的名称编号规格与计量单位、色号档案的颜色名称；全部走批量关联查询，
+    /// 无逐行再查，档案缺席一律点名报错而非留空
     async fn get_sales_delivery_print_data(&self, id: i32) -> Result<PrintData, AppError> {
-        use crate::models::sales_delivery;
+        let relations = Self::fetch_sales_delivery_relations(&self.db, id).await?;
+        Ok(PrintData {
+            template: "sales_delivery".to_string(),
+            data: Self::build_sales_delivery_main_data(&relations),
+            items: Self::build_sales_delivery_item_list(&relations),
+            image: None,
+        })
+    }
 
-        use crate::models::sales_delivery_item;
+    /// 销售发货单打印：一次性取单据主体、四个关联档案、明细行、产品与色号名称字典
+    async fn fetch_sales_delivery_relations(
+        db: &DatabaseConnection,
+        id: i32,
+    ) -> Result<SalesDeliveryPrintRelations, AppError> {
+        use crate::models::{
+            customer, sales_delivery, sales_delivery_item, sales_order, user, warehouse,
+        };
 
         let record = sales_delivery::Entity::find_by_id(id)
-            .one(&*self.db)
+            .one(db)
             .await?
             .ok_or_else(|| AppError::not_found(format!("销售发货单 {} 未找到", id)))?;
+
+        let customer = record
+            .find_related(customer::Entity)
+            .one(db)
+            .await?
+            .ok_or_else(|| {
+                AppError::not_found(format!(
+                    "销售发货单 {} 的客户档案(ID={})缺失",
+                    id, record.customer_id
+                ))
+            })?;
+
+        let warehouse = record
+            .find_related(warehouse::Entity)
+            .one(db)
+            .await?
+            .ok_or_else(|| {
+                AppError::not_found(format!(
+                    "销售发货单 {} 的仓库档案(ID={})缺失",
+                    id, record.warehouse_id
+                ))
+            })?;
+
+        let order = record
+            .find_related(sales_order::Entity)
+            .one(db)
+            .await?
+            .ok_or_else(|| {
+                AppError::not_found(format!(
+                    "销售发货单 {} 的来源销售订单(ID={})缺失",
+                    id, record.order_id
+                ))
+            })?;
+
+        let creator = record
+            .find_related(user::Entity)
+            .one(db)
+            .await?
+            .ok_or_else(|| {
+                AppError::not_found(format!(
+                    "销售发货单 {} 的制单人账号(ID={})缺失",
+                    id, record.created_by
+                ))
+            })?;
 
         let items = sales_delivery_item::Entity::find()
             .filter(sales_delivery_item::Column::DeliveryId.eq(id))
             .order_by(sales_delivery_item::Column::Id, Order::Asc)
-            .all(&*self.db)
+            .all(db)
             .await?;
 
+        let products = Self::load_delivery_products(db, &items, id).await?;
+        let color_names = Self::load_delivery_color_names(db, &items).await?;
+
+        Ok(SalesDeliveryPrintRelations {
+            record,
+            customer,
+            warehouse,
+            order,
+            creator,
+            items,
+            products,
+            color_names,
+        })
+    }
+
+    /// 销售发货单打印：按明细行批量取产品档案，缺席行点名到具体产品编号
+    async fn load_delivery_products(
+        db: &DatabaseConnection,
+        items: &[crate::models::sales_delivery_item::Model],
+        id: i32,
+    ) -> Result<Vec<crate::models::product::Model>, AppError> {
+        use crate::models::product;
+
+        let loaded = items.load_one(product::Entity, db).await?;
+        let mut products = Vec::with_capacity(loaded.len());
+        for (item, found) in items.iter().zip(loaded) {
+            products.push(found.ok_or_else(|| {
+                AppError::not_found(format!(
+                    "销售发货单 {} 的明细产品档案(ID={})缺失",
+                    id, item.product_id
+                ))
+            })?);
+        }
+        Ok(products)
+    }
+
+    /// 销售发货单打印：按明细行的产品与色号批量取色号档案名称，键为 (产品编号, 色号)
+    /// 明细色号可以是色号档案之外的自由文本，未登记时该键缺席，出参留空由调用点如实体现
+    async fn load_delivery_color_names(
+        db: &DatabaseConnection,
+        items: &[crate::models::sales_delivery_item::Model],
+    ) -> Result<HashMap<(i32, String), String>, AppError> {
+        use crate::models::product_color;
+
+        let product_ids: Vec<i32> = items.iter().map(|item| item.product_id).collect();
+        if product_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let colors = product_color::Entity::find()
+            .filter(product_color::Column::ProductId.is_in(product_ids))
+            .all(db)
+            .await?;
+
+        Ok(colors
+            .into_iter()
+            .map(|color| ((color.product_id, color.color_no), color.color_name))
+            .collect())
+    }
+
+    /// 销售发货单打印：主表栏次；可空列按空串出参，非空档案缺席已在上游点名报错
+    fn build_sales_delivery_main_data(
+        relations: &SalesDeliveryPrintRelations,
+    ) -> HashMap<String, serde_json::Value> {
+        let record = &relations.record;
         let mut data = HashMap::new();
         data.insert(
-            "delivery_no".to_string(),
+            "单号".to_string(),
             serde_json::json!(record.delivery_no.clone()),
         );
-        data.insert("order_id".to_string(), serde_json::json!(record.order_id));
         data.insert(
-            "customer_id".to_string(),
-            serde_json::json!(record.customer_id),
-        );
-        data.insert(
-            "delivery_date".to_string(),
+            "送货日期".to_string(),
             serde_json::json!(record.delivery_date.format("%Y-%m-%d").to_string()),
         );
         data.insert(
-            "warehouse_id".to_string(),
-            serde_json::json!(record.warehouse_id),
+            "客户名称".to_string(),
+            serde_json::json!(relations.customer.customer_name.clone()),
         );
         data.insert(
-            "status".to_string(),
-            serde_json::json!(record.status.clone()),
+            "送货地址".to_string(),
+            serde_json::json!(relations.customer.address.clone().unwrap_or_default()),
         );
         data.insert(
-            "total_quantity".to_string(),
+            "发货仓库".to_string(),
+            serde_json::json!(relations.warehouse.name.clone()),
+        );
+        data.insert(
+            "来源销售订单号".to_string(),
+            serde_json::json!(relations.order.order_no.clone()),
+        );
+        data.insert("状态".to_string(), serde_json::json!(record.status.clone()));
+        data.insert(
+            "总数量".to_string(),
             serde_json::json!(record.total_quantity.to_string()),
         );
         data.insert(
-            "total_amount".to_string(),
+            "总金额(元)".to_string(),
             serde_json::json!(record.total_amount.to_string()),
         );
+        data.insert(
+            "制单人".to_string(),
+            serde_json::json!(
+                relations
+                    .creator
+                    .real_name
+                    .clone()
+                    .filter(|name| !name.trim().is_empty())
+                    .unwrap_or_else(|| relations.creator.username.clone())
+            ),
+        );
+        data.insert(
+            "备注".to_string(),
+            serde_json::json!(record.remarks.clone().unwrap_or_default()),
+        );
+        data
+    }
 
-        let mut item_list = Vec::with_capacity(items.len());
-        for item in items {
+    /// 销售发货单打印：明细栏次；产品与色号名称按行下标取自批量结果
+    fn build_sales_delivery_item_list(
+        relations: &SalesDeliveryPrintRelations,
+    ) -> Vec<HashMap<String, serde_json::Value>> {
+        let mut rows = Vec::with_capacity(relations.items.len());
+        for (item, product) in relations.items.iter().zip(relations.products.iter()) {
             let mut row = HashMap::new();
-            row.insert("product_id".to_string(), serde_json::json!(item.product_id));
+            row.insert("品名".to_string(), serde_json::json!(product.name.clone()));
+            row.insert("编号".to_string(), serde_json::json!(product.code.clone()));
             row.insert(
-                "batch_no".to_string(),
-                serde_json::json!(item.batch_no.clone()),
+                "规格".to_string(),
+                serde_json::json!(product.specification.clone().unwrap_or_default()),
             );
             row.insert(
-                "color_no".to_string(),
-                serde_json::json!(item.color_no.clone()),
+                "计量单位".to_string(),
+                serde_json::json!(product.unit.clone()),
+            );
+            row.insert("批次".to_string(), serde_json::json!(item.batch_no.clone()));
+            row.insert("色号".to_string(), serde_json::json!(item.color_no.clone()));
+            row.insert(
+                "颜色".to_string(),
+                serde_json::json!(
+                    relations
+                        .color_names
+                        .get(&(item.product_id, item.color_no.clone()))
+                        .cloned()
+                        .unwrap_or_default()
+                ),
             );
             row.insert(
-                "dye_lot_no".to_string(),
+                "缸号".to_string(),
                 serde_json::json!(item.dye_lot_no.clone()),
             );
             row.insert(
-                "quantity".to_string(),
+                "卷号".to_string(),
+                serde_json::json!(item.piece_no.clone().unwrap_or_default()),
+            );
+            row.insert(
+                "数量".to_string(),
                 serde_json::json!(item.quantity.to_string()),
             );
             row.insert(
-                "unit_price".to_string(),
+                "单价(元)".to_string(),
                 serde_json::json!(item.unit_price.to_string()),
             );
             row.insert(
-                "amount".to_string(),
+                "金额(元)".to_string(),
                 serde_json::json!(item.amount.to_string()),
             );
-            item_list.push(row);
+            row.insert(
+                "备注".to_string(),
+                serde_json::json!(item.remarks.clone().unwrap_or_default()),
+            );
+            rows.push(row);
         }
-
-        Ok(PrintData {
-            template: "sales_delivery".to_string(),
-            data,
-            items: item_list,
-            image: None,
-        })
+        rows
     }
 
     /// 应收账款收款单打印数据
@@ -3416,73 +3593,6 @@ impl PrintService {
 
         Ok(PrintData {
             template: "inventory_adjustment".to_string(),
-            data,
-            items: item_list,
-            image: None,
-        })
-    }
-
-    /// 物料清单打印数据
-    async fn get_bom_print_data(&self, id: i32) -> Result<PrintData, AppError> {
-        use crate::models::bom;
-
-        use crate::models::bom_item;
-
-        let record = bom::Entity::find_by_id(id)
-            .one(&*self.db)
-            .await?
-            .ok_or_else(|| AppError::not_found(format!("物料清单 {} 未找到", id)))?;
-
-        let items = bom_item::Entity::find()
-            .filter(bom_item::Column::BomId.eq(id))
-            .order_by(bom_item::Column::Id, Order::Asc)
-            .all(&*self.db)
-            .await?;
-
-        let mut data = HashMap::new();
-        data.insert(
-            "product_id".to_string(),
-            serde_json::json!(record.product_id),
-        );
-        data.insert("version".to_string(), serde_json::json!(record.version));
-        data.insert(
-            "is_default".to_string(),
-            serde_json::json!(record.is_default),
-        );
-        data.insert(
-            "status".to_string(),
-            serde_json::json!(record.status.clone()),
-        );
-
-        let mut item_list = Vec::with_capacity(items.len());
-        for item in items {
-            let mut row = HashMap::new();
-            row.insert(
-                "material_id".to_string(),
-                serde_json::json!(item.material_id),
-            );
-            row.insert(
-                "quantity".to_string(),
-                serde_json::json!(item.quantity.to_string()),
-            );
-            row.insert("unit".to_string(), serde_json::json!(item.unit.clone()));
-            // 打印出参口径 = API 百分比数值（与 bom_handler 读边界同源，
-            // 经 scrap_ratio_to_percent 换算；禁止直出 DECIMAL(5,4) 存储比率）
-            row.insert(
-                "scrap_rate".to_string(),
-                serde_json::json!(
-                    crate::services::bom_service::BomService::scrap_ratio_to_percent(
-                        item.scrap_rate
-                    )
-                    .map(|v| v.to_string())
-                    .unwrap_or_default()
-                ),
-            );
-            item_list.push(row);
-        }
-
-        Ok(PrintData {
-            template: "bom".to_string(),
             data,
             items: item_list,
             image: None,
@@ -5493,7 +5603,6 @@ impl PrintService {
             "ap_reconciliation" => "应付对账单",
             "purchase_inspection" => "采购质检单",
             "inventory_adjustment" => "库存调整单",
-            "bom" => "物料清单",
             "material_shortage" => "物料缺料预警",
             "quality_8d_report" => "8D质量报告",
             "labor_contract" => "劳动合同",
@@ -5525,10 +5634,13 @@ impl PrintService {
             other => other,
         };
 
-        // 主表键值对
-        let mut keys = Vec::with_capacity(print_data.data.len());
-        let mut values = Vec::with_capacity(print_data.data.len());
-        for (k, v) in print_data.data.iter() {
+        // 主表键值对：data 是 HashMap，迭代次序不固定，同一单据两次打印会栏次漂移，
+        // 渲染前按键排序出稳定次序
+        let mut ordered: Vec<(&String, &serde_json::Value)> = print_data.data.iter().collect();
+        ordered.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+        let mut keys = Vec::with_capacity(ordered.len());
+        let mut values = Vec::with_capacity(ordered.len());
+        for (k, v) in ordered {
             keys.push(k.clone());
             let v_str = match v {
                 serde_json::Value::String(s) => s.clone(),
@@ -5538,15 +5650,17 @@ impl PrintService {
         }
         let kv = crate::utils::docx_export::DocxKeyValue { keys, values };
 
-        // 明细表头与行：若 items 为空，则不输出明细表
+        // 明细表头与行：若 items 为空，则不输出明细表；表头次序同主表按列名排序固定
         let detail_headers: Vec<String> = if print_data.items.is_empty() {
             Vec::new()
         } else {
-            print_data
+            let mut headers: Vec<String> = print_data
                 .items
                 .first()
                 .map(|first| first.keys().cloned().collect())
-                .unwrap_or_default()
+                .unwrap_or_default();
+            headers.sort();
+            headers
         };
         let detail_rows: Vec<Vec<String>> = print_data
             .items

@@ -26,6 +26,19 @@ pub async fn list_industry_benchmarks(
     Ok(Json(ApiResponse::success(benchmarks)))
 }
 
+/// GET /api/v1/erp/industry-benchmarks/:id - 获取单个行业基准
+pub async fn get_industry_benchmark(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    _auth: AuthContext,
+) -> Result<Json<ApiResponse<industry_benchmark_config::Model>>, AppError> {
+    let benchmark = industry_benchmark_config::Entity::find_by_id(id)
+        .one(&*state.db)
+        .await?
+        .ok_or_else(|| AppError::not_found("行业基准不存在"))?;
+    Ok(Json(ApiResponse::success(benchmark)))
+}
+
 /// POST /api/v1/erp/industry-benchmarks - 创建行业基准
 pub async fn create_industry_benchmark(
     State(state): State<AppState>,

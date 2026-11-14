@@ -25,7 +25,7 @@
 //   写操作（seed 客户/订单与清理）由默认 e2e_admin 上下文完成（RBAC 全通、all scope），
 //   订单 created_by=管理员 id，self 角色越权读必然过不了 check_resource_owner。
 // 仍覆盖不到的风险点（如实标注，交回编排方）：
-//   当前角色种子里没有任何**非 admin** 角色持有 customers:read 权限码，
+//   当前角色种子里 salesperson 与 sales_manager 已按后端矩阵持 customers:read，其余非 admin 岗未持，
 //   因此「客户详情/360 数据范围层 403」（customer_ops/crud.rs:88-94、crm/cust.rs:159-165）
 //   在现有授权面下不可达——第 3 节用例只能如实钉 RBAC 层 403，钉不了 data-scope 层。
 import { test, expect } from '../diagnose-fixture';
@@ -165,15 +165,11 @@ test.describe('越权 IDOR/data-scope — 销售订单与客户（self 角色）
       expect(adminRead.id, 'admin 应读到自己的客户').toBe(customerId);
       expect(adminRead.customer_name, '客户详情应回读到落库名称').toBe(customerName);
 
-      for (const role of ['salesperson', 'customer_service']) {
+      // 客服岗未持 customers:read，此处的 403 只能钉 RBAC 中间件层（message 透传原文），
+      // 不得冒充数据范围层；已持键的销售岗改由下方分支钉行级数据范围，两层互斥各自钉死。
+      for (const role of ['customer_service']) {
         const session = await openRoleSession(browser, role);
         intruders.push(session);
-
-        // 现状种子权限里不存在任何非 admin 角色的 customers:read
-        //（global-setup SEED_ROLE_EXTRA_PERMISSIONS 未授予；后端 permission.rs 的
-        // sales_rep/crm_rep 授码对应角色不在前端种子键内）——
-        // 因此此处的 403 只能钉 RBAC 中间件层（message 直出原文），**不得**冒充数据范围层；
-        // 数据范围层（crud.rs:88-94）对他人客户不可达，作为覆盖缺口如实交回编排方。
         const cross = await apiCallExpectFail(session.page, 'GET', `/crm/customers/${customerId}`);
         expectDenied(cross, `${role} 读他人客户应返回 403（RBAC 层，权限码缺失）`);
         expect(
@@ -192,6 +188,30 @@ test.describe('越权 IDOR/data-scope — 销售订单与客户（self 角色）
           '权限不足，无法访问该资源'
         );
       }
+      // 销售岗经种子补键已真实持有 customers:read（与后端 sales_rep 矩阵同键），RBAC 已过门，
+      // 因此它的 403 只能来自 handler 行级数据范围校验（脱敏文案），且列表按 self 范围
+      // 读不到 admin 管辖的这条客户。两条判据合起来才钉住"持键不等于可读他人行"。
+      const keyed = await openRoleSession(browser, 'salesperson');
+      intruders.push(keyed);
+      const keyedCross = await apiCallExpectFail(keyed.page, 'GET', `/crm/customers/${customerId}`);
+      expectDenied(keyedCross, 'salesperson 持 customers:read 后读他人客户应被行级数据范围拒');
+      expect(
+        String(keyedCross.message),
+        '该 403 的来源层应是数据范围校验脱敏文案，不是 RBAC 直出原文'
+      ).toBe('无权限');
+      const keyedList = await apiCallRaw<{ items?: Array<{ id: number }> }>(
+        keyed.page,
+        'GET',
+        '/crm/customers?page=1&page_size=20'
+      );
+      expect(
+        Array.isArray(keyedList.items),
+        `客户列表应回分页信封 items 数组，实际 ${JSON.stringify(keyedList)}`
+      ).toBe(true);
+      expect(
+        keyedList.items!.some(r => Number(r.id) === customerId),
+        'self 数据范围不应看到 admin 管辖的这条客户'
+      ).toBe(false);
     } finally {
       await tryCleanup(page, 'DELETE', `/crm/customers/${customerId}`, 'customer');
       for (const s of intruders) await s.close();
@@ -301,15 +321,21 @@ test.describe('越权 IDOR/data-scope — 销售订单与客户（self 角色）
       );
       expectDenied(denied, 'salesperson(self) 对他人管辖客户揭示 PII 应 403');
 
-      // 同角色的列表读取被 RBAC 拦（customers:read 未授）——反证上面 403 的层归因：
-      // 同会话对**同一资源**的 reveal 已过 RBAC（有键）、list 未过（无键），
-      // 两次 403 都只以状态+机器码归因，不比对文案
-      const listDenied = await apiCallExpectFail(
-        intruder.page,
-        'GET',
-        '/crm/customers?page=1&page_size=5'
-      );
-      expectDenied(listDenied, 'salesperson 无 customers:read，列表应 403（RBAC 层）');
+      // 分层反证改用仍未持 customers:read 的客服岗：同一资源上"持键岗只被行级数据范围拒"
+      // 与"无键岗被 RBAC 拒"两类 403 必须可区分，否则本用例的层归因不成立。
+      // 销售岗已按后端 sales_rep 矩阵补该键，其列表读为 200 且按 self 范围不含他人行，
+      // 那条正向判据由本文件的越权分层用例钉，此处不重复也不退化。
+      const noKey = await openRoleSession(browser, 'customer_service');
+      try {
+        const listDenied = await apiCallExpectFail(
+          noKey.page,
+          'GET',
+          '/crm/customers?page=1&page_size=5'
+        );
+        expectDenied(listDenied, 'customer_service 无 customers:read，列表应 403（RBAC 层）');
+      } finally {
+        await noKey.close();
+      }
     } finally {
       await tryCleanup(page, 'DELETE', `/crm/customers/${customerId}`, 'customer');
       await intruder.close();

@@ -19,7 +19,6 @@ import {
   apiCall,
   apiCallRaw,
   genCode,
-  tryCleanup,
 } from '../flow/helpers';
 import { pickSelectIn, openScopedDropdown, dropdownItems } from '../flow/ui-helpers';
 import { cellInputByColumn } from '../flow/table-column';
@@ -103,11 +102,23 @@ async function clearProductSelection(itemsTable: Locator) {
   ).toBeVisible({ timeout: 10000 });
 }
 
+/**
+ * 报价单头级没有删除路由（路由快照 quotations 族只挂 GET/PUT 与动作 POST），在册的终止腿是
+ * POST /quotations/{id}/cancel：写 quotation 状态词表的 cancelled（全小写四值词表）退出活跃列表。
+ * 清理腿直接断响应里的状态值，不发不判。
+ */
 test.describe('04 明细选产品自动带出主档资料', () => {
   test.afterEach(async ({ page }) => {
     while (CREATED_QUOTATION_IDS.length) {
       const id = CREATED_QUOTATION_IDS.pop();
-      if (id != null) await tryCleanup(page, 'DELETE', `/quotations/${id}`, `quotation#${id}`);
+      if (id != null) {
+        const cancelled = await apiCallRaw<{ status: string }>(
+          page,
+          'POST',
+          `/quotations/${id}/cancel`
+        );
+        expect(cancelled.status, `报价单 ${id} 清理腿取消后状态应为 cancelled`).toBe('cancelled');
+      }
     }
     // 带出产品用后不删。ensureTestEntities 从全局产品池（GET /products 按 code 升序）取
     // productIds 首位并可能对其补写色号，本用例的 E2E-AF 编码恰好排序最前、且为无色的新建产品，

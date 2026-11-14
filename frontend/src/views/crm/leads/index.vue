@@ -338,8 +338,9 @@ const {
   setQueryParam,
 } = useTableApi<LeadRow>({
   url: '/crm/leads',
-  // 钉到后端真实键（crm_service::list_leads → json!({ data, total, page, page_size })）
-  listKey: 'data',
+  // 钉到后端真实键（services/crm/lead.rs 的 list_leads 产出 PaginatedResponse
+  // {items,total,page,page_size}，utils/response.rs 的唯一分页信封形状）
+  listKey: 'items',
   onError: (e: unknown) => logger.warn(t('crmLeads.message.loadListFailed'), String(e)),
 });
 

@@ -336,7 +336,7 @@ pub async fn get_locked_accounts(
     State(state): State<AppState>,
     _auth: AuthContext,
 ) -> Result<Json<ApiResponse<Vec<serde_json::Value>>>, AppError> {
-    use crate::models::log_login;
+    use crate::models::{log_login, user};
     use chrono::{Duration, Utc};
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
@@ -349,29 +349,47 @@ pub async fn get_locked_accounts(
         .all(state.db.as_ref())
         .await?;
 
-    let mut locked_users: std::collections::HashMap<String, (Option<i32>, i32, Option<String>)> =
+    let mut attempts_by_username: std::collections::HashMap<String, i32> =
         std::collections::HashMap::new();
-
     for login in &failed_logins {
-        // log_login.user_id 在用户不存在时为 None；保留 None 而非用 0 占位，
-        // 避免与"系统用户 id=0"在审计中混淆
-        let entry = locked_users.entry(login.username.clone()).or_insert((
-            login.user_id,
-            0,
-            login.login_time.map(|t| t.to_rfc3339()),
-        ));
-        entry.1 += 1;
+        *attempts_by_username
+            .entry(login.username.clone())
+            .or_insert(0) += 1;
     }
 
-    let locked_accounts: Vec<serde_json::Value> = locked_users
+    let locked_names: Vec<String> = attempts_by_username
+        .iter()
+        .filter(|(_, attempts)| **attempts >= MAX_FAILED_ATTEMPTS)
+        .map(|(username, _)| username.clone())
+        .collect();
+
+    if locked_names.is_empty() {
+        return Ok(Json(ApiResponse::success(Vec::new())));
+    }
+
+    // 解锁腿按用户主键定位，而 log_login.user_id 在密码校验失败上写的是占位 0（登录未成功前不取主键），
+    // 不能当解锁键；这里按用户名回查 users 取真实主键，查不到即该名无对应账号，id 出参为 null。
+    let id_by_username: std::collections::HashMap<String, i32> = user::Entity::find()
+        .filter(user::Column::Username.is_in(locked_names.iter().cloned()))
+        .all(state.db.as_ref())
+        .await?
         .into_iter()
-        .filter(|(_, (_, count, _))| *count >= MAX_FAILED_ATTEMPTS)
-        .map(|(username, (user_id, attempts, last_attempt))| {
+        .map(|row| (row.username, row.id))
+        .collect();
+
+    // failed_logins 已按登录时间倒序，逐名首次命中即该账号最近一次失败时间
+    let locked_accounts: Vec<serde_json::Value> = locked_names
+        .iter()
+        .map(|username| {
             serde_json::json!({
-                "id": user_id,
+                "id": id_by_username.get(username).copied(),
                 "username": username,
-                "lock_reason": format!("{} 次登录失败", attempts),
-                "locked_at": last_attempt,
+                "lock_reason": format!("{} 次登录失败", attempts_by_username[username]),
+                "locked_at": failed_logins
+                    .iter()
+                    .find(|l| &l.username == username)
+                    .and_then(|l| l.login_time)
+                    .map(|t| t.to_rfc3339()),
                 "unlock_at": None::<String>,
             })
         })

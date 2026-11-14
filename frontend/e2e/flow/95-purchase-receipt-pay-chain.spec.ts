@@ -679,10 +679,7 @@ test.describe('95 采购收货→入库→应付→付款 数值对账链', () =
       inspection_date: todayStr(),
     });
     const inspId = requireId(insp, '建质检单');
-    CLEANUP.push({
-      path: `/purchase/inspections/${inspId}`,
-      label: `purchase_inspection#${inspId}`,
-    });
+    // 采购质检单头级没有删除路由，靠本次运行唯一批次号与自建收货单隔离，本用例只按 inspId 回读。
     await apiCall(page, 'POST', `/purchase/inspections/${inspId}/complete`, {
       pass_quantity: '0',
       reject_quantity: '20',
@@ -757,10 +754,7 @@ test.describe('95 采购收货→入库→应付→付款 数值对账链', () =
       }
     );
     const cnRecordId = requireId(cnRecord, '中文结论质检记录');
-    CLEANUP.push({
-      path: `/production/quality-inspection/records/${cnRecordId}`,
-      label: `quality_inspection_record#${cnRecordId}`,
-    });
+    // 通用质检记录域没有删除路由，靠 genCode 生成的唯一 inspection_no 隔离，本用例只按 id 回读。
     const cnReadBack = await apiCallRaw<Record<string, unknown>>(
       page,
       'GET',
@@ -1090,7 +1084,7 @@ test.describe('95 采购收货→入库→应付→付款 数值对账链', () =
       notes: `E2E-F95-PAY1-${batch}`,
     });
     const pay1Id = requireId(pay1, '建第一笔付款单');
-    CLEANUP.push({ path: `/ap/payments/${pay1Id}`, label: `ap_payment#${pay1Id}` });
+    // 应付付款单没有删除路由（在册只有 create/confirm/update），靠唯一 notes 与后端唯一 payment_no 隔离。
     const pay1Head = await apiCallRaw<Record<string, unknown>>(
       page,
       'GET',
@@ -1272,7 +1266,7 @@ test.describe('95 采购收货→入库→应付→付款 数值对账链', () =
       notes: `E2E-F95-TAXPAY-${batch}`,
     });
     const payId = requireId(pay, '含税付款单');
-    CLEANUP.push({ path: `/ap/payments/${payId}`, label: `ap_payment#${payId}` });
+    // 应付付款单没有删除路由（在册只有 create/confirm/update），靠唯一 notes 与后端唯一 payment_no 隔离。
     await apiCall(page, 'PUT', `/ap/payments/${payId}`, {
       transaction_no: `E2E-F95-TXTN-${batch}`,
     });

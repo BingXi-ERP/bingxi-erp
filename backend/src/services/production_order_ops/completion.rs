@@ -8,14 +8,15 @@
 //! - record_production_cost（私有 &self）
 //! - complete_production_order（`pub(crate)` &self，被 crud 子模块 update_status 跨 impl 块调用）
 //! - handle_production_completion_inventory_txn / fetch_default_warehouse_txn / deduct_raw_materials_txn（私有 associated fn）
-//! - lookup_default_bom / lookup_bom_items / batch_load_stock_records / deduct_for_each_bom_item（私有 associated fn）
+//! - collect_for_order 聚合、load_yarn_codes / load_yarn_stock_rows / take_stock_row（私有 associated fn）
 //! - calculate_deduct_qty / record_production_consumption（私有 associated fn）
 //! - increase_finished_goods_txn / update_existing_finished_stock_txn / create_new_finished_stock_txn（私有 associated fn）
 //! - record_production_output_txn（私有 associated fn）
 //!
 //! 业务规则：
 //! - COMPLETED 状态变更在事务内执行（状态变更 + 库存联动），任一失败回滚全部
-//! - 原材料扣减按 BOM 用量 × 生产数量，加 FOR UPDATE 行锁防止并发丢失更新
+//! - 纱线扣减逐行取自流转卡投纱明细（绝对投入量），加 FOR UPDATE 行锁防止并发丢失更新
+//! - 投纱为空显式拒绝完工，不做无来源的静默放行
 //! - 成品入库按克重/幅宽换算 kg，加 FOR UPDATE 行锁防止并发丢失更新
 //! - 库存流水事件收集后由 commit 成功后统一 publish，避免事务回滚时幻事件
 //! - 排产状态变更走产能负荷校验（load_rate > 100 阻塞，> 80 warn）
@@ -27,20 +28,26 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
 };
 
-use crate::models::bom::{Column as BomColumn, Entity as BomEntity};
-use crate::models::bom_item::{Column as BomItemColumn, Entity as BomItemEntity};
+use crate::models::flow_card_material::{Model as FlowCardMaterialModel, UNIT_KG, UNIT_METER};
 use crate::models::inventory_stock::Entity as InventoryStockEntity;
 use crate::models::product::Entity as ProductEntity;
+use crate::models::production_flow_card::Model as FlowCardModel;
 use crate::models::production_order::{
     ActiveModel, Entity as ProductionOrderEntity, Model as ProductionOrderModel,
 };
 use crate::models::status::purchase_inventory::inventory_stock_grade;
 use crate::models::warehouse::Entity as WarehouseEntity;
 use crate::services::event_bus::{BusinessEvent, EVENT_BUS};
+use crate::services::flow_card_material_service::FlowCardMaterialService;
 use crate::utils::error::AppError;
 
 use super::types::ProductionOutputRecord;
 use crate::services::production_order_service::ProductionOrderService;
+
+/// 纱线库存行的定位键：仓库 × 纱线 × 批次 × 色号 × 等级。
+/// 缸号不进键里，因为投纱行允许未采集缸号；未采集时靠"该键下只剩一行"保证唯一命中，
+/// 剩下多行则显式拒绝，批次与缸维度不能在命中后被折平。
+type YarnStockLocator = (i32, i32, String, String, String);
 
 impl ProductionOrderService {
     /// 排产状态变更时进行产能负荷校验（批次 386 v13 复审 B-P2-5 修复：原 update_status 直接更新状态，；未校验工作中心产能负荷，导致超载工作中心仍可排产。）
@@ -245,8 +252,13 @@ impl ProductionOrderService {
         Ok(updated)
     }
 
-    /// 处理生产完成时的库存联动（事务版本）
-    /// 1. 查询产品默认BOM，扣减原材料库存（按BOM用量 × 生产数量）；2. 增加成品库存（生产数量）；3. 记录库存流水（PRODUCTION_CONSUMPTION 和 PRODUCTION_OUTPUT）；批次 9（2026-06-28）：从原 `handle_production_completion_inventory` 改造而来，；接受外部事务参数，所有查询/更新都在 `txn` 上执行；原材料库存查询加 FOR UPDATE 行锁，；防止并发完成多个生产订单时原材料库存被并发扣减导致丢失更新。；P2 1-4 修复：原函数 275 行混合 5 职责（仓库查询+数量校验+原材料扣减+成品入库+日志），；拆为 fetch_default_warehouse_txn / deduct_raw_materials_txn / increase_finished_goods_txn 3 个私有方法
+    /// 处理生产完成时的库存联动（事务版本）：按流转卡投纱扣减纱线库存、成品按生产数量入库、
+    /// 两侧各落一条库存流水（PRODUCTION_CONSUMPTION 与 PRODUCTION_OUTPUT）。
+    ///
+    /// 接受外部事务参数，所有查询与更新都在同一 `txn` 上执行，本函数不 commit；库存行加
+    /// FOR UPDATE 行锁，防止并发完成多张订单时扣减丢失更新。流水事件先收集，由调用方在
+    /// commit 成功后统一 publish，避免回滚时产生幻事件。
+    /// 拆为 fetch_default_warehouse_txn / deduct_raw_materials_txn / increase_finished_goods_txn。
     async fn handle_production_completion_inventory_txn(
         txn: &sea_orm::DatabaseTransaction,
         order: &ProductionOrderModel,
@@ -267,10 +279,8 @@ impl ProductionOrderService {
             ));
         }
 
-        // 3. 扣减原材料库存
-        pending_events.extend(
-            Self::deduct_raw_materials_txn(txn, order, &default_warehouse, production_qty).await?,
-        );
+        // 3. 按流转卡投纱明细扣减纱线库存（无投纱即拒绝完工，不静默放行）
+        pending_events.extend(Self::deduct_raw_materials_txn(txn, order).await?);
 
         // 4. 增加成品库存
         pending_events.extend(
@@ -298,175 +308,264 @@ impl ProductionOrderService {
             .ok_or_else(|| AppError::business("未找到可用仓库，无法执行库存联动"))
     }
 
-    /// P2 1-4 修复：扣减原材料库存（从 handle_production_completion_inventory_txn 抽取）
-    /// 查询产品默认BOM，按BOM用量 × 生产数量扣减原材料库存，记录 PRODUCTION_CONSUMPTION 流水；v16 批次 43 修复：循环外批量查询并锁定所有原材料库存记录，避免 N+1 查询；批次 9（2026-06-28）：FOR UPDATE 行锁批量获取，防止并发扣减丢失更新
+    /// 扣减纱线库存：扣料来源是该生产订单名下全部流转卡的投纱明细行，
+    /// 一投纱行一次扣减并落一条 PRODUCTION_CONSUMPTION 流水。
+    ///
+    /// 口径：
+    /// - 投纱数量是绝对投入量，不乘生产数量——布厂投的是采购来的成品纱线，
+    ///   不存在"单耗 × 产量"的展开关系。
+    /// - 库存行按 `仓库 × 纱线 × 批次 × 色号 × 等级` 定位；投纱行带缸号时再按缸号收敛到唯一行，
+    ///   未带缸号时要求该组维度下只剩一行，多行则显式拒绝，批次与缸维度不能在命中后被折平。
+    /// - 加行锁的库存查询在循环外批量完成，避免逐行查询与逐行锁。
+    /// - 投纱为空直接拒绝完工，不给无来源的静默放行。
     async fn deduct_raw_materials_txn(
         txn: &sea_orm::DatabaseTransaction,
         order: &ProductionOrderModel,
-        default_warehouse: &crate::models::warehouse::Model,
-        production_qty: Decimal,
-    ) -> Result<Vec<BusinessEvent>, AppError> {
-        let bom = Self::lookup_default_bom(txn, order.product_id).await?;
-
-        if let Some(bom) = bom {
-            let bom_items = Self::lookup_bom_items(txn, bom.id).await?;
-            let stock_map =
-                Self::batch_load_stock_records(txn, &bom_items, default_warehouse).await?;
-            Self::deduct_for_each_bom_item(
-                txn,
-                order,
-                default_warehouse,
-                production_qty,
-                &bom_items,
-                &stock_map,
-            )
-            .await
-        } else {
-            Ok(Vec::new())
-        }
-    }
-
-    async fn lookup_default_bom(
-        txn: &sea_orm::DatabaseTransaction,
-        product_id: i32,
-    ) -> Result<Option<crate::models::bom::Model>, AppError> {
-        BomEntity::find()
-            .filter(BomColumn::ProductId.eq(product_id))
-            .filter(BomColumn::IsDefault.eq(true))
-            .filter(BomColumn::Status.eq(crate::models::status::common::STATUS_ACTIVE))
-            .one(txn)
-            .await
-            .map_err(AppError::from)
-    }
-
-    async fn lookup_bom_items(
-        txn: &sea_orm::DatabaseTransaction,
-        bom_id: i32,
-    ) -> Result<Vec<crate::models::bom_item::Model>, AppError> {
-        BomItemEntity::find()
-            .filter(BomItemColumn::BomId.eq(bom_id))
-            .all(txn)
-            .await
-            .map_err(AppError::from)
-    }
-
-    async fn batch_load_stock_records(
-        txn: &sea_orm::DatabaseTransaction,
-        bom_items: &[crate::models::bom_item::Model],
-        default_warehouse: &crate::models::warehouse::Model,
-    ) -> Result<std::collections::HashMap<i32, crate::models::inventory_stock::Model>, AppError>
-    {
-        let material_ids: Vec<i32> = bom_items.iter().map(|b| b.material_id).collect();
-
-        if material_ids.is_empty() {
-            Ok(std::collections::HashMap::new())
-        } else {
-            let stocks = InventoryStockEntity::find()
-                .filter(crate::models::inventory_stock::Column::ProductId.is_in(material_ids))
-                .filter(
-                    crate::models::inventory_stock::Column::WarehouseId.eq(default_warehouse.id),
-                )
-                .lock_exclusive()
-                .all(txn)
-                .await?;
-
-            Ok(stocks.into_iter().map(|s| (s.product_id, s)).collect())
-        }
-    }
-
-    async fn deduct_for_each_bom_item(
-        txn: &sea_orm::DatabaseTransaction,
-        order: &ProductionOrderModel,
-        default_warehouse: &crate::models::warehouse::Model,
-        production_qty: Decimal,
-        bom_items: &[crate::models::bom_item::Model],
-        stock_map: &std::collections::HashMap<i32, crate::models::inventory_stock::Model>,
     ) -> Result<Vec<BusinessEvent>, AppError> {
         use crate::services::inventory_stock_service::InventoryStockService;
 
+        let inputs = FlowCardMaterialService::collect_for_order(txn, order.id).await?;
+
+        if inputs.is_empty() {
+            return Err(AppError::business(format!(
+                "生产订单 {} 没有流转卡投纱明细，无法扣减纱线库存；请先为该订单的流转卡登记投纱",
+                order.order_no
+            )));
+        }
+
+        let yarn_codes = Self::load_yarn_codes(txn, &inputs).await?;
+        let mut stock_index = Self::load_yarn_stock_rows(txn, &inputs).await?;
+
         let mut pending_events: Vec<BusinessEvent> = Vec::new();
 
-        for bom_item in bom_items {
-            let consumption_qty = (bom_item.quantity * production_qty).round_dp(4);
+        for (card, material) in &inputs {
+            let code = yarn_codes.get(&material.material_id).ok_or_else(|| {
+                AppError::business(format!(
+                    "投纱明细引用的纱线产品 ID {} 不存在，无法定位库存行",
+                    material.material_id
+                ))
+            })?;
 
-            let stock_record = stock_map
-                .get(&bom_item.material_id)
-                .cloned()
-                .ok_or_else(|| {
-                    AppError::business(format!(
-                        "原材料(ID={})在默认仓库中无库存记录，无法扣减",
-                        bom_item.material_id
-                    ))
-                })?;
+            let locator = (
+                material.warehouse_id,
+                material.material_id,
+                material.batch_no.clone(),
+                material.color_no.clone(),
+                material.grade.clone(),
+            );
 
-            let (qty_after_meters, qty_after_kg) = Self::calculate_deduct_qty(
-                bom_item.material_id,
-                stock_record.quantity_meters,
-                stock_record.quantity_kg,
-                consumption_qty,
-            )?;
+            let candidates = stock_index.get_mut(&locator).ok_or_else(|| {
+                AppError::business(format!(
+                    "纱线 {} 批次 {} 色号 {} 等级 {} 在仓库 ID {} 中没有库存行，无法扣减",
+                    code,
+                    material.batch_no,
+                    material.color_no,
+                    material.grade,
+                    material.warehouse_id
+                ))
+            })?;
 
-            InventoryStockService::update_stock_quantity_with_optimistic_lock_txn(
+            let stock = Self::take_stock_row(candidates, material, code)?;
+            let before_meters = stock.quantity_meters;
+            let before_kg = stock.quantity_kg;
+
+            let (deducted_meters, deducted_kg, after_meters, after_kg) =
+                Self::calculate_deduct_qty(code, material, before_meters, before_kg)?;
+
+            let updated = InventoryStockService::update_stock_quantity_with_optimistic_lock_txn(
                 txn,
-                stock_record.id,
-                qty_after_meters,
-                qty_after_kg,
-                stock_record.version,
+                stock.id,
+                after_meters,
+                after_kg,
+                stock.version,
             )
             .await?;
 
-            if let Some(ev) = Self::record_production_consumption(
+            tracing::info!(
+                order_no = %order.order_no,
+                flow_card_no = %card.card_no,
+                material_code = %code,
+                batch_no = %material.batch_no,
+                unit = %material.unit,
+                deducted_meters = %deducted_meters,
+                deducted_kg = %deducted_kg,
+                "流转卡投纱扣减纱线库存（deduct_raw_materials_txn）"
+            );
+
+            if let Some(event) = Self::record_production_consumption(
                 txn,
-                bom_item.material_id,
-                default_warehouse.id,
-                &stock_record,
-                consumption_qty,
-                qty_after_meters,
-                qty_after_kg,
                 order,
+                card,
+                &stock,
+                deducted_meters,
+                deducted_kg,
+                after_meters,
+                after_kg,
             )
             .await?
             {
-                pending_events.push(ev);
+                pending_events.push(event);
             }
+
+            stock_index.entry(locator).or_default().push(updated);
         }
 
         Ok(pending_events)
     }
 
-    fn calculate_deduct_qty(
-        material_id: i32,
-        qty_before_meters: Decimal,
-        qty_before_kg: Decimal,
-        consumption_qty: Decimal,
-    ) -> Result<(Decimal, Decimal), AppError> {
-        if qty_before_meters < consumption_qty {
-            return Err(AppError::business(format!(
-                "原材料(ID={})库存不足，需要 {}，当前库存 {}",
-                material_id, consumption_qty, qty_before_meters
-            )));
-        }
+    /// 批量取投纱行引用的纱线编号：拒绝文案与流水都要落到纱的编号，不能只报产品 ID。
+    async fn load_yarn_codes(
+        txn: &sea_orm::DatabaseTransaction,
+        inputs: &[(FlowCardModel, FlowCardMaterialModel)],
+    ) -> Result<std::collections::HashMap<i32, String>, AppError> {
+        let mut material_ids: Vec<i32> = inputs.iter().map(|(_, m)| m.material_id).collect();
+        material_ids.sort_unstable();
+        material_ids.dedup();
 
-        let qty_after_meters = qty_before_meters - consumption_qty;
+        let products = ProductEntity::find()
+            .filter(crate::models::product::Column::Id.is_in(material_ids))
+            .all(txn)
+            .await?;
 
-        let qty_after_kg = if qty_before_meters > Decimal::ZERO {
-            qty_before_kg - (qty_before_kg * consumption_qty / qty_before_meters)
-        } else {
-            qty_before_kg
-        };
-
-        Ok((qty_after_meters, qty_after_kg))
+        Ok(products.into_iter().map(|p| (p.id, p.code)).collect())
     }
 
+    /// 循环外批量加锁装载纱线库存行，并按定位键聚成候选组：同键多行即同批多缸。
+    async fn load_yarn_stock_rows(
+        txn: &sea_orm::DatabaseTransaction,
+        inputs: &[(FlowCardModel, FlowCardMaterialModel)],
+    ) -> Result<
+        std::collections::HashMap<YarnStockLocator, Vec<crate::models::inventory_stock::Model>>,
+        AppError,
+    > {
+        let mut warehouse_ids: Vec<i32> = inputs.iter().map(|(_, m)| m.warehouse_id).collect();
+        warehouse_ids.sort_unstable();
+        warehouse_ids.dedup();
+
+        let mut material_ids: Vec<i32> = inputs.iter().map(|(_, m)| m.material_id).collect();
+        material_ids.sort_unstable();
+        material_ids.dedup();
+
+        let rows = InventoryStockEntity::find()
+            .filter(crate::models::inventory_stock::Column::WarehouseId.is_in(warehouse_ids))
+            .filter(crate::models::inventory_stock::Column::ProductId.is_in(material_ids))
+            .lock_exclusive()
+            .all(txn)
+            .await?;
+
+        let mut index: std::collections::HashMap<YarnStockLocator, Vec<_>> =
+            std::collections::HashMap::new();
+        for row in rows {
+            index
+                .entry((
+                    row.warehouse_id,
+                    row.product_id,
+                    row.batch_no.clone(),
+                    row.color_no.clone(),
+                    row.grade.clone(),
+                ))
+                .or_default()
+                .push(row);
+        }
+
+        Ok(index)
+    }
+
+    /// 从同一组定位键的候选行里取走唯一命中的一行：带缸号按缸号收敛，不带缸号要求只剩一行。
+    fn take_stock_row(
+        candidates: &mut Vec<crate::models::inventory_stock::Model>,
+        material: &FlowCardMaterialModel,
+        code: &str,
+    ) -> Result<crate::models::inventory_stock::Model, AppError> {
+        if let Some(dye_lot_no) = material.dye_lot_no.as_deref() {
+            let position = candidates
+                .iter()
+                .position(|s| s.dye_lot_no.as_deref() == Some(dye_lot_no));
+            return match position {
+                Some(index) => Ok(candidates.remove(index)),
+                None => Err(AppError::business(format!(
+                    "纱线 {} 批次 {} 色号 {} 等级 {} 的库存中没有缸号 {}，无法扣减",
+                    code, material.batch_no, material.color_no, material.grade, dye_lot_no
+                ))),
+            };
+        }
+
+        if candidates.len() == 1 {
+            Ok(candidates.remove(0))
+        } else {
+            Err(AppError::business(format!(
+                "纱线 {} 批次 {} 色号 {} 等级 {} 在同一仓库有 {} 个缸，投纱行必须登记缸号才能扣减",
+                code,
+                material.batch_no,
+                material.color_no,
+                material.grade,
+                candidates.len()
+            )))
+        }
+    }
+
+    /// 按投纱单位落在对应计量列扣减：kg 扣公斤列，m 扣米数列；另一列按被命中库存行自身的
+    /// 米公斤比值等比随行，不借用其它批次的比值，也不做跨单位折算。
+    /// 返回（本次扣掉的米数，本次扣掉的公斤数，扣后米数，扣后公斤数）。
+    fn calculate_deduct_qty(
+        code: &str,
+        material: &FlowCardMaterialModel,
+        before_meters: Decimal,
+        before_kg: Decimal,
+    ) -> Result<(Decimal, Decimal, Decimal, Decimal), AppError> {
+        let qty = material.quantity;
+
+        if material.unit == UNIT_KG {
+            if before_kg < qty {
+                return Err(AppError::business(format!(
+                    "纱线 {} 批次 {} 的公斤库存不足，本次投入 {}，当前库存 {}",
+                    code, material.batch_no, qty, before_kg
+                )));
+            }
+
+            let after_kg = before_kg - qty;
+            let after_meters = if before_kg > Decimal::ZERO {
+                (before_meters * after_kg / before_kg).round_dp(4)
+            } else {
+                before_meters
+            };
+
+            Ok((Decimal::ZERO, qty, after_meters, after_kg))
+        } else if material.unit == UNIT_METER {
+            if before_meters < qty {
+                return Err(AppError::business(format!(
+                    "纱线 {} 批次 {} 的米数库存不足，本次投入 {}，当前库存 {}",
+                    code, material.batch_no, qty, before_meters
+                )));
+            }
+
+            let after_meters = before_meters - qty;
+            let after_kg = if before_meters > Decimal::ZERO {
+                (before_kg * after_meters / before_meters).round_dp(4)
+            } else {
+                before_kg
+            };
+
+            Ok((qty, Decimal::ZERO, after_meters, after_kg))
+        } else {
+            Err(AppError::business(format!(
+                "纱线 {} 批次 {} 的投纱单位 {} 不在允许取值内，无法扣减",
+                code, material.batch_no, material.unit
+            )))
+        }
+    }
+
+    /// 落一条 PRODUCTION_CONSUMPTION 流水：批次、色号、缸号、等级四项定位维度取自本次实际
+    /// 命中的库存行，扣减量按米与公斤两列分别记账。
     async fn record_production_consumption(
         txn: &sea_orm::DatabaseTransaction,
-        material_id: i32,
-        warehouse_id: i32,
-        stock_record: &crate::models::inventory_stock::Model,
-        consumption_qty: Decimal,
-        qty_after_meters: Decimal,
-        qty_after_kg: Decimal,
         order: &ProductionOrderModel,
+        card: &FlowCardModel,
+        stock: &crate::models::inventory_stock::Model,
+        deducted_meters: Decimal,
+        deducted_kg: Decimal,
+        after_meters: Decimal,
+        after_kg: Decimal,
     ) -> Result<Option<BusinessEvent>, AppError> {
         use crate::services::inventory_stock_query::RecordTransactionArgs;
         use crate::services::inventory_stock_service::InventoryStockService;
@@ -475,22 +574,25 @@ impl ProductionOrderService {
             txn,
             RecordTransactionArgs {
                 transaction_type: "PRODUCTION_CONSUMPTION".to_string(),
-                product_id: material_id,
-                warehouse_id,
-                batch_no: stock_record.batch_no.clone(),
-                color_no: stock_record.color_no.clone(),
-                dye_lot_no: stock_record.dye_lot_no.clone(),
-                grade: stock_record.grade.clone(),
-                quantity_meters: consumption_qty,
-                quantity_kg: Decimal::ZERO,
+                product_id: stock.product_id,
+                warehouse_id: stock.warehouse_id,
+                batch_no: stock.batch_no.clone(),
+                color_no: stock.color_no.clone(),
+                dye_lot_no: stock.dye_lot_no.clone(),
+                grade: stock.grade.clone(),
+                quantity_meters: deducted_meters,
+                quantity_kg: deducted_kg,
                 source_bill_type: Some("production_order".to_string()),
                 source_bill_no: Some(order.order_no.clone()),
                 source_bill_id: Some(i64::from(order.id)),
-                quantity_before_meters: Some(stock_record.quantity_meters),
-                quantity_before_kg: Some(stock_record.quantity_kg),
-                quantity_after_meters: Some(qty_after_meters),
-                quantity_after_kg: Some(qty_after_kg),
-                notes: Some(format!("生产消耗 - 订单 {}", order.order_no)),
+                quantity_before_meters: Some(stock.quantity_meters),
+                quantity_before_kg: Some(stock.quantity_kg),
+                quantity_after_meters: Some(after_meters),
+                quantity_after_kg: Some(after_kg),
+                notes: Some(format!(
+                    "生产消耗 - 订单 {} 流转卡 {} 纱批次 {}",
+                    order.order_no, card.card_no, stock.batch_no
+                )),
                 created_by: Some(order.created_by),
             },
         )

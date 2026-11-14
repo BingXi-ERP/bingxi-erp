@@ -791,6 +791,16 @@ pub async fn create_confirmation(
     auth: AuthContext,
     Json(req): Json<CreateConfirmationRequest>,
 ) -> Result<Json<ApiResponse<JsonValue>>, AppError> {
+    let data_scope_ctx = auth.to_data_scope_context();
+    let row = crate::models::ar_reconciliation::Entity::find_by_id(req.reconciliation_id)
+        .one(&*state.db)
+        .await?
+        .ok_or_else(|| AppError::not_found("对账单不存在".to_string()))?;
+    // 行级归属门（确认腿）：本端点是 /confirm 的别名腿，同样把 confirmed_by_customer 置真。
+    // 缺此门时任意持该 RBAC 键的用户可对他人客户的对账单代客户确认，把未确认的对账单
+    // 伪造成已确认。按父客户可见范围过门——不可见→403 + 固定脱敏文案，不触达 service。
+    ensure_reconciliation_customer_access(&state.db, &data_scope_ctx, row.customer_id).await?;
+
     info!(
         "用户 {} 为对账单 {} 触发客户确认",
         auth.username, req.reconciliation_id

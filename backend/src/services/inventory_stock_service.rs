@@ -535,29 +535,44 @@ impl InventoryStockService {
         query.all(&*self.db).await.map_err(AppError::from)
     }
 
-    // ========== 双计量单位自动计算辅助方法 ==========
+    // ========== 双计量单位口径 ==========
 
-    /// 自动计算公斤数（如果提供了克重和幅宽）
-    pub fn calculate_quantity_kg(
+    /// 决定一条面料库存记录落库的公斤数。
+    ///
+    /// 谁调它：直建端点入口 `handlers::inventory_stock_handler_fabric::create_stock_fabric`
+    /// （唯一知道"公斤数有没有被提交"的地方）。传给谁：结果作为 `CreateStockFabricArgs` 的
+    /// `quantity_kg` 交给 `create_stock_fabric` 落库；事务版
+    /// `inventory_stock_txn::create_stock_fabric_txn` 只消费上游算好的值，不重复判定。
+    /// 存哪里：`inventory_stocks.quantity_kg`。
+    ///
+    /// 入参：`submitted_kg` 提交的公斤数（None=未提交）、`quantity_meters` 米数、
+    /// `gram_weight` 克重(g/m²)、`width` 幅宽(cm，与 [`DualUnitConverter::meters_to_kg`] 同单位口径)。
+    ///
+    /// 三条口径：
+    /// 1. 提交过就原样用，绝不重算覆盖——公斤数是仓管实测录入的独立事实，实测与理论本就
+    ///    允许不等（回潮、零头、绕卷松紧），按 米×克重×门幅 重算等于销毁录入事实，
+    ///    并使按公斤口径的成本分摊与对账失真。
+    /// 2. 未提交且克重与幅宽齐备：走换算器补算，补算失败如实上报（`Err` 携带换算器原因），
+    ///    由调用方翻成校验错误；不咽掉失败回退成别的值。
+    /// 3. 未提交且克重或幅宽缺任一：不可算，记 `Decimal::ZERO`。0 是"未称量"的显式表达，
+    ///    任何由半套参数推出来的数都会被下游当成实测事实参与分摊，因此宁缺不猜。
+    ///
+    /// 建库写入方法自身不再做任何反算，两条建库路径因此对同一入参必然算出同一个值。
+    pub fn resolve_quantity_kg(
+        submitted_kg: Option<Decimal>,
         quantity_meters: Decimal,
         gram_weight: Option<Decimal>,
         width: Option<Decimal>,
-        fallback_quantity_kg: Decimal,
-    ) -> Decimal {
-        if let Some(gram_weight) = gram_weight {
-            if let Some(width) = width {
-                // 使用双计量单位转换器进行精确计算
-                match DualUnitConverter::meters_to_kg(quantity_meters, gram_weight, width) {
-                    Ok(kg) => return kg,
-                    Err(e) => {
-                        // 如果计算失败，回退到直接传入的公斤数
-                        tracing::warn!("双计量单位换算失败: {:?}，使用原始公斤数", e);
-                        return fallback_quantity_kg;
-                    }
-                }
-            }
+    ) -> Result<Decimal, String> {
+        if let Some(submitted_kg) = submitted_kg {
+            return Ok(submitted_kg);
         }
-        fallback_quantity_kg
+        match (gram_weight, width) {
+            (Some(gram_weight), Some(width)) => {
+                DualUnitConverter::meters_to_kg(quantity_meters, gram_weight, width)
+            }
+            (None, _) | (_, None) => Ok(Decimal::ZERO),
+        }
     }
 
     /// 创建库存（面料行业版）（批次 338 v10 复审 P3 修复：签名从 13 参数改为单一参数对象 `CreateStockFabricArgs`，；消除 `clippy::too_many_arguments` 警告。）
@@ -584,10 +599,11 @@ impl InventoryStockService {
         // P2 5-23 修复：service 层校验仓库/产品存在性，外键完整性不再仅依赖数据库
         Self::validate_stock_references(&*self.db, warehouse_id, product_id).await?;
 
-        // 自动计算公斤数（如果提供了克重和幅宽）
-        let final_quantity_kg =
-            Self::calculate_quantity_kg(quantity_meters, gram_weight, width, quantity_kg);
-
+        // 公斤数按调用方提交的事实原样落库，不在这里按 米×克重×门幅 反算覆盖：
+        // 反算得到的是理论重量，实测重量与之不等是常态（回潮、零头、绕卷松紧），
+        // 覆盖会把录入事实抹掉。换算补齐只在调用方未提交公斤数时发生，口径统一在
+        // `Self::resolve_quantity_kg`（由直建端点入口调用，本方法只消费其结果），
+        // 与事务版 `inventory_stock_txn::create_stock_fabric_txn` 的落库口径保持一致。
         let active_stock = Self::build_stock_fabric_active(StockFabricFields {
             warehouse_id,
             product_id,
@@ -596,7 +612,7 @@ impl InventoryStockService {
             dye_lot_no,
             grade,
             quantity_meters,
-            final_quantity_kg,
+            final_quantity_kg: quantity_kg,
             gram_weight,
             width,
             location_id,
@@ -819,8 +835,8 @@ impl InventoryStockService {
             production_date,
             expiry_date,
         } = args;
-        let meters = Decimal::from_f64_retain(quantity_meters).unwrap_or(Decimal::ZERO);
-        let kg = Decimal::from_f64_retain(quantity_kg).unwrap_or(Decimal::ZERO);
+        let meters = crate::utils::decimal::from_f64(quantity_meters).unwrap_or(Decimal::ZERO);
+        let kg = crate::utils::decimal::from_f64(quantity_kg).unwrap_or(Decimal::ZERO);
         let batch = inventory_stock::ActiveModel {
             // id 交由 SERIAL 序列生成；显式 Set(0) 会写入主键 0 并在第二次插入时主键冲突
             id: NotSet,
@@ -848,8 +864,8 @@ impl InventoryStockService {
             // 面料行业字段
             quantity_meters: Set(meters),
             quantity_kg: Set(kg),
-            gram_weight: Set(gram_weight.and_then(Decimal::from_f64_retain)),
-            width: Set(width.and_then(Decimal::from_f64_retain)),
+            gram_weight: Set(gram_weight.and_then(crate::utils::decimal::from_f64)),
+            width: Set(width.and_then(crate::utils::decimal::from_f64)),
             production_date: Set(production_date),
             expiry_date: Set(expiry_date),
             stock_status: Set(inventory_stock_status::NORMAL.to_string()),
@@ -871,7 +887,7 @@ impl InventoryStockService {
     /// f64 入参 → Decimal 落库值：转换失败（NaN/Inf/溢出）如实报校验错误，
     /// 不得 `unwrap_or(ZERO)` 硬造 0 假值落库（旧实现即静默兜底形态）。
     fn to_batch_decimal(v: f64) -> Result<Decimal, AppError> {
-        Decimal::from_f64_retain(v).ok_or_else(|| {
+        crate::utils::decimal::from_f64(v).ok_or_else(|| {
             AppError::validation_displayable(format!("数值无法转换为十进制（NaN/Inf/溢出）：{v}"))
         })
     }
@@ -985,8 +1001,9 @@ impl InventoryStockService {
             .await
             .map_err(|e| AppError::database(format!("开启事务失败：{}", e)))?;
 
-        let transfer_meters = Decimal::from_f64_retain(quantity_meters).unwrap_or(Decimal::ZERO);
-        let transfer_kg = Decimal::from_f64_retain(quantity_kg).unwrap_or(Decimal::ZERO);
+        let transfer_meters =
+            crate::utils::decimal::from_f64(quantity_meters).unwrap_or(Decimal::ZERO);
+        let transfer_kg = crate::utils::decimal::from_f64(quantity_kg).unwrap_or(Decimal::ZERO);
 
         // 1. 校验源批次存在且库存充足
         let source = inventory_stock::Entity::find_by_id(id)
@@ -994,14 +1011,18 @@ impl InventoryStockService {
             .await
             .map_err(|e| AppError::database(format!("获取批次失败：{}", e)))?
             .ok_or_else(|| AppError::not_found("源批次不存在"))?;
-        if source.quantity_available < transfer_meters {
+        if source.quantity_available < transfer_meters || source.quantity_kg < transfer_kg {
             return Err(AppError::bad_request("库存数量不足"));
         }
 
         // 2. 扣减源批次
+        // 建档时 quantity_on_hand/quantity_available 与 quantity_meters/quantity_kg 写成同值，
+        // 转移必须四列同笔扣减；只扣前两列会让主辅计量列停在转移前的旧值，读面米数与在库数从此分叉。
         let mut source_am: inventory_stock::ActiveModel = source.clone().into();
         source_am.quantity_on_hand = Set(source.quantity_on_hand - transfer_meters);
         source_am.quantity_available = Set(source.quantity_available - transfer_meters);
+        source_am.quantity_meters = Set(source.quantity_meters - transfer_meters);
+        source_am.quantity_kg = Set(source.quantity_kg - transfer_kg);
         source_am.updated_at = Set(Utc::now());
         source_am
             .update(&txn)
@@ -1023,6 +1044,8 @@ impl InventoryStockService {
                 let mut t: inventory_stock::ActiveModel = existing.clone().into();
                 t.quantity_on_hand = Set(existing.quantity_on_hand + transfer_meters);
                 t.quantity_available = Set(existing.quantity_available + transfer_meters);
+                t.quantity_meters = Set(existing.quantity_meters + transfer_meters);
+                t.quantity_kg = Set(existing.quantity_kg + transfer_kg);
                 t.updated_at = Set(Utc::now());
                 t.update(&txn)
                     .await

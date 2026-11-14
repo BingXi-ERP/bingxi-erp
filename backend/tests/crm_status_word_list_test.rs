@@ -1,7 +1,7 @@
 //! CRM 状态词表与「生效的」库层 CHECK 同源性回归（确定性文本+常量比对，不依赖活库）。
 //!
 //! 背景（漂移长期没被 CI 抓到的根因）：`backend/tests/` 下 bad_debt / bpm / po / quotation /
-//! dye_recipe / mrp 等都各有一份 `*status_word_list*` 守卫测试锁死「Rust 常量 == 迁移 CHECK」，
+//! dye_recipe 等都各有一份 `*status_word_list*` 守卫测试锁死「Rust 常量 == 迁移 CHECK」，
 //! **唯独 CRM 没有**。CRM 三套词表（`crm_lead.lead_status`、`crm_opportunity.opportunity_stage`、
 //! `crm_opportunity.opportunity_status`）的权威源是 `models/status/bpm_crm_contract.rs` 里的
 //! `crm_lead::ALL` / `crm_opportunity::ALL_STAGES` / `ALL_STATUSES`，DB 侧兜底 CHECK 定义在迁移
