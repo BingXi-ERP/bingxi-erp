@@ -39,3 +39,19 @@ models/audit_log.rs 现有列直读结论：
 ## 四、排期约束
 
 超折扣阈值审批门的落点是 services/quotation_approval_service.rs，该文件此刻在 fix/main-e2e-red-batch2-1103（PR #1171）里正被改（+9/-3）。同一枚 hub 文件不并行改，这枚补齐排在 #1171 合入之后，届时基于新主干顶点另开车道，并按配对门禁同时补 e2e。
+
+## 五、逐条复核结案与存活清单（2026-11-14）
+
+对上文「经复核确认为真」的六条逐条再核现态：
+
+已结案（后续轮不再取证）：
+
+- 超折扣审批门：已由 #1183 落地（badbca4c3「feat(quotation): 超折扣审批门与阈值配置面」，已在主干），quotation_approval_service.rs 现经 QuotationDiscountService.evaluate 判折扣档，阈值读单行配置表缺行 fail-closed。结案。
+- 幂等键缺失：已由 #1216 落地（8ab81cf00，middleware/idempotency.rs + 474 用例），已在主干。结案。
+
+存活（均为用户可见 UX 或产品口径变更，不擅动，待拍板）：
+
+- v-permission 无权限按钮 removeChild 而非灰化加 tooltip（目标 4.1 O 节）：现态 directives/permission.ts 两处 removeChild 未变。不能轻动的证据：全仓 246 处 v-permission 使用点；e2e 面 481（「v-permission 应移除该 form-item」count==0）与 482（「不应渲染公告卡片」count==0）的断言语义与移除行为直接耦合，改灰化后元素仍在 DOM，count() 翻红，须同支改用例且 481/482 刚随 #1190 收口。「移除」与「灰化+说明」是两种产品口径的取舍，交用户裁定。
+- 列表筛选/排序/分页不入 URL：useTableApi.ts 仍无路由（全文无 router/route 引用），被 109 个视图消费，改 URL 态波及面同样属产品口径，待拍板。
+- 面料字段前端零面（余码/打样逐版/缸号补录）：parent_piece_id 仅在 inventory-transfer.ts 类型声明出现，views 层无任何余码显示与 version_label 引用，仍「后端有列前端缺半边」。建新页面属功能补齐立项，待拍板。
+- 移动端专项清单（第二节）：useBreakpoint 现量 4 个视图（较登记时 3 个 +1），其余项（灯箱/手势放大/压缩上传/云打印/弱网缓存/审批卡片）现态未变，整体属移动端体验批次，待排期拍板。
