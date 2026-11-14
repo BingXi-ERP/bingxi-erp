@@ -34,6 +34,15 @@ use crate::models::scheduler_job_run;
 /// 执行历史错误摘要的最大保留长度（超长截断，防错误风暴灌表）
 const ERROR_MESSAGE_MAX_LEN: usize = 2000;
 
+/// 失败摘要截断：超长错误按字符截到保留上限，防错误风暴灌表
+fn error_summary(e: String) -> String {
+    if e.chars().count() > ERROR_MESSAGE_MAX_LEN {
+        e.chars().take(ERROR_MESSAGE_MAX_LEN).collect()
+    } else {
+        e
+    }
+}
+
 /// 定时触发词表（scheduler_job_runs.trigger）
 pub const TRIGGER_SCHEDULE: &str = "schedule";
 
@@ -92,12 +101,8 @@ async fn run_once_recorded(
                 active.error_message = Set(None);
             }
             Err(e) => {
-                let mut msg = e.clone();
-                if msg.chars().count() > ERROR_MESSAGE_MAX_LEN {
-                    msg = msg.chars().take(ERROR_MESSAGE_MAX_LEN).collect();
-                }
                 active.status = Set(STATUS_FAILED.to_string());
-                active.error_message = Set(Some(msg));
+                active.error_message = Set(Some(error_summary(e)));
             }
         }
         if let Err(e) = active.update(db.as_ref()).await {
@@ -302,5 +307,42 @@ impl SchedulerRegistry {
 impl Default for SchedulerRegistry {
     fn default() -> Self {
         Self::new(None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 短错误原样保留
+    #[test]
+    fn error_summary_short_passthrough() {
+        assert_eq!(error_summary("短错误".to_string()), "短错误");
+    }
+
+    /// 超长错误按字符截到上限（中文按字符数不按字节，多字节不截半字）
+    #[test]
+    fn error_summary_truncates_long_multibyte() {
+        let long = "错".repeat(ERROR_MESSAGE_MAX_LEN + 100);
+        let out = error_summary(long);
+        assert_eq!(out.chars().count(), ERROR_MESSAGE_MAX_LEN);
+        assert!(out.starts_with("错"));
+    }
+
+    /// 恰在上限的长度不截
+    #[test]
+    fn error_summary_exact_limit_untouched() {
+        let exact = "a".repeat(ERROR_MESSAGE_MAX_LEN);
+        assert_eq!(error_summary(exact.clone()), exact);
+    }
+
+    /// 词表常量与迁移列注释口径逐字符一致
+    #[test]
+    fn trigger_and_status_vocab_constants() {
+        assert_eq!(TRIGGER_SCHEDULE, "schedule");
+        assert_eq!(TRIGGER_MANUAL, "manual");
+        assert_eq!(STATUS_RUNNING, "running");
+        assert_eq!(STATUS_SUCCESS, "success");
+        assert_eq!(STATUS_FAILED, "failed");
     }
 }
