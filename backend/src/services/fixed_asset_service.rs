@@ -32,6 +32,9 @@ mod no_prefix {
     pub const DISPOSAL_NO: &str = "D";
     /// 盘点计划号（fixed_asset_counts.count_no UNIQUE：migration/src/domain/v15/mod.rs uk_fac_count_no）
     pub const COUNT_NO: &str = "FAC";
+    /// 处置凭证号（vouchers.voucher_no UNIQUE：m0006 :103）。凭证行不随资产删除、
+    /// 序列单调；与前缀 D 的处置号域分开，避免处置行被清理后号回退重发撞残留凭证
+    pub const DISPOSAL_VOUCHER_NO: &str = "FAD-";
 }
 
 /// 导出分批取数的单批行数，取本服务对外分页的既有上限，
@@ -699,7 +702,17 @@ impl FixedAssetService {
     ) -> Result<(), AppError> {
         use crate::models::{voucher, voucher_item};
 
-        let voucher_no = format!("FAD-{}", disposal.disposal_no);
+        // 凭证号必须由 vouchers 表自身取号（本域行随资产删除也永不清理，序列单调）：
+        // 旧拼法 FAD-{处置号} 在「处置 A→删 A→处置 B」链上，处置行随资产删除使
+        // 处置号回退重发，与资产 A 残留的凭证行撞 vouchers_voucher_no_key，事务 500。
+        let voucher_no = DocumentNumberGenerator::generate_no_with_width_txn(
+            txn,
+            no_prefix::DISPOSAL_VOUCHER_NO,
+            voucher::Entity,
+            voucher::Column::VoucherNo,
+            DocumentNumberGenerator::DEFAULT_SEQ_WIDTH,
+        )
+        .await?;
         let summary = format!("固定资产处置-{}-{}", asset.asset_no, disposal.disposal_type);
 
         // 创建凭证主表
