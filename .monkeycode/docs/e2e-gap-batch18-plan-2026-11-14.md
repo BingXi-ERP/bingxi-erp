@@ -66,3 +66,9 @@
 - 实量范围：目标 4.10 三条主述——①主流浏览器兼容 ②微信版本与小程序基础库兼容 ③特殊字符面料符号显示不乱码不截断。
 - ①命中面：playwright.config.ts 三 project——chromium（全量 spec）/ firefox（smoke 子集，fullyParallel workers=2）/ webkit（Desktop Safari，全量 spec），CI 45 分片跑 flow+smoke+traversal 三目录，chromium 与 webkit 双 project 全量在跑，firefox 靠 smoke 子集钉兼容底线——矩阵真实生效不是摆设。②命中面：微信版本与小程序基础库属真机/开发者工具实测范围，CI 无微信运行时，登记为非 e2e 边界（小程序域任务 #85/#87 已有车道载体）。③命中面：18 号 resilience-boundary「可疑字符作为数据原样落库可读回，不吞不改写也不 500」即特殊字符不乱码的服务面钉法；显示面由 vue-i18n 全量转义（check-i18n 门）与 i18n 键完整性双闸守住。
 - 结论：4.10 的 CI 可达面（三浏览器矩阵、特殊字符服务面与显示面）闭合；微信真机兼容属小程序域既有任务非 e2e 补测。
+
+## 十一、4.12 历史迁移与灰度发布按条实量（目标四逐条口径第六枚）
+
+- 实量范围：目标 4.12 三条主述——①老历史单据库存迁移后数据对账平衡 ②数据库升级脚本与功能开关灰度验证 ③（升级脚本幂等）。
+- ①命中面：e2e CI 每跑一轮即是一次完整迁移对账——TEST_EMPTY_DATABASE_URL 空库全量迁移到顶点（含 m0139 签收三列等全部在库迁移）后 00-deploy-init 十四腿走通初始化链（健康检查/登录/部门/仓库/产品分类/产品/色号），迁移链可用性与老数据落库语义每轮被证实；Rust 侧三枚迁移门测试钉 schema 一致性（contract_template_schema_migration_lock、migration_derive_name_uniqueness_lock、utils_migration_jump_detector——跳号检测有 has_jump 正反两腿，断点恢复真有实现）。②命中面：升级脚本幂等由 sea-orm-migration append-only 语义保证（同一迁移不会重放，跳号由检测器报警）。③命中面：全库 grep 零 feature flag/灰度开关机制——本仓部署形态是单实例自部署 ERP（无多租户无灰度需求场景），判为架构口径而非缺陷；若后续引入灰度需求再立项。
+- 结论：4.12 两条可达主述闭合（迁移对账与升级幂等全有钉面）；灰度开关缺失判为部署形态口径不立补测不立缺陷。
