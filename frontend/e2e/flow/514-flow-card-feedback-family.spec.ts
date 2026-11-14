@@ -1,26 +1,5 @@
-// 流转卡工序质量反馈族用例（批十七 514，E2E 补测批二真缺口）
-//
-// 选题判据。后端五枚端点全部挂在 flow_card_handler 的工序质量反馈段
-// （POST /flow-cards/feedbacks 建反馈、GET /flow-cards/feedbacks/{id} 详情、
-// POST /flow-cards/feedbacks/{id}/handle 处理、POST /flow-cards/feedbacks/{id}/close
-// 关闭、GET /flow-cards/{flow_card_id}/feedbacks 按卡列表），e2e 全树 grep 真实
-// 调用点仅 24 号 spec 一处对按卡列表做 verifyEndpointHealthy 健康检查，五个端点的
-// 业务写面零覆盖；覆盖缺口登记文档批二候选写的是配料审批三枚，经 grep 已被 487 号
-// spec 全覆盖属陈旧语料，故本支落反馈族。
-//
-// 写入方口径。状态机唯一事实源在 flow_card_ops/feedback.rs：
-// create 落小写 pending，handle 无处理结果落 processing、有处理结果落 resolved，
-// close 只允许 resolved 转 closed；closed 状态再 handle 被拒。建单人取服务端会话，
-// found_by 是业务归属由请求体录入。出参是 process_quality_feedback::Model 全字段
-// 序列化（snake_case）。中文词表（feedback_type 与 severity 的取值）按建表默认与
-// 常量词表核对，本用例用面料业务真实取值：feedback_type 用 quality 异常上报。
-//
-// 造数纪律。前置自建：流转卡由 24 号同款链造出可反馈的卡（建卡即存在，不依赖
-// 库里恰好有数据）；反馈单按本用例自建自用，不与其它用例共享行；关闭腿的非法
-// 前置用第二张反馈单造（建出 pending 直接 close 断被拒），两条腿互不污染。
-
 import { test, expect, type Page } from '../diagnose-fixture';
-import { apiCall, apiCallRaw, apiCallExpectFail, ensureTestEntities } from './helpers';
+import { apiCall, apiCallRaw, apiCallExpectFail, ensureTestEntities, getCtx } from './helpers';
 
 type Row = Record<string, unknown>;
 
@@ -39,23 +18,23 @@ function expectStatusChar(status: unknown, expected: string, label: string): voi
   expect(status, `${label} 词值逐字符比对`).toBe(expected);
 }
 
-/** 建一张可反馈的流转卡并回读 id（造数链与 24 号同款：建卡即存在） */
 async function createFlowCard(page: Page): Promise<number> {
-  const products = await apiCallRaw<{ items: Array<Row> }>(
-    page,
-    'GET',
-    '/products?page=1&page_size=20'
-  );
-  const product = products.items?.[0];
-  expect(product, '共享实体面 products 至少一行').toBeTruthy();
-  const productId = readNumber(product.id, '产品 id');
-
-  const created = await apiCallRaw<Row>(page, 'POST', '/production/flow-cards', {
+  const productId = readNumber(getCtx().productIds[0], '前置产品 id');
+  const order = await apiCallRaw<Row>(page, 'POST', '/production/production-orders/orders', {
     product_id: productId,
-    quantity: 100,
+    planned_quantity: 100,
+  });
+  const productionOrderId = readNumber(order.id, '前置生产订单 id');
+  const created = await apiCallRaw<Row>(page, 'POST', '/production/flow-cards', {
+    production_order_id: productionOrderId,
+    product_id: productId,
+    planned_fabric_weight: 100,
     remarks: '514 反馈族用例卡',
   });
   const cardId = readNumber(created.id, '流转卡 id');
+  const detail = await apiCallRaw<Row>(page, 'GET', `/production/flow-cards/${cardId}`);
+  expect(Number(detail.production_order_id), '流转卡关联本用例生产订单').toBe(productionOrderId);
+  expect(Number(detail.product_id), '流转卡关联前置产品').toBe(productId);
   return cardId;
 }
 
@@ -67,9 +46,9 @@ async function createFeedback(
 ): Promise<{ feedbackId: number; status: string }> {
   const fb = await apiCallRaw<Row>(page, 'POST', '/production/flow-cards/feedbacks', {
     flow_card_id: flowCardId,
-    feedback_type: 'quality',
+    feedback_type: 'abnormal',
     description,
-    severity: 'major',
+    severity: 'high',
     remarks: '514 用例自建',
   });
   const id = readNumber(fb.id, '反馈单 id');
