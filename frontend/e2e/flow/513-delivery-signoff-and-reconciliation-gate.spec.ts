@@ -127,7 +127,7 @@ async function shipFullAndReadDelivery(
     `/sales/orders/${orderId}/deliveries`
   );
   const delivery = res.items?.find(d => String(d.status) === 'shipped');
-  expect(delivery, '发货后存在 shipped 送货单').toBeTruthy();
+  if (!delivery) throw new Error('发货后不存在 shipped 送货单');
   return {
     deliveryId: readNumber(delivery.id, '送货单 id'),
     deliveryNo: String(delivery.delivery_no ?? ''),
@@ -168,9 +168,13 @@ test('513-01 签收事实三列落库，状态列不动', async ({ page }) => {
   const { deliveryId } = await shipFullAndReadDelivery(page, orderId, productId, qty, batchNo);
 
   // 签收前三列必须全空
-  const before = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${orderId}/deliveries`);
+  const before = await apiCallRaw<{ items: Array<Row> }>(
+    page,
+    'GET',
+    `/sales/orders/${orderId}/deliveries`
+  );
   const beforeRow = before.items?.find(d => Number(d.id) === deliveryId);
-  expect(beforeRow, '签收前送货单行存在').toBeTruthy();
+  if (!beforeRow) throw new Error('签收前送货单行不存在');
   expect(beforeRow.delivered_at, '签收前 delivered_at 为空').toBeNull();
   expect(beforeRow.signed_at, '签收前 signed_at 为空').toBeNull();
   expect(beforeRow.signed_by, '签收前 signed_by 为空').toBeNull();
