@@ -460,6 +460,9 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     }
     ctx.productColorIds = [created.data.id];
     ctx.colorNos = [`E2E-C${Date.now().toString().slice(-6)}`];
+    // 契约锚点恢复：既有用例（21a 等）以「productIds[0] 拥有 colorNos[0]」取配对，
+    // 自建色号挂在末位产品上，把该专属产品提到首位保住这条配对假设。
+    ctx.productIds = [ownProductId, ...ctx.productIds.filter(id => id !== ownProductId)];
   }
 
   // ---- 4. 供应商（本 worker 自建自持，不复用库里的共享行）----
