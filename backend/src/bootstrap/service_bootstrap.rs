@@ -125,32 +125,15 @@ pub async fn bootstrap_full_mode(
     )?;
 
     start_failover_monitor(&app_state);
-    start_report_subscription_scheduler(&app_state);
-    start_color_card_issue_scheduler(&app_state);
-    // 邮件队列后台 Worker（扫描 PENDING 邮件 + 指数退避重试）
-    start_email_queue_worker(&app_state);
-    // 公众号通知重试队列 Worker（扫描 PENDING 队列行 + 指数退避重投模板消息）
-    start_wechat_mp_outbox_worker(&app_state);
-    // 导出合规审查定时任务（每日扫描 + 6 类异常导出行为识别）
-    start_export_compliance_scheduler(&app_state);
-    // 追踪数据 90 天保留策略（page_views/user_behaviors 归档清理）
-    start_tracking_cleanup_scheduler(&app_state);
-    // 库存告警通知调度器（扫描库存告警 + 推送通知）
-    start_stock_alert_notification_scheduler(&app_state);
-    // 供应商评估定时调度（每季度/每年自动触发评估）
-    start_supplier_evaluation_scheduler(&app_state);
-    // 定时推送后台调度（扫描到期推送订阅并触发推送）
-    start_notification_push_scheduler(&app_state);
+    // 周期任务统一收编进 SchedulerRegistry（A.6.1）：各任务实现 Scheduler trait
+    // （enabled 门/初始延迟/间隔覆盖随实现走），此处只注册与启动，句柄统一入
+    // MAIN_BACKGROUND_TASKS 供停机 abort。
+    let scheduler_handles = start_registered_schedulers(&app_state, settings).await;
+    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
+        tasks.extend(scheduler_handles);
+    }
     // PDA/工控终端心跳超时清理任务（默认每 60 秒扫描一次超时设备）
     start_device_connection_cleanup_task(&app_state);
-    // 财务预警扫描调度（四类预警按 background_jobs.finance_alert_scan 周期生成）
-    start_finance_alert_scan_scheduler(&app_state, settings);
-    // 催收任务自动生成调度（按应收账龄周期建单，受派人来自配置）
-    start_collection_task_auto_generate_scheduler(&app_state, settings);
-    // 劳动合同到期扫描调度（到期合同状态自动流转）
-    start_labor_contract_expiry_scheduler(&app_state, settings);
-    // ES 搜索索引对账补偿调度（以 PG 为权威源重建已同步索引）
-    start_es_reconcile_scheduler(&app_state, settings);
     init_event_bus(&app_state, settings).await;
     init_assist_dimensions(&app_state).await;
     seed_product_categories(&app_state).await;
@@ -171,8 +154,6 @@ pub async fn bootstrap_full_mode(
     }
     // 启动权限合规审查定时任务（异常权限分配识别 + 定期合规审查）
     start_permission_compliance_review(&app_state);
-    // 启动审计日志分级保留清理调度
-    start_audit_cleanup_scheduler(&app_state);
 
     Ok((app_state, shutdown_handles))
 }
@@ -702,37 +683,6 @@ fn start_failover_monitor(app_state: &AppState) {
     );
 }
 
-/// 启动报表订阅调度任务（默认每 60 秒扫描到期订阅并发送邮件通知）。
-fn start_report_subscription_scheduler(app_state: &AppState) {
-    let scheduler = std::sync::Arc::new(
-        crate::services::report_subscription_scheduler::ReportSubscriptionScheduler::new(
-            app_state.db.clone(),
-        ),
-    );
-    let scheduler_handle = scheduler.start_background_task();
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(scheduler_handle);
-    }
-    info!("报表订阅调度任务已启动（默认每 60 秒扫描一次到期订阅）");
-}
-
-/// 启动色卡发放过期检查调度任务。
-/// 默认每 24 小时扫描一次过期发放记录并自动标记为 cancelled，同时恢复色卡库存。
-/// 环境变量门控：COLOR_CARD_ISSUE_EXPIRY_CHECK_ENABLED（默认 true）/ COLOR_CARD_ISSUE_EXPIRY_CHECK_INTERVAL_SECS（默认 86400）。
-fn start_color_card_issue_scheduler(app_state: &AppState) {
-    let scheduler = std::sync::Arc::new(
-        crate::services::color_card_issue_scheduler::ColorCardIssueExpiryScheduler::new(
-            app_state.db.clone(),
-            Some(app_state.audit_log.clone()),
-        ),
-    );
-    let scheduler_handle = scheduler.start_background_task();
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(scheduler_handle);
-    }
-    info!("色卡发放过期检查调度任务已启动（默认每 24 小时扫描一次过期发放记录）");
-}
-
 /// 启动邮件队列后台 Worker。
 ///
 /// 默认每 60 秒扫描一次 PENDING 邮件并通过 EmailService 实际发送：
@@ -740,133 +690,19 @@ fn start_color_card_issue_scheduler(app_state: &AppState) {
 /// - 失败按指数退避（60s/300s/1800s）重试，超过 3 次转入 FAILED 死信
 /// - 附件通过 SendGrid base64 编码方式发送
 ///
-/// 环境变量门控：
-/// - `EMAIL_QUEUE_WORKER_ENABLED`（默认 "true"）— 设为 "false" / "0" 时跳过启动
-/// - `EMAIL_QUEUE_WORKER_INTERVAL_SECS`（默认 60）— 扫描间隔
-fn start_email_queue_worker(app_state: &AppState) {
-    let worker = std::sync::Arc::new(crate::services::email_queue_worker::EmailQueueWorker::new(
-        app_state.db.clone(),
-    ));
-    let worker_handle = worker.start_background_task();
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(worker_handle);
-    }
-    info!("邮件队列后台 Worker 已启动（默认每 60 秒扫描一次 PENDING 邮件，含指数退避重试）");
-}
-
 /// 启动公众号通知重试队列 Worker。
 ///
-/// 与邮件队列 Worker 同模式：每 60 秒扫描一次 PENDING 队列行（环境变量
-/// `WECHAT_MP_OUTBOX_WORKER_INTERVAL_SECS` 可调），失败按指数退避重投，3 次转死信。
-fn start_wechat_mp_outbox_worker(app_state: &AppState) {
-    let worker = std::sync::Arc::new(
-        crate::services::wechat_mp_notification_outbox_worker::WechatMpNotificationOutboxWorker::new(
-            app_state.db.clone(),
-        ),
-    );
-    let worker_handle = worker.start_background_task();
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(worker_handle);
-    }
-    info!(
-        "公众号通知重试队列 Worker 已启动（默认每 60 秒扫描一次 PENDING 队列行，含指数退避重投）"
-    );
-}
-
 /// 启动导出合规审查定时任务。
 ///
 /// 默认每 24 小时执行一次合规审查，扫描前一天的 print/export 操作并识别 6 类异常：
 /// 高频导出 / 大批量导出 / 非工作时间导出 / 离职用户导出 / 跨权限导出 / 敏感数据无审批导出。
 ///
-/// 环境变量门控：
-/// - `EXPORT_COMPLIANCE_CHECK_ENABLED`（默认 true）/ `EXPORT_COMPLIANCE_CHECK_INTERVAL_SECS`（默认 86400）。
-fn start_export_compliance_scheduler(app_state: &AppState) {
-    let service = std::sync::Arc::new(
-        crate::services::export_compliance_service::ExportComplianceService::new(
-            app_state.db.clone(),
-            app_state.audit_log.clone(),
-        ),
-    );
-    let handle = service.start_background_task();
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(handle);
-    }
-    info!(
-        "导出合规审查定时任务已启动（默认每 24 小时扫描前一天 print/export 操作，识别 6 类异常行为）"
-    );
-}
-
 /// 启动追踪数据 90 天保留策略定时任务。
 ///
 /// 默认每 24 小时执行一次清理，将超过 retention_days 的 page_views / user_behaviors
 /// 明细按 (date, path|event_type) 聚合到 page_view_daily_summary /
 /// user_behavior_daily_summary 后批量删除明细，避免明细表无限膨胀。
 ///
-/// 环境变量门控：
-/// - `TRACKING_CLEANUP_ENABLED`（默认 true）/ `TRACKING_CLEANUP_INTERVAL_SECS`（默认 86400）
-/// - `TRACKING_RETENTION_DAYS`（默认 90，对应《个人信息保护法》数据最小化原则）
-fn start_tracking_cleanup_scheduler(app_state: &AppState) {
-    let retention_days = std::env::var("TRACKING_RETENTION_DAYS")
-        .ok()
-        .and_then(|v| v.parse::<i32>().ok())
-        .filter(|&v| v > 0)
-        .unwrap_or(crate::services::tracking_cleanup_service::DEFAULT_RETENTION_DAYS);
-    let service = std::sync::Arc::new(
-        crate::services::tracking_cleanup_service::TrackingCleanupService::new(
-            app_state.db.clone(),
-            retention_days,
-        ),
-    );
-    let handle = service.start_background_task();
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(handle);
-    }
-    info!(
-        retention_days,
-        "追踪数据 90 天保留策略任务已启动（默认每 24 小时扫描一次过期 page_views/user_behaviors 明细并归档）"
-    );
-}
-
-/// 启动库存告警通知调度器
-fn start_stock_alert_notification_scheduler(app_state: &AppState) {
-    let scheduler = std::sync::Arc::new(
-        crate::services::stock_alert_notification_scheduler::StockAlertNotificationScheduler::new(
-            app_state.db.clone(),
-        ),
-    );
-    let handle = scheduler.start_background_task();
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(handle);
-    }
-    info!("库存告警通知调度器已启动（默认每 6 小时扫描全量库存并推送告警通知）");
-}
-
-/// 15.2-1：启动供应商评估定时调度任务（每季度/每年自动触发评估）。
-fn start_supplier_evaluation_scheduler(app_state: &AppState) {
-    let handle = crate::services::supplier_evaluation_service::SupplierEvaluationService::start_evaluation_scheduler(
-        app_state.db.clone(),
-        MAIN_CANCELLATION_TOKEN.clone(),
-    );
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(handle);
-    }
-    info!("供应商评估定时调度任务已启动（默认每 24 小时检查评估触发条件）");
-}
-
-/// 16.2-D1：启动定时推送后台调度任务（扫描到期推送订阅并触发推送）。
-fn start_notification_push_scheduler(app_state: &AppState) {
-    let scheduler = std::sync::Arc::new(
-        crate::services::notification_scheduler::NotificationPushScheduler::new(
-            app_state.db.clone(),
-        ),
-    );
-    let handle = scheduler.start_background_task();
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(handle);
-    }
-    info!("定时推送后台调度任务已启动（默认每 60 秒扫描一次到期推送订阅）");
-}
-
 /// 启动设备连接心跳超时清理任务（默认 60s 扫描，超时标记 timeout）。
 // 环境变量门控：DEVICE_CONNECTION_CLEANUP_ENABLED(默认true) / DEVICE_HEARTBEAT_TIMEOUT_SECS(默认300) / DEVICE_CONNECTION_CLEANUP_INTERVAL_SECS(默认60)
 fn start_device_connection_cleanup_task(app_state: &AppState) {
@@ -928,132 +764,6 @@ fn start_device_connection_cleanup_task(app_state: &AppState) {
     }
 }
 
-/// 启动财务预警扫描调度（应收逾期/库存积压/现金缺口/预算超支四类预警的周期生成入口）。
-/// 开关与周期来自配置段 background_jobs.finance_alert_scan；句柄注册进 MAIN_BACKGROUND_TASKS，
-/// 循环受 MAIN_CANCELLATION_TOKEN 控制优雅退出。
-fn start_finance_alert_scan_scheduler(app_state: &AppState, settings: &AppSettings) {
-    let job = settings.background_jobs.finance_alert_scan.clone();
-    if !job.enabled {
-        info!("财务预警扫描调度已禁用（background_jobs.finance_alert_scan.enabled=false）");
-        return;
-    }
-    let scheduler = std::sync::Arc::new(
-        crate::services::finance_alert_scheduler::FinanceAlertScanScheduler::new(
-            app_state.db.clone(),
-            job.clone(),
-        ),
-    );
-    let handle = scheduler.start_background_task(MAIN_CANCELLATION_TOKEN.clone());
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(handle);
-    }
-    info!(
-        interval_secs = job.interval_secs,
-        "财务预警扫描调度已启动（每 {} 秒全量幂等扫描四类预警候选）", job.interval_secs
-    );
-}
-
-/// 启动催收任务自动生成调度（按应收账龄扫描逾期发票并幂等生成催收任务）。
-/// 受派人（assigned_to 为 NOT NULL 外键）取自配置 assign_user_id：未配置时记 warn 并跳过挂载，
-/// 绝不写死任何用户；轮内仍存在性预检（见 CollectionTaskAutoGenerateScheduler::scan_once）。
-fn start_collection_task_auto_generate_scheduler(app_state: &AppState, settings: &AppSettings) {
-    let job = settings
-        .background_jobs
-        .collection_task_auto_generate
-        .clone();
-    if !job.enabled {
-        info!(
-            "催收任务自动生成调度已禁用（background_jobs.collection_task_auto_generate.enabled=false）"
-        );
-        return;
-    }
-    let Some(assign_user_id) = job.assign_user_id else {
-        warn!(
-            "催收任务自动生成调度已启用但未配置受派人（background_jobs.collection_task_auto_generate.assign_user_id），跳过挂载：\
-             催收任务 assigned_to 为 NOT NULL 外键，自动生成必须先由部署方指定默认受派用户"
-        );
-        return;
-    };
-    let scheduler = std::sync::Arc::new(
-        crate::services::collection_task_scheduler::CollectionTaskAutoGenerateScheduler::new(
-            app_state.db.clone(),
-            job.clone(),
-            assign_user_id,
-        ),
-    );
-    let handle = scheduler.start_background_task(MAIN_CANCELLATION_TOKEN.clone());
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(handle);
-    }
-    info!(
-        interval_secs = job.interval_secs,
-        assign_user_id,
-        "催收任务自动生成调度已启动（每 {} 秒扫描逾期发票并按客户聚合建单）",
-        job.interval_secs
-    );
-}
-
-/// 启动劳动合同到期扫描调度（到期档位预警 + 已过期合同状态自动流转）。
-/// 扫描方法本身即含"已过期合同自动流转 expired"的真实写库副作用，周期触发使状态机闭环不再依赖人工调用。
-fn start_labor_contract_expiry_scheduler(app_state: &AppState, settings: &AppSettings) {
-    let job = settings.background_jobs.labor_contract_expiry_scan.clone();
-    if !job.enabled {
-        info!(
-            "劳动合同到期扫描调度已禁用（background_jobs.labor_contract_expiry_scan.enabled=false）"
-        );
-        return;
-    }
-    let scheduler = std::sync::Arc::new(
-        crate::services::labor_contract_expiry_scheduler::LaborContractExpiryScheduler::new(
-            app_state.db.clone(),
-            job.clone(),
-        ),
-    );
-    let handle = scheduler.start_background_task(MAIN_CANCELLATION_TOKEN.clone());
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(handle);
-    }
-    info!(
-        interval_secs = job.interval_secs,
-        "劳动合同到期扫描调度已启动（每 {} 秒全量扫描到期/临近到期合同）", job.interval_secs
-    );
-}
-
-/// 启动 ES 搜索索引对账补偿调度（以 PG 为权威源重建 customers/products/sales_orders 索引，
-/// 兑现客户/产品/销售订单同步失败路径 warn 文案中"靠补偿任务修复"的承诺）。
-/// ELASTICSEARCH_URL 未配置时搜索客户端为进程内 mock 存储（无跨进程最终一致性需求），跳过挂载。
-fn start_es_reconcile_scheduler(app_state: &AppState, settings: &AppSettings) {
-    let job = settings.background_jobs.es_reconcile.clone();
-    if !job.enabled {
-        info!("ES 对账补偿调度已禁用（background_jobs.es_reconcile.enabled=false）");
-        return;
-    }
-    if std::env::var("ELASTICSEARCH_URL")
-        .unwrap_or_default()
-        .is_empty()
-    {
-        info!("ES 对账补偿调度跳过挂载：ELASTICSEARCH_URL 未配置，搜索客户端为进程内 mock 存储");
-        return;
-    }
-    let scheduler = std::sync::Arc::new(
-        crate::services::es_reconcile_scheduler::EsReconcileScheduler::new(
-            app_state.db.clone(),
-            app_state.search_client.clone(),
-            job.clone(),
-        ),
-    );
-    let handle = scheduler.start_background_task(MAIN_CANCELLATION_TOKEN.clone());
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(handle);
-    }
-    info!(
-        interval_secs = job.interval_secs,
-        batch_size = job.batch_size,
-        "ES 对账补偿调度已启动（每 {} 秒以 PG 为权威源重建已同步索引）",
-        job.interval_secs
-    );
-}
-
 /// 启动事件总线监听器并按 Kafka 配置初始化事件总线。
 async fn init_event_bus(app_state: &AppState, settings: &AppSettings) {
     crate::services::event_bus::start_event_listener(
@@ -1077,26 +787,6 @@ fn start_permission_compliance_review(app_state: &AppState) {
         tasks.push(handle);
     }
     info!("权限合规审查定时任务已启动（14.10-C，受 MAIN_CANCELLATION_TOKEN 控制）");
-}
-
-/// 启动审计日志分级保留清理调度（标准 scheduler 模式）
-fn start_audit_cleanup_scheduler(app_state: &AppState) {
-    let retention_days = resolve_audit_retention_days();
-    let service = std::sync::Arc::new(
-        crate::services::audit_cleanup_service::AuditCleanupService::new(
-            app_state.db.clone(),
-            retention_days,
-        ),
-    );
-    let handle = service.start_cleanup_task(MAIN_CANCELLATION_TOKEN.clone());
-    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
-        tasks.push(handle);
-    }
-    info!(
-        retention_days,
-        "审计日志分级保留清理调度已启动（omni_audit_logs/audit_logs {}天, permission_change_audits/security_alert_logs 7年）",
-        retention_days
-    );
 }
 
 /// 启动时初始化 8 个辅助核算维度（幂等实现，失败仅 warn 不阻塞启动）。
@@ -1170,4 +860,121 @@ async fn init_es_indices() {
     } else {
         tracing::info!("ES 索引初始化完成（3 个索引：sales_orders/customers/products）");
     }
+}
+
+/// 周期任务统一注册中心启动（A.6.1 收编）
+///
+/// 13 个周期任务实现 Scheduler trait 后在此统一注册：env 门控与配置段门控由
+/// 各实现的 enabled() 承担，间隔覆盖与初始延迟同样随实现走。禁用的任务在
+/// start_all 内跳过（与历史自循环的"门控 false 即跳过启动"语义一致）。
+async fn start_registered_schedulers(
+    app_state: &AppState,
+    settings: &AppSettings,
+) -> Vec<tokio::task::JoinHandle<()>> {
+    use crate::utils::scheduler_framework::{Scheduler, SchedulerRegistry};
+
+    let mut registry = SchedulerRegistry::new();
+
+    // env 门控任务
+    registry.register(std::sync::Arc::new(
+        crate::services::report_subscription_scheduler::ReportSubscriptionScheduler::new(
+            app_state.db.clone(),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+    registry.register(std::sync::Arc::new(
+        crate::services::color_card_issue_scheduler::ColorCardIssueExpiryScheduler::new(
+            app_state.db.clone(),
+            Some(app_state.audit_log.clone()),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+    registry.register(std::sync::Arc::new(
+        crate::services::email_queue_worker::EmailQueueWorker::new(app_state.db.clone()),
+    ) as std::sync::Arc<dyn Scheduler>);
+    registry.register(std::sync::Arc::new(
+        crate::services::wechat_mp_notification_outbox_worker::WechatMpNotificationOutboxWorker::new(
+            app_state.db.clone(),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+    registry.register(std::sync::Arc::new(
+        crate::services::export_compliance_service::ExportComplianceService::new(
+            app_state.db.clone(),
+            app_state.audit_log.clone(),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+    registry.register(std::sync::Arc::new(
+        crate::services::tracking_cleanup_service::TrackingCleanupService::new(
+            app_state.db.clone(),
+            std::env::var("TRACKING_RETENTION_DAYS")
+                .ok()
+                .and_then(|v| v.parse::<i32>().ok())
+                .filter(|&v| v > 0)
+                .unwrap_or(crate::services::tracking_cleanup_service::DEFAULT_RETENTION_DAYS),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+    registry.register(std::sync::Arc::new(
+        crate::services::stock_alert_notification_scheduler::StockAlertNotificationScheduler::new(
+            app_state.db.clone(),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+    registry.register(std::sync::Arc::new(
+        crate::services::supplier_evaluation_service::SupplierEvaluationService::new(
+            app_state.db.clone(),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+    registry.register(std::sync::Arc::new(
+        crate::services::notification_scheduler::NotificationPushScheduler::new(
+            app_state.db.clone(),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+    // 审计日志分级保留清理（无门控，固定 24h）
+    registry.register(std::sync::Arc::new(
+        crate::services::audit_cleanup_service::AuditCleanupService::new(
+            app_state.db.clone(),
+            resolve_audit_retention_days(),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+
+    // 配置段门控任务（background_jobs.*）
+    registry.register(std::sync::Arc::new(
+        crate::services::finance_alert_scheduler::FinanceAlertScanScheduler::new(
+            app_state.db.clone(),
+            settings.background_jobs.finance_alert_scan.clone(),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+    // 催收任务受派人未配置时跳过挂载（与原启动器语义一致）
+    if let Some(assign_user_id) = settings
+        .background_jobs
+        .collection_task_auto_generate
+        .assign_user_id
+    {
+        registry.register(std::sync::Arc::new(
+            crate::services::collection_task_scheduler::CollectionTaskAutoGenerateScheduler::new(
+                app_state.db.clone(),
+                settings
+                    .background_jobs
+                    .collection_task_auto_generate
+                    .clone(),
+                assign_user_id,
+            ),
+        ) as std::sync::Arc<dyn Scheduler>);
+    }
+    registry.register(std::sync::Arc::new(
+        crate::services::labor_contract_expiry_scheduler::LaborContractExpiryScheduler::new(
+            app_state.db.clone(),
+            settings.background_jobs.labor_contract_expiry_scan.clone(),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+    registry.register(std::sync::Arc::new(
+        crate::services::es_reconcile_scheduler::EsReconcileScheduler::new(
+            app_state.db.clone(),
+            app_state.search_client.clone(),
+            settings.background_jobs.es_reconcile.clone(),
+        ),
+    ) as std::sync::Arc<dyn Scheduler>);
+
+    info!(
+        scheduler_count = registry.count(),
+        "周期任务统一注册中心启动完成"
+    );
+    registry.start_all(MAIN_CANCELLATION_TOKEN.clone()).await
 }

@@ -29,7 +29,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
-use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 use crate::config::settings::EsReconcileJob;
@@ -443,35 +442,39 @@ impl EsReconcileScheduler {
         }
         Ok(deleted)
     }
+}
 
-    /// 启动后台调度循环（受全局取消 Token 控制），返回 JoinHandle 供启动链注册与停机 abort。
-    pub fn start_background_task(
-        self: Arc<Self>,
-        cancel: CancellationToken,
-    ) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(self.job.initial_delay_secs)).await;
-            let interval = std::time::Duration::from_secs(self.job.interval_secs);
-            info!(
-                interval_secs = self.job.interval_secs,
-                batch_size = self.job.batch_size,
-                "ES 对账补偿调度运行中（每 {} 秒以 PG 为权威源重建 customers/products/sales_orders 索引）",
-                self.job.interval_secs
-            );
-            loop {
-                tokio::select! {
-                    _ = tokio::time::sleep(interval) => {
-                        match self.scan_once().await {
-                            Ok(()) => {}
-                            Err(e) => warn!(error = %e, "ES 对账补偿调度：本轮存在失败域，下一轮继续"),
-                        }
-                    }
-                    _ = cancel.cancelled() => {
-                        info!("ES 对账补偿调度收到取消信号，优雅退出");
-                        break;
-                    }
-                }
-            }
-        })
+#[async_trait::async_trait]
+impl crate::utils::scheduler_framework::Scheduler for EsReconcileScheduler {
+    fn name(&self) -> &str {
+        "es-reconcile-scheduler"
+    }
+
+    /// ELASTICSEARCH_URL 未配置时搜索客户端为进程内 mock 存储，无跨进程一致性
+    /// 需求，对账任务不挂载（与历史启动器跳过语义一致）
+    fn enabled(&self) -> bool {
+        if !self.job.enabled {
+            return false;
+        }
+        !std::env::var("ELASTICSEARCH_URL")
+            .unwrap_or_default()
+            .trim()
+            .is_empty()
+    }
+
+    fn interval_secs(&self) -> u64 {
+        self.job.interval_secs
+    }
+
+    fn initial_delay_secs(&self) -> u64 {
+        self.job.initial_delay_secs
+    }
+
+    fn enabled(&self) -> bool {
+        self.job.enabled
+    }
+
+    async fn run_once(&self) -> Result<(), String> {
+        self.scan_once().await
     }
 }

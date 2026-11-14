@@ -14,7 +14,6 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 /// 供应商评估定时调度默认间隔（秒）— 每 24 小时检查一次
@@ -612,69 +611,6 @@ impl SupplierEvaluationService {
         Ok(record)
     }
 
-    /// 启动供应商评估定时调度任务（15.2-1）
-    ///
-    /// 定时检查供应商评估是否需要触发，支持季度/年度评估周期。
-    /// 环境变量门控：
-    /// - `SUPPLIER_EVALUATION_SCHEDULER_ENABLED`（默认 "true"）— 设为 "false" 时跳过
-    /// - `SUPPLIER_EVALUATION_SCHEDULER_INTERVAL_SECS`（默认 86400=24h）— 扫描间隔
-    pub fn start_evaluation_scheduler(
-        db: Arc<DatabaseConnection>,
-        token: CancellationToken,
-    ) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            let enabled = std::env::var("SUPPLIER_EVALUATION_SCHEDULER_ENABLED")
-                .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
-                .unwrap_or(true);
-            if !enabled {
-                info!(
-                    "供应商评估调度器：环境变量 SUPPLIER_EVALUATION_SCHEDULER_ENABLED=false，跳过启动"
-                );
-                return;
-            }
-
-            let interval_secs = std::env::var("SUPPLIER_EVALUATION_SCHEDULER_INTERVAL_SECS")
-                .ok()
-                .and_then(|v| v.parse::<u64>().ok())
-                .filter(|&v| v > 0)
-                .unwrap_or(DEFAULT_EVALUATION_INTERVAL_SECS);
-
-            tokio::time::sleep(std::time::Duration::from_secs(
-                EVALUATION_INITIAL_DELAY_SECS,
-            ))
-            .await;
-
-            let interval = std::time::Duration::from_secs(interval_secs);
-            info!(
-                interval_secs,
-                "供应商评估调度器：后台任务已启动（每 {} 秒检查一次评估触发条件）", interval_secs
-            );
-
-            let service = Self::new(db);
-            loop {
-                tokio::select! {
-                    _ = tokio::time::sleep(interval) => {
-                        match service.run_evaluation_check().await {
-                            Ok(count) if count > 0 => {
-                                info!(count, "供应商评估调度器：本轮自动触发 {} 条评估", count);
-                            }
-                            Ok(_) => {
-                                // 无需触发的评估，静默
-                            }
-                            Err(e) => {
-                                warn!(error = %e, "供应商评估调度器：本轮检查失败，下次循环继续");
-                            }
-                        }
-                    }
-                    _ = token.cancelled() => {
-                        info!("供应商评估调度器：收到取消信号，优雅退出");
-                        break;
-                    }
-                }
-            }
-        })
-    }
-
     /// 执行一次评估检查：扫描需要触发评估的供应商并生成评估记录
     async fn run_evaluation_check(&self) -> Result<u64, AppError> {
         let now = Utc::now();
@@ -743,5 +679,40 @@ impl SupplierEvaluationService {
         }
 
         Ok(triggered)
+    }
+}
+
+/// 统一注册中心的调度器名
+const SUPPLIER_EVALUATION_SCHEDULER_NAME: &str = "supplier-evaluation-scheduler";
+
+#[async_trait::async_trait]
+impl crate::utils::scheduler_framework::Scheduler for SupplierEvaluationService {
+    fn name(&self) -> &str {
+        SUPPLIER_EVALUATION_SCHEDULER_NAME
+    }
+
+    fn interval_secs(&self) -> u64 {
+        std::env::var("SUPPLIER_EVALUATION_SCHEDULER_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(DEFAULT_EVALUATION_INTERVAL_SECS)
+    }
+
+    fn initial_delay_secs(&self) -> u64 {
+        EVALUATION_INITIAL_DELAY_SECS
+    }
+
+    fn enabled(&self) -> bool {
+        std::env::var("SUPPLIER_EVALUATION_SCHEDULER_ENABLED")
+            .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
+            .unwrap_or(true)
+    }
+
+    async fn run_once(&self) -> Result<(), String> {
+        self.run_evaluation_check()
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 }

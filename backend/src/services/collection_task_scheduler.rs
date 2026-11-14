@@ -13,7 +13,6 @@
 use std::sync::Arc;
 
 use sea_orm::{DatabaseConnection, EntityTrait};
-use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 use crate::config::settings::CollectionTaskAutoGenerateJob;
@@ -74,35 +73,27 @@ impl CollectionTaskAutoGenerateScheduler {
         );
         Ok(created.len())
     }
+}
 
-    /// 启动后台调度循环（受全局取消 Token 控制），返回 JoinHandle 供启动链注册与停机 abort。
-    pub fn start_background_task(
-        self: Arc<Self>,
-        cancel: CancellationToken,
-    ) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(self.job.initial_delay_secs)).await;
-            let interval = std::time::Duration::from_secs(self.job.interval_secs);
-            info!(
-                interval_secs = self.job.interval_secs,
-                assign_user_id = self.assign_user_id,
-                "催收任务自动生成调度运行中（每 {} 秒扫描逾期发票并按客户聚合建单）",
-                self.job.interval_secs
-            );
-            loop {
-                tokio::select! {
-                    _ = tokio::time::sleep(interval) => {
-                        match self.scan_once().await {
-                            Ok(_) => {}
-                            Err(e) => warn!(error = %e, "催收任务自动生成调度：本轮失败，下一轮继续"),
-                        }
-                    }
-                    _ = cancel.cancelled() => {
-                        info!("催收任务自动生成调度收到取消信号，优雅退出");
-                        break;
-                    }
-                }
-            }
-        })
+#[async_trait::async_trait]
+impl crate::utils::scheduler_framework::Scheduler for CollectionTaskAutoGenerateScheduler {
+    fn name(&self) -> &str {
+        "collection-task-auto-generate-scheduler"
+    }
+
+    fn interval_secs(&self) -> u64 {
+        self.job.interval_secs
+    }
+
+    fn initial_delay_secs(&self) -> u64 {
+        self.job.initial_delay_secs
+    }
+
+    fn enabled(&self) -> bool {
+        self.job.enabled
+    }
+
+    async fn run_once(&self) -> Result<(), String> {
+        self.scan_once().await.map(|_| ())
     }
 }

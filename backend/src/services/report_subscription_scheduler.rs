@@ -237,53 +237,6 @@ impl ReportSubscriptionScheduler {
         };
         Ok(recipients)
     }
-
-    /// 启动后台调度任务（参考 RecycleExecutor，先延迟 INITIAL_DELAY_SECS 秒再以默认 60 秒间隔循环）
-    /// 环境变量门控：ENABLED 默认 true（false/0 跳过）；INTERVAL_SECS 默认 60（扫描间隔）
-    pub fn start_background_task(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            let enabled = std::env::var("REPORT_SUBSCRIPTION_SCHEDULER_ENABLED")
-                .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
-                .unwrap_or(true);
-            if !enabled {
-                info!(
-                    "报表订阅调度器：环境变量 REPORT_SUBSCRIPTION_SCHEDULER_ENABLED=false，跳过启动"
-                );
-                return;
-            }
-
-            let interval_secs = std::env::var("REPORT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECS")
-                .ok()
-                .and_then(|v| v.parse::<u64>().ok())
-                .filter(|&v| v > 0)
-                .unwrap_or(DEFAULT_INTERVAL_SECS);
-
-            // 启动初始延迟
-            tokio::time::sleep(std::time::Duration::from_secs(INITIAL_DELAY_SECS)).await;
-
-            let interval = std::time::Duration::from_secs(interval_secs);
-            info!(
-                interval_secs,
-                "报表订阅调度器：后台任务已启动（每 {} 秒扫描一次到期订阅 + 待重试订阅）",
-                interval_secs
-            );
-
-            loop {
-                match self.scan_once().await {
-                    Ok(count) if count > 0 => {
-                        info!(count, "报表订阅调度器：本轮处理 {} 条订阅", count);
-                    }
-                    Ok(_) => {
-                        // 无到期订阅，静默
-                    }
-                    Err(e) => {
-                        warn!(error = %e, "报表订阅调度器：本轮扫描失败，下次循环继续");
-                    }
-                }
-                tokio::time::sleep(interval).await;
-            }
-        })
-    }
 }
 
 #[async_trait::async_trait]
@@ -293,7 +246,21 @@ impl Scheduler for ReportSubscriptionScheduler {
     }
 
     fn interval_secs(&self) -> u64 {
-        DEFAULT_INTERVAL_SECS
+        std::env::var("REPORT_SUBSCRIPTION_SCHEDULER_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(DEFAULT_INTERVAL_SECS)
+    }
+
+    fn initial_delay_secs(&self) -> u64 {
+        INITIAL_DELAY_SECS
+    }
+
+    fn enabled(&self) -> bool {
+        std::env::var("REPORT_SUBSCRIPTION_SCHEDULER_ENABLED")
+            .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
+            .unwrap_or(true)
     }
 
     async fn run_once(&self) -> Result<(), String> {

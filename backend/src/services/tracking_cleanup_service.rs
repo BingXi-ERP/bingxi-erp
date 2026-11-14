@@ -45,59 +45,6 @@ impl TrackingCleanupService {
         }
     }
 
-    /// 启动定期归档清理任务（默认每 24 小时执行一次）
-    pub fn start_background_task(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            let enabled = std::env::var("TRACKING_CLEANUP_ENABLED")
-                .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
-                .unwrap_or(true);
-            if !enabled {
-                tracing::info!("追踪数据清理：环境变量 TRACKING_CLEANUP_ENABLED=false，跳过启动");
-                return;
-            }
-
-            let interval_secs = std::env::var("TRACKING_CLEANUP_INTERVAL_SECS")
-                .ok()
-                .and_then(|v| v.parse::<u64>().ok())
-                .filter(|&v| v > 0)
-                .unwrap_or(DEFAULT_INTERVAL_SECS);
-
-            // 启动初始延迟，避开启动期高峰
-            tokio::time::sleep(std::time::Duration::from_secs(INITIAL_DELAY_SECS)).await;
-
-            tracing::info!(
-                retention_days = self.retention_days,
-                interval_secs,
-                "追踪数据清理：后台任务已启动（每 {} 秒扫描一次过期明细）",
-                interval_secs
-            );
-
-            let mut ticker = interval(Duration::from_secs(interval_secs));
-            loop {
-                ticker.tick().await;
-                // 单次清理 panic 隔离：避免单次失败导致整个循环退出
-                let result = AssertUnwindSafe(async {
-                    if let Err(e) = self.run_once().await {
-                        tracing::error!(error = %e, "追踪数据清理失败");
-                    }
-                })
-                .catch_unwind()
-                .await;
-                if let Err(panic_payload) = result {
-                    let panic_msg = panic_payload
-                        .downcast_ref::<String>()
-                        .map(|s| s.as_str())
-                        .or_else(|| panic_payload.downcast_ref::<&'static str>().copied())
-                        .unwrap_or("<非字符串 panic payload>");
-                    tracing::error!(
-                        panic = %panic_msg,
-                        "⚠ 追踪数据清理 spawn 任务内 panic 已被隔离，清理循环继续运行"
-                    );
-                }
-            }
-        })
-    }
-
     /// 单轮清理：依次归档并删除 page_views 与 user_behaviors 过期明细
     pub async fn run_once(&self) -> Result<CleanupStats, AppError> {
         let page_view_archived = self.archive_page_views().await?;
@@ -297,4 +244,39 @@ pub struct TrackingStats {
     pub newest_page_view: Option<String>,
     pub oldest_user_behavior: Option<String>,
     pub newest_user_behavior: Option<String>,
+}
+
+/// 统一注册中心的调度器名
+const TRACKING_CLEANUP_SCHEDULER_NAME: &str = "tracking-cleanup-scheduler";
+
+#[async_trait::async_trait]
+impl crate::utils::scheduler_framework::Scheduler for TrackingCleanupService {
+    fn name(&self) -> &str {
+        TRACKING_CLEANUP_SCHEDULER_NAME
+    }
+
+    fn interval_secs(&self) -> u64 {
+        std::env::var("TRACKING_CLEANUP_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(DEFAULT_INTERVAL_SECS)
+    }
+
+    fn initial_delay_secs(&self) -> u64 {
+        INITIAL_DELAY_SECS
+    }
+
+    fn enabled(&self) -> bool {
+        std::env::var("TRACKING_CLEANUP_ENABLED")
+            .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
+            .unwrap_or(true)
+    }
+
+    async fn run_once(&self) -> Result<(), String> {
+        Self::run_once(self)
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
 }
