@@ -509,10 +509,10 @@ test.describe.serial('社保公积金缴纳记录写面：建单计算、确认�
       `[516-09] 三键过滤应至少命中本行，实际 ${rows.length}`
     ).toBeGreaterThanOrEqual(1);
     const mine = rows.find(r => Number(r.id) === id);
-    expect(
-      mine,
-      `[516-09] 本行 ${id} 应在过滤结果内，实际主键集 ${JSON.stringify(rows.map(r => Number(r.id)))}`
-    ).toBeTruthy();
+    if (!mine)
+      throw new Error(
+        `[516-09] 本行 ${id} 应在过滤结果内，实际主键集 ${JSON.stringify(rows.map(r => Number(r.id)))}`
+      );
     expect(mine.status, `[516-09] 过滤行状态应为 pending，实际 ${str(mine.status)}`).toBe(
       'pending'
     );
