@@ -39,7 +39,7 @@ function expectStatusChar(status: unknown, expected: string, label: string): voi
 
 /** 取本用例专属客户 id（ensureTestEntities 提供共享实体，本用例再建一支专属客户） */
 async function createOwnCustomer(page: Page, nameSuffix: string): Promise<number> {
-  const cust = await apiCallRaw<Row>(page, 'POST', '/customers', {
+  const cust = await apiCallRaw<Row>(page, 'POST', '/crm/customers', {
     customer_name: `签收对账门专属客户_${nameSuffix}_${Date.now()}`,
     customer_type: 'fabric_dealer',
     contact_person: '签收用例',
