@@ -22,7 +22,7 @@ use crate::models::status::sales_delivery as delivery_status;
 use crate::utils::error::AppError;
 
 use super::super::{
-    generate_reconciliation_no, ArReconciliationService, GenerateReconciliationRequest,
+    ArReconciliationService, GenerateReconciliationRequest, generate_reconciliation_no,
 };
 
 impl ArReconciliationService {

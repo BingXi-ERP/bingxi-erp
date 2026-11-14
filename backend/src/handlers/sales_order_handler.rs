@@ -1,8 +1,8 @@
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use axum::{
-    extract::{Path, Query, State},
     Json,
+    extract::{Path, Query, State},
 };
 use sea_orm::EntityTrait;
 use serde::Deserialize;
@@ -11,7 +11,7 @@ use validator::Validate;
 use crate::models::dto::PageRequest;
 use crate::models::sales_order;
 use crate::services::amount_visibility::{
-    apply_default_amount_hiding, DefaultAmountHiding, DefaultAmountResource,
+    DefaultAmountHiding, DefaultAmountResource, apply_default_amount_hiding,
 };
 use crate::services::so::order::SalesService;
 use crate::services::so::{CreateSalesOrderRequest, UpdateSalesOrderRequest};
@@ -596,7 +596,7 @@ pub async fn get_order_history(
 
 // ========== 数据导出接口 ==========
 
-use crate::utils::xlsx_export::{build_xlsx_response_with_watermark, WatermarkConfig, XlsxTable};
+use crate::utils::xlsx_export::{WatermarkConfig, XlsxTable, build_xlsx_response_with_watermark};
 // 导出审计日志写入所需依赖
 use crate::models::audit_log::{OperationType, Severity};
 use crate::services::audit_log_service::{AuditEvent, AuditLogService};
