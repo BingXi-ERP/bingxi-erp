@@ -87,6 +87,8 @@ pub mod sales_delivery {
     pub const PENDING: &str = "pending";
     /// 已发货
     pub const SHIPPED: &str = "shipped";
+    /// 已签收（客户确认收货，签收端点写 signed_at 时同步落此状态）
+    pub const DELIVERED: &str = "delivered";
     /// 已取消（批次 216 真实接入：cancel_delivery 方法使用）
     pub const CANCELLED: &str = "cancelled";
 }
