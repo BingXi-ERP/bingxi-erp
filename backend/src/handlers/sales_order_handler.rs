@@ -1,8 +1,8 @@
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use axum::{
-    Json,
     extract::{Path, Query, State},
+    Json,
 };
 use sea_orm::EntityTrait;
 use serde::Deserialize;
@@ -11,7 +11,7 @@ use validator::Validate;
 use crate::models::dto::PageRequest;
 use crate::models::sales_order;
 use crate::services::amount_visibility::{
-    DefaultAmountHiding, DefaultAmountResource, apply_default_amount_hiding,
+    apply_default_amount_hiding, DefaultAmountHiding, DefaultAmountResource,
 };
 use crate::services::so::order::SalesService;
 use crate::services::so::{CreateSalesOrderRequest, UpdateSalesOrderRequest};
@@ -596,7 +596,7 @@ pub async fn get_order_history(
 
 // ========== 数据导出接口 ==========
 
-use crate::utils::xlsx_export::{WatermarkConfig, XlsxTable, build_xlsx_response_with_watermark};
+use crate::utils::xlsx_export::{build_xlsx_response_with_watermark, WatermarkConfig, XlsxTable};
 // 导出审计日志写入所需依赖
 use crate::models::audit_log::{OperationType, Severity};
 use crate::services::audit_log_service::{AuditEvent, AuditLogService};
@@ -932,6 +932,33 @@ pub async fn cancel_delivery(
 pub struct CancelDeliveryRequest {
     #[validate(length(min = 1, max = 500, message = "取消原因不能为空且最长500字符"))]
     pub reason: String,
+}
+
+/// 送货单签收 POST /api/v1/erp/sales/orders/:id/deliveries/:delivery_id/sign
+pub async fn sign_delivery(
+    auth: AuthContext,
+    State(state): State<AppState>,
+    Path((order_id, delivery_id)): Path<(i32, i32)>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    let sales_service = SalesService::new(state.db.clone(), state.search_client.clone());
+
+    // 行级归属门（写口）：签收登记挂在父订单维度下，必须先证父订单归属；
+    // 走 assert_order_ownership 只读主表——响应体是签收后的发货行。
+    let data_scope_ctx = auth.to_data_scope_context();
+    sales_service
+        .assert_order_ownership(order_id, Some(&data_scope_ctx))
+        .await?;
+
+    let delivery = sales_service
+        .sign_delivery(order_id, delivery_id, auth.user_id)
+        .await?;
+
+    let delivery_json = serde_json::to_value(delivery)
+        .map_err(|e| AppError::internal(format!("序列化失败: {}", e)))?;
+    Ok(Json(ApiResponse::success_with_message(
+        delivery_json,
+        "送货单已签收",
+    )))
 }
 
 // ========== 统计接口 ==========

@@ -8,8 +8,8 @@
 
 use crate::container::AppState;
 use axum::{
-    Router,
     routing::{delete, get, post, put},
+    Router,
 };
 
 use crate::handlers::{
@@ -59,6 +59,10 @@ fn sales_order_delivery_report_routes() -> Router<AppState> {
         .route(
             "/orders/{id}/deliveries/{delivery_id}/cancel",
             post(sales_order_handler::cancel_delivery),
+        )
+        .route(
+            "/orders/{id}/deliveries/{delivery_id}/sign",
+            post(sales_order_handler::sign_delivery),
         )
         .route(
             "/orders/{id}/deliveries/{delivery_id}/print",

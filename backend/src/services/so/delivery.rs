@@ -19,12 +19,15 @@
 //! - `SalesService` struct 定义在 `crate::services::so::order`，impl 块分散到 delivery_ops 子模块
 //! - impl 块分散在 delivery_ops 子模块，Rust 允许同一 crate 多文件多 impl 块
 
+use crate::middleware::audit_context::set_audit_doc_no;
 use crate::models::status::sales_delivery as delivery_status;
 use crate::models::status::sales_order as so_status;
 use crate::models::{sales_delivery, sales_order};
 use crate::utils::error::AppError;
 use rust_decimal::Decimal;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
+};
 use serde::Deserialize;
 use validator::Validate;
 
@@ -181,5 +184,69 @@ impl SalesService {
         let delivery = delivery.insert(&txn).await?;
         txn.commit().await?;
         Ok(delivery)
+    }
+
+    /// 送货单签收（记录客户签收事实）。
+    /// 调用方 handlers/sales_order_handler.rs 的 sign_delivery
+    /// （POST /sales/orders/{id}/deliveries/{delivery_id}/sign）。
+    /// 入参 order_id 路径订单主键、delivery_id 送货单主键、user_id 签收经办人。
+    /// 前置：行级归属门（assert_order_ownership）与路径一致性校验在 handler 层完成，
+    /// 本方法只管业务态门与事实落库。
+    /// 业务门：仅 status=shipped 且未签收的送货单可签收——pending 单货未出库无从签收，
+    /// cancelled 单已冲销不可再签；重复签收拒绝（signed_at 非空即已签）。
+    /// 存什么与存哪里：sales_deliveries 同行的 delivered_at（首次签收时记送达时刻，
+    /// 已有值不覆盖）、signed_by（签收经办人 users.id）、signed_at（签收时刻）三列，
+    /// 状态列不动——签收是事实登记不是状态跃迁，状态机口径另案裁定。
+    /// 审计定位维度：doc_no 取本行 delivery_no，与 cancel 同为单点审计快照。
+    pub async fn sign_delivery(
+        &self,
+        order_id: i32,
+        delivery_id: i32,
+        user_id: i32,
+    ) -> Result<sales_delivery::Model, AppError> {
+        let txn = (*self.db).begin().await?;
+
+        // 行锁读，串行化并发签收与取消签收竞态
+        let delivery = sales_delivery::Entity::find_by_id(delivery_id)
+            .lock_exclusive()
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::not_found("发货单不存在"))?;
+        if delivery.order_id != order_id {
+            // 路径与行不符按不存在回（与 handler 归属门同口径，防错配探测）
+            return Err(AppError::not_found("发货单不存在"));
+        }
+        if delivery.status != delivery_status::SHIPPED {
+            txn.rollback().await?;
+            return Err(AppError::business_displayable(
+                "仅已发货的送货单可签收，请确认送货单已出库发货",
+            ));
+        }
+        if delivery.signed_at.is_some() {
+            txn.rollback().await?;
+            return Err(AppError::business_displayable(
+                "该送货单已签收，不可重复签收",
+            ));
+        }
+
+        let now = chrono::Utc::now();
+        set_audit_doc_no(Some(delivery.delivery_no.clone()));
+
+        let mut delivery_active: sales_delivery::ActiveModel = delivery.into();
+        delivery_active.delivered_at = Set(Some(now));
+        delivery_active.signed_by = Set(Some(user_id));
+        delivery_active.signed_at = Set(Some(now));
+        delivery_active.updated_at = Set(now);
+
+        let updated_delivery =
+            crate::services::audit_log_service::AuditLogService::update_with_audit(
+                &txn,
+                "auto_audit",
+                delivery_active,
+                Some(user_id),
+            )
+            .await?;
+        txn.commit().await?;
+        Ok(updated_delivery)
     }
 }
