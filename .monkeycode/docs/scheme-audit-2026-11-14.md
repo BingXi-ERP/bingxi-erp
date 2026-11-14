@@ -35,3 +35,10 @@
 ## 结论
 
 方案主体（一至四、七、八、九）在 CI 可达范围内全部落地或有明确承载；剩余开口项全部属三类：①等用户 UI 合并的五支在途 PR；②等拍板的 UX/产品口径项（四条）；③属用户主动推迟的小程序推送面。无新发现的实现缺口，无积压红标。
+
+## 补记一 抽查项补核（2026-11-14 同日）
+
+- 方案 4.1 J 脱敏抽查：产品列表 cost_price 走 field_mask::mask_sensitive_fields + admin_checker::is_admin_role 单源判定（product_handler.rs:356-361），导出面 caller_can_see_cost_price fail-closed，与记忆口径一致。
+- 方案 4.1 P/K/R 抽查：垂直越权 33/水平越权 34/黑名单 33b/2FA 35 在册；并发协同 18 号与 473 号钉面；状态机门 16 个 spec 钉 STATE_GATE_REJECT_CODES。
+- 方案 3.3 审计留痕抽查：六维定位列（终端/页面/单号/原因/风险标记 risk_flag/角色码）与 before/after_snapshot 变更快照全在（audit_log.rs），462 号追溯用例在册——三端统一留痕、变更对比、高危单独标记三要素全落。
+- 方案 3.2③ 报价历史版本留存定性：无独立版本表（仅 incoterms_version 字段），但报价更新走 AuditLogService::update_with_audit（quotation_ops/update.rs:37），变更前后快照落审计日志可追溯。「独立版本表」属产品增强候选非缺陷，登记待裁不擅动。
