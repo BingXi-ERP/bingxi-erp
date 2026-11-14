@@ -28,11 +28,11 @@ test('512-01 悬空 work_order_id 返回 200 与 data null', async ({ page }) =>
   const resp = await apiCallRaw<{ data: unknown }>(
     page,
     'GET',
-    `/production/production-recipes/by-work-order/${danglingId}`,
+    `/production/production-recipes/by-work-order/${danglingId}`
   );
   expect(
     resp.data,
-    `[${tag}] 悬空工单应返回 data null 而非空数组或 404，实际 ${JSON.stringify(resp)}`,
+    `[${tag}] 悬空工单应返回 data null 而非空数组或 404，实际 ${JSON.stringify(resp)}`
   ).toBeNull();
 });
 
@@ -42,7 +42,7 @@ test('512-02 悬空 work_order_id 的信封形状仍是 code 0 的成功信封',
   const resp = await apiCallRaw<{ code: number; data: unknown; message?: string }>(
     page,
     'GET',
-    `/production/production-recipes/by-work-order/${danglingId}`,
+    `/production/production-recipes/by-work-order/${danglingId}`
   );
   expect(resp.code, `[${tag}] 悬空工单仍是成功信封 code 0，实际 ${resp.code}`).toBe(0);
   expect(resp.data, `[${tag}] data 应为 null，实际 ${JSON.stringify(resp.data)}`).toBeNull();
