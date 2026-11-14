@@ -120,6 +120,13 @@ async fn quotation_app() -> (Arc<DatabaseConnection>, axum::Router) {
     seed_operator(&db).await;
     let state = AppState {
         db: db.clone(),
+        // 通知腿在 approve/reject 响应路径上查 user_notification_setting，
+        // AppState::default() 给的通知服务绑 Disconnected 连接会 panic，须同库装配
+        event_notification_service: Some(std::sync::Arc::new(
+            bingxi_backend::services::event_notification_service::EventNotificationService::new(
+                db.clone(),
+            ),
+        )),
         ..Default::default()
     };
     async fn inject_auth(
