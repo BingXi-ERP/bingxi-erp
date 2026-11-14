@@ -160,9 +160,10 @@ test('514-02 closed 再处理被拒，pending 直接关闭被拒', async ({ page
     'POST',
     `/production/flow-cards/feedbacks/${fbA.feedbackId}/handle`
   );
-  expect(fClosedHandle.status, `closed 再 handle 应 400，实际=${JSON.stringify(fClosedHandle)}`).toBe(
-    400
-  );
+  expect(
+    fClosedHandle.status,
+    `closed 再 handle 应 400，实际=${JSON.stringify(fClosedHandle)}`
+  ).toBe(400);
 
   // 腿二：pending 直接 close
   const fbB = await createFeedback(page, cardId, '514-02 pending 直接关闭前置');
