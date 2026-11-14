@@ -37,12 +37,16 @@ test('519-01 任务清单：已注册集合非空且四键逐项完整', async (
   ).toBe(true);
   expect(
     data.length,
-    `已注册任务集合必须非空（13 枚任务注册），实际 ${data.length}`
-  ).toBeGreaterThanOrEqual(1);
+    `已注册任务集合必须 ≥12（14 枚注册调用，催收未配受派人时少 1），实际 ${data.length}`
+  ).toBeGreaterThanOrEqual(12);
   const names = data.map(j => String(j.name));
   expect(names, `任务清单必须含邮件队列任务 ${KNOWN_JOB}，实际 ${JSON.stringify(names)}`).toContain(
     KNOWN_JOB
   );
+  expect(
+    names,
+    `任务清单必须含 ES 对账任务 es-reconcile-scheduler，实际 ${JSON.stringify(names)}`
+  ).toContain('es-reconcile-scheduler');
   for (const j of data) {
     expect(
       typeof j.name === 'string' && j.name.length > 0,
