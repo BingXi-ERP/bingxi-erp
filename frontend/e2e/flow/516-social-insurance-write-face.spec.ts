@@ -174,6 +174,8 @@ test.describe.serial('社保公积金缴纳记录写面：建单计算、确认�
       isRealTimestamp(created.created_at),
       `[516-01] 创建时间应落库为可解析时间串，实际 ${JSON.stringify(created.created_at)}`
     ).toBe(true);
+    const persisted = await apiCallRaw<Row>(page, 'GET', `${SI}/${id}`);
+    expect(persisted, '[516-01] 独立详情回读应完整保留建单字段与五险一金计算结果').toEqual(created);
   });
 
   test('516-02 详情与按工人按期间查询：自建行双路回读一致', async ({ page }) => {
