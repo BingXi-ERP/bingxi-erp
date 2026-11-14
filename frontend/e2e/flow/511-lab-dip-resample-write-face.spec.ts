@@ -22,9 +22,9 @@ import { apiCallRaw, apiCallExpectFail, expectStateGateRejection } from './helpe
  * 455 带 created_by 行级归属门、record_resample_result 487、issue_tech_card
  * 504 无请求体）。请求体字段面在 backend/src/services/lab_dip_ops/types.rs：
  * 建复样必填 request_id 与 source_sample_id 与 workshop_fabric_batch（车间
- * 半制品布批号必填门在 resample.rs:127），录结果必填 color_difference_grade。
- * 前置门（resample.rs:94-137）：通知单必须 approved、源样必须 selected。
- * 判定线：色差 4-5 级 passed，低于 4 级 failed（resample.rs 判定同 210 号）；
+ * 半制品布批号必填门在复样服务建单校验段），录结果必填 color_difference_grade。
+ * 前置门在复样服务前置校验段：通知单必须 approved、源样必须 selected。
+ * 判定线：色差 4-5 级 passed，低于 4 级 failed，判定线与 210 号同源；
  * 复样结果非 pending 不可重复记录；技术卡仅 passed 可开且不可重复开。
  * 出参是 lab_dip_resample Model 全列，result 初值 pending，单号 RS 前缀。
  */
