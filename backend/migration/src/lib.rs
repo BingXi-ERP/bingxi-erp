@@ -370,6 +370,7 @@ impl MigratorTrait for Migrator {
             Box::new(domain::wechat_mp_binding::Migration),
             // 公众号通知失败重试队列表，链尾独立域（无外键依赖,通知腿旁路数据地基）
             Box::new(domain::wechat_mp_notification_outbox::Migration),
+            Box::new(domain::delivery_signoff::Migration),
         ]
     }
 }

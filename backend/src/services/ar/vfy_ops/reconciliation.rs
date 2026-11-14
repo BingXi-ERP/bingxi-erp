@@ -16,7 +16,9 @@ use crate::models::ar_collection;
 use crate::models::ar_invoice;
 use crate::models::ar_reconciliation::ActiveModel;
 use crate::models::customer;
+use crate::models::sales_delivery;
 use crate::models::status::ar as ar_status;
+use crate::models::status::sales_delivery as delivery_status;
 use crate::utils::error::AppError;
 
 use super::super::{
@@ -36,6 +38,23 @@ impl ArReconciliationService {
             .one(&txn)
             .await?
             .ok_or_else(|| AppError::not_found(format!("客户 {} 不存在", req.customer_id)))?;
+
+        // 送货单签收来源门：该客户存在已发货但未签收且未冲销的送货单时，
+        // 拒绝生成对账单——未签收即货权未确认，先签收后对账（对账期间取值
+        // 无法过滤签收事实，按客户全域拦截）。无送货单行的客户不拦，
+        // 对账单可从发票与期初余额正常生成。
+        let unsigned_deliveries = sales_delivery::Entity::find()
+            .filter(sales_delivery::Column::CustomerId.eq(req.customer_id))
+            .filter(sales_delivery::Column::Status.eq(delivery_status::SHIPPED))
+            .filter(sales_delivery::Column::SignedAt.is_null())
+            .all(&txn)
+            .await?;
+        if !unsigned_deliveries.is_empty() {
+            txn.rollback().await?;
+            return Err(AppError::business_displayable(
+                "存在未签收的送货单，请先完成送货单签收再生成对账单",
+            ));
+        }
 
         // 批次 27 v7 P1 修复：事务边界泄漏，单号生成移入 txn，避免断号/重复
         let reconciliation_no = generate_reconciliation_no(&txn).await?;
