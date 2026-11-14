@@ -116,6 +116,10 @@
 //!   schema，export_approval 流程定义行由 services/bpm_definition_seed.rs 出厂种子登记；
 //!   依赖 system 建的 bpm_process_instance、v15 建的 export_approval_request 与
 //!   download_token 等既有列，故必须排全链尾为新的顶层条目，复用库上也必然执行）
+//! - wechat_mp_binding: 用户与微信公众号 openid 绑定关系表（user_wechat_mp_binding，user_id
+//!   外键引用 system 域建的 users 并级联回收、openid 具名唯一索引固化一个 openid 只绑一个用户；
+//!   域内不播种数据行，users 的初始用户由 init 写入且晚于 migrate；置于链尾为新的顶层条目，
+//!   复用库上也必然执行）
 
 pub mod system;
 pub mod business;
@@ -172,7 +176,8 @@ pub mod product_grade_vocab_check;
 // 仓储两岗补授扫码入库细键的存量库通道。独立顶层域，理由与 purchase_greige_read_grant 一致
 // （并入已应用域会在复用库被整体跳过，补授永不执行）。
 pub mod scan_receipt_grant;
-// 审计日志表 DB 层只追加约束。独立顶层域，理由与上面各补授域一致
+// HTTP 请求级幂等去重域：建 http_request_dedupe 表，链尾独立域（不给 user_id 加外键，
+// users 表不由迁移创建；独立域才能在复用库上落到 pending 段必然执行）。
 // （并入已应用域会在复用库被整体跳过，建门语句永不执行）。
 pub mod audit_append_only_guard;
 // 库存匹冗余库存状态列探测式下线域，同上一条口径：晚于代码面摘除读写，先改代码再收列形态。
@@ -201,3 +206,7 @@ pub mod bom_mrp_permission_withdrawal;
 // HTTP 请求级幂等去重域：建 http_request_dedupe 表，链尾独立域（不给 user_id 加外键，
 // users 表不由迁移创建；独立域才能在复用库上落到 pending 段必然执行）。
 pub mod http_idempotency_guard;
+// 用户与公众号 openid 绑定关系表。独立顶层域，理由见域头（并入已应用域会在复用库被整体跳过）。
+pub mod wechat_mp_binding;
+// 公众号通知失败重试队列表。独立顶层域,理由同绑定域（并入已应用域会在复用库被整体跳过）。
+pub mod wechat_mp_notification_outbox;

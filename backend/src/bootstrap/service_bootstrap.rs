@@ -129,6 +129,8 @@ pub async fn bootstrap_full_mode(
     start_color_card_issue_scheduler(&app_state);
     // 邮件队列后台 Worker（扫描 PENDING 邮件 + 指数退避重试）
     start_email_queue_worker(&app_state);
+    // 公众号通知重试队列 Worker（扫描 PENDING 队列行 + 指数退避重投模板消息）
+    start_wechat_mp_outbox_worker(&app_state);
     // 导出合规审查定时任务（每日扫描 + 6 类异常导出行为识别）
     start_export_compliance_scheduler(&app_state);
     // 追踪数据 90 天保留策略（page_views/user_behaviors 归档清理）
@@ -750,6 +752,25 @@ fn start_email_queue_worker(app_state: &AppState) {
         tasks.push(worker_handle);
     }
     info!("邮件队列后台 Worker 已启动（默认每 60 秒扫描一次 PENDING 邮件，含指数退避重试）");
+}
+
+/// 启动公众号通知重试队列 Worker。
+///
+/// 与邮件队列 Worker 同模式：每 60 秒扫描一次 PENDING 队列行（环境变量
+/// `WECHAT_MP_OUTBOX_WORKER_INTERVAL_SECS` 可调），失败按指数退避重投，3 次转死信。
+fn start_wechat_mp_outbox_worker(app_state: &AppState) {
+    let worker = std::sync::Arc::new(
+        crate::services::wechat_mp_notification_outbox_worker::WechatMpNotificationOutboxWorker::new(
+            app_state.db.clone(),
+        ),
+    );
+    let worker_handle = worker.start_background_task();
+    if let Ok(mut tasks) = MAIN_BACKGROUND_TASKS.lock() {
+        tasks.push(worker_handle);
+    }
+    info!(
+        "公众号通知重试队列 Worker 已启动（默认每 60 秒扫描一次 PENDING 队列行，含指数退避重投）"
+    );
 }
 
 /// 启动导出合规审查定时任务。

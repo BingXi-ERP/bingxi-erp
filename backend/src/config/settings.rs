@@ -58,6 +58,25 @@ fn set_global_print_config(cfg: PrintConfig) {
     let _ = GLOBAL_PRINT_CONFIG.set(cfg);
 }
 
+/// 进程级微信公众号通知腿配置单例：`AppSettings::new` 在 `load_wechat_mp_from_env` 之后写入，
+/// 通知腿（`services/wechat_mp_service`）据此读取 appid/secret 与三枚模板 ID，避免在发送链路里
+/// 出现第二套手写常量或重复读环境变量。
+/// **无硬编码默认值**：五项全部 `Option`，未配置即 `None`（部署态而非代码缺陷），
+/// 发送腿必须据此把通知腿标记为不可用并显式记日志，禁止静默跳过、禁止把未配置当成功。
+/// `secret` 与三枚模板 ID 属凭证/资源标识，不派生 `Serialize`（与 [`AuthConfig`] 同源规则），
+/// 避免被误入任何结构化日志或响应体。
+static GLOBAL_WECHAT_MP_CONFIG: OnceLock<WechatMpConfig> = OnceLock::new();
+
+/// 读取进程级公众号通知腿配置；未初始化时返回 [`WechatMpConfig::default`]（五项全 `None`）。
+pub fn global_wechat_mp_config() -> WechatMpConfig {
+    GLOBAL_WECHAT_MP_CONFIG.get().cloned().unwrap_or_default()
+}
+
+/// 将 `load_wechat_mp_from_env` 处理后的公众号配置写入进程级单例（重复调用仅首次生效，幂等）。
+fn set_global_wechat_mp_config(cfg: WechatMpConfig) {
+    let _ = GLOBAL_WECHAT_MP_CONFIG.set(cfg);
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppSettings {
     pub server: ServerConfig,
@@ -100,6 +119,12 @@ pub struct AppSettings {
     /// `print_targets` 表，由派发层按 `target_code` 查询解析。
     #[serde(default)]
     pub print: PrintConfig,
+    /// 微信公众号通知腿凭证与模板 ID（`WECHAT_MP_APPID` / `WECHAT_MP_SECRET` /
+    /// 三枚 `WECHAT_MP_TEMPLATE_*`）。`#[serde(default)]`：缺失 wechat_mp 段时走
+    /// [`WechatMpConfig::default`]（五项全 `None`），**不给任何默认值**——未配置属部署态，
+    /// 通知腿据此标记不可用并显式记日志，禁止静默跳过、禁止把未配置当成功。
+    #[serde(default)]
+    pub wechat_mp: WechatMpConfig,
     /// 环保税适用税额（元/污染当量；env 覆盖键 `ENV_TAX_RATE_PER_EQUIVALENT`）——
     /// **地方可变值**：《环境保护税法》附表规定法定幅度为每污染当量 **1.2–12 元**，
     /// 具体适用税额由省级人民政府在本行政区域内确定（运维取值须落在该法定幅度内）。
@@ -559,6 +584,143 @@ impl Default for PrintConfig {
     }
 }
 
+/// 公众号模板消息的事件类型，一一对应三枚模板 ID 配置位。
+///
+/// 每个变体绑定一枚环境变量名与一个配置字段，发送腿按事件类型取模板 ID，
+/// 取不到即该事件类型不可发（与"凭证缺失整条腿不可用"是两个层级的判据）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WechatMpTemplateKind {
+    /// 待报价提醒
+    PendingQuotation,
+    /// 报价结果通知
+    QuotationResult,
+    /// 待对账提醒
+    PendingReconcile,
+}
+
+impl WechatMpTemplateKind {
+    /// 该事件类型对应的环境变量名（同时用于缺配日志点名，日志里只出现变量名不出现值）。
+    pub fn env_name(self) -> &'static str {
+        match self {
+            Self::PendingQuotation => "WECHAT_MP_TEMPLATE_PENDING_QUOTATION",
+            Self::QuotationResult => "WECHAT_MP_TEMPLATE_QUOTATION_RESULT",
+            Self::PendingReconcile => "WECHAT_MP_TEMPLATE_PENDING_RECONCILE",
+        }
+    }
+
+    /// 该事件类型的中文称谓（用于日志与错误信息定位是哪一类通知）。
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::PendingQuotation => "待报价提醒",
+            Self::QuotationResult => "报价结果通知",
+            Self::PendingReconcile => "待对账提醒",
+        }
+    }
+
+    /// 该事件类型的稳定 ASCII 标识（落库与幂等台账用，与中文称谓、环境变量名三者分列）。
+    ///
+    /// 值一旦写入 `processed_events.event_type` 即为历史数据，禁止改名；新增事件类型只能追加新值。
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::PendingQuotation => "wechat_mp_pending_quotation",
+            Self::QuotationResult => "wechat_mp_quotation_result",
+            Self::PendingReconcile => "wechat_mp_pending_reconcile",
+        }
+    }
+}
+
+/// 微信公众号通知腿配置：接口凭证（appid/secret）+ 三枚模板 ID。
+///
+/// 全部字段 `Option<String>` 且**无默认值**——未配置是合法的部署态，语义由类型本身表达：
+/// - `appid`/`secret` 任一缺失 ⇒ 整条通知腿不可用（拿不到接口调用令牌，任何事件都发不出）。
+/// - 某枚模板 ID 缺失 ⇒ 只有该事件类型不可发，其余已配模板照常可发。
+///
+/// 值只从环境变量注入（`WECHAT_MP_*`），仓库内任何被跟踪文件只出现变量名。
+/// `Debug` 手工实现并屏蔽全部取值，防止凭证经结构化日志外泄。
+#[derive(Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct WechatMpConfig {
+    /// 公众号 appid（env `WECHAT_MP_APPID`）
+    pub appid: Option<String>,
+    /// 公众号 appsecret（env `WECHAT_MP_SECRET`）
+    pub secret: Option<String>,
+    /// 待报价提醒模板 ID（env `WECHAT_MP_TEMPLATE_PENDING_QUOTATION`）
+    pub template_pending_quotation: Option<String>,
+    /// 报价结果通知模板 ID（env `WECHAT_MP_TEMPLATE_QUOTATION_RESULT`）
+    pub template_quotation_result: Option<String>,
+    /// 待对账提醒模板 ID（env `WECHAT_MP_TEMPLATE_PENDING_RECONCILE`）
+    pub template_pending_reconcile: Option<String>,
+}
+
+impl std::fmt::Debug for WechatMpConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // 只打印"配置位是否已填"，绝不打印值本身（含 appsecret 与模板 ID）
+        f.debug_struct("WechatMpConfig")
+            .field("appid_configured", &self.appid.is_some())
+            .field("secret_configured", &self.secret.is_some())
+            .field(
+                "template_pending_quotation_configured",
+                &self.template_pending_quotation.is_some(),
+            )
+            .field(
+                "template_quotation_result_configured",
+                &self.template_quotation_result.is_some(),
+            )
+            .field(
+                "template_pending_reconcile_configured",
+                &self.template_pending_reconcile.is_some(),
+            )
+            .finish()
+    }
+}
+
+impl WechatMpConfig {
+    /// 接口凭证是否齐备：`appid` 与 `secret` 都非空才可能取到接口调用令牌。
+    pub fn has_credentials(&self) -> bool {
+        self.appid.is_some() && self.secret.is_some()
+    }
+
+    /// 缺失的凭证环境变量名（用于缺配日志点名；空 Vec = 凭证齐备）。
+    pub fn missing_credential_env_names(&self) -> Vec<&'static str> {
+        let mut missing = Vec::new();
+        if self.appid.is_none() {
+            missing.push("WECHAT_MP_APPID");
+        }
+        if self.secret.is_none() {
+            missing.push("WECHAT_MP_SECRET");
+        }
+        missing
+    }
+
+    /// 按事件类型取模板 ID；`None` = 该事件类型未配置模板，发送腿必须显式拒绝而不是换模板。
+    pub fn template_id(&self, kind: WechatMpTemplateKind) -> Option<&str> {
+        let raw = match kind {
+            WechatMpTemplateKind::PendingQuotation => &self.template_pending_quotation,
+            WechatMpTemplateKind::QuotationResult => &self.template_quotation_result,
+            WechatMpTemplateKind::PendingReconcile => &self.template_pending_reconcile,
+        };
+        raw.as_deref()
+    }
+
+    /// 三枚模板 ID 各自的配置状态点名（供启动日志一次性打出，不打印值）。
+    pub fn template_config_status(&self) -> [(&'static str, bool); 3] {
+        [
+            (
+                WechatMpTemplateKind::PendingQuotation.env_name(),
+                self.template_pending_quotation.is_some(),
+            ),
+            (
+                WechatMpTemplateKind::QuotationResult.env_name(),
+                self.template_quotation_result.is_some(),
+            ),
+            (
+                WechatMpTemplateKind::PendingReconcile.env_name(),
+                self.template_pending_reconcile.is_some(),
+            ),
+        ]
+    }
+}
+
 impl AppSettings {
     pub fn new() -> Result<Self, ConfigError> {
         let mut app_settings = Self::load_from_env()?;
@@ -569,6 +731,7 @@ impl AppSettings {
         Self::load_database_config(&mut app_settings);
         Self::load_update_from_env(&mut app_settings);
         Self::load_print_from_env(&mut app_settings);
+        Self::load_wechat_mp_from_env(&mut app_settings);
         // 镜像清单 fail-fast 校验（非法 https/内网/IP 字面量 → 拒绝启动），
         // 校验通过后再写入进程级单例供下载链路读取，避免带病镜像进入运行期。
         Self::validate_update_mirrors(&app_settings)?;
@@ -578,6 +741,9 @@ impl AppSettings {
         set_global_env_tax_rate(app_settings.env_tax_rate_per_equivalent);
         // 打印派发运行期配置写入进程级单例供受理链路读取（不含任何设备地址）。
         set_global_print_config(app_settings.print.clone());
+        // 公众号通知腿配置写入进程级单例供发送腿读取（凭证与模板 ID 均可能为 None，
+        // None 即"该配置位未配置"，由发送腿据此判不可用；此处不阻断启动）。
+        set_global_wechat_mp_config(app_settings.wechat_mp.clone());
         Ok(app_settings)
     }
 
@@ -834,6 +1000,63 @@ impl AppSettings {
                 app_settings.print.temp_dir_root = None;
             } else {
                 app_settings.print.temp_dir_root = Some(trimmed.to_string());
+            }
+        }
+    }
+
+    /// 从环境变量填充公众号通知腿配置（`WECHAT_MP_*` 五枚变量名，环境变量优先级高于 config.yaml）。
+    ///
+    /// 变量名为扁平形式（不含 `__`），config crate 的 `separator("__")` 环境源无法把它们映射到
+    /// `wechat_mp` 段，故按既有 `load_sensitive_from_env` 范式显式读取。
+    /// 空串与纯空白一律归一成 `None`（= 该配置位未配置），不给任何默认值；
+    /// 取不到凭证时记显式 WARN 点名缺失的变量名，把通知腿标记为不可用交由发送腿判定，
+    /// 不静默跳过、不把未配置当成功、不影响其余配置段与启动。
+    fn load_wechat_mp_from_env(app_settings: &mut AppSettings) {
+        let read_env = |name: &str| -> Option<String> {
+            match std::env::var(name) {
+                Ok(raw) => {
+                    let trimmed = raw.trim();
+                    if trimmed.is_empty() {
+                        warn!("环境变量 {} 已设置但为空，按未配置处理", name);
+                        None
+                    } else {
+                        Some(trimmed.to_string())
+                    }
+                }
+                Err(_) => None,
+            }
+        };
+
+        if let Some(appid) = read_env("WECHAT_MP_APPID") {
+            app_settings.wechat_mp.appid = Some(appid);
+        }
+        if let Some(secret) = read_env("WECHAT_MP_SECRET") {
+            app_settings.wechat_mp.secret = Some(secret);
+        }
+        if let Some(tpl) = read_env("WECHAT_MP_TEMPLATE_PENDING_QUOTATION") {
+            app_settings.wechat_mp.template_pending_quotation = Some(tpl);
+        }
+        if let Some(tpl) = read_env("WECHAT_MP_TEMPLATE_QUOTATION_RESULT") {
+            app_settings.wechat_mp.template_quotation_result = Some(tpl);
+        }
+        if let Some(tpl) = read_env("WECHAT_MP_TEMPLATE_PENDING_RECONCILE") {
+            app_settings.wechat_mp.template_pending_reconcile = Some(tpl);
+        }
+
+        // 缺配状态显式点名（只报变量名，绝不回显任何取值）
+        let missing = app_settings.wechat_mp.missing_credential_env_names();
+        if !missing.is_empty() {
+            warn!(
+                "公众号通知腿不可用：接口凭证缺失 {:?}；模板消息一律不发送，其余功能不受影响",
+                missing
+            );
+        }
+        for (env_name, configured) in app_settings.wechat_mp.template_config_status() {
+            if !configured {
+                warn!(
+                    "公众号通知腿模板未配置：{}；该事件类型的模板消息不发送",
+                    env_name
+                );
             }
         }
     }
