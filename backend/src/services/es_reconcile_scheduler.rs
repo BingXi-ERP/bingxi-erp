@@ -470,10 +470,6 @@ impl crate::utils::scheduler_framework::Scheduler for EsReconcileScheduler {
         self.job.initial_delay_secs
     }
 
-    fn enabled(&self) -> bool {
-        self.job.enabled
-    }
-
     async fn run_once(&self) -> Result<(), String> {
         self.scan_once().await
     }

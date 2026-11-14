@@ -55,15 +55,12 @@ pub async fn list_job_runs(
     if let Some(name) = &params.scheduler_name {
         select = select.filter(scheduler_job_run::Column::SchedulerName.eq(name.as_str()));
     }
-    let paginator = select.paginate(state.db.as_ref(), page_size);
-    let total = paginator
-        .num_items()
-        .await
-        .map_err(|e| AppError::internal(format!("执行历史总数查询失败: {e}")))?;
-    let items = paginator
-        .fetch_page(page - 1)
-        .await
-        .map_err(|e| AppError::internal(format!("执行历史查询失败: {e}")))?;
+    let (items, total) = crate::utils::pagination::paginate_with_total(
+        select.paginate(state.db.as_ref(), page_size),
+        page,
+    )
+    .await
+    .map_err(|e| AppError::internal(format!("执行历史查询失败: {e}")))?;
     Ok(Json(ApiResponse::success(
         crate::utils::response::PaginatedResponse {
             items,

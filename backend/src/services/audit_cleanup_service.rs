@@ -199,6 +199,9 @@ impl crate::utils::scheduler_framework::Scheduler for AuditCleanupService {
     }
     async fn run_once_counted(&self) -> (Result<(), String>, Option<i64>) {
         let r = self.cleanup_expired_logs().await.map_err(|e| e.to_string());
-        (r.map(|_| ()), r.ok().map(|n| n as i64))
+        match r {
+            Ok(n) => (Ok(()), Some(n as i64)),
+            Err(e) => (Err(e), None),
+        }
     }
 }

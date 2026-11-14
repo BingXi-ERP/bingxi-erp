@@ -67,6 +67,7 @@ async fn run_once_recorded(
     let run_id: Option<i32> = match db {
         Some(db) => {
             let placeholder = scheduler_job_run::ActiveModel {
+                id: sea_orm::NotSet,
                 scheduler_name: Set(scheduler.name().to_string()),
                 trigger: Set(trigger.to_string()),
                 started_at: Set(chrono::Utc::now()),

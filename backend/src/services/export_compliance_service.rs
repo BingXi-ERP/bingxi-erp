@@ -464,6 +464,9 @@ impl crate::utils::scheduler_framework::Scheduler for ExportComplianceService {
             .daily_export_compliance_review()
             .await
             .map_err(|e| e.to_string());
-        (r.map(|_| ()), r.ok().map(|n| n as i64))
+        match r {
+            Ok(n) => (Ok(()), Some(n as i64)),
+            Err(e) => (Err(e), None),
+        }
     }
 }

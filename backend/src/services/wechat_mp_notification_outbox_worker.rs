@@ -206,6 +206,9 @@ impl crate::utils::scheduler_framework::Scheduler for WechatMpNotificationOutbox
             .dispatch_pending_batch()
             .await
             .map_err(|e| e.to_string());
-        (r.map(|_| ()), r.ok().map(|n| n as i64))
+        match r {
+            Ok(n) => (Ok(()), Some(n as i64)),
+            Err(e) => (Err(e), None),
+        }
     }
 }
