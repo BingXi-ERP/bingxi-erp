@@ -873,7 +873,7 @@ async fn start_registered_schedulers(
 ) -> Vec<tokio::task::JoinHandle<()>> {
     use crate::utils::scheduler_framework::{Scheduler, SchedulerRegistry};
 
-    let mut registry = SchedulerRegistry::new();
+    let mut registry = SchedulerRegistry::new(Some(app_state.db.clone()));
 
     // env 门控任务
     registry.register(std::sync::Arc::new(

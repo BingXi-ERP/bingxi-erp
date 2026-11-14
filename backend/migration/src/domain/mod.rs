@@ -212,3 +212,5 @@ pub mod wechat_mp_binding;
 pub mod wechat_mp_notification_outbox;
 // 列表模糊查询加速域：like 过滤高频列补 pg_trgm GIN 索引，链尾独立域（并入已应用域会被台账整体跳过）。
 pub mod like_acceleration;
+// 周期任务执行可观测域：scheduler_job_runs 执行历史表，链尾独立域（并入已应用域会被台账整体跳过）。
+pub mod scheduler_observability;

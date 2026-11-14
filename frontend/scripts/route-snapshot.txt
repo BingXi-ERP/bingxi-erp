@@ -1,4 +1,4 @@
-# layers=8 endpoints=1805
+# layers=8 endpoints=1808
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -906,6 +906,8 @@ GET	/api/v1/erp/scanner/history	barcode_scanner_handler::scan_history	analytics
 GET	/api/v1/erp/scanner/scan-inventory	barcode_scanner_handler::scan_inventory	analytics
 GET	/api/v1/erp/scanner/scan-statistics	barcode_scanner_handler::scan_statistics	analytics
 GET	/api/v1/erp/scanner/scan-to-ship	barcode_scanner_handler::scan_to_ship_get	analytics
+GET	/api/v1/erp/scheduler/jobs	crate::handlers::scheduler_handler::list_jobs	mod
+GET	/api/v1/erp/scheduler/jobs/runs	crate::handlers::scheduler_handler::list_job_runs	mod
 GET	/api/v1/erp/scheduling/conflicts	scheduling_handler::detect_conflicts	mod
 GET	/api/v1/erp/scheduling/gantt	scheduling_handler::get_gantt_data	mod
 GET	/api/v1/erp/scheduling/history	scheduling_handler::get_schedule_history	mod
@@ -1588,6 +1590,7 @@ POST	/api/v1/erp/sales/sales-returns/*/submit	submit_sales_return	sales_return_h
 POST	/api/v1/erp/scanner/scan-receipt	barcode_scanner_handler::scan_receipt_post	analytics
 POST	/api/v1/erp/scanner/scan-to-ship	barcode_scanner_handler::scan_to_ship_post	analytics
 POST	/api/v1/erp/scanner/ship-by-piece	barcode_scanner_handler::ship_by_piece_no	analytics
+POST	/api/v1/erp/scheduler/jobs/*/trigger	crate::handlers::scheduler_handler::trigger_job	mod
 POST	/api/v1/erp/scheduling/auto-schedule	scheduling_handler::auto_schedule	mod
 POST	/api/v1/erp/scheduling/results/*/confirm	scheduling_handler::confirm_schedule_result	mod
 POST	/api/v1/erp/send	email_handler::send_email	analytics
