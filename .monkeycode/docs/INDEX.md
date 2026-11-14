@@ -271,8 +271,8 @@ SMTP_PORT=587
 
 ## 联系方式
 
-- **项目地址**: https://github.com/57231307/1
-- **问题反馈**: https://github.com/57231307/1/issues
+- **项目地址**: https://github.com/BingXi-ERP/bingxi-erp
+- **问题反馈**: https://github.com/BingXi-ERP/bingxi-erp/issues
 - **技术支持**: support@bingxi.com
 - **文档反馈**: docs@bingxi.com
 
