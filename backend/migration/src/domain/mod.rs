@@ -210,3 +210,7 @@ pub mod http_idempotency_guard;
 pub mod wechat_mp_binding;
 // 公众号通知失败重试队列表。独立顶层域,理由同绑定域（并入已应用域会在复用库被整体跳过）。
 pub mod wechat_mp_notification_outbox;
+// 列表模糊查询加速域：like 过滤高频列补 pg_trgm GIN 索引，链尾独立域（并入已应用域会被台账整体跳过）。
+pub mod like_acceleration;
+// 周期任务执行可观测域：scheduler_job_runs 执行历史表，链尾独立域（并入已应用域会被台账整体跳过）。
+pub mod scheduler_observability;

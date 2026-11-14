@@ -54,7 +54,7 @@ impl EmailQueueWorker {
     }
 
     /// 执行一次扫描：查询到期邮件并逐个发送（返回本次扫描处理的邮件数量。）
-    pub async fn run_once(&self) -> Result<u64, AppError> {
+    pub async fn process_pending_batch(&self) -> Result<u64, AppError> {
         let log_service = EmailLogService::new(self.db.clone());
 
         // 查询待发送邮件：PENDING + retry_count < MAX + (next_retry_at IS NULL OR <= now)
@@ -231,57 +231,49 @@ impl EmailQueueWorker {
             attachments,
         })
     }
+}
 
-    /// 启动后台调度任务（参考 ReportSubscriptionScheduler 模式）
-    /// 环境变量门控：`EMAIL_QUEUE_WORKER_ENABLED`（默认 "true"）— 设为 "false" / "0" 时跳过启动；`EMAIL_QUEUE_WORKER_INTERVAL_SECS`（默认 60）— 扫描间隔。
-    pub fn start_background_task(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            let enabled = std::env::var("EMAIL_QUEUE_WORKER_ENABLED")
-                .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
-                .unwrap_or(true);
-            if !enabled {
-                info!("邮件队列 Worker：环境变量 EMAIL_QUEUE_WORKER_ENABLED=false，跳过启动");
-                return;
-            }
+/// 统一注册中心的调度器名
+const EMAIL_QUEUE_SCHEDULER_NAME: &str = "email-queue-worker";
 
-            let interval_secs = std::env::var("EMAIL_QUEUE_WORKER_INTERVAL_SECS")
-                .ok()
-                .and_then(|v| v.parse::<u64>().ok())
-                .filter(|&v| v > 0)
-                .unwrap_or(DEFAULT_INTERVAL_SECS);
+#[async_trait::async_trait]
+impl crate::utils::scheduler_framework::Scheduler for EmailQueueWorker {
+    fn name(&self) -> &str {
+        EMAIL_QUEUE_SCHEDULER_NAME
+    }
 
-            // 启动初始延迟
-            tokio::time::sleep(std::time::Duration::from_secs(INITIAL_DELAY_SECS)).await;
+    fn interval_secs(&self) -> u64 {
+        std::env::var("EMAIL_QUEUE_WORKER_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(DEFAULT_INTERVAL_SECS)
+    }
 
-            let interval = std::time::Duration::from_secs(interval_secs);
-            info!(
-                interval_secs,
-                max_emails_per_scan = MAX_EMAILS_PER_SCAN,
-                max_retry_count = MAX_RETRY_COUNT,
-                "邮件队列 Worker：后台任务已启动（每 {} 秒扫描一次 PENDING 邮件）",
-                interval_secs
-            );
+    fn initial_delay_secs(&self) -> u64 {
+        INITIAL_DELAY_SECS
+    }
 
-            loop {
-                let scan_start = Utc::now();
-                match self.run_once().await {
-                    Ok(count) if count > 0 => {
-                        info!(
-                            count,
-                            elapsed_ms = (Utc::now() - scan_start).num_milliseconds(),
-                            "邮件队列 Worker：本轮处理 {} 封邮件",
-                            count
-                        );
-                    }
-                    Ok(_) => {
-                        // 无到期邮件，静默
-                    }
-                    Err(e) => {
-                        warn!(error = %e, "邮件队列 Worker：本轮扫描失败，下次循环继续");
-                    }
-                }
-                tokio::time::sleep(interval).await;
-            }
-        })
+    fn enabled(&self) -> bool {
+        std::env::var("EMAIL_QUEUE_WORKER_ENABLED")
+            .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
+            .unwrap_or(true)
+    }
+
+    async fn run_once(&self) -> Result<(), String> {
+        self.process_pending_batch()
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    async fn run_once_counted(&self) -> (Result<(), String>, Option<i64>) {
+        let r = self
+            .process_pending_batch()
+            .await
+            .map_err(|e| e.to_string());
+        match r {
+            Ok(n) => (Ok(()), Some(n as i64)),
+            Err(e) => (Err(e), None),
+        }
     }
 }

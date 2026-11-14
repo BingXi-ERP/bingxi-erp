@@ -422,50 +422,51 @@ impl ExportComplianceService {
         };
         self.audit_service.clone().record_async(event, None);
     }
+}
 
-    /// 启动后台定时任务（每 24 小时执行一次合规审查）（返回 JoinHandle 供 shutdown 时 abort。）
-    pub fn start_background_task(self: &Arc<Self>) -> tokio::task::JoinHandle<()> {
-        let service = self.clone();
-        tokio::spawn(async move {
-            // 读取环境变量门控
-            let enabled = std::env::var("EXPORT_COMPLIANCE_CHECK_ENABLED")
-                .unwrap_or_else(|_| "true".to_string());
-            if enabled == "false" || enabled == "0" {
-                info!("导出合规审查：环境变量禁用，跳过启动");
-                return;
-            }
+/// 统一注册中心的调度器名
+const EXPORT_COMPLIANCE_SCHEDULER_NAME: &str = "export-compliance-review-scheduler";
 
-            let interval_secs = std::env::var("EXPORT_COMPLIANCE_CHECK_INTERVAL_SECS")
-                .ok()
-                .and_then(|s| s.parse::<u64>().ok())
-                .unwrap_or(DEFAULT_INTERVAL_SECS);
+#[async_trait::async_trait]
+impl crate::utils::scheduler_framework::Scheduler for ExportComplianceService {
+    fn name(&self) -> &str {
+        EXPORT_COMPLIANCE_SCHEDULER_NAME
+    }
 
-            // 启动初始延迟
-            tokio::time::sleep(std::time::Duration::from_secs(INITIAL_DELAY_SECS)).await;
+    fn interval_secs(&self) -> u64 {
+        std::env::var("EXPORT_COMPLIANCE_CHECK_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(DEFAULT_INTERVAL_SECS)
+    }
 
-            let interval = std::time::Duration::from_secs(interval_secs);
-            info!(
-                interval_secs,
-                "导出合规审查：后台任务已启动（每 {} 秒执行一次合规审查）", interval_secs
-            );
+    fn initial_delay_secs(&self) -> u64 {
+        INITIAL_DELAY_SECS
+    }
 
-            loop {
-                match service.daily_export_compliance_review().await {
-                    Ok(alert_count) if alert_count > 0 => {
-                        warn!(
-                            alert_count,
-                            "导出合规审查：本轮发现 {} 项异常导出行为", alert_count
-                        );
-                    }
-                    Ok(_) => {
-                        info!("导出合规审查：本轮无异常");
-                    }
-                    Err(e) => {
-                        warn!(error = %e, "导出合规审查：本轮扫描失败，下次循环继续");
-                    }
-                }
-                tokio::time::sleep(interval).await;
-            }
-        })
+    fn enabled(&self) -> bool {
+        std::env::var("EXPORT_COMPLIANCE_CHECK_ENABLED").unwrap_or_else(|_| "true".to_string())
+            != "false"
+            && std::env::var("EXPORT_COMPLIANCE_CHECK_ENABLED")
+                .unwrap_or_else(|_| "true".to_string())
+                != "0"
+    }
+
+    async fn run_once(&self) -> Result<(), String> {
+        self.daily_export_compliance_review()
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    async fn run_once_counted(&self) -> (Result<(), String>, Option<i64>) {
+        let r = self
+            .daily_export_compliance_review()
+            .await
+            .map_err(|e| e.to_string());
+        match r {
+            Ok(n) => (Ok(()), Some(n as i64)),
+            Err(e) => (Err(e), None),
+        }
     }
 }

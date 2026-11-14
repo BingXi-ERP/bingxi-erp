@@ -7,7 +7,6 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use sea_orm::DatabaseConnection;
 use tracing::{info, warn};
 
@@ -34,7 +33,7 @@ impl WechatMpNotificationOutboxWorker {
     }
 
     /// 执行一次扫描：查询到期队列行并逐条重投（返回本次处理的行数）。
-    pub async fn run_once(&self) -> Result<u64, AppError> {
+    pub async fn dispatch_pending_batch(&self) -> Result<u64, AppError> {
         let outbox = WechatMpNotificationOutboxService::new(self.db.clone());
         let rows = outbox.list_pending_for_retry().await?;
         if rows.is_empty() {
@@ -156,55 +155,6 @@ impl WechatMpNotificationOutboxWorker {
 
         Ok(true)
     }
-
-    /// 启动后台调度任务（镜像 email_queue_worker 模式）。
-    pub fn start_background_task(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            let enabled = std::env::var("WECHAT_MP_OUTBOX_WORKER_ENABLED")
-                .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
-                .unwrap_or(true);
-            if !enabled {
-                info!(
-                    "公众号通知重试 Worker：环境变量 WECHAT_MP_OUTBOX_WORKER_ENABLED=false，跳过启动"
-                );
-                return;
-            }
-
-            let interval_secs = std::env::var("WECHAT_MP_OUTBOX_WORKER_INTERVAL_SECS")
-                .ok()
-                .and_then(|v| v.parse::<u64>().ok())
-                .filter(|&v| v > 0)
-                .unwrap_or(DEFAULT_INTERVAL_SECS);
-
-            tokio::time::sleep(std::time::Duration::from_secs(INITIAL_DELAY_SECS)).await;
-
-            let interval = std::time::Duration::from_secs(interval_secs);
-            info!(
-                interval_secs,
-                "公众号通知重试 Worker：后台任务已启动（每 {} 秒扫描一次 PENDING 队列行）",
-                interval_secs
-            );
-
-            loop {
-                let scan_start = Utc::now();
-                match self.run_once().await {
-                    Ok(count) if count > 0 => {
-                        info!(
-                            count,
-                            elapsed_ms = (Utc::now() - scan_start).num_milliseconds(),
-                            "公众号通知重试 Worker：本轮处理 {} 条队列行",
-                            count
-                        );
-                    }
-                    Ok(_) => {}
-                    Err(e) => {
-                        warn!(error = %e, "公众号通知重试 Worker：本轮扫描失败，下次循环继续");
-                    }
-                }
-                tokio::time::sleep(interval).await;
-            }
-        })
-    }
 }
 
 /// 按 code 反解事件类型（与 WechatMpTemplateKind::code() 词表一一对应）。
@@ -214,5 +164,50 @@ fn kind_from_code(code: &str) -> Option<WechatMpTemplateKind> {
         "wechat_mp_quotation_result" => Some(WechatMpTemplateKind::QuotationResult),
         "wechat_mp_pending_reconcile" => Some(WechatMpTemplateKind::PendingReconcile),
         _ => None,
+    }
+}
+
+/// 统一注册中心的调度器名
+const WECHAT_MP_OUTBOX_SCHEDULER_NAME: &str = "wechat-mp-notification-outbox-worker";
+
+#[async_trait::async_trait]
+impl crate::utils::scheduler_framework::Scheduler for WechatMpNotificationOutboxWorker {
+    fn name(&self) -> &str {
+        WECHAT_MP_OUTBOX_SCHEDULER_NAME
+    }
+
+    fn interval_secs(&self) -> u64 {
+        std::env::var("WECHAT_MP_OUTBOX_WORKER_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(DEFAULT_INTERVAL_SECS)
+    }
+
+    fn initial_delay_secs(&self) -> u64 {
+        INITIAL_DELAY_SECS
+    }
+
+    fn enabled(&self) -> bool {
+        std::env::var("WECHAT_MP_OUTBOX_WORKER_ENABLED")
+            .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
+            .unwrap_or(true)
+    }
+
+    async fn run_once(&self) -> Result<(), String> {
+        self.dispatch_pending_batch()
+            .await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    async fn run_once_counted(&self) -> (Result<(), String>, Option<i64>) {
+        let r = self
+            .dispatch_pending_batch()
+            .await
+            .map_err(|e| e.to_string());
+        match r {
+            Ok(n) => (Ok(()), Some(n as i64)),
+            Err(e) => (Err(e), None),
+        }
     }
 }

@@ -15,7 +15,6 @@
 use std::sync::Arc;
 
 use sea_orm::DatabaseConnection;
-use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 use crate::config::settings::FinanceAlertScanJob;
@@ -52,34 +51,31 @@ impl FinanceAlertScanScheduler {
         );
         Ok(created.len())
     }
+}
 
-    /// 启动后台调度循环（受全局取消 Token 控制），返回 JoinHandle 供启动链注册与停机 abort。
-    pub fn start_background_task(
-        self: Arc<Self>,
-        cancel: CancellationToken,
-    ) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(self.job.initial_delay_secs)).await;
-            let interval = std::time::Duration::from_secs(self.job.interval_secs);
-            info!(
-                interval_secs = self.job.interval_secs,
-                "财务预警扫描调度运行中（每 {} 秒扫描应收逾期/库存积压/现金缺口/预算超支四类候选）",
-                self.job.interval_secs
-            );
-            loop {
-                tokio::select! {
-                    _ = tokio::time::sleep(interval) => {
-                        match self.scan_once().await {
-                            Ok(_) => {}
-                            Err(e) => warn!(error = %e, "财务预警扫描调度：本轮失败，下一轮继续"),
-                        }
-                    }
-                    _ = cancel.cancelled() => {
-                        info!("财务预警扫描调度收到取消信号，优雅退出");
-                        break;
-                    }
-                }
-            }
-        })
+#[async_trait::async_trait]
+impl crate::utils::scheduler_framework::Scheduler for FinanceAlertScanScheduler {
+    fn name(&self) -> &str {
+        "finance-alert-scan-scheduler"
+    }
+
+    fn interval_secs(&self) -> u64 {
+        self.job.interval_secs
+    }
+
+    fn initial_delay_secs(&self) -> u64 {
+        self.job.initial_delay_secs
+    }
+
+    fn enabled(&self) -> bool {
+        self.job.enabled
+    }
+
+    async fn run_once(&self) -> Result<(), String> {
+        self.scan_once().await.map(|_| ())
+    }
+    async fn run_once_counted(&self) -> (Result<(), String>, Option<i64>) {
+        let r = self.scan_once().await;
+        (r.clone().map(|_| ()), r.ok().map(|n| n as i64))
     }
 }

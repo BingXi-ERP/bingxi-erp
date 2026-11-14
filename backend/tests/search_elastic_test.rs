@@ -29,6 +29,25 @@ fn test_doc_type_desc_zh() {
     assert_eq!(DocType::Product.desc_zh(), "产品");
 }
 
+/// 名实一致门：DocType 只注册有同步写点的三域。历史上注册过 19 类而真实同步仅
+/// 3 域，/search/doc-types 对外返回 16 类 doc_count 恒 0 的假可供性；本断言钉住
+/// 注册集合不回涨——扩索引必须连同步写点一起接入。
+#[test]
+fn test_doc_type_all_matches_synced_domains() {
+    let all = DocType::all();
+    assert_eq!(all.len(), 3, "DocType 注册数必须等于真实同步域数 3");
+    let indices_of: Vec<&str> = all.iter().map(|t| t.index()).collect();
+    assert_eq!(indices_of.len(), 3);
+    assert!(indices_of.contains(&indices::SALES_ORDERS));
+    assert!(indices_of.contains(&indices::CUSTOMERS));
+    assert!(indices_of.contains(&indices::PRODUCTS));
+    assert_eq!(
+        indices::ALL.len(),
+        3,
+        "ensure_indices 建索引集合必须与注册 DocType 集合同源"
+    );
+}
+
 #[test]
 fn test_search_query_new() {
     let q = SearchQuery::new();

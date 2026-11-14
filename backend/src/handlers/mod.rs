@@ -249,3 +249,4 @@ pub mod supplier_product_color_handler;
 pub mod textile_safety_handler;
 pub mod textile_safety_report_handler;
 pub mod textile_safety_master_handler;
+pub mod scheduler_handler;
