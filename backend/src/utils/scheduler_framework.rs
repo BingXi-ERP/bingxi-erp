@@ -26,7 +26,7 @@
 
 use std::sync::{Arc, OnceLock};
 
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
 use tokio_util::sync::CancellationToken;
 
 use crate::models::scheduler_job_run;
@@ -103,7 +103,7 @@ async fn run_once_recorded(
             }
             Err(e) => {
                 active.status = Set(STATUS_FAILED.to_string());
-                active.error_message = Set(Some(error_summary(e)));
+                active.error_message = Set(Some(error_summary(e.clone())));
             }
         }
         if let Err(e) = active.update(db.as_ref()).await {

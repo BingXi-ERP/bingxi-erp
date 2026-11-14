@@ -1,5 +1,4 @@
 use crate::utils::error::AppError;
-use futures::FutureExt;
 use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement, TransactionTrait};
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;

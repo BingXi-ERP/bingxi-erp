@@ -12,7 +12,7 @@
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 
 use crate::models::scheduler_job_run;
 use crate::utils::error::AppError;

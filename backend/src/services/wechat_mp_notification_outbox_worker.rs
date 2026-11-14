@@ -7,7 +7,6 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use sea_orm::DatabaseConnection;
 use tracing::{info, warn};
 
