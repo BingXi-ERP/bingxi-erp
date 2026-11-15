@@ -325,26 +325,37 @@ impl LabDipRequestService {
     }
 
     /// 状态流转：客户确认 OK 样（submitted → approved）（真实业务：客户从 ABCD 多版中选 1 版作为 OK 样）
+    ///
+    /// 双写（通知单 + 小样）在同一事务内提交：任一写失败整事务回滚，不留下
+    /// "通知单已 approved 但小样未 selected"的半态——该半态会让报价转单的
+    /// 确认样门（只读 approved_sample_id 非空）误放行。通知单行在事务内以
+    /// 排他锁读取并重新校验状态，串行化并发 approve/reject。
     pub async fn approve_ok_sample(
         &self,
         id: i32,
         sample_id: i32,
         comment: Option<String>,
     ) -> Result<RequestModel, AppError> {
-        let model = self.get_by_id(id).await?;
+        let txn = (*self.db).begin().await?;
+
+        let model = RequestEntity::find_by_id(id)
+            .filter(lab_dip_request::Column::IsDeleted.eq(false))
+            .lock_exclusive()
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::not_found(format!("打样通知单 {} 不存在", id)))?;
         Self::validate_status_transition(&model.status, req_status::APPROVED)?;
 
-        // 校验选中的小样存在且属于该通知单
+        // 校验选中的小样存在且属于该通知单（同事务读取，锁序 request → sample）
         let sample = SampleEntity::find_by_id(sample_id)
             .filter(lab_dip_sample::Column::RequestId.eq(id))
             .filter(lab_dip_sample::Column::IsDeleted.eq(false))
-            .one(&*self.db)
+            .one(&txn)
             .await?
             .ok_or_else(|| {
                 AppError::business(format!("小样 {} 不存在或不属于该通知单", sample_id))
             })?;
 
-        // 事务：更新通知单状态 + 更新选中样状态 + 更新其他样状态
         let now = crate::utils::date_utils::utc_now_fixed();
 
         // 1. 更新通知单
@@ -354,32 +365,44 @@ impl LabDipRequestService {
         req_active.customer_approval_comment = Set(comment);
         req_active.approved_sample_id = Set(Some(sample_id));
         req_active.updated_at = Set(now);
-        let updated_req = req_active.update(&*self.db).await?;
+        let updated_req = req_active.update(&txn).await?;
 
-        // 2. 更新选中样状态为 selected
+        // 2. 更新选中样状态为 selected（与上一步同事务，任一失败整体回滚）
         let mut sample_active: SampleActiveModel = sample.into();
         sample_active.matching_result = Set(sample_status::SELECTED.to_string());
         sample_active.approved_at = Set(Some(now));
         sample_active.updated_at = Set(now);
-        sample_active.update(&*self.db).await?;
+        sample_active.update(&txn).await?;
 
+        txn.commit().await?;
         Ok(updated_req)
     }
 
     /// 状态流转：客户要求重打（submitted → rejected）
+    ///
+    /// 与 approve_ok_sample 同一互斥口径：事务内排他锁读通知单并重新校验状态，
+    /// 防止并发 approve/reject 双成功把同一单既置 approved 又置 rejected。
     pub async fn reject_and_redo(
         &self,
         id: i32,
         comment: String,
     ) -> Result<RequestModel, AppError> {
-        let model = self.get_by_id(id).await?;
+        let txn = (*self.db).begin().await?;
+
+        let model = RequestEntity::find_by_id(id)
+            .filter(lab_dip_request::Column::IsDeleted.eq(false))
+            .lock_exclusive()
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::not_found(format!("打样通知单 {} 不存在", id)))?;
         Self::validate_status_transition(&model.status, req_status::REJECTED)?;
 
         let mut active: RequestActiveModel = model.into();
         active.status = Set(req_status::REJECTED.to_string());
         active.customer_approval_comment = Set(Some(comment));
         active.updated_at = Set(crate::utils::date_utils::utc_now_fixed());
-        let updated = active.update(&*self.db).await?;
+        let updated = active.update(&txn).await?;
+        txn.commit().await?;
         Ok(updated)
     }
 
