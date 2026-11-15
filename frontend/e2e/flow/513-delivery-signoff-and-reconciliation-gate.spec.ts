@@ -94,8 +94,8 @@ async function createApprovedOrder(
 ): Promise<{ orderId: number; orderNo: string }> {
   const created = await apiCallRaw<Row>(page, 'POST', '/sales/orders', {
     customer_id: customerId,
-    order_date: new Date().toISOString().slice(0, 10),
-    delivery_date: new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10),
+    order_date: new Date().toISOString(),
+    delivery_date: new Date(Date.now() + 7 * 86_400_000).toISOString(),
     remarks: '签收对账门用例订单',
     items: [
       {
