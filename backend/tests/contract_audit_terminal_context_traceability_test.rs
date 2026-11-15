@@ -1021,6 +1021,9 @@ async fn seed_leg_delivery(
         created_by: Set(100),
         created_at: Set(Utc::now()),
         updated_at: Set(Utc::now()),
+        delivered_at: Set(None),
+        signed_by: Set(None),
+        signed_at: Set(None),
     }
     .insert(db)
     .await

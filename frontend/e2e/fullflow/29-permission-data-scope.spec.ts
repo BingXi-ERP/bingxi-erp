@@ -36,8 +36,7 @@
 //      原文与本人行的非 PII 列作为正向对照（防"整列恒空"型假绿）。
 //
 // CI 测不到（显式声明）：
-//   - DEPT/DEPT_AND_BELOW 范围：role.data_scope 无 API 写入口（仅迁移 SQL 更新，
-//     migration/src/domain/finance/mod.rs:26-35），用例无法自建 dept 范围角色；
+//   - role.data_scope 的 DEPT_AND_BELOW：该取值无对应应用执行器；29-08 只覆盖 dept；
 //   - RLS 策略层（PostgreSQL app.user_id 会话变量）与应用层过滤的双保险一致性——需 DBA 侧验证；
 //   - 权限缓存跨实例失效（Redis pub/sub，permission.rs:400-461）单实例 CI 下不可测；
 //   - print/export 角色黑名单（permission.rs:463-478）与字段级写权限（field-permissions）。
@@ -630,6 +629,257 @@ test.describe('29 权限键与数据范围契约链', () => {
       ).toBe(false);
     } finally {
       await session?.close();
+    }
+  });
+
+  test('29-07 应收生成 SELF：有权限但异 owner 拒绝且零写入，本 owner 正向落库', async ({
+    page,
+    browser,
+  }) => {
+    const { roleId, userId, username, password } = await seedRoleAndUser(page, 'Z7');
+    const scope = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'PATCH',
+      `/roles/${roleId}/data-scope`,
+      { data_scope: 'self' }
+    );
+    expect(scope.data_scope, '角色范围显式设为 self').toBe('self');
+    const role = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/roles/${roleId}`);
+    expect(role.data_scope, '角色范围回读 self').toBe('self');
+    await grantPermission(page, roleId, 'ar-reconciliations-enhanced', 'create');
+    await grantPermission(page, roleId, 'customers', 'create');
+
+    const admin = await apiCallRaw<Record<string, unknown>>(page, 'GET', '/users/me');
+    const adminId = requireNum(admin.id, 'admin 会话用户 id');
+    expect(adminId, '两名客户 owner 必须不同').not.toBe(userId);
+    const external = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/crm/customers', {
+      customer_name: `E2F29应收外部客户${Date.now()}`,
+    });
+    const externalId = requireNum(external.id, 'admin 建外部客户');
+    CLEANUP.push({ path: `/crm/customers/${externalId}`, label: `customer(admin)#${externalId}` });
+    expect(requireNum(external.owner_id, '外部客户 owner'), '外部客户归属 admin').toBe(adminId);
+
+    const period = { start_date: '2026-01-01', end_date: '2026-01-31' };
+    const externalListPath = `/ar-reconciliations?customer_id=${externalId}&page=1&page_size=100`;
+    const baseline = await apiCallRaw<{ items: Record<string, unknown>[]; total: number }>(
+      page,
+      'GET',
+      externalListPath
+    );
+    expect(baseline.items, '外部独立客户对账基线 items 为空').toEqual([]);
+    expect(baseline.total, '外部独立客户对账基线 total 为 0').toBe(0);
+
+    let session: IsolatedAuthedSession | undefined;
+    try {
+      session = await loginInIsolatedContext(browser, username, password);
+      const own = await apiCallRaw<Record<string, unknown>>(
+        session.page,
+        'POST',
+        '/crm/customers',
+        { customer_name: `E2F29应收本人客户${Date.now()}` }
+      );
+      const ownId = requireNum(own.id, 'SELF 用户建本人客户');
+      CLEANUP.push({ path: `/crm/customers/${ownId}`, label: `customer(U)#${ownId}` });
+      expect(requireNum(own.owner_id, '本人客户 owner'), '本人客户归属新用户').toBe(userId);
+      expect(own.owner_id, '本人客户与外部客户归属不同').not.toBe(external.owner_id);
+      const ownBaseline = await apiCallRaw<{ items: Record<string, unknown>[]; total: number }>(
+        page,
+        'GET',
+        `/ar-reconciliations?customer_id=${ownId}&page=1&page_size=100`
+      );
+      expect(ownBaseline.items, '本人独立客户对账基线 items 为空').toEqual([]);
+      expect(ownBaseline.total, '本人独立客户对账基线 total 为 0').toBe(0);
+
+      // 无发票/收款的独立客户也能生成零余额对账，先证实同会话 RBAC 放行。
+      const generated = await apiCallRaw<Record<string, unknown>>(
+        session.page,
+        'POST',
+        '/ar-reconciliations-enhanced/generate',
+        { customer_id: ownId, ...period }
+      );
+      const reconciliationId = requireNum(generated.id, '本人客户生成对账 id');
+      CLEANUP.push({
+        path: `/ar-reconciliations/${reconciliationId}`,
+        label: `ar_reconciliation#${reconciliationId}`,
+      });
+      expect(generated.customer_id, '生成响应客户 id').toBe(ownId);
+      expect(generated.reconciliation_status, '生成响应状态 draft').toBe('draft');
+      expect(generated.period_start, '生成响应期间起始').toBe(period.start_date);
+      expect(generated.period_end, '生成响应期间结束').toBe(period.end_date);
+      const persisted = await apiCallRaw<Record<string, unknown>>(
+        page,
+        'GET',
+        `/ar-reconciliations/${reconciliationId}`
+      );
+      expect(persisted.id, 'admin 详情证实对账落库').toBe(reconciliationId);
+      expect(persisted.customer_id, '落库客户 id').toBe(ownId);
+      expect(persisted.reconciliation_status, '落库状态 draft').toBe('draft');
+      expect(persisted.period_start, '落库期间起始').toBe(period.start_date);
+      expect(persisted.period_end, '落库期间结束').toBe(period.end_date);
+
+      const denied = await apiCallExpectFail(
+        session.page,
+        'POST',
+        '/ar-reconciliations-enhanced/generate',
+        { customer_id: externalId, ...period }
+      );
+      expectForbidden(denied, '同一 SELF 会话有生成权限但无外部客户归属权限');
+      const afterDenied = await apiCallRaw<{ items: Record<string, unknown>[]; total: number }>(
+        page,
+        'GET',
+        externalListPath
+      );
+      expect(afterDenied.items, '拒绝后 admin 回读外部客户对账仍为空').toEqual([]);
+      expect(afterDenied.total, '拒绝后外部客户对账总数仍为 0（零写入）').toBe(0);
+    } finally {
+      await session?.close();
+    }
+  });
+
+  test('29-08 应收生成 DEPT：同部异 owner 正向落库，异部拒绝且零写入', async ({
+    page,
+    browser,
+  }) => {
+    const departmentIds: number[] = [];
+    for (const tag of ['A', 'B']) {
+      const department = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/departments', {
+        name: `E2F29部门${tag}${Date.now()}`,
+        parent_id: null,
+      });
+      const departmentId = requireNum(department.id, `建根部门 ${tag}`);
+      CLEANUP.push({
+        path: `/departments/${departmentId}`,
+        label: `department(${tag})#${departmentId}`,
+      });
+      departmentIds.push(departmentId);
+      const back = await apiCallRaw<Record<string, unknown>>(
+        page,
+        'GET',
+        `/departments/${departmentId}`
+      );
+      expect(back.parent_id, `部门 ${tag} 必须为独立根部门`).toBeNull();
+    }
+    const [departmentA, departmentB] = departmentIds;
+    expect(departmentA, '部门 A 与 B 必须不同').not.toBe(departmentB);
+
+    const u = await seedRoleAndUser(page, 'Z8U');
+    const v = await seedRoleAndUser(page, 'Z8V');
+    const w = await seedRoleAndUser(page, 'Z8W');
+    expect(u.userId, 'U 与 V 必须是同部异 owner').not.toBe(v.userId);
+    expect(new Set([u.userId, v.userId, w.userId]).size, '三个用户必须独立').toBe(3);
+    expect(new Set([u.roleId, v.roleId, w.roleId]).size, '三个角色必须独立').toBe(3);
+    for (const { user, departmentId } of [
+      { user: u, departmentId: departmentA },
+      { user: v, departmentId: departmentA },
+      { user: w, departmentId: departmentB },
+    ]) {
+      await apiCallRaw(page, 'PUT', `/users/${user.userId}`, { department_id: departmentId });
+      const back = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/users/${user.userId}`);
+      expect(back.department_id, `${user.username} 部门真实落库`).toBe(departmentId);
+      expect(back.role_id, `${user.username} 保留独立角色`).toBe(user.roleId);
+    }
+    await grantPermission(page, u.roleId, 'ar-reconciliations-enhanced', 'create');
+    await grantPermission(page, v.roleId, 'customers', 'create');
+    await grantPermission(page, w.roleId, 'customers', 'create');
+    const scope = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'PATCH',
+      `/roles/${u.roleId}/data-scope`,
+      { data_scope: 'dept' }
+    );
+    expect(scope.data_scope, 'U 角色范围显式设为 dept').toBe('dept');
+    const role = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/roles/${u.roleId}`);
+    expect(role.data_scope, 'U 角色范围回读 dept').toBe('dept');
+
+    const sessions: IsolatedAuthedSession[] = [];
+    const customerIds: number[] = [];
+    try {
+      for (const { user, departmentId, tag } of [
+        { user: v, departmentId: departmentA, tag: 'V' },
+        { user: w, departmentId: departmentB, tag: 'W' },
+      ]) {
+        const session = await loginInIsolatedContext(browser, user.username, user.password);
+        sessions.push(session);
+        const customer = await apiCallRaw<Record<string, unknown>>(
+          session.page,
+          'POST',
+          '/crm/customers',
+          { customer_name: `E2F29部门客户${tag}${Date.now()}` }
+        );
+        const customerId = requireNum(customer.id, `${tag} 建独立客户`);
+        CLEANUP.push({
+          path: `/crm/customers/${customerId}`,
+          label: `customer(${tag})#${customerId}`,
+        });
+        customerIds.push(customerId);
+        expect(customer.owner_id, `${tag} 客户 owner 为创建用户`).toBe(user.userId);
+        expect(customer.department_id, `${tag} 客户部门由 owner 触发器写入`).toBe(departmentId);
+        const back = await apiCallRaw<Record<string, unknown>>(
+          page,
+          'GET',
+          `/crm/customers/${customerId}`
+        );
+        expect(back.owner_id, `${tag} 客户 owner 落库回读`).toBe(user.userId);
+        expect(back.department_id, `${tag} 客户部门落库回读`).toBe(departmentId);
+        await session.close();
+        sessions.pop();
+      }
+      const [sameDepartmentId, otherDepartmentId] = customerIds;
+      expect(sameDepartmentId, '同部与异部客户必须独立').not.toBe(otherDepartmentId);
+      const externalListPath = `/ar-reconciliations?customer_id=${otherDepartmentId}&page=1&page_size=100`;
+      const baseline = await apiCallRaw<{ items: Record<string, unknown>[]; total: number }>(
+        page,
+        'GET',
+        externalListPath
+      );
+      expect(baseline.items, '异部独立客户对账基线 items 为空').toEqual([]);
+      expect(baseline.total, '异部独立客户对账基线 total 为 0').toBe(0);
+
+      const session = await loginInIsolatedContext(browser, u.username, u.password);
+      sessions.push(session);
+      const period = { start_date: '2026-01-01', end_date: '2026-01-31' };
+      const generated = await apiCallRaw<Record<string, unknown>>(
+        session.page,
+        'POST',
+        '/ar-reconciliations-enhanced/generate',
+        { customer_id: sameDepartmentId, ...period }
+      );
+      const reconciliationId = requireNum(generated.id, '同部异 owner 客户生成对账 id');
+      CLEANUP.push({
+        path: `/ar-reconciliations/${reconciliationId}`,
+        label: `ar_reconciliation#${reconciliationId}`,
+      });
+      expect(generated.customer_id, '生成响应为 V 同部客户').toBe(sameDepartmentId);
+      expect(generated.reconciliation_status, '生成响应状态 draft').toBe('draft');
+      expect(generated.period_start, '生成响应期间起始').toBe(period.start_date);
+      expect(generated.period_end, '生成响应期间结束').toBe(period.end_date);
+      const persisted = await apiCallRaw<Record<string, unknown>>(
+        page,
+        'GET',
+        `/ar-reconciliations/${reconciliationId}`
+      );
+      expect(persisted.id, 'admin 详情证实同部异 owner 对账落库').toBe(reconciliationId);
+      expect(persisted.customer_id, '落库客户为 V 同部客户').toBe(sameDepartmentId);
+      expect(persisted.reconciliation_status, '落库状态 draft').toBe('draft');
+      expect(persisted.period_start, '落库期间起始').toBe(period.start_date);
+      expect(persisted.period_end, '落库期间结束').toBe(period.end_date);
+
+      const denied = await apiCallExpectFail(
+        session.page,
+        'POST',
+        '/ar-reconciliations-enhanced/generate',
+        { customer_id: otherDepartmentId, ...period }
+      );
+      expectForbidden(denied, '同一 DEPT 会话有生成权限但无 W 异部客户权限');
+      const afterDenied = await apiCallRaw<{ items: Record<string, unknown>[]; total: number }>(
+        page,
+        'GET',
+        externalListPath
+      );
+      expect(afterDenied.items, '拒绝后异部客户对账 items 与空基线一致').toEqual(baseline.items);
+      expect(afterDenied.total, '拒绝后异部客户对账 total 与零基线一致').toBe(baseline.total);
+    } finally {
+      await Promise.all(sessions.map(session => session.close()));
     }
   });
 });

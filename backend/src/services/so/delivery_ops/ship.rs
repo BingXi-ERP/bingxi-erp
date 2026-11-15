@@ -244,6 +244,9 @@ impl SalesService {
             created_by: Set(user_id),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
+            delivered_at: Set(None),
+            signed_by: Set(None),
+            signed_at: Set(None),
         };
         Ok(delivery.insert(txn).await?)
     }

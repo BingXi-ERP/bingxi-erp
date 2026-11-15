@@ -32,7 +32,7 @@ pub struct Model {
     /// 仓库 ID（外键）
     pub warehouse_id: i32,
 
-    /// 交货状态：DRAFT=草稿，SHIPPED=已发货，DELIVERED=已交货，PARTIAL=部分交货
+    /// 交货状态：pending 待处理，shipped 已发货，cancelled 已取消
     pub status: String,
 
     /// 总数量
@@ -52,6 +52,13 @@ pub struct Model {
 
     /// 更新时间
     pub updated_at: DateTime<Utc>,
+
+    /// 送达时间（配送完成，签收前）
+    pub delivered_at: Option<DateTime<Utc>>,
+    /// 签收人 ID（客户侧或会话用户，签收端点写）
+    pub signed_by: Option<i32>,
+    /// 签收时间（对账来源门依据）
+    pub signed_at: Option<DateTime<Utc>>,
 }
 
 /// 销售交货关联关系
