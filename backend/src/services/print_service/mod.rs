@@ -1,4 +1,17 @@
 //! 通用打印服务（域子模块拆分入口）
+//!
+//! V15 P0-S17 修复（Batch 476）：6 个 get_*_print_data 方法从硬编码占位数据
+//! 改为真实查询数据库（主表 + 关联客户/供应商/仓库 + 明细项）。
+//! 2026-11-15 拆分：方法按业务域下沉到本目录子模块，签名与外部路径零改动。
+
+use crate::utils::error::AppError;
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 pub struct PrintData {
     pub template: String,
@@ -30,7 +43,7 @@ pub struct PrintService {
 }
 
 /// 库存调拨打印上下文：聚合主表、调出/调入仓库、明细及产品映射
-struct TransferPrintContext {
+pub(crate) struct TransferPrintContext {
     transfer: crate::models::inventory_transfer::Model,
     from_warehouse: Option<crate::models::warehouse::Model>,
     to_warehouse: Option<crate::models::warehouse::Model>,
