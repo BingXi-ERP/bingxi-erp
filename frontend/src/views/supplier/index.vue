@@ -52,7 +52,7 @@
       :suppliers="suppliers"
       :total="total"
       :loading="loading"
-      :query-params="queryParams"
+      :query-params="{ ...queryParams, page, page_size: pageSize }"
       :dialog-mode="dialogMode"
       @search="handleSearch"
       @reset="handleReset"
