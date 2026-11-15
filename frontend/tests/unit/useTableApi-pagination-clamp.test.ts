@@ -26,8 +26,9 @@ function mountTable(initialTotal: number, initialPage: number, pageSize = 20) {
   const Host = defineComponent({
     setup() {
       const table = useTableApi<Record<string, unknown>>('/test/table');
-      table.page.value = initialPage;
-      table.pageSize.value = pageSize;
+      // 初始加载完成后才把 page 设到目标值：useTableApi 现在会在 total 落定后做
+      // 页码越界钳位，mount 期间直接设大页会被首次响应的 maxPage 判定拉回 1，
+      // 使后续断言失去前提。
       return () =>
         h('div', { class: 'host' }, [
           h(ElPagination, {
@@ -46,22 +47,34 @@ function mountTable(initialTotal: number, initialPage: number, pageSize = 20) {
   });
 
   const wrapper = mount(Host, { global: { plugins: [ElementPlus] } });
-  return { wrapper, calls, mockGet };
+  const setPageAfterInitialLoad = async () => {
+    await flushPromises();
+    const table = (wrapper.vm.$.setupState as { table: ReturnType<typeof useTableApi> }).table;
+    table.page.value = initialPage;
+    table.pageSize.value = pageSize;
+    await flushPromises();
+    await nextTick();
+  };
+  return { wrapper, calls, mockGet, setPageAfterInitialLoad };
 }
 
 describe('useTableApi pagination clamp on total decrease', () => {
   it('does not clamp when page is within range of total', async () => {
-    const { calls, mockGet } = mountTable(60, 2);
-    await flushPromises();
+    const { calls, mockGet, setPageAfterInitialLoad } = mountTable(60, 2);
+    await setPageAfterInitialLoad();
     expect(mockGet).toHaveBeenCalled();
     expect(calls.length).toBeGreaterThanOrEqual(1);
-    expect(calls[0].page).toBe(2);
+    expect(calls[calls.length - 1].page).toBe(2);
+    // 页内页不被钳位：page=2 稳定保留（total=60/page_size=20 maxPage=3）
+    await flushPromises();
+    await nextTick();
+    expect(calls.filter(c => c.page === 2).length).toBeGreaterThanOrEqual(1);
   });
 
   it('clamps page to maxPage when total drops below current page boundary', async () => {
     const { calls, mockGet, wrapper } = mountTable(40, 3, 20);
-    await flushPromises();
-    expect(calls[0].page).toBe(3);
+    await setPageAfterInitialLoad();
+    expect(calls[calls.length - 1].page).toBe(3);
 
     mockGet.mockResolvedValueOnce(makeResponse([], 20) as never);
     const pagination = wrapper.getComponent(ElPagination);
@@ -78,7 +91,7 @@ describe('useTableApi pagination clamp on total decrease', () => {
 
   it('clamps to page 1 when total becomes 0', async () => {
     const { calls, mockGet, wrapper } = mountTable(40, 3, 20);
-    await flushPromises();
+    await setPageAfterInitialLoad();
 
     mockGet.mockResolvedValueOnce(makeResponse([], 0) as never);
     wrapper.getComponent(ElPagination).vm.$emit('update:current-page', 3);
