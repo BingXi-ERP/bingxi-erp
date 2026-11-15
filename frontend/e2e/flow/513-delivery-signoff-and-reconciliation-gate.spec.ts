@@ -41,7 +41,7 @@ function expectStatusChar(status: unknown, expected: string, label: string): voi
 async function createOwnCustomer(page: Page, nameSuffix: string): Promise<number> {
   const cust = await apiCallRaw<Row>(page, 'POST', '/crm/customers', {
     customer_name: `签收对账门专属客户_${nameSuffix}_${Date.now()}`,
-    customer_type: 'fabric_dealer',
+    customer_type: 'wholesale',
     contact_person: '签收用例',
     phone: '13800001122',
   });
