@@ -492,5 +492,12 @@ fn is_misc_direct_resource(part: &str) -> bool {
         | "totp"
         | "unread-count"
         | "warnings"
+        // ===== 周期任务可观测面（/scheduler/jobs 与 /scheduler/jobs/runs 与 /scheduler/jobs/{name}/trigger）=====
+        // seg3=scheduler 即权威资源名（jobs 是同一资源下的清单面，runs 是查询维度，
+        // {name}/trigger 的末段非动作关键字按 POST→create 派生）。不登记则
+        // validate_route_whitelist 对全员（含 admin）fail-closed 403；授权键
+        // scheduler:read（清单与执行历史）与 scheduler:create（手动触发）按运维面
+        // 缺省只发 ops 岗，其余岗位 403 是缺省安全语义。
+        | "scheduler"
     )
 }
