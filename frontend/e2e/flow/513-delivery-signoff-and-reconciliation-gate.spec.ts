@@ -132,12 +132,14 @@ async function shipFullAndReadDelivery(
       },
     ],
   });
-  const res = await apiCallRaw<{ items: Array<Row> }>(
+  const res = await apiCallRaw<{ list: Array<Row>; total: number }>(
     page,
     'GET',
     `/sales/orders/${orderId}/deliveries`
   );
-  const delivery = res.items?.find(d => String(d.status) === 'shipped');
+  expect(Array.isArray(res.list), '送货记录响应必须提供 list 数组').toBe(true);
+  expect(res.total, '送货记录总数必须与实际返回条数一致').toBe(res.list.length);
+  const delivery = res.list.find(d => String(d.status) === 'shipped');
   if (!delivery) throw new Error('发货后不存在 shipped 送货单');
   return {
     deliveryId: readNumber(delivery.id, '送货单 id'),
