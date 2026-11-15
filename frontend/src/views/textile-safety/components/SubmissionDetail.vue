@@ -67,7 +67,7 @@
         </el-table-column>
         <el-table-column label="归因" width="130">
           <template #default="{ row }">
-            <el-tag size="small" :type="(ITEM_SOURCE_TAG_TYPE[row.source] as any) ?? 'info'">
+            <el-tag size="small" :type="(ITEM_SOURCE_TAG_TYPE[row.source] as string | undefined) ?? 'info'">
               {{ ITEM_SOURCE_LABELS[row.source] ?? row.source }}
             </el-tag>
           </template>
