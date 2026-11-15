@@ -16,14 +16,14 @@ use crate::utils::state_machine_trait::{StateMachine, TransitionResult};
 ///
 /// 持有当前状态字符串，按 10 条合法边校验与执行转换。
 // 后续接入 StateMachine 时会使用
-#[allow(dead_code)]
+#[allow(dead_code, reason = "统一状态机 trait 家族：适配器由 trait 分发消费")]
 pub struct Quality8dStateMachineAdapter {
     /// 当前状态（8D 状态值字符串，如 "not_started"/"d0_plan" 等）
     current: String,
 }
 
 // 后续接入 StateMachine 时会使用
-#[allow(dead_code)]
+#[allow(dead_code, reason = "统一状态机 trait 家族：适配器由 trait 分发消费")]
 impl Quality8dStateMachineAdapter {
     /// 以指定初始状态构造适配器
     pub fn new(current: impl Into<String>) -> Self {

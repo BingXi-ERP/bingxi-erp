@@ -14,7 +14,7 @@ pub fn random_4_digit() -> u16 {
 
 /// 生成指定长度的字母数字随机字符串（非密码学安全，用于验证码/编号）
 // 后续接入 SchedulerRegistry/StateMachine 时会使用（保留作非密码学场景用）
-#[allow(dead_code)]
+#[allow(dead_code, reason = "随机串生成工具：邀请码与临时凭证场景备用")]
 pub fn random_alphanumeric(length: usize) -> String {
     (0..length)
         // fastrand::alphanumeric() 已直接返回 char，无需再 cast

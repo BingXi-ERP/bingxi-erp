@@ -119,7 +119,7 @@ fn render_code128_png_produces_valid_png_for_single_char_input() {
 /// 按源码实际行为（`print_service.rs` 成品布标签装配函数的缺值校验段），空值产生
 /// `AppError::validation_displayable(...)`（HTTP 400 + VALIDATION_ERROR），
 /// 而非静默跳过。此扫描锁钉死该保护不被削弱或删除。
-const PRINT_SERVICE_SRC: &str = include_str!("../src/services/print_service.rs");
+const PRINT_SERVICE_SRC: &str = include_str!("../src/services/print_service/inventory.rs");
 
 /// 断言 `get_inventory_piece_label_print_data` 函数体内，`render_code128_png` 调用
 /// 之前存在对 `barcode` 字段的 `is_empty` 检查（fail-closed 不可移除）。

@@ -35,7 +35,7 @@ fn render_arms(src: &str) -> BTreeSet<String> {
 /// 渲染分支取值集必须与 SUPPORTED_DOC_TYPES 完全相等，且常量内无重复项。
 #[test]
 fn supported_doc_types_equals_render_arms() {
-    let src = read_rel("src/services/print_service.rs");
+    let src = read_rel("src/services/print_service/mod.rs");
     let arms = render_arms(&src);
     let declared: BTreeSet<String> = SUPPORTED_DOC_TYPES.iter().map(|s| s.to_string()).collect();
     assert_eq!(
@@ -76,7 +76,7 @@ fn supported_doc_types_cover_builtin_template_seed() {
 /// get_print_data 必须保留词表外 fail-closed 分支（未知单据类型报 404，不静默返回空数据）。
 #[test]
 fn unknown_doc_type_is_fail_closed() {
-    let src = read_rel("src/services/print_service.rs");
+    let src = read_rel("src/services/print_service/mod.rs");
     assert!(
         src.contains("Unknown document type"),
         "get_print_data 缺失未知单据类型的 fail-closed 分支"

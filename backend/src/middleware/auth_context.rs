@@ -240,7 +240,10 @@ pub struct OptionalAuthContext {
     pub role_id: Option<i32>,
 }
 
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "认证上下文框架形态：OptionalAuthContext 关联函数与 Extension 别名供路由层选用"
+)]
 impl OptionalAuthContext {
     pub fn from_claims(claims: AppClaims) -> Self {
         Self {
@@ -261,5 +264,8 @@ impl OptionalAuthContext {
 }
 
 /// 认证上下文提取器类型别名（使用 Extension）
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "认证上下文框架形态：OptionalAuthContext 关联函数与 Extension 别名供路由层选用"
+)]
 pub type Auth = axum::extract::Extension<AuthContext>;

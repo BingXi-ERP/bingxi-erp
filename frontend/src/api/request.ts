@@ -236,7 +236,7 @@ class Request {
         if (
           error.response?.status === 401 &&
           !originalRequest?._retry &&
-          !(originalRequest as any)?._skipAuthRetry
+          !(originalRequest as { _skipAuthRetry?: boolean } | undefined)?._skipAuthRetry
         ) {
           if (isRefreshing) {
             // FE-P1-1 修复：排队请求同时持有 resolve/reject，

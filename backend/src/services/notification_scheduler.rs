@@ -24,7 +24,7 @@ use crate::utils::scheduler_framework::Scheduler;
 
 /// 调度器名称（用于 Scheduler trait 统一标识）
 // 后续接入 SchedulerRegistry 时会使用
-#[allow(dead_code)]
+#[allow(dead_code, reason = "调度器注册名常量：SchedulerRegistry 注册面消费")]
 const SCHEDULER_NAME: &str = "notification-push-scheduler";
 
 /// 默认扫描间隔（秒）— 每分钟扫描一次到期订阅
