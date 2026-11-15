@@ -293,7 +293,12 @@ export function useOlv() {
     try {
       // 后端 GET /products 返回 ApiResponse<PaginatedResponse>（product_handler.rs:254/308），
       // 列表键恒为 data.items。单形状直读、缺键即抛，同 fetchCustomers 口径。
-      const res = await request.get<{ data?: { items?: Product[] } }>('/products');
+      // page_size 必须显式带 100（后端 clamp 上限）：不带参时后端默认 page_size=10，
+      // 产品超过 10 个后新建订单的产品下拉永远只见到第一页，第二页之后的产品选不到
+      //（21a 用例因此等待目标产品选项 30s 超时，实为该缺陷暴露）。
+      const res = await request.get<{ data?: { items?: Product[] } }>('/products', {
+        params: { page: 1, page_size: 100 },
+      });
       const items = res.data?.items;
       if (!Array.isArray(items)) {
         throw new Error(`GET /products 响应缺少 data.items 数组：${JSON.stringify(res)}`);

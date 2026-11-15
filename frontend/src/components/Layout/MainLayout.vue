@@ -41,14 +41,29 @@
           >
             <el-icon :size="22"><Expand /></el-icon>
           </el-button>
-          <el-breadcrumb separator="/" :aria-label="t('layout.main.breadcrumbAriaLabel')">
+          <el-breadcrumb
+            v-if="!isMobile"
+            separator="/"
+            :aria-label="t('layout.main.breadcrumbAriaLabel')"
+          >
             <el-breadcrumb-item :to="{ path: '/' }">{{
               t('layout.breadcrumb.home')
             }}</el-breadcrumb-item>
             <el-breadcrumb-item>{{ currentTitle }}</el-breadcrumb-item>
           </el-breadcrumb>
-          <!-- 全局搜索：真实接入后端 /search 端点（批次 104 SearchClient）；移动端隐藏防 header 溢出 -->
           <GlobalSearch v-if="!isMobile" class="header-search" />
+          <el-button
+            v-else
+            class="mobile-search-btn"
+            text
+            :title="t('layout.main.openSearch')"
+            :aria-label="t('layout.main.openSearch')"
+            :aria-expanded="searchVisible"
+            aria-haspopup="dialog"
+            @click="openSearch"
+          >
+            <el-icon :size="22"><Search /></el-icon>
+          </el-button>
         </div>
         <div class="header-right">
           <!-- V15 P1-20-16 暗黑模式切换按钮（触屏尺寸 ≥ 44px，WCAG 2.5.5） -->
@@ -86,7 +101,9 @@
           </el-button>
           <el-dropdown :aria-label="t('layout.main.userMenuAriaLabel')">
             <span class="user-info" role="button" tabindex="0">
-              {{ userStore.userInfo?.username || t('layout.user.defaultName') }}
+              <span class="user-name">{{
+                userStore.userInfo?.username || t('layout.user.defaultName')
+              }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -101,7 +118,23 @@
             </template>
           </el-dropdown>
         </div>
+        <span v-if="isMobile" class="mobile-current-title">{{ currentTitle }}</span>
       </el-header>
+
+      <el-dialog
+        v-model="searchVisible"
+        class="mobile-search-dialog"
+        :title="t('layout.main.searchTitle')"
+        append-to-body
+        destroy-on-close
+        :close-on-press-escape="true"
+      >
+        <GlobalSearch
+          v-if="searchVisible"
+          class="mobile-search-input"
+          @select="searchVisible = false"
+        />
+      </el-dialog>
 
       <el-main class="main-content">
         <router-view v-slot="{ Component, route }">
@@ -135,7 +168,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 // V15 P1-20-2 响应式侧边栏：动态组件切换需要显式导入 ElDrawer/ElAside
 import { ElDrawer, ElAside } from 'element-plus';
-import { ArrowDown, Expand, Sunny, Moon } from '@element-plus/icons-vue';
+import { ArrowDown, Expand, Sunny, Moon, Search } from '@element-plus/icons-vue';
 import { useUserStore } from '@/store/user';
 import ErrorBoundary from '@/components/ErrorBoundary.vue';
 // 批次 6 修复（2026-06-28）：MainLayout 菜单按 permission 过滤（审计 #8 完整修复）
@@ -170,6 +203,7 @@ const { company, load: loadCompanyProfile } = useCompanyProfile();
 const brandName = computed(() => company.value?.name || t('layout.brand'));
 // 移动端抽屉可见性状态
 const drawerVisible = ref(false);
+const searchVisible = ref(false);
 
 const activeMenu = computed(() => route.path);
 const currentTitle = computed(() => (route.meta.title as string) || '');
@@ -236,25 +270,29 @@ const sidebarAttrs = computed<Record<string, unknown>>(() => {
   };
 });
 
-// V15 P1-20-2 打开移动端抽屉
+// 移动端导航和搜索互斥，避免叠加模态层。
 const openDrawer = () => {
+  searchVisible.value = false;
   drawerVisible.value = true;
 };
+const openSearch = () => {
+  drawerVisible.value = false;
+  searchVisible.value = true;
+};
 
-// V15 P1-20-2 路由切换时关闭移动端抽屉（点击菜单项导航后自动收起）
+// 查询参数变化也属于导航，应收起移动端弹层。
 watch(
-  () => route.path,
+  () => route.fullPath,
   () => {
-    if (isMobile.value && drawerVisible.value) {
-      drawerVisible.value = false;
-    }
+    drawerVisible.value = false;
+    searchVisible.value = false;
   }
 );
 
-// V15 P1-20-2 切换到桌面端时关闭抽屉（避免从移动端放大后抽屉残留）
 watch(isMobile, mobile => {
-  if (!mobile && drawerVisible.value) {
+  if (!mobile) {
     drawerVisible.value = false;
+    searchVisible.value = false;
   }
 });
 
@@ -422,11 +460,23 @@ async function handleLogout() {
 
 /* V15 P1-20-2 移动端响应式适配（max-width: 991px，与 md 断点一致） */
 @media (max-width: 991px) {
-  /* 窄屏顶栏降档，52 像素内容高加安全区，触控目标仍靠下方 44 像素规则保证 */
+  /* 操作入口与当前页标题分行，标题不参与按钮行的空间竞争。 */
   .header {
-    --el-header-height: calc(52px + var(--bx-safe-top));
+    --el-header-height: auto;
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    grid-template-rows: minmax(52px, auto) auto;
     padding-left: calc(8px + var(--bx-safe-left));
     padding-right: calc(8px + var(--bx-safe-right));
+  }
+
+  .mobile-current-title {
+    grid-column: 1 / -1;
+    min-width: 0;
+    padding-bottom: 8px;
+    font-size: 14px;
+    line-height: 20px;
+    overflow-wrap: anywhere;
   }
 
   /* 窄屏 logo 条同步降档，品牌字从 18 像素收到 15 像素，与 14 像素面包屑保持一档层级差 */
@@ -448,15 +498,59 @@ async function handleLogout() {
       calc(12px + var(--bx-safe-left));
   }
 
-  /* 移动端头部用户菜单触屏尺寸 ≥ 44px */
-  .header-right .user-info {
-    min-height: 44px;
-    padding: 8px 12px;
+  .header-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
   }
 
-  /* 移动端面包屑简化（减少水平占用） */
+  .header-right .notification-badge,
+  .header-right .theme-toggle-btn {
+    flex: 0 0 44px;
+  }
+
+  .header-right :deep(.el-button) {
+    width: 44px;
+    padding: 0;
+    margin-left: 0;
+  }
+
+  .header-right :deep(.el-dropdown) {
+    min-width: 0;
+  }
+
+  /* 用户名让出按钮空间，长名称不撑破窄屏。 */
+  .header-right .user-info {
+    min-height: 44px;
+    min-width: 0;
+    max-width: 96px;
+    padding: 0 4px;
+  }
+
+  .user-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-info .el-icon {
+    flex-shrink: 0;
+  }
+
   .header-left {
     gap: 4px;
+    min-width: 92px;
+  }
+
+  .hamburger-btn,
+  .mobile-search-btn {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    margin-left: 0;
+    padding: 0;
   }
 }
 
@@ -476,5 +570,23 @@ async function handleLogout() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+</style>
+
+<style>
+/* 弹层挂到 body，使用组件专属类限定宽度，不影响其他对话框。 */
+.el-dialog.mobile-search-dialog {
+  --search-available-width: calc(100vw - 32px - var(--bx-safe-left) - var(--bx-safe-right));
+  /* 剩余空间均分到各自安全边距之外，在安全矩形内居中而非视口居中。 */
+  --search-centering-space: max(0px, calc((var(--search-available-width) - 480px) / 2));
+  box-sizing: border-box;
+  width: auto !important;
+  max-width: min(480px, var(--search-available-width)) !important;
+  margin-left: calc(16px + var(--bx-safe-left) + var(--search-centering-space)) !important;
+  margin-right: calc(16px + var(--bx-safe-right) + var(--search-centering-space)) !important;
+}
+.mobile-search-dialog .mobile-search-input {
+  width: 100%;
+  min-width: 0;
 }
 </style>

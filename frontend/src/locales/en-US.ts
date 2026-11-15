@@ -422,6 +422,9 @@ export default {
       products: 'Products',
       noResult: 'No results',
       hint: 'Type at least 2 characters to search',
+      partialFailure:
+        'Some search categories are temporarily unavailable; showing only results returned.',
+      failed: 'Search is temporarily unavailable. Please try again later.',
     },
     user: {
       defaultName: 'Not Logged In',
@@ -594,6 +597,8 @@ export default {
       toggleSidebar: 'Toggle sidebar',
       toggleSidebarAriaLabel: 'Expand or collapse the sidebar menu',
       sidebarDrawerTitle: 'System navigation menu',
+      openSearch: 'Open global search',
+      searchTitle: 'Global search',
 
       // V15 P1-20-16 dark mode toggle i18n
       darkMode: 'Switch to dark mode',

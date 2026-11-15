@@ -6,7 +6,75 @@
 -->
 <template>
   <el-card shadow="hover" class="table-card">
+    <section v-if="isPhone" v-loading="loading" class="bpm-pending-mobile">
+      <ul class="task-list" :aria-label="t('bpm.pendingTable.ariaLabel')">
+        <li v-for="task in tasks" :key="task.id" class="task-card">
+          <dl class="task-fields">
+            <div class="task-number">
+              <dt>{{ t('bpm.approval.pendingTable.taskNo') }}</dt>
+              <dd>{{ task.task_no }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.pendingTable.taskName') }}</dt>
+              <dd>{{ task.node_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.pendingTable.instanceId') }}</dt>
+              <dd>{{ task.instance_id }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.pendingTable.status') }}</dt>
+              <dd>{{ task.status == null ? '-' : getTaskStatusLabel(task.status) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.pendingTable.priority') }}</dt>
+              <dd>{{ task.priority == null ? '-' : getPriorityTextFmt(task.priority) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.pendingTable.applyTime') }}</dt>
+              <dd>{{ formatDateTime(task.created_at) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.pendingTable.dueDate') }}</dt>
+              <dd :class="{ 'task-overdue': task.due_date && isOverdue(task.due_date) }">
+                {{ formatDateTime(task.due_date) }}
+              </dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.pendingTable.handler') }}</dt>
+              <dd>{{ task.actual_handler_name || task.actual_handler_id?.toString() || '-' }}</dd>
+            </div>
+          </dl>
+          <div class="task-actions">
+            <ElButton type="primary" @click="emit('approve', task)">
+              {{ t('bpm.approval.pendingTable.approve') }}
+            </ElButton>
+            <ElButton type="danger" plain @click="emit('reject', task)">
+              {{ t('bpm.approval.pendingTable.reject') }}
+            </ElButton>
+            <ElButton type="warning" plain @click="emit('transfer', task)">
+              {{ t('bpm.approval.pendingTable.transfer') }}
+            </ElButton>
+            <ElButton @click="emit('view-chain', task)">
+              {{ t('bpm.approval.pendingTable.viewChain') }}
+            </ElButton>
+          </div>
+        </li>
+      </ul>
+      <ElEmpty v-if="!loading && tasks.length === 0" :description="t('components.v2Table.empty')" />
+      <ElPagination
+        :current-page="page"
+        :page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
+        :total="total"
+        layout="total, sizes, prev, next"
+        :aria-label="t('components.v2Table.paginationAriaLabel')"
+        @current-change="(v: number) => emit('update:page', v)"
+        @size-change="(v: number) => emit('update:page-size', v)"
+      />
+    </section>
     <V2Table
+      v-else
       :columns="columns"
       :data="tasks"
       :loading="loading"
@@ -23,8 +91,9 @@
 
 <script setup lang="ts">
 import { computed, h } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
-import { ElButton, ElTag } from 'element-plus';
+import { ElButton, ElTag, ElEmpty, ElPagination } from 'element-plus';
 import V2Table from '@/components/V2Table/index.vue';
 import type { ColumnDef } from '@/components/V2Table/types';
 import type { ApprovalTask } from '@/api/bpm-enhanced';
@@ -37,6 +106,9 @@ import {
 } from '../composables/bpmApFmts';
 
 const { t } = useI18n({ useScope: 'global' });
+
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /** 任务状态显示文本（取值域与后端 bpm_task 词表同源，见 TASK_STATUSES） */
 const TASK_STATUS_LABEL_KEYS: Record<(typeof TASK_STATUSES)[number], string> = {
@@ -201,5 +273,72 @@ const columns = computed<ColumnDef<ApprovalTask>[]>(() => [
 .overdue {
   color: #f56c6c;
   font-weight: 600;
+}
+.bpm-pending-mobile {
+  min-width: 0;
+}
+.task-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.task-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.task-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.task-fields > div {
+  min-width: 0;
+}
+.task-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.task-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.task-number dd {
+  font-weight: 600;
+}
+.task-fields .task-overdue {
+  color: var(--el-color-danger);
+}
+.task-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.task-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+.bpm-pending-mobile :deep(.el-pagination) {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.bpm-pending-mobile :deep(.el-pagination button),
+.bpm-pending-mobile :deep(.el-pager li),
+.bpm-pending-mobile :deep(.el-pagination__sizes .el-select__wrapper) {
+  min-width: 44px;
+  min-height: 44px;
 }
 </style>
