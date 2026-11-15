@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// 打印数据类型
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PrintData {
     pub template: String,
     pub data: HashMap<String, serde_json::Value>,
