@@ -81,6 +81,7 @@ describe('useTableApi pagination clamp on total decrease', () => {
     const { calls, mockGet, wrapper, setPageAfterInitialLoad } = mountTable(60, 3, 20);
     await setPageAfterInitialLoad();
     expect(calls[calls.length - 1].page).toBe(3);
+    mockGet.mockClear();
 
     mockGet.mockResolvedValueOnce(makeResponse([], 20) as never);
     const pagination = wrapper.getComponent(ElPagination);
@@ -88,24 +89,26 @@ describe('useTableApi pagination clamp on total decrease', () => {
     await flushPromises();
     await nextTick();
 
-    const correctedCall = calls.find(c => c.page === 1);
-    expect(
-      correctedCall,
-      'total=20/page_size=20 maxPage=1, page 3 must clamp to 1 and re-fetch'
-    ).toBeDefined();
+    // 钳位回退写入 page ref 后由分页 watch 以 page=1 重取；清空历史后按
+    // 修正请求断言，不与初始页混淆。
+    expect(mockGet, 'total=20 必须触发钳位后的重取').toHaveBeenCalled();
+    expect(mockGet.mock.calls[0][1].params.page, 'maxPage=1, page 3 must clamp to 1').toBe(1);
   });
 
   it('clamps to page 1 when total becomes 0', async () => {
     // total=60 ⇒ maxPage=3，page=3 页内；随后 total=0 ⇒ maxPage=1 钳回首页。
-    const { calls, mockGet, wrapper, setPageAfterInitialLoad } = mountTable(60, 3, 20);
+    const { mockGet, wrapper, setPageAfterInitialLoad } = mountTable(60, 3, 20);
     await setPageAfterInitialLoad();
+    mockGet.mockClear();
 
     mockGet.mockResolvedValueOnce(makeResponse([], 0) as never);
     wrapper.getComponent(ElPagination).vm.$emit('update:current-page', 3);
     await flushPromises();
     await nextTick();
 
-    const correctedCall = calls.find(c => c.page === 1);
-    expect(correctedCall, 'total=0 must clamp to page 1').toBeDefined();
+    // 断言修正后的重取确实发生且以 page=1 发出（钳位回退写入 page ref，
+    // 分页 watch 以该值再次取数），不用 find 全历史把初始页误当修正页。
+    expect(mockGet, 'total=0 必须触发钳位后的重取').toHaveBeenCalled();
+    expect(mockGet.mock.calls[0][1].params.page, 'total=0 must clamp to page 1').toBe(1);
   });
 });
