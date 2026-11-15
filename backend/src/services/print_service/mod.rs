@@ -1,10 +1,7 @@
 //! 通用打印服务，按单据类型分派到业务域取数模块。
 
 use crate::utils::error::AppError;
-use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
-    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
-};
+use sea_orm::{DatabaseConnection, EntityTrait};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

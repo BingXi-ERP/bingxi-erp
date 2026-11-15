@@ -2,10 +2,9 @@
 
 use crate::utils::error::AppError;
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
-    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+    ColumnTrait, DatabaseConnection, EntityTrait, LoaderTrait, ModelTrait, Order, QueryFilter,
+    QueryOrder,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 

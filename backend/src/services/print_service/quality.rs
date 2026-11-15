@@ -1,11 +1,7 @@
 //! quality 域打印取数（自 print_service.rs 拆分，方法签名零改动）
 
 use crate::utils::error::AppError;
-use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
-    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
-};
-use serde::{Deserialize, Serialize};
+use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder};
 use std::collections::HashMap;
 use std::sync::Arc;
 
