@@ -461,6 +461,24 @@ const EXPECTED: &[ColExpect] = &[
         column_default: None,
         why: "复检改判时间模型 Option<DateTime<Utc>>，列须带时区；与 concession_at 同批裸建同族，须一并归位",
     },
+    ColExpect {
+        table: "sales_delivery",
+        column: "delivered_at",
+        data_type: "timestamp with time zone",
+        udt_name: "timestamptz",
+        is_nullable: "YES",
+        column_default: None,
+        why: "送达时间模型 Option<DateTime<Utc>>，裸建 TIMESTAMP 在 SeaORM 回读时解码类型失配",
+    },
+    ColExpect {
+        table: "sales_delivery",
+        column: "signed_at",
+        data_type: "timestamp with time zone",
+        udt_name: "timestamptz",
+        is_nullable: "YES",
+        column_default: None,
+        why: "签收时间模型 Option<DateTime<Utc>>，裸建 TIMESTAMP 在 SeaORM 回读时解码类型失配",
+    },
 ];
 
 struct LiveCol {

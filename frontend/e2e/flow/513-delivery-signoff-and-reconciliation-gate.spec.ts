@@ -8,7 +8,7 @@
 //   二、非法前置与重复签收拦截。pending 送货单签收被拒（货未出库无从签收），
 //       已签收送货单重复签收被拒，两类都只回可外显业务错（HTTP 400 code BusinessError），
 //       不出现内部 ID 与状态实值。
-//   三、对账来源门。该客户存在已发货未签收的送货单时，POST /ar-reconciliations/generate
+//   三、对账来源门。该客户存在已发货未签收的送货单时，POST /ar-reconciliations-enhanced/generate
 //       被拒；签收后再生成对账单放行。无送货单的客户生成对账单不拦（对账可从发票与
 //       期初余额正常生成）。
 //
@@ -181,18 +181,21 @@ test('513-01 签收事实三列落库，状态列不动', async ({ page }) => {
   const { deliveryId } = await shipFullAndReadDelivery(page, orderId, productId, qty, batchNo);
 
   // 签收前三列必须全空
-  const before = await apiCallRaw<{ items: Array<Row> }>(
+  const before = await apiCallRaw<{ list: Array<Row>; total: number }>(
     page,
     'GET',
     `/sales/orders/${orderId}/deliveries`
   );
-  const beforeRow = before.items?.find(d => Number(d.id) === deliveryId);
+  expect(Array.isArray(before.list), '签收前送货记录必须提供 list 数组').toBe(true);
+  expect(before.total, '签收前送货记录总数一致').toBe(before.list.length);
+  const beforeRow = before.list.find(d => Number(d.id) === deliveryId);
   if (!beforeRow) throw new Error('签收前送货单行不存在');
   expect(beforeRow.delivered_at, '签收前 delivered_at 为空').toBeNull();
   expect(beforeRow.signed_at, '签收前 signed_at 为空').toBeNull();
   expect(beforeRow.signed_by, '签收前 signed_by 为空').toBeNull();
 
-  // 签收
+  const actor = await apiCallRaw<{ id: number }>(page, 'GET', '/users/me');
+  const actorId = readNumber(actor.id, '当前签收经办人 id');
   const signed = await apiCallRaw<Row>(
     page,
     'POST',
@@ -200,22 +203,23 @@ test('513-01 签收事实三列落库，状态列不动', async ({ page }) => {
   );
   expect(signed.delivered_at, '签收后 delivered_at 落值').toBeTruthy();
   expect(signed.signed_at, '签收后 signed_at 落值').toBeTruthy();
-  expect(
-    Number.isFinite(Number(signed.signed_by)) && Number(signed.signed_by) > 0,
-    `签收后 signed_by 落经办人 id，raw=${JSON.stringify(signed.signed_by)}`
-  ).toBe(true);
+  expect(signed.signed_by, '签收后 signed_by 等于当前经办人').toBe(actorId);
   expectStatusChar(signed.status, 'shipped', '签收后送货单状态列不动');
 
   // 读回路径二次确认（不采信签收响应自带值）
-  const after = await apiCallRaw<{ items: Array<Row> }>(
+  const after = await apiCallRaw<{ list: Array<Row>; total: number }>(
     page,
     'GET',
     `/sales/orders/${orderId}/deliveries`
   );
-  const afterRow = after.items.find(d => Number(d.id) === deliveryId);
+  expect(Array.isArray(after.list), '签收后送货记录必须提供 list 数组').toBe(true);
+  expect(after.total, '签收后送货记录总数一致').toBe(after.list.length);
+  const afterRow = after.list.find(d => Number(d.id) === deliveryId);
   if (!afterRow) throw new Error('签收后送货单行不存在');
-  expect(afterRow.delivered_at, '读回 delivered_at 已落值').toBeTruthy();
-  expect(afterRow.signed_at, '读回 signed_at 已落值').toBeTruthy();
+  expect(afterRow.delivered_at, '读回 delivered_at 与签收响应一致').toBe(signed.delivered_at);
+  expect(afterRow.signed_at, '读回 signed_at 与签收响应一致').toBe(signed.signed_at);
+  expect(afterRow.signed_by, '读回 signed_by 等于当前经办人').toBe(actorId);
+  expectStatusChar(afterRow.status, 'shipped', '读回送货单状态列不动');
 });
 
 test('513-02 pending 送货单签收被拒，已签收重复签收被拒', async ({ page }) => {
@@ -254,6 +258,16 @@ test('513-02 pending 送货单签收被拒，已签收重复签收被拒', async
   // 发货后签收一次成功，再签一次被拒
   const shipped = await shipFullAndReadDelivery(page, orderId, productId, '50', batchNo);
   await apiCall(page, 'POST', `/sales/orders/${orderId}/deliveries/${shipped.deliveryId}/sign`);
+  const firstRead = await apiCallRaw<{ list: Array<Row>; total: number }>(
+    page,
+    'GET',
+    `/sales/orders/${orderId}/deliveries`
+  );
+  const firstRow = firstRead.list.find(d => Number(d.id) === shipped.deliveryId);
+  if (!firstRow) throw new Error('首次签收后送货单行不存在');
+  expect(firstRow.delivered_at, '首次签收送达时间已落库').toBeTruthy();
+  expect(firstRow.signed_at, '首次签收时间已落库').toBeTruthy();
+  expectStatusChar(firstRow.status, 'shipped', '首次签收后状态不变');
   const fRepeatSign = await apiCallExpectFail(
     page,
     'POST',
@@ -261,6 +275,19 @@ test('513-02 pending 送货单签收被拒，已签收重复签收被拒', async
   );
   expect(fRepeatSign.status, `重复签收应 400，实际=${JSON.stringify(fRepeatSign)}`).toBe(400);
   expect(JSON.stringify(fRepeatSign), '重复签收拒因可外显').toContain('不可重复签收');
+  const repeatRead = await apiCallRaw<{ list: Array<Row>; total: number }>(
+    page,
+    'GET',
+    `/sales/orders/${orderId}/deliveries`
+  );
+  const repeatRow = repeatRead.list.find(d => Number(d.id) === shipped.deliveryId);
+  if (!repeatRow) throw new Error('重复签收被拒后送货单行不存在');
+  expect(repeatRead.total, '拒绝重复签收不增减送货记录').toBe(firstRead.total);
+  expect(repeatRow.delivered_at, '拒绝重复签收不改送达时间').toBe(firstRow.delivered_at);
+  expect(repeatRow.signed_at, '拒绝重复签收不改签收时间').toBe(firstRow.signed_at);
+  expect(repeatRow.signed_by, '拒绝重复签收不改签收人').toBe(firstRow.signed_by);
+  expect(repeatRow.updated_at, '拒绝重复签收不改更新时间').toBe(firstRow.updated_at);
+  expectStatusChar(repeatRow.status, 'shipped', '拒绝重复签收后状态不变');
 });
 
 test('513-03 对账来源门：未签收拒、签收后放行、无送货单客户不拦', async ({ page }) => {
@@ -292,13 +319,23 @@ test('513-03 对账来源门：未签收拒、签收后放行、无送货单客�
   };
 
   // 未签收：生成对账单被拒
-  const fGen = await apiCallExpectFail(page, 'POST', '/ar-reconciliations/generate', genBody);
+  const fGen = await apiCallExpectFail(
+    page,
+    'POST',
+    '/ar-reconciliations-enhanced/generate',
+    genBody
+  );
   expect(fGen.status, `未签收生成对账单应 400，实际=${JSON.stringify(fGen)}`).toBe(400);
   expect(JSON.stringify(fGen), '来源门拒因可外显').toContain('未签收的送货单');
 
   // 签收后再生成放行
   await apiCall(page, 'POST', `/sales/orders/${orderId}/deliveries/${deliveryId}/sign`);
-  const generated = await apiCallRaw<Row>(page, 'POST', '/ar-reconciliations/generate', genBody);
+  const generated = await apiCallRaw<Row>(
+    page,
+    'POST',
+    '/ar-reconciliations-enhanced/generate',
+    genBody
+  );
   expect(generated.reconciliation_no, '签收后对账单生成带 RC 号').toBeTruthy();
 
   // 无送货单的客户：生成对账单不拦（只建发票即生成）
@@ -309,7 +346,7 @@ test('513-03 对账来源门：未签收拒、签收后放行、无送货单客�
     invoice_date: new Date().toISOString().slice(0, 10),
     due_date: new Date().toISOString().slice(0, 10),
   });
-  const bareGen = await apiCallRaw<Row>(page, 'POST', '/ar-reconciliations/generate', {
+  const bareGen = await apiCallRaw<Row>(page, 'POST', '/ar-reconciliations-enhanced/generate', {
     customer_id: bareCustomerId,
     start_date: periodStart,
     end_date: periodEnd,

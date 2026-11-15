@@ -17,7 +17,7 @@ impl MigrationTrait for Migration {
                     .table(Alias::new("sales_delivery"))
                     .add_column(
                         ColumnDef::new(Alias::new("delivered_at"))
-                            .timestamp()
+                            .timestamp_with_time_zone()
                             .null(),
                     )
                     .to_owned(),
@@ -35,7 +35,11 @@ impl MigrationTrait for Migration {
             .alter_table(
                 Table::alter()
                     .table(Alias::new("sales_delivery"))
-                    .add_column(ColumnDef::new(Alias::new("signed_at")).timestamp().null())
+                    .add_column(
+                        ColumnDef::new(Alias::new("signed_at"))
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
                     .to_owned(),
             )
             .await?;

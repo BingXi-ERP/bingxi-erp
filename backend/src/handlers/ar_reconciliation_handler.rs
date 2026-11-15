@@ -616,6 +616,9 @@ pub async fn generate_reconciliation(
     auth: AuthContext,
     Json(req): Json<GenerateReconciliationApiRequest>,
 ) -> Result<Json<ApiResponse<JsonValue>>, AppError> {
+    let data_scope_ctx = auth.to_data_scope_context();
+    ensure_reconciliation_customer_access(&state.db, &data_scope_ctx, req.customer_id).await?;
+
     info!(
         "用户 {} 生成对账单，客户 ID: {}",
         auth.username, req.customer_id
