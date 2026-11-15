@@ -20,6 +20,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::container::AppState;
+use crate::models::custom_order;
+use crate::models::lab_dip_request;
 use crate::models::product;
 use crate::models::sales_order::{self, ActiveModel as OrderActive, Entity as OrderEntity};
 use crate::models::sales_order_item::ActiveModel as OrderItemActive;
@@ -132,6 +134,52 @@ impl QuotationConvertService {
             active.updated_at = Set(Utc::now());
             active.update(txn).await?;
             return Err(AppError::business("报价单已过期，无法转订单"));
+        }
+        Self::validate_sample_confirmed_for_convert(quotation, txn).await
+    }
+
+    /// 报价转单的客户确认样门（R 节第 6 条时序约束的转单腿）
+    ///
+    /// 功能：报价关联了定制订单（custom_orders.quotation_id 反查命中）且该定制订单
+    /// 关联了打样通知单（lab_dip_request_id）时，打样通知单必须已确认 OK 样
+    /// （approved_sample_id 非空）才允许转大货订单；常规大货报价（无定制订单关联）
+    /// 不受此门约束，避免误伤正常路径。
+    /// 调用方：validate_quotation_for_convert（转单事务内的状态校验一步）。
+    /// 入参：quotation 待转的报价行（用其 id 反查定制订单）、txn 转单事务连接。
+    /// 传给谁：SeaORM find（custom_order 实体 → lab_dip_request 实体），同事务不新开连接。
+    /// 存什么：不落库，只读判定；拒绝时经 AppError::business_displayable 外显中文文案。
+    /// 存哪里：无写入，错误沿调用链上抛给转单 handler。
+    async fn validate_sample_confirmed_for_convert<C>(
+        quotation: &sales_quotation::Model,
+        txn: &C,
+    ) -> Result<(), AppError>
+    where
+        C: sea_orm::ConnectionTrait,
+    {
+        // 同一报价可能被多笔定制订单引用（历史重复转单），find one 命中任一行即视为关联
+        let custom_order = custom_order::Entity::find()
+            .filter(custom_order::Column::QuotationId.eq(quotation.id))
+            .one(txn)
+            .await?;
+        let Some(custom_order) = custom_order else {
+            return Ok(());
+        };
+        let Some(lab_dip_id) = custom_order.lab_dip_request_id else {
+            return Ok(());
+        };
+        let lab_dip = lab_dip_request::Entity::find_by_id(lab_dip_id)
+            .one(txn)
+            .await?
+            .ok_or_else(|| {
+                AppError::business(format!(
+                    "该报价关联的打样通知单 {} 不存在，不能转大货订单",
+                    lab_dip_id
+                ))
+            })?;
+        if lab_dip.approved_sample_id.is_none() {
+            return Err(AppError::business_displayable(
+                "该报价关联的打样单尚未确认 OK 样，不能转大货订单",
+            ));
         }
         Ok(())
     }
