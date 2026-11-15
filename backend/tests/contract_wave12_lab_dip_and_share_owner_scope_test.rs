@@ -567,6 +567,184 @@ async fn lab_dip_approve_own_is_2xx_and_status_moves() {
 }
 
 #[tokio::test]
+async fn lab_dip_approve_second_write_failure_rolls_back_both_rows() {
+    use bingxi_backend::services::lab_dip_service::LabDipRequestService;
+    use bingxi_backend::utils::error::AppError;
+    use sea_orm::{ConnectOptions, ConnectionTrait, Database, DbBackend, Statement};
+
+    let url = std::env::var("TEST_DATABASE_URL").expect("TEST_DATABASE_URL must be set");
+    let base = Database::connect(url.clone()).await.unwrap();
+    assert_eq!(base.get_database_backend(), DbBackend::Postgres);
+    let schema = format!("lab_dip_atomic_{}", uuid::Uuid::new_v4().simple());
+    eprintln!("[lab-dip-atomic] creating private schema {schema}");
+    base.execute_raw(Statement::from_string(
+        DbBackend::Postgres,
+        format!("CREATE SCHEMA \"{schema}\""),
+    ))
+    .await
+    .unwrap();
+    for table in ["lab_dip_request", "lab_dip_sample"] {
+        base.execute_raw(Statement::from_string(
+            DbBackend::Postgres,
+            format!(
+                "CREATE TABLE \"{schema}\".\"{table}\" \
+                 (LIKE public.\"{table}\" INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES)"
+            ),
+        ))
+        .await
+        .unwrap();
+    }
+    base.execute_raw(Statement::from_string(
+        DbBackend::Postgres,
+        format!(
+            "ALTER TABLE \"{schema}\".lab_dip_sample \
+             ADD CONSTRAINT lab_dip_atomic_reject_selected \
+             CHECK (id <> 2 OR matching_result <> 'selected')"
+        ),
+    ))
+    .await
+    .unwrap();
+
+    let mut options = ConnectOptions::new(url);
+    options.set_schema_search_path(schema.clone());
+    let db = Arc::new(Database::connect(options).await.unwrap());
+    for table in ["lab_dip_request", "lab_dip_sample"] {
+        let resolved = db
+            .query_one_raw(Statement::from_sql_and_values(
+                DbBackend::Postgres,
+                "SELECT current_schema()::text AS active_schema, n.nspname::text AS table_schema \
+                 FROM pg_catalog.pg_class c \
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace \
+                 WHERE c.oid = pg_catalog.to_regclass($1)",
+                [table.into()],
+            ))
+            .await
+            .unwrap()
+            .expect("private entity table must resolve");
+        assert_eq!(
+            resolved.try_get::<String>("", "active_schema").unwrap(),
+            schema
+        );
+        assert_eq!(
+            resolved.try_get::<String>("", "table_schema").unwrap(),
+            schema
+        );
+    }
+    eprintln!("[lab-dip-atomic] both entity tables resolve to {schema}; CHECK installed");
+
+    let now = Utc::now().fixed_offset();
+    for id in [1, 2] {
+        lab_dip_request::ActiveModel {
+            id: Set(id),
+            request_no: Set(format!("LD-ATOMIC-{id}")),
+            customer_id: Set(None),
+            light_source: Set("D65".to_string()),
+            sample_versions: Set(4),
+            required_date: Set(now.date_naive()),
+            status: Set(req_status::SUBMITTED.to_string()),
+            customer_approved_at: Set(None),
+            customer_approval_comment: Set(None),
+            approved_sample_id: Set(None),
+            is_deleted: Set(false),
+            created_by: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        }
+        .insert(&*db)
+        .await
+        .unwrap();
+        lab_dip_sample::ActiveModel {
+            id: Set(id),
+            request_id: Set(id),
+            version_label: Set("A".to_string()),
+            version_seq: Set(1),
+            matching_result: Set(sample_status::PENDING.to_string()),
+            resample_status: Set(Some("none".to_string())),
+            is_deleted: Set(false),
+            created_by: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+            ..Default::default()
+        }
+        .insert(&*db)
+        .await
+        .unwrap();
+        let request = reload_request(&db, id).await;
+        let sample = reload_sample(&db, id).await;
+        assert_eq!(request.status, req_status::SUBMITTED);
+        assert_eq!(request.customer_approved_at, None);
+        assert_eq!(request.customer_approval_comment, None);
+        assert_eq!(request.approved_sample_id, None);
+        assert_eq!(sample.request_id, request.id);
+        assert_eq!(sample.matching_result, sample_status::PENDING);
+        assert!(!request.is_deleted && !sample.is_deleted);
+    }
+    let request_before = reload_request(&db, 2).await;
+    let sample_before = reload_sample(&db, 2).await;
+    let service = LabDipRequestService::new(db.clone());
+    let positive = service
+        .approve_ok_sample(1, 1, Some("positive control".to_string()))
+        .await;
+    let positive_request = reload_request(&db, 1).await;
+    let positive_sample = reload_sample(&db, 1).await;
+    eprintln!("[lab-dip-atomic] positive result: {positive:?}");
+    let failure = service
+        .approve_ok_sample(2, 2, Some("must roll back".to_string()))
+        .await;
+    let request_after = reload_request(&db, 2).await;
+    let sample_after = reload_sample(&db, 2).await;
+    eprintln!("[lab-dip-atomic] injected second-write result: {failure:?}");
+
+    for table in ["lab_dip_sample", "lab_dip_request"] {
+        base.execute_raw(Statement::from_string(
+            DbBackend::Postgres,
+            format!("DROP TABLE \"{schema}\".\"{table}\""),
+        ))
+        .await
+        .unwrap();
+    }
+    base.execute_raw(Statement::from_string(
+        DbBackend::Postgres,
+        format!("DROP SCHEMA \"{schema}\""),
+    ))
+    .await
+    .unwrap();
+    eprintln!("[lab-dip-atomic] private tables and schema {schema} removed");
+
+    assert_eq!(positive.unwrap(), positive_request);
+    assert_eq!(positive_request.status, req_status::APPROVED);
+    assert_eq!(positive_request.approved_sample_id, Some(1));
+    assert_eq!(
+        positive_request.customer_approval_comment.as_deref(),
+        Some("positive control")
+    );
+    assert!(positive_request.customer_approved_at.is_some());
+    assert_eq!(positive_sample.matching_result, sample_status::SELECTED);
+    assert_eq!(
+        positive_sample.approved_at,
+        positive_request.customer_approved_at
+    );
+    assert_eq!(
+        positive_request.updated_at,
+        positive_request.customer_approved_at.unwrap()
+    );
+    assert_eq!(positive_sample.updated_at, positive_request.updated_at);
+    assert!(
+        matches!(&failure, Err(AppError::DatabaseError(_))),
+        "second write must fail with DatabaseError: {failure:?}"
+    );
+    assert_eq!(
+        sample_after, sample_before,
+        "failed sample write must leave the entire row unchanged"
+    );
+    assert_eq!(
+        request_after, request_before,
+        "second-write failure must roll back the entire request row"
+    );
+}
+
+#[tokio::test]
 async fn lab_dip_approve_other_is_403_and_status_frozen() {
     let (app, db) = build_app(make_auth(USER_A)).await;
     let (status, v) = call(
