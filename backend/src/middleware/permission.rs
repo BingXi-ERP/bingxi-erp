@@ -482,7 +482,7 @@ pub fn invalidate_permission_cache(role_id: i32) {
 }
 
 /// 失效全部权限缓存（同步发布 Redis pub/sub "ALL"，多实例清空）
-#[allow(dead_code)]
+#[allow(dead_code, reason = "权限缓存批量失效入口：角色批量变更路径接入点")]
 pub fn invalidate_all_permission_cache() {
     PERMISSION_CACHE.clear();
     tracing::info!("全部权限缓存已失效");

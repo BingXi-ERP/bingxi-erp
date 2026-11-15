@@ -457,7 +457,7 @@ impl DataPermissionService {
 
     /// 收集部门子树 ID（含自身）：一次性加载全部门后内存遍历，
     /// 避免 BFS 逐层查询的 N+1 问题（部门表为主数据，规模有限）。
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "部门子树收集：数据范围判定备用路径")]
     async fn collect_dept_subtree(&self, dept_id: i32) -> Result<Vec<i32>, AppError> {
         use crate::models::department::Entity as DeptEntity;
 

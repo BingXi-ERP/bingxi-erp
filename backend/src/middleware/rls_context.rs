@@ -52,7 +52,7 @@ tokio::task_local! {
 ///
 /// 生产路径由 rls_context_middleware 直接使用 RLS_GUC.scope（等价实现）；
 /// 本函数仅集成测试（tests/rls_context_test.rs）在 task 级验证钩子行为使用。
-#[allow(dead_code)]
+#[allow(dead_code, reason = "行级安全 GUC 上下文封装：按需进入 RLS 会话的统一入口")]
 pub async fn with_rls_context<F, R>(guc: Option<RlsGuc>, fut: F) -> R
 where
     F: std::future::Future<Output = R>,

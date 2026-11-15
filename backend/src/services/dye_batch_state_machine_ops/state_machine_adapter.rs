@@ -18,7 +18,7 @@ use crate::services::dye_batch_state_machine_service::{
 use crate::utils::state_machine_trait::{StateMachine, TransitionResult};
 
 // 后续接入 StateMachine 时会使用
-#[allow(dead_code)]
+#[allow(dead_code, reason = "统一状态机 trait 家族：适配器由 trait 分发消费")]
 /// 缸号状态机适配器，实现统一 StateMachine trait
 pub struct DyeBatchStateMachineAdapter {
     /// 当前缸号生命周期状态
@@ -26,7 +26,7 @@ pub struct DyeBatchStateMachineAdapter {
 }
 
 // 后续接入 StateMachine 时会使用
-#[allow(dead_code)]
+#[allow(dead_code, reason = "统一状态机 trait 家族：适配器由 trait 分发消费")]
 impl DyeBatchStateMachineAdapter {
     /// 构造适配器，传入初始状态（如 "pending_schedule"）
     pub fn new(initial_state: String) -> Self {

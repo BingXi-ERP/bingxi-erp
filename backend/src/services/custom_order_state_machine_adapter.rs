@@ -21,7 +21,7 @@ use crate::utils::state_machine_trait::{StateMachine, TransitionResult};
 /// 持有当前状态（String），通过委托纯函数实现 trait。
 /// 构造时校验初始状态合法，运行期保证状态机语义一致。
 // 后续接入 StateMachine 时会使用
-#[allow(dead_code)]
+#[allow(dead_code, reason = "统一状态机 trait 家族：适配器与结构体由 trait 分发消费")]
 #[derive(Debug, Clone)]
 pub struct CustomOrderStateMachineAdapter {
     /// 当前状态字符串（对应 CustomOrderStatus::as_str）
@@ -29,7 +29,7 @@ pub struct CustomOrderStateMachineAdapter {
 }
 
 // 后续接入 StateMachine 时会使用
-#[allow(dead_code)]
+#[allow(dead_code, reason = "统一状态机 trait 家族：适配器与结构体由 trait 分发消费")]
 impl CustomOrderStateMachineAdapter {
     /// 构造适配器，初始状态必须合法
     pub fn new(initial: &str) -> Result<Self, String> {

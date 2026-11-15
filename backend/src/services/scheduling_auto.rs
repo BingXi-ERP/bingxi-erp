@@ -357,7 +357,7 @@ impl SchedulingService {
     ///
     /// max_depth 限制回溯深度，防止最坏情况指数爆炸（默认 3 层）
     // 后续接入 SchedulerRegistry/StateMachine 时会使用
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "排产回溯算法分支：约束冲突时回退路径")]
     fn backtrack_schedule(
         &self,
         schedule: &mut [(NaiveDate, NaiveDate, i32, String)],

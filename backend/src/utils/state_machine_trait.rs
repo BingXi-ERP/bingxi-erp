@@ -39,7 +39,7 @@
 /// 各域状态机适配此 trait 后，可统一管理状态流转、校验和测试。
 /// 适配方负责实现：当前状态查询、合法性检查、状态流转。
 // 后续接入 SchedulerRegistry/StateMachine 时会使用
-#[allow(dead_code)]
+#[allow(dead_code, reason = "统一状态机 trait 定义：各域适配器实现此契约")]
 pub trait StateMachine {
     /// 状态类型（如 String 枚举值、自定义 enum）
     type State;
@@ -70,7 +70,7 @@ pub trait StateMachine {
 
 /// 状态转换结果
 // 后续接入 SchedulerRegistry/StateMachine 时会使用
-#[allow(dead_code)]
+#[allow(dead_code, reason = "统一状态机 trait 定义：各域适配器实现此契约")]
 #[derive(Debug, Clone)]
 pub struct TransitionResult<S> {
     /// 转换前状态

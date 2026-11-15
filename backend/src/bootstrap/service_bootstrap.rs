@@ -51,7 +51,7 @@ static MAIN_CANCELLATION_TOKEN: once_cell::sync::Lazy<CancellationToken> =
     once_cell::sync::Lazy::new(CancellationToken::new);
 
 /// 获取后台任务取消 Token 的引用（供 5 个 spawn 任务 clone 传入循环）。
-#[allow(dead_code)]
+#[allow(dead_code, reason = "预留管理取消令牌入口（优雅停机编排备用）")]
 pub fn main_cancellation_token() -> &'static CancellationToken {
     &MAIN_CANCELLATION_TOKEN
 }
