@@ -291,6 +291,11 @@ pub const PERMISSION_RESOURCES: &[&str] = &[
     "system-update-tasks",
     "system-update-backups",
     "system-update-versions",
+    // ===== 周期任务可观测面 =====
+    // /scheduler/jobs 与执行历史、手动触发三端点派生资源名为 scheduler
+    // （与 utils/path_utils.rs 的运行时白名单同源）；矩阵 ops 岗已授予
+    // scheduler:read/create，此处缺登记会让闸门①判"授予后永不命中"。
+    "scheduler",
     // ===== 审批流域 =====
     "export-approvals",
     "role-change-approvals",
