@@ -19,6 +19,7 @@
 import { test, expect, type Page } from '../diagnose-fixture';
 import { apiCall, apiCallRaw, apiCallExpectFail } from './helpers';
 import { ensureTestEntities } from './helpers';
+import { PRODUCT_TYPE } from '../../src/constants/product-type';
 
 type Row = Record<string, unknown>;
 
@@ -49,17 +50,27 @@ async function createOwnCustomer(page: Page, nameSuffix: string): Promise<number
   return id;
 }
 
-/** 解析产品与仓库 id（ensureTestEntities 已就绪共享实体） */
+/** 解析产品与仓库 id：产品自建专属（不锚共享行第一行漂移），仓库仍取共享列表首行 */
 async function resolveProductAndWarehouse(
   page: Page
 ): Promise<{ productId: number; warehouseId: number }> {
-  const products = await apiCallRaw<{ items: Array<Row> }>(
-    page,
-    'GET',
-    '/products?page=1&page_size=20'
-  );
-  const product = products.items?.[0];
-  expect(product, '共享实体面 products 至少一行').toBeTruthy();
+  // 共享实体面 products 第一行在不同 worker 并发夹具下会漂移到非面料类或被清理，
+  // 建单/发货链路因此踩到校验门。自建一支本腿专属面料产品（键名与必填面照
+  // helpers 报价专用产品范式：面料类必录门要求成分/克重/幅宽/每匹米数齐全），
+  // 与 11 号用例「锚定真实来源行」同源——本腿全链只认该自建行，零共享行依赖。
+  const code513 = `E2E-513-${Date.now().toString().slice(-9)}`;
+  const created = await apiCallRaw<Row>(page, 'POST', '/products', {
+    code: code513,
+    name: `签收对账门专属产品${code513}`,
+    unit: '米',
+    category_id: 1,
+    product_type: PRODUCT_TYPE.finished,
+    fabric_composition: '100%涤纶',
+    gram_weight: 180,
+    width: 150,
+    meters_per_piece: 50,
+  });
+  const productId = readNumber(created.id, '自建专属产品 id');
   const warehouses = await apiCallRaw<{ items: Array<Row> }>(
     page,
     'GET',
@@ -68,7 +79,7 @@ async function resolveProductAndWarehouse(
   const warehouse = warehouses.items?.[0];
   expect(warehouse, '共享实体面 warehouses 至少一行').toBeTruthy();
   return {
-    productId: readNumber(product.id, '产品 id'),
+    productId,
     warehouseId: readNumber(warehouse.id, '仓库 id'),
   };
 }
