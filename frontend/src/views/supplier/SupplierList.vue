@@ -131,8 +131,8 @@
           :total="total"
           layout="total, sizes, prev, pager, next, jumper"
           :aria-label="t('supplier.list.paginationAriaLabel')"
-          @size-change="handleQuery"
-          @current-change="handleQuery"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
         />
       </div>
     </el-card>
@@ -179,6 +179,17 @@ watch(
   newQ => Object.assign(localQuery, newQ),
   { deep: true }
 );
+
+const handlePageChange = (page: number) => {
+  localQuery.page = page;
+  emit('update:queryParams', { ...localQuery });
+};
+
+const handleSizeChange = (pageSize: number) => {
+  localQuery.page_size = pageSize;
+  localQuery.page = 1;
+  emit('update:queryParams', { ...localQuery });
+};
 
 const handleQuery = () => {
   emit('update:queryParams', { ...localQuery, page: 1 });
