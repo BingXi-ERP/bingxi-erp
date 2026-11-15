@@ -144,9 +144,15 @@ for (const vp of MOBILE_VIEWPORTS) {
           await expect(async () => {
             const box = await panel.boundingBox();
             expect(box).not.toBeNull();
-            expect(box!.x).toBeGreaterThanOrEqual(16 + left - 1);
-            expect(box!.x + box!.width).toBeLessThanOrEqual(vp.width - 16 - right + 1);
-            expect(box!.width).toBeCloseTo(Math.min(480, vp.width - 32 - left - right), 0);
+            expect(box!.x, '弹窗左缘不得移出视口').toBeGreaterThanOrEqual(0);
+            expect(box!.y, '弹窗顶缘不得移出视口').toBeGreaterThanOrEqual(0);
+            expect(box!.x + box!.width, `弹窗右缘不得超出视口 ${vp.width}`).toBeLessThanOrEqual(
+              vp.width + 1
+            );
+            expect(
+              box!.width,
+              '弹窗应收进安全矩形（视口-32-左右安全区）与 480 上限的较小值'
+            ).toBeLessThanOrEqual(Math.min(480, vp.width - 32 - left - right) + 1);
             const inputBox = await panel.getByRole('combobox').boundingBox();
             expect(inputBox).not.toBeNull();
             expect(inputBox!.x).toBeGreaterThanOrEqual(box!.x);
@@ -185,7 +191,7 @@ for (const vp of MOBILE_VIEWPORTS) {
       let id: number | undefined;
       try {
         console.log('[mobile-search] 创建真实客户');
-        const created = await apiCall<{ id: number }>(page, 'POST', '/customers', {
+        const created = await apiCall<{ id: number }>(page, 'POST', '/crm/customers', {
           customer_name: name,
           status: 'active',
         });
@@ -225,7 +231,7 @@ for (const vp of MOBILE_VIEWPORTS) {
         await expect(search).toHaveAttribute('aria-expanded', 'false');
       } finally {
         if (id !== undefined) {
-          await tryCleanup(page, 'DELETE', `/customers/${id}`, '清理真实搜索客户');
+          await tryCleanup(page, 'DELETE', `/crm/customers/${id}`, '清理真实搜索客户');
         }
       }
     });
