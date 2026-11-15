@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::PrintData;
+use super::{PrintData, SalesDeliveryPrintRelations};
 
 impl super::PrintService {
     /// 销售订单打印数据：订单主表 + 客户 + 明细项（含产品）

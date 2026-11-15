@@ -26,7 +26,7 @@ pub struct PrintData {
 
 /// 销售发货单打印上下文：聚合单据主体、客户/仓库/来源订单/制单人四个档案、
 /// 明细行、按行下标对齐的产品档案，以及 (产品编号, 色号) 到色号名称的字典
-struct SalesDeliveryPrintRelations {
+pub(crate) struct SalesDeliveryPrintRelations {
     record: crate::models::sales_delivery::Model,
     customer: crate::models::customer::Model,
     warehouse: crate::models::warehouse::Model,
@@ -57,7 +57,7 @@ pub(crate) struct TransferPrintContext {
 /// 字段全部取该匹自身行实测值（决策 §2：匹行才是交易事实，不回落产品主数据）；
 /// supplier_piece_no / 供应商侧编码 / 成本列（unit_cost/total_cost）**不得**进入本结构（决策 §6 保密口径）。
 #[derive(Debug, Clone, sea_orm::FromQueryResult)]
-struct PieceLabelView {
+pub(crate) struct PieceLabelView {
     id: i32,
     piece_no: String,
     piece_type: String,

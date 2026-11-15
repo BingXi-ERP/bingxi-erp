@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::{PrintData, TransferPrintContext};
+use super::{PieceLabelView, PrintData, TransferPrintContext};
 
 impl super::PrintService {
     /// 库存调拨单打印数据：调拨主表 + 调出/调入仓库 + 明细项（含产品）

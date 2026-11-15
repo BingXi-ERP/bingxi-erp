@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::PrintData;
+use super::{PrintData, PrintService};
 
 impl PrintService {
     pub async fn generate_docx(
