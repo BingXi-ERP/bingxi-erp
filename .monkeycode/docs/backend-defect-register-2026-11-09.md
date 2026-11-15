@@ -138,5 +138,5 @@
 
 - **已修（源码面补齐 + 用例钉面）**：E8 超折扣审批门（#1183，折扣阈值配置 + evaluate 判档 + 469 号用例）；订单编辑并发冲突（#1212，更新时刻令牌 + 473）；产品编码重复拒因 + 色号唯一性（#1214，服务层查重 + 505）；HTTP 幂等重放防护（#1216，middleware/idempotency.rs + 474，11-12 登记的"无实现落点"已收口）；交货允差超收拦截（purchase_receipt_ops/crud.rs 的 plan_order_item_links 已按行解析 resolve_tolerance_pct + tolerance_bounds 整单拒超收，含上下界提示，11-03 登记的三腿缺口已由收货腿消费）。
 - **设计裁定（非漏修）**：预警扫描触发人——调度器只落预警行，站内信由 finance_alert_service 的 attach_notification 按规则角色集投递（454 号用例钉）；生产完工扣料 fail-open 空转——BOM 整族移除裁定（11-06）后该域随 BOM 下线。
-- **仍开口（待裁/待排期）**：D-62 微信订阅消息发送腿（P1，feat/wechat-subscribe-send-leg 车道仅保工并基无实现提交，HTTP 侧无出站触发入口，属凭证环境 + 出站渠道建设）；D-66 小程序四缺失页（用户裁定不建假页，基线棘轮拦截新增死链，待真实小程序源）。
+- **仍开口（待裁/待排期）**：D-62 微信订阅消息发送腿（P1，feat/wechat-subscribe-send-leg 车道仅保工并基无实现提交，HTTP 侧无出站触发入口，属凭证环境 + 出站渠道建设）；D-66 小程序四缺失页——小程序源码主体在独立车道 feat/wechat-miniprogram-domain（wt-mp-land，192 页在册、demand 族 13 个 wxml），按用户「先不推」裁定未进主干也未开 PR；缺的是 post-demand / offer-info / my-post-result-choose / demand-order-detail 四页的**页面文件与业务逻辑**（app.json 零声明、跳转调用点 11 处在册），不是缺源码；裁定不凭空造页，10 条死链已入 miniprogram-route-baseline.txt 债务台账并由棘轮拦新增。
 - 结论：测试暴露的功能缺失绝大多数已闭环或按裁定处置；剩余两项均属微信/小程序域，被用户「先不推」裁定覆盖，非遗漏。
