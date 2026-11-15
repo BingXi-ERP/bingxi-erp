@@ -249,7 +249,7 @@ impl DocumentNumberGenerator {
     }
 
     /// `insert_with_no_retry` 使用的默认流水位数，与 `generate_no` 的默认一致
-    const DEFAULT_SEQ_WIDTH: usize = 3;
+    pub const DEFAULT_SEQ_WIDTH: usize = 3;
 
     /// 取 `prefix+date` 的事务咨询锁（同会话重复获取不阻塞；
     /// 最外层事务提交时释放，保存点回滚会释放该保存点之后获取的部分，
