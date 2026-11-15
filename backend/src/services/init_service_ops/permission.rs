@@ -1565,6 +1565,10 @@ impl InitService {
                     ("system-update-backups", "create"),
                     ("system-update-versions", "read"),
                     ("system-update-versions", "create"),
+                    // 周期任务可观测面（/scheduler/jobs 清单、执行历史、手动触发）：
+                    // 与系统更新整段同属运维面，scheduler:create 覆盖 POST trigger 腿。
+                    ("scheduler", "read"),
+                    ("scheduler", "create"),
                     ("dashboard", "read"),
                     ("notifications", "read"),
                 ],
