@@ -1,8 +1,6 @@
 use crate::utils::error::AppError;
 use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement, TransactionTrait};
-use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
-use tokio::time::{Duration, interval};
 
 pub struct AuditCleanupService {
     db: Arc<DatabaseConnection>,

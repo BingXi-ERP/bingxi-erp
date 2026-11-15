@@ -13,7 +13,7 @@
 use std::sync::Arc;
 
 use sea_orm::{DatabaseConnection, EntityTrait};
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::config::settings::CollectionTaskAutoGenerateJob;
 use crate::models::collection_task_dto::AutoGenerateTasksRequest;

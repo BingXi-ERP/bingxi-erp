@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 use sea_orm::DatabaseConnection;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::config::settings::FinanceAlertScanJob;
 use crate::models::finance_alert_dto::TriggerScanRequest;

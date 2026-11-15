@@ -9,13 +9,10 @@
 //!
 //! 参考模板：audit_cleanup_service.rs（同模式的后台清理任务）
 
-use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 
-use futures::FutureExt;
 use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement};
 use serde::Serialize;
-use tokio::time::{Duration, interval};
 
 use crate::utils::error::AppError;
 

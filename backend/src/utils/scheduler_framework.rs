@@ -92,20 +92,25 @@ async fn run_once_recorded(
     let elapsed = started.elapsed();
 
     if let (Some(db), Some(id)) = (db, run_id) {
-        let mut active: scheduler_job_run::ActiveModel = Default::default();
-        active.id = Set(id);
-        active.finished_at = Set(Some(chrono::Utc::now()));
-        match &result {
-            Ok(()) => {
-                active.status = Set(STATUS_SUCCESS.to_string());
-                active.affected = Set(affected);
-                active.error_message = Set(None);
-            }
-            Err(e) => {
-                active.status = Set(STATUS_FAILED.to_string());
-                active.error_message = Set(Some(error_summary(e.clone())));
-            }
-        }
+        // 终态回填只覆盖 update 需要的主键 + 结束时间 + 三结果列；全字段字面构造
+        // 是 ActiveModel 的正确形状（Default + 逐字段 Set 会触发 field_reassign_with_default）。
+        let active = scheduler_job_run::ActiveModel {
+            id: Set(id),
+            finished_at: Set(Some(chrono::Utc::now())),
+            status: match &result {
+                Ok(()) => Set(STATUS_SUCCESS.to_string()),
+                Err(_) => Set(STATUS_FAILED.to_string()),
+            },
+            affected: match &result {
+                Ok(()) => Set(affected),
+                Err(_) => Set(None),
+            },
+            error_message: match &result {
+                Ok(()) => Set(None),
+                Err(e) => Set(Some(error_summary(e.clone()))),
+            },
+            ..Default::default()
+        };
         if let Err(e) = active.update(db.as_ref()).await {
             tracing::warn!(scheduler = scheduler.name(), run_id = id, error = %e, "执行历史终态回填失败");
         }

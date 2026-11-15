@@ -14,7 +14,7 @@
 use std::sync::Arc;
 
 use sea_orm::DatabaseConnection;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::config::settings::LaborContractExpiryScanJob;
 use crate::services::labor_contract_service::{ContractExpiryLevel, LaborContractService};

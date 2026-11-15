@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use chrono::{Duration, Utc};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, QueryFilter, QueryOrder};
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::models::audit_log::{self, Entity as AuditLogEntity};
 use crate::models::audit_log::{OperationType, Severity};
