@@ -1,0 +1,16 @@
+<view class="chooseRole">
+  <view class="head">
+    <view class="title">创建公司/成为专家？</view>
+    <view class="titleIllustrate">请在进入秉羲工作台前选择适合您的角色</view>
+  </view>
+  <view
+    bindtap="topath"
+    class="content {{item.role==='professer'?'contentDashed':''}}"
+    data-role="{{item.role}}"
+    wx:for="{{roleList}}"
+    wx:key="{{item.role}}"
+  >
+    <image alt="" class="img" src="{{item.img}}"></image>
+    <view class="text">{{item.illustrate}}</view>
+  </view>
+</view>

@@ -1,0 +1,26 @@
+<view class="search-panel">
+    <view class="search-box">
+        <image alt="" class="search-icon" mode="aspectFit" src="{{image.search}}"></image>
+        <input autoFocus="true" bindconfirm="inputShow" bindinput="inputTyping" class="search-input" confirmType="search" placeholder="请输入关键字搜索" type="text" value="{{search_name}}"></input>
+        <image alt="" bindtap="clearName" class="clear-icon" mode="aspectFit" src="{{image.clearicon}}" wx:if="{{search_name!=''}}"></image>
+        <text bindtap="canleSearch">取消</text>
+    </view>
+    <view class="select-lists">
+        <block wx:for="{{resList}}" wx:key="index">
+            <block wx:for="{{item.childList}}" wx:for-index="index1" wx:for-item="childItem" wx:key="{{index1}}">
+                <view bindtap="checkCategories" class="select-list" data-index="{{index2}}" data-parent="{{item}}" id="{{childItems.id}}" wx:for="{{childItem.childList}}" wx:for-index="index2" wx:for-item="childItems" wx:key="{{index2}}">
+                    <view>{{item.name}}->{{childItem.name}}->{{childItems.name}}</view>
+                    <view>
+                        <image mode="aspectFit" src="{{childItems.isChecked==1?imgS:imgNo}}"></image>
+                    </view>
+                </view>
+            </block>
+        </block>
+    </view>
+    <view class="select-list select-list-tip" wx:if="{{listNull==true}}">
+        <view>没有相关的数据，请重新搜索</view>
+    </view>
+</view>
+<view class="footer-btns">
+    <button bindtap="sureCheck" class="{{btnShow==true?'btn-gray':''}}">确定</button>
+</view>

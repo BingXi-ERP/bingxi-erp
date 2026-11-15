@@ -1,0 +1,42 @@
+<view class="listContainer">
+    <view class="top-content">
+        <image class="colorCard" mode="aspectFit" src="{{parentMsg?replImage(parentMsg.mainImgPath,globalApp,288):''}}"></image>
+        <view>
+            <view class="productName">{{parentMsg.goodsName}}</view>
+            <view class="infoDetailed">
+                <view class="times">{{parentMsg.printTimes}}次</view>
+                <view>{{parentMsg.detailQuantities}}{{parentMsg.goodsUnit}}</view>
+            </view>
+        </view>
+    </view>
+    <view class="c-search-bar">
+        <view class="c-search-bar-wrapper">
+            <input bindconfirm="searchList" bindinput="inputgetName" class="c-search-bar-input" confirmType="search" data-name="searchKey" placeholder="搜索已打印色号" type="text" value="{{keyword}}">
+                <view catch:tap="searchList" class="searchC">
+                    <image class="c-search-bar-btn" mode="aspectFit" src="/assets/images/icon2nd/ic_sous@3x.png"></image>
+                </view>
+            </input>
+        </view>
+    </view>
+    <view class="noDataComtent" wx:if="{{detailList.length==0}}">
+        <view class="noDataBg" style="background-image:url(\"{{noDataBg}}\")"></view>
+        <view class="noDataContent">暂无数据</view>
+    </view>
+    <view class="detailcontent" wx:else>
+        <view class="detailList" wx:for="{{detailList}}" wx:key="index">
+            <view class="vertical-show">
+                <text class="name-show">{{item.customerName}}</text>
+                <text class="phone-font">{{item.customerTel}}</text>
+            </view>
+            <view class="vertical-show">
+                <text class="name-show">{{item.quantity}}{{item.quantityUnit}}</text>
+                <text class="phone-font">{{item.colorNo}}{{item.colorName}}</text>
+            </view>
+            <view>{{item.printTime}}</view>
+        </view>
+    </view>
+    <view class="more" wx:if="{{detailList.length!=0}}">
+        <view class="moreIcon" wx:if="{{moreIcon}}">上拉更多</view>
+        <view class="moreIcon" wx:if="{{!moreIcon}}">没有更多数据</view>
+    </view>
+</view>

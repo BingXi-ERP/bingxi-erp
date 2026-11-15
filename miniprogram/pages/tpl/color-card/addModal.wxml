@@ -1,0 +1,28 @@
+<template name="addclassify">
+    <view class="mask-modal" wx:if="{{showType=='addclassify'||showType=='editclassify'}}">
+        <view class="dialog-modal">
+            <view class="dialog-modal-hd" wx:if="{{showType=='addclassify'}}">新建分类</view>
+            <view class="dialog-modal-hd" wx:if="{{showType=='editclassify'}}">编辑分类</view>
+            <view class="dialog-modal-bd">
+                <input bindinput="addName" placeholder="请填写分类名称" value="{{classifyName}}"></input>
+            </view>
+            <view class="dialog-modal-fd">
+                <view catchtap="cancelAdd">取消</view>
+                <view catchtap="sureAdd">确定</view>
+            </view>
+        </view>
+    </view>
+    <view class="mask-modal" wx:if="{{showType=='delclassify'}}">
+        <view class="dialog-modal">
+            <view class="dialog-modal-hd">删除该分类</view>
+            <view class="dialog-modal-bd2">
+                <view>该分类下商品不会被删除</view>
+                <view>会保存到默认分类</view>
+            </view>
+            <view class="dialog-modal-fd">
+                <view catchtap="cancelAdd">取消</view>
+                <view catchtap="delList">删除</view>
+            </view>
+        </view>
+    </view>
+</template>

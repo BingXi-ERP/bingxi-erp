@@ -1,0 +1,221 @@
+page {
+  background-color: #f5f7f9;
+  height: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+.restockList {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 16rpx;
+}
+.headSearch {
+  border-radius: 32rpx;
+  font-weight: 400;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+.headSearch .van-search {
+  padding: 6rpx;
+}
+.headSearch .van-search__content {
+  background: #fff;
+}
+.search_btn {
+  background: #4177f5;
+  border-radius: 36rpx;
+  height: 60rpx;
+  right: 10rpx;
+  text-align: center;
+  width: 116rpx;
+}
+.search_btn .search_btn_text {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  position: relative;
+  top: -2rpx;
+}
+.restock_content {
+  background-color: #f5f7f9;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 112rpx);
+  overflow: hidden;
+}
+.restock_bar {
+  height: 92rpx;
+  justify-content: space-between;
+  padding: 0 16rpx;
+}
+.filter_tool,
+.filter_tool_item,
+.restock_bar {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.filter_tool_item {
+  font-size: 14px;
+  margin-right: 48rpx;
+}
+.restock_list {
+  flex: 1;
+  height: calc(100% - 94rpx);
+}
+.restock_flex {
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: wrap;
+}
+.restock_inline {
+  display: block;
+}
+.card_item {
+  background-color: #fff;
+  border-radius: 12rpx;
+  height: 600rpx;
+  margin-bottom: 16rpx;
+  margin-right: 14rpx;
+  overflow: hidden;
+  width: calc(50% - 10rpx);
+}
+.card_item .card_img {
+  align-items: flex-start;
+  display: -webkit-flex;
+  display: flex;
+  min-height: 336rpx;
+  position: relative;
+}
+.card_item van-image {
+  width: 100%;
+}
+.card_item .card_img .address {
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 26rpx;
+  bottom: 16rpx;
+  color: #fff;
+  font-size: 12px;
+  height: 50rpx;
+  line-height: 50rpx;
+  padding: 0 20rpx;
+  position: absolute;
+  right: 16rpx;
+  text-align: center;
+}
+.filter_tool_item image {
+  height: 32rpx;
+  margin-right: 8rpx;
+  width: 32rpx;
+}
+.tool_bar_img {
+  height: 32rpx;
+  margin-left: 32rpx;
+  width: 32rpx;
+}
+.card_item .card_img {
+  width: 100%;
+}
+.card_item .card_img .address .van-icon {
+  font-size: 14px;
+  margin-right: 8rpx;
+}
+.card_item .card_img .van-image image {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  width: 100%;
+}
+.card_item .info {
+  background-color: #fff;
+  border-bottom-left-radius: 12rpx;
+  border-bottom-right-radius: 12rpx;
+  padding: 16rpx 24rpx;
+}
+.card_item .info .h1 {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 4rpx;
+}
+.card_item .info .p {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 12px;
+  line-height: 44rpx;
+}
+.card_item .info .svg-icon {
+  height: 30rpx;
+  margin-right: 8rpx;
+  width: 30rpx;
+}
+.card_item .info .p text {
+  color: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card_item:nth-of-type(2n) {
+  margin-right: 0;
+}
+.card_inline_item {
+  box-sizing: border-box;
+  display: -webkit-flex;
+  display: flex;
+  height: 240rpx;
+  justify-content: space-between;
+  margin-right: 0;
+  overflow: hidden;
+  padding: 16rpx;
+  width: 100%;
+}
+.card_inline_item .card_img {
+  height: 208rpx;
+  min-height: 208rpx;
+  min-width: 208rpx;
+  width: 208rpx;
+}
+.card_inline_item .address {
+  bottom: 8rpx;
+  right: 8rpx;
+}
+.card_inline_item .van-image {
+  width: 100%;
+}
+.card_inline_item .van-image img {
+  border-bottom-left-radius: 12rpx;
+  border-bottom-right-radius: 12rpx;
+}
+.card_inline_item .info {
+  flex: 1;
+  padding: 0 24rpx;
+}
+.card_inline_item .info .p {
+  font-size: 12px;
+  line-height: 1;
+  margin-bottom: 16rpx;
+}
+.card_inline_item .info .p text {
+  font-size: 12px;
+}
+.card_item .info .p .price {
+  color: #ff2332;
+  margin-right: 20rpx;
+}
+.card_item .info .matrial {
+  margin-bottom: 0;
+}
+.card_item .info .matrial text {
+  display: inline-block;
+  max-width: 250rpx;
+}
+.card_inline_item .info .matrial text {
+  display: inline-block;
+  font-size: 12px;
+  max-width: 400rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

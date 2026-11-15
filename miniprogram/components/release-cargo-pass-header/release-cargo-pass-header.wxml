@@ -1,0 +1,35 @@
+<view class="color-card-filter-wrapper">
+  <scroll-view scrollX class="color-card-scroll">
+    <view class="tab-wrapper {{userType==1?'':'tabBarCenter'}}">
+      <view class="tabBar tabs">
+        <view
+          bindtap="onChange"
+          class="f14 sell {{tabActive==1?'choosedBar':''}}"
+          data-index="1"
+          >放货中 ({{count.inTransitCount||0}})<view
+            class="SellBar"
+            wx:if="{{tabActive==1}}"
+          ></view>
+        </view>
+      </view>
+      <view
+        bindtap="onChange"
+        class="unSell tabs {{tabActive==2?'choosedBar':''}}"
+        data-index="2"
+        >暂停放货 ({{count.breakCount||0}})<view
+          class="unSellBar"
+          wx:if="{{tabActive==2}}"
+        ></view>
+      </view>
+      <view
+        bindtap="onChange"
+        class="unSell tabs {{tabActive==3?'choosedBar':''}}"
+        data-index="3"
+        >审核中 ({{count.inReviewCount||0}})<view
+          class="unSellBar"
+          wx:if="{{tabActive==3}}"
+        ></view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "色卡领取总排行榜",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

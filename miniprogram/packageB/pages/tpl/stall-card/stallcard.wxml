@@ -1,0 +1,35 @@
+<template name="stallcard">
+    <view class="search-box">
+        <image alt="" class="search-icon" mode="aspectFit" src="/assets/images/icon2nd/symbols-search.png"></image>
+        <input bindtap="toSearch" class="search-input" disabled="true" id="stallSearch" placeholder="请输入档口名称/电话"></input>
+    </view>
+    <block wx:if="{{shopList.length>0}}">
+        <view class="stall-list" wx:for="{{shopList}}" wx:key="{{index}}">
+            <view class="stall-list-img">
+                <image class="picture" mode="aspectFit" src="{{item.ownerHeadImg}}?x-oss-process=image/resize,w_266"></image>
+            </view>
+            <view class="stall-list-info">
+                <!-- 原此处有 bindtap 到 toShop 的进入店铺按钮，入参是档口 id，跳转落点
+                /pages/component/index 不在 app.json 声明集也不在磁盘，paramShopId 全仓零读方，
+                且 wx.switchTab 只能落 tabBar 三页之一，入口从未接通，故按钮整体退场。
+                调用方本模板仅被 packageB/pages/personal-center/collect/collect.wxml 引入，
+                同目录 stall-search.wxml 是另一份模板，不受本次退场影响。
+                存什么 本模板只渲染档口收藏列表，不写任何本地键。
+                待访客侧店铺页与其读口迁入本仓后，按 app.json 声明路由重新接回该入口。 -->
+                <view class="stall-list-info-hd">{{item.shopName}}
+                </view>
+                <view class="stall-list-info-bd">
+                    <text>电话：{{item.telephone}}</text>
+                    <text>地址：{{item.shopProvince}}{{item.shopCity}}{{item.shopArea}}{{item.shopAddress}}</text>
+                </view>
+                <view class="stall-list-info-fd">
+                    <span class="tags" type="">{{item.category}}</span>
+                </view>
+            </view>
+        </view>
+    </block>
+    <view class="color-data-list-null" wx:else>
+        <image mode="aspectFit" src="/assets/images/icon2nd/symbols-stall-l.png"></image>
+        <text class="f14">你没有收藏任何档口~</text>
+    </view>
+</template>

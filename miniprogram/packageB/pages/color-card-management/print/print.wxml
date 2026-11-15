@@ -1,0 +1,131 @@
+<view class="print-content">
+    <view class="print-view">
+        <image class="topstaff" mode="aspectFit" src="{{image.topStaff}}"></image>
+        <image class="leftstaff" mode="aspectFit" src="{{image.leftStaff}}"></image>
+        <view class="print-view-card {{nowList.labelType==1?'print-view-card-reverse':''}}">
+            <view class="print-view-card-code" wx:if="{{nowList.printCode}}">
+                <image mode="aspectFit" src="{{miniCodeImgPath}}"></image>
+                <text style="word-wrap:break-word;height:76rpx;overflow:hidden" wx:if="{{nowList.labelRemark.length>0}}">*{{nowList.labelRemark}}</text>
+                <text wx:if="{{nowList.labelRemark.length<1&&nowList.labelType==1}}">扫码查看新品</text>
+                <block wx:if="{{nowList.labelRemark.length<1&&(nowList.labelType==0||nowList.labelType==2)}}">
+                    <text>{{nowList.langType==1?'微信扫码查看':'Scan QR code'}}</text>
+                    <text>{{nowList.langType==1?'店铺最新产品':'to get more info'}}</text>
+                </block>
+            </view>
+            <view class="print-view-card-name">
+                <view class="loading" hidden="{{!showLoading}}">{{nowList.langType==1?'加载中...':'loading...'}}</view>
+                <text class="g_limtRowTwo {{nowList.printIngredient?'g_limtRowThree':''}}" wx:for="{{selectSortList}}" wx:key="index">{{nowList.langType==1?item.label+':'+(item.value||''):item.EnLabel!=''?item.EnLabel+':'+(item.enValue||''):''}}</text>
+                <text wx:if="{{nowList.printCode!==1&&nowList.labelRemark}}">*{{nowList.labelRemark}}</text>
+            </view>
+        </view>
+    </view>
+    <view class="print-list print-list1">
+        <view class="print-list-bd picker-select">
+            <text>标签类型</text>
+            <picker bindchange="bindPickerChange" range="{{array}}" value="{{nowList.labelType}}">
+                <view>{{array[nowList.labelType]}}</view>
+            </picker>
+        </view>
+        <view class="print-list-bd">
+            <text>打印份数</text>
+            <input bindinput="inputVal" maxlength="3" value="{{input_val}}"></input>
+        </view>
+        <view class="print-list-bd">
+            <text>打印语言</text>
+            <view>
+                <button bindtap="changeLang" class="lang-btn {{nowList.langType=='1'?'active':''}}" id="1">中文</button>
+                <button bindtap="changeLang" class="ml lang-btn {{nowList.langType=='2'?'active':''}}" id="2">英文</button>
+            </view>
+        </view>
+    </view>
+    <view class="print-list print-list2">
+        <view bindtap="changeQRCode" class="print-list-bd">
+            <text>二维码</text>
+            <view class="qrCode-wrap">
+                <view class="qr-text">{{qrCode}}</view>
+                <van-icon name="arrow-down"></van-icon>
+            </view>
+        </view>
+        <view class="code-wrap" hidden="{{!showCode}}">
+            <view class="code-text">可上传存在好友码的截图，系统将自动识别</view>
+            <view>
+                <van-uploader bind:after-read="afterRead" bind:delete="deletePic" deletable="{{true}}" fileList="{{fileList}}" maxCount="1"></van-uploader>
+            </view>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="printGoodsNo">
+            <text>编号/ART.NO.</text>
+            <image mode="aspectFit" src="{{nowList.printGoodsNo==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="printGoodsName">
+            <text>品名/DESC</text>
+            <image mode="aspectFit" src="{{nowList.printGoodsName==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="printGramWeight">
+            <text>克重/Weight</text>
+            <image mode="aspectFit" src="{{nowList.printGramWeight==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="printIngredient">
+            <text>成分/COMP</text>
+            <image mode="aspectFit" src="{{nowList.printIngredient==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="printBreadth">
+            <text>幅宽/Width</text>
+            <image mode="aspectFit" src="{{nowList.printBreadth==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="printPrice">
+            <text>价格/Price</text>
+            <image mode="aspectFit" src="{{nowList.printPrice==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="printShrinkage">
+            <text>缩水率/Shrinkage</text>
+            <image mode="aspectFit" src="{{nowList.printShrinkage==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="printMeterLong">
+            <text>米长/Length</text>
+            <image mode="aspectFit" src="{{nowList.printMeterLong==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="printDeviation">
+            <text>空差/Shortage</text>
+            <image mode="aspectFit" src="{{nowList.printDeviation==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view bindtap="changeStatus" class="print-list-bd" id="printColorNo">
+            <text>色号/Color NO.</text>
+            <view class="color-tips">如需单独打印色号，请返回上一层选择打印色号</view>
+            <image mode="aspectFit" src="{{nowList.printColorNo==1?image.select:image.unSelect}}"></image>
+        </view>
+        <view class="page-body textarea-page-section">
+            <form catchreset="formReset" catchsubmit="formSubmit" class="com-form">
+                <view class="page-form-title" style="display:flex;">
+                    <view>{{nowList.langType==1?'备注':'Remarks'}}</view>
+                    <view style="font-size:24rpx;color:#999999;margin-left:16rpx;">信息将展示在标签纸二维码之下</view>
+                </view>
+                <view class="page-section">
+                    <view class="textarea-wrp">
+                        <input bindinput="inputgetName" class="explain-input" data-name="nowList.labelRemark" focus="{{remarkFocus}}" name="textarea" placeholder="请输入备注信息，如：8号色花灰剪板加2元" value="{{nowList.labelRemark}}"></input>
+                    </view>
+                </view>
+            </form>
+        </view>
+        <view class="bottom"></view>
+    </view>
+</view>
+<view class="print-btn">
+    <button bindtap="printLink" class="g_bottomBtn">打印</button>
+</view>
+<view class="mask-modal" wx:if="{{showColorDialog}}">
+    <view class="dialog-modal">
+        <view class="dialog-modal-bd">
+            <text>是否仅需打印"色号"信息？</text>
+        </view>
+        <view class="dialog-modal-fds">
+            <button catchtap="cancelColor" class="btn-cancel">取消</button>
+            <button catchtap="sureColor" class="btn-confirm">确认</button>
+        </view>
+    </view>
+</view>
+<van-popup customStyle="height: 32%;" position="bottom" show="{{showBottom}}" zIndex="1000">
+    <view class="wrap">
+        <view bind:tap="setQRCode" class="single" data-item="{{item}}" wx:for="{{erCodeArr}}" wx:key="index">{{item.name}}</view>
+    </view>
+    <view bind:tap="cancel" class="cancel">取消</view>
+</van-popup>

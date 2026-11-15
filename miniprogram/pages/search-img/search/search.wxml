@@ -1,0 +1,24 @@
+<view class="search-wrapper">
+    <view class="list-wrapper" wx:if="{{searchList.length>0}}">
+        <view class="block-wrapper" wx:for="{{searchList}}" wx:key="index">
+            <color-card-list-block bind:onOrOff="onOrOff" bind:shareF="shareF" bind:shareM="shareM" idx="{{index}}" isSearch="{{true}}" list="{{item}}"></color-card-list-block>
+        </view>
+    </view>
+    <view class="no-date-wrapper" wx:if="{{noColorCardShow}}">
+        <view class="bg-img no-list-bg" style="background-image:url(\"{{noColorCardBg}}\")"></view>
+        <view class="text">SORRY,暂时搜不到色卡</view>
+    </view>
+</view>
+<van-popup bind:close="closePopup" customClass="canvas-popup-wrapper" show="{{popupInit.canvas.show}}">
+    <view class="{{popupInit.canvas.show?'showBigCanvas':'hideBigCanvas'}}">
+        <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas}}" height="1350" style="width:500px;height:900px" width="750"></canvas>
+    </view>
+    <view class="canvas-wrapper {{popupInit.canvas.show?'':'hideCanvas'}}">
+        <canvas canvasId="{{popupInit.canvas.canvasId.shareCanvas}}" height="900" style="width:250px;height:450px" width="500"></canvas>
+    </view>
+    <view class="share-monents-notice-wrapper">
+        <view catchtap="saveCanvas" class="save-share-btn">保存图片</view>
+        <view>保存图片后分享到朋友圈</view>
+        <view>会有更多的人来您的店铺哦~</view>
+    </view>
+</van-popup>

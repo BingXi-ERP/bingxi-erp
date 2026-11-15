@@ -1,0 +1,7 @@
+<view class="cargo-warp">
+  <view class="suss_box">
+    <image mode="aspectFill" src="{{icon.success}}"></image>
+  </view>
+  <view class="text">您的申请已提交</view>
+  <view class="text">审核通知将通过系统通知/短信告知</view>
+</view>

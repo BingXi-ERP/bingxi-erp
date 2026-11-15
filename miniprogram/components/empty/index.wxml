@@ -1,0 +1,4 @@
+<view class="noList">
+  <view class="noImg" style="background-image:url('{{noImg}}')"></view>
+  <view class="text">暂无数据</view>
+</view>

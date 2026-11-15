@@ -1,0 +1,53 @@
+<view class="contain">
+    <view class="topContent">
+        <view class="dateChoose">
+            <view class="lately-date-choose">
+                <button catchtap="choosedWeek" class="dateB buttonSpace {{confirmDate==2?'choosedBotton':''}}">近7天</button>
+                <button catchtap="choosedMonth" class="dateB {{confirmDate==3?'choosedBotton':''}}">近30天</button>
+            </view>
+            <view class="date-choose displayFlex">
+                <picker bindchange="bindStartDateChange" end="2027-09-01" mode="date" start="2015-09-01" value="{{date}}">
+                    <view class="picker data-choose">{{startDate==''?'请选择时间':startDate}}</view>
+                </picker>
+                <span class="dateRange">至</span>
+                <picker bindchange="bindEndDateChange" end="2027-09-01" mode="date" start="2015-09-01" value="{{endDate}}">
+                    <view class="picker data-choose">{{endDate==''?'请选择时间':endDate}}</view>
+                </picker>
+            </view>
+        </view>
+    </view>
+    <view class="chartContent">
+        <view class="canvas-container">
+            <ec-canvas canvasId="mychart-bar" ec="{{ec}}" id="mychart-dom-line"></ec-canvas>
+        </view>
+    </view>
+    <view style="height:20rpx;background:#F5F5F9"></view>
+    <view>
+        <view class="dataList">
+            <view>
+                <image class="dataSourceLogo" src="{{icon.paihan}}"></image>
+            </view>
+            <view class="dataSource">数据来源</view>
+        </view>
+        <view class="list" wx:for="{{dataSourceList}}" wx:key="index">
+            <view class="list-date">{{item.date}}</view>
+            <view class="data-list " wx:for="{{item.respList}}" wx:for-index="listIndex" wx:for-item="listItem" wx:key="index">
+                <view class="orderList {{listIndex==item.fetchList.length-1?'noBorder':''}}">
+                    <view class="">
+                        <image class="customerInfo" src="{{listItem.visitorHeadImg}}"></image>
+                    </view>
+                    <view class="orderInfo">
+                        <view>{{listItem.visitorName}}</view>
+                    </view>
+                    <view class="times">{{listItem.accessCount}}次</view>
+                    <view class="orderReceiveTimes">{{listItem.lastAccessTime}}</view>
+                </view>
+            </view>
+        </view>
+        <view class="noDataComtent" wx:if="{{dataSourceList.length==0}}">
+            <view class="noDataBg" style="background-image:url(\"{{icon.noDataBg}}\")"></view>
+            <view class="noDataContent">暂无数据</view>
+        </view>
+        <view class="spaceBg" wx:if="{{dataSourceList.length>0}}"></view>
+    </view>
+</view>

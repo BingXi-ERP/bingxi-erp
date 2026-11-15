@@ -1,0 +1,35 @@
+<view class="restock">
+  <text class="h1">进货通</text>
+  <text class="tip">源头供应商，尽在秉羲工作台！</text>
+  <view class="headSearch">
+    <van-search
+      useActionSlot
+      bind:change="onChange"
+      bind:clear="handleSearch"
+      bind:search="handleSearch"
+      class="headSearch"
+      placeholder="搜索商品名称/成分"
+      shape="round"
+      value="{{searchFiled}}"
+    >
+      <view bind:tap="handleSearch" class="search_btn" slot="action">
+        <text class="search_btn_text">搜索</text>
+      </view>
+    </van-search>
+  </view>
+  <view class="history_key">
+    <view class="history_key_title"
+      >历史搜索<van-icon catchtap="clearHistoryKey" name="delete-o"></van-icon>
+    </view>
+    <view class="history_key_content">
+      <view
+        catchtap="onToSearch"
+        class="history_key_item"
+        data-item="{{item}}"
+        wx:for="{{historyKey}}"
+        wx:key="item"
+        >{{item}}</view
+      >
+    </view>
+  </view>
+</view>

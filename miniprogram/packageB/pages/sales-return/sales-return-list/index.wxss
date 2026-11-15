@@ -1,0 +1,36 @@
+@import "/packageB/pages/sales-return/select-bill/index.wxss";
+.listId {
+  width: 350rpx;
+}
+.order-info {
+  border: 0;
+  padding-bottom: 20rpx;
+  padding-top: 20rpx;
+  position: relative;
+}
+.order-info::after {
+  border-bottom: 1rpx solid #edeff6;
+  bottom: 0;
+  content: "";
+  height: 1rpx;
+  left: -30rpx;
+  position: absolute;
+  width: 690rpx;
+}
+.userName {
+  width: 500rpx;
+}
+.list {
+  position: relative;
+}
+.cancelOrder {
+  opacity: 0.6;
+}
+.cancelIcon {
+  height: 144rpx;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 144rpx;
+  z-index: 99;
+}

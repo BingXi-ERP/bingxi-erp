@@ -1,0 +1,101 @@
+<view class="salesReturnSelectCodeList">
+  <view class="listContent">
+    <view
+      bindtap="toSelectCode"
+      class="fl listItem"
+      data-id="{{item.id}}"
+      data-item="{{item}}"
+      wx:for="{{list}}"
+      wx:key="index"
+    >
+      <image class="img" mode="aspectFill" src="{{item.goodsImgPath}}"></image>
+      <view class="left">
+        <view class="itemTitle g_limtRow f14">{{item.goodsName}}</view>
+        <view class="fl f12 itemDetail" wx:if="{{item.selectCodeArr.length>0}}">
+          <view class="totle g_limtRow"
+            >{{item.selectedColor.length}}种颜色,<block
+              wx:for="{{item.totalReturnNum}}"
+              wx:for-item="totoal"
+              wx:key="index"
+              >{{toFixNum(totoal.refundableQuantity)}}{{totoal.quantityUnit}}</block
+            >
+          </view>
+          <view class="comfirmIcon">已选择退货产品</view>
+        </view>
+        <view class="f12 itemDetail" wx:else>请选择退货数量</view>
+        <van-icon
+          class="left-arrow"
+          color="#5D5D5D"
+          name="arrow"
+          size="24rpx"
+        ></van-icon>
+      </view>
+    </view>
+    <view class="more">
+      <view class="moreIcon" wx:if="{{!isAll}}">上拉更多</view>
+      <view class="moreIcon" wx:if="{{isAll}}">已经到底了</view>
+    </view>
+  </view>
+  <view class="fixed-toolbar-bottom iphone_bottom">
+    <view class="f12 refundBtn fr-between-center" wx:if="{{showHandleTips}}">
+      <view bindtap="handleRefund" class="fl" style="height: 100%">
+        <image
+          src="{{isRefund?icon.checked:icon.noCheck}}"
+          style="margin-right: 20rpx"
+        ></image>
+        <view class="tips-word">退货&退款(核销已收款)</view>
+      </view>
+    </view>
+    <view class="toolbar-left">
+      <text class="totle-name">退货合计：</text>
+      <text class="totle-content g_limtRow"
+        >￥ <text class="f18">{{toFixNum(totalAccount)}}</text>
+      </text>
+    </view>
+    <view class="toolbar-right">
+      <view class="flex-row toolbar-button-group-right">
+        <button bind:tap="showComfirmPop" class="marR g_samllBtn">确定</button>
+      </view>
+    </view>
+  </view>
+</view>
+<van-popup
+  :close-on-click-overlay="true"
+  class="tip-dialog"
+  show="{{showPop}}"
+  zIndex="10001"
+>
+  <view
+    class="popTitle"
+    style="background-image:url( '{{icon.popHeader}}' )"
+  ></view>
+  <view class="popContent">
+    <view>1、选择已售商品；</view>
+    <view>2、勾选细码，勾选后可输入退货数量；</view>
+    <view>3、点击确定，完成退货！</view>
+  </view>
+  <view class="popBtn">
+    <button catch:tap="closePop" class="popBtn" size="small">我知道了</button>
+  </view>
+</van-popup>
+<van-popup
+  closeOnClickOverlay
+  class="tip-dialog"
+  getContainer="body"
+  round="true"
+  show="{{comfirmPop}}"
+  zIndex="10001"
+>
+  <text class="popTitle2">温馨提示</text>
+  <view class="popContent2"
+    >你还有{{noChecked}}商品未选择退货细码，确定后系统将不纳入退货单中！</view
+  >
+  <view class="popBtn">
+    <button catch:tap="closeComfirmPop" class="popBtn cancelBtn" size="small">
+      取消
+    </button>
+    <button catch:tap="saveRutenRequest" class="popBtn" size="small">
+      确定
+    </button>
+  </view>
+</van-popup>

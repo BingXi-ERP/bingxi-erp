@@ -1,0 +1,35 @@
+page {
+  background-color: #f8f8f8;
+}
+.phone {
+  margin: auto;
+  text-align: center;
+  width: 90%;
+}
+.btn-active {
+  background: #2f7bfd;
+  border-radius: 8rpx;
+  color: #fff;
+  font-size: 32rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  margin: 5%auto auto;
+  width: 90%;
+}
+.list-li {
+  background-color: #fff;
+  margin: 8%0;
+  width: 100%;
+}
+.list-li input {
+  font-size: 32rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding-left: 35rpx;
+}
+.phone-tip {
+  color: #9d9d9d;
+  font-size: 32rpx;
+  text-align: left;
+  width: 100%;
+}

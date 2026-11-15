@@ -1,0 +1,318 @@
+.order-list {
+  color: #333;
+  font-size: 28rpx;
+}
+.tab-wrapper .van-tab--active {
+  color: #2f7bfd;
+  font-weight: 600;
+}
+.data-empty {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  height: calc(100vh - 215rpx);
+  justify-content: center;
+}
+.data-empty-image {
+  height: 200rpx;
+  margin: 0 auto;
+  text-align: center;
+  width: 200rpx;
+}
+.data-empty-image image {
+  height: 100%;
+  width: 100%;
+}
+.data-empty-content {
+  color: grey;
+  margin-top: 30rpx;
+  text-align: center;
+}
+.data-empty-title {
+  font-size: 32rpx;
+}
+.order-pin {
+  color: #333;
+  font-size: 28rpx;
+}
+.list-wrapper {
+  height: calc(100vh - 140rpx);
+}
+.list {
+  padding: 30rpx 30rpx 0;
+}
+.list-item {
+  background-color: #fff;
+  border-radius: 4px;
+  margin-bottom: 20rpx;
+  padding: 30rpx;
+  position: relative;
+}
+.order-type {
+  background: #b7bed9;
+  border-radius: 2rpx 0 0 2rpx;
+  color: #fff;
+  font-size: 24rpx;
+  height: 36rpx;
+  left: 0;
+  line-height: 36rpx;
+  overflow: hidden;
+  padding: 0 30rpx 0 10rpx;
+  top: 30rpx;
+}
+.order-type,
+.order-type::after {
+  display: block;
+  position: absolute;
+}
+.order-type::after {
+  border-bottom: 18rpx solid transparent;
+  border-right: 18rpx solid #fff;
+  border-top: 18rpx solid transparent;
+  content: "";
+  height: 0;
+  right: 0rpx;
+  top: 1rpx;
+  width: 0;
+}
+.order-info {
+  border-bottom: 1rpx solid #ddd;
+  padding-bottom: 30rpx;
+  position: relative;
+}
+.order-status {
+  color: #999;
+  font-size: 24rpx;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.order-status-hl {
+  color: #e2525a;
+}
+.order-create-by {
+  display: -webkit-flex;
+  display: flex;
+}
+.order-create-by image {
+  border-radius: 50%;
+  height: 48rpx;
+  margin-right: 20rpx;
+  width: 48rpx;
+}
+.order-create-by text {
+  flex: 1;
+  font-size: 32rpx;
+}
+.order-create-at {
+  display: block;
+  font-size: 24rpx;
+  margin-bottom: 22rpx;
+}
+.timeSpace {
+  padding-left: 70rpx;
+}
+.order-product .product {
+  border-bottom: 1rpx solid #ddd;
+  display: -webkit-flex;
+  display: flex;
+  padding: 30rpx 0;
+}
+.order-product .product-image {
+  height: 88rpx;
+  margin-right: 34rpx;
+  width: 88rpx;
+}
+.order-product .product-content text {
+  display: block;
+}
+.order-product .product-total {
+  color: #999;
+  font-size: 24rpx;
+  margin-top: 20rpx;
+}
+.order-unpay {
+  margin-bottom: -20rpx;
+}
+.order-total,
+.order-unpay {
+  font-size: 24rpx;
+  margin-top: 30rpx;
+  text-align: right;
+}
+.order-total > text:not(:first-child) {
+  margin-left: 40rpx;
+}
+.order-total .strong {
+  font-size: 32rpx;
+}
+.order-actions {
+  padding-top: 38rpx;
+  text-align: right;
+}
+.order-actions button:not(:first-child) {
+  margin-left: 10rpx;
+}
+.order-actions .button-normal,
+.order-actions .button-primary {
+  background: transparent;
+  border: 1rpx solid #ccc;
+  border-radius: 50rpx;
+  color: #333;
+  display: inline-block;
+  font-size: 24rpx;
+  height: 50rpx;
+  line-height: 50rpx;
+  min-width: 142rpx;
+  padding: 0 30rpx;
+}
+.order-actions .button-primary {
+  border: 1rpx solid #2f7bfd;
+  color: #2f7bfd;
+  font-weight: 600;
+}
+.close-reason {
+  padding: 85rpx 30rpx 30rpx;
+  position: relative;
+}
+.close-reason image {
+  height: 48rpx;
+  position: absolute;
+  right: 30rpx;
+  top: 20rpx;
+  width: 48rpx;
+}
+.close-reason .close-reason-input,
+.close-reason textarea {
+  background: #f5f5f9;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  height: 334rpx;
+  padding: 30rpx;
+  width: 100%;
+}
+.close-reason .close-reason-input {
+  color: #999;
+}
+.dialog-close-reason .van-button--default {
+  color: #333;
+  font-size: 32rpx;
+}
+.dialog-close-reason .van-dialog__confirm,
+.dialog-close-reason .van-dialog__confirm:active {
+  color: #2f7bfd !important;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+.image-preview {
+  background: #fff;
+  width: 652rpx;
+}
+.image-preview .image-content {
+  background: url(https://img.duibu.cn/duibu/shop/img/customer/img_fenxiangdingdan@2x.png)
+    no-repeat 50%;
+  background-size: cover;
+  height: 534rpx;
+  position: relative;
+  width: 652rpx;
+}
+.image-preview .image-content text {
+  color: #a2accc;
+  font-size: 32rpx;
+  font-weight: 600;
+  left: 50%;
+  line-height: 44rpx;
+  position: absolute;
+  top: 42rpx;
+  transform: translateX(-50%);
+}
+.image-preview .image-content text::after {
+  background: #7d88ab;
+  bottom: -30rpx;
+  content: "";
+  height: 4rpx;
+  width: 32rpx;
+}
+.image-preview .image-content image,
+.image-preview .image-content text::after {
+  display: block;
+  left: 50%;
+  position: absolute;
+  transform: translateX(-50%);
+}
+.image-preview .image-content image {
+  height: 270rpx;
+  top: 204rpx;
+  width: 270rpx;
+}
+.image-preview .image-tip {
+  color: #333;
+  font-size: 28rpx;
+  line-height: 1.8;
+  margin: 0 auto;
+  padding: 40rpx 0;
+  text-align: center;
+  width: 70%;
+}
+.image-preview .actions {
+  padding: 0 40rpx 40rpx;
+  text-align: center;
+}
+.image-preview button {
+  background: #2f7bfd;
+  border-radius: 2rpx;
+  color: #fff;
+  display: inline-block;
+  font-size: 32rpx;
+  height: 90rpx;
+  line-height: 90rpx;
+  width: 452rpx;
+}
+.history-wrapper {
+  background-color: #fff;
+  padding: 50rpx 0;
+  width: 100%;
+}
+.history-wrapper .title {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+.history-wrapper .title .text {
+  color: 333;
+  font-size: 32rpx;
+  padding-left: 30rpx;
+}
+.history-wrapper .title .icon {
+  height: 36rpx;
+  margin-right: 50rpx;
+  width: 28rpx;
+}
+.history-wrapper .history {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  margin: 30rpx auto;
+  width: 90%;
+}
+.history-wrapper .history .item {
+  background-color: #f5f5f9;
+  border-radius: 52rpx;
+  color: #666;
+  font-size: 28rpx;
+  margin: 0 30rpx 30rpx 0;
+  padding: 8rpx 20rpx;
+}
+.no-data {
+  background-color: #f5f5f9;
+  padding-top: 150rpx;
+}
+.no-data .icon {
+  height: 250rpx;
+  margin-bottom: 80rpx;
+  width: 300rpx;
+}

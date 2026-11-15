@@ -1,0 +1,93 @@
+.color-ys-bg {
+  background-color: #f8f8f8;
+  height: 20rpx;
+  width: 100%;
+}
+.colorname {
+  margin: auto;
+  width: 90%;
+}
+.title {
+  color: #282828;
+  font-size: 32rpx;
+  margin: 20rpx 0;
+  width: 100%;
+}
+.title span {
+  color: #a8a8a8;
+  font-size: 20rpx;
+  margin-left: 20rpx;
+}
+.user-tag {
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.user-tags {
+  border: 1rpx solid #b6b6b6;
+  border-radius: 4px;
+  color: #bfbfbf;
+  font-size: 28rpx;
+  margin-bottom: 20rpx;
+  margin-right: 20rpx;
+  padding: 8rpx 20rpx;
+}
+.coloractive {
+  background-color: #2f7bfd;
+  border-color: #2f7bfd;
+  color: #fff;
+}
+.colour-fd button {
+  height: 80rpx;
+  line-height: 80rpx;
+  margin-top: 10rpx;
+  width: 40%;
+}
+.mask-modal {
+  height: 100%;
+  position: fixed;
+  top: 0;
+  width: 100%;
+}
+.dialog-modal-bd {
+  text-align: center;
+  width: 100%;
+}
+.dialog-modal-bd input {
+  display: inline-block;
+  height: 60rpx;
+  line-height: 60rpx;
+  vertical-align: middle;
+}
+.dialog-modal-fds {
+  bottom: 30rpx;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-left: 5%;
+  position: absolute;
+  width: 90%;
+}
+.dialog-modal-fds button {
+  display: inline-block;
+  height: 72rpx;
+  line-height: 72rpx;
+  width: 42%;
+}
+.data-empty {
+  color: #999;
+  flex: 1;
+  font-size: 24rpx;
+  padding: 30rpx;
+  text-align: center;
+}
+.customColor {
+  max-height: calc(50vh - 120rpx);
+  overflow: auto;
+}

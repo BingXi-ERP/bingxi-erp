@@ -1,0 +1,6 @@
+page {
+  background-color: #f5f6fa;
+}
+.selectBill {
+  padding: 30rpx 0 160rpx;
+}

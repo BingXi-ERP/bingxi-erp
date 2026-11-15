@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "修改采购记录",
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "usingComponents": {
+    "panel-img": "/components/panel-img/panel-img",
+    "upload-img": "/components/upload-img/upload-img",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

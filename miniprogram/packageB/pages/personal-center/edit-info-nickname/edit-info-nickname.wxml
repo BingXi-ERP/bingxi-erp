@@ -1,0 +1,12 @@
+<view class="dataItem">
+    <form bindsubmit="formSubmit" reportSubmit="true">
+        <view class="input-list-li">
+            <input bindinput="input_val" data-name="contacts" name="contacts" placeholder="请输入用户昵称" value="{{nickName}}"></input>
+        </view>
+        <view class="tips">
+            <van-icon class="img" name="info-o"></van-icon>好名称可以让你的朋友更容易记住你。</view>
+        <view class="fixed-bottom-tools">
+            <button class="g_bottomBtn" formType="submit">保存</button>
+        </view>
+    </form>
+</view>

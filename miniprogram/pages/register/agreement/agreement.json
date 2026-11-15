@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "申请开店协议",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

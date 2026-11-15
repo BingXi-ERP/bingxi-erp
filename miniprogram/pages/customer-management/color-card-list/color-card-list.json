@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "选择色卡",
+  "component": true,
+  "usingComponents": {
+    "search-input": "/components/search-input/search-input",
+    "popup-stepper": "/components/popup-stepper/popup-stepper",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

@@ -1,0 +1,30 @@
+<view class="env-page">
+  <view class="title">环境切换调试</view>
+  <view class="hint">
+    当前生效：
+    <text class="cur">{{currentKey}}</text>
+    <text wx:if="{{overrideKey}}" class="tag">本地覆盖</text>
+    <text wx:else class="tag def">默认</text>
+  </view>
+
+  <view class="list">
+    <view
+      wx:for="{{envList}}"
+      wx:key="key"
+      class="item {{item.key === currentKey ? 'active' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onSwitch"
+    >
+      <view class="name">{{item.name}}</view>
+      <view class="host">{{item.rootHost}}</view>
+      <view wx:if="{{item.key === currentKey}}" class="badge">当前</view>
+    </view>
+  </view>
+
+  <view class="actions">
+    <button class="btn" bindtap="onReset">恢复默认环境</button>
+    <button class="btn ghost" bindtap="onBack">返回个人中心</button>
+  </view>
+
+  <view class="tip">提示：切换后将环境写入本地，需杀进程重启小程序才会生效。</view>
+</view>

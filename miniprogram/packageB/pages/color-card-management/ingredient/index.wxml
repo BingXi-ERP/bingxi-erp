@@ -1,0 +1,118 @@
+<view class="ingredient {{!showChooseIngredient?'':'pageFixed'}}">
+    <view class="tips">
+        <van-icon color="#FF7C00" name="info-o" size="24rpx"></van-icon>
+        <text>单面料最多支持10个成分</text>
+    </view>
+    <view wx:if="{{ingredientList.length>0}}">
+        <view class="header">
+            <view class="chn">中文名称</view>
+            <view class="en">英文名称</view>
+            <view class="bfb">成分比例(选填)</view>
+        </view>
+        <view class="ingredientContent">
+            <view class="fr-between-center ingredientBtn ingredientItem" wx:for="{{ingredientList}}" wx:key="indx">
+                <image bindtap="delItem" data-index="{{index}}" mode="widthFix" src="{{icon.delete}}"></image>
+                <view class="iconText ingredientName g_limtRow">{{item.name}}</view>
+                <view class="iconText ingredientName g_limtRow">{{item.enName}}</view>
+                <view class="fl iconText inputArea">
+                    <input bindblur="handleUpdateIngredient" bindinput="inputIngredient" data-index="{{index}}" maxlength="20" placeholder="0.1~100" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{item.ratio}}"></input>
+                </view>
+                <view class="percent">%</view>
+            </view>
+        </view>
+    </view>
+    <view class="list-empty-wrapper" wx:if="{{ingredientList.length===0}}">
+        <image class="noaddress" src="{{icon.noDataBg}}"></image>
+        <view class="empty-text">暂无成分信息～</view>
+    </view>
+    <view class="save-btn-wrapper">
+        <view class="save-color fr-between-center">
+            <view bindtap="chooseIngredient" class="fl iconBtn">
+                <image class="" mode="widthFix" src="{{icon.centern}}"></image>
+                <view class="iconText">选择成分</view>
+            </view>
+            <view bindtap="handleAddIngredient" class="fl iconBtn">
+                <image class="" mode="widthFix" src="{{icon.delIngredient}}"></image>
+                <view class="iconText">自定义成分</view>
+            </view>
+            <view bindtap="clearAll" class="fl iconBtn">
+                <image class="" mode="widthFix" src="{{icon.del}}"></image>
+                <view class="iconText">清空成分</view>
+            </view>
+            <button bindtap="saveIngredientList" class="g_samllBtn SaveBtn">保存</button>
+        </view>
+    </view>
+</view>
+<van-popup round :close-on-click-overlay="true" class="tip-dialog" position="bottom" show="{{showAddIngredient}}" zIndex="1000">
+    <view class="popBody">
+        <view class="headers">
+            <view catchtap="handleAddIngredient" class="btn-cancel">取消</view>
+            <text>自定义成分</text>
+            <view catchtap="saveNewIngredient" class="btn-add">添加</view>
+        </view>
+        <view class="content">
+            <view class="content-name">成分名称<text>*</text>
+            </view>
+            <view class="inputAear">
+                <input bindinput="addName" cursorSpacing="30" data-name="addColorName" maxlength="30" placeholder="请输入成分的名称" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{addColorName}}"></input>
+            </view>
+            <view class="inputAear">
+                <view class="content-name">英文成分名称</view>
+                <input bindinput="addName" cursorSpacing="30" data-name="addColorEngName" maxlength="30" placeholder="请输入成分的英文名称/缩写(选填项)" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" value="{{addColorEngName}}"></input>
+            </view>
+        </view>
+    </view>
+</van-popup>
+<van-popup round :close-on-click-overlay="true" bind:click-overlay="chooseIngredient" class="tip-dialog" position="bottom" show="{{showChooseIngredient}}" zIndex="1000">
+    <view class="popBody chooseIngredientBody">
+        <view style="height:1200rpx;overflow-y:auto;">
+            <view class="dialog-title">
+                <view catchtap="chooseIngredient" class="btn-cancel" wx:if="{{!isEdit}}">取消</view>
+                <text>选择成分</text>
+                <view catchtap="savePushIngredient" class="btn-confirm" wx:if="{{!isEdit}}">确定</view>
+            </view>
+            <view class="search-code-input">
+                <view class="search-code-input-box">
+                    <input bind:confirm="onSearch" bind:search="onSearch" maxlength="15" placeholder="请输入搜索关键词" placeholderStyle="color: #C0C0C0; font-size: 26rpx;"></input>
+                    <van-icon name="search" size="18"></van-icon>
+                </view>
+            </view>
+            <view class="popItem">
+                <view class="headers">常用成分(可多选)</view>
+                <view class="fl chooseContent">
+                    <view catchtap="handleChooseIngredient" class="chooseIngredientItem {{item.checked?'checkedItem':''}}" data-item="{{item}}" data-type="commonIngredientList" wx:for="{{commonIngredientList}}" wx:key="{{item.id}}">
+                        <view class="chooseName g_limtRow">{{item.name}}</view>
+                        <view class="chooseEngName g_limtRow">{{item.enName}}</view>
+                    </view>
+                </view>
+            </view>
+            <view class="popItem">
+                <view class="headers">其他纤维<text class="headersText">可多选</text>
+                </view>
+                <view class="fl chooseContent">
+                    <view catchtap="handleChooseIngredient" class="chooseIngredientItem {{item.checked?'checkedItem':''}}" data-item="{{item}}" data-type="otherIngredientList" wx:for="{{otherIngredientList}}" wx:key="{{item.id}}">
+                        <view class="chooseName g_limtRow">{{item.name}}</view>
+                        <view class="chooseEngName g_limtRow">{{item.enName}}</view>
+                    </view>
+                </view>
+            </view>
+            <view class="popItem" wx:if="{{customIngredientList.length||saveNewCustomIngredient}}">
+                <view class="headers fr-between-center">
+                    <view>自定义成分</view>
+                    <view class="fl">
+                        <image src="{{icon.edit}}" style="width:26rpx;height:26rpx;"></image>
+                        <view bindtap="changeEdit" class="cator">{{isEdit?'完成':'编辑'}}</view>
+                    </view>
+                </view>
+                <view class="fl chooseContent">
+                    <view catchtap="handleChooseIngredient" class="chooseIngredientItem {{item.checked?'checkedItem':''}}" data-item="{{item}}" data-type="customIngredientList" wx:for="{{customIngredientList}}" wx:key="id">
+                        <view class="chooseName g_limtRow">{{item.name}}</view>
+                        <view class="chooseEngName g_limtRow">{{item.enName}}</view>
+                        <image catchtap="delCustomIngredient" class="delIngredient" data-item="{{item}}" src="{{icon.delIngredient}}" wx:if="{{isEdit}}"></image>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <van-dialog id="van-dialog"></van-dialog>
+    </view>
+</van-popup>

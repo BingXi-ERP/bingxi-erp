@@ -1,0 +1,25 @@
+.loginPsd,
+page {
+  height: 100%;
+}
+.loginPsd {
+  background-color: #f5f7f9;
+  padding: 32rpx;
+}
+.psd_box {
+  background-color: #fff;
+  font-size: 12px;
+  margin-bottom: 32rpx;
+  position: relative;
+}
+.psd_box input {
+  padding: 16rpx;
+}
+.password-icon {
+  height: 30rpx;
+  position: absolute;
+  right: 20rpx;
+  top: 30rpx;
+  width: 50rpx;
+  z-index: 100;
+}

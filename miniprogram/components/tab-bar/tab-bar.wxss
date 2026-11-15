@@ -1,0 +1,37 @@
+.tab-image {
+  height: 24px !important;
+  width: 24px !important;
+}
+.barBarText {
+  color: #d8d8d8;
+  display: block;
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.van-hairline--top-bottom::after {
+  border-width: 0 !important;
+}
+.tabBar {
+  background: #fff;
+  bottom: 0;
+  justify-content: space-around;
+  left: 0;
+  padding: 5px 0 15px;
+  position: fixed;
+  width: 100%;
+  z-index: 50;
+}
+.tab-item,
+.tabBar {
+  display: -webkit-flex;
+  display: flex;
+}
+.tab-item {
+  align-items: center;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+}
+.adv-text {
+  color: #fb562c;
+}

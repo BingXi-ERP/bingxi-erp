@@ -1,0 +1,206 @@
+.mask {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  bottom: 0;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0rpx;
+  transition-duration: 0.3s;
+  z-index: 1010;
+}
+.content .title {
+  color: #fff;
+  font-size: 36rpx;
+  font-weight: 500;
+  margin-bottom: 30rpx;
+  text-align: center;
+  width: 100%;
+}
+.content .box {
+  background-color: #fff;
+  height: 836rpx;
+  left: 0;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  width: 750rpx;
+  z-index: 1111;
+}
+.content .box .calendar-box {
+  height: 830rpx;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+.content .box .calendar-box .scroll-y {
+  height: calc(100% - 240rpx);
+  width: 100%;
+}
+.content .box .calendar-box .calendar-column {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 25rpx;
+}
+.content .box .calendar-box .calendar-column .listing {
+  background: #e6f3ff;
+  display: -webkit-flex;
+  display: flex;
+  height: 64rpx;
+  justify-content: space-around;
+  width: 100%;
+}
+.content .box .calendar-box .calendar-column .item {
+  border-radius: 50%;
+  color: #2493f8;
+  font-size: 32rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  width: 63rpx;
+}
+.content .box .calendar-box .calendar {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  padding: 0 30rpx;
+}
+.content .box .calendar-box .calendar .date {
+  color: #333;
+  font-size: 30rpx;
+  font-weight: 600;
+  text-align: center;
+  width: 100%;
+}
+.content .box .calendar-box .calendar .select-box {
+  border-radius: 30rpx;
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  margin-bottom: 40rpx;
+  margin-top: 15rpx;
+  overflow: hidden;
+  padding-bottom: 24rpx;
+  padding-top: 20rpx;
+  width: 100%;
+}
+.content .box .calendar-box .calendar .select-box:last-of-type {
+  margin-bottom: 0;
+}
+.content .box .calendar-box .calendar .select-box .item-box {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  height: 70rpx;
+  justify-content: center;
+  margin-bottom: 4rpx;
+  position: relative;
+  width: 14.285%;
+}
+.content .box .calendar-box .calendar .select-box .item {
+  border-radius: 50%;
+  color: #333;
+  font-size: 25rpx;
+  height: 70rpx;
+  line-height: 70rpx;
+  text-align: center;
+  width: 70rpx;
+}
+.content .box .calendar-box .calendar .select-box .start {
+  color: #fff;
+  font-size: 12rpx;
+  left: 0;
+  position: absolute;
+  text-align: center;
+  top: 5rpx;
+  width: 100%;
+}
+.content .box .calendar-box .calendar .select-box .end {
+  bottom: 3rpx;
+  color: #fff;
+  font-size: 12rpx;
+  left: 0;
+  position: absolute;
+  text-align: center;
+  width: 100%;
+}
+.content .box .calendar-box .calendar .day_late_bg_left {
+  background: linear-gradient(90deg, #fff 50%, #e6f3ff 0);
+}
+.content .box .calendar-box .calendar .day_late_bg_left .item {
+  background: #2493f8;
+  color: #fff;
+}
+.content .box .calendar-box .calendar .day_late_bg_right {
+  background: linear-gradient(270deg, #fff 50%, #e6f3ff 0);
+}
+.content .box .calendar-box .calendar .day_late_bg_left_and_right .item,
+.content .box .calendar-box .calendar .day_late_bg_right .item {
+  background: #2493f8;
+  color: #fff;
+}
+.content .box .calendar-box .calendar .day_late_bg_left_start {
+  background: linear-gradient(90deg, #fff 50%, #e6f3ff 0);
+}
+.content .box .calendar-box .calendar .day_late_bg_left_start .item {
+  background-color: #e6f3ff;
+}
+.content .box .calendar-box .calendar .day_late_bg_right_end {
+  background: linear-gradient(270deg, #fff 50%, #e6f3ff 0);
+}
+.content .box .calendar-box .calendar .day_late_bg_left_start_and_right_end,
+.content .box .calendar-box .calendar .day_late_bg_right_end .item {
+  background-color: #e6f3ff;
+}
+.content
+  .box
+  .calendar-box
+  .calendar
+  .day_late_bg_left_start_and_right_end_and_front {
+  background: linear-gradient(90deg, #fff 50%, #fff 0);
+}
+.content
+  .box
+  .calendar-box
+  .calendar
+  .day_late_bg_left_start_and_right_end_and_back {
+  background: linear-gradient(90deg, #fff 100%, #e6f3ff 0);
+}
+.content .box .calendar-box .calendar .select-box .day_no {
+  color: #898d8d;
+  opacity: 0.42;
+}
+.content .box .btn-box {
+  align-items: center;
+  bottom: 30rpx;
+  display: -webkit-flex;
+  display: flex;
+  height: 90rpx;
+  justify-content: space-around;
+  position: absolute;
+  width: 100%;
+}
+.content .box .btn-box .no {
+  background: #b7b7b7;
+}
+.content .box .btn-box .no,
+.content .box .btn-box .yes {
+  border-radius: 50rpx;
+  color: #fff;
+  font-size: 28rpx;
+  height: 76rpx;
+  line-height: 76rpx;
+  text-align: center;
+  width: 284rpx;
+}
+.content .box .btn-box .yes {
+  background: linear-gradient(270deg, #1790ff, #59c0fd 0, #1790ff);
+}
+.content .box .btn-box .hide {
+  opacity: 0.3;
+}

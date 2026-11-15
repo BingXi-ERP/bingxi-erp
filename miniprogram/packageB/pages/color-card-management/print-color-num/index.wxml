@@ -1,0 +1,70 @@
+<view class="printColorNum">
+    <view class="colorSample">
+        <view class="fl title f15">展示样式</view>
+        <view class="fl colorSampleContent">
+            <view bindtap="colorSampleChange" class="checkBox {{item.checked?'isCheckedBox':''}}" data-index="{{item.index}}" wx:for="{{colorSample}}" wx:key="index">{{item.value}}</view>
+        </view>
+    </view>
+    <view class="colorSample">
+        <view class="fl title f15">打印顺序</view>
+        <view class="fl colorSampleContent">
+            <view bindtap="printArrangeChange" class="checkBox {{item.checked?'isCheckedBox':''}}" data-index="{{item.index}}" wx:for="{{printArrange}}" wx:key="index">{{item.value}}</view>
+        </view>
+    </view>
+    <view class="exmaple">
+        <view class="eaxmpleDetail"></view>
+        <swiper current="{{printImgIndex}}" wx:if="{{langType==1}}">
+            <swiper-item wx:for="{{firstShow?showIndexPrintImg:showPrintImg}}" wx:key="{{item}}">
+                <image class="slide-image" data-src="{{item}}" mode="aspectFill" src="{{item}}"></image>
+            </swiper-item>
+        </swiper>
+        <swiper current="{{printImgIndex}}" wx:else>
+            <swiper-item wx:for="{{firstShow?enIndexPrintImg:enPrintImg}}" wx:key="{{item}}">
+                <image class="slide-image" data-src="{{item}}" mode="aspectFill" src="{{item}}"></image>
+            </swiper-item>
+        </swiper>
+    </view>
+    <view class="fr-between-center colorType">
+        <view class="title f15">标签类型</view>
+        <view class="right">
+            <picker bindchange="bindPickerChange" range="{{array}}" value="{{labelType}}">
+                <view class="f15 title">{{array[labelType]}}</view>
+            </picker>
+        </view>
+    </view>
+    <view class="fr-between-center howPrint">
+        <view class="title f15">打印份数</view>
+        <view class="right f15 title num-title">
+            <input bindinput="inputVal" maxlength="3" value="{{input_val}}"></input>
+            <text>份</text>
+        </view>
+    </view>
+    <view class="fr-between-center printLang">
+        <text>打印语言</text>
+        <view>
+            <button bindtap="changeLang" class="lang-btn {{langType=='1'?'active':''}}" id="1">中文</button>
+            <button bindtap="changeLang" class="ml lang-btn {{langType=='2'?'active':''}}" id="2">英文</button>
+        </view>
+    </view>
+    <view class="fr-between-center howPrint">
+        <view class="title f15">首行文字说明</view>
+        <view class="fl right f15 title">
+            <text catchtap="showText" class="f12 detailText">什么是首行文字说明?</text>
+            <van-checkbox useIconSlot bind:change="firstShowChange" checkedColor="#07c160" value="{{firstShow}}">
+                <image class="checkImg" slot="icon" src="{{firstShow?iconImg.choosed:iconImg.noChoose}}"></image>
+            </van-checkbox>
+        </view>
+    </view>
+    <button bindtap="printLink" class="g_bottomBtn">打印</button>
+</view>
+<view class="picker-custom picker-color-select ">
+    <view bindtap="showText" class="picker-custom-overlay " hidden="{{!showTextImg}}"></view>
+    <view class="picker-custom-wrapper {{showTextImg?'openAnimate':'closeAnimate'}}">
+        <view class="f18 custom-title">首行文字说明</view>
+        <view class="content">
+            <image class="exampleImg" slot="icon" src="{{langType==1?iconImg.cnExample:iconImg.enExample}}"></image>
+            <view class="f12 illustrate">首行说明：按照打印色号顺序显示“左、右”等文案，告知拿到色卡的客户色号打印的排序。</view>
+            <button bindtap="showText" class="popBtn">我知道了</button>
+        </view>
+    </view>
+</view>

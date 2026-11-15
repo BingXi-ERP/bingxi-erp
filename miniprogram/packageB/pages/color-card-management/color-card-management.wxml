@@ -1,0 +1,59 @@
+<page-meta pageStyle="{{popupInit.canvas.show?'overflow: hidden;':''}}">
+    <view class="wrapper">
+        <view class="filter-wrapper">
+            <color-card-filter bind:changeTab="changeTab" bind:filterConfirm="filterConfirm" count="{{colorCardCount}}" userType="1"></color-card-filter>
+            <view class="fl headerBtns">
+                <view class="pringRecode">
+                    <image bindtap="toPringRecode" mode="aspectFill" src="{{icon.pringRecode}}"></image>
+                </view>
+                <view class="searchBtn">
+                    <image bindtap="toSearch" mode="aspectFill" src="{{icon.search}}"></image>
+                </view>
+                <view bindtap="closeTips" class="showTips" wx:if="{{showTips}}">
+                    <image mode="aspectFill" src="{{icon.tips}}"></image>
+                </view>
+            </view>
+        </view>
+        <view class="color-card-list-wrapper" wx:if="{{colorCardList.length>0}}">
+            <color-card-list-block bind:colorCard="shareColorCard" bind:isUpdate="isUpdate" bind:onOrOff="onOrOff" bind:shareF="shareF" bind:shareM="shareM" idx="{{index}}" isShareProd="{{true}}" list="{{item}}" newPrintType="{{printType}}" wx:for="{{colorCardList}}" wx:key="index"></color-card-list-block>
+        </view>
+        <view class="no-color-card-list" wx:if="{{!isLoad&&colorCardList.length<1}}">
+            <view class="bg-img no-list-bg" style="background-image:url(\"{{noColorCardBg}}\")"></view>
+            <view class="text" wx:if="{{userAuthList['goods:add']}}">您暂无色卡，建议您可以<text bindtap="toAddColorCard" class="font-blue2">新增面料></text>
+            </view>
+            <view class="text gray" wx:else>您暂无色卡，建议您可以 新增面料</view>
+        </view>
+        <view class="bottom"></view>
+    </view>
+    <view class="footer-wrapper flex bg-white iphone_bottom">
+        <view bindtap="footerBarTap" class="item flex" data-action="{{item.action}}" wx:for="{{footerBar}}" wx:key="index">
+            <view class="footer-icon bg-img" style="background-image:url(\"{{item.icon}}\")"></view>
+            <view>{{item.name}}</view>
+        </view>
+    </view>
+</page-meta>
+<van-popup closeOnClickOverlay bind:close="closePopup" customClass="canvas-popup-wrapper" show="{{popupInit.canvas.show}}" zIndex="999">
+    <view class="{{popupInit.canvas.show?'showBigCanvas':'hideBigCanvas'}}">
+        <block wx:if="{{popupInit.canvas.type==='colorCard'}}">
+            <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas+'0'}}" height="1050" style="width:610px;height:{{popupInit.canvasHeight2}}px;" width="610" wx:if="{{shareColorList.length>0}}"></canvas>
+            <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas+'0'}}" height="1050" style="width:500px;height:900px" width="610" wx:else></canvas>
+        </block>
+        <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas}}" height="1350" style="width:600px;height:900px" width="750" wx:else></canvas>
+    </view>
+    <view class="canvas-wrapper {{popupInit.canvas.show?'':'hideCanvas'}} {{popupInit.canvas.type}}" style="border-radius:6px;">
+        <scroll-view scrollWithAnimation scrollY style="height:550px;" wx:if="{{popupInit.canvas.type==='colorCard'}}">
+            <canvas canvasId="{{popupInit.canvas.canvasId.shareCanvas+'0'}}" height="525" style="width:305px;height:{{popupInit.canvasHeight}}px" width="300"></canvas>
+        </scroll-view>
+        <canvas canvasId="{{popupInit.canvas.canvasId.shareCanvas}}" height="900" style="width:300px;height:450px" width="500" wx:else></canvas>
+    </view>
+    <view catchtap="closePopup" class="share-monents-notice-wrapper" wx:if="{{popupInit.canvas.show}}">
+        <view catchtap="doNothing" class="btn_panel">
+            <view bindtap="colorSetting" class="c_btn">
+                <image mode="aspectFill" src="{{icon.set}}" style="width:16px;height:16px"></image>色卡设置</view>
+            <view catchtap="saveColorCardImg" class="c_btn">
+                <image mode="aspectFill" src="{{icon.save}}" style="width:16px;height:16px"></image>一键保存</view>
+        </view>
+        <view>保存图片后分享到朋友圈</view>
+        <view>会有更多的人来您的店铺哦~</view>
+    </view>
+</van-popup>

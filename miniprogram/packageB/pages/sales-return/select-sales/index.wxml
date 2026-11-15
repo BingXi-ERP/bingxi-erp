@@ -1,0 +1,28 @@
+<view class="selectSales" wx:if="{{salesList.length>0}}">
+  <view class="salesList">
+    <van-radio-group value="{{radio}}">
+      <van-cell-group>
+        <van-cell
+          clickable
+          bind:click="onRadioClick"
+          data-item="{{item}}"
+          data-name="{{item.salesId}}"
+          title="{{item.salesName}}"
+          valueClass="value-class"
+          wx:for="{{salesList}}"
+          wx:key="index"
+        >
+          <van-radio
+            checkedColor="#66CF7E"
+            name="{{item.salesId}}"
+            style="display: flex; justify-content: flex-end"
+          ></van-radio>
+        </van-cell>
+      </van-cell-group>
+    </van-radio-group>
+  </view>
+  <button bindtap="goback" class="g_bottomBtn">确定</button>
+</view>
+<view class="color-data-list-null" wx:else>
+  <text class="f14">暂无业务员数据~</text>
+</view>

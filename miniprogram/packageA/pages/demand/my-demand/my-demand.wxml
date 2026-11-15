@@ -1,0 +1,120 @@
+<view class="my-demand">
+    <view class="myDemandHead" wx:if="{{userType}}">
+        <view bind:tap="changeTab" class="{{tabSelect==='0'?'headChoose':''}}" id="0">我的回复</view>
+        <view bind:tap="changeTab" class="{{tabSelect==='1'?'headChoose':''}}" id="1">我的需求</view>
+        <image bind:tap="toSearch" class="sreachIcon" src="{{icon.search}}"></image>
+    </view>
+    <view class="myJoin" wx:if="{{tabSelect==='0'}}">
+        <view class="vanTabs">
+            <van-tabs sticky active="{{myJoinTabIndex}}" bind:change="changeVanTab" swipeThreshold="4.5" zIndex="20">
+                <van-tab class="vanTab" title="{{item}}" wx:for="{{myJionTab}}" wx:key="{{item}}">
+                    <view bind:tap="toJoinDetail" class="demandItem" data-item-id="{{i.id}}" data-reply-id="{{i.replyId}}" wx:for="{{myJoin}}" wx:for-item="i" wx:key="{{item.title}}">
+                        <form bindsubmit="formSubmit" class="item-form" reportSubmit="true">
+                            <button class="form-btn" formType="submit"></button>
+                        </form>
+                        <view class="itemHead fl">
+                            <view>需求编号: {{i.askNo}}</view>
+                            <view class="waitIcon {{i.statusName==='待审核'?'waitText':i.statusName==='审核通过'?'successText':i.statusName==='审核失败'||i.statusName==='找版失败'?'loseText':'closeText'}}">{{i.statusName}}</view>
+                        </view>
+                        <view class="itemContent fr-between-center">
+                            <view class="fl contentRight">
+                                <view class="itemImg" style="background-image:url(\"{{i.img}}?imageView2/2/w/160\")" wx:if="{{i.img}}"></view>
+                                <text class="replier g_limtRowTwo" wx:if="{{userType&&i.createUserName}}">
+                  回复人: {{i.createUserName}}
+                </text>
+                            </view>
+                            <view class="contentText">
+                                <view class="statusText" wx:if="{{i.rewardType==1}}">即将揭晓</view>
+                                <view class="statusText" wx:if="{{i.rewardType==2}}">获得补贴￥ {{i.rewardAmount}}</view>
+                                <view class="statusText" wx:if="{{i.rewardType==3}}">参与奖￥ {{i.rewardAmount}}</view>
+                                <view class="statusText" wx:if="{{i.statusName==='待审核'}}">补贴￥ {{i.askRewardAmount}}</view>
+                                <view class="failText" wx:if="{{i.noMatchReason}}">原因：{{i.noMatchReason}}</view>
+                                <view class="statusTime">{{i.createTime}}</view>
+                            </view>
+                        </view>
+                    </view>
+                </van-tab>
+            </van-tabs>
+        </view>
+        <view class="noResult" wx:if="{{!myJoin.length}}">
+            <view class="noPage"></view>
+            <view class="title">暂无回复</view>
+            <view class="text">马上去需求广场回复赚补贴</view>
+        </view>
+        <view class="more" wx:if="{{myJoin.length}}">
+            <view class="moreIcon" wx:if="{{!isAll}}">上拉更多</view>
+            <view class="moreIcon" wx:if="{{isAll}}">没有更多数据</view>
+        </view>
+    </view>
+    <view class="myPost" wx:if="{{tabSelect==='1'}}">
+        <view class="vanTabs">
+            <van-tabs bind:change="changeVanTab" color="#4C7CF9" sticky="true" swipeThreshold="4.5" zIndex="20">
+                <van-tab class="vanTab" title="{{item}}" wx:for="{{myPostTab}}" wx:key="{{item}}">
+                    <view catch:tap="toPostDetail" class="demandItem" data-item-id="{{i.id}}" data-type="{{i.statusName}}" wx:for="{{myPost}}" wx:for-item="i" wx:key="{{i.id}}">
+                        <form bindsubmit="formSubmit" class="item-form" reportSubmit="true">
+                            <button class="form-btn" formType="submit"></button>
+                        </form>
+                        <view class="itemHead fl">
+                            <view>需求编号: {{i.askNo}}</view>
+                            <view class="waitIcon {{i.statusName==='找版中'||i.statusName==='审核中'?'waitText':i.statusName==='已领色卡'||i.statusName==='已剪版'||i.statusName==='已下大货'?'successText':i.statusName==='审核失败'||i.statusName==='找版失败'?'loseText':'closeText'}}">{{i.statusName}}</view>
+                        </view>
+                        <view class="itemContent fl">
+                            <view class="itemImg" style="background-image:url(\"{{i.img}}?imageView2/2/w/160\")" wx:if="{{i.img}}"></view>
+                            <view class="itemContentText">
+                                <view class="titleName g_limtRow">{{i.detailText}}</view>
+                                <view class="loseReason g_limtRow">{{formatDateTime(i.createTime,true)}}</view>
+                            </view>
+                        </view>
+                        <view catch:tap="toDemandSchedule" class="fl scheduleTime" data-item-id="{{i.id}}">
+                            <view class="limit">{{i.title}}</view>
+                            <view class="i-scheduleTime">
+                                <view class="time">{{formatDateTime(i.optTime,true)}}</view>
+                                <view class="bg-img right-arrow" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+                            </view>
+                        </view>
+                        <view class="itemFooterBtn">
+                            <view catch:tap="toPostResult" class="btn normalBtn" data-item-id="{{i.id}}" wx:if="{{i.statusName==='已领色卡'||i.statusName==='已剪版'||i.statusName==='已下大货'||i.isMatch===1&&i.statusName==='找版中'||i.isMatch===1&&(i.status===5||i.status===60)}}">查看匹配结果<view class="point" wx:if="{{i.matchPushNum}}">{{i.matchPushNum}}</view>
+                            </view>
+                            <view catch:tap="closeDemand" class="btn" data-item-id="{{i.id}}" wx:if="{{i.statusName==='审核中'}}">关闭需求单</view>
+                            <view catch:tap="toPost" class="btn nomalBtn" data-item-id="{{i.id}}" wx:if="{{i.statusName==='已关闭'||i.statusName==='审核失败'||i.statusName==='找版失败'}}">重新发起</view>
+                        </view>
+                    </view>
+                </van-tab>
+            </van-tabs>
+        </view>
+        <van-popup bind:close="popupClose" lockScroll="true" position="bottom" safeAreaInsetTop="true" show="{{popup.showPopup}}" vModel="true">
+            <view class="popupContent">
+                <view class="title fl">请选择关闭理由</view>
+                <van-radio-group bind:change="popupChange" value="{{popup.popupRadio}}">
+                    <van-cell-group>
+                        <van-cell clickable bind:click="popupClick" data-name="1" title="已找到，无需匹配">
+                            <van-radio checkedColor="#66CF7E" name="1"></van-radio>
+                        </van-cell>
+                        <van-cell clickable bind:click="popupClick" data-name="2" title="填写错误，需重新发起需求">
+                            <van-radio checkedColor="#66CF7E" name="2"></van-radio>
+                        </van-cell>
+                        <van-cell clickable bind:click="popupClick" data-name="3" title="其他原因">
+                            <van-radio checkedColor="#66CF7E" name="3"></van-radio>
+                        </van-cell>
+                    </van-cell-group>
+                </van-radio-group>
+                <view class="itemArea">
+                    <view class="fackArea textarea-placeholder" wx:if="{{popup.popupRadio!=='3'}}">请输入原因</view>
+                    <textarea bindinput="inputgetName" data-name="closeForm.closeReason" placeholder="请输入原因" placeholderStyle="fontSize:12px;" wx:if="{{popup.popupRadio==='3'}}"></textarea>
+                </view>
+                <view class="popupBtn">
+                    <view bind:tap="popupComfirm" class="popupComfirm">确定</view>
+                    <view bind:tap="popupCancle" class="popupCancle">取消</view>
+                </view>
+            </view>
+        </van-popup>
+        <view class="noResult" wx:if="{{!myPost.length}}">
+            <view class="noPage"></view>
+            <view class="title">暂无该发布</view>
+        </view>
+        <view class="more" wx:if="{{myPost.length}}">
+            <view class="moreIcon" wx:if="{{!isAll}}">上拉更多</view>
+            <view class="moreIcon" wx:if="{{isAll}}">没有更多数据</view>
+        </view>
+    </view>
+</view>

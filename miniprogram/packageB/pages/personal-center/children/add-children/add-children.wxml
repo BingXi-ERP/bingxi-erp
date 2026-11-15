@@ -1,0 +1,12 @@
+<view class="code">
+  <image src="{{qrCodeUrl}}"></image>
+  <view wx:if="{{checkCode==0}}">请让员工扫码二维码进入绑定流程</view>
+  <view class="spe-text" wx:if="{{checkCode==1}}">
+    <image src="/assets/images/icon2nd/symbols-select.png"></image
+    >扫码成功</view
+  >
+  <view class="f14" wx:if="{{checkCode==1}}">等待员工验证身份及手机号码</view>
+  <view class="f14" wx:if="{{checkCode==1}}"
+    >完成后，请及时为他设置岗位并启用账号</view
+  >
+</view>

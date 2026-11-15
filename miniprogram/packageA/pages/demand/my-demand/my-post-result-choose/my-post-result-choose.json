@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "选择匹配结果",
+  "navigationBarTextStyle": "white",
+  "navigationBarBackgroundColor": "#2D74EE",
+  "enablePullDownRefresh": true
+}

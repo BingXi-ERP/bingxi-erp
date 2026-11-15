@@ -1,0 +1,84 @@
+<view
+  bindtap="onNavTo"
+  class="result_item"
+  data-goodsId="{{data.productId}}"
+  data-mainProduct="{{data.mainProduct}}"
+>
+  <text class="item_left"
+    >{{(mainFlag||platRank?data.allStationRank:index+1)||'-'}}<text
+      class="main_product"
+      wx:if="{{data.mainProduct===1&&mainFlag}}"
+      >主</text
+    >
+  </text>
+  <view class="item_right">
+    <search-pic-color
+      colorCompare="{{true}}"
+      data="{{data}}"
+      isCompare="{{true}}"
+      sampleData="{{sampleData}}"
+    ></search-pic-color>
+    <text class="item_title">
+      <text>{{data.businessProductName||''}}</text>
+      <text>{{data.spuNumber||''}}</text>
+    </text>
+    <view class="item_marter">
+      <view
+        class="item_marter_content {{item.prop==='material'?'material-desc':''}}"
+        wx:for="{{ProductParamsComputed}}"
+        wx:key="prop"
+      >
+        <view class="marter_item" wx:if="{{data[item.prop]}}">
+          <image
+            mode="aspectFit"
+            src="../../../assets/images/icon2nd/{{item.icon}}.png"
+          ></image>
+          <text class="desc-val"
+            >{{data[item.prop]||''}}{{item.unitProp?data[item.unitProp]||'':''}}</text
+          >
+        </view>
+      </view>
+    </view>
+    <view class="item_similar">
+      <text>色号：<text>{{data.colorName||'-'}}</text> </text>
+      <text wx:if="{{data.mainProduct!==1}}"
+        >货架：<text>{{data.goodsShelves||'-'}}</text>
+      </text>
+      <text wx:if="{{data.duiBuCode&&data.familyQuantity>0}}"
+        >别称：<text class="val">{{data.duiBuCode||'-'}}</text>
+      </text>
+    </view>
+    <view class="item_recommand" wx:if="{{data.similarGroupNum>1}}">
+      <view class="recommand_l"
+        >所属面料：<text>{{data.parentName||'-'}}</text>
+      </view>
+      <view
+        catchtap="onViewRecommendProduct"
+        class="recommand_r"
+        data-parentId="{{data.parentId}}"
+        >更多推荐（{{data.similarGroupNum}}）<van-icon
+          class="icon"
+          color="#909090"
+          name="arrow"
+        ></van-icon>
+      </view>
+    </view>
+    <view
+      class="item_recommand {{!data.duiBuCode||data.familyQuantity<=0?'flex-justify-end':''}}"
+      wx:if="{{plat}}"
+    >
+      <view
+        catchtap="handleRouterToFamily"
+        class="recommand_r"
+        data-item="{{data}}"
+        wx:if="{{data.duiBuCode&&data.familyQuantity>0}}"
+        >家族产品（{{data.familyQuantity}}）<van-icon
+          class="icon"
+          color="#909090"
+          name="arrow"
+        ></van-icon>
+      </view>
+      <slot></slot>
+    </view>
+  </view>
+</view>

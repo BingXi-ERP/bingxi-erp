@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "类目缺失反馈",
+  "navigationBarBackgroundColor": "#F5F7F9",
+  "usingComponents": {
+    "van-field": "../../../miniprogram_npm/@vant/weapp/field/index",
+    "van-toast": "../../../miniprogram_npm/@vant/weapp/toast/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

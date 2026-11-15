@@ -1,0 +1,32 @@
+<view class="color-ys-bg"></view>
+<view class="colorname">
+    <view class="colorname-used">
+        <view class="title">常用</view>
+        <view class="user-tag customColor">
+            <view bindtap="checkColorName" class="user-tags {{checkId==item.colorName?'coloractive':''}}" data-item="{{item}}" id="{{item.id}}" wx:for="{{colorColorListName}}" wx:key="index">{{item.colorName}}</view>
+        </view>
+    </view>
+    <view class="colorname-used">
+        <view class="title">自定义颜色<span>长按可删除自定义颜色</span>
+        </view>
+        <view class="user-tag customColor">
+            <view bindlongpress="delName" bindtap="checkColorName" class="user-tags {{checkId==item.colorName?'coloractive':''}}" data-item="{{item}}" id="{{item.id}}" wx:for="{{colorColorListNames}}" wx:key="index">{{item.colorName}}</view>
+        </view>
+    </view>
+</view>
+<view class="colour-fd">
+    <button bindtap="addColorNameModal" class="btn-bg-color-fill">新增颜色</button>
+    <button bindtap="sureColorName" class="btn-bg-color">确定</button>
+</view>
+<view class="mask-modal" wx:if="{{showAddColorName==1}}">
+    <view class="dialog-modal">
+        <view class="dialog-modal-hd">自定义颜色</view>
+        <view class="dialog-modal-bd">
+            <input bindinput="addColorName" placeholder="请输入颜色名称" value="{{colorName}}"></input>
+        </view>
+        <view class="dialog-modal-fds">
+            <button catchtap="cancelAdd" class="btn-bg-color-cancel">取消</button>
+            <button catchtap="sureAddName" class="btn-bg-color">添加</button>
+        </view>
+    </view>
+</view>

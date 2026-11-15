@@ -1,0 +1,66 @@
+.add-img-wrapper {
+  width: 100%;
+}
+.add-img {
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: wrap;
+  position: relative;
+}
+.add-icon-wrapper {
+  flex: 1;
+}
+.add-icon {
+  align-items: center;
+  box-sizing: border-box;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  font-size: 28px;
+  height: 150rpx;
+  justify-content: center;
+  text-align: center;
+  width: 150rpx;
+}
+.add-icon image {
+  height: 40rpx;
+  width: 54rpx;
+}
+.upload-btn-word {
+  margin-top: 12rpx;
+}
+.item-wrapper {
+  height: 140rpx;
+  margin: 0 16rpx 16rpx 0;
+  width: 140rpx;
+}
+.upload-img {
+  position: relative;
+}
+.item {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border-radius: 14rpx;
+}
+.item:nth-child(4n) {
+  margin: 0 !important;
+}
+.del-icon {
+  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/Icon_Delete.png);
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 32rpx;
+  position: absolute;
+  right: 0rpx;
+  top: 0rpx;
+  width: 32rpx;
+}
+.clear {
+  clear: both;
+}
+.i6-add-icon-margin,
+.i6s-add-icon-margin {
+  margin: 20rpx 0 0 20rpx;
+}

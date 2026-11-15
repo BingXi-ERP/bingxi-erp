@@ -1,0 +1,7 @@
+{
+  "component": true,
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  },
+  "navigationBarTitleText": "搜索"
+}

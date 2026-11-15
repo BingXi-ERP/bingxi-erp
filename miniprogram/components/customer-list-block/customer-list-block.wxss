@@ -1,0 +1,129 @@
+.wrapper {
+  align-items: center;
+  background-color: #fff;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: center;
+  margin: 20rpx auto;
+  padding: 30rpx 0;
+  position: relative;
+  width: 690rpx;
+}
+.avatar {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border-radius: 50%;
+  height: 88rpx;
+  left: 28rpx;
+  position: absolute;
+  top: 40rpx;
+  width: 88rpx;
+}
+.info {
+  align-items: flex-start;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-left: 100rpx;
+  width: 512rpx;
+}
+.info > view {
+  flex: 1;
+}
+.name {
+  color: #333;
+  font-size: 32rpx;
+  margin-right: 16rpx;
+}
+.id {
+  background-color: #b8bed9;
+  border-radius: 16rpx;
+  color: #fff;
+  font-size: 20rpx;
+  height: 32rpx;
+  line-height: 32rpx;
+  padding: 0 14rpx;
+}
+.contain {
+  align-items: center;
+  background-color: #f8f9fc;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: center;
+  margin: 20rpx 0 0;
+  padding: 10rpx 34rpx;
+  width: 450rpx;
+}
+.icon {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 40rpx;
+  margin-right: 20rpx;
+  width: 40rpx;
+}
+.text {
+  color: #333;
+  display: -webkit-flex;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  font-size: 28rpx;
+}
+.text > view {
+  flex: 1;
+}
+.in {
+  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/ic_jinru.png?imageView2/2/w/750);
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 20rpx;
+  margin-left: 20rpx;
+  width: 10rpx;
+}
+.img-wrapper {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: center;
+  margin: 20rpx 0;
+  position: relative;
+}
+.img-wrapper .item-img {
+  margin-right: 16rpx;
+}
+.img-wrapper .modal,
+.img-wrapper image {
+  height: 116rpx;
+  width: 116rpx;
+}
+.img-wrapper .modal {
+  background-color: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  line-height: 116rpx;
+  position: absolute;
+  right: 16rpx;
+  text-align: center;
+  top: 0rpx;
+  z-index: 99;
+}
+.footer {
+  width: 100%;
+}
+.footer > view {
+  display: inline-block;
+  width: 50%;
+}
+.footer .date {
+  color: #666;
+  font-size: 20rpx;
+  text-align: left;
+}
+.footer .explain {
+  color: #666;
+  font-size: 20rpx;
+  text-align: right;
+}

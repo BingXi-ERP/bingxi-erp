@@ -1,0 +1,37 @@
+@import "/packageB/pages/personal-center/collect/collect.wxss";
+page {
+  background-color: #f8f8f8;
+}
+.color-search-res text.red {
+  font-size: 28rpx;
+}
+.color-search-res {
+  background-color: #fff;
+  padding: 20rpx 0;
+  width: 100%;
+}
+.color-search-res .media-list {
+  width: 88%;
+}
+.search-panel {
+  width: 100%;
+}
+.search-panel .search-box {
+  padding: 10rpx 0;
+  position: relative;
+}
+.search-panel .search-box input {
+  margin-top: 10rpx;
+  width: 82%;
+}
+.search-panel .search-box text {
+  margin-top: 0;
+  padding-right: 10rpx;
+}
+.search-panel .search-box .clear-icon,
+.search-panel .search-box .search-icon {
+  top: 30rpx;
+}
+.search-panel .search-box .clear-icon {
+  right: 120rpx;
+}

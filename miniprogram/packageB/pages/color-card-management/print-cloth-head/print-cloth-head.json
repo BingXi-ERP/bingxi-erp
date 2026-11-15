@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "打印布头",
+  "enablePullDownRefresh": false,
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

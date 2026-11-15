@@ -1,0 +1,60 @@
+.wrapper {
+  height: 100%;
+  overflow: hidden;
+  width: 100%;
+}
+.search-input-wrapper {
+  align-items: center;
+  background-color: #f5f5f9;
+  border-radius: 44rpx;
+  display: -webkit-flex;
+  display: flex;
+  margin: 0 auto;
+  position: relative;
+}
+.search-input {
+  color: #333;
+  flex: 1;
+  font-size: 28rpx;
+  height: 40rpx;
+  padding: 16rpx 40rpx;
+}
+.search-icon-wrapper {
+  margin: 0 30rpx;
+}
+.search-icon-wrapper,
+.search-icon-wrapper image {
+  height: 20px;
+  width: 20px;
+}
+.tools {
+  color: #333;
+  float: right;
+  font-size: 32rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  margin-right: 60rpx;
+}
+.tools2 {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 12rpx;
+}
+.tools2 .icon {
+  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/ic_saoyisao.png?imageView2/2/w/750);
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 40rpx;
+  width: 40rpx;
+}
+.tools2 .text {
+  color: #666;
+  font-size: 20rpx;
+}
+.placeholder {
+  color: #ccc;
+}

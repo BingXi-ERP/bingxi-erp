@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "以图搜图",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

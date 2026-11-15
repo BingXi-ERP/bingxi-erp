@@ -1,0 +1,28 @@
+<import src="../../tpl/color-card/colorcard.wxml"></import>
+<import src="../../tpl/stall-card/stallcard.wxml"></import>
+<view class="navbarlist">
+  <view
+    bindtap="changeActive"
+    class="{{tabArr.curHdIndex==0?'active':''}}"
+    id="0"
+    >色卡<span></span>
+  </view>
+  <view
+    bindtap="changeActive"
+    class="{{tabArr.curHdIndex==1?'active':''}}"
+    id="1"
+    >档口<span></span>
+  </view>
+</view>
+<view class="navbarlist-top">
+  <template
+    is="colorcard"
+    data="{{bgiconGray:bgiconGray,cardList:cardList,showModal:showModal,textContent:textContent,userMobile:userMobile}}"
+    wx:if="{{tabArr.curBdIndex==0}}"
+  ></template>
+  <template
+    is="stallcard"
+    data="{{shopList:shopList}}"
+    wx:if="{{tabArr.curBdIndex==1}}"
+  ></template>
+</view>

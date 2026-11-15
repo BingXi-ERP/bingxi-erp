@@ -1,0 +1,95 @@
+<view class="selectBill">
+  <view class="noList" wx:if="{{list.length===0}}">
+    <view class="noImg" style="background-image:url('{{icon.noImg}}')"></view>
+    <view class="text">暂无数据</view>
+  </view>
+  <view class="selectBillContent list-wrapper" wx:else>
+    <view
+      class="list"
+      wx:if="{{list.length>0}}"
+      wx:for="{{list}}"
+      wx:for-index="idx"
+      wx:key="{{idx}}"
+    >
+      <view
+        bind:tap="selectItem"
+        class="list-item {{selectedId===item.id?'selectedColor':''}}"
+        data-billing-no="{{item.billingNo}}"
+        data-id="{{item.id}}"
+      >
+        <view class="order-info">
+          <view class="fl order-create-by">
+            <image
+              mode="aspectFill"
+              src="{{addDefaultAvatar(item.buyerHeadImg,initImgApp)+'?imageView2/2/w/200'}}"
+            ></image>
+            <view class="f14 g_limtRow userName">{{item.buyerName}}</view>
+          </view>
+          <view class="order-status order-status-hl">
+            <text
+              class="order-create-at {{item.saleType==1||item.saleType==2?'timeSpace':''}}"
+              wx:if="{{chooseStatus!=-10&&chooseStatus!=-20}}"
+            >
+              {{formatDateTime(item.orderTime,true)}}
+            </text>
+            <text
+              class="order-create-at {{item.saleType==1||item.saleType==2?'timeSpace':''}}"
+              wx:if="{{chooseStatus==-10||chooseStatus==-20}}"
+            >
+              {{formatDateTime(item.orderTime,true)}}
+            </text>
+            <text style="margin-left: 10rpx"
+              >{{orderConditon[item.orderStatus]}}</text
+            >
+          </view>
+        </view>
+        <view class="order-product">
+          <view
+            class="product"
+            wx:for="{{item.orderGoodsDetailModels}}"
+            wx:key="index"
+          >
+            <image
+              class="product-image"
+              mode="aspectFill"
+              src="{{replImage(item.goodsImgPath,initImgApp,180)}}"
+            ></image>
+            <view class="product-content">
+              <view class="f14 product-title g_limtRow"
+                >{{item.goodsName}} {{item.goodsNo||''}}</view
+              >
+              <view class="product-total">{{item.goodsSummaryInfo}}</view>
+            </view>
+          </view>
+        </view>
+        <view class="type-unpay">
+          <view
+            class="order-type"
+            wx:if="{{item.saleType==1||item.saleType==2}}"
+          >
+            <text
+              >{{item.saleType==1?'大货':''}}{{item.saleType==2?'剪样':''}}</text
+            >
+          </view>
+          <text class="order-unpay" wx:if="{{chooseStatus===40}}"
+            >欠款：¥ {{item.payableAmount}}
+          </text>
+        </view>
+        <view class="f12 orderDebt"
+          >欠款: ¥ {{toFixNum(item.payableAmount)}}</view
+        >
+        <view class="order-total">
+          <view class="total-before">共：{{item.colorCount}}种颜色</view>
+          <view
+            >合计：¥<text class="strong">{{toFixNum(item.orderAmount)}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="more">
+      <view class="moreIcon" wx:if="{{!isAll}}">上拉更多</view>
+      <view class="moreIcon" wx:if="{{isAll}}">已经到底了</view>
+    </view>
+    <button bindtap="goback" class="g_bottomBtn">确定</button>
+  </view>
+</view>

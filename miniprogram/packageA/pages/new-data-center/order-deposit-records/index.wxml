@@ -1,0 +1,120 @@
+<view>
+    <view class="top-date-select" wx:if="{{fromPage==='due'}}">
+        <picker bindchange="bindStartDateChange" end="2027-09-01" mode="date" placeholder="请选择开始时间" start="2015-09-01" value="{{startDate}}">
+            <view class="picker data-choose">{{startDate==''?'点按选择开始时间':startDate}}</view>
+        </picker>
+        <span class="dateRange">至</span>
+        <picker bindchange="bindEndDateChange" end="2027-09-01" mode="date" start="2015-09-01" value="{{endDate}}">
+            <view class="picker data-choose">{{endDate==''?'点按选择结束时间':endDate}}</view>
+        </picker>
+    </view>
+    <view class="records-list">
+        <view catchtap="gotoDetail" class="list-item" data-pay-way="{{item.payWay}}" data-record-id="{{item.recordId}}" wx:for="{{listData}}" wx:key="index">
+            <view class="list-top" wx:if="{{item.wxAmount}}">
+                <view class="left fl">
+                    <image src="{{icon[0]}}"></image>
+                    <text class="item-text g_limtRow" wx:if="{{fromPage==='due'}}">微信 - 来自{{item.customerName}}</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==12}}">微信支付 (系统冲抵)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==3}}">微信支付 (对账收款)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==33}}">微信支付 (对账退款)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==66}}">微信支付 (退货单核销)</text>
+                    <text wx:else>微信支付</text>
+                </view>
+                <view class="right item-right-text g_limtRow">
+                    <text style="color:#ED5C5C;" wx:if="{{item.paymentType==1}}"> - ￥{{item.wxAmount}}</text>
+                    <text wx:else> + ￥{{item.wxAmount}}</text>
+                </view>
+                <image class="invalid-icon" mode="aspectFill" src="{{iconInvalid}}" wx:if="{{item.paymentStatus==-20}}"></image>
+            </view>
+            <view class="list-top" wx:if="{{item.alipayAmount}}">
+                <view class="left fl">
+                    <image src="{{icon[1]}}"></image>
+                    <text class="item-text g_limtRow" wx:if="{{fromPage==='due'}}">支付宝 - 来自{{item.customerName}}</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==12}}">支付宝支付 (系统冲抵)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==3}}">支付宝支付 (对账收款)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==33}}">支付宝支付 (对账退款)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==66}}">支付宝支付 (退货单核销)</text>
+                    <text wx:else>支付宝</text>
+                </view>
+                <view class="right item-right-text g_limtRow">
+                    <text style="color:#ED5C5C;" wx:if="{{item.paymentType==1}}"> - ￥{{item.alipayAmount}}</text>
+                    <text wx:else> + ￥{{item.alipayAmount}}</text>
+                </view>
+                <image class="invalid-icon" mode="aspectFill" src="{{iconInvalid}}" wx:if="{{item.paymentStatus==-20}}"></image>
+            </view>
+            <view class="list-top" wx:if="{{item.cashAmount}}">
+                <view class="left fl">
+                    <image src="{{icon[2]}}"></image>
+                    <text class="item-text g_limtRow" wx:if="{{fromPage==='due'}}">现金 - 来自{{item.customerName}}</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==12}}">现金支付 (系统冲抵)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==3}}">现金支付 (对账收款)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==33}}">现金支付 (对账退款)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==66}}">现金支付 (退货单核销)</text>
+                    <text wx:else>现金</text>
+                </view>
+                <view class="right item-right-text g_limtRow">
+                    <text style="color:#ED5C5C;" wx:if="{{item.paymentType==1}}"> - ￥{{item.cashAmount}}</text>
+                    <text wx:else> + ￥{{item.cashAmount}}</text>
+                </view>
+                <image class="invalid-icon" mode="aspectFill" src="{{iconInvalid}}" wx:if="{{item.paymentStatus==-20}}"></image>
+            </view>
+            <view class="list-top" wx:if="{{item.cardAmount}}">
+                <view class="left fl">
+                    <image src="{{icon[3]}}"></image>
+                    <text class="item-text g_limtRow" wx:if="{{fromPage==='due'}}">刷卡 - 来自{{item.customerName}}</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==12}}">刷卡支付 (系统冲抵)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==3}}">刷卡支付 (对账收款)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==33}}">刷卡支付 (对账退款)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==66}}">刷卡支付 (退货单核销)</text>
+                    <text wx:else>银行卡</text>
+                </view>
+                <view class="right item-right-text g_limtRow">
+                    <text style="color:#ED5C5C;" wx:if="{{item.paymentType==1}}"> - ￥{{item.cardAmount}}</text>
+                    <text wx:else> + ￥{{item.cardAmount}}</text>
+                </view>
+                <image class="invalid-icon" mode="aspectFill" src="{{iconInvalid}}" wx:if="{{item.paymentStatus==-20}}"></image>
+            </view>
+            <view class="list-top" wx:if="{{item.remitAmount}}">
+                <view class="left fl">
+                    <image src="{{icon[4]}}"></image>
+                    <text class="item-text g_limtRow" wx:if="{{fromPage==='due'}}">汇款 - 来自{{item.customerName}}</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==12}}">汇款支付 (系统冲抵)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==3}}">汇款支付 (对账收款)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==33}}">汇款支付 (对账退款)</text>
+                    <text class="item-text g_limtRow" wx:elif="{{item.sourceType==66}}">汇款支付 (退货单核销)</text>
+                    <text wx:else>汇款</text>
+                </view>
+                <view class="right item-right-text g_limtRow">
+                    <text style="color:#ED5C5C;" wx:if="{{item.paymentType==1}}"> - ￥{{item.remitAmount}}</text>
+                    <text wx:else> + ￥{{item.remitAmount}}</text>
+                </view>
+                <image class="invalid-icon" mode="aspectFill" src="{{iconInvalid}}" wx:if="{{item.paymentStatus==-20}}"></image>
+            </view>
+            <view class="list-bottom">
+                <view class="left list-text">
+                    <text>{{item.paymentNo}}</text>
+                    <text>{{item.paymentDate}}</text>
+                </view>
+                <view class="right right-text" wx:if="{{item.paymentType==0}}">
+                    <text class="g_limtRow discount-text " wx:if="{{item.sourceType==3&&item.customerPaymentId>0}}">(合并收款  ￥ {{item.totalAmount}})</text>
+                    <text class="g_limtRow discount-text">优惠：- ￥{{item.discountAmount}}</text>
+                </view>
+                <view class="right right-text" wx:if="{{item.paymentType==1}}">
+                    <text class="g_limtRow discount-text" wx:if="{{item.sourceType==33&&item.customerPaymentId>0}}">(合并退款  ￥ {{item.totalAmount}})</text>
+                    <text class="g_limtRow discount-text">{{item.remark||''}}</text>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="more" wx:if="{{fromPage=='due'}}">
+        <view class="moreIcon" wx:if="{{moreIcon}}">上拉更多</view>
+        <view class="moreIcon" wx:if="{{!moreIcon}}">没有更多数据了</view>
+    </view>
+    <view class="more" wx:else>
+        <view class="moreIcon">没有更多数据了</view>
+    </view>
+    <view class="noDataComtent" wx:if="{{listData.length==0}}">
+        <view class="noDataBg" style="background-image:url(\"{{noDataBg}}\")"></view>
+        <view class="noDataContent">暂无数据</view>
+    </view>
+</view>

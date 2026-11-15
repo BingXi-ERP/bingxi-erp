@@ -146,3 +146,13 @@ frontend/stats.html
 # 本地跑一次就会把 backend.log / playwright-output.txt / seed-failures-*.json
 # 之类带进版本库，故按目录名整体忽略）
 reports/
+
+# 小程序主机面本地真值配置，模板 mpHost.local.example.js 入库，真值 mpHost.local.js 由开发者本地维护不入库
+/miniprogram/mpHost.local.js
+
+# 微信开发者工具"构建 npm"的再生面：内容完全由 miniprogram/package.json 的依赖声明推导，
+# 每次构建整目录重写。入库会让依赖声明面与审计面双双失真，且开发者工具重新构建即得，
+# 故按产物处理不入库。这两条与 scripts/ci/miniprogram-checks.sh 第五道（依赖声明对账）同源：
+# 该道只判产物里出现的包必须在 package.json 声明，产物是否入库由本处两条规则判。
+/miniprogram/miniprogram_npm/
+/miniprogram/@babel/

@@ -1,0 +1,9 @@
+var addDefaultAvatar = function (headImg, app) {
+  var avatarUrl = app.config.imgHost + "/Face_User_Face_Man_Default@3x.png";
+  if (headImg == "" || headImg == undefined) {
+    return (headImg = avatarUrl);
+  } else {
+    return headImg;
+  }
+};
+module.exports = addDefaultAvatar;

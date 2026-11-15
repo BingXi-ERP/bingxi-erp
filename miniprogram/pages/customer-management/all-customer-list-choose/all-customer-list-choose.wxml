@@ -1,0 +1,24 @@
+<view id="search">
+    <view class="search-code-input">
+        <view class="search-code-input-box">
+            <input bind:confirm="search" bind:search="search" bindinput="getValue" maxlength="15" placeholder="搜索客户名称、手机号" placeholderStyle="color: #C0C0C0; font-size: 26rpx;"></input>
+            <van-icon bind:tap="search" name="search" size="18"></van-icon>
+        </view>
+    </view>
+    <view class="section">
+        <view bind:tap="handleClickCustom" class="flex-wrp" data-fullname="{{item.customerName}}" data-id="{{item.id}}" data-mobile="{{item.customerPhone}}" style="flex-direction:row;" url="/pages/customer-management/all-customer-detail/all-customer-detail?customerId={{item.id}}" wx:for="{{customerList}}" wx:key="index">
+            <view class="flex-item-lef">
+                <image src="{{item.headImg}}"></image>
+            </view>
+            <view class="flex-item-middle">
+                <view class="userName">{{item.customerName}}</view>
+                <view class="customer-phone">{{item.customerPhone}}</view>
+            </view>
+        </view>
+    </view>
+</view>
+<view class="all-loading" wx:if="{{searchLoading}}">正在载入更多...</view>
+<view class="all-complete" wx:else>没有更多内容了～</view>
+<view class="fixed-bottom-tools">
+    <button bindtap="toAddCustomer" class="g_bottomBtn" wx:if="{{userAuthList['crm:saveCustomer']}}">添加客户</button>
+</view>

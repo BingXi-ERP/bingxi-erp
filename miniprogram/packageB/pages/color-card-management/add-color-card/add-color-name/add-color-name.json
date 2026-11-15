@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "选择颜色名称",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

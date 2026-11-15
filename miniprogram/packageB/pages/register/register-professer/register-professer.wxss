@@ -1,0 +1,55 @@
+.userName {
+  padding: 0 48rpx;
+}
+.userName .head {
+  padding: 48rpx 0;
+}
+.userName .title {
+  color: #373c55;
+  font-family: PingFangSC-Semibold;
+  font-size: 24px;
+  font-weight: 600;
+  height: 80rpx;
+}
+.titleIllustrate {
+  color: #999bb4;
+  font-family: PingFangSC-Light;
+  font-size: 14px;
+  font-weight: 300;
+}
+.item {
+  border-bottom: 1rpx solid #eaeaea;
+  height: 96rpx;
+  margin-bottom: 96rpx;
+}
+.item input {
+  position: relative;
+  top: 3rpx;
+}
+.item .label {
+  color: #373c55;
+  font-family: PingFangSC-Medium;
+  font-size: 16px;
+  font-weight: 500;
+  margin-right: 28rpx;
+  min-width: 50px;
+  width: 135rpx;
+}
+.newBtn {
+  background: #d8d9e3;
+  background: linear-gradient(90deg, #7ab5ff, #336af8);
+  border-radius: 48rpx;
+  color: #fff;
+  height: 96rpx;
+  width: 622rpx;
+}
+.userName .newBtn[disabled] {
+  background: #d8d9e3;
+  color: #fff;
+}
+.placeholder {
+  color: #c7c8d8;
+  font-family: PingFangSC-Regular;
+  font-size: 14px;
+  font-weight: 400;
+}

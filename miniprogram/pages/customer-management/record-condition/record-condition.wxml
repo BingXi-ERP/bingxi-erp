@@ -1,0 +1,70 @@
+<view class="content">
+  <view
+    class="flexDisplay conTop"
+    wx:if="{{recordInfo.shopUserName||recordInfo.shopUserHeadImg}}"
+  >
+    <view style="width: 30%">
+      <image
+        class="headImg"
+        src="{{recordInfo.shopUserHeadImg?recordInfo.shopUserHeadImg+'?imageView2/2/w/200':recordInfo.shopUserHeadImg}}"
+      ></image>
+    </view>
+    <view class="createUser">{{recordInfo.createUser}}</view>
+  </view>
+  <view style="margin-top: 40rpx">
+    <view class="content" wx:if="{{recordInfo.content}}"
+      >{{recordInfo.content}}</view
+    >
+    <view wx:if="{{recordInfo.trackRecordImgList.length>0}}">
+      <image
+        bindtap="previewNumImage"
+        data-ImgList="{{recordInfo.trackRecordImgList}}"
+        id="{{item.imgPath}}"
+        src="{{item.imgPath?item.imgPath+'?imageView2/2/w/200':item.imgPath}}"
+        style="width: 170rpx; height: 170rpx; margin: 10rpx 6rpx"
+        wx:for="{{recordInfo.trackRecordImgList}}"
+        wx:key="index"
+      ></image>
+    </view>
+    <view
+      style="margin: 40rpx 0; background: #f8f9fc"
+      wx:if="{{recordInfo.fetchGoodsList.length>0}}"
+    >
+      <view
+        class="flexDisplay"
+        style="font-size: 32rpx; padding: 30rpx"
+        wx:for="{{recordInfo.fetchGoodsList}}"
+        wx:key="index"
+      >
+        <view style="">
+          <image
+            bindtap="previewImage"
+            id="{{item.goodsImgPath}}"
+            src="{{item.goodsImgPath?item.goodsImgPath+'?imageView2/2/w/200':item.goodsImgPath}}"
+            style="width: 88rpx; height: 88rpx; margin: 10rpx"
+          ></image>
+        </view>
+        <view style="margin-left: 20rpx; margin-top: 4rpx">
+          <span style="color: #2f7bfd">领取色卡#</span>{{item.goodsName}}</view
+        >
+      </view>
+    </view>
+  </view>
+  <view>
+    <view class="flexDisplay" style="justify-content: space-between">
+      <view class="createTime">{{recordInfo.createTime}}</view>
+      <view bindtap="removeTrackRecord" style="font-size: 24rpx">删除</view>
+    </view>
+  </view>
+</view>
+<modal
+  mask
+  bindcancel="modalCancel"
+  bindconfirm="modalConfirm"
+  cancelText="取消"
+  confirmText="确定"
+  hidden="{{modalHidden}}"
+  title=""
+>
+  <view style="text-align: center">确定删除记录？</view>
+</modal>

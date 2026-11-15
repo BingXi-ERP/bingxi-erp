@@ -1,0 +1,72 @@
+page {
+  background-color: #eff0f7;
+  height: 100%;
+}
+.list-empty-wrapper {
+  text-align: center;
+}
+.noaddress {
+  height: 174rpx;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 230rpx;
+  width: 180rpx;
+}
+.empty-text {
+  color: #999bb4;
+  font-size: 24rpx;
+  margin-top: 28rpx;
+  text-align: center;
+}
+.touchVideo {
+  padding: 32rpx;
+}
+.touch-item {
+  background-color: #fff;
+  border-radius: 16rpx;
+  display: -webkit-flex;
+  display: flex;
+  margin-bottom: 22rpx;
+  padding: 18rpx;
+}
+.touch-item .bg-view {
+  background-size: cover;
+  border-radius: 14rpx;
+  height: 140rpx;
+  margin-right: 16rpx;
+  width: 140rpx;
+}
+.touch-item .touch-item-r {
+  display: -webkit-flex;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.touch-item .touch-item-r text {
+  color: #b6b6b6;
+  font-size: 12px;
+}
+.touch-item .touch-item-r .title {
+  color: #000;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+.video-wrapper {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: center;
+  padding-top: 400rpx;
+  position: relative;
+}
+.video-wrapper video {
+  width: 100%;
+}
+.video-wrapper .v-close {
+  color: #fff;
+  font-size: 30px;
+  position: absolute;
+  right: 30rpx;
+  top: 60rpx;
+}

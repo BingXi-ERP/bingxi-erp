@@ -1,0 +1,24 @@
+page {
+  background-color: #fff;
+}
+.feedback-text {
+  background-color: #f5f5f9;
+  font-size: 28rpx;
+  margin-top: 20rpx;
+  width: 100%;
+}
+textarea {
+  margin: 0 auto;
+  min-height: 600rpx;
+  padding-top: 20rpx;
+  width: 690rpx;
+}
+.fd-btn button {
+  border: 1rpx solid #629cff;
+  border-radius: 50rpx;
+  margin-top: 10rpx;
+  width: 690rpx;
+}
+form {
+  width: 100%;
+}

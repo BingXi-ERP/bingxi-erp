@@ -1,0 +1,13 @@
+<view class="userName">
+    <view class="head">
+        <view class="title">您的名字？</view>
+        <view class="titleIllustrate">请告诉我们您的称呼</view>
+    </view>
+    <view class="content">
+        <view class="item fl">
+            <view class="label">姓名</view>
+            <input bindinput="inputVal" maxlength="20" placeholder="请输入你的名字" placeholderClass="placeholder" type="text" value="{{userName}}"></input>
+        </view>
+        <button bindtap="toPath" class="newBtn" disabled="{{!userName.length}}">下一步</button>
+    </view>
+</view>

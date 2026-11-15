@@ -1,0 +1,24 @@
+page {
+  background-color: #f5f7f9;
+  box-sizing: border-box;
+  height: 100%;
+}
+.containerss {
+  padding-bottom: 80rpx;
+}
+.block {
+  margin-top: 16rpx;
+}
+.title {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  padding-bottom: 16rpx;
+  padding-left: 32rpx;
+}
+.cell-title-color {
+  color: #969799 !important;
+}
+.cell-value-color {
+  color: #323233 !important;
+}

@@ -1,0 +1,124 @@
+<view class="order-receipt">
+    <view class="steps">
+        <view class="step current">
+            <view class="pointer">1</view>
+            <view class="step-main">订单详情</view>
+        </view>
+        <view class="step">
+            <view class="line"></view>
+        </view>
+        <view class="step current">
+            <view class="pointer">2</view>
+            <view class="step-main">收款信息</view>
+        </view>
+        <view class="step">
+            <view class="line"></view>
+        </view>
+        <view class="step">
+            <view class="pointer gray">3</view>
+            <view class="step-main">开单成功</view>
+        </view>
+    </view>
+    <view class="card">
+        <view class="payment-name">
+            <text>本次收款</text>
+        </view>
+        <view class="card-body">
+            <view class="discount-cell">
+                <view class="cell-title">订单总额</view>
+                <picker bindchange="bindCountMode" range="{{countModeArray}}" value="{{countModeIndex}}">
+                    <view class="picker-order">
+                        <view class="total" style="justify-content:flex-end;">¥ {{total}}</view>
+                        <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                    </view>
+                </picker>
+            </view>
+        </view>
+        <view class="card-extra">
+            <view class="discount-cell">
+                <view class="cell-title">其他费用</view>
+                <view class="cell-value">
+                    <input bindblur="handleBlurInput" bindinput="handleInputOtherCost" data-key="otherCost" placeholder="请输入其他费用" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{otherCost}}"></input>
+                </view>
+            </view>
+            <view class="discount-cell">
+                <view class="cell-title">本次优惠</view>
+                <view class="cell-value placeholder-gray">
+                    <input bindblur="handleBlurInput" bindinput="handleInputDiscount" data-key="discount" placeholder="请输入本次优惠" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{discount}}"></input>
+                </view>
+            </view>
+        </view>
+        <view class="card-b">
+            <text class="wait-get">待收金额</text>
+            <text class="unpay">￥{{unpay}}</text>
+        </view>
+    </view>
+    <view class="payment-content">
+        <view class="payment-title">
+            <text class="payment-way">收款方式</text>
+            <view class="payment-tips">
+                <van-icon color="#C0C0C0" name="warning-o" size="24rpx"></van-icon>如果本次欠款，可不填写金额</view>
+        </view>
+        <view class="payment-cell {{paymentWechat?'payment-cell-val':''}}">
+            <view class="cell-title">
+                <image mode="aspectFit" src="{{icon.weixin}}"></image>
+                <text>微信</text>
+            </view>
+            <view class="cell-value">
+                <input bindblur="handleBlurInput" bindinput="handleValUpdate" data-key="paymentWechat" placeholder="请输入支付金额" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{paymentWechat}}"></input>
+            </view>
+        </view>
+        <view class="payment-cell {{paymentAlipay?'payment-cell-val':''}}">
+            <view class="cell-title">
+                <image mode="aspectFit" src="{{icon.zhifubao}}"></image>
+                <text>支付宝</text>
+            </view>
+            <view class="cell-value">
+                <input bindblur="handleBlurInput" bindinput="handleValUpdate" data-key="paymentAlipay" placeholder="请输入支付金额" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{paymentAlipay}}"></input>
+            </view>
+        </view>
+        <view class="payment-cell {{paymentCash?'payment-cell-val':''}}">
+            <view class="cell-title">
+                <image mode="aspectFit" src="{{icon.xianjin}}"></image>
+                <text>现金</text>
+            </view>
+            <view class="cell-value">
+                <input bindblur="handleBlurInput" bindinput="handleValUpdate" data-key="paymentCash" placeholder="请输入支付金额" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{paymentCash}}"></input>
+            </view>
+        </view>
+        <view class="payment-cell {{paymentCard?'payment-cell-val':''}}">
+            <view class="cell-title">
+                <image mode="aspectFit" src="{{icon.shuaka}}"></image>
+                <text>刷卡</text>
+            </view>
+            <view class="cell-value">
+                <input bindblur="handleBlurInput" bindinput="handleValUpdate" data-key="paymentCard" placeholder="请输入支付金额" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{paymentCard}}"></input>
+            </view>
+        </view>
+        <view class="payment-cell {{paymentRemit?'payment-cell-val':''}}">
+            <view class="cell-title">
+                <image mode="aspectFit" src="{{icon.huikuan}}"></image>
+                <text>汇款</text>
+            </view>
+            <view class="cell-value no-border">
+                <input bindblur="handleBlurInput" bindinput="handleValUpdate" data-key="paymentRemit" placeholder="请输入支付金额" placeholderClass="placeholder-gray" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{paymentRemit}}"></input>
+            </view>
+        </view>
+    </view>
+    <view class="fixed-toolbar-bottom iphone_bottom">
+        <view class="toolbar-left">
+            <view class="totle-content">
+                <text class="totle-name">本次收款：</text>
+                <text class="totle-rmb">￥</text>
+                <text class="totle-number">{{payment}}</text>
+            </view>
+        </view>
+        <view class="toolbar-right">
+            <view class="toolbar-button-group-right">
+                <button bind:tap="handleSubmit" class="g_samllBtn">确定</button>
+            </view>
+        </view>
+    </view>
+    <van-toast id="van-toast"></van-toast>
+    <van-dialog id="van-dialog"></van-dialog>
+</view>

@@ -1,0 +1,188 @@
+<view class="restock_container">
+  <van-tabs
+    active="{{tabsActive}}"
+    bind:click="onChangeTabs"
+    customClass="product_tabs"
+  >
+    <van-tab name="{{1}}" title="产品信息">
+      <view class="restock_content">
+        <view class="restock_bar">
+          <scroll-view class="bar-left" scrollX="true">
+            <view class="wrap" wx:if="{{titleType.length>1}}">
+              <view
+                bind:tap="handleType"
+                class="single {{curIndex==i?'active':0}}"
+                data-id="{{item.id}}"
+                data-index="{{i}}"
+                wx:for="{{titleType}}"
+                wx:for-index="i"
+                >{{item.name}}</view
+              >
+            </view>
+          </scroll-view>
+          <view class="tool_right">
+            <image
+              bindtap="onChangeListMode"
+              class="tool_bar_img"
+              mode="aspectFill"
+              src="{{jhtListIcon}}"
+            ></image>
+          </view>
+        </view>
+        <view class="restock_list {{productShowMode?'restock_inline':''}}">
+          <data-empty-1 wx:if="{{restockData.length===0}}"></data-empty-1>
+          <scroll-view
+            bindscrolltolower="onScrollLower"
+            scrollY="true"
+            style="height: 98%"
+            wx:else
+          >
+            <view class="restock_flex">
+              <view
+                bindtap="onViewDetail"
+                class="card_item {{productShowMode?'card_inline_item':''}}"
+                data-item="{{item}}"
+                wx:for="{{restockData}}"
+                wx:key="id"
+              >
+                <view class="card_img">
+                  <van-image
+                    fit="cover"
+                    height="{{productShowMode?104:168}}"
+                    src="{{replImgPath(item.mainImgPath,globalApp,312)}}"
+                    width="100%"
+                  ></van-image>
+                  <view class="address">
+                    <van-icon name="location"></van-icon
+                    >{{colValueFormat.valueFormat(item,'areaType',supplierAdrTypeOption)}}</view
+                  >
+                </view>
+                <view class="info">
+                  <text class="h1">{{item.businessProductName}}</text>
+                  <view class="p">
+                    <text class="price"
+                      >{{colValueFormat.priceFormat(item)}}</text
+                    >
+                  </view>
+                  <view class="p">共{{item.colorNum}}种颜色</view>
+                  <view class="p">
+                    <image
+                      class="svg-icon"
+                      mode="aspectFill"
+                      src="{{iconGramWeight}}"
+                    ></image>
+                    <text>{{item.gramWeight+item.weightUnit}}</text>
+                  </view>
+                  <view class="p matrial">
+                    <image
+                      class="svg-icon"
+                      mode="aspectFill"
+                      src="{{iconMaterial}}"
+                    ></image>
+                    <text>{{item.material}}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </scroll-view>
+        </view>
+      </view>
+      <view class="product_img">
+        <van-image
+          bindtap="onViewDetailImage"
+          data-index="{{index}}"
+          height="375"
+          src="{{item}}"
+          width="100%"
+          wx:for="{{detailImage}}"
+          wx:key="index"
+        ></van-image>
+        <van-image
+          bindtap="onViewColorImage"
+          data-index="{{index}}"
+          height="375"
+          src="{{item}}"
+          width="100%"
+          wx:for="{{colorImage}}"
+          wx:key="index"
+        ></van-image>
+      </view>
+    </van-tab>
+    <van-tab name="{{2}}" title="供应商信息">
+      <view class="product_content">
+        <view class="supplier_info">
+          <view class="supplier_top">
+            <van-image
+              class="top_img"
+              fit="cover"
+              height="48"
+              src="{{supplierData.logo}}"
+              useErrorSlot="{{true}}"
+              useLoadingSlot="{{true}}"
+              width="48"
+            >
+              <van-image
+                height="24"
+                slot="error"
+                src="{{iconList.defaultAvatar}}"
+                width="24"
+              ></van-image>
+              <van-image
+                height="24"
+                slot="loading"
+                src="{{iconList.defaultAvatar}}"
+                width="24"
+              ></van-image>
+            </van-image>
+            <view class="info">
+              <text>{{supplierData.companyName}}</text>
+              <view class="product_view">
+                <view class="product_view_item">
+                  <text>{{supplierData.areaTypeName}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+          <view class="category van-hairline--bottom">
+            <view class="left">主营</view>
+            <view class="right">
+              <text
+                class="span"
+                wx:for="{{supplierData.clusterNames}}"
+                wx:key="index"
+                >{{item}}</text
+              >
+            </view>
+          </view>
+          <view class="contact van-hairline--bottom">
+            <text class="h1">联系人</text>
+            <view
+              class="p"
+              wx:for="{{supplierData.linkManList}}"
+              wx:key="index"
+            >
+              <text>{{item.contacts}}</text>
+              <text>{{item.phone}}</text>
+            </view>
+          </view>
+          <view class="address">
+            <view class="item">
+              <view class="h1"
+                >档口地址<text class="span">默认地址</text>
+              </view>
+              <text
+                >{{supplierData.province?supplierData.province+supplierData.city+supplierData.area+supplierData.addr:'无'}}</text
+              >
+            </view>
+            <view class="item">
+              <view class="h1">仓库地址</view>
+              <text
+                >{{supplierData.warehouseProvince?supplierData.warehouseProvince+supplierData.warehouseCity+supplierData.warehouseArea+supplierData.warehouseAddr:'无'}}</text
+              >
+            </view>
+          </view>
+        </view>
+      </view>
+    </van-tab>
+  </van-tabs>
+</view>

@@ -1,0 +1,94 @@
+page {
+  background-color: #f8f8f8;
+}
+.wrapper {
+  position: relative;
+  width: 100%;
+}
+.search-wrapper {
+  padding: 0 0 10rpx;
+}
+.color-data-list {
+  background-color: #fff;
+  margin-bottom: 128rpx;
+  width: 100%;
+}
+.search-wrapper {
+  height: 100%;
+}
+.color-card-list-wrapper {
+  margin-bottom: 104rpx;
+}
+.no-color-card-list {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  font-size: 28rpx;
+  justify-content: center;
+  margin-top: 200rpx;
+}
+.no-color-card-list .no-list-bg {
+  height: 300rpx;
+  margin-bottom: 60rpx;
+  width: 300rpx;
+}
+.footer-wrapper {
+  bottom: 0rpx;
+  height: 100rpx;
+  left: 0rpx;
+  padding-bottom: env(safe-area-inset-bottom);
+  position: fixed;
+  right: 0rpx;
+}
+.footer-wrapper .item {
+  flex: 1;
+  font-size: 28rpx;
+  text-align: center;
+}
+.footer-wrapper .item1 {
+  border-left: 1rpx solid #ddd;
+  border-right: 1rpx solid #ddd;
+}
+.footer-wrapper .item .footer-icon {
+  height: 38rpx;
+  margin-right: 16rpx;
+  width: 38rpx;
+}
+.canvas-popup-wrapper {
+  background-color: transparent !important;
+}
+.share-monents-notice-wrapper {
+  color: #fff;
+  font-size: 26rpx;
+  margin-top: 20rpx;
+  text-align: center;
+}
+.save-share-btn {
+  background-color: #2f7bfd;
+  border-radius: 10rpx;
+  color: #fff;
+  height: 68rpx;
+  line-height: 68rpx;
+  margin: 20rpx 0;
+  text-align: center;
+  width: 250px;
+}
+.hideCanvas {
+  display: none;
+  height: 0;
+  overflow: hidden;
+  width: 0;
+}
+.showBigCanvas {
+  left: -1500rpx;
+  opacity: 0;
+  position: absolute;
+  top: -2700rpx;
+}
+.hideBigCanvas {
+  display: none;
+}
+.gray {
+  color: #cfcfcf;
+}

@@ -1,0 +1,130 @@
+<view class="wrapper">
+    <view class="f14 list-title">请填写申请资料</view>
+    <view class="f14 list-title-tips">请完善您的档口信息</view>
+    <form bindsubmit="formSubmit">
+        <view class="secction-list">
+            <view class="commodity-list">
+                <text class="validate">档口名称</text>
+                <input bindinput="input_val" data-name="shopName" name="shopName" placeholder="请输入档口名称" placeholderClass="phcolor" value="{{shopName}}"></input>
+            </view>
+            <view class="commodity-list">
+                <text class="validate">主营品类</text>
+                <input bindinput="input_val" data-name="category" name="category" placeholder="请输入主营品类" placeholderClass="phcolor" value="{{category}}"></input>
+            </view>
+        </view>
+        <view class="secction-list">
+            <view class="commodity-list">
+                <text class="validate">联系人</text>
+                <input bindinput="input_val" data-name="contacts" name="contacts" placeholder="请输入联系人姓名" placeholderClass="phcolor" value="{{contacts}}"></input>
+            </view>
+            <view class="commodity-list">
+                <text class="validate">联系电话</text>
+                <input disabled="true" name="mobile" value="{{mobile}}"></input>
+            </view>
+        </view>
+        <view class="secction-list">
+            <view class="commodity-list">
+                <text class="validate">所在地区</text>
+                <picker bindchange="bindRegionChange" customItem="{{customItem}}" mode="region" value="{{region}}">
+                    <view class="picker">
+                        <view wx:if="{{!region||region.length===0}}">请选择所在地区</view>
+                        <block wx:else>{{region[0]}} {{region[1]}} {{region[2]}}</block>
+                    </view>
+                </picker>
+            </view>
+            <view class="commodity-list">
+                <text class="validate">详细地址</text>
+                <input bindinput="input_val" data-name="shopAddress" name="shopAddress" placeholder="请输入档口地址" placeholderClass="phcolor" value="{{shopAddress}}"></input>
+            </view>
+            <view class="commodity-list">
+                <text class="validate">是否有仓库</text>
+                <view class="fl checkGroup">
+                    <view bindtap="radioChange" class="checkItem {{item.checked?'checked':''}}" data-item="{{item.name}}" wx:for="{{radiogroupitems}}" wx:key="{{item.name}}">{{item.value}}</view>
+                </view>
+            </view>
+            <view class="commodity-list" wx:if="{{storeStatus==0}}">
+                <text class="validate">仓库所在地区</text>
+                <picker bindchange="bindRegionChange2" customItem="{{customItem}}" mode="region" value="{{region2}}">
+                    <view class="picker">{{region2[0]}} {{region2[1]}} {{region2[2]}}</view>
+                </picker>
+            </view>
+            <view class="commodity-list" wx:if="{{storeStatus==0}}">
+                <text class="validate">仓库地址</text>
+                <input bindinput="input_val" data-name="storeAddress" name="storeAddress" placeholder="请输入仓库地址" placeholderClass="phcolor" value="{{storeAddress}}"></input>
+            </view>
+        </view>
+        <view class="secction-list">
+            <view class="commodity-list">
+                <text class="validate">档口面积</text>
+                <input bindinput="input_val" data-name="shopSize" name="shopSize" placeholder="请输入档口面积" placeholderClass="phcolor" type="number" value="{{shopSize}}"></input>
+            </view>
+            <view class="commodity-list">
+                <text class="validate">业务员数量</text>
+                <input bindinput="input_val" data-name="salemanNum" name="salemanNum" placeholder="请输入业务员数量" placeholderClass="phcolor" type="number" value="{{salemanNum}}"></input>
+            </view>
+            <view class="commodity-list" wx:if="{{storeStatus==0}}">
+                <text class="validate">仓库面积</text>
+                <input bindinput="input_val" data-name="storeSize" name="storeSize" placeholder="请输入仓库面积" placeholderClass="phcolor" type="number" value="{{storeSize}}"></input>
+            </view>
+            <view class="commodity-list" wx:if="{{storeStatus==0}}">
+                <text class="validate">仓库员工数量</text>
+                <input bindinput="input_val" data-name="storeWorkerNum" name="storeWorkerNum" placeholder="请输入员工数量" placeholderClass="phcolor" type="number" value="{{storeWorkerNum}}"></input>
+            </view>
+        </view>
+        <view class="secction-list">
+            <view class="list-upload">
+                <text class="validate f14">档口门头照片</text>
+                <text class="validate-no f12">门头名称完整清晰，可清晰看出是档口</text>
+                <view class="weui-uploader">
+                    <view class="weui-uploader__bd">
+                        <view class="weui-uploader__files">
+                            <view class="weui-uploader__file">
+                                <image bindtap="previewImage" class="weui-uploader__img" id="0" mode="aspectFill" src="{{imagePre[0]}}"></image>
+                                <view bindtap="previewImage" class="checkImage" id="0">查看示例</view>
+                            </view>
+                            <view class="weui-uploader__file" wx:if="{{remoteImageFiles[0].length>0}}">
+                                <image class="weui-uploader__img" id="0" mode="aspectFill" src="{{remoteImageFiles[0]}}?x-oss-process=image/resize,w_77"></image>
+                            </view>
+                        </view>
+                        <view class="weui-uploader__input-box">
+                            <view bindtap="choseImage" class="weui-uploader__input" id="0"></view>
+                            <view class="checkImages">添加图片</view>
+                        </view>
+                    </view>
+                </view>
+            </view>
+            <view class="list-upload">
+                <text class="validate-no f14">营业执照照片</text>
+                <text class="validate-no f12">个体工商或企业营业执照，清晰，且在营业期限内</text>
+                <view class="weui-uploader">
+                    <view class="weui-uploader__bd">
+                        <view class="weui-uploader__files">
+                            <view class="weui-uploader__file">
+                                <image bindtap="previewImage" class="weui-uploader__img" id="1" mode="aspectFill" src="{{imagePre[1]}}"></image>
+                                <view bindtap="previewImage" class="checkImage" id="1">查看示例</view>
+                            </view>
+                            <view class="weui-uploader__file" wx:if="{{remoteImageFiles[1].length>0}}">
+                                <image class="weui-uploader__img" id="1" mode="aspectFill" src="{{remoteImageFiles[1]}}?x-oss-process=image/resize,w_77"></image>
+                            </view>
+                        </view>
+                        <view class="weui-uploader__input-box">
+                            <view bindtap="choseImage" class="weui-uploader__input" id="1"></view>
+                            <view class="checkImages">添加图片</view>
+                        </view>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <view class="foot">
+            <button class="g_LineatBtn" formType="submit">审核</button>
+            <view class="bottomInfo" style="display:flex;">
+                <view>
+                    <image class="contactCustomer" src="{{icon.listen}}"></image>
+                </view>
+                <view>
+                    <button class="contactS" openType="contact">联系客服</button>
+                </view>
+            </view>
+        </view>
+    </form>
+</view>

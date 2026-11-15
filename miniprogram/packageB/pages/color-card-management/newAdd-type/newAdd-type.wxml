@@ -1,0 +1,43 @@
+<view>
+    <view class="title">分类名称</view>
+    <view class="section">
+        <input bindinput="inputgetName" data-name="addParams.categoryName" maxlength="15" placeholder="输入分类名称" value="{{addParams.categoryName}}"></input>
+    </view>
+    <view class="title">权限设置</view>
+    <view class="section">
+        <view class="section section_gap">
+            <radio-group bindchange="radioChange" class="radio-group">
+                <view class="powerContent">
+                    <label class="radio" style="color:black">
+                        <radio checked="{{radio[0].checked}}" color="#2F7BFD" value="{{radio[0].value}}"></radio>公开</label>
+                    <view style="padding-left:60rpx;">所有朋友可见</view>
+                </view>
+                <view class="powerContent">
+                    <label class="radio" style="color:black">
+                        <radio checked="{{radio[1].checked}}" color="#2F7BFD" value="{{radio[1].value}}"></radio>仅扫码可见</label>
+                    <view style="padding-left:60rpx;">仅扫色卡标签二维码可见</view>
+                </view>
+                <view class="powerContent">
+                    <label class="radio" style="color:black">
+                        <radio checked="{{radio[2].checked}}" color="#2F7BFD" value="{{radio[2].value}}"></radio>仅自己可见</label>
+                    <view style="padding-left:60rpx;">仅自己开单可见</view>
+                </view>
+                <view class="powerContent">
+                    <view style="float:left;">
+                        <label class="radio" style="color:black;">
+                            <radio checked="{{radio[3].checked}}" color="#2F7BFD" value="{{radio[3].value}}"></radio>指定客户可见</label>
+                        <view catchtap="toChooseCustomer" class="comfCustomer">
+                            <span wx:for="{{customerList}}" wx:key="index">{{item.customerName}}</span>
+                        </view>
+                    </view>
+                    <span catchtap="toChooseCustomer" class="bg-img icon" style="float:right;padding:30rpx;padding-left:15%;">
+                        <view class="bg-img icon" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+                    </span>
+                </view>
+            </radio-group>
+        </view>
+    </view>
+</view>
+<view bindtap="comfirmAdd" class="g_bottomBtn">
+    <view>保存</view>
+</view>

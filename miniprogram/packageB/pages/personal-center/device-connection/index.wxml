@@ -1,0 +1,15 @@
+<view class="device-connection">
+  <view class="deviceChild">
+    <view bind:tap="handleLinkTo" class="cell-title">蓝牙打印机</view>
+    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+  </view>
+  <view class="deviceChild">
+    <view
+      bind:tap="handleLinkToZhen"
+      class="cell-title"
+      data-url="/packageB/pages/personal-center/device-connect-needle/index"
+      >针式打印机</view
+    >
+    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+  </view>
+</view>

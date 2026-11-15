@@ -1,0 +1,46 @@
+var filterEnum = function (callValue, enumData) {
+  if (callValue === "" || callValue === undefined || callValue === null)
+    return "--";
+  if (typeof callValue === "object") {
+    var filterData = enumData.filter(function (f) {
+      return callValue.indexOf(f.value) !== -1;
+    });
+    return filterData.length
+      ? filterData
+          .map(function (item) {
+            return item.label;
+          })
+          .join(",")
+      : "--";
+  }
+  var filterData = enumData.filter(function (item) {
+    return item.value === callValue;
+  });
+  return filterData && filterData.length ? filterData[0].label : "--";
+};
+var valueFormat = function (data, prop, dictData) {
+  if (prop === "areaType") {
+    return filterEnum(
+      data[
+        ((nt_1 = prop),
+        null == nt_1 ? undefined : "number" === typeof nt_1 ? nt_1 : "" + nt_1)
+      ],
+      dictData
+    );
+  }
+  return (
+    data[
+      ((nt_2 = prop),
+      null == nt_2 ? undefined : "number" === typeof nt_2 ? nt_2 : "" + nt_2)
+    ] || "--"
+  );
+};
+var priceFormat = function (row) {
+  return row.price === "0" ||
+    row.price === "0.00" ||
+    row.price === "0.0" ||
+    !row.price
+    ? "面议"
+    : "￥" + row.price + "/" + row.priceUnit;
+};
+module.exports = { valueFormat: valueFormat, priceFormat: priceFormat };

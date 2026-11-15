@@ -1,0 +1,20 @@
+<view class="contain">
+    <view class="listTitle displayFlex">
+        <view>排名</view>
+        <view>品名</view>
+        <view catchtap="ListUpDowm">领取（份）<image src="{{listUpDowm==0?colorCardOrder.up:colorCardOrder.dowm}}" style="width:18rpx;height:18rpx"></image>
+        </view>
+    </view>
+    <view class="listData displayFlex" wx:for="{{colorCardReceiveList}}" wx:key="index">
+        <view>{{index+1}}</view>
+        <view class="displayFlex" data-goodsId="{{item.goodsId}}">
+            <image src="{{replImage(item.goodsImgPath,globalApp,90)||defBg}}" style="width:60rpx;height:60rpx"></image>
+            <view style="margin-left:6rpx;width:60%;">{{item.goodsName||'-'}}</view>
+        </view>
+        <view>{{item.num}}</view>
+    </view>
+    <view class="noDataComtent" wx:if="{{colorCardReceiveList.length==0}}">
+        <view class="noDataBg" style="background-image:url(\"{{noDataBg}}\")"></view>
+        <view class="noDataContent">暂无数据</view>
+    </view>
+</view>

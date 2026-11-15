@@ -1,0 +1,22 @@
+#add-record {
+  padding: 0 100rpx;
+}
+.input-wrapper {
+  margin-top: 40rpx;
+}
+.textarea {
+  color: #333;
+}
+.color-card-wrapper {
+  border-bottom: 1rpx solid #ddd;
+  border-top: 1rpx solid #ddd;
+  margin: 150rpx 0;
+  padding-bottom: 24rpx;
+}
+.comfirn-btn {
+  bottom: 40rpx;
+  left: 50%;
+  margin-top: 100rpx;
+  position: fixed;
+  transform: translateX(-50%);
+}

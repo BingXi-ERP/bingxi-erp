@@ -1,0 +1,68 @@
+<view class="containerr">
+  <view class="tips" wx:if="{{comboList.length>0}}">
+    <van-notice-bar
+      leftIcon="volume-o"
+      text="2000+家面料代理商正在使用秉羲工作台"
+      wx:if="{{comboList.length>0}}"
+    ></van-notice-bar>
+  </view>
+  <view
+    class="combo-item"
+    style="{{item.current?'background-image:url('+useImg+')':''}}"
+    wx:for="{{comboList}}"
+    wx:key="index"
+  >
+    <view class="recommend" wx:if="{{item.recommendFlag}}">推荐</view>
+    <view class="seal-using" wx:if="{{item.current}}"></view>
+    <view class="combo-title">{{item.name}}</view>
+    <view>
+      <span class="first-price">￥{{item.firstPrice}}</span>
+      <span class="price-unit">/{{item.duration>12?'永久':'年'}}</span>
+      <span class="original-price">￥{{item.originalPrice}}</span>
+    </view>
+    <view class="discount-desc">{{item.discountDesc}}</view>
+    <view
+      class="benefit-desc"
+      wx:for="{{item.benefitDescArr}}"
+      wx:for-item="obj"
+      wx:key="obj"
+    >
+      <span>✔</span>{{obj}}</view
+    >
+    <view class="account-limit" wx:if="{{item.subAccountLimit}}">
+      <span>
+        <van-icon color="#2ecc71" name="contact"></van-icon> </span
+      >{{item.subAccountLimit}}个子账号</view
+    >
+    <button disabled class="current-btn" wx:if="{{item.current}}">
+      当前套餐
+    </button>
+    <button
+      bind:tap="selectCombo"
+      class="open-btn"
+      data-item="{{item}}"
+      wx:else
+    >
+      {{canPurchase?'立即开通':'升级套餐'}}
+    </button>
+  </view>
+  <view class="list-empty-wrapper" wx:if="{{comboList.length===0}}">
+    <image class="no-data" src="{{noDataBg}}"></image>
+    <view class="empty-text">暂无套餐信息～</view>
+  </view>
+  <view class="footer" wx:if="{{comboList.length>0}}">
+    <view class="top">
+      <span>✔</span>
+      <span>支持微信支付 · 到期前可随时续费或升级</span>
+    </view>
+    <view class="foot"
+      >开通套餐即代表同意<span bind:tap="agreeHandle"
+        >《秉羲工作台付费服务协议》</span
+      >
+    </view>
+  </view>
+</view>
+<van-dialog useSlot show="{{open}}">
+  <view class="service">联系客服</view>
+  <view catchtap="callServicePhone" class="phone">{{customsPhoneNum}}</view>
+</van-dialog>

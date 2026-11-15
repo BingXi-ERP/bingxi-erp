@@ -1,0 +1,133 @@
+<view class="add-fine-code">
+    <view class="add-fine-code-top">
+        <view class="color">
+            <view class="colors-title" style="font-size:36rpx;font-weight:500;color:#333">色号</view>
+            <view bind:tap="handleShowPickerColorSelect" class="actions-buttons" style="display:flex;">
+                <text class="addColor">添加色号</text>
+                <image class="button-del" mode="aspectFill" src="/assets/images/icon2nd/add.png"></image>
+            </view>
+        </view>
+        <view class="color-list top-border" wx:if="{{colorJarNumFineCodeList.length>0}}">
+            <view class="badge {{index==tabCurrentColor?'badge-primary':'badge-gray'}}" data-id="{{item.id}}" data-index="{{index}}" wx:for="{{colorJarNumFineCodeList}}" wx:key="index">
+                <view bind:tap="handleSwitchColor" class="badge-button g_limtRow" data-id="{{item.colorId}}" data-index="{{index}}">{{item.color+''+item.colorName}}</view>
+                <view bind:tap="handleDelTabColorTab" class="badge-del" data-id="{{item.colorId}}" data-index="{{index}}" wx:if="{{isEdit}}">
+                    <image mode="scaleToFill" src="../../../../assets/images/icon2nd/ic_close.svg"></image>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="add-fine-code-top" style="margin-top:24rpx;">
+        <view class="color">
+            <view class="colors-title" style="font-size:36rpx;font-weight:500;color:#333">缸号</view>
+            <view bind:tap="addJarNum" class="actions-buttons" style="display:flex;">
+                <text class="addCom {{colorJarNumFineCodeList.length<1?'banAdd':''}}">添加缸号</text>
+                <image class="button-del" mode="aspectFill" src="{{icon.banAdd}}" wx:if="{{colorJarNumFineCodeList.length>0}}"></image>
+                <image class="button-del" mode="aspectFill" src="{{icon.banAdd}}" wx:if="{{colorJarNumFineCodeList.length<1}}"></image>
+            </view>
+        </view>
+        <view class="color-list top-border" wx:if="{{selectedjarNumList.length>0}}">
+            <view class="badge {{index==tabCurrentJarNum?'badge-primary':'badge-gray'}}" data-id="{{item.id}}" data-index="{{index}}" wx:for="{{selectedjarNumList}}" wx:key="index">
+                <view bind:tap="handleSwitchJarNum" class="badge-button g_limtRow" data-id="{{item.colorId}}" data-index="{{index}}">{{item.dyelot==''?'无缸号':item.dyelot}}</view>
+                <view bind:tap="handleDelTabJarNum" class="badge-del" data-id="{{item.colorId}}" data-index="{{index}}" wx:if="{{isEdit}}">
+                    <image mode="scaleToFill" src="../../../../assets/images/icon2nd/ic_close.svg"></image>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="add-fine-code-top" style="margin-top:24rpx;">
+        <view class="color">
+            <view class="colors-title" style="font-size:36rpx;font-weight:500;color:#333">细码</view>
+            <view bind:tap="addFineCode" class="actions-buttons" style="display:flex;">
+                <text class="addCom {{selectedjarNumList.length<1?'banAdd':''}}">添加细码</text>
+                <image class="button-del" mode="aspectFill" src="/assets/images/icon2nd/add.png" wx:if="{{selectedjarNumList.length>0}}"></image>
+                <image class="button-del" mode="aspectFill" src="{{icon.banAdd}}" wx:if="{{selectedjarNumList.length<1}}"></image>
+            </view>
+        </view>
+        <view class="color-list top-border" wx:if="{{colorFineCodeList.length>0}}">
+            <view class="badge badge-gray" data-id="{{item.id}}" data-index="{{index}}" wx:for="{{colorFineCodeList}}" wx:key="index">
+                <view class="badge-button g_limtRow">{{item.quantity}}{{item.quantityUnit}}</view>
+                <view bind:tap="handleDelFineCode" class="badge-del" data-id="{{item.colorId}}" data-index="{{index}}" wx:if="{{isEdit}}">
+                    <image mode="scaleToFill" src="../../../../assets/images/icon2nd/ic_close.svg"></image>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="picker-custom picker-color-select" wx:if="{{showPickerColorSelect}}">
+        <view bind:tap="handleHidePickerColorSelect" class="picker-custom-overlay"></view>
+        <view class="picker-custom-wrapper">
+            <text class="picker-custom-title">选择色号</text>
+            <view class="picker-custom-content">
+                <scroll-view scrollY class="color-list" wx:if="{{colorList.length!==0}}">
+                    <view class="chooseBox badge-gray" style="display:inline-block;padding:0 10rpx;margin-bottom:30rpx" wx:for="{{colorList}}" wx:key="index">
+                        <button bind:tap="selectColor" class="badge-button g_limtRow" data-color="{{item.colorVal}}" data-color-name="{{item.colorName}}" data-id="{{item.id}}" data-index="{{index}}" data-item="{{item}}" disabled="{{item.isSelected}}">{{item.colorVal+''+item.colorName}}</button>
+                    </view>
+                </scroll-view>
+                <view class="empty-data" wx:else>该商品暂时没有色号数据 ~</view>
+            </view>
+        </view>
+    </view>
+    <view class="dialog-custom {{isKeyboardActived?'dialog-custom-adjust':''}}" wx:if="{{showDialogColorFineCode}}">
+        <view class="dialog-custom-overlay"></view>
+        <view class="dialog-custom-wrapper">
+            <view class="dialog-custom-head">
+                <view class="dialog-custom-subtitle" wx:if="{{modalJarNumList.length<1}}">已录入0条细码</view>
+                <view class="dialog-custom-subtitle" wx:if="{{modalAloneJarNumList.length<1&&isAddJarNum}}">已录入0条细码</view>
+            </view>
+            <view class="dialog-custom-content">
+                <scroll-view scrollY class="color-tags" wx:if="{{!isAddJarNum}}">
+                    <view class="" wx:for="{{modalJarNumList}}" wx:key="index">
+                        <view class="jarNum">{{item.dyelot==''?'':'缸号'}}{{item.dyelot==''?'无缸号':item.dyelot}}</view>
+                        <view class="dialog-custom-subtitle dataSpace">已录入{{item.quantityDetailModels.length}}条细码</view>
+                        <text class="tag" wx:for="{{item.quantityDetailModels}}" wx:key="index">{{item.quantity}}{{item.quantityUnit}}</text>
+                    </view>
+                </scroll-view>
+                <scroll-view scrollY class="color-tags" wx:if="{{isAddJarNum}}">
+                    <view class="" wx:for="{{modalAloneJarNumList}}" wx:key="index">
+                        <view class="jarNum">{{item.dyelot==''?'':'缸号'}}{{item.dyelot==''?'无缸号':item.dyelot}}</view>
+                        <view class="dialog-custom-subtitle dataSpace">已录入{{item.quantityDetailModels.length}}条细码</view>
+                        <text class="tag" wx:for="{{item.quantityDetailModels}}" wx:key="index">{{item.quantity}}{{item.quantityUnit}}</text>
+                    </view>
+                </scroll-view>
+                <view class="color-tags-empty" wx:if="{{willAddColorCodes.length===0}}"></view>
+                <view class="color-edit-form" wx:if="{{!isAddFineCode}}">
+                    <view class="form-item">
+                        <text class="form-item-label">请输入缸号</text>
+                        <view class="form-item-content">
+                            <input bindinput="inputgetName" data-name="jarNum" placeholder="请输入缸号(非必填)" type="text" value="{{jarNum}}"></input>
+                        </view>
+                    </view>
+                </view>
+                <view class="color-edit-form">
+                    <view class="form-item">
+                        <text class="form-item-label">请输入细码</text>
+                        <view class="form-item-content" style="display:flex;">
+                            <input bindinput="handleInputDecimalLengOne" class="fineCodeInput" confirmHold="false" data-name="colorFineCode" focus="{{isFocusFineCode}}" placeholder="{{placeHolder}}" type="digit" value="{{colorFineCode}}" wx:if="{{showDialogColorFineCode}}"></input>
+                            <picker bindchange="changeUnit" catch:tap="closeKybo" range="{{unit}}" value="{{unitIndex}}">
+                                <view class="fineCode">{{unit[unitIndex]}}</view>
+                                <view style="display:inline-block">
+                                    <image class="fineCodeLogo" mode="aspectFit" src="../../../../assets/images/icon2nd/selectLogo.png"></image>
+                                </view>
+                            </picker>
+                        </view>
+                    </view>
+                    <view class="form-item-error" wx:if="{{colorFineCode.length<1&&ischeckFineCode}}">
+                        <image mode="aspectFit" src="../../../../assets/images/icon2nd/ic_gantanhao.svg"></image>
+                        <text>请输入细码</text>
+                    </view>
+                </view>
+            </view>
+            <view class="dialog-custom-buttons">
+                <view bind:tap="handleFinishedAddColorDetail" style="display:inline-block;width:50%;text-align:center;line-height:100rpx;font-size:32rpx;">完成</view>
+                <button bind:tap="handleAddColorDetail" class="button-primary" wx:if="{{!isAddJarNum}}">{{modalJarNumList.length===0?'添加':'继续添加'}}</button>
+                <button bind:tap="handleAddColorDetail" class="button-primary" wx:if="{{isAddJarNum}}">{{modalAloneJarNumList.length===0?'添加':'继续添加'}}</button>
+            </view>
+        </view>
+    </view>
+    <view style="height:140rpx;width:100%;"></view>
+    <view class="nextStep ">
+        <view class="fr-between-center toolbar-right">
+            <button bind:tap="handleToggleEdit" class="marR g_samllNormalBtn" disabled="{{colorJarNumFineCodeList.length===0}}" wx:if="{{colorJarNumFineCodeList.length!==0}}">{{isEdit?'完成':'编辑'}}</button>
+            <button bind:tap="toPrintFormat" class="marR g_samllBtn" disabled="{{colorJarNumFineCodeList.length===0||isEdit}}">下一步</button>
+        </view>
+    </view>
+</view>

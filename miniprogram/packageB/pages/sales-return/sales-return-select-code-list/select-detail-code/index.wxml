@@ -1,0 +1,86 @@
+<view class="selectCode">
+    <view class="codeInfo">
+        <view class="fl headers">
+            <image class="img" mode="aspectFill" src="{{orderDetailInfo.goodsImgPath}}"></image>
+            <view class="left">
+                <view class="itemTitle g_limtRow f14">{{orderDetailInfo.goodsName}}</view>
+                <view class="f12 codeData">
+                    <view class="fr-between-center">
+                        <view>销售条数：{{orderDetailInfo.itemCount}}条</view>
+                    </view>
+                    <view class="fr-between-center" style="word-break:break-all;">
+                        <text style="margin-right:10rpx;">标签数量：{{orderDetailInfo.goodsQuantityInfo}}</text>
+                    </view>
+                    <view class="fr-between-center" style="word-break:break-all;">
+                        <text>计价数量：{{orderDetailInfo.goodsPriceQuantityInfo}}</text>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <view class="fl f12 itemDetail">
+            <view class="totle g_limtRow">{{orderDetailInfo.goodsSummaryInfo}}</view>
+            <view catch:tap="detailDisplay" class="buttom-toggle">
+                <text>{{setUp?'收起':'展开'}}</text>
+                <image src="{{setUp?icon.up:icon.down}}"></image>
+            </view>
+        </view>
+        <view class="codeSelect" wx:if="{{setUp}}">
+            <text class="product-detail-title">颜色</text>
+            <view class="product-detail-tab">
+                <view catch:tap="detailTableDisplay" class="badge  {{color.goodsColorId===orderDetailInfo.tabCurrentColorId?'badge-primary':'badge-gray'}}" data-index="{{idx}}" data-product-id="{{orderDetailInfo.id}}" wx:for="{{orderDetailInfo.billingGoodsColorModels}}" wx:for-index="idx" wx:for-item="color" wx:key="index">
+                    <text class="badge-button g_limtRow">{{color.colorNo}}{{color.colorName}}</text>
+                    <text class="badge-sup">{{color.dyelotModelList.length}}</text>
+                </view>
+            </view>
+            <text class="product-detail-title">缸号</text>
+            <view class="product-detail-tab">
+                <view catch:tap="changeCurrentDyelot" class="badge  {{dyelotArr.dyelot===orderDetailInfo.tabCurrentDyelotId?'badge-primary':'badge-gray'}}" data-index="{{idx}}" data-product-id="{{orderDetailInfo.id}}" data-product-item="{{orderDetailInfo}}" wx:for="{{orderDetailInfo.tabCurrentDyelot}}" wx:for-index="idx" wx:for-item="dyelotArr" wx:key="index">
+                    <text class="badge-button g_limtRow">{{dyelotArr.dyelot}}</text>
+                    <text class="badge-sup">{{dyelotArr.refundableQuantityModelList.length}}</text>
+                </view>
+            </view>
+            <view class="codeTable">
+                <view class="f12 fr-between-center tableTh">
+                    <view class="thName emty"></view>
+                    <view class="thName">编号</view>
+                    <view class="thName">单价(元)</view>
+                    <view class="thName">可退数量</view>
+                    <view class="thName">小计(元)</view>
+                </view>
+                <view class="f12 fr-between-center tableTr" wx:for="{{orderDetailInfo.tabCurrentColorList}}" wx:for-item="colorList" wx:key="index">
+                    <view bindtap="selectCode" class="checked selectIcon" data-dyelot="{{orderDetailInfo.tabCurrentDyelotId}}" data-id="{{colorList.id}}" data-product-id="{{orderDetailInfo.id}}" data-product-item="{{orderDetailInfo}}" data-select-item="{{colorList}}" style="background-image:url(\"{{colorList.checked?icon.checked:icon.noCheck}}\")"></view>
+                    <view class="g_limtRow">{{index+1}}</view>
+                    <view class="g_limtRow">{{colorList.colorPrice}}/ {{colorList.quantityUnit}}</view>
+                    <input bindblur="handleUpdateColorFineCode" bindinput="handleInputDecimalLengOne" class="" cursorSpacing="50" data-dyelot="{{orderDetailInfo.tabCurrentDyelotId}}" data-id="{{colorList.id}}" data-key="inputCode" data-product-id="{{orderDetailInfo.id}}" data-product-item="{{orderDetailInfo}}" data-select-item="{{colorList}}" placeholderClass="place-holder" type="digit" value="{{colorList.fixedQuantity||colorList.refundableQuantity}}" wx:if="{{colorList.checked}}"></input>
+                    <view class="g_limtRow" wx:else>{{colorList.refundableQuantity}}</view>
+                    <view class="g_limtRow" wx:if="{{colorList.checked}}">{{toFixNum(colorList.fixedColorAmount)}}</view>
+                    <view class="g_limtRow" wx:else>￥{{toFixNum(colorList.refundableQuantity*colorList.colorPrice)}}</view>
+                </view>
+            </view>
+        </view>
+        <view class="totalItem" wx:if="{{setUp}}">
+            <view class="s">退货数量：</view>
+            <view class="detailNum g_limtRow">
+                <block wx:if="{{totalReturnNum.length}}">
+                    <block wx:for="{{totalReturnNum}}" wx:key="index">{{toFixNum(item.refundableQuantity)}} {{item.quantityUnit}}</block>
+                </block>
+                <text wx:else>0</text>
+            </view>
+        </view>
+        <view class="fixed-toolbar-bottom iphone_bottom">
+            <view class="toolbar-left">
+                <view class="f12">
+                    <view class="totle-name">退货合计：</view>
+                    <view class="g_limtRow totle-content">￥<text class="f18">{{toFixNum(fixedGoodsAmount||0)}}</text>
+                    </view>
+                </view>
+            </view>
+            <view class=" toolbar-right">
+                <view class="flex-row toolbar-button-group-right">
+                    <button bind:tap="handleCancel" class="marL g_samllNormalBtn">取消</button>
+                    <button bind:tap="handleComfirm" class="marL g_samllBtn">确定</button>
+                </view>
+            </view>
+        </view>
+    </view>
+</view>

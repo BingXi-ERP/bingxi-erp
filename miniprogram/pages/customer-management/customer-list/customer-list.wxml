@@ -1,0 +1,49 @@
+<view id="customer-list">
+  <view class="header bg-img flex">
+    <view class="left flex">
+      <view class="icon bg-img" wx:if="{{grouping!='-1'}}"></view>
+      <view class="{{grouping!='-1'?'all':'blackList'}}">
+        <view class="count f40 font-white"
+          >{{blackListTotal?blackListTotal:customerData.totalCount}}</view
+        >
+        <view class="title f14 font-white">客户总数</view>
+        <view class="subTitle f10 font-white">（{{subTitle}}）</view>
+      </view>
+    </view>
+    <view class="right flex-column f12 font-white" wx:if="{{grouping!='-1'}}">
+      <view class="block1"
+        >7日新增<text class="count f24">{{customerData.totalOfWeekCount}}</text
+        >人</view
+      >
+      <view class="block2"
+        >15日新增<text class="count f24"
+          >{{customerData.totalOfHalfMonthCount}}</text
+        >人</view
+      >
+    </view>
+  </view>
+  <view class="contain">
+    <view class="explain-wrapper bg-white">
+      <view class="explain bg-gray">
+        <icon class="bg-img icon"></icon>
+        <text class="text f10">{{explain}}</text>
+      </view>
+    </view>
+    <view class="filter-wrapper bg-white">
+      <filter bind:filterTap="filterTap" filterList="{{filterList}}"></filter>
+    </view>
+    <view class="list-wrapper" wx:if="{{customerList!=[]}}">
+      <customer-list-block
+        bind:tabBlock="tabBlock"
+        customerList="{{item}}"
+        wx:for="{{customerList}}"
+        wx:key="index"
+      ></customer-list-block>
+    </view>
+    <view class="no-data flex-column" wx:if="{{customerList.length==0}}">
+      <view class="icon bg-img"></view>
+      <view class="text f16 font-black">暂无数据</view>
+      <view class="text2 f28 font-gray2">SORRY</view>
+    </view>
+  </view>
+</view>

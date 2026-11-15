@@ -1,0 +1,46 @@
+<view id="search">
+  <view class="serch-wrapper bg-white">
+    <search-input
+      bind:confirm="search"
+      bind:getValue="getValue"
+      bind:search="search"
+      placeholder="{{input.placeholder}}"
+      width="648"
+    ></search-input>
+  </view>
+  <view class="type bg-white">
+    <filter bind:filterTap="getFilterTap" filterList="{{filterList}}"></filter>
+  </view>
+  <view>
+    <view class="section">
+      <view
+        bind:tap="handleClickCustom"
+        class="flex-wrp"
+        data-fullname="{{item.fullname}}"
+        data-id="{{item.id}}"
+        data-mobile="{{item.mobile}}"
+        style="flex-direction: row"
+        url="/pages/customer-management/all-customer-detail/all-customer-detail?customerId={{item.id}}"
+        wx:for="{{customerList}}"
+        wx:key="index"
+      >
+        <view class="flex-item-lef">
+          <image
+            src="{{item.headImg?item.headImg+'?imageView2/2/w/200':item.headImg}}"
+            style="width: 80rpx; height: 80rpx; border-radius: 50%"
+          ></image>
+        </view>
+        <view class="flex-item-middle">
+          <view class="userName">{{item.fullname}}</view>
+          <view>
+            <span style="font-size: 24rpx">手机:{{item.mobile}}</span>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+<view class="loading" hidden="{{!searchLoading}}">正在载入更多...</view>
+<view class="loading complete" hidden="{{!searchLoadingComplete}}"
+  >已加载全部</view
+>

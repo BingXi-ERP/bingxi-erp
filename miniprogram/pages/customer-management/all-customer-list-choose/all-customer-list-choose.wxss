@@ -1,0 +1,243 @@
+page {
+  background-color: #eff0f7;
+  padding-bottom: 200rpx;
+}
+.search-code-input {
+  background: #eff0f7;
+  height: 120rpx;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 100%;
+}
+.search-code-input-box {
+  background-color: #fff;
+  border-radius: 32rpx;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 26rpx;
+  justify-content: space-between;
+  margin: 36rpx;
+  padding: 14rpx 28rpx;
+}
+.search-code-input-box input {
+  width: 90%;
+}
+.customer-list {
+  height: 100%;
+  margin-top: 20rpx;
+}
+.item-wrapper {
+  height: 100%;
+  width: 100%;
+}
+.search-btn-wrapper {
+  border-radius: 50rpx;
+  color: #ccc;
+  font-size: 28rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  margin: 20rpx auto;
+  position: relative;
+  width: 640rpx;
+}
+.text {
+  margin-left: 40rpx;
+}
+.search-icon-wrapper {
+  position: absolute;
+  right: 46rpx;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.search-icon-wrapper,
+.search-icon-wrapper image {
+  height: 40rpx;
+  width: 40rpx;
+}
+.type {
+  background: #fff;
+  height: 60rpx;
+  padding: 20rpx 50rpx 0;
+}
+.section {
+  padding-top: 140rpx;
+}
+.section .flex-wrp {
+  background-color: #fff;
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  display: -webkit-flex;
+  display: flex;
+  margin-bottom: 20rpx;
+  margin-left: 34rpx;
+  padding: 28rpx;
+  width: calc(100vw - 68rpx);
+}
+.flex-item-lef {
+  height: 100rpx;
+  margin-right: 28rpx;
+  width: 100rpx;
+}
+.flex-item-lef image {
+  border-radius: 100%;
+  height: 106rpx;
+  width: 106rpx;
+}
+.flex-item-middle {
+  font-size: 28rpx;
+  width: 70%;
+}
+.flex-item-middle,
+.flex-item-right {
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  height: 100rpx;
+}
+.flex-item-right {
+  color: #666;
+  font-size: 24rpx;
+  padding: 16rpx 20rpx;
+  width: 200rpx;
+  width: 70%;
+}
+.right_view {
+  display: -webkit-flex;
+  display: flex;
+  line-height: 30px;
+  position: relative;
+}
+.all-loading {
+  font-size: 26rpx;
+  font-size: 24rpx;
+  margin-top: 10rpx;
+  text-align: center;
+}
+.all-complete {
+  color: #5d5d5d;
+  font-size: 26rpx;
+  margin-top: 54rpx;
+  text-align: center;
+}
+.userName {
+  color: #0b0b0b;
+  display: inline-block;
+  font-size: 28rpx;
+  margin-bottom: 28rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+.customer-phone {
+  color: #5d5d5d;
+  font-size: 26rpx;
+}
+.nav-wrapper {
+  color: #2f7bfd;
+  font-size: 24rpx;
+  height: 852rpx;
+  position: fixed;
+  right: 20rpx;
+  top: 275rpx;
+}
+.nav-item {
+  margin-bottom: 5rpx;
+}
+.fixBottom .btn {
+  background: #e4eeff;
+  border: 1rpx solid #629cff;
+  border-radius: 50rpx;
+  color: #2f7bfd;
+  height: 88rpx;
+  line-height: 88rpx;
+  margin: 0 auto;
+  width: 690rpx;
+}
+.fixBottom .icon {
+  height: 38rpx;
+  margin-right: 16rpx;
+  width: 38rpx;
+}
+.order-item {
+  border-bottom: 1rpx solid #f5f5f5;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 30rpx;
+  line-height: 100rpx;
+  padding-left: 4%;
+  position: relative;
+  width: 96%;
+}
+.title {
+  background: #f5f6fa;
+  font-size: 12px;
+  height: 60rpx;
+  line-height: 60rpx;
+  margin-top: 60rpx;
+  padding-left: 40rpx;
+}
+.title:first-child {
+  margin-top: 0;
+}
+.list-group {
+  background: #fff;
+}
+.list-group-item {
+  -webkit-box-align: center;
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  padding: 40rpx 0 0 60rpx;
+}
+.list-group-item:last-child {
+  padding-bottom: 60rpx;
+}
+.list-group-item .icon {
+  border-radius: 50%;
+  height: 100rpx;
+  width: 100rpx;
+}
+::-webkit-scrollbar {
+  color: transparent;
+  height: 0;
+  width: 0;
+}
+.list-shortcut {
+  background: #fff;
+  border-radius: 10px;
+  font-family: Helvetica;
+  padding: 2px 0;
+  position: fixed;
+  right: 0;
+  text-align: center;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  z-index: 30;
+}
+.list-shortcut text {
+  color: #2f7bfd;
+  display: block;
+  font-size: 24rpx;
+  line-height: 1;
+  padding: 2px;
+}
+.current {
+  color: #000 !important;
+}
+.list-fixed {
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+.fixed-title {
+  background: #f5f6fa;
+  font-size: 12px;
+  height: 60rpx;
+  line-height: 60rpx;
+  padding-left: 40rpx;
+}

@@ -1,0 +1,96 @@
+.searchDemand {
+  background: #fff;
+  color: #333;
+  font-size: 28rpx;
+}
+.fl {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+.searchBar {
+  background-color: #fff;
+  box-sizing: border-box;
+  height: 112rpx;
+  padding: 0 40rpx;
+  width: 100%;
+}
+.searchBar .searchInput {
+  align-items: center;
+  background: #f5f6fa;
+  border-radius: 44rpx;
+  box-sizing: border-box;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+  height: 72rpx;
+  padding: 0 36rpx;
+  position: relative;
+  width: 576rpx;
+}
+.searchInput input {
+  color: #333;
+  font-size: 28rpx;
+  height: 40rpx;
+  padding: 0 36rpx;
+  width: 400rpx;
+}
+.searchWrapper image {
+  height: 40rpx;
+  position: relative;
+  top: 2px;
+  width: 40rpx;
+}
+.searchCancel {
+  color: #4c7cf9;
+  font-size: 16px;
+  font-weight: 400;
+}
+.no-data {
+  background-color: #f5f5f9;
+  padding-top: 150rpx;
+}
+.no-data .icon {
+  height: 250rpx;
+  margin-bottom: 80rpx;
+  width: 300rpx;
+}
+.placeholder {
+  color: #ccc;
+}
+.searchHistory {
+  background: #fff;
+  padding: 12px 36rpx 96rpx;
+  position: relative;
+}
+.searchHistory view {
+  color: #70728c;
+  font-size: 14px;
+  font-weight: 400;
+  height: 96rpx;
+}
+.searchHistory .title {
+  color: #373c55;
+  font-size: 16px;
+  font-weight: 500;
+}
+.searchItem {
+  border-bottom: 1rpx solid #edeff6;
+  box-sizing: border-box;
+}
+.searchHistory .historyClear {
+  border: 1rpx solid #c7c8d8;
+  border-radius: 40rpx;
+  bottom: 0;
+  color: #373c55;
+  font-size: 12px;
+  font-weight: 400;
+  height: 56rpx;
+  line-height: 56rpx;
+  position: absolute;
+  right: 36rpx;
+  text-align: center;
+  width: 140rpx;
+}

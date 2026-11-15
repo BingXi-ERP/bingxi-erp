@@ -1,0 +1,7 @@
+<view class="color-ys-bg"></view>
+<view class="child-lists">
+    <view class="color-ys-bg"></view>
+    <view class="child-list">姓名<input bindinput="input_val" value="{{name}}"></input>
+    </view>
+</view>
+<button bindtap="changeName" class="{{name.length==0?'btn-actives':''}} btn-active">完成</button>

@@ -1,0 +1,165 @@
+page {
+  background-color: #eff0f7;
+  padding-top: 40rpx;
+}
+.selectCode {
+  background-color: #fff;
+  border-radius: 20rpx;
+  margin-left: 38rpx;
+  width: calc(100vw - 68rpx);
+}
+.headers {
+  align-items: flex-start;
+  border-radius: 16rpx;
+  padding: 28rpx;
+}
+.itemDetail {
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  padding: 34rpx 28rpx;
+}
+.headers .img {
+  border-radius: 14rpx;
+  flex-shrink: 0;
+  height: 174rpx;
+  margin-right: 24rpx;
+  width: 174rpx;
+}
+.headers .itemDetail {
+  color: #373c55;
+}
+.itemTitle {
+  margin-bottom: 20rpx;
+  width: 470rpx;
+}
+.codeData {
+  color: #999bb4;
+}
+.fixed-toolbar-bottom {
+  padding: 0 20rpx 50rpx;
+}
+.marL {
+  margin-left: 16rpx;
+}
+.product-detail-title {
+  color: #5d5d5d;
+  display: inline-block;
+  font-size: 26rpx;
+  margin: 0 30rpx 30rpx;
+}
+.product-detail {
+  background: #f6f9fd;
+  box-sizing: border-box;
+  flex: 1;
+  margin-top: 28rpx;
+  width: 100%;
+}
+.product-detail-tab {
+  margin-left: 30rpx;
+  margin-right: 30rpx;
+}
+.codeTable {
+  background-color: #f9f9fb;
+  border-radius: 14rpx;
+  margin: 0 28rpx;
+}
+.product-detail-tab .badge {
+  margin-bottom: 30rpx;
+  margin-right: 30rpx;
+}
+.tableTh,
+.tableTr {
+  flex-wrap: nowrap;
+  font-size: 22rpx;
+  height: 80rpx;
+  padding: 0 32rpx;
+  text-align: center;
+}
+.tableTh > view,
+.tableTr > input,
+.tableTr > view {
+  flex: 1;
+}
+.tableTr > input {
+  background-color: #fff;
+  border-radius: 8rpx;
+  box-shadow: 0 0 0 1px #c7c8d8;
+  opacity: 0.78;
+}
+.tableTh > .selectIcon,
+.tableTr > .selectIcon {
+  flex: inherit;
+}
+.tableTh > .emty,
+.tableTr > .emty {
+  flex: 0.3;
+}
+.tableTr:nth-child(odd) {
+  background: #fff;
+}
+.tableTh {
+  border-bottom: 2rpx solid #0b0b0b;
+  color: #5d5d5d;
+  font-size: 22rpx;
+  font-weight: 500;
+}
+.tableTr {
+  font-weight: 400;
+}
+.totalItem {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: nowrap;
+  font-size: 24rpx;
+  height: 80rpx;
+  padding: 0 32rpx;
+}
+.totalItem .s {
+  margin-right: 10rpx;
+}
+.detailNum {
+  display: inline-block;
+  max-width: 60%;
+  width: inherit;
+}
+.tableTr .addNum {
+  flex: 2;
+  padding-right: 35rpx;
+  text-align: right;
+}
+.strong {
+  color: #ed5c5c;
+}
+.checked {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 30rpx;
+  width: 30rpx;
+}
+.totle-name {
+  color: #373c55;
+  font-size: 24rpx;
+  font-weight: 400;
+}
+.totle-content {
+  color: #e2525a;
+  font-size: 26rpx;
+  font-weight: 600;
+  width: 250rpx;
+}
+.totle-content:first-child {
+  font-size: 22rpx;
+}
+.buttom-toggle {
+  color: #fb562c;
+}
+.buttom-toggle image {
+  height: 8rpx;
+  margin-left: 10rpx;
+  position: relative;
+  top: -4rpx;
+  width: 14rpx;
+}

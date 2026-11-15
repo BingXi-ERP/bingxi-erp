@@ -1,0 +1,20 @@
+<view class="tabBar">
+  <view
+    bind:tap="toPath"
+    class="tab-item"
+    data-index="{{index}}"
+    data-item="{{item}}"
+    wx:if="{{item.perm?userAuthList[item.perm]:true}}"
+    wx:for="{{tabBarList}}"
+    wx:key="index"
+  >
+    <image
+      class="tab-image"
+      mode="aspectFit"
+      src="{{index==actived?item.selectedIconPath:item.iconPath}}"
+    ></image>
+    <text class="{{index==actived?'barBarText adv-text':'barBarText'}}"
+      >{{item.text}}</text
+    >
+  </view>
+</view>

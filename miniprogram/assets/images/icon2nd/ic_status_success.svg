@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 52.2 (67145) - http://www.bohemiancoding.com/sketch -->
+    <title>ic_kaidanchengg@4.5x</title>
+    <desc>Created with Sketch.</desc>
+    <g id="开单" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="卖家端/开单收款成功" transform="translate(-49.000000, -100.000000)" fill="#FFFFFF">
+            <g id="ic_kaidanchengg" transform="translate(49.000000, 100.000000)">
+                <path d="M8,0 C3.58826667,0 0,3.58826667 0,8 C0,12.4117333 3.58826667,16 8,16 C12.4117333,16 16,12.4117333 16,8 C16,3.58826667 12.4117333,0 8,0 Z M8,14.4 C4.47146667,14.4 1.6,11.5285333 1.6,8 C1.6,4.47146667 4.47146667,1.6 8,1.6 C11.5285333,1.6 14.4,4.47146667 14.4,8 C14.4,11.5285333 11.5285333,14.4 8,14.4 Z" id="形状" fill-rule="nonzero"></path>
+                <g id="分组-7" transform="translate(8.242641, 7.242641) rotate(-45.000000) translate(-8.242641, -7.242641) translate(4.742641, 4.742641)">
+                    <rect id="矩形" x="0" y="0" width="2" height="5"></rect>
+                    <rect id="矩形-copy" transform="translate(4.000000, 4.000000) rotate(90.000000) translate(-4.000000, -4.000000) " x="3" y="1" width="2" height="6"></rect>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

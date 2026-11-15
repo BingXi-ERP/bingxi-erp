@@ -1,0 +1,114 @@
+<view class="order-create-success">
+  <van-toast id="van-toast"></van-toast>
+  <view class="steps">
+    <view class="step current">
+      <view class="pointer">1</view>
+      <view class="step-main">订单详情</view>
+    </view>
+    <view class="step">
+      <view class="line"></view>
+    </view>
+    <view class="step current">
+      <view class="pointer">2</view>
+      <view class="step-main">收款信息</view>
+    </view>
+    <view class="step">
+      <view class="line"></view>
+    </view>
+    <view class="step">
+      <view class="pointer">3</view>
+      <view class="step-main">开单成功</view>
+    </view>
+  </view>
+  <view class="order-info panel">
+    <view class="order-total"> <text>¥</text>{{orderAccount}}</view>
+    <view class="order-ok">
+      <image src="{{icon.editorOk}}"></image>
+      <text>您已成功开单！</text>
+    </view>
+    <view class="cell cell-min">
+      <view class="cell-title">订单编号</view>
+      <view class="cell-value">{{orderNo}}</view>
+    </view>
+    <view class="cell cell-min">
+      <view class="cell-title">订单金额</view>
+      <view class="cell-value">{{orderAccount}}</view>
+    </view>
+    <view class="cell cell-min">
+      <view class="cell-title">本次金额</view>
+      <view class="cell-value">{{currentAccount}}</view>
+    </view>
+    <view class="cell cell-min">
+      <view class="cell-title">其他费用</view>
+      <view class="cell-value">{{otherCost}}</view>
+    </view>
+    <view class="cell cell-min">
+      <view class="cell-title">本次优惠</view>
+      <view class="cell-value">{{currentDiscount}}</view>
+    </view>
+    <view class="cell cell-min cell-border-no">
+      <view class="cell-title">收款方式</view>
+      <view class="cell-value">{{paymentText}}</view>
+    </view>
+  </view>
+  <view class="order-info panel">
+    <view class="cell cell-min">
+      <view class="cell-title">客户</view>
+      <view class="cell-value">{{customerName}}</view>
+    </view>
+    <view class="order-info-buttons">
+      <button bindtap="handleShowShareOrder" data-id="{{orderId}}">
+        <text>分享给客户</text>
+        <view>
+          <image mode="aspectFill" src="{{icon.weixin}}"></image>
+          <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+        </view>
+      </button>
+    </view>
+  </view>
+  <view class="fixed-bottom-confirm">
+    <view bindtap="handleOrderCreate" class="button-cancel">继续开单</view>
+    <view
+      bindtap="handleToOrderDetail"
+      class="button-cancel"
+      data-id="{{orderId}}"
+    >
+      <text>订单详情</text>
+    </view>
+    <view
+      bindtap="handleOrderPrint"
+      class="button-confirm"
+      data-id="{{orderId}}"
+      >打印</view
+    >
+  </view>
+  <van-popup
+    round
+    bind:close="handleCloseShareOrder"
+    id="van-popup"
+    show="{{showShareImage}}"
+  >
+    <view class="image-preview">
+      <view class="image-content">
+        <image mode="scaleToFill" src="{{QRCode}}"></image>
+      </view>
+      <view class="image-tip"
+        >此订单仅下单的采购商有权限查看保存图片，分享给微信好友</view
+      >
+      <view class="actions">
+        <button bindtap="handleDownload">保存图片</button>
+      </view>
+    </view>
+  </van-popup>
+  <van-dialog
+    asyncClose
+    showCancelButton
+    useSlot
+    bind:close="handleCloseAuthDialog"
+    bind:opensetting="openSetting"
+    confirmButtonOpenType="openSetting"
+    show="{{showAuth}}"
+  >
+    <view class="auth-apply">“秉羲工作台商家”需要保存图片或者视频到你的相册</view>
+  </van-dialog>
+</view>

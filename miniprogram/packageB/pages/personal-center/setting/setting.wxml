@@ -1,0 +1,56 @@
+<view class="center-list">
+  <view class="optionlMuen">
+    <view
+      catch:tap="toDetailTap"
+      class="fr-between-center muenItem"
+      data-action="{{item.action}}"
+      wx:for="{{panel}}"
+      wx:key="index"
+    >
+      <view class="fl left">
+        <view class="muenText">{{item.title}}</view>
+      </view>
+      <view class="fl right">
+        <view
+          class="QRcodeRed"
+          wx:if="{{item.action=='QRcode'&&QRcodeRed!=='QRcodeRed'}}"
+        ></view>
+        <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+      </view>
+      <button
+        class="contact"
+        openType="contact"
+        sessionFrom="weapp"
+        wx:if="{{item.action=='service'}}"
+      ></button>
+    </view>
+  </view>
+  <view class="optionlMuen">
+    <view
+      catch:tap="toDetailTap"
+      class="fr-between-center muenItem"
+      data-action="{{item.action}}"
+      wx:for="{{teach}}"
+      wx:key="index"
+    >
+      <view class="fl left">
+        <view class="muenText">{{item.title}}</view>
+      </view>
+      <view class="fl right">
+        <image
+          class="meunIcon"
+          src="{{item.hongBao}}"
+          style="margin-right: 0"
+        ></image>
+        <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+      </view>
+      <button
+        class="contact"
+        openType="contact"
+        sessionFrom="weapp"
+        wx:if="{{item.action=='service'}}"
+      ></button>
+    </view>
+  </view>
+  <view bindtap="loginout" class="loginout">退出登录</view>
+</view>

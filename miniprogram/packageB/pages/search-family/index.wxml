@@ -1,0 +1,131 @@
+<view class="search-result">
+  <search-new-bar
+    bind:confirm="handleSearchConfirm"
+    bind:input="handleSearchInput"
+    id="searchNewBar"
+    placeholder="搜索品名、商品编号"
+  ></search-new-bar>
+  <view class="bar_tools flex-justify-end">
+    <view
+      bindtap="handleShowFilter"
+      class="bar_tools_item {{isUseFilter?'bar_tools_active':''}}"
+    >
+      <text>筛选</text>
+      <image
+        mode="aspectFit"
+        src="../../../assets/images/icon2nd/icon_ResultSx.png"
+      ></image>
+    </view>
+  </view>
+  <view class="result_content">
+    <van-empty
+      description="暂无数据"
+      wx:if="{{searchData.length===0}}"
+    ></van-empty>
+    <scroll-view
+      bindscrolltolower="onScrollLower"
+      scrollTop="{{scrollTop}}"
+      scrollY="true"
+      style="height: 98%"
+      wx:else
+    >
+      <result-card
+        authList="{{userAuthList}}"
+        data="{{item}}"
+        plat="{{true}}"
+        platRank="{{true}}"
+        sampleData="{{moreRecommendParent}}"
+        searchId="{{formInline.searchId}}"
+        wx:for="{{searchData}}"
+        wx:key="uuid"
+      >
+        <view
+          class="item_recommand flex-justify-end"
+          style="line-height: 30px"
+          wx:if="{{formInline.mode}}"
+        >
+          <view
+            catchtap="handleColorCard"
+            class="recommand_r"
+            data-item="{{item}}"
+            >电子色卡<van-icon
+              class="icon"
+              color="#909090"
+              name="arrow"
+            ></van-icon>
+          </view>
+        </view>
+      </result-card>
+    </scroll-view>
+  </view>
+  <search-filter
+    bind:confirm="onConfirmFilter"
+    id="searchFilter"
+    searchId="{{formInline.searchId}}"
+    show="{{showSearchFilter}}"
+  ></search-filter>
+</view>
+<van-popup
+  bind:close="closePopup"
+  customClass="popup-wrapper"
+  show="{{hasColorCard}}"
+  zIndex="999"
+>
+  <swiper
+    autoplay="{{swiper.autoplay}}"
+    class="card-swiper"
+    duration="{{swiper.duration}}"
+    indicatorActiveColor="{{swiper.indicatorActiveColor}}"
+    indicatorColor="{{swiper.indicatorColor}}"
+    indicatorDots="{{swiper.indicatorDots}}"
+    interval="{{swiper.interval}}"
+  >
+    <swiper-item wx:for="{{colorList}}" wx:key="index">
+      <view class="share-save-wrap">
+        <view class="share-color">
+          <view class="share-color-wrap">
+            <view
+              class="color-item"
+              wx:for="{{item}}"
+              wx:for-item="node"
+              wx:key="{{node.colorVal}}"
+            >
+              <view
+                class="color"
+                style="background-color:{{node.colorValue||''}}"
+              >
+                <image
+                  mode="aspectFit"
+                  src="{{icon.colorCard}}"
+                  style="width: 40rpx; height: 40rpx"
+                  wx:if="{{!node.colorValue}}"
+                ></image>
+              </view>
+              <view class="color-name">
+                <view class="color-name-arrow"></view
+                >{{node.colorVal||''}}</view
+              >
+              <view
+                class="color-name"
+                style="margin-top: 0"
+                wx:if="{{node.colorName}}"
+                >{{node.colorName||''}}</view
+              >
+            </view>
+          </view>
+        </view>
+      </view>
+    </swiper-item>
+    <swiper-item
+      class="share-swipe-item"
+      wx:for="{{colorChartPaths}}"
+      wx:key="index"
+    >
+      <image
+        mode="aspectFit"
+        src="{{replImage(item,globalApp)}}"
+        style="width: 100%; height: 100%"
+      ></image>
+    </swiper-item>
+  </swiper>
+</van-popup>

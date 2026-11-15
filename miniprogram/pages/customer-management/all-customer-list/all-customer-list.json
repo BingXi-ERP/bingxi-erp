@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "全部客户",
+  "component": true,
+  "usingComponents": {
+    "search-input": "/components/search-input/search-input",
+    "panel-img": "/components/panel-img/panel-img",
+    "filter": "/components/filter/filter",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

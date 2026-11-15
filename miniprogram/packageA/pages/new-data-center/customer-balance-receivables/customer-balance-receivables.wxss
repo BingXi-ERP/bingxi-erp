@@ -1,0 +1,141 @@
+page {
+  background-color: #eff0f7;
+}
+.content {
+  background-color: #fff;
+  border-radius: 20rpx;
+  box-sizing: border-box;
+  font-size: 30rpx;
+  margin-left: 34rpx;
+  margin-top: 42rpx;
+  width: calc(100vw - 68rpx);
+}
+.money-ipt {
+  padding: 28rpx 28rpx 0;
+}
+.box-value {
+  border-bottom: 2rpx solid #f4f4f4;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 26rpx;
+  justify-content: space-between;
+  padding: 20rpx 0 28rpx;
+}
+.place-value {
+  color: #bbb;
+}
+.head-img {
+  height: 226rpx;
+  margin-top: 48rpx;
+  width: 240rpx;
+}
+.money-ipt .ipt-text {
+  border-bottom: 2rpx solid #f4f4f4;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  padding: 20rpx 0 28rpx;
+}
+.money-ipt .view-value {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.money-ipt .name {
+  color: #5d5d5d;
+  font-size: 26rpx;
+}
+.money-ipt .ipt-text text {
+  font-size: 26rpx;
+  margin-left: 20rpx;
+}
+.arrow-right {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 22rpx;
+  margin-left: 20rpx;
+  width: 12rpx;
+}
+.money-ipt text {
+  color: #5d5d5d;
+  font-family: PingFangSC-Medium, PingFangSC;
+  font-size: 26rpx;
+}
+.money-ipt textarea {
+  font-size: 26rpx;
+  height: 112rpx;
+  line-height: 112rpx;
+  line-height: 1.2;
+  padding: 22rpx 0;
+  width: 440rpx;
+  width: 100%;
+}
+.icon-img {
+  height: 34rpx;
+  vertical-align: middle;
+  width: 34rpx;
+}
+.color-btn {
+  background: linear-gradient(90deg, #7ab5ff, #336af8);
+  border-radius: 24px;
+  box-shadow: 0 6px 12px -2px rgba(120, 169, 255, 0.5);
+  color: #fff;
+  font-size: 32rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  margin-top: 64rpx;
+  width: 480rpx;
+}
+.title {
+  color: #0b0b0b;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 28rpx;
+  height: 112rpx;
+  justify-content: center;
+  line-height: 112rpx;
+  padding-left: 32rpx;
+  text-align: center;
+}
+.way-icon {
+  height: 48rpx;
+  margin-right: 24rpx;
+  vertical-align: middle;
+  width: 48rpx;
+}
+.close-icon {
+  color: silver;
+  font-size: 26rpx;
+  left: 32rpx;
+  position: absolute;
+}
+.list-content {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 24rpx;
+  height: calc(100% - 58rpx);
+  justify-content: space-between;
+  padding: 20rpx 32rpx;
+}
+.checked {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 28rpx;
+  margin: 0 auto;
+  width: 28rpx;
+}
+button[disabled] {
+  background: hsla(0, 1%, 46%, 0.6) !important;
+}
+.tips {
+  background-color: #fff9f3;
+  color: #ff7c00;
+  font-size: 20rpx;
+  padding: 14rpx;
+}
+.tips .img {
+  margin-right: 10rpx;
+}

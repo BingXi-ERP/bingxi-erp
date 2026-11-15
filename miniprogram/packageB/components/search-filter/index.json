@@ -1,0 +1,12 @@
+{
+  "component": true,
+  "usingComponents": {
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-button": "/miniprogram_npm/@vant/weapp/button/index",
+    "van-toast": "/miniprogram_npm/@vant/weapp/toast/index",
+    "van-icon": "/miniprogram_npm/@vant/weapp/icon/index",
+    "van-checkbox": "/miniprogram_npm/@vant/weapp/checkbox/index",
+    "van-field": "/miniprogram_npm/@vant/weapp/field/index",
+    "van-notify": "/miniprogram_npm/@vant/weapp/notify/index"
+  }
+}

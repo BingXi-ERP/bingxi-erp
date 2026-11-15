@@ -1,0 +1,12 @@
+<view class="no-power-wrapper">
+  <view class="img-wrapper">
+    <image
+      mode="aspectFit"
+      src="{{errorBg}}"
+      style="width: 120px; height: 120px"
+    ></image>
+  </view>
+  <view class="title">审核不通过</view>
+  <view class="text1">不通过原因：{{reasonsed}}</view>
+  <view bindtap="toMine" class="text2">重新注册</view>
+</view>

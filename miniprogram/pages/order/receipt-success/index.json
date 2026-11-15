@@ -1,0 +1,10 @@
+{
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  },
+  "navigationBarTitleText": "订单详情",
+  "navigationBarBackgroundColor": "#2d74ee",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#eeeeee",
+  "backgroundTextStyle": "light"
+}

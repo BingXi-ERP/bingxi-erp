@@ -1,0 +1,290 @@
+page {
+  background-color: #eff0f7;
+}
+.ingredient {
+  overflow-x: hidden;
+}
+.ingredient .tips text {
+  color: #ff7c00;
+  font-size: 22rpx;
+  margin-left: 10rpx;
+}
+.pageFixed {
+  height: 100vh;
+  left: 0;
+  overflow-y: hidden;
+  position: fixed;
+  right: 0;
+  top: 0;
+}
+.ingredientContent {
+  margin-left: 34rpx;
+  width: calc(100vw - 68rpx);
+}
+.ingredientItem {
+  background-color: #fff;
+  border-radius: 20rpx;
+  margin-bottom: 20rpx;
+  padding: 14rpx 28rpx;
+}
+.ingredientItem input {
+  width: 150rpx;
+}
+.ingredientBtn image {
+  flex-shrink: 0;
+  height: 28rpx !important;
+  width: 28rpx !important;
+}
+.inputArea {
+  border: 2rpx solid #e2e2e2;
+  border-radius: 14rpx;
+  padding: 8rpx 16rpx;
+}
+.iconText {
+  color: #0b0b0b;
+  font-size: 22rpx;
+}
+.percent {
+  color: #0b0b0b;
+  font-size: 26rpx;
+  margin-left: 12rpx;
+}
+.ingredientName {
+  margin-left: 34rpx;
+  width: 220rpx;
+}
+.header {
+  color: #5d5d5d;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 26rpx;
+  margin-bottom: 20rpx;
+  margin-top: 54rpx;
+  padding-left: 34rpx;
+  padding-right: 32rpx;
+}
+.header .chn {
+  padding-left: 94rpx;
+  width: 176rpx;
+}
+.header .en {
+  width: 160rpx;
+}
+.save-btn-wrapper {
+  background-color: #fff;
+  bottom: 0rpx;
+  left: 0rpx;
+  position: fixed;
+  right: 0rpx;
+  width: 100%;
+  z-index: 999;
+}
+.save-btn-wrapper .save-btnn {
+  align-items: center;
+  background-color: #e4eeff;
+  border: 1rpx solid #629cff;
+  border-radius: 44rpx;
+  color: #2f7bfd;
+  display: -webkit-flex;
+  display: flex;
+  height: 88rpx;
+  justify-content: center;
+  margin: 0 auto;
+  width: 690rpx;
+}
+.save-btn-wrapper .save-color {
+  background: #f5f6fa;
+  display: -webkit-flex;
+  display: flex;
+  height: 120rpx;
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+}
+.iconBtn {
+  color: #373c55;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+.iconBtn image {
+  height: 40rpx;
+  margin-bottom: 10rpx;
+  width: 40rpx;
+}
+.SaveBtn {
+  margin: 0 0 0 100rpx;
+  width: 174rpx;
+}
+.g_samllBtn[disabled] {
+  background: #d8d9e3 !important;
+  box-shadow: 0 12rpx 24rpx -4rpx hsla(0, 0%, 77%, 0.5);
+  color: #fff !important;
+}
+.popBody {
+  overflow-x: hidden;
+  padding: 32rpx 32rpx 310rpx;
+  position: relative;
+}
+.popBody .headers {
+  display: -webkit-flex;
+  display: flex;
+  font-size: 28rpx;
+  margin-bottom: 28rpx;
+}
+.popBody .headers .btn-cancel {
+  color: silver;
+  font-size: 26rpx;
+}
+.popBody .headers .btn-add {
+  color: #fb562c;
+  font-size: 26rpx;
+}
+.popBody .content {
+  margin: 0 30rpx;
+}
+.popBody .content-name {
+  color: #5d5d5d;
+  font-size: 26rpx;
+  padding-top: 28rpx;
+}
+.popBody .content-name text {
+  color: red;
+}
+.inputAear {
+  border-bottom: 2rpx solid #f4f4f4;
+}
+.inputAear input {
+  display: inline-block;
+  font-size: 14px;
+  height: 80rpx;
+  line-height: 80rpx;
+  vertical-align: middle;
+  width: 90%;
+}
+.btns {
+  justify-content: flex-end;
+}
+.chooseIngredientBody {
+  box-sizing: border-box;
+  height: 1200rpx;
+  overflow: hidden;
+  padding-bottom: 200rpx;
+  position: relative;
+}
+.popBody .chooseContent {
+  flex-wrap: wrap;
+}
+.popBody .chooseIngredientItem {
+  align-items: center;
+  background: #f9f9fb;
+  border-radius: 14rpx;
+  color: #0b0b0b;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  font-size: 26rpx;
+  height: 122rpx;
+  justify-content: center;
+  margin: 8rpx;
+  position: relative;
+  text-align: center;
+  width: 213rpx;
+}
+.delIngredient {
+  height: 34rpx;
+  position: absolute;
+  right: -8rpx;
+  top: -17rpx;
+  width: 34rpx;
+}
+.popItem {
+  margin-bottom: 42rpx;
+}
+.popBody .checkedItem {
+  border: 2rpx solid #fb562c;
+  border-radius: 14rpx;
+  box-sizing: border-box;
+  color: #fb562c;
+}
+.popBody .chooseName {
+  font-size: 28rpx;
+  width: 90%;
+}
+.popBody .chooseEngName {
+  font-size: 24rpx;
+  margin-top: 10rpx;
+  width: 90%;
+}
+.dialog-title {
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+}
+.dialog-title text {
+  color: #0b0b0b;
+  font-size: 26rpx;
+}
+.dialog-title .btn-cancel {
+  color: silver;
+  font-size: 26rpx;
+}
+.dialog-title .btn-confirm {
+  color: #fb562c;
+  font-size: 26rpx;
+}
+.ingredientBtns {
+  background: #f5f6fa;
+  bottom: 0;
+  height: 120rpx;
+  left: 0;
+  padding: 0 32rpx 64rpx;
+  position: fixed;
+  width: 686rpx;
+}
+.tips {
+  background: #fff9f3;
+  font-size: 12px;
+  height: 52rpx;
+  line-height: 52rpx;
+  padding-left: 36rpx;
+}
+.custom-class {
+  padding-left: 0 !important;
+  padding-right: 0;
+}
+.list-empty-wrapper {
+  text-align: center;
+}
+.noaddress {
+  height: 174rpx;
+  margin-top: 140rpx;
+  width: 182rpx;
+}
+.empty-text {
+  color: #999;
+  font-size: 24rpx;
+  margin-top: 28rpx;
+  text-align: center;
+}
+.search-code-input {
+  width: 100%;
+}
+.search-code-input-box {
+  background-color: #fff;
+  border: 2rpx solid #e2e2e2;
+  border-radius: 60rpx;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 26rpx;
+  justify-content: space-between;
+  margin: 52rpx 0 42rpx;
+  padding: 14rpx 28rpx;
+}
+.cator {
+  color: #fb562c;
+  font-size: 26rpx;
+  margin-left: 12rpx;
+}

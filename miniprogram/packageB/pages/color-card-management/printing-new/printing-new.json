@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "打印标签",
+  "usingComponents": {
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

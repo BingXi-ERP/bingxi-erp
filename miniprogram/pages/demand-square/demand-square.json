@@ -1,0 +1,14 @@
+{
+  "navigationBarTitleText": "需求广场",
+  "navigationBarTextStyle": "white",
+  "enablePullDownRefresh": true,
+  "navigationBarBackgroundColor": "#2D74EE",
+  "onReachBottomDistance": 200,
+  "usingComponents": {
+    "van-tabs": "/miniprogram_npm/@vant/weapp/tabs/index",
+    "van-tab": "/miniprogram_npm/@vant/weapp/tab/index",
+    "cmp-tab-bar": "/components/tab-bar/tab-bar",
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

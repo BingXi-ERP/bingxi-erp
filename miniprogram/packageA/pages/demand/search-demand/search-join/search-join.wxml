@@ -1,0 +1,27 @@
+<view class="sreachResult" wx:if="{{myJoin.length}}">
+    <view bind:tap="toJoinDetail" class="demandItem" data-item-id="{{i.id}}" data-reply-id="{{i.replyId}}" wx:for="{{myJoin}}" wx:for-item="i" wx:key="{{item.title}}">
+        <view class="itemHead fl">
+            <view>需求编号: {{i.askNo}}</view>
+            <view class="waitIcon {{i.statusName==='待审核'?'waitText':i.statusName==='审核通过'?'successText':i.statusName==='审核失败'||i.statusName==='找版失败'?'loseText':'closeText'}}">{{i.statusName}}</view>
+        </view>
+        <view class="itemContent fr-between-center">
+            <view class="itemImg" style="background-image:url(\"{{i.img}}?imageView2/2/w/160\")" wx:if="{{i.img}}"></view>
+            <view class="contentText">
+                <view class="statusText" wx:if="{{i.rewardType==1}}">即将揭晓</view>
+                <view class="statusText" wx:if="{{i.rewardType==2}}">获得补贴￥ {{i.askRewardAmount}}</view>
+                <view class="statusText" wx:if="{{i.rewardType==3}}">参与奖￥ {{i.askRewardAmount}}</view>
+                <view class="failText" wx:if="{{i.noMatchReason}}">原因：{{i.noMatchReason}}</view>
+                <view class="statusTime">{{i.createTime}}</view>
+            </view>
+        </view>
+    </view>
+    <view class="more">
+        <view class="moreIcon" wx:if="{{!isAll}}">上拉更多</view>
+        <view class="moreIcon" wx:if="{{isAll}}">这是底线</view>
+    </view>
+</view>
+<view class="noResult" wx:if="{{!myJoin.length}}">
+    <view class="noPage"></view>
+    <view class="title">暂无回复</view>
+    <view class="text">马上去需求广场回复赚补贴</view>
+</view>

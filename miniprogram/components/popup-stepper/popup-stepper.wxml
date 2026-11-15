@@ -1,0 +1,21 @@
+<van-popup bind:close="onClose" overlay="{{overlay}}" position="{{position}}" show="{{show}}" zIndex="999">
+    <view class="header">
+        <view class="has-chosen-card-text">已选色卡</view>
+        <view bindtap="delList" class="del-list-text">删除列表</view>
+    </view>
+    <view class="content">
+        <view class="item-block" wx:for="{{colorCardList}}" wx:key="index">
+            <view class="item-name">
+                <view bindtap="minTap" class="min" data-index="{{index}}" style="background-image:url(\"{{delBg}}\")"></view>
+                <view>{{item.goodsname}}</view>
+            </view>
+            <view class="stepper-wrapper">
+                <text> *{{item.count}} </text>
+            </view>
+        </view>
+    </view>
+    <view class="footer">
+        <view class="has-chosen-btn">已选（{{total==''?colorCardList.length:total}}）</view>
+        <view bindtap="confirm" class="confirm-btn">确定</view>
+    </view>
+</van-popup>

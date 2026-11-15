@@ -1,0 +1,133 @@
+page {
+  background: #f4f4f8;
+}
+.inviteRegister {
+  overflow: hidden;
+}
+.positonBgImg {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+.inputBtn button {
+  bottom: 0;
+  left: 0;
+  position: relative !important;
+  transform: none !important;
+}
+.inputBtn button[disabled] {
+  background: #d8d9e3 !important;
+  box-shadow: 0 12rpx 24rpx -4rpx hsla(0, 0%, 77%, 0.5);
+  color: #fff !important;
+}
+.headerImg {
+  height: 480rpx;
+  width: 100vw;
+}
+.friendTalk {
+  height: 180rpx;
+  padding-left: 32rpx;
+}
+.friendTalk .text {
+  box-sizing: border-box;
+  color: #373c55;
+  font-family: PingFangSC-Light;
+  font-size: 12px;
+  font-weight: 300;
+  height: 124rpx;
+  padding: 25rpx 50rpx 0 40rpx;
+  width: 580rpx;
+}
+.friendTalk .userImg {
+  border-radius: 50%;
+  height: 112rpx;
+  width: 112rpx;
+}
+.inputInfo {
+  margin-bottom: 60rpx;
+  padding: 0 32rpx;
+}
+.inputVal {
+  background: #fff;
+  border-radius: 16rpx;
+  box-sizing: border-box;
+  height: 96rpx;
+  margin-bottom: 32rpx;
+  padding: 0 40rpx;
+  width: 686rpx;
+}
+.inputVal input {
+  flex: 2;
+}
+.verificationCode {
+  background: #fff;
+  color: #336af8;
+  font-family: PingFangSC-Regular;
+  font-size: 14px;
+  font-weight: 400;
+}
+.inputVal button[disabled] {
+  background: #fff;
+  border: 0;
+}
+.placeholder {
+  color: #c7c8d8;
+  font-family: PingFangSC-Light;
+  font-size: 14px;
+  font-weight: 300;
+}
+.agreePage {
+  color: #4077f9;
+  font-size: 12px;
+}
+.nonmal {
+  color: #999bb4;
+  font-family: PingFangSC-Regular;
+  font-size: 12px;
+  font-weight: 400;
+}
+.register-check {
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+  font-size: 12px;
+  justify-content: center;
+  margin: 30rpx auto;
+}
+.check {
+  height: 30px;
+  margin-right: 10rpx;
+}
+.noCheck {
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+.noCheck,
+.register-check image {
+  height: 32rpx;
+  width: 32rpx;
+}
+.mask {
+  background: rgba(0, 0, 0, 0.6);
+  height: 100vh;
+  left: 0;
+  position: fixed;
+  top: 0;
+  width: 100vw;
+  z-index: 900;
+}
+.mask text {
+  background-color: rgba(0, 0, 0, 0.8);
+  border-radius: 20rpx;
+  color: #fff;
+  height: 60rpx;
+  left: 50%;
+  line-height: 60rpx;
+  margin-left: -130rpx;
+  position: absolute;
+  text-align: center;
+  top: 40%;
+  width: 260rpx;
+  z-index: 999;
+}

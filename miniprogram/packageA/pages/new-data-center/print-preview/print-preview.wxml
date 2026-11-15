@@ -1,0 +1,17 @@
+<view class="imgCon" style="width:{{imageList.length*1000+200}}rpx">
+  <image
+    bindtap="imgPre"
+    class="orderImg"
+    src="{{item}}"
+    wx:for="{{imageList}}"
+    wx:key="index"
+  ></image>
+</view>
+<view class="add-btn-wrapper">
+  <view bindtap="saveImg" class="g_bottomBtn">
+    <view>保存相册</view>
+    <form bindsubmit="formSubmit" reportSubmit="{{true}}">
+      <button class="form-btn" formType="submit"></button>
+    </form>
+  </view>
+</view>

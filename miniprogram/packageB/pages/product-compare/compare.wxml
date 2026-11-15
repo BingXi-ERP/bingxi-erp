@@ -1,0 +1,94 @@
+<view class="container-product">
+  <view class="select-tip">
+    <view class="tip">
+      <van-icon color="#ED9215" name="warning"></van-icon>选择要对比的产品</view
+    >
+  </view>
+  <view class="scrollable-container">
+    <view class="product-list">
+      <view class="product-item" wx:for="{{products}}" wx:key="index">
+        <image class="product-img" src="{{item.imageTwo}}"></image>
+        <text class="product-name">{{item.productName}}</text>
+        <van-checkbox
+          bind:change="checkboxChange"
+          checkedColor="#FB562C"
+          class="product-checkbox"
+          data-index="{{index}}"
+          value="{{item.checked}}"
+        ></van-checkbox>
+      </view>
+    </view>
+  </view>
+  <view class="fixed-bottom">
+    <button bind:tap="startCompare" class="compare-btn">开始对比</button>
+  </view>
+  <van-dialog
+    useSlot
+    bind:close="onClose"
+    show="{{showResult}}"
+    showConfirmButton="{{false}}"
+    title="产品对比结果"
+    width="90%"
+  >
+    <view class="result-table">
+      <view class="result-row" style="height: 130rpx">
+        <text class="result-label" style="height: 130rpx"></text>
+        <view
+          class="result-value1"
+          style="height: 130rpx; z-index: 100"
+          wx:for="{{selectedProducts}}"
+          wx:key="index"
+        >
+          <image class="little-img" mode="" src="{{item.imageTwo}}"></image>
+        </view>
+      </view>
+      <view class="result-row">
+        <text class="result-label">品名</text>
+        <text class="result-value" wx:for="{{selectedProducts}}" wx:key="index"
+          >{{item.productName}}
+        </text>
+      </view>
+      <view class="result-row">
+        <text class="result-label">成分</text>
+        <text class="result-value" wx:for="{{selectedProducts}}" wx:key="index"
+          >{{item.material}}
+        </text>
+      </view>
+      <view class="result-row">
+        <text class="result-label">克重</text>
+        <text class="result-value" wx:for="{{selectedProducts}}" wx:key="index"
+          >{{item.gramWeight||'--'}} {{item.weightUnit}}
+        </text>
+      </view>
+      <view class="result-row">
+        <text class="result-label">门幅</text>
+        <text class="result-value" wx:for="{{selectedProducts}}" wx:key="index"
+          >{{item.clothWidth||'--'}} {{item.clothWidthUnit||''}}
+        </text>
+      </view>
+      <view class="result-row">
+        <text class="result-label">空差</text>
+        <text class="result-value" wx:for="{{selectedProducts}}" wx:key="index"
+          >{{item.clothEnough||'--'}}
+        </text>
+      </view>
+      <view class="result-row">
+        <text class="result-label">工艺</text>
+        <text class="result-value" wx:for="{{selectedProducts}}" wx:key="index"
+          >{{item.predictPostProcess||'--'}}
+        </text>
+      </view>
+    </view>
+    <van-button
+      block
+      hairline
+      plain
+      round
+      bindtap="closeResult"
+      class="close-btn"
+      color="#FB562C"
+      type="warn"
+      >关闭</van-button
+    >
+  </van-dialog>
+</view>

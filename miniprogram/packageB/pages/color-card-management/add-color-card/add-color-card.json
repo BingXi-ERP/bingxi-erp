@@ -1,0 +1,11 @@
+{
+  "navigationBarTitleText": "新增面料",
+  "component": true,
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "usingComponents": {
+    "van-popup": "/miniprogram_npm/@vant/weapp/popup/index",
+    "van-field": "/miniprogram_npm/@vant/weapp/field/index",
+    "van-icon": "/miniprogram_npm/@vant/weapp/icon/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

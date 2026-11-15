@@ -1,0 +1,62 @@
+<template name="colorcard">
+    <view style="height:100%">
+        <view class="search-box">
+            <image alt="" class="search-icon" mode="aspectFit" src="/assets/images/icon2nd/symbols-search.png"></image>
+            <input bindtap="toSearch" class="search-input" disabled="true" id="colorSearch" placeholder="请输入色卡编号/品名"></input>
+        </view>
+        <view class="data-null"></view>
+        <block wx:if="{{cardList.length>0}}">
+            <view class="color-data-list" wx:for="{{cardList}}" wx:key="{{index}}">
+                <view class="media-list">
+                    <view bindtap="onJump" class="list-info" id="{{item.goodsId}}">
+                        <view class="list-info-img">
+                            <image lazyLoad="true" mode="aspectFill" src="{{replImage(item.mainImgPath,app,210)}}"></image>
+                        </view>
+                        <view class="list-info-info">
+                            <text class="f14">品名：{{item.goodsName}}</text>
+                            <text class="f14" wx:if="{{item.goodsNo.length>0&&item.goodsNo!=0}}">编号：{{item.goodsNo||'--'}}</text>
+                            <text class="f14" wx:if="{{item.breadth!=0}}">幅宽：{{item.breadth}}  {{item.breadthUnit}}</text>
+                            <text class="f14" wx:if="{{item.ingredient!=0}}">成分：{{item.ingredient}}</text>
+                            <text class="f14" wx:if="{{userMobile==false||item.goodsPriceMin==0||item.goodsPriceMin==0}}">价格：<text class="red f18">面议</text>
+                            </text>
+                            <text class="f14" wx:elif="{{userMobile==true&&item.goodsPriceMin==item.goodsPriceMax}}">价格：<text class="red f18">￥{{item.goodsPriceMin}}/{{item.priceUnit}}</text>
+                            </text>
+                            <text class="f14" wx:elif="{{userMobile==true}}">价格：<text class="red">￥{{item.goodsPriceMin}}~{{item.goodsPriceMax}}/{{item.priceUnit}}</text>
+                            </text>
+                        </view>
+                    </view>
+                    <view class="list-setting">
+                        <view bindtap="showDialogBtn" class="list-setting-left" data-value="{{item.remark}}" id="{{item.favoriteId}}">
+                            <image class="icon-edit" mode="aspectFit" src="{{bgiconGray}}"></image>
+                            <input class="f12" disabled="true" placeholder="添加备注" value="{{item.remark}}"></input>
+                        </view>
+                        <view class="list-setting-right">
+                            <text class="f12">浏览量:{{item.viewCount}}</text>
+                            <text class="f12">收藏量:{{item.favoriteCount}}</text>
+                        </view>
+                    </view>
+                </view>
+            </view>
+        </block>
+        <view class="color-data-list-null" wx:else>
+            <image mode="aspectFit" src="/assets/images/icon2nd/symbols-color-l.png"></image>
+            <text class="f14">你没有收藏任何色卡~</text>
+        </view>
+        <view catchtouchmove="preventTouchMove" class="modal-mask" wx:if="{{showModal}}"></view>
+        <view class="modal-dialog" wx:if="{{showModal}}">
+            <form bindsubmit="bindFormSubmit">
+                <view class="modal-title">色卡备注</view>
+                <view class="modal-content">
+                    <view class="modal-input">
+                        <input autoFocus="true" class="input" name="textarea" placeholder="请填写色卡备注" value="{{textContent}}"></input>
+                    </view>
+                </view>
+                <view class="modal-footer">
+                    <view bindtap="onCancel" class="btn-cancel" data-status="cancel">取消</view>
+                    <button class="btn-confirm" formType="submit">确定</button>
+                </view>
+            </form>
+        </view>
+    </view>
+</template>
+<wxs module="replImage" src="../../../../utils/replImages.wxs"/>

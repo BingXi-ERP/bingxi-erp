@@ -1,0 +1,66 @@
+<view class="duibu_product">
+  <view class="db-card">
+    <view class="preview-img-wrap justify-between">
+      <view
+        bindtap="handleClickPreviewImg"
+        class="preview-img-item"
+        data-index="{{imgIndex}}"
+        data-item="{{imgItem}}"
+        data-type="{{1}}"
+        wx:for="{{duibuImgConfig}}"
+        wx:for-index="imgIndex"
+        wx:for-item="imgItem"
+        wx:key="prop"
+      >
+        <van-image
+          fit="cover"
+          height="5rem"
+          position="center"
+          src="{{replImage(imgItem.value[0],globalApp,350)}}"
+          width="5rem"
+        ></van-image>
+        <view class="preview-cover van-ellipsis">{{imgItem.label}}</view>
+      </view>
+    </view>
+  </view>
+  <van-cell-group
+    inset
+    customClass="group-cell-product"
+    wx:for="{{infoConfig}}"
+    wx:key="value"
+  >
+    <van-cell
+      title="{{node.label}}"
+      titleClass="cell-title-color"
+      value="{{formInline[node.prop]}}"
+      valueClass="cell-value-color"
+      wx:for="{{item.options}}"
+      wx:for-item="node"
+      wx:key="nprop"
+    ></van-cell>
+  </van-cell-group>
+  <view class="db-card db-mt-8">
+    <text class="title">电子色卡</text>
+    <view class="preview-img-wrap">
+      <view
+        bindtap="handleClickPreviewImg"
+        class="preview-img-item color_card_item"
+        data-index="{{imgIndex}}"
+        data-item="{{imgItem}}"
+        data-type="{{2}}"
+        wx:for="{{formInline.colorChartRespList}}"
+        wx:for-index="imgIndex"
+        wx:for-item="imgItem"
+        wx:key="imgIndex"
+      >
+        <van-image
+          fit="cover"
+          height="70"
+          position="center"
+          src="{{replImage(imgItem.colorChartPathMini,globalApp,350)}}"
+          width="70"
+        ></van-image>
+      </view>
+    </view>
+  </view>
+</view>

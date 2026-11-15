@@ -1,0 +1,75 @@
+<view class="user-center-wrapper">
+    <image bindtap="toDebug" class="debugBtn" mode="widthFix" src="{{iconDebug}}" wx:if="{{isShowDebugBtn}}"></image>
+    <view bindtap="toEditInfo">
+        <view class="avatar bg-img" style="background-image:url(\"{{avatar}}\")">
+            <view class="role-icon" style="background-image:url(\"{{icon.boss}}\")" wx:if="{{userType==3}}"></view>
+            <view class="role-icon" style="background-image:url(\"{{icon.worker}}\")" wx:if="{{userType==4}}"></view>
+        </view>
+        <view wx:if="{{userType===5}}">
+            <view class="shop-name f16 g_limtRow">{{defaultTitle}}</view>
+            <view class="fl">
+                <view class="name f11 g_limtRow">{{defaultName}}</view>
+            </view>
+        </view>
+        <view wx:else>
+            <view class="shop-name f16 g_limtRow">{{shopInfo.shopName||'-'}}</view>
+            <view class="fl">
+                <view class="name f12 g_limtRow" wx:if="{{userType==4||userType==3}}">{{nickName||'-'}}</view>
+                <view class="name f11 g_limtRow" wx:else>{{fullName||nickName||'-'}}</view>
+            </view>
+        </view>
+    </view>
+    <view class="combo" wx:if="{{comboData.canPurchase}}">
+        <view class="lock">🔒</view>
+        <view>
+            <view class="tips">尚未开通套餐</view>
+            <view class="tips">开通即可使用全部功能，老用户首年8折</view>
+        </view>
+        <button bind:tap="openCombo">立即开通</button>
+    </view>
+    <view class="combo" wx:else>
+        <view class="lock">🔓</view>
+        <view>
+            <view class="tips">当前套餐：{{comboData.packageName}}</view>
+            <view class="tips">有效期至 {{comboData.expireTime}}<span class="dot">子账号上限{{comboData.subAccountLimit}}个</span>
+            </view>
+        </view>
+        <button bind:tap="openCombo">查看</button>
+    </view>
+    <view class="personal-child fl">
+        <view catch:tap="toDetailTap" class="muen-child" data-action="{{item.action}}" data-auth="{{item.noAuth}}" wx:for="{{panel}}" wx:key="index">
+            <view class="child-box" style="background:{{item.bgcolor}};">
+                <image class="child-icon" src="{{item.img}}"></image>
+            </view>
+            <view class="child-text">{{item.title}}</view>
+            <button class="contact" openType="contact" sessionFrom="weapp" wx:if="{{item.action=='service'}}"></button>
+        </view>
+    </view>
+    <view class="personal-muen">
+        <view class="more">更多服务</view>
+        <view catchtap="toDetailTap" class="fr-between-center muen-item" data-action="{{item.action}}" data-auth="{{item.noAuth}}" wx:for="{{panelMuen}}" wx:key="index">
+            <view class="fl left">
+                <image class="meun-icon" src="{{item.img}}"></image>
+                <view class="muen-text">{{item.title}}</view>
+            </view>
+            <view class="fl right">
+                <image class="meun-icon" src="{{item.hongBao}}" style="margin-right:0" wx:if="{{item.action==='myWallet'&&redPointList.balanceAmount>0}}"></image>
+                <view class="openShopStatus" wx:if="{{item.action==='openShop'}}">{{openShopStatus==0?'审核中':openShopStatus==1?'已开通':'申请成为供货商'}}</view>
+                <view catchtap="callServicePhone" class="fl contactCustomer" wx:if="{{item.action==='service'}}">
+                    <image class="contactIcon" src="{{icon.contact}}"></image>
+                    <view>{{customsPhoneNum}}（微信同步）</view>
+                </view>
+                <van-icon color="#5D5D5D" name="arrow" size="24rpx" wx:if="{{item.action!=='service'}}"></van-icon>
+            </view>
+            <button class="contact" openType="contact" sessionFrom="weapp" wx:if="{{item.action=='service'}}"></button>
+        </view>
+    </view>
+    <view class="approveMask" wx:if="{{openShopPopup}}">
+        <view class="approve">
+            <view class="title">审核通过</view>
+            <view class="content">您提交的开店申请已审核通过，请退出后重新登录~</view>
+            <view catch:tap="closePopup" class="toBtn">确定</view>
+        </view>
+    </view>
+</view>
+<cmp-tab-bar active="{{active}}"></cmp-tab-bar>

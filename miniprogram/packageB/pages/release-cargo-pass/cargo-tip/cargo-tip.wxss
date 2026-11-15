@@ -1,0 +1,23 @@
+page {
+  background-color: #f8f8f8;
+}
+.cargo-warp {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  margin-top: 300rpx;
+}
+.suss_box {
+  height: 80rpx;
+  margin-bottom: 20rpx;
+  width: 80rpx;
+}
+.suss_box image {
+  height: 100%;
+  width: 100%;
+}
+.text {
+  line-height: 60rpx;
+}

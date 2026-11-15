@@ -1,0 +1,12 @@
+{
+  "navigationBarTitleText": "个人中心",
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "component": true,
+  "enablePullDownRefresh": false,
+  "usingComponents": {
+    "panel-img": "/components/panel-img/panel-img",
+    "cmp-tab-bar": "/components/tab-bar/tab-bar",
+    "van-icon": "/miniprogram_npm/@vant/weapp/icon/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

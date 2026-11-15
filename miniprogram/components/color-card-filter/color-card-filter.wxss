@@ -1,0 +1,161 @@
+.color-card-filter-wrapper {
+  align-items: center;
+  background-color: #fff;
+  display: -webkit-flex;
+  display: flex;
+}
+.tab-wrapper {
+  color: #999bb4;
+  text-align: center;
+}
+.filter-wrapper {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex: 1;
+}
+.filter-wrapper .icon {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 24rpx;
+  margin: 0 10rpx 0 100rpx;
+  width: 24rpx;
+}
+.filter-wrapper .name {
+  color: #333;
+  font-size: 24rpx;
+}
+.filter-area {
+  background-color: #fff;
+  padding: 30rpx 0;
+}
+.filter-area .text {
+  align-items: center;
+  color: #666;
+  display: -webkit-flex;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 28rpx;
+  justify-content: flex-start;
+  padding: 30rpx 0;
+}
+.filter-area .text .item {
+  position: relative;
+}
+.filter-area .text .name {
+  background-color: #f8f9fc;
+  margin: 0 30rpx 20rpx;
+  padding: 8rpx 0;
+  text-align: center;
+  width: 276rpx;
+}
+.filter-area .text .icon {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: cover;
+  bottom: 20rpx;
+  height: 30rpx;
+  position: absolute;
+  right: 30rpx;
+  width: 28rpx;
+}
+.btn-wrapper {
+  height: 100%;
+  overflow: hidden;
+}
+.btn-wrapper > view {
+  float: right;
+  font-size: 28rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  text-align: center;
+  width: 128rpx;
+}
+.cancel {
+  background-color: #e4eeff;
+  border-radius: 30rpx 0 0 30rpx;
+  color: #2f7bfd;
+}
+.confirm {
+  background-color: #2f7bfd;
+  border-radius: 0 30rpx 30rpx 0;
+  color: #fff;
+  margin-right: 40rpx;
+}
+.active,
+.filterActive {
+  color: #2f7bfd !important;
+}
+.active {
+  background-color: #e4eeff !important;
+}
+.tabBar {
+  display: inline-block;
+  font-size: 28rpx;
+  height: 96rpx;
+  line-height: 96rpx;
+  width: 240rpx;
+}
+.tabBarCenter {
+  margin: 0 auto;
+}
+.SellBar {
+  background: #2f7bfd;
+  border-radius: 8rpx;
+  height: 8rpx;
+  left: 30%;
+  position: absolute;
+  top: 78rpx;
+  width: 80rpx;
+}
+.sell {
+  position: relative;
+}
+.unSellBar {
+  background: #2f7bfd;
+  border-radius: 8rpx;
+  height: 8rpx;
+  left: 26%;
+  position: absolute;
+  top: 50rpx;
+  width: 80rpx;
+}
+.unSell {
+  display: inline-block;
+  font-size: 28rpx;
+  padding: 0 45rpx;
+  position: relative;
+}
+.choosedBar {
+  color: #4c7cf9;
+}
+.filterChoose {
+  background-color: #fff;
+  box-sizing: border-box;
+  color: #999bb4;
+  font-size: 28rpx;
+  height: 96rpx;
+  padding: 0 80rpx;
+  width: 100%;
+}
+.filterChoose image {
+  height: 24rpx;
+  width: 24rpx;
+}
+.itemCheck {
+  color: #373c55;
+}
+.filterItem text {
+  margin-right: 16rpx;
+}
+.fr-between-center {
+  justify-content: space-between;
+}
+.fl,
+.fr-between-center {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+}

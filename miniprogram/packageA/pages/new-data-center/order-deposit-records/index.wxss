@@ -1,0 +1,136 @@
+.top-date-select {
+  align-items: center;
+  background: #dfe9ff;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+  height: 106rpx;
+  justify-content: center;
+  margin: 36rpx 50rpx 0 0rpx;
+  width: 100%;
+}
+.data-choose {
+  color: #4c7cf9;
+  font-size: 28rpx;
+  font-weight: 500;
+  height: 60rpx;
+  line-height: 60rpx;
+  text-align: center;
+  width: 260rpx;
+}
+.dateRange {
+  color: #4c7cf9;
+  font-size: 32rpx;
+}
+.records-list {
+  background: #fff;
+  padding: 0 32rpx 100rpx;
+  position: relative;
+}
+.list-item {
+  padding: 20rpx 0;
+}
+.list-left {
+  align-items: flex-start;
+  display: -webkit-flex;
+  display: flex;
+  flex-direction: row;
+  height: 120rpx;
+  justify-content: space-around;
+}
+.list-item .item-text {
+  display: inline-block;
+  line-height: 1em;
+  max-width: 300rpx;
+}
+.list-item image {
+  height: 48rpx;
+  margin-right: 32rpx;
+  vertical-align: middle;
+  width: 48rpx;
+}
+.list-top {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  height: 80rpx;
+  justify-content: space-between;
+  position: relative;
+}
+.list-top .left text {
+  color: #373c55;
+  font-size: 28rpx;
+}
+.list-top .right {
+  color: #37c172;
+  font-size: 36rpx;
+}
+.list-bottom {
+  align-items: flex-end;
+  border-bottom: 1rpx solid #edeff6;
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 0 32rpx 80rpx;
+}
+.list-bottom .left text,
+.list-bottom .right text {
+  color: #999bb4;
+  display: block;
+  font-size: 24rpx;
+}
+.discount-text {
+  color: #999bb4;
+  font-size: 24rpx;
+}
+.right-text {
+  max-width: 265rpx;
+  text-align: right;
+}
+.noDataComtent {
+  margin-bottom: 100rpx;
+}
+.noDataBg {
+  background-position: 50%;
+  background-repeat: no-repeat;
+  background-size: 300rpx 300rpx;
+  height: 300rpx;
+  margin-top: 330rpx;
+  width: 100%;
+}
+.noDataContent {
+  color: #999;
+  font-size: 24rpx;
+  font-weight: 400;
+  height: 34rpx;
+  line-height: 34rpx;
+  margin-top: 20rpx;
+  text-align: center;
+  width: 100%;
+}
+.item-right-text {
+  max-width: 240rpx;
+}
+.more {
+  height: 120px;
+  position: relative;
+}
+.moreIcon {
+  color: #999bb4;
+  font-size: 24rpx;
+  height: 34rpx;
+  left: 50%;
+  position: absolute;
+  text-align: center;
+  top: 10rpx;
+  transform: translateX(-50%);
+  width: 170rpx;
+}
+.list-item .invalid-icon {
+  height: 144rpx;
+  margin: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 144rpx;
+}

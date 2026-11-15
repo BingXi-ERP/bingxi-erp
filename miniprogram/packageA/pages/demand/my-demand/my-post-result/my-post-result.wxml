@@ -1,0 +1,35 @@
+<view class="noData" wx:if="{{showNoData}}">
+    <image src="{{icon.noImg}}"></image>
+</view>
+<view bindtap="toHome" class="toHome" wx:if="{{showIcon===1}}">
+    <image src="../../../../assets/images/Icon_Backtohome@2x.png" style="width:144rpx;height:144rpx;;"></image>
+</view>
+<view class="myPostResult" wx:if="{{!showNoData}}">
+    <view catch:tap="toResultDetail" class="demandItem" data-item-id="{{i.id}}" wx:for="{{postResult}}" wx:for-item="i" wx:key="{{item.title}}">
+        <view class="itemContent fl">
+            <view class="itemImg" style="background-image:url(\"{{i.img}}?imageView2/2/w/160\")" wx:if="{{i.img}}"></view>
+            <view class="itemContentText">
+                <view class="titleName g_limtRow">
+                    <view class="marB">剪版价：{{i.partPrice}}元/{{i.partPriceUnit}}</view>
+                    <view class="s">大货价：{{i.bulkPrice}}元/{{i.bulkPriceUnit}}</view>
+                </view>
+                <view class="waitIcon {{i.matchStatusName==='找版中'||i.matchStatusName==='待确认'?'waitText':i.matchStatusName==='已剪版'||i.matchStatusName==='已下大货'||i.matchStatusName==='已领色卡'?'successText':''}}">{{i.matchStatusName}}</view>
+            </view>
+            <view class="bg-img rightIcon" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+        </view>
+        <view class="footerBtn">
+            <text>{{i.pushTime}}</text>
+            <view class="rightBtn" wx:if="{{i.isShowOrderBtn===1}}">
+                <form bindsubmit="formSubmit" reportSubmit="true">
+                    <button catch:tap="toPostResult" class="postbtn blueBtn" data-item="{{i}}" data-item-id="{{i.id}}" data-type="0" formType="submit">领色卡</button>
+                </form>
+                <form bindsubmit="formSubmit" reportSubmit="true">
+                    <button catch:tap="toPostResult" class="postbtn blueBtn" data-item="{{i}}" data-item-id="{{i.id}}" data-type="1" formType="submit">剪版</button>
+                </form>
+                <form bindsubmit="formSubmit" reportSubmit="true">
+                    <button catch:tap="toPostResult" class="buyBtn g_samllBtn" data-item="{{i}}" data-item-id="{{i.id}}" data-type="2" formType="submit">买大货</button>
+                </form>
+            </view>
+        </view>
+    </view>
+</view>

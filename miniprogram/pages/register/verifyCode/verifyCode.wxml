@@ -1,0 +1,17 @@
+<view class="page-container">
+    <view class="top-area">
+        <view class="app-name">
+            <image src="{{icon.duibuLogo}}"></image>
+        </view>
+        <view class="app-title">秉羲工作台</view>
+        <view class="app-slogan">登录账号以使用更多服务</view>
+    </view>
+    <view class="code-area">
+        <view class="code-display">
+            <input bindinput="onCodeNumberInput" class="code-number" maxlength="6" placeholder="短信验证码" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="number" value="{{code}}"></input>
+            <text bindtap="resendCode" class="code-msg">{{resendSeconds?'重新发送('+resendSeconds+'s)':'获取验证码'}}</text>
+        </view>
+        <view class="hint">验证码已发送至手机 {{maskedPhoneNumber}}</view>
+        <view bindtap="loginByMobile" class="next-button">登录/注册</view>
+    </view>
+</view>

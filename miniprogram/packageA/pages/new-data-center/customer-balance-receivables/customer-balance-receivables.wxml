@@ -1,0 +1,47 @@
+<view class="page">
+    <view class="tips" wx:if="{{orderType==1}}">
+        <van-icon class="img" name="info-o"></van-icon>操作退款后，会与收款金额扣抵</view>
+    <view class="content">
+        <view class="money-ipt">
+            <view class="name">{{typeText}}金额<text style="color:red;">*</text>
+            </view>
+            <view class="box-value">
+                <input bindinput="numInput" class="ipt" data-item="moneyNum" placeholder="请输入退款金额" placeholderStyle="color: #C0C0C0; font-size: 26rpx;" type="digit" value="{{moneyNum}}"></input>
+                <span class="ipt-unit">元</span>
+            </view>
+        </view>
+        <view bindtap="chooseWay" class="money-ipt">
+            <view class="name">{{typeText}}方式</view>
+            <view class="ipt-text">
+                <view class="view-value">
+                    <image class="icon-img" src="{{wayArray[selectedIndex].icon}}"></image>
+                    <text>{{wayArray[selectedIndex].label}}</text>
+                </view>
+                <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+            </view>
+        </view>
+        <view class="money-ipt" wx:if="{{orderType==1}}">
+            <text>退款备注</text>
+            <textarea autoHeight bindinput="inputgetName" data-key="remarks" data-name="{{refundRemark}}" maxlength="25" placeholder="选填，最多可输入25个字符" placeholderClass="place-holder place-holder-right" placeholderStyle="color: #C0C0C0;font-size: 26rpx" showConfirmBar="{{false}}"></textarea>
+        </view>
+        <van-popup round position="bottom" safeAreaInsetTop="true" show="{{popup.showPopup}}">
+            <view class="popupContent">
+                <view class="title fl">
+                    <text bindtap="popupClose" class="close-icon">取消</text>选择{{typeText}}方式</view>
+                <view bindtap="wayTap" class="list-content" data-index="{{index}}" wx:for="{{wayArray}}" wx:key="index">
+                    <view class="list-left">
+                        <image class="way-icon" src="{{item.icon}}"></image>
+                        <text class="left-text">{{item.label}}</text>
+                    </view>
+                    <view class="list-right">
+                        <view class="checked" style="background-image:url(\"{{index===selectedIndex?icon.checked:icon.noCheck}}\")"></view>
+                    </view>
+                </view>
+            </view>
+        </van-popup>
+    </view>
+    <view class="fixed-bottom-tools">
+        <button catchtap="confirm" class="g_bottomBtn" disabled="{{btnDisabled}}">确定{{typeText}}</button>
+    </view>
+</view>
+<van-toast id="van-toast"></van-toast>

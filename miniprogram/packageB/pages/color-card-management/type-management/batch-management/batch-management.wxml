@@ -1,0 +1,37 @@
+<view class="wrapper">
+    <view class="search-wrapper bg-white">
+        <search-input bind:confirm="keyboardConfirm" bind:getValue="getValue" bind:search="search" placeholder="请输入色卡编号或品名搜索" width="648"></search-input>
+    </view>
+    <view class="filter-wrapper" wx:if="{{!hideFilter}}">
+        <color-card-filter bind:changeTab="changeTab" bind:filterConfirm="filterConfirm" count="{{colorCardCount}}"></color-card-filter>
+    </view>
+    <view class="color-card-list-wrapper" wx:if="{{colorCardList.length>0}}">
+        <color-card-list-block bind:moveitem="moveitem" bind:onOrOff="onOrOff" bind:shareF="shareF" bind:shareM="shareM" categoryId="{{categoryId}}" filterKey="{{filterKey}}" idx="{{index}}" list="{{item}}" listTotle="{{listTotle}}" showbottom="true" wx:for="{{colorCardList}}" wx:key="index"></color-card-list-block>
+        <view style="height:100rpx;"></view>
+    </view>
+    <view class="no-color-card-list" wx:else>
+        <view class="bg-img no-list-bg" style="background-image:url(\"{{noColorCardBg}}\")"></view>
+        <view class="text" wx:if="{{userAuthList['goods:add']}}">您暂无色卡，建议您可以<text bindtap="toAddColorCard" class="font-blue2">添加色卡></text>
+        </view>
+        <view class="text gray" wx:if="{{!userAuthList['goods:add']}}">您暂无色卡，建议您可以 添加色卡</view>
+    </view>
+    <view class="footer-wrapper flex bg-white">
+        <view bindtap="footerBarTap" class="item flex item{{index}}" data-action="{{item.action}}" wx:for="{{footerBar}}" wx:key="index">
+            <view class="footer-icon bg-img" style="background-image:url(\"{{item.icon}}\")"></view>
+            <view>{{item.name}}</view>
+        </view>
+    </view>
+</view>
+<van-popup bind:close="closePopup" customClass="canvas-popup-wrapper" show="{{popupInit.canvas.show}}">
+    <view class="{{popupInit.canvas.show?'showBigCanvas':'hideBigCanvas'}}">
+        <canvas canvasId="{{popupInit.canvas.canvasId.photoCanvas}}" height="1350" style="width:500px;height:900px" width="750"></canvas>
+    </view>
+    <view class="canvas-wrapper {{popupInit.canvas.show?'':'hideCanvas'}}">
+        <canvas canvasId="{{popupInit.canvas.canvasId.shareCanvas}}" height="900" style="width:250px;height:450px" width="500"></canvas>
+    </view>
+    <view class="share-monents-notice-wrapper">
+        <view catchtap="saveCanvas" class="save-share-btn">保存图片</view>
+        <view>保存图片后分享到朋友圈</view>
+        <view>会有更多的人来您的店铺哦~</view>
+    </view>
+</van-popup>

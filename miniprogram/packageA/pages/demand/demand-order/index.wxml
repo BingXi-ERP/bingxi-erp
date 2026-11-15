@@ -1,0 +1,36 @@
+<view class="demandOrder">
+    <view class="headerBar fr-between-center">
+        <view bind:tap="changeVanTab" class="f15 itemBar {{orderIndex===index?'curItem':''}}" data-index="{{index}}" wx:for="{{userTab}}" wx:key="{{item}}">{{item}}</view>
+    </view>
+    <view class="demandContent" wx:if="{{demandOrderList.length}}">
+        <view bindtap="toPath" class="contentItem" data-id="{{item.orderId}}" wx:for="{{demandOrderList}}" wx:key="{{item.id}}">
+            <view class="fr-between-center title">
+                <view class="s">{{item.orderTypeName}}</view>
+                <view class="orderStatus">{{item.statusName}}</view>
+            </view>
+            <view class="orderDetail">
+                <view class="flexRow detailItem">
+                    <view class="orderImg bg-img" style="background-image:url(\"{{item.goodsImgPath}}\")"></view>
+                    <view class="leftItem">
+                        <view class="fr-between-center itemTitle">
+                            <view class="titleFont limitName g_limtRowTwo">{{item.goodsName}}</view>
+                            <view class="titleFont" wx:if="{{item.orderType===11}}">领色卡：免费</view>
+                            <view class="titleFont" wx:else>¥{{item.goodsPrice}}</view>
+                        </view>
+                        <view class="fr-between-center  itemDetial">
+                            <view class="s">{{item.goodsInfo}}</view>
+                            <view class="s">x {{item.totalQuantity}}</view>
+                        </view>
+                    </view>
+                </view>
+                <view class="fr-between-center detailTotle">
+                    <view class="titleFont totleItem">总额: ¥<text class="numBig">{{item.orderAmountNum}}</text>.{{item.orderAmountDecimals}}</view>
+                </view>
+            </view>
+        </view>
+    </view>
+    <view class="noResult" wx:else>
+        <view class="noPage"></view>
+        <view class="title">暂无订单数据</view>
+    </view>
+</view>

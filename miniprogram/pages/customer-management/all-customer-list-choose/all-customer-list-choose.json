@@ -1,0 +1,12 @@
+{
+  "navigationBarTitleText": "选择客户",
+  "component": true,
+  "navigationBarBackgroundColor": "#EFF0F7",
+  "usingComponents": {
+    "search-input": "/components/search-input/search-input",
+    "panel-img": "/components/panel-img/panel-img",
+    "filter": "/components/filter/filter",
+    "van-icon": "../../../miniprogram_npm/@vant/weapp/icon/index",
+    "van-image": "/./miniprogram_npm/@vant/weapp/image/index"
+  }
+}

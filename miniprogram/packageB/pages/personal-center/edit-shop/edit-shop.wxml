@@ -1,0 +1,106 @@
+<view class="edit-shop">
+    <form bindsubmit="formSubmit">
+        <view class="input-list">
+            <view bindtap="changeAvatar" class="input-list-li">
+                <view class="title">店铺Logo</view>
+                <view class="e-container">
+                    <view class="bg-img avatar" style="background-image:url(\"{{formParams.logo}}?imageView2/2/w/120\")" wx:if="{{formParams.logo}}"></view>
+                    <view class="defalut-icon" wx:else>
+                        <van-icon name="photo-o"></van-icon>
+                    </view>
+                    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </view>
+            <view bindtap="changeBanner" class="input-list-li banner-wrapper">
+                <view class="title">店铺背景图</view>
+                <view class="e-container">
+                    <view class="bg-img banner" style="background-image:url(\"{{formParams.background}}?imageView2/2/w/120\")" wx:if="{{formParams.background}}"></view>
+                    <view class="defalut-icon" wx:else>
+                        <van-icon name="photo-o"></van-icon>
+                    </view>
+                    <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                </view>
+            </view>
+            <view class="input-list-li">
+                <view class="title">店铺名称</view>
+                <input bindinput="input_val" data-name="companyName" name="companyName" placeholder="请输入档口名称" value="{{formParams.companyName}}"></input>
+            </view>
+            <view class="input-list-li">
+                <view class="title">店铺微信号</view>
+                <input bindinput="input_val" data-name="wechatId" name="wechatId" placeholder="请输入店铺微信号" value="{{formParams.wechatId}}"></input>
+            </view>
+            <view class="input-list-li">
+                <view class="title">联系人</view>
+                <input bindinput="input_val" data-name="contacts" name="contacts" placeholder="请输入联系人姓名" value="{{formParams.contacts}}"></input>
+            </view>
+            <view class="input-list-li">
+                <text class="title">手机号</text>
+                <input bindinput="input_val" data-name="phone" name="phone" value="{{formParams.phone}}"></input>
+            </view>
+            <view bind:tap="choseType" class="input-list-li category-wrapper">
+                <text class="title">主营类目</text>
+                <view class="bg-type" wx:if="{{formParams.clusterNames}}">{{formParams.clusterNames}}</view>
+            </view>
+        </view>
+        <view class="input-list">
+            <view class="titleText">联系方式</view>
+            <view class="input-list-li" wx:for="{{telPhone}}" wx:key="index">
+                <view bindtap="removeContact" class="f14 remove-add" data-item="{{item}}" data-type="{{1}}">
+                    <image mode="aspectFit" src="{{icon.delete}}"></image>{{item.name}}</view>
+                <input bindinput="input_val2" data-index="{{index}}" data-type="{{1}}" name="value" placeholder="添加电话号" value="{{item.value}}"></input>
+            </view>
+            <view bindtap="addContact" class="fl add-sth-li" data-type="{{1}}">
+                <van-icon color="#FB562C" name="add-o"></van-icon>
+                <view class="f14 add-btn">添加电话</view>
+            </view>
+            <view class="input-list-li" wx:for="{{faxNo}}" wx:key="index">
+                <view bindtap="removeContact" class="f14 remove-add" data-item="{{item}}" data-type="{{2}}">
+                    <image mode="aspectFit" src="{{icon.delete}}"></image>{{item.name}}</view>
+                <input bindinput="input_val2" data-index="{{index}}" data-type="{{2}}" placeholder="请输入传真" value="{{item.value}}"></input>
+            </view>
+            <view bindtap="addContact" class="fl add-sth-li" data-type="{{2}}">
+                <van-icon color="#FB562C" name="add-o"></van-icon>
+                <view class="f14 add-btn">添加传真</view>
+            </view>
+        </view>
+        <view class="input-list">
+            <view class="titleText">联系地址</view>
+            <view class="input-list-li">
+                <view class="titleText">档口所在地区</view>
+                <picker bindchange="bindRegionChange" customItem="{{customItem}}" mode="region" value="{{region}}">
+                    <view class="picker">
+                        <view>
+                            <view wx:if="{{!region||region.length===0}}">请选择所在地区</view>
+                            <view wx:else>{{region[0]}} {{region[1]}} {{region[2]}}</view>
+                        </view>
+                        <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                    </view>
+                </picker>
+            </view>
+            <view class="input-list-li">
+                <view class="titleText">档口详细地址</view>
+                <input bindinput="input_val" data-name="addr" name="addr" value="{{formParams.addr}}"></input>
+            </view>
+            <view class="marginB24"></view>
+            <view class="input-list-li">
+                <view class="titleText">仓库所在地区</view>
+                <picker bindchange="bindRegionChange2" customItem="{{customItem}}" mode="region" range="{{multiArray}}" value="{{region}}">
+                    <view class="picker">
+                        <view>
+                            <view wx:if="{{!region2||region2.length===0}}">请选择所在地区</view>
+                            <view wx:else>{{region2[0]}} {{region2[1]}} {{region2[2]}}</view>
+                        </view>
+                        <van-icon color="#5D5D5D" name="arrow" size="24rpx"></van-icon>
+                    </view>
+                </picker>
+            </view>
+            <view class="input-list-li">
+                <view class="titleText">仓库详细地址</view>
+                <input bindinput="input_val" data-name="warehouseAddr" name="warehouseAddr" placeholder="请输入仓库详细地址" value="{{formParams.warehouseAddr}}"></input>
+            </view>
+        </view>
+        <view class="fixed-bottom-tools">
+            <button class="g_bottomBtn" formType="submit">保存</button>
+        </view>
+    </form>
+</view>

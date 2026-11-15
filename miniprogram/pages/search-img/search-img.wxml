@@ -1,0 +1,21 @@
+<view class="search-img-wrapper">
+    <view class="start-wrapper">
+        <view class="notice-wrapper flex">
+            <view class="bg-img icon" style="background-image:url(\"{{icon.notice}}\")"></view>
+            <view class="text">图搜功能仅适用于印花型商品的使用</view>
+        </view>
+        <view class="bg-wrapper bg-img" style="background-image:url(\"{{icon.bg}}\")"></view>
+        <view class="explain-wrapper">
+            <view class="title f20 font-black">以图搜图怎么用？</view>
+            <view class="text f14 font-gray">1.请在添加色卡时上传清晰的面料细节图</view>
+            <view class="text f14 font-gray">2.点击选择相册图片或直接拍照搜索</view>
+        </view>
+        <view class="btn-wrapper flex f16">
+            <view bindtap="chooseImage" class="album" data-action="album">相册</view>
+            <view bindtap="chooseImage" class="photo flex" data-action="camera">
+                <view class="bg-img icon" style="background-image:url(\"{{icon.photo}}\")"></view>
+                <view>拍照</view>
+            </view>
+        </view>
+    </view>
+</view>

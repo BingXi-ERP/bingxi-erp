@@ -1,0 +1,48 @@
+<view class="contain">
+    <view class="top-fixed">
+        <view class="top-bg">
+            <text>待收金额 ( 元 )</text>
+            <text class="number">{{toFixNum(balanceDueSum,2,true)}}</text>
+        </view>
+        <view class="top-mask fr-between-center">
+            <view class="text">欠款客户数 :<text>{{toFixNum(crmSum,0,true)}}人</text>
+            </view>
+            <view bindtap="toSearch" class="fl searchBar">
+                <view>搜索客户名称</view>
+                <image src="{{icon.search}}"></image>
+            </view>
+        </view>
+        <view class="list-title">
+            <text>客户</text>
+            <view bindtap="filterTap" class="filter">
+                <text>待收金额</text>
+            </view>
+        </view>
+    </view>
+    <view class="cus-list">
+        <view catchtap="gotoDetail" class="list-item" data-cust-id="{{item.customerId}}" data-cust-name="{{item.nickName}}" data-shop-id="{{item.shopId}}" wx:for="{{listData}}" wx:key="index">
+            <view class="list-left">
+                <image src="{{item.headImg?item.headImg:icon.defaultAvator}}" style="border-radius:50%;overflow:hidden;"></image>
+                <text>{{item.nickName}}</text>
+            </view>
+            <view class="fl list-right">
+                <text class="g_limtRow {{item.isRed?'red-num':'gray-num'}}">{{toFixNum(item.debtAmount,2,true,true)}}</text>
+                <image src="{{icon.rightArrow}}"></image>
+            </view>
+        </view>
+    </view>
+    <view class="noDataComtent" wx:if="{{listData.length==0}}">
+        <view class="noDataBg" style="background-image:url(\"{{icon.noDataBg}}\")"></view>
+        <view class="noDataContent">暂无数据</view>
+    </view>
+    <view class="more">
+        <view class="moreIcon" wx:if="{{moreIcon}}">上拉更多</view>
+        <view class="moreIcon" wx:if="{{!moreIcon}}">没有更多数据</view>
+    </view>
+    <view class="footer-btn iphone_bottom">
+        <view class="btn-box">
+            <button bindtap="gotoPrint" class="fff-btn">打印对账单</button>
+            <button bindtap="goRecords" class="color-btn">收款记录</button>
+        </view>
+    </view>
+</view>

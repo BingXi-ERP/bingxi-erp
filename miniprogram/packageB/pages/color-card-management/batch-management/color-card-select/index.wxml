@@ -1,0 +1,41 @@
+<view class="container-gray order-select-color-card">
+    <van-toast id="van-toast"></van-toast>
+    <search-bar bind:confirm="handleConfirm" placeholder="请输入色卡编号/品名搜索"></search-bar>
+    <view class="empty-result" wx:if="{{result.length===0}}">抱歉，没有找到此色卡!</view>
+    <scroll-view scrollY bindscrolltolower="handleScrolltolower" class="color-cards {{checkedId?'color-cards-checked':''}}" wx:if="{{result.length>0}}">
+        <view bind:tap="handleSelect" class="card-item {{item.id===checkedId?'card-item-checked':''}}" data-id="{{item.id}}" data-name="{{item.businessProductName}}" wx:for="{{result}}" wx:key="id">
+            <view class="check-wrapper">
+                <view class="checked" style="background-image:url(\"{{item.id===checkedId?icon.checked:icon.noCheck}}\")"></view>
+            </view>
+            <view class="card-item-image">
+                <image mode="aspectFill" src="{{replImage(item.mainImgPath,globalApp,288)}}"></image>
+            </view>
+            <view class="card-item-content">
+                <view class="card-item-title g_limtRow">{{item.businessProductName}} {{item.spuNumber||''}}</view>
+                <view class="card-item-extra">
+                    <block wx:if="{{item.price&&item.price!='0.0'}}">
+                        <text class="currency">￥</text>
+                        <text class="money">
+            {{item.price}}
+            </text>
+                        <text class="unit">{{item.priceUnit}}</text>
+                    </block>
+                    <text class="m" wx:else>面议</text>
+                </view>
+                <view class="card-item-meda">
+                    <view class="card-item-meda-left">
+                        <text>浏览量 {{item.viewCount}}</text>
+                    </view>
+                    <view class="card-item-meda-right">
+                        <text>收藏量 {{item.favoriteCount}}</text>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <text class="list-status" wx:if="{{isLast}}">没有更多了</text>
+    </scroll-view>
+    <view bindtap="onSave" class="g_bottomBtn">
+        <view>保存</view>
+    </view>
+</view>
+<van-dialog id="van-dialog"></van-dialog>

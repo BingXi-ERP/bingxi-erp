@@ -1,0 +1,40 @@
+<view class="container-gray receipt-success">
+  <view class="receipt-result">
+    <view class="receipt-result-content">
+      <text class="receipt-result-title">收款成功</text>
+      <text class="receipt-result-detail">您的订单已收款成功</text>
+    </view>
+    <view class="amount-panel">
+      <text class="h3">本次收款：</text>
+      <view class="amount">
+        <text class="n">￥</text>
+        <text class="strong">{{moneyData.totalAmount}}</text>
+      </view>
+    </view>
+  </view>
+  <view class="receipt-info panel">
+    <view class="cell cell-min cell-border-no">
+      <view class="cell-title">收款方式：</view>
+      <view class="cell-value">{{moneyData.paymentTerm}}</view>
+    </view>
+    <view class="cell cell-min cell-border-no">
+      <view class="cell-title">收款时间：</view>
+      <view class="cell-value">{{moneyData.paymentDate}}</view>
+    </view>
+    <view class="cell cell-min cell-border-no">
+      <view class="cell-title">收款单号：</view>
+      <view class="cell-value">{{moneyData.paymentNo}}</view>
+    </view>
+  </view>
+  <view class="receipt-info-buttons">
+    <button bindtap="handleToDetail" data-id="{{moneyData.billingId}}">
+      <text>查看订单详情</text>
+    </button>
+  </view>
+  <view
+    bindtap="handlePayment"
+    class="g_bottomBtn"
+    wx:if="{{moneyData.totalAmount+moneyData.discountAmount<moneyData.unpay}}"
+    >继续收款</view
+  >
+</view>

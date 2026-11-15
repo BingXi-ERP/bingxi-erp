@@ -1,0 +1,193 @@
+.searchFilter {
+  padding: 32rpx;
+}
+.searchFilter .filter_title {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 20rpx;
+  position: relative;
+  text-align: center;
+}
+.filter_title .close_icon {
+  height: 48rpx;
+  position: absolute;
+  right: 15rpx;
+  top: 20rpx;
+  width: 48rpx;
+}
+.filter_tools {
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  padding-top: 20rpx;
+}
+.filter_tools .filter_btn {
+  border-radius: 44rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  width: 328rpx;
+}
+.filter_tools .confirm_btn {
+  background-color: #4177f5;
+  border-color: #4177f5;
+}
+.filter_content {
+  height: calc(100% - 185rpx);
+  overflow-y: scroll;
+}
+.filter_content .filter_item .title {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+  font-size: 16px;
+  font-weight: 700;
+}
+.filter_content .filter_item .title .tcheckbox {
+  font-size: 14px;
+  margin-left: 20rpx;
+}
+.filter_content .filter_item .title_f {
+  color: #7f7f7f;
+  display: block;
+  font-size: 14px;
+  margin-top: 16rpx;
+}
+.filter_content .filter_item .filter_price {
+  display: -webkit-flex;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 32rpx;
+  margin-top: 32rpx;
+}
+.filter_price .filter_price-input {
+  background-color: #f5f5f5;
+  border-radius: 36rpx;
+  font-size: 13px;
+  height: 72rpx;
+  text-align: center;
+  width: 300rpx;
+}
+.filter_select {
+  flex-wrap: wrap;
+  margin-top: 32rpx;
+}
+.filter_select,
+.filter_select text {
+  align-items: center;
+  display: -webkit-inline-flex;
+  display: inline-flex;
+}
+.filter_select text {
+  background: #f5f5f5;
+  border: 1px solid #f5f5f5;
+  border-radius: 36rpx;
+  font-size: 14px;
+  height: 72rpx;
+  justify-content: center;
+  margin-bottom: 32rpx;
+  margin-right: 16rpx;
+  width: 117rpx;
+}
+.filter_select_mul {
+  margin-top: 32rpx;
+}
+.filter_select_mul text {
+  align-items: center;
+  background: #f5f5f5;
+  border: 1px solid #eff4ff;
+  border-radius: 36rpx;
+  display: -webkit-inline-flex;
+  display: inline-flex;
+  font-size: 14px;
+  height: 72rpx;
+  justify-content: center;
+  margin-bottom: 32rpx;
+  margin-right: 16rpx;
+  width: 208rpx;
+}
+.filter_item .item_active {
+  background: #eff4ff;
+  border: 1px solid #4177f5;
+  color: #4177f5;
+}
+.plat_material {
+  flex-wrap: wrap;
+  margin-top: 32rpx;
+}
+.plat_material,
+.plat_material .plat_material_item {
+  align-items: center;
+  display: -webkit-flex;
+  display: flex;
+}
+.plat_material .plat_material_item {
+  background-color: #f5f5f5;
+  border-radius: 36rpx;
+  box-sizing: border-box;
+  height: 72rpx;
+  justify-content: space-between;
+  margin-bottom: 32rpx;
+  margin-right: 10rpx;
+  overflow: hidden;
+  padding: 0 0 0 20rpx;
+}
+.plat_material_item .plat_material-label {
+  font-size: 12px;
+  max-width: 60%;
+  word-break: break-all;
+}
+.plat_material-field {
+  align-items: center;
+  box-sizing: border-box;
+  display: -webkit-flex;
+  display: flex;
+  flex: 1;
+  height: 100%;
+  max-width: 120rpx;
+  min-width: 60rpx;
+  overflow: hidden;
+  padding-right: 8rpx;
+}
+.plat_material-field input {
+  background-color: #f5f5f5;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 10rpx;
+  width: 90%;
+}
+.plat_material-field text {
+  font-size: 12px;
+}
+.filter_select_family text {
+  height: auto;
+  line-height: 42rpx;
+  padding: 10rpx 20rpx;
+  width: auto;
+}
+.filter_select .select_input_area {
+  background-color: #f5f5f5;
+  border-radius: 36rpx;
+  display: -webkit-inline-flex;
+  display: inline-flex;
+  height: 72rpx;
+  margin-bottom: 32rpx;
+  position: relative;
+}
+.filter_select .select_input_area::after {
+  content: "-";
+  left: 50%;
+  position: absolute;
+  top: 46%;
+  transform: translateY(-50%);
+}
+.filter_select .select_input_area input {
+  background: transparent;
+  border: none;
+  box-sizing: border-box;
+  font-size: 13px;
+  height: 72rpx;
+  outline: none;
+  padding: 0 15rpx;
+  text-align: center;
+  width: 160rpx;
+}

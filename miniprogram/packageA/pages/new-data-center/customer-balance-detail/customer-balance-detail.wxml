@@ -1,0 +1,94 @@
+<view class="contain">
+    <view class="top-fixed">
+        <view class="top-bg">
+            <text>待收金额 ( 元 )</text>
+            <text class="number">{{toFixNum(currentSum,2,true)}}</text>
+        </view>
+        <view class="date-picker">
+            <view class="start-time">
+                <picker bindchange="bindStartDateChange" class="picker-box" end="2027-09-01" mode="date" start="2015-09-01" value="{{startTime}}">
+                    <view class="picker data-choose">{{startTime==''?'点按选择开始时间':startTime}}</view>
+                </picker>
+            </view>
+            <span class="dateRange">至</span>
+            <view class="end-time">
+                <picker bindchange="bindEndDateChange" end="2027-09-01" mode="date" start="2015-09-01" value="{{endTime}}">
+                    <view class="picker data-choose">{{endTime==''?'点按选择结束时间':endTime}}</view>
+                </picker>
+            </view>
+        </view>
+    </view>
+    <view class="tabBar">
+        <view catchtouchmove="banScroll" class="tabStyle ">
+            <view class="tab">
+                <span bindtap="allListTab" class="unactiveTab {{orderFlag==0?'active':''}}" style="position:relative;">全部单据<view class="{{orderFlag==0?'allActiveTab':''}}"></view>
+                </span>
+            </view>
+            <view class="tab">
+                <span bindtap="debtListTab" class="unactiveTab {{orderFlag==1?'active':''}}">只看欠款</span>
+                <view class="{{orderFlag==1?'debtActiveTab':''}}"></view>
+            </view>
+        </view>
+    </view>
+    <view class="list-item" wx:if="{{listData.length>0}}">
+        <view catchtap="checkTap" class="item {{selectedStatusArr[index]?'active':''}}" data-amount="{{item.payable}}" data-id="{{item.id}}" data-index="{{index}}" data-type="{{item.billingType}}" wx:for="{{listData}}" wx:key="index">
+            <view class="list-item-content">
+                <view class="list-left">
+                    <view class="checked" style="background-image:url(\"{{selectedStatusArr[index]?icon.checked:icon.noCheck}}\")" wx:if="{{item.billingType==1}}"></view>
+                </view>
+                <view class="list-right">
+                    <view class="left-text">
+                        <text catchtap="goOrderDetail" data-id="{{item.id}}" data-type="{{item.billingType}}">{{item.billingNo}}</text>
+                        <span>{{item.sortTime}}</span>
+                    </view>
+                    <view class="right-text" wx:if="{{orderFlag==0}}">
+                        <span class="g_limtRow" wx:if="{{item.billingType==4||item.billingType==7}}">收款：<text class="font-green">+￥{{toFixNum(item.receivedAmount,2,true)}}</text>
+                            <image class="invalid-icon" mode="aspectFill" src="{{icon.invalid}}" wx:if="{{item.billingType==7}}"></image>
+                        </span>
+                        <span class="g_limtRow" wx:if="{{item.billingType<=2||item.billingType==5}}">订单：<text class="font-black g_limtRow">￥{{toFixNum(item.orderAmount,2,true)}}</text>
+                            <image class="invalid-icon" mode="aspectFill" src="{{icon.invalid}}" wx:if="{{item.billingType==2}}"></image>
+                        </span>
+                        <span class="g_limtRow" wx:if="{{item.billingType==6||item.billingType==8}}">退款：<text class="font-black">-￥{{toFixNum(item.refundAmount,2,true)}}</text>
+                            <image class="invalid-icon" mode="aspectFill" src="{{icon.invalid}}" wx:if="{{item.billingType==8}}"></image>
+                        </span>
+                        <span class="g_limtRow" wx:if="{{item.billingType==3||item.billingType==9}}">退货：<text class="font-black">-￥{{toFixNum(item.returnedGoodsAmount,2,true)}}</text>
+                            <image class="invalid-icon" mode="aspectFill" src="{{icon.invalid}}" wx:if="{{item.billingType==9}}"></image>
+                        </span>
+                        <span class="mt-5" wx:if="{{item.billingType<=2||item.billingType==5}}">累计优惠 {{toFixNum(item.discountAmount,2,true,true)}}</span>
+                        <span class="mt-5" wx:if="{{(item.billingType==4||item.billingType==6||item.billingType==7||item.billingType==8)&&item.paymentCancelAmount>0}}">作废 {{toFixNum(item.paymentCancelAmount,2,true,true)}}</span>
+                    </view>
+                    <view class="right-text" wx:if="{{orderFlag==1}}">
+                        <span class="g_limtRow">待{{item.billingType===3?'付':'收'}}：<text class="{{item.billingType===3?'font-green':'font-red'}}">￥{{(item.billingType===3?'-':'')+toFixNum(item.payableAmount,2,true)}}</text>
+                        </span>
+                    </view>
+                </view>
+            </view>
+        </view>
+        <view class="bottom"></view>
+    </view>
+    <view class="more">
+        <view class="moreIcon" wx:if="{{moreIcon}}">上拉更多</view>
+        <view class="moreIcon" wx:if="{{!moreIcon}}">没有更多数据了</view>
+    </view>
+    <view class="noDataComtent" wx:if="{{listData.length==0}}">
+        <view class="noDataBg" style="background-image:url(\"{{icon.noDataBg}}\")"></view>
+        <view class="noDataContent">暂无数据</view>
+    </view>
+    <view class="footer-btn  iphone_bottom {{currentCrm.deptSumAmount>0?'':'footer-end'}}">
+        <view class="text-box" wx:if="{{currentCrm.deptSumAmount>0}}">
+            <span style="height:40rpx;line-height:50rpx;">本次小计</span>
+            <text class="g_limtRow">￥{{toFixNum(totalAmount,2,true)}}</text>
+        </view>
+        <view class="btn-box">
+            <button bindtap="gotoRefund" class="fff-btn color-gray" wx:if="{{currentCrm.deptSumAmount!=0}}">退款</button>
+            <button bindtap="gotoReceive" class="fff-btn" wx:if="{{currentCrm.deptSumAmount>0}}">收款</button>
+            <button bindtap="gotoPrint" class="color-btn">打印</button>
+            <button bindtap="onHexiaoOnkey" class="fff-btn" wx:if="{{currentCrm.deptSumAmount===0&&orderFlag==1}}">一键核销</button>
+        </view>
+    </view>
+    <van-dialog showCancelButton useSlot bind:cancel="onClose" bind:confirm="onHexiaoOnkey" cancelButtonText="暂时忽略" confirmButtonColor="rgb(60, 11, 236);" confirmButtonText="一键核销" overlay="true" rootPortal="true" show="{{hexiao}}" title="提示" zIndex="10000">
+        <view class="wrap-hexiao">
+            <text class="hexiaotext">当前客户对账记录存在退货单退款与销售单收款可冲抵，建议使用一键核销功能</text>
+        </view>
+    </van-dialog>
+</view>

@@ -1,0 +1,113 @@
+<view class="restockList">
+  <view class="headSearch">
+    <van-search
+      useActionSlot
+      bind:change="onChangeSearch"
+      bind:clear="handleSearch"
+      bind:search="handleSearch"
+      class="headSearch"
+      placeholder="搜索品名/色卡编号"
+      shape="round"
+      value="{{formInline.keyword}}"
+    >
+      <view bindtap="handleSearch" class="search_btn" slot="action">
+        <text class="search_btn_text">搜索</text>
+      </view>
+    </van-search>
+  </view>
+  <view class="restock_content">
+    <view class="restock_bar">
+      <view class="filter_tool">
+        <view
+          bindtap="onChangeSort"
+          class="filter_tool_item"
+          data-item="{{item}}"
+          wx:for="{{sortConfig}}"
+          wx:key="index"
+        >
+          <image
+            mode="aspectFill"
+            src="{{item.sort===0?descIcon:ascIcon}}"
+          ></image
+          >{{item.label}}</view
+        >
+      </view>
+      <view class="tool_right">
+        <image
+          bindtap="onShowFilter"
+          class="tool_bar_img"
+          mode="aspectFill"
+          src="{{jhtFilterIcon}}"
+        ></image>
+        <image
+          bindtap="onChangeListMode"
+          class="tool_bar_img"
+          mode="aspectFill"
+          src="{{jhtListIcon}}"
+        ></image>
+      </view>
+    </view>
+    <view class="restock_list {{productShowMode?'restock_inline':''}}">
+      <data-empty-1 wx:if="{{restockData.length===0}}"></data-empty-1>
+      <scroll-view
+        bindscrolltolower="onScrollLower"
+        scrollY="true"
+        style="height: 98%"
+        wx:else
+      >
+        <view class="restock_flex">
+          <view
+            bindtap="onViewDetail"
+            class="card_item {{productShowMode?'card_inline_item':''}}"
+            data-item="{{item}}"
+            wx:for="{{restockData}}"
+            wx:key="id"
+          >
+            <view class="card_img">
+              <van-image
+                fit="cover"
+                height="{{productShowMode?104:168}}"
+                src="{{replImgPath(item.mainImgPath,globalApp,312)}}"
+                width="100%"
+              ></van-image>
+              <view class="address">
+                <van-icon name="location"></van-icon
+                >{{colValueFormat.valueFormat(item,'areaType',supplierAdrTypeOption)}}</view
+              >
+            </view>
+            <view class="info">
+              <text class="h1">{{item.businessProductName||'--'}}</text>
+              <view class="p">
+                <text class="price">{{colValueFormat.priceFormat(item)}}</text>
+              </view>
+              <view class="p">共{{item.colorNum}}种颜色</view>
+              <view class="p">
+                <image
+                  class="svg-icon"
+                  mode="aspectFill"
+                  src="{{iconGramWeight}}"
+                ></image>
+                <text>{{item.gramWeight+item.weightUnit}}</text>
+              </view>
+              <view class="p matrial">
+                <image
+                  class="svg-icon"
+                  mode="aspectFill"
+                  src="{{iconMaterial}}"
+                ></image>
+                <text>{{item.material}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+  <search-filter
+    bind:confirm="onConfirmFilter"
+    id="searchFilter"
+    isAllStation="{{isAllStation}}"
+    isRestock="{{true}}"
+    show="{{showSearchFilter}}"
+  ></search-filter>
+</view>

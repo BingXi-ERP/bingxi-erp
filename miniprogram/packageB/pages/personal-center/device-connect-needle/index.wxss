@@ -1,0 +1,90 @@
+page {
+  background-color: #eff0f7;
+}
+.form-box {
+  background: #fff;
+  border-radius: 28rpx;
+  box-sizing: border-box;
+  margin-left: 34rpx;
+  margin-top: 40rpx;
+  padding: 0 28rpx;
+  width: calc(100vw - 68rpx);
+}
+.device-needle {
+  box-sizing: border-box;
+  color: #333;
+  font-size: 28rpx;
+}
+.block-gray {
+  background-color: #eff0f7;
+  min-height: 20rpx;
+  width: 100%;
+}
+.device-needle .child {
+  border-bottom: 2rpx solid #f4f4f4;
+}
+.device-needle .child .child-title {
+  color: #5d5d5d;
+  font-size: 26rpx;
+  padding-top: 28rpx;
+}
+.device-needle .child .child-title text {
+  color: red;
+}
+.device-needle .child .child-value {
+  color: #333;
+  padding: 20rpx 0 28rpx;
+}
+device-needle .child .child-value input {
+  width: 100%;
+}
+.device-needle .child .child input {
+  text-align: right;
+}
+.device-needle .status {
+  display: inline-block;
+  height: 50rpx;
+  line-height: 18rpx;
+  vertical-align: middle;
+}
+.device-needle .status-online {
+  color: #2f7bfd;
+  font-weight: 600;
+}
+.device-needle .dot {
+  background: #2f7bfd;
+  border-radius: 100%;
+  height: 12rpx;
+  margin-left: 20rpx;
+  vertical-align: middle;
+  width: 12rpx;
+}
+.device-needle .dot-offline {
+  background: #e2525a;
+}
+.fixed-bottom-tools {
+  bottom: 0;
+  left: 0;
+  padding: 16rpx 30rpx;
+  position: fixed;
+  right: 0;
+}
+.fixed-bottom-tools .button-full {
+  background: #e4eeff;
+  border: 1rpx solid #629cff;
+  border-radius: 44rpx;
+  color: #2f7bfd;
+  display: inline-block;
+  font-size: 32rpx;
+  font-weight: 400;
+  height: 88rpx;
+  line-height: 88rpx;
+  width: 100%;
+}
+.close_text {
+  color: #ff414e;
+  font-size: 16px;
+  margin-right: 25rpx;
+  padding: 15rpx 0;
+  text-align: right;
+}

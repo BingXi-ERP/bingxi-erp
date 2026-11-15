@@ -1,0 +1,22 @@
+.moneyRule {
+  padding: 32rpx;
+}
+.content {
+  margin: 50rpx;
+}
+.title {
+  color: #373c55;
+  font-family: SFProText-Medium;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 30rpx;
+}
+.item {
+  color: #70728c;
+  font-family: PingFangSC-Regular;
+  font-size: 14px;
+  font-weight: 400;
+}
+.moneyRed {
+  color: red;
+}

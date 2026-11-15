@@ -1,0 +1,43 @@
+<view class="listContainer">
+    <view class="list" wx:for="{{classifyList}}" wx:key="index">
+        <view class="listTop">
+            <view class="typeName">{{item.name}}<view class="powerLimit">
+                    <span wx:if="{{item.visiableFlag==1}}">
+                        <image class="titleOpIoc" src="{{icon.everyone}}"></image>所有人可见</span>
+                    <span wx:if="{{item.visiableFlag==3}}">
+                        <image class="titleOpIoc" src="{{icon.onlyone}}"></image>指定客户可见</span>
+                    <span wx:if="{{item.visiableFlag==4}}">
+                        <image class="titleOpIoc" src="{{icon.onlyone}}"></image>仅自己可见</span>
+                    <span wx:if="{{item.visiableFlag==2}}">
+                        <image class="titleOpIoc" src="{{icon.onlyone}}"></image>仅扫码可见</span>
+                </view>
+            </view>
+            <view catchtap="toBatchManagement" class="count-wrapper flex" data-id="{{item.id}}" data-name="{{item.name}}" style="font-size:28rpx;color:#999BB4;line-height:70rpx;">
+                <view>{{item.productCount}} 件商品</view>
+                <view class="bg-img icon" style="background-image:url(\"{{icon.rightArrow}}\")"></view>
+            </view>
+        </view>
+        <view class="listBottom fl" wx:if="{{userAuthList['goods:category:manage']}}">
+            <view catchtap="moveUp" class="fl listBottomItem" data-id="{{item.id}}" data-index="{{index}}">
+                <image class="opIoc" src="{{index==0?icon.moveupDisable:icon.moveup}}"></image>
+                <view>上移</view>
+            </view>
+            <view catchtap="movedown" class="fl listBottomItem" data-id="{{item.id}}" data-index="{{index}}">
+                <image class="opIoc" src="{{index==classifyList.length-1?icon.movedownDisable:icon.movedown}}"></image>
+                <view>下移</view>
+            </view>
+            <view catchtap="typeEdit" class="fl listBottomItem" data-id="{{item.id}}" data-item="{{item}}" wx:if="{{item.isDefault==0}}">
+                <image class="opIoc" src="{{icon.edit}}"></image>
+                <view>编辑</view>
+            </view>
+            <view catchtap="delete" class="fl listBottomItem" data-id="{{item.id}}" wx:if="{{item.isDefault==0}}">
+                <image class="opIoc" src="{{icon.del}}"></image>
+                <view>删除</view>
+            </view>
+        </view>
+    </view>
+    <view style="height:200rpx;"></view>
+</view>
+<view bindtap="toAddType" class="g_bottomBtn" wx:if="{{userAuthList['goods:category:manage']}}">
+    <view>新建分类</view>
+</view>

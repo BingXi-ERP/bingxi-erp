@@ -1,0 +1,33 @@
+<view class="news">
+    <view bindtap="toSysMessage" class="fl newsItem">
+        <image class="" src="{{icon.message}}"></image>
+        <view class="right">
+            <view class="fl header">
+                <text class="f15 title">系统通知</text>
+                <view class="logo f10">官方</view>
+                <view class="messageNum f12" wx:if="{{unReadCount.noticeCount>0}}">{{unReadCount.noticeCount>99?'99+':unReadCount.noticeCount}}条未读</view>
+            </view>
+        </view>
+        <view class="bg-img rightArrow" style="background-image:url(\"{{icon.right}}\")"></view>
+    </view>
+    <view bindtap="toDynamic" class="fl newsItem" wx:if="{{userAuthList['crm:msgCenter:shopDynamics']}}">
+        <image class="" src="{{icon.order}}"></image>
+        <view class="f15 right">
+            <view class="fl header">
+                <text class="f15 title">店铺动态</text>
+                <view class="messageNum f12" wx:if="{{unReadCount.shopCount>0}}">{{unReadCount.shopCount>99?'99+':unReadCount.shopCount}}条未读</view>
+            </view>
+        </view>
+        <view class="bg-img rightArrow" style="background-image:url(\"{{icon.right}}\")"></view>
+    </view>
+    <view bindtap="toFeedback" class="fl newsItem">
+        <image class="" src="{{icon.feedback}}"></image>
+        <view class="right">
+            <view class="fl header">
+                <text class="f15 title">问题反馈</text>
+                <view class="messageNum f12" wx:if="{{unReadCount.feedbackCount>0}}">{{unReadCount.feedbackCount>99?'99+':unReadCount.feedbackCount}}条未读</view>
+            </view>
+        </view>
+        <view class="bg-img rightArrow" style="background-image:url(\"{{icon.right}}\")"></view>
+    </view>
+</view>

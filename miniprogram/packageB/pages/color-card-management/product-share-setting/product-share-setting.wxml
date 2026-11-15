@@ -1,0 +1,51 @@
+<view class="print-content">
+  <view class="print-list print-list2">
+    <view bindtap="changeStatus" class="print-list-bd" id="showQrcode">
+      <text>商品二维码</text>
+      <image
+        mode="aspectFit"
+        src="{{nowList.showQrcode==1?image.select:image.unSelect}}"
+      ></image>
+    </view>
+    <view bindtap="changeStatus" class="print-list-bd" id="showProductName">
+      <text>品名/DESC</text>
+      <image
+        mode="aspectFit"
+        src="{{image.select}}"
+        wx:if="{{nowList.showProductName==1}}"
+      ></image>
+      <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+    </view>
+    <view bindtap="changeStatus" class="print-list-bd" id="showPrice">
+      <text>价格/Price</text>
+      <image
+        mode="aspectFit"
+        src="{{image.select}}"
+        wx:if="{{nowList.showPrice==1}}"
+      ></image>
+      <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+    </view>
+    <view bindtap="changeStatus" class="print-list-bd" id="showShelvesNumber">
+      <text>编号/ART.NO.</text>
+      <image
+        mode="aspectFit"
+        src="{{image.select}}"
+        wx:if="{{nowList.showShelvesNumber==1}}"
+      ></image>
+      <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+    </view>
+    <view bindtap="changeStatus" class="print-list-bd" id="showMaterial">
+      <text>成分/COMP</text>
+      <image
+        mode="aspectFit"
+        src="{{image.select}}"
+        wx:if="{{nowList.showMaterial==1}}"
+      ></image>
+      <image mode="aspectFit" src="{{image.unSelect}}" wx:else></image>
+    </view>
+    <view style="height: 220rpx"></view>
+  </view>
+</view>
+<view class="print-btn">
+  <button bindtap="carterProdShare" class="g_bottomBtn">确定</button>
+</view>
