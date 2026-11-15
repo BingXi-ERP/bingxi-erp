@@ -321,13 +321,14 @@ fn shipment_window_never_rewraps_app_error_calls_as_internal() {
 
 /// shrink-only ratchet：基线 = 修复后逐文件 grep 坐实的真实命中数。
 /// 非零条目保留理由：
-/// - sales_order_handler.rs=10：全部为 `serde_json::to_value` 序列化失败的
-///   真系统错误（非对 AppError 调用的重包）。
+/// - sales_order_handler.rs=11：10 处为 `serde_json::to_value` 序列化失败的
+///   真系统错误（非对 AppError 调用的重包）+ 签收端点新增 1 处同型站点
+///   （sign 返回体序列化，与既有 10 处同型同惯例，wave4 棘轮同步上调）。
 /// - delivery_ops/inventory.rs=1：`扣减规划返回了候选之外的库存行`（不可能态
 ///   内部不变量违例），真系统错误。
 const INTERNAL_RATCHET: &[(&str, usize)] = &[
     ("src/handlers/inventory_stock_handler_query.rs", 0),
-    ("src/handlers/sales_order_handler.rs", 10),
+    ("src/handlers/sales_order_handler.rs", 11),
     ("src/services/so/delivery.rs", 0),
     ("src/services/so/delivery_ops/ship.rs", 0),
     ("src/services/so/delivery_ops/cancel.rs", 0),
