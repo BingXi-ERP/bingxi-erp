@@ -6,7 +6,54 @@
 -->
 <template>
   <el-card shadow="hover" class="table-card">
+    <section v-if="isPhone" v-loading="loading" class="bpm-completed-mobile">
+      <ul class="completed-task-list" :aria-label="t('bpm.approval.tab.completed')">
+        <li v-for="task in tasks" :key="task.id" class="completed-task-card">
+          <dl>
+            <div>
+              <dt>{{ t('bpm.approval.completedTable.taskNo') }}</dt>
+              <dd>{{ task.task_no }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.completedTable.taskName') }}</dt>
+              <dd>{{ task.node_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.completedTable.instanceId') }}</dt>
+              <dd>{{ task.instance_id }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.completedTable.approvedAt') }}</dt>
+              <dd>{{ formatDateTime(task.handled_at) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.completedTable.result') }}</dt>
+              <dd>{{ task.status == null ? '-' : getTaskStatusLabel(task.status) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('bpm.approval.completedTable.comment') }}</dt>
+              <dd>{{ task.approval_opinion || '-' }}</dd>
+            </div>
+          </dl>
+          <ElButton @click="emit('view-chain', task)">
+            {{ t('bpm.approval.completedTable.viewChain') }}
+          </ElButton>
+        </li>
+      </ul>
+      <ElEmpty v-if="!loading && tasks.length === 0" :description="t('components.v2Table.empty')" />
+      <ElPagination
+        :current-page="page"
+        :page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
+        :total="total"
+        layout="total, sizes, prev, next"
+        :aria-label="t('components.v2Table.paginationAriaLabel')"
+        @current-change="(v: number) => emit('update:page', v)"
+        @size-change="(v: number) => emit('update:page-size', v)"
+      />
+    </section>
     <V2Table
+      v-else
       :columns="columns"
       :data="tasks"
       :loading="loading"
@@ -24,13 +71,16 @@
 <script setup lang="ts">
 import { computed, h } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ElButton, ElTag } from 'element-plus';
+import { ElButton, ElTag, ElEmpty, ElPagination } from 'element-plus';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import V2Table from '@/components/V2Table/index.vue';
 import type { ColumnDef } from '@/components/V2Table/types';
 import type { ApprovalTask } from '@/api/bpm-enhanced';
 import { getTaskStatusType, formatDateTime } from '../composables/bpmApFmts';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /** 已办任务状态（completed/rejected/cancelled）显示文本，取值域与后端 bpm_task 词表同源 */
 const getTaskStatusLabel = (status: string) => {
@@ -119,5 +169,58 @@ const columns = computed<ColumnDef<ApprovalTask>[]>(() => [
 <style scoped>
 .table-card {
   margin-bottom: 20px;
+}
+.bpm-completed-mobile {
+  min-width: 0;
+}
+.completed-task-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.completed-task-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.completed-task-card dl {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.completed-task-card dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.completed-task-card dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.completed-task-card .el-button {
+  width: 100%;
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  padding: 8px;
+  white-space: normal;
+}
+.bpm-completed-mobile :deep(.el-pagination) {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.bpm-completed-mobile :deep(.el-pagination button),
+.bpm-completed-mobile :deep(.el-pagination__sizes .el-select__wrapper) {
+  min-width: 44px;
+  min-height: 44px;
 }
 </style>
