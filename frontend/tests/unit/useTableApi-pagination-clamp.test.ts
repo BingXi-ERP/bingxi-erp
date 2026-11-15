@@ -76,7 +76,7 @@ describe('useTableApi pagination clamp on total decrease', () => {
   });
 
   it('clamps page to maxPage when total drops below current page boundary', async () => {
-    const { calls, mockGet, wrapper } = mountTable(40, 3, 20);
+    const { calls, mockGet, wrapper, setPageAfterInitialLoad } = mountTable(40, 3, 20);
     await setPageAfterInitialLoad();
     expect(calls[calls.length - 1].page).toBe(3);
 
@@ -94,7 +94,7 @@ describe('useTableApi pagination clamp on total decrease', () => {
   });
 
   it('clamps to page 1 when total becomes 0', async () => {
-    const { calls, mockGet, wrapper } = mountTable(40, 3, 20);
+    const { calls, mockGet, wrapper, setPageAfterInitialLoad } = mountTable(40, 3, 20);
     await setPageAfterInitialLoad();
 
     mockGet.mockResolvedValueOnce(makeResponse([], 0) as never);
