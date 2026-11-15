@@ -707,7 +707,7 @@ fn source_scan_handler_uses_view_on_all_exits() {
 /// 打印装配锁：打印数据的客户名必须走行主键富化回读，不得回到直读实体冗余列。
 #[test]
 fn source_scan_print_data_uses_enriched_row_read() {
-    let clean = code_only(include_str!("../src/services/print_service.rs"));
+    let clean = code_only(include_str!("../src/services/print_service/sales.rs"));
     let block = extract_impl_fn(&clean, "async fn get_customer_credit_print_data(");
     assert!(
         canon(&block).contains(&canon("get_view_by_row_id(id)")),

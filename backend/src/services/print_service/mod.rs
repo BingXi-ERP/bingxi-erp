@@ -1,8 +1,4 @@
-//! 通用打印服务（域子模块拆分入口）
-//!
-//! V15 P0-S17 修复（Batch 476）：6 个 get_*_print_data 方法从硬编码占位数据
-//! 改为真实查询数据库（主表 + 关联客户/供应商/仓库 + 明细项）。
-//! 2026-11-15 拆分：方法按业务域下沉到本目录子模块，签名与外部路径零改动。
+//! 通用打印服务，按单据类型分派到业务域取数模块。
 
 use crate::utils::error::AppError;
 use sea_orm::{
@@ -39,7 +35,7 @@ pub(crate) struct SalesDeliveryPrintRelations {
     color_names: HashMap<(i32, String), String>,
 }
 
-/// 打印服务（V15 P0-S17：持有数据库连接，6 个 get_*_print_data 方法真实查询数据库）
+/// 持有数据库连接的单据打印取数服务。
 pub struct PrintService {
     db: Arc<DatabaseConnection>,
 }
@@ -254,7 +250,6 @@ pub const PRINT_SCOPE_PENDING: &[&str] = &[
     "inventory_piece_label",
 ];
 
-
 pub mod asset_hr;
 pub mod docx;
 pub mod export_trade;
@@ -456,5 +451,4 @@ impl PrintService {
             ))),
         }
     }
-
 }

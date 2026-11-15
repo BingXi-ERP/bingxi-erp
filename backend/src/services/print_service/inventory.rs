@@ -1,7 +1,10 @@
 //! inventory 域打印取数（自 print_service.rs 拆分，方法签名零改动）
 
 use crate::utils::error::AppError;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order, QueryFilter, QueryOrder, QuerySelect, RelationTrait};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -10,7 +13,10 @@ use super::{PieceLabelView, PrintData, TransferPrintContext};
 
 impl super::PrintService {
     /// 库存调拨单打印数据：调拨主表 + 调出/调入仓库 + 明细项（含产品）
-    async fn get_inventory_transfer_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_inventory_transfer_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         let ctx = self.fetch_transfer_print_context(id).await?;
         let data = Self::build_transfer_main_data(&ctx);
         let item_list = Self::build_transfer_item_list(&ctx);
@@ -21,7 +27,6 @@ impl super::PrintService {
             image: None,
         })
     }
-
 
     /// 查询调拨单所有关联数据：主表、调出/调入仓库、明细、产品映射
     async fn fetch_transfer_print_context(
@@ -64,7 +69,6 @@ impl super::PrintService {
             product_map,
         })
     }
-
 
     /// 构建调拨单主表数据 HashMap
     fn build_transfer_main_data(ctx: &TransferPrintContext) -> HashMap<String, serde_json::Value> {
@@ -114,7 +118,6 @@ impl super::PrintService {
         );
         data
     }
-
 
     /// 构建调拨单明细项列表
     fn build_transfer_item_list(
@@ -169,9 +172,11 @@ impl super::PrintService {
         item_list
     }
 
-
     /// 库存调整单打印数据
-    async fn get_inventory_adjustment_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_inventory_adjustment_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::inventory_adjustment;
 
         use crate::models::inventory_adjustment_item;
@@ -252,9 +257,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 存货跌价准备打印数据
-    async fn get_inventory_write_down_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_inventory_write_down_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::inventory_write_down;
 
         let record = inventory_write_down::Entity::find_by_id(id)
@@ -304,7 +311,6 @@ impl super::PrintService {
         })
     }
 
-
     /// 成品布入库标签数据装配（doc_type `inventory_piece_label`）
     /// 1. 单次查询该匹行 + LEFT JOIN products（款号=product.code、品名=product.name，
     ///    PurchaseOrderDto 范式，禁止逐行再查/造假名）；
@@ -315,7 +321,7 @@ impl super::PrintService {
     /// 4. 条码图形：校验通过的 `barcode` 码值经 utils::barcode 渲成 Code128 PNG，
     ///    随 PrintData.image 进 docx（文本码值行与图形同源同值）；
     /// 5. 保密口径：标签绝不出现 supplier_piece_no、供应商侧商品/色号编码、供应商名称、成本单价。
-    async fn get_inventory_piece_label_print_data(
+    pub(super) async fn get_inventory_piece_label_print_data(
         &self,
         piece_id: i32,
     ) -> Result<PrintData, AppError> {
@@ -477,9 +483,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 物料缺料预警打印数据
-    async fn get_material_shortage_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_material_shortage_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::material_shortage;
 
         let record = material_shortage::Entity::find_by_id(id)
@@ -539,9 +547,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 不合格品处理单打印数据
-    async fn get_unqualified_product_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_unqualified_product_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::unqualified_product;
 
         let record = unqualified_product::Entity::find_by_id(id)
@@ -594,5 +604,4 @@ impl super::PrintService {
             image: None,
         })
     }
-
 }

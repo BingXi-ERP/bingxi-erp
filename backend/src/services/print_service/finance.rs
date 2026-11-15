@@ -1,7 +1,10 @@
 //! finance 域打印取数（自 print_service.rs 拆分，方法签名零改动）
 
 use crate::utils::error::AppError;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order, QueryFilter, QueryOrder, QuerySelect, RelationTrait};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -10,7 +13,7 @@ use super::PrintData;
 
 impl super::PrintService {
     /// 会计凭证打印数据：凭证主表 + 分录明细
-    async fn get_voucher_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_voucher_print_data(&self, id: i32) -> Result<PrintData, AppError> {
         use crate::models::{voucher, voucher_item};
 
         let voucher = voucher::Entity::find_by_id(id)
@@ -101,9 +104,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 应收账款收款单打印数据
-    async fn get_ar_collection_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_ar_collection_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::ar_collection;
 
         let record = ar_collection::Entity::find_by_id(id)
@@ -153,9 +158,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 应付账款付款单打印数据
-    async fn get_ap_payment_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_ap_payment_print_data(&self, id: i32) -> Result<PrintData, AppError> {
         use crate::models::ap_payment;
 
         let record = ap_payment::Entity::find_by_id(id)
@@ -213,9 +217,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 应付发票打印数据
-    async fn get_ap_invoice_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_ap_invoice_print_data(&self, id: i32) -> Result<PrintData, AppError> {
         use crate::models::ap_invoice;
 
         let record = ap_invoice::Entity::find_by_id(id)
@@ -277,9 +280,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 付款申请单打印数据
-    async fn get_ap_payment_request_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_ap_payment_request_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::ap_payment_request;
 
         use crate::models::ap_payment_request_item;
@@ -357,9 +362,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 应付对账单打印数据
-    async fn get_ap_reconciliation_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_ap_reconciliation_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::ap_reconciliation;
 
         let record = ap_reconciliation::Entity::find_by_id(id)
@@ -413,9 +420,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 应收对账单打印数据
-    async fn get_ar_reconciliation_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_ar_reconciliation_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::ar_reconciliation;
 
         let record = ar_reconciliation::Entity::find_by_id(id)
@@ -477,9 +486,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 坏账核销单打印数据
-    async fn get_bad_debt_writeoff_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_bad_debt_writeoff_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::bad_debt_writeoff;
 
         let record = bad_debt_writeoff::Entity::find_by_id(id)
@@ -533,9 +544,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 外汇核销单打印数据
-    async fn get_foreign_exchange_verification_print_data(
+    pub(super) async fn get_foreign_exchange_verification_print_data(
         &self,
         id: i32,
     ) -> Result<PrintData, AppError> {
@@ -592,9 +602,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 出口退税申报单打印数据
-    async fn get_export_refund_declaration_print_data(
+    pub(super) async fn get_export_refund_declaration_print_data(
         &self,
         id: i32,
     ) -> Result<PrintData, AppError> {
@@ -650,5 +659,4 @@ impl super::PrintService {
             image: None,
         })
     }
-
 }

@@ -1,7 +1,10 @@
 //! asset_hr 域打印取数（自 print_service.rs 拆分，方法签名零改动）
 
 use crate::utils::error::AppError;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order, QueryFilter, QueryOrder, QuerySelect, RelationTrait};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -10,7 +13,10 @@ use super::PrintData;
 
 impl super::PrintService {
     /// 物流运单打印数据
-    async fn get_logistics_waybill_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_logistics_waybill_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::logistics_waybill;
 
         let record = logistics_waybill::Entity::find_by_id(id)
@@ -81,9 +87,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 能耗记录打印数据
-    async fn get_energy_consumption_record_print_data(
+    pub(super) async fn get_energy_consumption_record_print_data(
         &self,
         id: i32,
     ) -> Result<PrintData, AppError> {
@@ -157,9 +162,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 固定资产卡片打印数据
-    async fn get_fixed_asset_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_fixed_asset_print_data(&self, id: i32) -> Result<PrintData, AppError> {
         use crate::models::fixed_asset;
 
         let record = fixed_asset::Entity::find_by_id(id)
@@ -231,9 +235,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 固定资产盘点单打印数据
-    async fn get_fixed_asset_count_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_fixed_asset_count_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::fixed_asset_count;
 
         use crate::models::fixed_asset_count_item;
@@ -332,5 +338,4 @@ impl super::PrintService {
             image: None,
         })
     }
-
 }

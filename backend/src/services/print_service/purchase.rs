@@ -1,7 +1,10 @@
 //! purchase 域打印取数（自 print_service.rs 拆分，方法签名零改动）
 
 use crate::utils::error::AppError;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order, QueryFilter, QueryOrder, QuerySelect, RelationTrait};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -10,7 +13,10 @@ use super::PrintData;
 
 impl super::PrintService {
     /// 采购订单打印数据：订单主表 + 供应商 + 仓库 + 明细项（含产品）
-    async fn get_purchase_order_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_purchase_order_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         let (order, supplier, warehouse, items, product_map) =
             Self::fetch_purchase_order_relations(&self.db, id).await?;
         let data =
@@ -23,7 +29,6 @@ impl super::PrintService {
             image: None,
         })
     }
-
 
     /// 采购订单打印：批量查询订单 + 供应商 + 仓库 + 明细 + 产品
     async fn fetch_purchase_order_relations(
@@ -64,7 +69,6 @@ impl super::PrintService {
             products.into_iter().map(|p| (p.id, p)).collect();
         Ok((order, supplier, warehouse, items, product_map))
     }
-
 
     /// 采购订单打印：构造主表 data
     fn build_purchase_order_main_data(
@@ -130,7 +134,6 @@ impl super::PrintService {
         data
     }
 
-
     /// 采购订单打印：构造明细行列表
     fn build_purchase_order_item_list(
         items: Vec<crate::models::purchase_order_item::Model>,
@@ -177,9 +180,11 @@ impl super::PrintService {
         item_list
     }
 
-
     /// 采购收货单打印数据：收货主表 + 供应商 + 仓库 + 明细项
-    async fn get_purchase_receipt_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_purchase_receipt_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::{purchase_receipt, purchase_receipt_item, supplier, warehouse};
 
         let receipt = purchase_receipt::Entity::find_by_id(id)
@@ -302,9 +307,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 采购退货单打印数据
-    async fn get_purchase_return_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_purchase_return_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::purchase_return;
 
         use crate::models::purchase_return_item;
@@ -404,9 +411,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 采购合同打印数据
-    async fn get_purchase_contract_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_purchase_contract_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::purchase_contract;
 
         let record = purchase_contract::Entity::find_by_id(id)
@@ -489,9 +498,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 采购质检单打印数据
-    async fn get_purchase_inspection_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_purchase_inspection_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::purchase_inspection;
 
         use crate::models::purchase_inspection_item;
@@ -587,9 +598,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 供应商评价记录打印数据
-    async fn get_supplier_evaluation_record_print_data(
+    pub(super) async fn get_supplier_evaluation_record_print_data(
         &self,
         id: i32,
     ) -> Result<PrintData, AppError> {
@@ -647,5 +657,4 @@ impl super::PrintService {
             image: None,
         })
     }
-
 }

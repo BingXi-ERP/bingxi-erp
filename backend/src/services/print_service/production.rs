@@ -1,7 +1,10 @@
 //! production 域打印取数（自 print_service.rs 拆分，方法签名零改动）
 
 use crate::utils::error::AppError;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order, QueryFilter, QueryOrder, QuerySelect, RelationTrait};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -12,7 +15,10 @@ impl super::PrintService {
     /// V15 P1 batch-08 缺陷 8：生成 docx 字节流（规则 3 强制要求合同/发票/报表支持 .docx）
     /// 将 PrintData 转为 Word 文档（标题 + 主表键值对 + 明细表格）。
     /// 生产流转卡打印数据
-    async fn get_production_flow_card_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_production_flow_card_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::production_flow_card;
 
         let record = production_flow_card::Entity::find_by_id(id)
@@ -80,9 +86,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 生产工单打印数据
-    async fn get_production_order_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_production_order_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::production_order;
 
         let record = production_order::Entity::find_by_id(id)
@@ -168,9 +176,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 生产配方打印数据
-    async fn get_production_recipe_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_production_recipe_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::production_recipe;
 
         use crate::models::production_recipe_addition;
@@ -252,9 +262,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 工艺路线打印数据
-    async fn get_process_route_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_process_route_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::process_route;
 
         let record = process_route::Entity::find_by_id(id)
@@ -294,9 +306,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 染色批次卡打印数据
-    async fn get_dye_batch_card_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_dye_batch_card_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::dye_batch;
 
         let record = dye_batch::Entity::find_by_id(id)
@@ -357,9 +371,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 染色返工单打印数据
-    async fn get_dye_batch_rework_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_dye_batch_rework_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::dye_batch_rework;
 
         let record = dye_batch_rework::Entity::find_by_id(id)
@@ -428,9 +444,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 打样申请单打印数据
-    async fn get_lab_dip_request_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_lab_dip_request_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::lab_dip_request;
 
         use crate::models::lab_dip_sample;
@@ -534,9 +552,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 色卡发放单打印数据
-    async fn get_color_card_issue_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_color_card_issue_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::color_card_issue;
 
         let record = color_card_issue::Entity::find_by_id(id)
@@ -588,9 +608,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 大货色审批单打印数据
-    async fn get_bulk_color_approval_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_bulk_color_approval_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::bulk_color_approval;
 
         let record = bulk_color_approval::Entity::find_by_id(id)
@@ -666,9 +688,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 委外加工单打印数据
-    async fn get_outsourcing_order_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_outsourcing_order_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::outsourcing_order;
 
         use crate::models::outsourcing_order_item;
@@ -766,9 +790,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 委外收货单打印数据
-    async fn get_outsourcing_receipt_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_outsourcing_receipt_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::outsourcing_receipt;
         use crate::models::status::outsourcing_receipt_quality_status;
 
@@ -846,9 +872,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 排程结果打印数据
-    async fn get_scheduling_result_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_scheduling_result_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::scheduling_result;
 
         let record = scheduling_result::Entity::find_by_id(id)
@@ -902,9 +930,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 化工料领用单打印数据
-    async fn get_chemical_requisition_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_chemical_requisition_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::chemical_requisition;
 
         let record = chemical_requisition::Entity::find_by_id(id)
@@ -962,5 +992,4 @@ impl super::PrintService {
             image: None,
         })
     }
-
 }

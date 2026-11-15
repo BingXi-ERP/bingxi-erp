@@ -1,7 +1,10 @@
 //! quality 域打印取数（自 print_service.rs 拆分，方法签名零改动）
 
 use crate::utils::error::AppError;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order, QueryFilter, QueryOrder, QuerySelect, RelationTrait};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -10,7 +13,7 @@ use super::PrintData;
 
 impl super::PrintService {
     /// 质检记录打印数据
-    async fn get_quality_inspection_record_print_data(
+    pub(super) async fn get_quality_inspection_record_print_data(
         &self,
         id: i32,
     ) -> Result<PrintData, AppError> {
@@ -98,9 +101,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 8D质量报告打印数据
-    async fn get_quality_8d_report_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_quality_8d_report_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::quality_8d_report;
 
         let record = quality_8d_report::Entity::find_by_id(id)
@@ -167,9 +172,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 质量问题单打印数据
-    async fn get_quality_issue_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_quality_issue_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::quality_issue;
 
         let record = quality_issue::Entity::find_by_id(id)
@@ -232,9 +239,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 验布记录打印数据
-    async fn get_fabric_inspection_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_fabric_inspection_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::fabric_inspection_record;
 
         let record = fabric_inspection_record::Entity::find_by_id(id)
@@ -308,9 +317,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 安全事故报告打印数据
-    async fn get_safety_accident_report_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_safety_accident_report_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::safety_accident_report;
 
         let record = safety_accident_report::Entity::find_by_id(id)
@@ -369,9 +380,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 职业病危害监测打印数据
-    async fn get_occupational_hazard_monitoring_print_data(
+    pub(super) async fn get_occupational_hazard_monitoring_print_data(
         &self,
         id: i32,
     ) -> Result<PrintData, AppError> {
@@ -434,9 +444,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 排污许可证打印数据
-    async fn get_pollution_permit_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_pollution_permit_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::pollution_permit;
 
         let record = pollution_permit::Entity::find_by_id(id)
@@ -495,9 +507,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 固废处置单打印数据
-    async fn get_solid_waste_disposal_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_solid_waste_disposal_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::solid_waste_disposal_record;
 
         let record = solid_waste_disposal_record::Entity::find_by_id(id)
@@ -564,9 +578,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 职业健康体检打印数据
-    async fn get_occupational_health_exam_print_data(
+    pub(super) async fn get_occupational_health_exam_print_data(
         &self,
         id: i32,
     ) -> Result<PrintData, AppError> {
@@ -617,9 +630,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 劳保用品发放记录打印数据
-    async fn get_ppe_distribution_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_ppe_distribution_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::ppe_distribution_record;
 
         let record = ppe_distribution_record::Entity::find_by_id(id)
@@ -675,9 +690,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 社保缴纳记录打印数据
-    async fn get_social_insurance_record_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_social_insurance_record_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::social_insurance_record;
 
         let record = social_insurance_record::Entity::find_by_id(id)
@@ -736,9 +753,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 劳动合同打印数据
-    async fn get_labor_contract_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_labor_contract_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::labor_contract;
 
         let record = labor_contract::Entity::find_by_id(id)
@@ -802,9 +821,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 工资记录打印数据
-    async fn get_wage_record_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_wage_record_print_data(&self, id: i32) -> Result<PrintData, AppError> {
         use crate::models::wage_record;
 
         use crate::models::wage_record_detail;
@@ -900,5 +918,4 @@ impl super::PrintService {
             image: None,
         })
     }
-
 }

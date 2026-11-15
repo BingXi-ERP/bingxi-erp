@@ -1,7 +1,10 @@
 //! sales 域打印取数（自 print_service.rs 拆分，方法签名零改动）
 
 use crate::utils::error::AppError;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order, QueryFilter, QueryOrder, QuerySelect, RelationTrait};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -10,7 +13,7 @@ use super::{PrintData, SalesDeliveryPrintRelations};
 
 impl super::PrintService {
     /// 销售订单打印数据：订单主表 + 客户 + 明细项（含产品）
-    async fn get_sales_order_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_sales_order_print_data(&self, id: i32) -> Result<PrintData, AppError> {
         let (order, customer, items, products) =
             Self::fetch_sales_order_relations(&self.db, id).await?;
         let data = Self::build_sales_order_main_data(&order, customer.as_ref());
@@ -22,7 +25,6 @@ impl super::PrintService {
             image: None,
         })
     }
-
 
     /// 销售订单打印：批量查询订单 + 客户 + 明细 + 产品
     async fn fetch_sales_order_relations(
@@ -51,7 +53,6 @@ impl super::PrintService {
         let products = items.load_one(product::Entity, db).await?;
         Ok((order, customer, items, products))
     }
-
 
     /// 销售订单打印：构造主表 data
     fn build_sales_order_main_data(
@@ -147,7 +148,6 @@ impl super::PrintService {
         data
     }
 
-
     /// 销售订单打印：构造明细行列表
     fn build_sales_order_item_list(
         items: Vec<crate::models::sales_order_item::Model>,
@@ -211,9 +211,11 @@ impl super::PrintService {
         item_list
     }
 
-
     /// 销售合同打印数据：合同主表 + 客户
-    async fn get_sales_contract_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_sales_contract_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::{customer, sales_contract};
 
         let contract = sales_contract::Entity::find_by_id(id)
@@ -323,9 +325,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 销售报价单打印数据
-    async fn get_sales_quotation_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_sales_quotation_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::sales_quotation;
 
         use crate::models::sales_quotation_item;
@@ -415,13 +419,15 @@ impl super::PrintService {
         })
     }
 
-
     /// 销售发货单打印数据
     ///
     /// 出参键即 docx 正文栏名与明细表头。主表取客户、仓库、来源销售订单、制单人四个档案，
     /// 明细取产品档案的名称编号规格与计量单位、色号档案的颜色名称；全部走批量关联查询，
     /// 无逐行再查，档案缺席一律点名报错而非留空
-    async fn get_sales_delivery_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_sales_delivery_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         let relations = Self::fetch_sales_delivery_relations(&self.db, id).await?;
         Ok(PrintData {
             template: "sales_delivery".to_string(),
@@ -430,7 +436,6 @@ impl super::PrintService {
             image: None,
         })
     }
-
 
     /// 销售发货单打印：一次性取单据主体、四个关联档案、明细行、产品与色号名称字典
     async fn fetch_sales_delivery_relations(
@@ -511,7 +516,6 @@ impl super::PrintService {
         })
     }
 
-
     /// 销售发货单打印：按明细行批量取产品档案，缺席行点名到具体产品编号
     async fn load_delivery_products(
         db: &DatabaseConnection,
@@ -532,7 +536,6 @@ impl super::PrintService {
         }
         Ok(products)
     }
-
 
     /// 销售发货单打印：按明细行的产品与色号批量取色号档案名称，键为 (产品编号, 色号)
     /// 明细色号可以是色号档案之外的自由文本，未登记时该键缺席，出参留空由调用点如实体现
@@ -557,7 +560,6 @@ impl super::PrintService {
             .map(|color| ((color.product_id, color.color_no), color.color_name))
             .collect())
     }
-
 
     /// 销售发货单打印：主表栏次；可空列按空串出参，非空档案缺席已在上游点名报错
     fn build_sales_delivery_main_data(
@@ -615,7 +617,6 @@ impl super::PrintService {
         );
         data
     }
-
 
     /// 销售发货单打印：明细栏次；产品与色号名称按行下标取自批量结果
     fn build_sales_delivery_item_list(
@@ -675,9 +676,8 @@ impl super::PrintService {
         rows
     }
 
-
     /// 销售退货单打印数据
-    async fn get_sales_return_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_sales_return_print_data(&self, id: i32) -> Result<PrintData, AppError> {
         use crate::models::sales_return;
 
         use crate::models::sales_return_item;
@@ -754,9 +754,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 售后服务单打印数据
-    async fn get_after_sales_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_after_sales_print_data(&self, id: i32) -> Result<PrintData, AppError> {
         use crate::models::after_sales;
 
         let record = after_sales::Entity::find_by_id(id)
@@ -833,14 +832,16 @@ impl super::PrintService {
         })
     }
 
-
     /// 客户信用额度打印数据
     ///
     /// {id} 是 customer_credit_ratings.id 行主键（与 /customer-credits/{id} 系列
     /// 端点的客户自然键不同义）。客户名单次 LEFT JOIN 取 customers 真值，与列表/详情
     /// 同一条富化链路：本表冗余的 customer_name 列在写入路径从不赋值，直读它会把打印件
     /// 的客户名印成空白。
-    async fn get_customer_credit_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_customer_credit_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::services::customer_credit_service::CustomerCreditService;
 
         let record = CustomerCreditService::new(self.db.clone())
@@ -908,9 +909,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 定制订单打印数据
-    async fn get_custom_order_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_custom_order_print_data(&self, id: i32) -> Result<PrintData, AppError> {
         use crate::models::custom_order;
 
         let record = custom_order::Entity::find_by_id(id)
@@ -988,5 +988,4 @@ impl super::PrintService {
             image: None,
         })
     }
-
 }

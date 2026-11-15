@@ -1,7 +1,10 @@
 //! export_trade 域打印取数（自 print_service.rs 拆分，方法签名零改动）
 
 use crate::utils::error::AppError;
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order, QueryFilter, QueryOrder, QuerySelect, RelationTrait};
+use sea_orm::{
+    ColumnTrait, DatabaseConnection, EntityTrait, JoinType, LoaderTrait, ModelTrait, Order,
+    QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -10,7 +13,10 @@ use super::PrintData;
 
 impl super::PrintService {
     /// 原产地证明打印数据
-    async fn get_certificate_of_origin_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_certificate_of_origin_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::certificate_of_origin;
 
         let record = certificate_of_origin::Entity::find_by_id(id)
@@ -65,9 +71,8 @@ impl super::PrintService {
         })
     }
 
-
     /// 出口报关单打印数据
-    async fn get_export_customs_declaration_print_data(
+    pub(super) async fn get_export_customs_declaration_print_data(
         &self,
         id: i32,
     ) -> Result<PrintData, AppError> {
@@ -116,9 +121,11 @@ impl super::PrintService {
         })
     }
 
-
     /// 出口检验单打印数据
-    async fn get_export_inspection_print_data(&self, id: i32) -> Result<PrintData, AppError> {
+    pub(super) async fn get_export_inspection_print_data(
+        &self,
+        id: i32,
+    ) -> Result<PrintData, AppError> {
         use crate::models::export_inspection;
 
         let record = export_inspection::Entity::find_by_id(id)
@@ -171,5 +178,4 @@ impl super::PrintService {
             image: None,
         })
     }
-
 }
