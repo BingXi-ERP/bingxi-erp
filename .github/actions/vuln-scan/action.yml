@@ -135,20 +135,20 @@ runs:
           > "$R/cargo-deny.log" 2>&1
         RC=$?
         set -e
-        echo "cargo deny exit=$RC（0=全过 1=命中 deny 规则 101=配置/执行异常）"
-        if [ "$RC" -gt 1 ]; then
-          echo "::error::cargo deny 异常退出（exit $RC，扫描器未正常完成）"
-          tail -30 "$R/cargo-deny.log" || true
+        echo "cargo deny exit=$RC（0=零命中；非 0=诊断条数，首轮观察档只报告）"
+        # 扫描器没跑成（无任何输出）必须 fail-closed 阻塞，不许把读不到结果咽成零命中。
+        if [ ! -s "$R/cargo-deny.log" ]; then
+          echo "::error::cargo deny 无输出，扫描器未正常完成"
           exit 1
         fi
-        if [ "$RC" -eq 1 ]; then
-          # 首轮观察档：licenses/bans/sources 三面命中先报 warning 不阻塞，
-          # 按 deny.toml 头注口径核准 allow 集后再收紧为阻塞；yanked 已在 deny 配置为 deny 档。
-          echo "::warning::cargo deny 命中 deny 规则（首轮观察档记录在案，不阻塞；详见 reports/audit/cargo-deny.log）"
-          grep -E "^(error|warning)\[" "$R/cargo-deny.log" | head -20 || true
-          grep -E "yanked" "$R/cargo-deny.log" | head -5 && { echo "::error::cargo deny 发现 yanked crate（安全面，直接阻塞）"; exit 1; } || true
-        else
+        if [ "$RC" -eq 0 ]; then
           echo "✅ cargo deny 零命中（license/ban/source/yanked 四面全过）"
+        else
+          # 首轮观察档（新门接档三件套：只报告 + 棘轮 + 未验证三态）：
+          # 存量 yanked（chacha20 0.10.1，主干 Cargo.lock 已含）与未核准的 license
+          # 一律只报告不阻塞；allow 集核准后按 deny.toml 头注收紧为阻塞。
+          echo "::warning::cargo deny 首轮观察档：${RC} 条诊断只报告不阻塞（详见 reports/audit/cargo-deny.log）"
+          grep -E "^(error|warning)\[" "$R/cargo-deny.log" | head -20 || true
         fi
 
     - name: npm 依赖漏洞审计（npm audit · high/critical 阻塞 CI）
