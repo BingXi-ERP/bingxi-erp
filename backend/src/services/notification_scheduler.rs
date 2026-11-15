@@ -110,50 +110,6 @@ impl NotificationPushScheduler {
         );
         Ok(())
     }
-
-    /// 启动后台调度任务
-    /// 环境变量门控：NOTIFICATION_PUSH_SCHEDULER_ENABLED（默认 true）
-    /// NOTIFICATION_PUSH_SCHEDULER_INTERVAL_SECS（默认 60）
-    pub fn start_background_task(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            let enabled = std::env::var("NOTIFICATION_PUSH_SCHEDULER_ENABLED")
-                .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
-                .unwrap_or(true);
-            if !enabled {
-                info!(
-                    "通知推送调度器：环境变量 NOTIFICATION_PUSH_SCHEDULER_ENABLED=false，跳过启动"
-                );
-                return;
-            }
-
-            let interval_secs = std::env::var("NOTIFICATION_PUSH_SCHEDULER_INTERVAL_SECS")
-                .ok()
-                .and_then(|v| v.parse::<u64>().ok())
-                .filter(|&v| v > 0)
-                .unwrap_or(DEFAULT_INTERVAL_SECS);
-
-            tokio::time::sleep(std::time::Duration::from_secs(INITIAL_DELAY_SECS)).await;
-
-            let interval = std::time::Duration::from_secs(interval_secs);
-            info!(
-                interval_secs,
-                "通知推送调度器：后台任务已启动（每 {} 秒扫描一次到期推送订阅）", interval_secs
-            );
-
-            loop {
-                match self.scan_once().await {
-                    Ok(count) if count > 0 => {
-                        info!(count, "通知推送调度器：本轮处理 {} 条订阅", count);
-                    }
-                    Ok(_) => {}
-                    Err(e) => {
-                        warn!(error = %e, "通知推送调度器：本轮扫描失败，下次循环继续");
-                    }
-                }
-                tokio::time::sleep(interval).await;
-            }
-        })
-    }
 }
 
 #[async_trait::async_trait]
@@ -163,7 +119,21 @@ impl Scheduler for NotificationPushScheduler {
     }
 
     fn interval_secs(&self) -> u64 {
-        DEFAULT_INTERVAL_SECS
+        std::env::var("NOTIFICATION_PUSH_SCHEDULER_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(DEFAULT_INTERVAL_SECS)
+    }
+
+    fn initial_delay_secs(&self) -> u64 {
+        INITIAL_DELAY_SECS
+    }
+
+    fn enabled(&self) -> bool {
+        std::env::var("NOTIFICATION_PUSH_SCHEDULER_ENABLED")
+            .map(|v| matches!(v.to_lowercase().as_str(), "true" | "1" | "yes" | "on"))
+            .unwrap_or(true)
     }
 
     async fn run_once(&self) -> Result<(), String> {
@@ -171,5 +141,12 @@ impl Scheduler for NotificationPushScheduler {
             .await
             .map(|_| ())
             .map_err(|e| e.to_string())
+    }
+    async fn run_once_counted(&self) -> (Result<(), String>, Option<i64>) {
+        let r = self.scan_once().await.map_err(|e| e.to_string());
+        match r {
+            Ok(n) => (Ok(()), Some(n as i64)),
+            Err(e) => (Err(e), None),
+        }
     }
 }

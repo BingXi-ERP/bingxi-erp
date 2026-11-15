@@ -467,6 +467,25 @@ fn build_erp_root_router() -> Router<AppState> {
         .merge(suppliers_select_alias())
         // P9-8 搜索 API
         .merge(search_routes())
+        // 周期任务可观测端点（任务清单 / 执行历史 / 手动触发）
+        .merge(scheduler_routes())
+}
+
+/// 周期任务可观测路由（path 前缀 /scheduler）
+fn scheduler_routes() -> Router<AppState> {
+    Router::new()
+        .route(
+            "/scheduler/jobs",
+            get(crate::handlers::scheduler_handler::list_jobs),
+        )
+        .route(
+            "/scheduler/jobs/runs",
+            get(crate::handlers::scheduler_handler::list_job_runs),
+        )
+        .route(
+            "/scheduler/jobs/{name}/trigger",
+            post(crate::handlers::scheduler_handler::trigger_job),
+        )
 }
 
 /// 构建基础设施路由（静态资源 + 指标 + API 文档）；与业务域不同，这三类基础设施不挂在 `/api/v1/erp` 之下，而是顶层独立路径： -
