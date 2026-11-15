@@ -23,12 +23,15 @@ function mountTable(initialTotal: number, initialPage: number, pageSize = 20) {
     return Promise.resolve(makeResponse([], initialTotal)) as never;
   });
 
+  // setup 返回的 table 句柄通过模板外暴露：expose 使测试可在初始加载落定后
+  // 再设置 page/pageSize（mount 期间设大页会被首次响应的 maxPage 判定拉回，
+  // 使钳位断言失去前提）。
+  let tableRef: ReturnType<typeof useTableApi> | undefined;
   const Host = defineComponent({
-    setup() {
+    setup(_props, { expose }) {
       const table = useTableApi<Record<string, unknown>>('/test/table');
-      // 初始加载完成后才把 page 设到目标值：useTableApi 现在会在 total 落定后做
-      // 页码越界钳位，mount 期间直接设大页会被首次响应的 maxPage 判定拉回 1，
-      // 使后续断言失去前提。
+      tableRef = table;
+      expose({ getTable: () => table });
       return () =>
         h('div', { class: 'host' }, [
           h(ElPagination, {
@@ -49,7 +52,8 @@ function mountTable(initialTotal: number, initialPage: number, pageSize = 20) {
   const wrapper = mount(Host, { global: { plugins: [ElementPlus] } });
   const setPageAfterInitialLoad = async () => {
     await flushPromises();
-    const table = (wrapper.vm.$.setupState as { table: ReturnType<typeof useTableApi> }).table;
+    const table = tableRef;
+    if (!table) throw new Error('useTableApi 句柄未就绪，无法构造钳位前提');
     table.page.value = initialPage;
     table.pageSize.value = pageSize;
     await flushPromises();
