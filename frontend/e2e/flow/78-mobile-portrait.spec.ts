@@ -1,6 +1,5 @@
 import { test, expect, type Page } from '../diagnose-fixture';
-import { randomUUID } from 'node:crypto';
-import { loginViaUI, BASE_URL, apiCall, tryCleanup } from './helpers';
+import { loginViaUI, BASE_URL, apiCall, genCode, tryCleanup } from './helpers';
 
 /**
  * 移动端竖屏布局与操作锁（补 CI 桌面视口测不到移动端的盲区）
@@ -182,7 +181,7 @@ for (const vp of MOBILE_VIEWPORTS) {
     });
 
     test('真实客户搜索选择及同路径 query 历史导航收起面板', async ({ page }) => {
-      const name = `MobileSearch${randomUUID().replaceAll('-', '')}`;
+      const name = genCode('MobileSearch客户');
       let id: number | undefined;
       try {
         console.log('[mobile-search] 创建真实客户');
