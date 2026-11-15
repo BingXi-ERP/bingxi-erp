@@ -234,6 +234,15 @@ export function useTableApi<T = unknown>(
         : (raw ?? {});
       data.value = detectList(payload) as T[];
       total.value = detectTotal(payload, rawWasArray);
+      // 总数下降后的页码越界修正：maxPage = max(1, ceil(total / pageSize))。
+      // 仅当当前页越出有效范围时回退并跳过本轮渲染，交给分页 watch 以修正后的
+      // 页码重新取数（用户看到的是修正页的真实数据，而不是一次空页）。
+      // total=0（清空筛选/删除末行等）按 maxPage=1 回首页。
+      const maxPage = Math.max(1, Math.ceil(total.value / pageSize.value));
+      if (page.value > maxPage) {
+        page.value = maxPage;
+        return;
+      }
     } catch (err) {
       const isSchema = isSchemaMismatchError(err);
       // 契约/形状错误是永久性的，重试只会放大请求量（且 axios 对幂等 GET 还会自动退避重试）——
