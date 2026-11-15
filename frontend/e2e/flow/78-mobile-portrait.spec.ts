@@ -142,7 +142,10 @@ for (const vp of MOBILE_VIEWPORTS) {
           await search.click();
           await expect(panel).toBeVisible();
           await expect(async () => {
-            const box = await panel.boundingBox();
+            // EP 2.14 modal 下 role=dialog 挂在 .el-overlay 遮罩（宽度恒为全视口），
+            // 宽度与边距断言必须量到 .el-dialog 本体，否则把遮罩全宽误判为弹窗超宽。
+            const dialogBody = panel.locator('.el-dialog').first();
+            const box = await dialogBody.boundingBox();
             expect(box).not.toBeNull();
             expect(box!.x, '弹窗左缘不得移出视口').toBeGreaterThanOrEqual(0);
             expect(box!.y, '弹窗顶缘不得移出视口').toBeGreaterThanOrEqual(0);
@@ -151,7 +154,7 @@ for (const vp of MOBILE_VIEWPORTS) {
             );
             expect(
               box!.width,
-              '弹窗应收进安全矩形（视口-32-左右安全区）与 480 上限的较小值'
+              '弹窗本体应收进安全矩形（视口-32-左右安全区）与 480 上限的较小值'
             ).toBeLessThanOrEqual(Math.min(480, vp.width - 32 - left - right) + 1);
             const inputBox = await panel.getByRole('combobox').boundingBox();
             expect(inputBox).not.toBeNull();
