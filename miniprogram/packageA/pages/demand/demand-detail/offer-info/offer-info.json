@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "报价信息",
+  "navigationBarTextStyle": "white",
+  "navigationBarBackgroundColor": "#2D74EE",
+  "enablePullDownRefresh": true
+}

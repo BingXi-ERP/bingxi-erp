@@ -638,9 +638,11 @@ NODE
     fi
     dead_keys="$(printf '%s\n' "$out" | awk '$1=="ROUTE_DEAD"{f=$2; sub(/:[0-9]+$/,"",f); print f" "$3}' | LC_ALL=C sort -u)"
     base_keys="$(sed -E 's/[[:space:]]*(#.*)?$//; s/^[[:space:]]+//' "$MP_ROUTE_BASELINE" | sed '/^$/d' | LC_ALL=C sort -u)"
+    # 有效键清零是棘轮的合法终态：存量死链全部修完后基线只剩注释。此时任何死链都是新增，
+    # 下面 comm -23 会把它们全部判出来；不得把"空基线"报成工装故障，也不得咽成没有新增。
+    # 反向边界仍是 fail-closed：缺文件走上面的 TOOL_BUG，空基线但有死链走下面的 MP_ROUTE_NEW_DEAD。
     if [ -z "$(printf '%s' "$base_keys")" ]; then
-      tool_bug "路由死链基线文件 $MP_ROUTE_BASELINE 去掉注释后为空，棘轮无参照面"
-      return 1
+      say "MP_ROUTE_BASELINE_EMPTY 存量死链已清零，任何死链均按新增判定"
     fi
     new_keys="$(comm -23 <(printf '%s\n' "$dead_keys") <(printf '%s\n' "$base_keys") | sed '/^$/d')"
     new_n="$(printf '%s\n' "$new_keys" | sed '/^$/d' | wc -l | tr -d ' ')"

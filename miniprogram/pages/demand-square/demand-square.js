@@ -116,7 +116,7 @@ Page({
       toConsumableArray = e.listId,
       objectSpread2 = e.askNo;
     wx.navigateTo({
-      url: "../../packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId="
+      url: "../../packageA/pages/demand/demand-detail/offer-info/offer-info?listId="
         .concat(toConsumableArray, "&&askNo=")
         .concat(objectSpread2),
     });

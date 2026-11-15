@@ -149,7 +149,7 @@ Page({
       e = t.currentTarget.dataset.listId,
       services_demand = t.currentTarget.dataset.askNo;
     wx.navigateTo({
-      url: "/packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId="
+      url: "/packageA/pages/demand/demand-detail/offer-info/offer-info?listId="
         .concat(e, "&&askNo=")
         .concat(services_demand, "&&replyId=")
         .concat(objectSpread2),

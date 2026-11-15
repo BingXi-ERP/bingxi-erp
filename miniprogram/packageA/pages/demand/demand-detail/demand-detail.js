@@ -129,13 +129,13 @@ Page({
       services_demand = this.data.replyId;
     services_demand && 3 !== this.data.myPostData.status
       ? wx.navigateTo({
-          url: "/packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId="
+          url: "/packageA/pages/demand/demand-detail/offer-info/offer-info?listId="
             .concat(objectSpread2, "&&askNo=")
             .concat(a, "&&replyId=")
             .concat(services_demand),
         })
       : wx.navigateTo({
-          url: "/packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId="
+          url: "/packageA/pages/demand/demand-detail/offer-info/offer-info?listId="
             .concat(objectSpread2, "&&askNo=")
             .concat(a),
         });

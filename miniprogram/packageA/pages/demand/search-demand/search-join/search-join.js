@@ -29,7 +29,7 @@ Page({
       console.log("replyId====>" + objectSpread2),
       console.log("askNo====>" + app),
       wx.navigateTo({
-        url: "/packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId="
+        url: "/packageA/pages/demand/demand-detail/offer-info/offer-info?listId="
           .concat(services_demand, "&&askNo=")
           .concat(app, "&&replyId=")
           .concat(objectSpread2),

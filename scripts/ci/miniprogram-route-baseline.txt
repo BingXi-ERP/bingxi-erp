@@ -4,13 +4,15 @@
 # 每条都是取档带回来的真实缺陷：目标页既无页面文件也无 app.json 声明，用户点到即跳转失败。
 # 修一条就把那一行从本文件删掉；删除后若该条仍出现，说明没真修好。缺页面登记见缺陷 D-66。
 # 来源：2026-11-09 首轮实跑 bash scripts/ci/miniprogram-checks.sh，MP_ROUTE_RED 11 处去重成 10 键。
-packageA/pages/demand/demand-detail/demand-detail.js /packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId=
-packageA/pages/demand/demand-detail/demand-detail.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=
-packageA/pages/demand/demand-order/index.js /packageA/pages/demand/demand-order/demand-order-detail/index?itemId=
-packageA/pages/demand/my-demand/my-demand.js /packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId=
-packageA/pages/demand/my-demand/my-demand.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=
-packageA/pages/demand/my-demand/my-post-result-detail/my-post-result-detail.js /packageA/pages/demand/my-demand/my-post-result-choose/my-post-result-choose?listId=
-packageA/pages/demand/my-demand/my-post-result/my-post-result.js /packageA/pages/demand/my-demand/my-post-result-choose/my-post-result-choose?&&replyId=
-packageA/pages/demand/search-demand/search-join/search-join.js /packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId=
-packageA/pages/demand/search-demand/search-join/search-join.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=
-packageA/pages/demand/search-demand/search-post/search-post.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=
+# 2026-11-15 D-66 四缺失页已补齐、offer-onfo 拼写已修，10 条存量死链全部清零，有效键清空。
+# 历史键归档如下（仅供追溯，不再是基线成员）：
+# 已修 packageA/pages/demand/demand-detail/demand-detail.js /packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId=
+# 已修 packageA/pages/demand/demand-detail/demand-detail.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=
+# 已修 packageA/pages/demand/demand-order/index.js /packageA/pages/demand/demand-order/demand-order-detail/index?itemId=
+# 已修 packageA/pages/demand/my-demand/my-demand.js /packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId=
+# 已修 packageA/pages/demand/my-demand/my-demand.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=
+# 已修 packageA/pages/demand/my-demand/my-post-result-detail/my-post-result-detail.js /packageA/pages/demand/my-demand/my-post-result-choose/my-post-result-choose?listId=
+# 已修 packageA/pages/demand/my-demand/my-post-result/my-post-result.js /packageA/pages/demand/my-demand/my-post-result-choose/my-post-result-choose?&&replyId=
+# 已修 packageA/pages/demand/search-demand/search-join/search-join.js /packageA/pages/demand/demand-detail/offer-info/offer-onfo?listId=
+# 已修 packageA/pages/demand/search-demand/search-join/search-join.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=
+# 已修 packageA/pages/demand/search-demand/search-post/search-post.js /packageA/pages/demand/demand-detail/post-demand/post-demand?itemId=

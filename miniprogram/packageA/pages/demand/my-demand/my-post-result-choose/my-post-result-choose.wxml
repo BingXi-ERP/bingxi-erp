@@ -1,0 +1,20 @@
+<view class="page">
+  <view class="head">选择匹配结果</view>
+  <view wx:if="{{!loaded}}" class="hint">正在加载</view>
+  <block wx:if="{{loaded}}">
+    <view wx:if="{{error}}" class="hint" bindtap="onRetry">加载失败，点此重试</view>
+    <block wx:elif="{{rows.length === 0}}">
+      <view class="hint">暂无匹配结果</view>
+    </block>
+    <block wx:else>
+      <block wx:for="{{rows}}" wx:key="index" wx:for-item="group">
+      <view class="rows">
+        <view class="row" wx:for="{{group}}" wx:key="label" wx:for-item="cell">
+          <text class="key">{{cell.label}}</text>
+          <text class="value">{{cell.value}}</text>
+        </view>
+      </view>
+      </block>
+    </block>
+  </block>
+</view>
