@@ -129,5 +129,24 @@
 处置与边界（本轮已做与不许做的分开写清）：
 
 1. 已做：第七道改只报告加棘轮基线（提交 9771a888b）。基线文件 scripts/ci/miniprogram-route-baseline.txt 十条键不含行号，理由是行号会随上方任意改动漂移而造出假新增；判定改成分层，基线内打 MP_ROUTE_RATCHET baselined=N new=0 并返 0，基线外新增打 MP_ROUTE_NEW_DEAD 逐条点名后判红；缺基线文件或基线去注释后为空一律走 tool_bug，不把读不到参照面咽成没有新增。改后三件验证齐过：bash -n rc 0，--self-test 仍 caught=7/7 missed:0 与 MP_DETECTOR_OK（证明反向探针没被基线吞掉，新增判红路径仍有效），真跑 MP_CHECK_GREEN 且 STEP_END routes rc 0。
-2. 不许做：不凭空补造这四页。页面业务逻辑未知，造页等于编功能，属仓内禁止的假可供性，也与"测试要真测"相悖。基线文件头已写明修掉一条就从基线删一行，基线是债务台账不是免修凭证。
+2. 不许凭空补造：不擅自按猜测写页面业务逻辑。四页的业务语义必须从仓内既有证据反推（调用点参数字面量、packageA/services 既有方法、demand 族相邻范式页回包字段），不许编造字段、不许造假数据、不许新增端点。基线是债务台账不是免修凭证。
 3. 待办：拿真实小程序源（或向业务确认目标页应落何处）逐条补齐，补齐后同支删对应基线行并把跳转链路的 e2e 或小程序侧用例补上；号段用 473 到 479 中已划给小程序域的号。
+
+## 附二：D-66 结案记录（2026-11-15，用户当轮授权「要修」）
+
+用户明确授权后，在 feat/wechat-miniprogram-domain 车道（wt-mp-land）落地，提交 d6d93fb8b，23 文件 +500/-17：
+
+1. **四页补齐**：post-demand（demandDetail）、offer-info（matchDetail）、my-post-result-choose（matchList）、demand-order-detail/index（ServicesDemandOrder.orderDetail）。每页 .js/.json/.wxml/.wxss 四件套，app.json 的 packageA.pages 补 4 条声明（191→195）。字段清单取自相邻范式页真实回包读写（demand-detail.js 的 productDate、my-post-result-detail.js 的 productDate、my-post-result.js 的 postResult、demand-order/index.js 的订单列表映射），零推测列名；请求失败由传输层外显，本页另记日志并提供重试入口，不做兜底掩盖。
+2. **拼写笔误**：4 个调用点文件共 5 处 `offer-onfo` 改 `offer-info`（demand-detail.js 2、my-demand.js 1、search-join.js 1、demand-square.js 1）。
+3. **零新增端点**：四页复用 packageA/services 既有 service 方法，不新写 URL 字面量；端点门只判 `/api/v1/erp/*` 调用点命中仓内快照，取档源码里 375 条 `/app-api/*` 记 legacy 不判红，契约文档 v3 已裁定未映射旧路径直通 404 不做回退/模拟，本批不扩面。
+4. **死链清零 + 基线棘轮终态**：11 处 ROUTE_DEAD → dead=0（exactOk 268→279）；10 条基线有效键全部注释归档。判定器修正：有效键清零是合法终态，不再报 TOOL_BUG，任何新死链一律按 MP_ROUTE_NEW_DEAD 判红（比原分类更严）；缺基线文件仍走 TOOL_BUG。
+5. **验证**：主门禁 `bash scripts/ci/miniprogram-checks.sh` rc=0 七道全过（MP_CHECK_GREEN、STEP_END routes rc=0、dead=0）；`--self-test` rc=0 且 caught=7/7 missed:0、MP_DETECTOR_OK、红向夹具正确打 MP_ROUTE_NEW_DEAD 2 处；`bash -n` rc=0；四页 js 逐文件 node --check 过；另造「基线塞真实非死链键」正向对照 rc=0，通过集合未缩小。本地验证齐过，未推送（用户「先不推」裁定仍生效，仅解除「不许修」）。
+
+## 附：功能缺失登记项处置全景核对（2026-11-15）
+
+对历份缺陷登记里「功能缺失」类逐条核修复载体后的全景：
+
+- **已修（源码面补齐 + 用例钉面）**：E8 超折扣审批门（#1183，折扣阈值配置 + evaluate 判档 + 469 号用例）；订单编辑并发冲突（#1212，更新时刻令牌 + 473）；产品编码重复拒因 + 色号唯一性（#1214，服务层查重 + 505）；HTTP 幂等重放防护（#1216，middleware/idempotency.rs + 474，11-12 登记的"无实现落点"已收口）；交货允差超收拦截（purchase_receipt_ops/crud.rs 的 plan_order_item_links 已按行解析 resolve_tolerance_pct + tolerance_bounds 整单拒超收，含上下界提示，11-03 登记的三腿缺口已由收货腿消费）。
+- **设计裁定（非漏修）**：预警扫描触发人——调度器只落预警行，站内信由 finance_alert_service 的 attach_notification 按规则角色集投递（454 号用例钉）；生产完工扣料 fail-open 空转——BOM 整族移除裁定（11-06）后该域随 BOM 下线。
+- **仍开口（待裁/待排期）**：D-62 微信订阅消息发送腿（P1，feat/wechat-subscribe-send-leg 车道仅保工并基无实现提交，HTTP 侧无出站触发入口，属凭证环境 + 出站渠道建设）。D-66 已于 2026-11-15 用户授权后结案（见「附二」），四缺失页、11 处死链、offer-onfo 拼写全修，本地七道门禁与反向自检全绿；仅「先不推」仍生效，未进主干未开 PR。
+- 结论：测试暴露的功能缺失绝大多数已闭环或按裁定处置；D-66 已授权修完（见「附二」），剩余 D-62 属微信域出站渠道建设，与小程序车道一起被用户「先不推」裁定覆盖，非遗漏。
