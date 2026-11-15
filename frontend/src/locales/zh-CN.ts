@@ -421,6 +421,8 @@ export default {
       products: '产品',
       noResult: '无匹配结果',
       hint: '输入至少 2 个字符进行搜索',
+      partialFailure: '部分类型搜索暂不可用，当前仅显示已返回结果',
+      failed: '搜索暂时不可用，请稍后重试',
     },
     user: {
       defaultName: '未登录',
@@ -593,6 +595,8 @@ export default {
       toggleSidebar: '切换侧边栏',
       toggleSidebarAriaLabel: '展开或收起侧边栏菜单',
       sidebarDrawerTitle: '系统导航菜单',
+      openSearch: '打开全局搜索',
+      searchTitle: '全局搜索',
 
       // V15 P1-20-16 暗黑模式切换相关 i18n
       darkMode: '切换到暗黑模式',
