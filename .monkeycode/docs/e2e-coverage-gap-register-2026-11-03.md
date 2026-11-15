@@ -30,3 +30,7 @@ crm/customers 10，production/business-modes 6，bi/sales 5，production/lab-dip
 - 疑似已覆盖那 824 枚还没逐条人工确认，确认前不得据此声称任何覆盖率。
 - 纯后端消费、前端无入口的端点需要单独分类，否则差集会长期虚高。
 - wage-rates 与 wage-records 两组属 HR 域，不在面料主链路，暂不排期。
+
+## 复核记录 2026-11-14
+
+本份排期的三枚选题（459 缸差与色差、460 打样小样与流程卡链路、461 染整批次生命周期日志与坯布收发钩稽）与 wage 族暂缓项全部核过现态：459 的缸差/色差面由 210、212、400、440 四枚 spec 在册覆盖；460 以同号 crm-contract-and-follow-up-chain 落地；461 以同号 purchase-receipt-to-ap-conservation 落地；wage-rates/wage-records 由 42-wage-rate-record-state-gates 钉状态门。「硬缺口前 25 组」清单的其余组已由批一到批十七逐批消化（606 底数清账见 e2e-coverage-gap-2026-11-10.md 与 e2e-gap-batch18-plan-2026-11-14.md 终局节）。本份转入存档态，后续补测选题按批十八规划的"先实量再立题"口径走，不再按本份排期。

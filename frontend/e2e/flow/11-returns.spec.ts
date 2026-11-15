@@ -30,18 +30,20 @@ test.describe('采购退货完整流程', () => {
     // 按「PO 明细行存在该产品」校验（purchase_return_service），夹具共享行错配
     // 会正当拒批（实测拒因「采购订单 N 无产品 M 的订单明细行」）。读 PO 详情取
     // 首明细行的真实产品 id，造库存与明细都锚它，不回退 ctx.productIds[0]。
-    const poDetail = await apiCallRaw<{ items?: Array<{ material_id: number }> }>(
+    // 明细行实体只有 product_id（purchase_order_item 模型无 material_id 列，
+    // 详情 handler 是 items 实体直序列化加 join 补 product_name/product_code）。
+    const poDetail = await apiCallRaw<{ items?: Array<{ product_id: number }> }>(
       page,
       'GET',
       `/purchase/orders/${poId}`
     );
-    const poMaterialId = Number(poDetail.items?.[0]?.material_id);
-    expect(poMaterialId, `[11] 采购单 ${poId} 明细行 material_id 缺失`).toBeGreaterThan(0);
+    const poProductId = Number(poDetail.items?.[0]?.product_id);
+    expect(poProductId, `[11] 采购单 ${poId} 明细行 product_id 缺失`).toBeGreaterThan(0);
 
     // 退货入库依赖库存：以实际库存行为准（修 ctx.warehouseIds 漂移）
     const stockRow = await ensureStockInWarehouse(
       page,
-      poMaterialId,
+      poProductId,
       ctx.warehouseIds[0],
       ctx.colorNos[0]
     );

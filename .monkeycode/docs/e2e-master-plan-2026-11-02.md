@@ -300,3 +300,7 @@ prettier 对 `data-permission.ts` 与 `index.vue` 报 warn，控制组（主干�
 推前门：rustfmt backend 全作用面 1878 文件 offender 0；`check-api-envelope/contract/api-paths/api-request` 四道 rc=0；注释门命中 0；#1152 另有 actionlint 原生面零发现、`bash -n`、判定器检测力自证（拿真制品正文命中 os error 28）。远端回读：`833057d7`／`f16b1293`／`b2c439d9` 与本地 HEAD 一致。
 
 测试面车道（214、waitfix、217、235、252 已落盘，215/218/236/253 在写）**未推**，等全部落盘后合成一枚测试面 PR——本仓规矩：测试文件变更一律单独 PR，绝不与功能面混。
+
+## 14. 13.1 遗留税额口径待裁项的结案（2026-11-14 复核）
+
+13.1 节登记的源码侧不对称（"tax_inclusive 为真时头 tax_amount 恒 0，同一张单的头与行对税额给的不是同一个口径，要不要统一到差额口径属产品裁定"）已由 #1149 在源码侧收口（提交 682abebc3「fix(报价单): 含税口径统一到行腿反算，单头三键与建单页显示与更新腿同源」，已在主干）：现态 quotation_ops/calc.rs 的含税分支为 tax_amount = total_with_tax − subtotal（行腿含税事实聚合后取差额），头行同口径钩稽，旧"恒 0"形态不复存在。该待裁项按"已按建议方向落地"结案，不再挂产品裁定。
