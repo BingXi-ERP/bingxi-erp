@@ -10,8 +10,8 @@
 //! 权限口径：与全仓"权限键由 URL 段推导"一致，admin 段由
 //! middleware/permission.rs 按段名推导，此处不再自设角色门。
 
-use axum::extract::{Path, Query, State};
 use axum::Json;
+use axum::extract::{Path, Query, State};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 
 use crate::models::scheduler_job_run;
@@ -30,8 +30,8 @@ pub struct JobRunsQuery {
 }
 
 /// GET /scheduler/jobs：已注册任务清单
-pub async fn list_jobs(
-) -> Result<Json<ApiResponse<Vec<crate::utils::scheduler_framework::SchedulerJobSummary>>>, AppError>
+pub async fn list_jobs()
+-> Result<Json<ApiResponse<Vec<crate::utils::scheduler_framework::SchedulerJobSummary>>>, AppError>
 {
     let registry = global_registry()
         .ok_or_else(|| AppError::internal("调度器注册中心尚未初始化，任务清单不可用"))?;
