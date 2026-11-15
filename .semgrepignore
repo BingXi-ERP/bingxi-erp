@@ -1,5 +1,0 @@
-# 第三方打包产物：echarts 压缩 bundle（870KB / 28508 行）。semgrep 的三条
-# javascript 规则在该文件上跑超时并在 JSON 自报 errors=3，vuln-scan 门按
-# fail-closed 判红。与门体既有 --exclude miniprogram_npm/node_modules/target
-# 同口径：第三方 vendor 不由 SAST 承担。排除单文件，semgrep 仍扫描小程序树其余全部源码。
-miniprogram/packageA/components/ec-canvas/echarts.js

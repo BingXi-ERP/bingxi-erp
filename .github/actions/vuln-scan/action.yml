@@ -278,7 +278,7 @@ runs:
         CFG_ARGS=()
         for rs in $SEMGREP_RULESETS; do CFG_ARGS+=(--config "$rs"); done
         set +e
-        env -u SEMGREP_URL -u SEMGREP_BASE_LEGACY_URL "$WORK/venv/bin/semgrep" scan --quiet --metrics=off --exclude 'miniprogram_npm' --exclude 'node_modules' --exclude 'target' --exclude '.github' --exclude 'monitoring'           "${CFG_ARGS[@]}" --json --output "$R/semgrep.json" . > "$R/semgrep.log" 2>&1
+        env -u SEMGREP_URL -u SEMGREP_BASE_LEGACY_URL "$WORK/venv/bin/semgrep" scan --quiet --metrics=off --exclude 'miniprogram_npm' --exclude 'node_modules' --exclude 'target' --exclude '.github' --exclude 'monitoring' --exclude 'echarts.js'           "${CFG_ARGS[@]}" --json --output "$R/semgrep.json" . > "$R/semgrep.log" 2>&1
         SRC=$?
         set -e
         echo "semgrep exit=$SRC（0=无命中 1=有命中 2 及以上=用法或运行错误）"
