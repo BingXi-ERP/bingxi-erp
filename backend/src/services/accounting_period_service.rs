@@ -227,7 +227,7 @@ impl AccountingPeriodService {
             .all(&txn)
             .await?;
         if year_periods.len() != 12 {
-            return Err(AppError::business(format!(
+            return Err(AppError::business_displayable(format!(
                 "年结失败：年度 {} 仅有 {} 个期间，需 12 个月完整",
                 year,
                 year_periods.len()
@@ -235,7 +235,7 @@ impl AccountingPeriodService {
         }
         for p in &year_periods {
             if p.status != period_status::CLOSED {
-                return Err(AppError::business(format!(
+                return Err(AppError::business_displayable(format!(
                     "年结失败：期间 {}（{}）状态为 {}，需全部 CLOSED",
                     p.period_name, p.id, p.status
                 )));

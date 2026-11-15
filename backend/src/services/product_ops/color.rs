@@ -70,6 +70,23 @@ impl ProductService {
         crate::services::product_service::validate_product_color_fastness_grade(
             input.color_fastness_grade.as_deref(),
         )?;
+        // 色号唯一性前置判据：product_colors 建表只有 product_id 索引，库级没有
+        // (product_id, color_no) 唯一约束，服务层此前也不查重，同一产品下重复色号会静默落多行。
+        // 表无约束则按仓内既有范式在服务层前置查重（供应商色号同范式），冲突点名色号外显；
+        // 不在这里补 DB 约束，存量重复行会把建约束的迁移直接挡在建库期。
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+        let color_no = input.color_no.clone();
+        let existing = product_color::Entity::find()
+            .filter(product_color::Column::ProductId.eq(product_id))
+            .filter(product_color::Column::ColorNo.eq(&color_no))
+            .one(&*self.db)
+            .await?;
+        if existing.is_some() {
+            return Err(AppError::business_displayable(format!(
+                "色号 {} 在该产品下已存在",
+                color_no
+            )));
+        }
         let active_model = product_color::ActiveModel {
             id: Default::default(),
             product_id: Set(product_id),

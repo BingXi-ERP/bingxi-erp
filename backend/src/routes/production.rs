@@ -1,12 +1,12 @@
 //! 生产域路由
 //!
-//! 处理生产订单、MRP 物料需求计划、生产排程、产能、缺料预警、质量检验/标准、成本归集、
+//! 处理生产订单、生产排程、产能、缺料预警、质量检验/标准、成本归集、
 //! 缸号/染色批次/染色配方、坯布等生产与工艺相关接口。
 //!
 //! 路由设计说明：所有子 router 内部 path 都已加上各自独立前缀
 //!（`/dye-batches`、`/greige-fabrics`、`/dye-recipes`、`/quality-inspection`、
-//!  `/quality-standards`、`/cost-collections`、`/production-orders`、`/mrp`、
-//!  `/mrp-history`、`/scheduling`、`/capacity`、`/material-shortage` 等），
+//!  `/quality-standards`、`/cost-collections`、`/production-orders`、
+//!  `/scheduling`、`/capacity`、`/material-shortage` 等），
 //!  这样 `routes()` 入口用 `merge` 组合时不会出现 path+method 重叠，
 //!  避免 axum 0.7 `Overlapping method route` panic。
 
@@ -19,7 +19,7 @@ use axum::{
 use crate::handlers::{
     business_mode_handler, capacity_handler, cost_collection_handler, dye_batch_handler,
     dye_batch_state_machine_handler, dye_recipe_handler, energy_handler, fabric_inspection_handler,
-    flow_card_handler, greige_fabric_handler, lab_dip_handler, missing_handlers, mrp_handler,
+    flow_card_handler, flow_card_material_handler, greige_fabric_handler, lab_dip_handler,
     outsourcing_handler, print_handler, production_order_handler, production_recipe_handler,
     quality_inspection_handler, wage_handler,
 };
@@ -265,6 +265,27 @@ pub fn flow_cards() -> Router<AppState> {
         .route("/flow-cards/feedbacks/{id}/handle", post(flow_card_handler::handle_feedback))
         .route("/flow-cards/feedbacks/{id}/close", post(flow_card_handler::close_feedback))
         .route("/flow-cards/{flow_card_id}/feedbacks", get(flow_card_handler::list_feedbacks_by_card))
+        // ===== 流转卡投纱明细（完工扣料的落库来源） =====
+        .route(
+            "/flow-cards/{flow_card_id}/materials",
+            get(flow_card_material_handler::list_materials_by_card),
+        )
+        .route(
+            "/flow-cards/materials",
+            post(flow_card_material_handler::create_material),
+        )
+        .route(
+            "/flow-cards/materials/{id}",
+            get(flow_card_material_handler::get_material),
+        )
+        .route(
+            "/flow-cards/materials/{id}",
+            put(flow_card_material_handler::update_material),
+        )
+        .route(
+            "/flow-cards/materials/{id}",
+            delete(flow_card_material_handler::delete_material),
+        )
         .route(
             "/flow-cards/{id}/print",
             get(print_handler::production_flow_card_print_docx),
@@ -657,38 +678,6 @@ pub fn production() -> Router<AppState> {
         )
 }
 
-/// MRP 物料需求计划路由（path 前缀 /mrp）
-pub fn mrp() -> Router<AppState> {
-    Router::new()
-        .route("/mrp/calculate", post(mrp_handler::calculate_mrp))
-        .route("/mrp/results", get(mrp_handler::get_mrp_results))
-        .route("/mrp/requirements", get(mrp_handler::get_mrp_requirements))
-        .route("/mrp/convert-orders", post(mrp_handler::convert_to_orders))
-        .route("/mrp/products", get(mrp_handler::list_products_for_mrp))
-}
-
-/// MRP 历史记录路由（path 前缀 /mrp-history）
-pub fn mrp_history() -> Router<AppState> {
-    Router::new()
-        .route("/mrp-history", get(missing_handlers::get_mrp_history))
-        .route(
-            "/mrp-history/{id}",
-            get(missing_handlers::get_mrp_history_detail),
-        )
-        .route(
-            "/mrp-history/{id}/cancel",
-            put(mrp_handler::cancel_calculation),
-        )
-        .route(
-            "/mrp-history/{id}/export",
-            get(mrp_handler::export_calculation),
-        )
-        .route(
-            "/mrp-history/{calculation_id}/materials/{material_id}",
-            get(mrp_handler::get_material_detail),
-        )
-}
-
 /// 产能分析路由（path 前缀 /capacity）
 pub fn capacity() -> Router<AppState> {
     Router::new()
@@ -732,6 +721,11 @@ pub fn capacity() -> Router<AppState> {
 }
 
 /// 生产域统一入口；子 router path 已加独立前缀，merge 时 path+method 互不重叠。
+///
+/// `/mrp` 与 `/mrp-history` 路由族不在此挂载：前者读写 mrp_results 表（该表已下线，
+/// 迁移 m0132），后者是该表的计算历史读面；权限键 `mrp:*` 已从注册表与角色矩阵撤回。
+/// 未挂载即 matchit 无该段，请求落 404，与"资源不存在"的真实语义一致。物料需求改由
+/// 生产流转卡投纱明细（`/flow-cards/{id}/materials`）与 `/material-shortage` 承载。
 pub fn routes() -> Router<AppState> {
     Router::new()
         .merge(dye_batches())
@@ -749,7 +743,5 @@ pub fn routes() -> Router<AppState> {
         .merge(quality_inspection())
         .merge(cost_collections())
         .merge(production())
-        .merge(mrp())
-        .merge(mrp_history())
         .merge(capacity())
 }

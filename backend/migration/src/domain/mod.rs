@@ -176,7 +176,8 @@ pub mod product_grade_vocab_check;
 // 仓储两岗补授扫码入库细键的存量库通道。独立顶层域，理由与 purchase_greige_read_grant 一致
 // （并入已应用域会在复用库被整体跳过，补授永不执行）。
 pub mod scan_receipt_grant;
-// 审计日志表 DB 层只追加约束。独立顶层域，理由与上面各补授域一致
+// HTTP 请求级幂等去重域：建 http_request_dedupe 表，链尾独立域（不给 user_id 加外键，
+// users 表不由迁移创建；独立域才能在复用库上落到 pending 段必然执行）。
 // （并入已应用域会在复用库被整体跳过，建门语句永不执行）。
 pub mod audit_append_only_guard;
 // 库存匹冗余库存状态列探测式下线域，同上一条口径：晚于代码面摘除读写，先改代码再收列形态。
@@ -194,5 +195,18 @@ pub mod quotation_discount_config_grant;
 pub mod logistics_waybill_order_fk_drop;
 // 审计日志补定位列（终端类型 操作页面 单据编号 变更原因 风险标记）与追溯索引，链尾独立域
 pub mod m0126_add_audit_terminal_context_columns;
+// 流转卡投纱明细建表域：为完工扣料换源提供落库表，链尾独立域（production_flow_card 与 products 建表均早于本域）。
+pub mod flow_card_material_input;
+// BOM/MRP 表下线域：DROP boms/bom_items/mrp_results 三表，链尾独立域（三表由 business 域先建；
+// 并入已应用域会被台账整体跳过、DROP 永不执行）。
+pub mod bom_mrp_table_drop;
+// BOM/MRP 撤权域：撤销 boms 与 mrp 两枚资源的全岗位历史授权，链尾独立域（与初始化矩阵的
+// 同源摘除为跨写点依赖；roles 与 role_permissions 及权限唯一索引均早于本域）。
+pub mod bom_mrp_permission_withdrawal;
+// HTTP 请求级幂等去重域：建 http_request_dedupe 表，链尾独立域（不给 user_id 加外键，
+// users 表不由迁移创建；独立域才能在复用库上落到 pending 段必然执行）。
+pub mod http_idempotency_guard;
 // 用户与公众号 openid 绑定关系表。独立顶层域，理由见域头（并入已应用域会在复用库被整体跳过）。
 pub mod wechat_mp_binding;
+// 公众号通知失败重试队列表。独立顶层域,理由同绑定域（并入已应用域会在复用库被整体跳过）。
+pub mod wechat_mp_notification_outbox;

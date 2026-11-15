@@ -167,6 +167,20 @@ impl ProductService {
         args: CreateProductArgs,
     ) -> Result<product::Model, AppError> {
         Self::validate_product_create_gates(&args)?;
+        // 编码唯一性前置判据：products.code 有库级 UNIQUE 但本入口此前不预检，重复编码裸撞约束
+        // 被归成 DATABASE_ERROR，对外只剩脱敏的 数据库错误 四字，操作者分不清是重复还是库故障。
+        // 与通用导入腿同一口径点名重复，让拒因走业务族可达前端；CSV 导入腿汇进本入口，同样受益。
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+        let dup = product::Entity::find()
+            .filter(product::Column::Code.eq(&args.code))
+            .one(&*self.db)
+            .await?;
+        if dup.is_some() {
+            return Err(AppError::business_displayable(format!(
+                "产品编码 {} 已存在",
+                args.code
+            )));
+        }
         let active_model = Self::product_active_model_from_args(&args)?;
         Self::require_product_category_exists(&*self.db, args.category_id).await?;
 

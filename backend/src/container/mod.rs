@@ -27,6 +27,7 @@ use crate::services::quotation_approval_service::QuotationApprovalService;
 use crate::services::quotation_convert_service::QuotationConvertService;
 use crate::services::quotation_pricing_service::QuotationPricingService;
 use crate::services::quotation_service::QuotationService;
+use crate::services::wechat_mp_service::WechatMpService;
 use crate::utils::cache::AppCache;
 use crate::utils::di_container::DIContainer;
 
@@ -210,10 +211,13 @@ fn build_app_services(
     // 站内通知不依赖 SMTP：此处无条件构造 EventNotificationService，仅在缺少 SMTP 配置时不启用邮件通道。
     // 服务内部按 Option<Arc<EmailService>> 区分邮件通道（event_notification_service.rs:110）；
     // 若把整个 EventNotificationService 配成 None，订单/OA 公告/库存预警等站内通知会静默不产生。
-    let event_notification_service = Some(Arc::new(match &email_service {
-        Some(email_svc) => EventNotificationService::with_email(db.clone(), email_svc.clone()),
-        None => EventNotificationService::new(db.clone()),
-    }));
+    let event_notification_service = Some(Arc::new(
+        match &email_service {
+            Some(email_svc) => EventNotificationService::with_email(db.clone(), email_svc.clone()),
+            None => EventNotificationService::new(db.clone()),
+        }
+        .with_wechat_mp(Arc::new(WechatMpService::new(db.clone()))),
+    ));
     let data_permission_service = Arc::new(DataPermissionService::new(db.clone()));
     let notification_service = Arc::new(NotificationService::new(db.clone()));
     let quotation_service = Arc::new(QuotationService::new(db.clone()));

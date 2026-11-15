@@ -420,12 +420,6 @@ impl SalesService {
         // B-P1-4 修复（批次 361 v13 复审）：commit 后发布 SalesOrderApproved 事件
         self.publish_approval_event(order_id, order.customer_id, user_id);
 
-        // 批次 356 v13 复审 B-P0-1 + A5 决策：审批后不再创建库存预留（可用量门控仅在发货时生效）
-        let order_items = self.fetch_order_items_for_approval(order_id).await?;
-
-        // B-P2-4 修复（批次 386 v13 复审）：commit 后对每个订单明细调用 MRP 计算
-        self.run_mrp_for_order_items(order_id, &order_items).await;
-
         Ok(order)
     }
 
@@ -499,51 +493,6 @@ impl SalesService {
                 user_id,
             },
         );
-    }
-
-    async fn fetch_order_items_for_approval(
-        &self,
-        order_id: i32,
-    ) -> Result<Vec<crate::models::sales_order_item::Model>, AppError> {
-        use sea_orm::{ColumnTrait, QueryFilter};
-        crate::models::sales_order_item::Entity::find()
-            .filter(crate::models::sales_order_item::Column::OrderId.eq(order_id))
-            .all(&*self.db)
-            .await
-            .map_err(AppError::from)
-    }
-
-    /// B-P2-4 修复（批次 386 v13 复审）：销售订单审批后触发 MRP 物料需求计算
-    /// 原实现 approve_order 仅做库存预留，不调用 MrpEngineService，；导致销售→MRP 物料需求链路断开，采购计划无法基于销售订单自动生成。；失败时 tracing::warn 不阻塞主流程（订单已审批，MRP 可后续重算）。
-    async fn run_mrp_for_order_items(
-        &self,
-        order_id: i32,
-        order_items: &[crate::models::sales_order_item::Model],
-    ) {
-        let mrp_service =
-            crate::services::mrp_engine_service::MrpEngineService::new(self.db.clone());
-        let required_date = chrono::Utc::now().date_naive() + chrono::Duration::days(7);
-        for item in order_items {
-            if let Err(e) = mrp_service
-                .run_mrp_calculation(crate::services::mrp_engine_service::MrpCalculationQuery {
-                    product_id: item.product_id,
-                    required_quantity: item.quantity,
-                    required_date,
-                    source_type: "SALES_ORDER".to_string(),
-                    source_id: Some(order_id),
-                    consider_safety_stock: true,
-                    consider_in_transit: true,
-                })
-                .await
-            {
-                tracing::warn!(
-                    order_id,
-                    product_id = item.product_id,
-                    error = %e,
-                    "销售订单审批后 MRP 计算失败，请人工检查物料需求"
-                );
-            }
-        }
     }
 
     /// 完成订单（P1-11 修复（2026-06-25 综合审计）：新增 user_id 参数，；原 Some(0) 硬编码导致审计日志无法追溯完成操作人。）

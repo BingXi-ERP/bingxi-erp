@@ -56,22 +56,6 @@ pub mod process_node {
     pub const BLOCKED: &str = "blocked";
 }
 
-/// MRP 结果状态（mrp_result.status，大写值）
-/// 批次 235 v13 真实接入：mrp_engine_service.rs 中 MRP 结果状态字符串字面量统一引用此模块（规则 0）
-pub mod mrp {
-    /// 已计划：MRP 计划生成，待发布
-    pub const PLANNED: &str = "PLANNED";
-
-    /// 已发布：MRP 计划已发布为生产订单
-    pub const RELEASED: &str = "RELEASED";
-
-    /// 已确认：MRP 计划已确认（采购订单类型）
-    pub const CONFIRMED: &str = "CONFIRMED";
-
-    /// 已取消：MRP 计划已取消
-    pub const CANCELLED: &str = "CANCELLED";
-}
-
 /// 工作中心状态（work_center.status 大写复用 active_status）+ 产能负载项状态（capacity_load_item.status 大写），批次 236 v13 真实接入
 pub mod work_center {
     /// 空闲：产能负载项空闲

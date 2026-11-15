@@ -173,6 +173,38 @@ pub struct DeleteUserResponse {
     pub success: bool,
 }
 
+/// 详情读面的名称富化：单次 LEFT JOIN 取 department.name 与 role.name。
+/// 调用方是 get_user 与 get_current_user_profile；入参为用户主键，出参为（部门名，角色名列表）。
+/// user::Model 里没有这两列，From<user::Model> 只能置空，所以出参声明的两列必须由这里补齐；
+/// 取不到行时返回 None，由调用方保留空值语义。
+async fn detail_names(
+    db: &DatabaseConnection,
+    id: i32,
+) -> Result<Option<(Option<String>, Vec<String>)>, AppError> {
+    let row = user::Entity::find_by_id(id)
+        .column_as(department::Column::Name, "department_name")
+        .column_as(role::Column::Name, "role_name")
+        .join(JoinType::LeftJoin, user::Relation::Department.def())
+        .join(JoinType::LeftJoin, user::Relation::Role.def())
+        .into_model::<UserListRow>()
+        .one(db)
+        .await?;
+    Ok(row.map(|r| {
+        (
+            r.department_name,
+            r.role_name.map(|n| vec![n]).unwrap_or_default(),
+        )
+    }))
+}
+
+/// 把富化到的名称写进详情出参；未命中行时保持 From 的空值
+fn apply_detail_names(resp: &mut UserResponse, names: Option<(Option<String>, Vec<String>)>) {
+    if let Some((department_name, role_names)) = names {
+        resp.department_name = department_name;
+        resp.role_names = role_names;
+    }
+}
+
 /// 获取单个用户详情
 #[utoipa::path(get, path = "/api/v1/erp/users/{id}", responses((status = 200, description = "用户详情", body = UserResponse), (status = 404, description = "用户不存在")), tags = ["User"])]
 pub async fn get_user(
@@ -203,7 +235,10 @@ pub async fn get_user(
     let user_service = UserService::new(state.db.clone());
 
     let user = user_service.find_by_id(id).await?;
-    Ok(Json(ApiResponse::success(user.into())))
+    let mut resp = UserResponse::from(user);
+    let names = detail_names(&*state.db, id).await?;
+    apply_detail_names(&mut resp, names);
+    Ok(Json(ApiResponse::success(resp)))
 }
 
 /// 获取当前登录用户个人信息
@@ -213,7 +248,10 @@ pub async fn get_current_user_profile(
 ) -> Result<Json<ApiResponse<UserResponse>>, AppError> {
     let user_service = UserService::new(state.db.clone());
     let user = user_service.find_by_id(auth.user_id).await?;
-    Ok(Json(ApiResponse::success(user.into())))
+    let mut resp = UserResponse::from(user);
+    let names = detail_names(&*state.db, auth.user_id).await?;
+    apply_detail_names(&mut resp, names);
+    Ok(Json(ApiResponse::success(resp)))
 }
 
 /// 当前用户可自改资料字段（角色/部门/状态等管理字段不自改，走管理员用户管理链路）

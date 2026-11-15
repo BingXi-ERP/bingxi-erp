@@ -320,10 +320,14 @@ fn unpaired_resources_are_registered_not_fabricated() {
             "事实登记：{role} 必须持有 purchase-receipts 的 confirm 行，否则收货确认端点对本岗不可达"
         );
     }
-    // 生产岗可读物料清单：/boms 与前端 /bom 路由门都判 boms:read
+    // BOM/MRP 下线：授权矩阵里任何岗位都不得再持 boms 或 mrp 的任何动作行——这两枚资源
+    // 随整族功能下线（表已由链尾迁移 DROP、纱批事实改由流转卡投纱承载），留着授权行只会
+    // 掩盖端点已不存在的悬空授权。撤权与迁移域 m_bom_mrp_permission_withdrawal 的存量库通道同源。
     assert!(
-        rows.contains(&("production_manager", "boms", "read")),
-        "事实登记：production_manager 必须持有 boms 的 read 行，否则物料清单页对本岗恒被拦"
+        !rows
+            .iter()
+            .any(|(_, res, _)| *res == "boms" || *res == "mrp"),
+        "BOM/MRP 已下线，矩阵不得再出现 boms 或 mrp 任何动作行（悬空授权回潮）"
     );
 }
 

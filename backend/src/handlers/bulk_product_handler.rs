@@ -59,15 +59,12 @@ pub async fn batch_create_products(
     Json(payload): Json<BatchCreateProductsPayload>,
 ) -> Result<Json<ApiResponse<BatchResponse<Vec<serde_json::Value>>>>, AppError> {
     // P2 2-9 修复：DTO 长度校验，拒绝超过 500 条的批量请求
-    payload
-        .validate()
-        .map_err(|e| AppError::bad_request(e.to_string()))?;
+    payload.validate()?;
     let service = BatchService::new(state.db.clone());
 
     let result = service
         .batch_create_products(auth.user_id, payload.products)
-        .await
-        .map_err(|e| AppError::bad_request(e.to_string()))?;
+        .await?;
 
     let data: Vec<serde_json::Value> = result
         .data
@@ -115,15 +112,12 @@ pub async fn batch_update_products(
     Json(payload): Json<BatchUpdateProductsPayload>,
 ) -> Result<Json<ApiResponse<BatchResponse<Vec<serde_json::Value>>>>, AppError> {
     // P2 2-9 修复：DTO 长度校验，拒绝超过 500 条的批量请求
-    payload
-        .validate()
-        .map_err(|e| AppError::bad_request(e.to_string()))?;
+    payload.validate()?;
     let service = BatchService::new(state.db.clone());
 
     let result = service
         .batch_update_products(auth.user_id, payload.products)
-        .await
-        .map_err(|e| AppError::bad_request(e.to_string()))?;
+        .await?;
 
     let data: Vec<serde_json::Value> = result
         .data
@@ -171,9 +165,7 @@ pub async fn batch_delete_products(
     Json(payload): Json<BatchDeleteProductsPayload>,
 ) -> Result<Json<ApiResponse<BatchResponse<()>>>, AppError> {
     // P2 2-9 修复：DTO 长度校验，拒绝超过 500 条的批量请求
-    payload
-        .validate()
-        .map_err(|e| AppError::bad_request(e.to_string()))?;
+    payload.validate()?;
     // P1 2-1/2-2 修复（批次 64）：批量删除显式校验 products:delete 权限
     // 原实现路由用 POST /products/batch/delete，permission 中间件按 POST→create 映射，
     // 持 products:create 权限即可批量删除，越权删除漏洞。

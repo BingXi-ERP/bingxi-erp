@@ -1,10 +1,10 @@
 # Bingxi Management Platform
 
-[![Build Status](https://github.com/57231307/bingxi-erp/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/57231307/bingxi-erp/actions/workflows/ci-cd.yml)
+[![Build Status](https://github.com/BingXi-ERP/bingxi-erp/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/BingXi-ERP/bingxi-erp/actions/workflows/ci-cd.yml)
 [![License](https://img.shields.io/badge/license-Proprietary-blue)](<>)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-> **Bingxi Management Platform** 是一套自托管的企业资源计划（ERP）平台：Rust 单体后端提供 HTTP 与 WebSocket 接口，Vue 3 单页前端经 Nginx 托管，数据落在 PostgreSQL。
+> **Bingxi Management Platform** 是一套面向面料纺织行业的自托管企业资源计划（ERP）平台：Rust 单体后端提供 HTTP 与 WebSocket 接口，Vue 3 单页前端经 Nginx 托管，数据落在 PostgreSQL，另有 Tauri 桌面壳与 Android 客户端。
 
 ---
 
@@ -25,9 +25,13 @@
 
 ## 项目介绍
 
-Bingxi Management Platform 是一套自托管的企业资源计划（ERP）平台，采用**单体 Rust 后端 + 单体 Vue 3 前端**的前后端分离形态：后端以 Axum 提供 HTTP 与 WebSocket 接口、SeaORM 访问 PostgreSQL、迁移以 Rust 代码内联 SQL 实现并按业务域聚合；前端为 Vue 3 + TypeScript + Element Plus 单页应用，经 Vite 构建为静态资源由 Nginx 托管。同一套后端还通过 Tauri 壳与 Android 工程产出桌面与移动客户端。
+Bingxi Management Platform 是一套面向面料纺织行业的自托管企业资源计划（ERP）平台，采用**单体 Rust 后端 + 单体 Vue 3 前端**的前后端分离形态：后端以 Axum 提供 HTTP 与 WebSocket 接口、SeaORM 访问 PostgreSQL、迁移以 Rust 代码内联 SQL 实现并按业务域聚合；前端为 Vue 3 + TypeScript + Element Plus 单页应用，经 Vite 构建为静态资源由 Nginx 托管。同一套后端还通过 Tauri 壳与 Android 工程产出桌面与移动客户端。
+
+业务覆盖面料业务全链路：基础资料（产品档案、色号、色卡、客户、供应商）、销售（报价、订单、送货、签收、对账）、采购（订单、收货、应付）、库存（细码卷号、缸号批次、调拨、盘点、预警）、生产（流转卡、打样、委外染整、处方）、质检（出口检验、纺织品安全合规）、财务（凭证、发票、账龄、坏账、收款）、CRM、审批流（BPM）、通知与报表等。路由按业务域聚合注册于 `backend/src/routes/`，顶层域二十余个（销售、采购、库存、生产、财务、CRM、色卡、价目、审批、公告、AI 模型、设备接入等），用户与角色、审计日志、看板与报表等共享面在 iam / catalog / analytics / system 四个聚合域内。
 
 数据持久化在 PostgreSQL。热点读与 TTL 缓存走进程内 moka 缓存，Redis 承载限流计数与令牌撤销（JTI）等需要跨实例共享的状态，实时推送走 WebSocket；鉴权采用 JWT 配合服务端权限校验与 PostgreSQL 行级安全，配置由 `.env` 与 `config.yaml` 提供，服务以 systemd 直部署运行并支持 `bingxi update` 增量升级（SHA256 校验）。本文只描述**如何把它跑起来和改起来**；业务域划分与实现细节见「文档索引」中的架构与接口文档。
+
+测试面以真实后端 + 真实 PostgreSQL 的 E2E 为主：463 个 Playwright spec 按 flow / smoke / traversal / extras 目录组织，CI 上按分片矩阵并行执行，并配「新增功能与 E2E 用例配对门」——新增业务端点必须配套 E2E 用例否则判红，防止功能与测试脱钩。
 
 ---
 
@@ -78,7 +82,7 @@ Bingxi Management Platform 是一套自托管的企业资源计划（ERP）平�
 | 图表     | ECharts      | 6.1   |
 | 虚拟列表 | el-table-v2  | 2.14+ |
 | 单元测试 | Vitest       | 4.1   |
-| E2E 测试 | Playwright   | 1.40  |
+| E2E 测试 | Playwright   | 1.63  |
 | 规范     | ESLint       | 10.8  |
 | 格式化   | Prettier     | 3.9   |
 
@@ -184,8 +188,8 @@ Bingxi Management Platform 是一套自托管的企业资源计划（ERP）平�
 ### 2. 克隆项目
 
 ```bash
-git clone https://github.com/57231307/bingxi-erp.git
-cd 1
+git clone https://github.com/BingXi-ERP/bingxi-erp.git
+cd bingxi-erp
 ```
 
 ### 3. 数据库准备
@@ -298,7 +302,7 @@ sudo journalctl -u bingxi-backend -f
 - [架构文档](.monkeycode/docs/ARCHITECTURE.md) — 分层与模块划分
 - [前端架构](.monkeycode/docs/frontend-architecture.md) — Vue 3 组件拆分与状态管理
 - [开发者指南](.monkeycode/docs/DEVELOPER_GUIDE.md) — 开发流程
-- [接口文档](.monkeycode/docs/INTERFACES.md) — API 接口
+- [接口文档（早期设想稿，以路由源码为准）](.monkeycode/docs/INTERFACES.md) — API 设想与现状差异警示
 - [安全策略](.monkeycode/docs/SECURITY.md) — 漏洞响应
 - [文档索引](.monkeycode/docs/INDEX.md) — 全部文档导航
 - [重构计划](.monkeycode/docs/refactoring/) — 重构任务清单
@@ -322,8 +326,8 @@ sudo journalctl -u bingxi-backend -f
 
 感谢所有为 Bingxi Management Platform 做出贡献的开发者！
 
-<a href="https://github.com/57231307/bingxi-erp/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=57231307/bingxi-erp" />
+<a href="https://github.com/BingXi-ERP/bingxi-erp/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=BingXi-ERP/bingxi-erp" />
 </a>
 
 ---
@@ -372,5 +376,5 @@ Copyright © 2026 成都秉羲布艺商行. 保留所有权利。
 
 ## 联系我们
 
-- **GitHub Issues**：[https://github.com/57231307/bingxi-erp/issues](https://github.com/57231307/bingxi-erp/issues)
-- **GitHub Discussions**：[https://github.com/57231307/bingxi-erp/discussions](https://github.com/57231307/bingxi-erp/discussions)
+- **GitHub Issues**：[https://github.com/BingXi-ERP/bingxi-erp/issues](https://github.com/BingXi-ERP/bingxi-erp/issues)
+- **GitHub Discussions**：[https://github.com/BingXi-ERP/bingxi-erp/discussions](https://github.com/BingXi-ERP/bingxi-erp/discussions)

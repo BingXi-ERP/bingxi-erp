@@ -19,7 +19,6 @@ import {
 import {
   createColorCardUI,
   createDyeRecipeUI,
-  createBomUI,
   createCustomOrderUI,
   pickListArray,
   readFirstEntityId,
@@ -210,7 +209,6 @@ export interface EntityContext {
   dyeLotNo?: string;
   dyeRecipeId?: number;
   productionRecipeId?: number;
-  bomId?: number;
   purchaseOrderId?: number;
   salesOrderId?: number;
   quotationId?: number;
@@ -370,8 +368,6 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     ctx.productIds = [];
   }
   // 夹具基数假设：消费用例要求 ctx.productIds 至少 3 个——
-  // 03-production「3-8 创建 BOM」用 items: productIds.slice(1)（需 ≥2 才非空，
-  // 否则后端 bom_handler.rs:33 items min=1 合法 400）；
   // 01-p2p「1-6b」用 ctx.productIds[1] 作「产品对不上」负例（需 ≥2 才不 undefined）。
   // 跨分片共库下 readEntityIds 可能读到 1~2 个现有产品（含 global-setup 全局种子先建的），
   // 故无条件补齐到至少 3：读到的现有 id（含 seed 产品）全部保留并计入基数，
@@ -422,24 +418,40 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   }
 
   // ---- 3. 产品色号（仍用 API，因为色号在详情页创建且依赖 product_id）----
+  // ---- 3. 产品色号（自建专属产品承载，不复用共享行）----
+  // 共享产品（readEntityIds 读到的列表行，如 seed id=2）可能在本 worker 建色时
+  // 已被并行 worker 的收尾清理，POST /products/{id}/colors 会撞
+  // fk_product_colors_product 外键违例回 500 DATABASE_ERROR（三 run 同文红实证）。
+  // 故建色一律打本 worker 刚自建的产品（补齐段末位必存在且归属本 worker），
+  // 与供应商段"自建自持不复用共享行"同范式。
   try {
+    const ownProductId = ctx.productIds[ctx.productIds.length - 1];
+    if (!ownProductId) {
+      throw new Error('自建产品不存在：补齐段应保证至少一支本 worker 专属产品');
+    }
     // 真实端点：GET /products/{id}/colors（返回数组，非分页包装）
     const colors = await apiCallRaw<Array<{ id: number; color_no: string }>>(
       page,
       'GET',
-      `/products/${ctx.productIds[0]}/colors`
+      `/products/${ownProductId}/colors`
     );
     ctx.productColorIds = colors?.map(c => c.id) || [];
-    ctx.colorNos = colors?.map(c => c.color_no) || ['TEST-COLOR'];
+    ctx.colorNos = colors?.map(c => c.color_no) || [];
+    if (ctx.colorNos.length > 0) {
+      // 与建色段同一契约锚点：colorNos 挂在本专属产品上，把该产品提到
+      // productIds[0]，保住「productIds[0] 拥有 colorNos[0]」配对假设。
+      ctx.productIds = [ownProductId, ...ctx.productIds.filter(id => id !== ownProductId)];
+    }
   } catch (e) {
     throw new Error(`[ensureTestEntities] 色号查询失败: ${(e as Error).message}`);
   }
   if (ctx.colorNos.length === 0) {
     // 新建产品天然无色号——真实创建一个（CreateProductColorRequest），非占位兜底
+    const ownProductId = ctx.productIds[ctx.productIds.length - 1];
     const created = await apiCall<{ id?: number }>(
       page,
       'POST',
-      `/products/${ctx.productIds[0]}/colors`,
+      `/products/${ownProductId}/colors`,
       {
         color_no: `E2E-C${Date.now().toString().slice(-6)}`,
         color_name: 'E2E色号',
@@ -453,6 +465,9 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     }
     ctx.productColorIds = [created.data.id];
     ctx.colorNos = [`E2E-C${Date.now().toString().slice(-6)}`];
+    // 契约锚点恢复：既有用例（21a 等）以「productIds[0] 拥有 colorNos[0]」取配对，
+    // 自建色号挂在末位产品上，把该专属产品提到首位保住这条配对假设。
+    ctx.productIds = [ownProductId, ...ctx.productIds.filter(id => id !== ownProductId)];
   }
 
   // ---- 4. 供应商（本 worker 自建自持，不复用库里的共享行）----
@@ -844,26 +859,6 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   } catch (e) {
     console.error('[ensureTestEntities] productionRecipeId 创建失败:', (e as Error).message);
     ctx.productionRecipeId = undefined;
-  }
-
-  // ---- 13. BOM（UI 创建）----
-  try {
-    const boms = await apiCallRaw<{ items: Array<{ id: number }> }>(
-      page,
-      'GET',
-      '/boms?page=1&page_size=1'
-    );
-    ctx.bomId = boms.items?.[0]?.id;
-  } catch (e) {
-    console.error('[ensureTestEntities] 查找失败:', (e as Error).message);
-  }
-  if (!ctx.bomId) {
-    const id = await uiCreateWithRetry(page, createBomUI);
-    ctx.bomId = id;
-    if (!id)
-      console.error(
-        '[ensureTestEntities] BOM UI 创建失败: 返回 undefined（详见 ui-helpers 截图诊断）'
-      );
   }
 
   // ---- 14. 生产订单（保留 API 查找，暂无创建需求）----
@@ -1529,7 +1524,8 @@ export async function apiCall<T = unknown>(
   page: Page,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
-  body?: ApiRequestBody
+  body?: ApiRequestBody,
+  extraHeaders?: Record<string, string>
 ): Promise<ApiResponse<T>> {
   const csrfToken =
     (await getCsrfToken(page).catch(e => {
@@ -1559,6 +1555,8 @@ export async function apiCall<T = unknown>(
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
         'X-CSRF-Token': token,
+        // 调用方自带的额外头（如写请求的 Idempotency-Key），缺省时不产生任何影响
+        ...(extraHeaders ?? {}),
       },
       data: dataPayload,
       // CI 16+ 分片并发时后端偶发响应超 30s（Playwright API 默认超时），
@@ -1649,9 +1647,10 @@ export async function apiCallRaw<T = unknown>(
   page: Page,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
-  body?: ApiRequestBody
+  body?: ApiRequestBody,
+  extraHeaders?: Record<string, string>
 ): Promise<T> {
-  const res = await apiCall<T>(page, method, path, body);
+  const res = await apiCall<T>(page, method, path, body, extraHeaders);
   return res.data;
 }
 
@@ -1659,7 +1658,8 @@ export async function apiCallExpectFail(
   page: Page,
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
-  body?: ApiRequestBody
+  body?: ApiRequestBody,
+  extraHeaders?: Record<string, string>
 ): Promise<ApiFailureResult> {
   const url = `${API_BASE}${API_PREFIX}${path}`;
   const csrfToken =
@@ -1675,6 +1675,7 @@ export async function apiCallExpectFail(
         'Content-Type': 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
         'X-CSRF-Token': token,
+        ...(extraHeaders ?? {}),
       },
       // 负例专用：body 缺省仍发无体(不补 {}),让真实缺参/非法前置的失败如实暴露,
       // 仅供 apiCallExpectFail 断言业务错误码用,不改动既有期望。

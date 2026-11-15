@@ -110,11 +110,13 @@ export function useOlvProc(refresh: RefreshCallbacks) {
     try {
       if (data.id) {
         // 更新契约（后端 UpdateSalesOrderRequest）仅 required_date/status/shipping_address/
-        // billing_address/notes/items；客户/下单日期/联系人不在其中（编辑这些字段需后端支持，属既有缺口）
+        // billing_address/notes/items/expected_updated_at；客户/下单日期/联系人不在其中（编辑这些字段需后端支持，属既有缺口）。
+        // expected_updated_at 用装载表单时读回的那一行更新时刻：本轮没读回该行即不参与并发比对。
         await updateSalesOrder(data.id, {
           required_date: toIsoDateTime(data.required_date),
           shipping_address: data.shipping_address || undefined,
           notes: data.notes || undefined,
+          expected_updated_at: data.expected_updated_at,
           items: data.items.map(toItemPayload),
         });
         msg.success('updateSuccess');

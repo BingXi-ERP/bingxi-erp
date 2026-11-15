@@ -18,6 +18,7 @@ use crate::container::AppState;
 use crate::middleware::auth::auth_middleware;
 use crate::middleware::circuit_breaker::circuit_breaker_middleware;
 use crate::middleware::csrf::csrf_middleware;
+use crate::middleware::idempotency::idempotency_middleware;
 use crate::middleware::permission::permission_middleware;
 use crate::middleware::rate_limit::rate_limit_by_ip;
 use crate::middleware::request_validator::request_logging_middleware;
@@ -62,6 +63,9 @@ pub fn build_cors_layer(allowed_origins: Vec<String>) -> CorsLayer {
             // 跨域部署（Origin 白名单直连后端）时浏览器预检要求显式允许，
             // 缺失会拦截真实请求导致首次部署初始化调用全部失败（同源部署无感）
             axum::http::header::HeaderName::from_static("x-init-token"),
+            // 写请求的幂等键：H5 与小程序跨域直连后端时，预检不放行该头会让带键的
+            // 提交在浏览器侧就被挡掉，重复提交防护形同虚设
+            axum::http::header::HeaderName::from_static("idempotency-key"),
         ])
         .allow_credentials(true) // 因为改成了 Cookie 鉴权，必须设置为 true
         .max_age(Duration::from_secs(86400)) // 24小时
@@ -70,8 +74,8 @@ pub fn build_cors_layer(allowed_origins: Vec<String>) -> CorsLayer {
 /// 为完整模式路由应用全部中间件链。
 /// 执行顺序（外→内）：trace_ctx → catch_panic → normalize_query → timeout →
 /// security_headers → rate_limiting → dynamic_router → circuit_breaker → auth →
-/// omni_audit → csrf → permission → request_logging → rls → cors → http_trace →
-/// metrics → audit_ctx → body_limit → handler。
+/// omni_audit → csrf → permission → request_logging → idempotency → rls → cors →
+/// http_trace → metrics → audit_ctx → body_limit → handler。
 ///
 /// trace_ctx 必须位于最外层（且 catch_panic 紧贴其内层），原因见
 /// [`apply_trace_and_panic_capture`]：只有这样，超时 408 / 熔断 503 / 鉴权 401 / 权限 403 /
@@ -87,6 +91,7 @@ pub fn apply_full_mode_layers(app_state: AppState, cors: CorsLayer) -> Router {
     let s_rate_limit = app_state.clone();
     let s_dynamic_router = app_state.clone();
     let s_rls = app_state.clone();
+    let s_idempotency = app_state.clone();
 
     let router = create_router(app_state);
     let router = apply_body_limit_and_audit(router);
@@ -112,6 +117,7 @@ pub fn apply_full_mode_layers(app_state: AppState, cors: CorsLayer) -> Router {
         s_csrf,
         s_omni_audit,
         s_auth,
+        s_idempotency,
     );
     // V15 P1 20.6-B：API 网关熔断中间件（5s 窗口失败率 > 50% 触发 open，30s 后 half-open 探测）
     // 放在 auth_chain 之外、rate_limiting 之内：监控认证后的业务处理 5xx 失败率
@@ -238,9 +244,17 @@ fn apply_auth_chain(
     s_csrf: AppState,
     s_omni_audit: AppState,
     s_auth: AppState,
+    s_idempotency: AppState,
 ) -> Router {
-    // 中间件执行顺序：auth（最外层、先执行）→ omni_audit → csrf → permission → request_logging → handler
+    // 中间件执行顺序：auth（最外层、先执行）→ omni_audit → csrf → permission → request_logging → idempotency → handler
     router
+        // 请求级幂等去重：注册在鉴权链最内层，因此鉴权 / CSRF / 权限三道门任一拒掉的请求
+        // 都不会消费幂等键（那种键之后重试会被误判成重复提交）。
+        // axum 语义：先注册的 .layer() 位于洋葱更内侧、后执行。
+        .layer(axum::middleware::from_fn_with_state(
+            s_idempotency,
+            idempotency_middleware,
+        ))
         .layer(axum::middleware::from_fn_with_state(
             s_request_validator,
             request_logging_middleware,

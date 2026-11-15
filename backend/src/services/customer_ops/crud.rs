@@ -51,7 +51,10 @@ impl CustomerService {
                     .one(&txn)
                     .await?;
                 if existing.is_some() {
-                    return Err(AppError::business("客户编码已存在"));
+                    return Err(AppError::business_displayable(format!(
+                        "客户编码 {} 已存在",
+                        &code
+                    )));
                 }
                 Self::build_customer_active_model(&args, code)
                     .insert(&txn)

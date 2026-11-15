@@ -491,7 +491,6 @@ const COARSE_DOMAIN_RESOURCES: Record<string, string[]> = {
   ],
   production: [
     'production-orders',
-    'boms',
     'process-routes',
     'production-recipes',
     'dye-batches',
@@ -500,7 +499,6 @@ const COARSE_DOMAIN_RESOURCES: Record<string, string[]> = {
     'greige-fabrics',
     'fabric-inspections',
     'flow-cards',
-    'mrp',
     'capacity',
     'scheduling',
     'outsourcing-orders',

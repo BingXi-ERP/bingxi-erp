@@ -52,7 +52,13 @@ type RoleResourceGroups = Vec<RoleResourceSlice>;
 ///   handler 只按 `auth.user_id` 取该用户自己的通知行。
 ///
 /// 缺码的角色登录后会被路由守卫送到 /403，或每次进主页都在控制台抛 403。
-const SHELL_PERMISSIONS: &[PermPair] = &[("dashboard", "read"), ("notifications", "read")];
+// 通知软删是所有者对自身收件箱的操作，归属校验在服务层（非本人拒），
+// 故按应用外壳码逐角色必授；此前该动作键不在任何角色分组里，删除端点对非超管恒拒。
+const SHELL_PERMISSIONS: &[PermPair] = &[
+    ("dashboard", "read"),
+    ("notifications", "read"),
+    ("notifications", "delete"),
+];
 
 /// 库里"已经算授权到位"的 role_permission 索引（按角色归组的 (resource,action) 集合）。
 ///
@@ -963,10 +969,6 @@ impl InitService {
                     ("outsourcing-orders", "*"),
                     ("outsourcing-receipts", "*"),
                     ("business-modes", "read"),
-                    // 生产经理要能查物料清单（/bom 页路由门是 boms:read，工单用料也以 BOM 为据），
-                    // 而生产域此前没有任何 boms 授权 ⇒ 该页对本岗恒被守卫拦成 403。只授读。
-                    ("boms", "read"),
-                    ("mrp", "*"),
                     ("capacity", "*"),
                     ("scheduling", "*"),
                     ("material-shortage", "read"),
@@ -1172,6 +1174,9 @@ impl InitService {
                     ("period-report-snapshots", "read"),
                     ("period-report-snapshots", "create"),
                     ("aging-alert-rules", "*"),
+                    // 财务预警台账与手工触发扫描同属财务岗职责，此前整段资源名在矩阵里无一行授权，
+                    // 除超管外任何岗位都碰不到，触发口等于不可委派。
+                    ("finance-alerts", "*"),
                     ("aging-grades", "*"),
                     ("asset-categories", "*"),
                     ("industry-benchmarks", "read"),

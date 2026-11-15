@@ -35,7 +35,6 @@ export * from './data-permission';
 export * from './fund';
 export * from './currency';
 export * from './cost';
-export * from './bom';
 export * from './scheduling';
 // D14 Batch 5b：purchase-receipt 与 purchase 存在同名导出（createPurchaseReceipt/getPurchaseReceiptList），
 // 且无 caller 从 '@/api' 聚合入口导入，故不在此 re-export
@@ -50,7 +49,6 @@ export * from './accounting-period';
 export * from './dye-recipe';
 export * from './dye-batch';
 export * from './greige-fabric';
-export * from './mrp';
 // 财务报表各端点返回单对象 DTO，逐字段对齐后端 finance_report_dto.rs；
 // 业务代码均通过 '@/api/finance-report' 直接导入，不依赖此处的重新导出
 export type {

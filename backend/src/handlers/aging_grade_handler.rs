@@ -23,6 +23,19 @@ pub async fn list_aging_grades(
     Ok(Json(ApiResponse::success(grades)))
 }
 
+/// GET /api/v1/erp/aging-grades/:id - 获取单个账龄档位
+pub async fn get_aging_grade(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    _auth: AuthContext,
+) -> Result<Json<ApiResponse<aging_grade_config::Model>>, AppError> {
+    let grade = aging_grade_config::Entity::find_by_id(id)
+        .one(&*state.db)
+        .await?
+        .ok_or_else(|| AppError::not_found("账龄档位不存在"))?;
+    Ok(Json(ApiResponse::success(grade)))
+}
+
 /// POST /api/v1/erp/aging-grades - 创建账龄档位
 pub async fn create_aging_grade(
     State(state): State<AppState>,

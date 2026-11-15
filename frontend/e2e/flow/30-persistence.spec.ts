@@ -588,68 +588,6 @@ test.describe.serial('P0 数据持久性：全字段填写→创建→回读→�
     console.log('[P0-采购订单] ✅ 全字段创建→详情二次访问+明细行数完整性全通过');
   });
 
-  // ===== 8. BOM（全字段：product_id/version/is_default/remarks + items 全字段） =====
-  test('BOM：全字段填写→创建→详情二次访问（逐字段比对）', async ({ page }) => {
-    test.setTimeout(180_000);
-    await ensureSharedEntities(page);
-    expect(
-      [shared.custId, shared.prodId, shared.supId, shared.whId, shared.deptId].every(Boolean),
-      `[P0-共享前置] 共享实体创建失败（cust=${shared.custId} prod=${shared.prodId} sup=${shared.supId} wh=${shared.whId} dept=${shared.deptId}），本用例前置失败`
-    ).toBe(true);
-    const payload = {
-      product_id: shared.prodId,
-      version: 1,
-      is_default: true,
-      remarks: `P0测试BOM${TS}`,
-      items: [
-        {
-          material_id: shared.prodId,
-          quantity: '5',
-          unit: '个',
-          // 损耗率 API 口径 = 百分比数值（10 表示 10%，见 bom.ts BomItem.scrap_rate 注释），
-          // '2' 即 2%。原 '0.02' 系按比率口径写的历史值，在 2ed1fff5 改为百分比口径后
-          // 语义变成 0.02%，虽本用例不断该值（仅核 quantity/unit），但会误导后人，按真实口径更正。
-          scrap_rate: '2',
-          sort_order: 1,
-        },
-      ],
-    };
-
-    const createResp = await apiCall<{ bom?: { id?: number } }>(page, 'POST', '/boms', payload);
-    const id = createResp.data?.bom?.id;
-    console.log(`[P0-BOM] 创建成功 id=${id}`);
-    expect(id, 'BOM 创建必须返回 id').toBeTruthy();
-
-    const detail = await apiCallRaw<{
-      bom?: {
-        id: number;
-        product_id?: number;
-        version?: number;
-        is_default?: boolean;
-        remarks?: string;
-      };
-      items?: Array<Record<string, unknown>>;
-    }>(page, 'GET', `/boms/${id}`);
-    const bom = detail?.bom;
-    console.log(
-      `[P0-BOM] 详情二次访问 → product_id=${bom?.product_id} version=${bom?.version} is_default=${bom?.is_default} items=${detail?.items?.length ?? 0} 条`
-    );
-    expect(bom?.id, '详情 id 应一致').toBe(id);
-    // 逐字段比对必须对照本用例真实创建时使用的值。
-    // 原实现写 toBe(1) 把 product_id 硬编码成字面量 1，而创建用的是动态 shared.prodId
-    // （本次 CI 实际为 6），等于假定库里第一个产品永远是本项目造的测试数据。
-    expect(bom?.product_id, `详情 product_id 应为创建时的 ${shared.prodId}`).toBe(shared.prodId);
-    // version/is_default 属于响应里的 bom 对象（结构为 { bom, items }），
-    // 原实现从 detail 顶层取，恒为 undefined
-    expect(bom?.version, '详情 version 应为 1').toBe(1);
-    expect(bom?.is_default, '详情 is_default 应为 true').toBe(true);
-    expect(detail?.items?.length ?? 0, 'BOM 应有 1 条明细').toBe(1);
-    const item = detail?.items?.[0] as Record<string, unknown>;
-    expect(item?.quantity, '明细 quantity 应为 5').toBeTruthy();
-    expect(item?.unit, '明细 unit 应为 个').toBe('个');
-    console.log('[P0-BOM] ✅ 全字段创建→详情二次访问+明细字段比对全通过');
-  });
-
   // ===== 9. 凭证（全字段：voucher_type/voucher_date/source_type/source_module/batch_no/color_no + items 全字段） =====
   test('凭证：全字段填写→创建→详情二次访问（逐字段比对）', async ({ page }) => {
     test.setTimeout(180_000);

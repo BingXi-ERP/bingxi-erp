@@ -4,9 +4,7 @@
 
 use chrono::{Datelike, NaiveDate};
 use rust_decimal::Decimal;
-use sea_orm::{
-    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, Statement,
-};
+use sea_orm::{ConnectionTrait, DatabaseConnection, Statement};
 use std::sync::Arc;
 
 use crate::models::status::purchase_order;
@@ -140,48 +138,23 @@ impl PurchaseDeliveryCalculator {
     }
 
     /// 估算生产周期
+    ///
+    /// 复杂度代理原为 BOM 道数，随 BOM 下线去除，现仅按订购数量分档。
+    /// 入参 `items` 是订单行的产品与订购数量；出参取各行分档天数的最大值（多产品并行
+    /// 生产时整体上浮 20%），最少 1 天。调用方：同文件的 `calculate_delivery_date`。
     async fn estimate_production_days(&self, items: &[OrderItemInfo]) -> Result<i32, AppError> {
-        use crate::models::bom::{Column as BomColumn, Entity as BomEntity};
-
         let mut total_days = 0;
 
-        // v15 批次 42 修复：批量查询所有产品的 BOM 数量，避免循环内逐个 count（N+1 查询）
-        let product_ids: Vec<i32> = items.iter().map(|i| i.product_id).collect();
-        let bom_counts: std::collections::HashMap<i32, usize> = if product_ids.is_empty() {
-            std::collections::HashMap::new()
-        } else {
-            BomEntity::find()
-                .filter(BomColumn::ProductId.is_in(product_ids))
-                .all(&*self.db)
-                .await
-                .unwrap_or_default()
-                .into_iter()
-                .fold(std::collections::HashMap::new(), |mut acc, bom| {
-                    *acc.entry(bom.product_id).or_insert(0) += 1;
-                    acc
-                })
-        };
-
         for item in items {
-            // 从批量查询结果获取 BOM 数量（缺失时默认 0，与原 unwrap_or_default 语义一致）
-            let bom_count = bom_counts.get(&item.product_id).copied().unwrap_or(0);
-
-            // 基础生产天数
-            let base_days = if bom_count > 0 {
-                // 有BOM的产品，根据BOM数量增加复杂度
-                let bom_complexity = std::cmp::min(bom_count as i32, 5);
-                2 + bom_complexity
+            // 按订购数量分档
+            let base_days = if item.quantity > Decimal::from(1000) {
+                5
+            } else if item.quantity > Decimal::from(500) {
+                3
+            } else if item.quantity > Decimal::from(100) {
+                2
             } else {
-                // 无BOM的产品，根据数量估算
-                if item.quantity > Decimal::from(1000) {
-                    5
-                } else if item.quantity > Decimal::from(500) {
-                    3
-                } else if item.quantity > Decimal::from(100) {
-                    2
-                } else {
-                    1
-                }
+                1
             };
 
             total_days = std::cmp::max(total_days, base_days);

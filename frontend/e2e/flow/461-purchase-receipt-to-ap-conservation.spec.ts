@@ -572,8 +572,16 @@ async function seedApprovedOrder(
   );
   const headerTotal = expectDecScaleAtMost(head.total_amount, 2, 'PO 主表总金额 DECIMAL(18,2)');
 
-  const rows = await readOrderItems(page, poId);
-  expect(rows.length, 'PO 明细行数应等于提交行数').toBe(lines.length);
+  const rawRows = await readOrderItems(page, poId);
+  expect(rawRows.length, 'PO 明细行数应等于提交行数').toBe(lines.length);
+
+  // 明细接口不承诺返回顺序，按产品主键把每行归位后再逐字段校验；
+  // 夹具每行产品唯一，归位只重排、不改值。
+  const rows = lines.map((l, i) => {
+    const found = rawRows.find(r => Number(r.product_id) === l.product.id);
+    expect(found, `PO 明细缺第 ${i + 1} 行（产品 ${l.product.code}）`).toBeTruthy();
+    return found!;
+  });
 
   const orderRows: OrderLine[] = [];
   for (const [i, l] of lines.entries()) {

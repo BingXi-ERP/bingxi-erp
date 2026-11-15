@@ -158,3 +158,112 @@ export function terminateFlowCard(
 export function reactivateFlowCard(id: number): Promise<ApiResponse<FlowCard>> {
   return request.post(`/production/flow-cards/${id}/reactivate`);
 }
+
+/**
+ * 投纱明细行（写面出参）——逐字段对齐 backend/src/models/flow_card_material.rs 的 Model
+ * （列表与单行读面的实体部分、以及 POST/PUT/DELETE 的回传体都是这一形状）。
+ * 键名即后端 serde 序列化名（snake_case，无 rename_all）。
+ * NOT NULL 列（id/flow_card_id/warehouse_id/material_id/batch_no/color_no/grade/quantity/
+ * unit/is_deleted 与两侧时间戳）不许标可选或可空；可空列（dye_lot_no/remark/created_by）
+ * 以 null 表达"库里没值"。
+ * quantity 为 DECIMAL(14,4)，后端 rust_decimal 序列化为字符串（如 "12.5000"），
+ * 与全站 DECIMAL 出参同一口径，消费前按 number-input 或 Number() 归一。
+ */
+export interface FlowCardMaterial {
+  id: number;
+  flow_card_id: number;
+  warehouse_id: number;
+  material_id: number;
+  batch_no: string;
+  color_no: string;
+  dye_lot_no: string | null;
+  grade: string;
+  quantity: string | number;
+  unit: string;
+  remark: string | null;
+  is_deleted: boolean;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 投纱列表读面视图——对齐 backend/src/services/flow_card_material_service.rs 的
+ * FlowCardMaterialView：实体字段加 LEFT JOIN products 带出的 material_no 与 material_name。
+ * 两枚富化键在序列化结构里恒存在（无 skip_serializing_if），关联不到产品时为 null。
+ */
+export interface FlowCardMaterialView extends FlowCardMaterial {
+  material_no: string | null;
+  material_name: string | null;
+}
+
+/**
+ * 新增投纱行入参——对齐 CreateFlowCardMaterialRequest。
+ * flow_card_id/warehouse_id/material_id/quantity/unit 必填；
+ * batch_no/color_no/grade 后端 #[serde(default)] 落空串，dye_lot_no/remark 可空。
+ * quantity 以 JSON number 提交（rust_decimal 反序列化接受数值）。
+ */
+export interface CreateFlowCardMaterialPayload {
+  flow_card_id: number;
+  warehouse_id: number;
+  material_id: number;
+  batch_no?: string;
+  color_no?: string;
+  dye_lot_no?: string | null;
+  grade?: string;
+  quantity: number;
+  unit: string;
+  remark?: string | null;
+}
+
+/**
+ * 修改投纱行入参——对齐 UpdateFlowCardMaterialRequest：整行覆盖语义，缺字段即按空值写入，
+ * 不做部分字段合并；flow_card_id 不在本契约（行归属不可改）。
+ */
+export interface UpdateFlowCardMaterialPayload {
+  warehouse_id: number;
+  material_id: number;
+  batch_no?: string;
+  color_no?: string;
+  dye_lot_no?: string | null;
+  grade?: string;
+  quantity: number;
+  unit: string;
+  remark?: string | null;
+}
+
+/**
+ * GET /production/flow-cards/{flow_card_id}/materials —— 按卡列出投纱明细。
+ * 信封为 ApiResponse.data 裸数组（handler 直接 ApiResponse::success(Vec<View>)，
+ * 不带 PaginatedResponse 包装），与 backend/src/handlers/flow_card_material_handler.rs 一致。
+ */
+export function listFlowCardMaterials(
+  flowCardId: number
+): Promise<ApiResponse<FlowCardMaterialView[]>> {
+  return request.get(`/production/flow-cards/${flowCardId}/materials`);
+}
+
+/** POST /production/flow-cards/materials —— 登记一条投纱（卡主键随请求体提交） */
+export function createFlowCardMaterial(
+  data: CreateFlowCardMaterialPayload
+): Promise<ApiResponse<FlowCardMaterial>> {
+  return request.post('/production/flow-cards/materials', data);
+}
+
+/** GET /production/flow-cards/materials/{id} —— 读取单条投纱 */
+export function getFlowCardMaterial(id: number): Promise<ApiResponse<FlowCardMaterial>> {
+  return request.get(`/production/flow-cards/materials/${id}`);
+}
+
+/** PUT /production/flow-cards/materials/{id} —— 整行覆盖修改单条投纱 */
+export function updateFlowCardMaterial(
+  id: number,
+  data: UpdateFlowCardMaterialPayload
+): Promise<ApiResponse<FlowCardMaterial>> {
+  return request.put(`/production/flow-cards/materials/${id}`, data);
+}
+
+/** DELETE /production/flow-cards/materials/{id} —— 作废单条投纱（后端软删并回传作废后的行） */
+export function deleteFlowCardMaterial(id: number): Promise<ApiResponse<FlowCardMaterial>> {
+  return request.delete(`/production/flow-cards/materials/${id}`);
+}
