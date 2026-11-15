@@ -119,6 +119,38 @@ runs:
             print('::warning::cargo audit 发现 %d 个低危/中危依赖漏洞（记录在案，不阻塞）' % len(items))
         PY
 
+    - name: 供应链许可与来源审计（cargo deny · license/ban/source 维度，首轮观察档）
+      shell: bash
+      run: |
+        R="$GITHUB_WORKSPACE/reports/audit"
+        # 与 cargo-audit 同款安装纪律：已存在不重装，装不上必须阻塞，禁止吞错。
+        if command -v cargo-deny >/dev/null 2>&1; then
+          echo "cargo-deny 已就绪，跳过安装"
+        else
+          cargo install cargo-deny --locked --quiet
+        fi
+        command -v cargo-deny >/dev/null 2>&1 || { echo "::error::cargo-deny 安装后仍不可用"; exit 1; }
+        set +e
+        ( cd backend && cargo deny check licenses bans sources advisories ) \
+          > "$R/cargo-deny.log" 2>&1
+        RC=$?
+        set -e
+        echo "cargo deny exit=$RC（0=全过 1=命中 deny 规则 101=配置/执行异常）"
+        if [ "$RC" -gt 1 ]; then
+          echo "::error::cargo deny 异常退出（exit $RC，扫描器未正常完成）"
+          tail -30 "$R/cargo-deny.log" || true
+          exit 1
+        fi
+        if [ "$RC" -eq 1 ]; then
+          # 首轮观察档：licenses/bans/sources 三面命中先报 warning 不阻塞，
+          # 按 deny.toml 头注口径核准 allow 集后再收紧为阻塞；yanked 已在 deny 配置为 deny 档。
+          echo "::warning::cargo deny 命中 deny 规则（首轮观察档记录在案，不阻塞；详见 reports/audit/cargo-deny.log）"
+          grep -E "^(error|warning)\[" "$R/cargo-deny.log" | head -20 || true
+          grep -E "yanked" "$R/cargo-deny.log" | head -5 && { echo "::error::cargo deny 发现 yanked crate（安全面，直接阻塞）"; exit 1; } || true
+        else
+          echo "✅ cargo deny 零命中（license/ban/source/yanked 四面全过）"
+        fi
+
     - name: npm 依赖漏洞审计（npm audit · high/critical 阻塞 CI）
       shell: bash
       run: |

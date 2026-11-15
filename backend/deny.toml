@@ -1,0 +1,55 @@
+# cargo-deny 配置：供应链审计的 license / ban / source 三维面
+# 与 .github/actions/vuln-scan/action.yml 的 cargo-audit 面（CVE 维度）互补：
+# audit 管"已知漏洞"，deny 管"许可证合规、封禁依赖、来源可信"。
+# 首轮按观察档上线（unmatched 允许记录不阻塞），license 集按 Cargo.lock 实际面核准后再收紧。
+# 维护口径：新增依赖触发 license 未列时，先判许可证兼容性再决定加白或换源，不静默放行。
+
+[graph]
+# 以 workspace 全部成员为根（backend + benches），all-features 扫全依赖面
+all-features = true
+
+[licenses]
+# 首轮观察档：不阻塞，仅报告未匹配项；核准后把 confidence 面与 allow 集收紧，
+# 并把 unlicensed 档从默认改为 deny（收紧时同步改本注释）。
+version = 2
+allow = [
+  "MIT",
+  "MIT-0",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "BSL-1.0",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "CC0-1.0",
+  "0BSD",
+  "MPL-2.0",
+  "OpenSSL",
+  "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.93
+
+[bans]
+# 首轮观察档：multiple-versions 记录不阻塞（生态常见），wildcards 记录
+multiple-versions = "warn"
+wildcards = "warn"
+deny = [
+  # 封禁已知有替代的旧依赖（按需追加，先留观察面）
+]
+skip = []
+skip-tree = []
+
+[sources]
+# 来源可信面：只允许 crates.io 与本仓 git 依赖；未登记 registry 一律拒绝
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
+
+[advisories]
+# CVE 维度由 cargo-audit 面（vuln-scan action）负责阻塞，本面只记录避免双重判定口径漂移
+version = 2
+yanked = "deny"
