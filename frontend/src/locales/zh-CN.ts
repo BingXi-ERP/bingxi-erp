@@ -7261,6 +7261,7 @@ export default {
       filterAriaLabel: '供应商筛选表单',
       tableAriaLabel: '供应商列表',
       paginationAriaLabel: '供应商列表分页',
+      mobileCardAriaLabel: '供应商手机卡片列表',
       filter: {
         keyword: '关键词',
         keywordPlaceholder: '供应商编码/名称',

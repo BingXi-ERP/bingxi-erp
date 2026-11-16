@@ -7311,6 +7311,7 @@ export default {
       filterAriaLabel: 'Supplier Filter Form',
       tableAriaLabel: 'Supplier List',
       paginationAriaLabel: 'Supplier List Pagination',
+      mobileCardAriaLabel: 'Supplier mobile card list',
       filter: {
         keyword: 'Keyword',
         keywordPlaceholder: 'Supplier code/name',
