@@ -168,7 +168,7 @@ describe('Subject tree responsive presentation', () => {
     ]);
     expect(columns.map(column => column.props('width'))).toEqual([
       '120',
-      undefined,
+      '',
       '100',
       '80',
       '80',
