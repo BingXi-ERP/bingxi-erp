@@ -309,7 +309,7 @@
             fixed="right"
           >
             <template #default="{ row }">
-              <!-- P3 维度 10 修复（批次 87）：编辑/删除按钮补齐 v-permission -->
+              <!-- 编辑/删除按钮按权限键显隐：粗域路由可达但缺细粒度操作键的按钮须按 v-permission 收口 -->
               <el-button
                 v-permission="PERMISSIONS.CUSTOMER_UPDATE"
                 type="primary"
