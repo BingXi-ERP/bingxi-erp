@@ -1305,6 +1305,7 @@ export default {
       buttonReview: '审核',
       buttonPost: '过账',
       paginationAriaLabel: '凭证列表分页',
+      mobileCardAriaLabel: '凭证手机卡片列表',
     },
     subjectTab: {
       pageTitle: '会计科目',

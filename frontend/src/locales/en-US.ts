@@ -1312,6 +1312,7 @@ export default {
       buttonReview: 'Review',
       buttonPost: 'Post',
       paginationAriaLabel: 'Voucher List Pagination',
+      mobileCardAriaLabel: 'Voucher mobile card list',
     },
     subjectTab: {
       pageTitle: 'Accounting Subjects',
