@@ -1111,6 +1111,7 @@ export default {
       submit: 'Submit',
       reject: 'Reject',
       paginationAria: 'Purchase order list pagination',
+      mobileCardAria: 'Purchase order mobile card list',
     },
     viewDlg: {
       title: 'Purchase Order Detail',

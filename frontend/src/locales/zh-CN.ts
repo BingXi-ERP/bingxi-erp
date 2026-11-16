@@ -1106,6 +1106,7 @@ export default {
       submit: '提交',
       reject: '驳回',
       paginationAria: '采购订单列表分页',
+      mobileCardAria: '采购订单手机卡片列表',
     },
     viewDlg: {
       title: '采购单详情',
