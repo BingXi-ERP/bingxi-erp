@@ -256,6 +256,7 @@ export const NAV_TREE: NavNode[] = [
       ]),
       S('integration', 'layout.section.integration', [
         L('/api-gateway', 'layout.menu.apiGateway'),
+        L('/system/payment-channels', 'paymentChannels.title'),
         L('/webhooks', 'layout.menu.webhooks'),
         L('/data-import', 'layout.menu.dataImport'),
         L('/notification', 'layout.menu.notification'),

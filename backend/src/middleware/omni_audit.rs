@@ -482,6 +482,10 @@ fn build_audit_payload(ctx: &AuditContext<'_>, truncated_response: &str) -> serd
 /// 判断请求路径是否为敏感路径（请求体含密码等敏感信息，需脱敏）
 fn is_sensitive_request_body_path(uri: &str) -> bool {
     let path = uri.split('?').next().unwrap_or(uri).to_lowercase();
+    // 通道写入包含密钥，审计仅保留请求元信息，不保存凭证原文。
+    if path.starts_with("/api/v1/erp/payment-channels/") {
+        return true;
+    }
     const SENSITIVE_PATTERNS: &[&str] = &[
         "/auth/change-password",
         "/auth/reset-password",
@@ -501,6 +505,23 @@ fn is_sensitive_request_body_path(uri: &str) -> bool {
     SENSITIVE_PATTERNS
         .iter()
         .any(|p| path == *p || path.ends_with(p))
+}
+
+#[cfg(test)]
+mod payment_channel_tests {
+    use super::is_sensitive_request_body_path;
+
+    #[test]
+    fn payment_channel_credentials_are_redacted_from_audit() {
+        for code in ["wechat_pay", "alipay"] {
+            assert!(is_sensitive_request_body_path(&format!(
+                "/api/v1/erp/payment-channels/{code}?action=update"
+            )));
+        }
+        assert!(!is_sensitive_request_body_path(
+            "/api/v1/erp/company-profile/full"
+        ));
+    }
 }
 
 /// 根据请求路径推断模块名称

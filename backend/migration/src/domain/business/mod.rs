@@ -64,6 +64,8 @@ mod m0096_grant_sku_mapping_import_purchase_roles;
 // 坯布建档三岗补授 greige-fabrics:read/create 与 suppliers:read（存量库通道，
 // 同 m0072/m0069 范式；roles/role_permissions 属 system 域先建，注册在本域 up 链尾）
 mod m0097_grant_greige_create_and_suppliers_read;
+// 独立登记迁移台账，存量库不受 business 域已应用状态影响。
+pub mod m0098_payment_channel_configs;
 
 pub struct Migration;
 

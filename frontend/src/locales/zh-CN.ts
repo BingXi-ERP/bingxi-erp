@@ -1,6 +1,28 @@
 /* 中文（简体）翻译 - Bingxi Management Platform */
 /* 命名空间：{module}.{section}.{key} */
 export default {
+  paymentChannels: {
+    title: '支付通道',
+    description: '仅用于配置和记录付款方式，不调用支付网关。',
+    readonly: '当前为只读权限，保存需要更新权限。',
+    enabled: '启用',
+    sandboxMode: '沙箱模式',
+    appId: '应用 ID',
+    mchId: '商户 ID',
+    apiKey: 'API 密钥',
+    callbackUrl: 'HTTPS 回调地址',
+    keyHint: '留空保留现有密钥，已保存的密钥不会回显。',
+    loadFailed: '支付通道加载失败，请重试读取服务端配置。',
+    saveFailed: '保存或服务端回读失败，表单已保留，请核实后重试。',
+    optionsFailed: '支付通道选项加载失败，请重试后再选择通道。',
+    historicalMethod: '历史方式（不可重新选择）',
+    wechatPay: '微信支付',
+    alipay: '支付宝',
+    validation: {
+      httpsRequired: '请输入不含凭据、空白或反斜杠的 HTTPS 地址，或留空。',
+      maskedKey: '不能将脱敏占位值作为密钥。',
+    },
+  },
   common: {
     offlineBannerTitle: '网络连接已断开',
     offlineBannerDescription: '当前处于离线状态，数据可能不是最新；网络恢复后自动重连。',
