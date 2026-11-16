@@ -293,7 +293,11 @@ const canReceive = computed(() =>
 const canApprove = computed(() =>
   hasRoutePermission(PERMISSIONS.PURCHASE_ORDER_APPROVE, userPermissions.value)
 );
-const formatAmount = (value: number) => `¥${(value || 0).toLocaleString()}`;
+const formatAmount = (value: number) =>
+  `¥${(Number(value) || 0).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 /** 可提交/可修改状态（后端允许草稿与被驳回两种） */
 const EDITABLE_STATUSES: PurchaseOrderStatus[] = [
