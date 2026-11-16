@@ -1,5 +1,5 @@
 import { test, expect } from '../diagnose-fixture';
-import { loginViaUI, apiCallRaw, getCtx, ensureTestEntities, tryCleanup } from './helpers';
+import { loginViaUI, apiCall, apiCallRaw, getCtx, ensureTestEntities, tryCleanup } from './helpers';
 
 /**
  * 522 应收对账三项账务口径：发票聚合唯一性、金额守恒、红字对冲
@@ -106,8 +106,11 @@ type SalesReturnRow = {
 
 const PERIOD_START = '2026-01-01';
 const PERIOD_END = '2026-12-31';
-const INVOICE_DATE = '2026-06-15';
-const PAYMENT_DATE = '2026-06-20';
+// 凭证日期取当天：AR 发票与收款过账都要求落在开放会计期间内，
+// 硬编码历史日期会撞「日期不在任何已设置的会计期间内」的门（init_first_period 只开当月）。
+const TODAY = new Date().toISOString().slice(0, 10);
+const INVOICE_DATE = TODAY;
+const PAYMENT_DATE = TODAY;
 
 /** DECIMAL 出参归一为数值做比较（金额精度 ≤2 位，Number 安全） */
 function dec(v: string | number): number {
@@ -124,6 +127,9 @@ test.describe.serial('522 应收对账三项账务口径（聚合唯一性/金�
 
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
+    // 开放当月会计期间（幂等）：AR 发票与收款过账都要过 check_date_locked，
+    // 本组凭证日期取当天，必须先确保对应期间存在。前置失败按真实缺陷判红，不吞错。
+    await apiCall(page, 'POST', '/finance/accounting-periods/init', {});
   });
 
   test('一、发票聚合唯一性：对账明细 INVOICE 行 document_id 与 amount 逐源对齐', async ({
