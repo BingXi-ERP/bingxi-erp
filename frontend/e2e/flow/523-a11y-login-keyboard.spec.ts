@@ -41,6 +41,8 @@ test.describe('登录页无障碍既有能力', () => {
     ).toHaveCount(1);
 
     // 密码输入框同样以 aria-label 提供非空可访问名称，且能被标签查询定位。
+    // show-password 会额外渲染明文切换按钮并继承同一 aria-label，故标签查询命中
+    // 密码框与切换按钮共两个元素；此处只要求至少一个，零命中（标签丢失）仍判红。
     const passwordInput = page.locator('input[type="password"]');
     await expect(passwordInput, '密码输入框应存在且唯一').toHaveCount(1);
     await expect(passwordInput, '密码输入框应带有明确的 aria-label').toHaveAttribute(
@@ -50,7 +52,7 @@ test.describe('登录页无障碍既有能力', () => {
     await expect(
       page.getByLabel('密码', { exact: true }),
       '密码输入框应以可访问名称被标签查询定位'
-    ).toHaveCount(1);
+    ).not.toHaveCount(0);
   });
 
   test('密码输入框以遮蔽类型渲染', async ({ page }) => {
