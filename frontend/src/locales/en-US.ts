@@ -2,6 +2,9 @@
 /* Namespace pattern: {module}.{section}.{key} */
 export default {
   common: {
+    offlineBannerTitle: 'Network Disconnected',
+    offlineBannerDescription:
+      'You are offline. Data may not be up to date. Reconnect will resume automatically.',
     returnReason: {
       customerCancel: 'Customer cancelled order',
       wrongShipment: 'Wrong goods shipped',

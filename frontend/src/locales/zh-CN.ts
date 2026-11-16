@@ -2,6 +2,8 @@
 /* 命名空间：{module}.{section}.{key} */
 export default {
   common: {
+    offlineBannerTitle: '网络连接已断开',
+    offlineBannerDescription: '当前处于离线状态，数据可能不是最新；网络恢复后自动重连。',
     returnReason: {
       customerCancel: '客户取消订单',
       wrongShipment: '发错货',
