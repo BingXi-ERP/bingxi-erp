@@ -970,6 +970,8 @@ export default {
       edit: '编辑库存',
       export: '导出',
       colOperation: '操作',
+      paginationAria: '库存台账列表分页',
+      mobileCardAria: '库存台账手机卡片列表',
     },
     stockDialog: {
       editReadonlyHint:

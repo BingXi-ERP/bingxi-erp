@@ -974,6 +974,8 @@ export default {
       edit: 'Edit Stock',
       export: 'Export',
       colOperation: 'Actions',
+      paginationAria: 'Stock ledger list pagination',
+      mobileCardAria: 'Stock ledger mobile card list',
     },
     stockDialog: {
       editReadonlyHint:
