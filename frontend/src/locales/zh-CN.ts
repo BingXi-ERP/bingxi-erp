@@ -5981,7 +5981,6 @@ export default {
       listAria: '对账列表',
       reconciliationNo: '对账编号',
       supplier: '供应商',
-      reconciliationDate: '对账日期',
       invoiceAmount: '发票金额',
       paymentAmount: '付款金额',
       difference: '差异',

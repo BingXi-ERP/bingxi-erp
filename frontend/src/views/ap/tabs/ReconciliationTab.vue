@@ -33,6 +33,14 @@
                 <dd>{{ row.supplier_name ?? '-' }}</dd>
               </div>
               <div>
+                <dt>{{ $t('apModule.reconciliation.startDate') }}</dt>
+                <dd>{{ row.start_date }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.reconciliation.endDate') }}</dt>
+                <dd>{{ row.end_date }}</dd>
+              </div>
+              <div>
                 <dt>{{ $t('apModule.reconciliation.invoiceAmount') }}</dt>
                 <dd>{{ formatMoney(row.total_invoice_amount) }}</dd>
               </div>
@@ -99,8 +107,13 @@
           width="150"
         />
         <el-table-column
-          prop="reconciliation_date"
-          :label="$t('apModule.reconciliation.reconciliationDate')"
+          prop="start_date"
+          :label="$t('apModule.reconciliation.startDate')"
+          width="120"
+        />
+        <el-table-column
+          prop="end_date"
+          :label="$t('apModule.reconciliation.endDate')"
           width="120"
         />
         <el-table-column
@@ -127,7 +140,7 @@
           align="right"
         >
           <template #default="{ row }">
-            <span :class="{ 'text-red': row.difference_amount !== 0 }">
+            <span :class="{ 'text-red': Number(row.difference_amount) !== 0 }">
               {{ formatMoney(row.difference_amount) }}
             </span>
           </template>

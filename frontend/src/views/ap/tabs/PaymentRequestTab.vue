@@ -39,6 +39,14 @@
               <dd>{{ row.payment_type || '-' }}</dd>
             </div>
             <div>
+              <dt>{{ t('apModule.payment.paymentMethod') }}</dt>
+              <dd>{{ row.payment_method }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('apModule.paymentRequest.currencyLabel') }}</dt>
+              <dd>{{ row.currency }}</dd>
+            </div>
+            <div>
               <dt>{{ t('common.status') }}</dt>
               <dd>
                 <el-tag :type="statusTagType(row.approval_status)" size="small">{{
@@ -48,6 +56,13 @@
             </div>
           </dl>
           <div class="card-actions">
+            <el-button
+              v-if="row.approval_status === 'DRAFT' || row.approval_status === 'REJECTED'"
+              type="primary"
+              @click="openEditDialog(row)"
+            >
+              {{ t('common.edit') }}
+            </el-button>
             <el-button
               v-if="row.approval_status === 'DRAFT' || row.approval_status === 'REJECTED'"
               type="warning"

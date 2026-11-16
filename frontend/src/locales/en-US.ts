@@ -5973,7 +5973,6 @@ export default {
       listAria: 'Reconciliation list',
       reconciliationNo: 'Reconciliation No.',
       supplier: 'Supplier',
-      reconciliationDate: 'Reconciliation Date',
       invoiceAmount: 'Invoice Amount',
       paymentAmount: 'Payment Amount',
       difference: 'Difference',

@@ -39,6 +39,14 @@
                 <dd>{{ getPaymentMethodLabel(row.payment_method) }}</dd>
               </div>
               <div>
+                <dt>{{ $t('apModule.payment.bankAccount') }}</dt>
+                <dd>{{ row.bank_account }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('common.createTime') }}</dt>
+                <dd>{{ row.created_at }}</dd>
+              </div>
+              <div>
                 <dt>{{ $t('common.status') }}</dt>
                 <dd>
                   <el-tag
