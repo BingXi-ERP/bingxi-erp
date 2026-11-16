@@ -5809,6 +5809,7 @@ export default {
       submit: '提交审批',
       approve: '审批',
       reject: '驳回',
+      listAria: '付款申请列表',
       submitConfirm: '确认提交该付款申请进入审批流程？',
       approveConfirm: '确认审批通过该付款申请？',
       rejectReason: '请输入驳回原因',
