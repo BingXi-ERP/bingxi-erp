@@ -533,12 +533,19 @@ async function createThenUiDelete(
       { column: 'name', value: rowName },
       { expectRowGone: false }
     );
-    const detail = await apiCallRaw<{ status?: string }>(page, 'GET', `${createApi}/${id}`);
-    console.log(`[P0-删除-${label}] UI 软删除后 status=${detail?.status}`);
-    expect(
-      detail?.status,
-      `[P0-删除-${label}] 自建 ${rowName} UI 删除（软删除）后 status 应为 ${softDeleteStatus}，实际 ${detail?.status}`
-    ).toBe(softDeleteStatus);
+    // 删除是异步落库的：单次 GET 可能早于 UPDATE 提交读到旧 status（CI run
+    // 43730568472 实证 DELETE 事务提交晚于详情 GET 234ms），改为轮询到目标
+    // 状态为止，超时仍非目标状态才判红，判据本身不放宽。
+    await expect
+      .poll(
+        async () => {
+          const detail = await apiCallRaw<{ status?: string }>(page, 'GET', `${createApi}/${id}`);
+          return detail?.status;
+        },
+        { timeout: 10_000, intervals: [250, 500, 1_000, 2_000] }
+      )
+      .toBe(softDeleteStatus);
+    console.warn(`[P0-删除-${label}] UI 软删除后 status=${softDeleteStatus}`);
     return;
   }
   const deleted = await uiDeleteRow(page, listRoute, { column: 'name', value: rowName });
