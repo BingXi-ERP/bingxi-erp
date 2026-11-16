@@ -187,7 +187,7 @@ import { useCompanyProfile } from '@/composables/useCompanyProfile';
 import brandLogo from '@/assets/logo.png';
 // 安卓系统返回手势：弹层打开时先消费返回（关弹层），无弹层才走默认后退
 import { pushAndroidBackHandler } from '@/composables/useAndroidBack';
-// 断网提示条（W3.4 弱网恢复前端面）
+// 断网提示条（弱网恢复前端面）
 import OfflineBanner from '@/components/mobile/OfflineBanner.vue';
 
 const { t } = useI18n({ useScope: 'global' });

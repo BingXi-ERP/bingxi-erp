@@ -1,5 +1,5 @@
 <!--
-  OfflineBanner.vue - 断网提示条（W3.4 弱网恢复前端面）
+  OfflineBanner.vue - 断网提示条（弱网恢复前端面）
   功能 监听 navigator.onLine 与 online/offline 事件，断网时在页面顶部
         显示固定提示条，恢复后自动消失。不拦截用户操作（写操作失败
         保留输入由 request.ts 已有重试与 useTableApi 层处理）。
