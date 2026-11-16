@@ -5,7 +5,7 @@
 -->
 <template>
   <el-card shadow="hover" class="table-card">
-    <!-- W2.3 手机卡片（<768 与 BPM 审批手机卡片同断点同范式） -->
+    <!-- 手机卡片（<768 与 BPM 审批手机卡片同断点同范式） -->
     <section v-if="isPhone" v-loading="loading" class="purchase-mobile">
       <ul class="order-list" :aria-label="t('purchase.table.mobileCardAria')">
         <li v-for="row in orders" :key="row.id" class="order-card">
@@ -273,7 +273,7 @@ import { useUserStore } from '@/store/user';
 // 接入 i18n，替换硬编码中文文案
 const { t } = useI18n({ useScope: 'global' });
 
-// W2.3 手机卡片断点与权限判定（与桌面列 v-permission/v-permission-detail 同源口径）
+// 手机卡片断点与权限判定（与桌面列 v-permission/v-permission-detail 同源口径）
 const { width } = useBreakpoint();
 const isPhone = computed(() => width.value < 768);
 const userStore = useUserStore();

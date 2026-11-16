@@ -184,7 +184,7 @@ import { useKeyboardNavigation } from '@/composables/useKeyboardNavigation';
 import { useCompanyProfile } from '@/composables/useCompanyProfile';
 // 品牌图形资产（已抠掉白底的透明版，深色侧栏上不会带出白方块）
 import brandLogo from '@/assets/logo.png';
-// W1.2 安卓系统返回手势：弹层打开时先消费返回（关弹层），无弹层才走默认后退
+// 安卓系统返回手势：弹层打开时先消费返回（关弹层），无弹层才走默认后退
 import { pushAndroidBackHandler } from '@/composables/useAndroidBack';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -298,7 +298,7 @@ watch(isMobile, mobile => {
   }
 });
 
-// W1.2 安卓返回手势接线：仅安卓壳内生效（isAndroidClient 门控在 composable 内）。
+// 安卓返回手势接线：仅安卓壳内生效（isAndroidClient 门控在 composable 内）。
 // 弹层打开才注册处理器（返回 true 消费手势并关弹层）；关闭即 dispose。
 // 两层注册次序决定栈顶：后注册者先消费——搜索面板比抽屉更"上层"，故后注册。
 watch([searchVisible, drawerVisible], ([search, drawer]) => {

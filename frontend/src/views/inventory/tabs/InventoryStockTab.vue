@@ -68,7 +68,7 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
-      <!-- W2.3 手机卡片（<768 与 BPM 审批手机卡片同断点同范式） -->
+      <!-- 手机卡片（<768 与 BPM 审批手机卡片同断点同范式） -->
       <section v-if="isPhone" v-loading="loading" class="stock-mobile">
         <ul class="stock-list" :aria-label="t('inventory.stockTab.mobileCardAria')">
           <li v-for="row in stocks" :key="row.id" class="stock-card" @click="handleRowView(row)">
@@ -187,7 +187,7 @@ import type { Warehouse } from '@/api/warehouse';
 // 接入 i18n，替换硬编码中文文案
 const { t } = useI18n({ useScope: 'global' });
 
-// W2.3 手机卡片断点（<768 与 BPM 审批手机卡片同断点）
+// 手机卡片断点（<768 与 BPM 审批手机卡片同断点）
 const { width } = useBreakpoint();
 const isPhone = computed(() => width.value < 768);
 

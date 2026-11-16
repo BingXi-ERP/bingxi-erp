@@ -5,7 +5,7 @@
 -->
 <template>
   <el-card shadow="hover">
-    <!-- W2.3 手机卡片（<768 与 BPM 审批手机卡片同断点同范式） -->
+    <!-- 手机卡片（<768 与 BPM 审批手机卡片同断点同范式） -->
     <section v-if="isPhone" v-loading="loading" class="sales-order-mobile">
       <ul class="order-list" :aria-label="t('sales.table.mobileCardAria')">
         <li v-for="row in data" :key="row.id" class="order-card">
