@@ -260,7 +260,8 @@ test.describe.serial('522 应收对账三项账务口径（聚合唯一性/金�
     // 因明细不唯一或商品不匹配而判 BUSINESS_ERROR。订单 submit+approve 即可，无需发货。
     const so = await apiCallRaw<{ id: number }>(page, 'POST', '/sales/orders', {
       customer_id: ctx.customerId,
-      order_date: TODAY,
+      // order_date 出参类型是 DateTime<Utc>，须传完整 ISO 时刻；纯日期会判 VALIDATION_ERROR
+      order_date: new Date().toISOString(),
       items: [
         {
           product_id: ctx.productIds[0],
