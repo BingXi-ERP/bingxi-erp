@@ -6967,6 +6967,7 @@ export default {
       table: {
         ariaLabel: '客户列表',
         paginationAria: '客户列表分页',
+        mobileCardAria: '客户手机卡片列表',
         column: {
           customerCode: '客户编码',
           customerName: '客户名称',

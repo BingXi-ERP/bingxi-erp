@@ -121,151 +121,231 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
-      <el-table
-        v-loading="loading"
-        :data="customers"
-        stripe
-        :aria-label="$t('customer.index.table.ariaLabel')"
-      >
-        <el-table-column
-          prop="customer_code"
-          :label="$t('customer.index.table.column.customerCode')"
-          width="120"
-          fixed
+      <!-- 手机卡片（<768 与 BPM 审批手机卡片同断点同范式） -->
+      <section v-if="isPhone" v-loading="loading" class="customer-mobile">
+        <ul class="customer-list" :aria-label="$t('customer.index.table.mobileCardAria')">
+          <li v-for="row in customers" :key="row.id" class="customer-card">
+            <dl class="customer-fields">
+              <div class="customer-number">
+                <dt>{{ $t('customer.index.table.column.customerCode') }}</dt>
+                <dd>{{ row.customer_code }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('customer.index.table.column.customerName') }}</dt>
+                <dd>
+                  <el-button type="primary" link @click="openDetail(row)">{{
+                    row.customer_name
+                  }}</el-button>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('customer.index.table.column.contactPerson') }}</dt>
+                <dd>{{ row.contact_person || '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('customer.index.table.column.phone') }}</dt>
+                <dd>{{ row.contact_phone || '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('customer.index.table.column.type') }}</dt>
+                <dd>
+                  <el-tag :type="getCustomerTypeTag(row.customer_type)" size="small">
+                    {{ getCustomerTypeLabel(row.customer_type) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('customer.index.table.column.creditLimit') }}</dt>
+                <dd>{{ row.credit_limit ? formatCurrency(row.credit_limit) : '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('customer.index.table.column.status') }}</dt>
+                <dd>
+                  <el-tag :type="getStatusTag(row.status)" size="small">
+                    {{ getStatusLabel(row.status) }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="customer-actions">
+              <el-button v-if="canUpdate" type="primary" @click="openEditDialog(row)">{{
+                $t('customer.index.button.edit')
+              }}</el-button>
+              <el-button type="primary" @click="openDetail(row)">{{
+                $t('customer.index.button.detail')
+              }}</el-button>
+              <el-button v-if="canDelete" type="danger" @click="handleDelete(row)">{{
+                $t('customer.index.button.delete')
+              }}</el-button>
+            </div>
+          </li>
+        </ul>
+        <ElEmpty
+          v-if="!loading && customers.length === 0"
+          :description="$t('components.v2Table.empty')"
         />
-        <el-table-column
-          prop="customer_name"
-          :label="$t('customer.index.table.column.customerName')"
-          min-width="180"
-          fixed
-        >
-          <template #default="{ row }">
-            <el-button type="primary" link @click="openDetail(row)">{{
-              row.customer_name
-            }}</el-button>
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="contact_person"
-          :label="$t('customer.index.table.column.contactPerson')"
-          width="100"
-        />
-        <el-table-column
-          prop="contact_phone"
-          :label="$t('customer.index.table.column.phone')"
-          width="130"
-        />
-        <el-table-column
-          prop="contact_email"
-          :label="$t('customer.index.table.column.email')"
-          width="180"
-          show-overflow-tooltip
-        />
-        <el-table-column
-          prop="customer_type"
-          :label="$t('customer.index.table.column.type')"
-          width="100"
-        >
-          <template #default="{ row }">
-            <el-tag :type="getCustomerTypeTag(row.customer_type)" size="small">
-              {{ getCustomerTypeLabel(row.customer_type) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column :label="$t('customer.index.table.column.tag')" min-width="150">
-          <template #default="{ row }">
-            <template v-if="tagsCellView(row.id).state === 'ready'">
-              <el-tag
-                v-for="tag in tagsCellView(row.id).tags"
-                :key="tag.id"
-                size="small"
-                class="table-tag"
-              >
-                {{ tag.name }}
-              </el-tag>
-              <span v-if="tagsCellView(row.id).tags.length === 0" class="no-tags">-</span>
-            </template>
-            <span v-else-if="tagsCellView(row.id).state === 'loading'" class="no-tags">{{
-              $t('customer.index.table.cell.tagsLoading')
-            }}</span>
-            <span v-else class="cell-load-failed">{{
-              $t('customer.index.table.cell.tagsLoadFailed')
-            }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column :label="$t('customer.index.table.column.owner')" width="100">
-          <template #default="{ row }">{{ ownerDisplay(row.owner_id) }}</template>
-        </el-table-column>
-        <el-table-column
-          prop="province"
-          :label="$t('customer.index.table.column.province')"
-          width="100"
-        />
-        <el-table-column
-          prop="credit_limit"
-          :label="$t('customer.index.table.column.creditLimit')"
-          width="120"
-          align="right"
-        >
-          <template #default="{ row }">
-            {{ row.credit_limit ? formatCurrency(row.credit_limit) : '-' }}
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="payment_terms"
-          :label="$t('customer.index.table.column.paymentTerms')"
-          width="90"
-          align="center"
-        />
-        <el-table-column prop="status" :label="$t('customer.index.table.column.status')" width="80">
-          <template #default="{ row }">
-            <el-tag :type="getStatusTag(row.status)" size="small">
-              {{ getStatusLabel(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column
-          :label="$t('customer.index.table.column.action')"
-          width="180"
-          fixed="right"
-        >
-          <template #default="{ row }">
-            <!-- P3 维度 10 修复（批次 87）：编辑/删除按钮补齐 v-permission -->
-            <el-button
-              v-permission="PERMISSIONS.CUSTOMER_UPDATE"
-              type="primary"
-              link
-              size="small"
-              @click="openEditDialog(row)"
-              >{{ $t('customer.index.button.edit') }}</el-button
-            >
-            <el-button type="primary" link size="small" @click="openDetail(row)">{{
-              $t('customer.index.button.detail')
-            }}</el-button>
-            <el-button
-              v-permission="PERMISSIONS.CUSTOMER_DELETE"
-              type="danger"
-              link
-              size="small"
-              @click="handleDelete(row)"
-              >{{ $t('customer.index.button.delete') }}</el-button
-            >
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="pagination-wrapper">
-        <el-pagination
+        <ElPagination
           v-model:current-page="page"
           v-model:page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[10, 20, 50]"
           :total="total"
-          layout="total, sizes, prev, pager, next, jumper"
+          layout="total, sizes, prev, next"
           :aria-label="$t('customer.index.table.paginationAria')"
           @size-change="handleSizeChange"
           @current-change="handlePageChange"
         />
-      </div>
+      </section>
+      <template v-else>
+        <el-table
+          v-loading="loading"
+          :data="customers"
+          stripe
+          :aria-label="$t('customer.index.table.ariaLabel')"
+        >
+          <el-table-column
+            prop="customer_code"
+            :label="$t('customer.index.table.column.customerCode')"
+            width="120"
+            fixed
+          />
+          <el-table-column
+            prop="customer_name"
+            :label="$t('customer.index.table.column.customerName')"
+            min-width="180"
+            fixed
+          >
+            <template #default="{ row }">
+              <el-button type="primary" link @click="openDetail(row)">{{
+                row.customer_name
+              }}</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="contact_person"
+            :label="$t('customer.index.table.column.contactPerson')"
+            width="100"
+          />
+          <el-table-column
+            prop="contact_phone"
+            :label="$t('customer.index.table.column.phone')"
+            width="130"
+          />
+          <el-table-column
+            prop="contact_email"
+            :label="$t('customer.index.table.column.email')"
+            width="180"
+            show-overflow-tooltip
+          />
+          <el-table-column
+            prop="customer_type"
+            :label="$t('customer.index.table.column.type')"
+            width="100"
+          >
+            <template #default="{ row }">
+              <el-tag :type="getCustomerTypeTag(row.customer_type)" size="small">
+                {{ getCustomerTypeLabel(row.customer_type) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('customer.index.table.column.tag')" min-width="150">
+            <template #default="{ row }">
+              <template v-if="tagsCellView(row.id).state === 'ready'">
+                <el-tag
+                  v-for="tag in tagsCellView(row.id).tags"
+                  :key="tag.id"
+                  size="small"
+                  class="table-tag"
+                >
+                  {{ tag.name }}
+                </el-tag>
+                <span v-if="tagsCellView(row.id).tags.length === 0" class="no-tags">-</span>
+              </template>
+              <span v-else-if="tagsCellView(row.id).state === 'loading'" class="no-tags">{{
+                $t('customer.index.table.cell.tagsLoading')
+              }}</span>
+              <span v-else class="cell-load-failed">{{
+                $t('customer.index.table.cell.tagsLoadFailed')
+              }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('customer.index.table.column.owner')" width="100">
+            <template #default="{ row }">{{ ownerDisplay(row.owner_id) }}</template>
+          </el-table-column>
+          <el-table-column
+            prop="province"
+            :label="$t('customer.index.table.column.province')"
+            width="100"
+          />
+          <el-table-column
+            prop="credit_limit"
+            :label="$t('customer.index.table.column.creditLimit')"
+            width="120"
+            align="right"
+          >
+            <template #default="{ row }">
+              {{ row.credit_limit ? formatCurrency(row.credit_limit) : '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="payment_terms"
+            :label="$t('customer.index.table.column.paymentTerms')"
+            width="90"
+            align="center"
+          />
+          <el-table-column
+            prop="status"
+            :label="$t('customer.index.table.column.status')"
+            width="80"
+          >
+            <template #default="{ row }">
+              <el-tag :type="getStatusTag(row.status)" size="small">
+                {{ getStatusLabel(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column
+            :label="$t('customer.index.table.column.action')"
+            width="180"
+            fixed="right"
+          >
+            <template #default="{ row }">
+              <!-- P3 维度 10 修复（批次 87）：编辑/删除按钮补齐 v-permission -->
+              <el-button
+                v-permission="PERMISSIONS.CUSTOMER_UPDATE"
+                type="primary"
+                link
+                size="small"
+                @click="openEditDialog(row)"
+                >{{ $t('customer.index.button.edit') }}</el-button
+              >
+              <el-button type="primary" link size="small" @click="openDetail(row)">{{
+                $t('customer.index.button.detail')
+              }}</el-button>
+              <el-button
+                v-permission="PERMISSIONS.CUSTOMER_DELETE"
+                type="danger"
+                link
+                size="small"
+                @click="handleDelete(row)"
+                >{{ $t('customer.index.button.delete') }}</el-button
+              >
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="pagination-wrapper">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="total"
+            layout="total, sizes, prev, pager, next, jumper"
+            :aria-label="$t('customer.index.table.paginationAria')"
+            @size-change="handleSizeChange"
+            @current-change="handlePageChange"
+          />
+        </div>
+      </template>
     </el-card>
 
     <CustomerFormTab
@@ -282,7 +362,7 @@ import { isDialogDismissal } from '@/utils/monitor';
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElEmpty, ElPagination } from 'element-plus';
 import { Plus, Download, Printer, Coin, Share } from '@element-plus/icons-vue';
 import {
   deleteCustomer,
@@ -300,12 +380,27 @@ import { loadIfNot, createLazyLoader } from '@/utils/lazy-loader';
 import { useTableApi } from '@/composables/useTableApi';
 // Batch 468 P0-S28：引入权限码常量，与后端 customers 资源对齐
 import { PERMISSIONS } from '@/constants/permissions';
+import { hasRoutePermission } from '@/router';
+import { useUserStore } from '@/store/user';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import CustomerFormTab from './tabs/CustomerFormTab.vue';
 
 const { t } = useI18n({ useScope: 'global' });
 
 const router = useRouter();
 const hasLoaded = createLazyLoader();
+
+// 手机卡片断点与权限判定（与桌面 v-permission 指令同源口径）
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
+const userStore = useUserStore();
+const userPermissions = computed(() => userStore.userInfo?.permissions || []);
+const canUpdate = computed(() =>
+  hasRoutePermission(PERMISSIONS.CUSTOMER_UPDATE, userPermissions.value)
+);
+const canDelete = computed(() =>
+  hasRoutePermission(PERMISSIONS.CUSTOMER_DELETE, userPermissions.value)
+);
 
 // 行内没有 tags / owner_name 键：标签经单客户端点逐行取数，负责人经销售用户集合联显
 type CustomerRow = Customer & { owner_id: number };
@@ -597,6 +692,72 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 手机卡片（范式与 BPM 审批手机卡片一致） */
+.customer-mobile {
+  min-width: 0;
+}
+.customer-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.customer-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.customer-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.customer-fields > div {
+  min-width: 0;
+}
+.customer-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.customer-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.customer-number dd {
+  font-weight: 600;
+}
+.customer-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.customer-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+.customer-mobile :deep(.el-pagination) {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.customer-mobile :deep(.el-pagination button),
+.customer-mobile :deep(.el-pager li),
+.customer-mobile :deep(.el-pagination__sizes .el-select__wrapper) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 .customer-page {
   padding: 24px;
   background-color: #f5f7fa;

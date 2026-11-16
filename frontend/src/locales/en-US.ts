@@ -7015,6 +7015,7 @@ export default {
       table: {
         ariaLabel: 'Customer List',
         paginationAria: 'Customer List Pagination',
+        mobileCardAria: 'Customer mobile card list',
         column: {
           customerCode: 'Customer Code',
           customerName: 'Customer Name',
