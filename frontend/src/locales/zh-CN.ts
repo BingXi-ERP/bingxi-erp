@@ -788,6 +788,12 @@ export default {
       reserve: '预留库存',
       bulkColor: '发起批色',
       convertContract: '转合同',
+      orderNo: '订单号',
+      customer: '客户',
+      orderDate: '订单日期',
+      totalAmount: '订单金额',
+      status: '状态',
+      mobileCardAria: '销售订单手机卡片列表',
     },
     convert: {
       title: '由销售订单转销售合同',

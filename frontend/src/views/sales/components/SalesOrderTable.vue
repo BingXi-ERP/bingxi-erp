@@ -5,7 +5,124 @@
 -->
 <template>
   <el-card shadow="hover">
+    <!-- W2.3 手机卡片（<768 与 BPM 审批手机卡片同断点同范式） -->
+    <section v-if="isPhone" v-loading="loading" class="sales-order-mobile">
+      <ul class="order-list" :aria-label="t('sales.table.mobileCardAria')">
+        <li v-for="row in data" :key="row.id" class="order-card">
+          <dl class="order-fields">
+            <div class="order-number">
+              <dt>{{ t('sales.table.orderNo') }}</dt>
+              <dd>{{ row.order_no }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('sales.table.customer') }}</dt>
+              <dd>{{ row.customer_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('sales.table.orderDate') }}</dt>
+              <dd>{{ row.order_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('sales.table.totalAmount') }}</dt>
+              <dd>{{ formatAmount(row.total_amount || 0) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('sales.table.status') }}</dt>
+              <dd>
+                <ElTag :type="getStatusType(row.status)" size="small">
+                  {{ getStatusText(row.status) }}
+                </ElTag>
+              </dd>
+            </div>
+          </dl>
+          <div class="order-actions">
+            <ElButton @click="emit('view', row)">{{ t('sales.table.view') }}</ElButton>
+            <template v-if="canAccessOrderDetail">
+              <ElButton @click="emit('detail', row)">{{ t('common.detail') }}</ElButton>
+            </template>
+            <ElButton
+              v-if="row.status === 'draft' && canSubmitOrder"
+              type="warning"
+              @click="emit('submitOrder', row)"
+            >
+              {{ t('sales.table.submit') }}
+            </ElButton>
+            <ElButton
+              v-if="row.status === 'draft' && canDeleteOrder"
+              type="danger"
+              @click="emit('deleteOrder', row)"
+            >
+              {{ t('sales.table.delete') }}
+            </ElButton>
+            <ElButton
+              v-if="row.status === 'pending' && canApproveOrder"
+              type="primary"
+              @click="emit('approve', row)"
+            >
+              {{ t('sales.table.approve') }}
+            </ElButton>
+            <ElButton
+              v-if="row.status === 'pending' && canRejectOrder"
+              type="danger"
+              @click="emit('reject', row)"
+            >
+              {{ t('sales.table.reject') }}
+            </ElButton>
+            <ElButton
+              v-if="row.status === 'approved' || row.status === 'partial_shipped'"
+              type="success"
+              @click="emit('delivery', row)"
+            >
+              {{ t('sales.table.deliver') }}
+            </ElButton>
+            <ElButton
+              v-if="row.status === 'approved' || row.status === 'partial_shipped'"
+              type="primary"
+              @click="emit('reserve', row)"
+            >
+              {{ t('sales.table.reserve') }}
+            </ElButton>
+            <ElButton
+              v-if="
+                (row.status === 'approved' || row.status === 'partial_shipped') &&
+                canCreateBulkColor
+              "
+              type="primary"
+              @click="emit('bulkColor', row)"
+            >
+              {{ t('sales.table.bulkColor') }}
+            </ElButton>
+            <ElButton
+              v-if="(row.status === 'pending' || row.status === 'approved') && canCancelOrder"
+              type="danger"
+              @click="emit('cancel', row)"
+            >
+              {{ t('sales.table.cancel') }}
+            </ElButton>
+            <ElButton
+              v-if="canConvertContract && isConvertible(row.status)"
+              type="primary"
+              @click="emit('convertContract', row)"
+            >
+              {{ t('sales.table.convertContract') }}
+            </ElButton>
+          </div>
+        </li>
+      </ul>
+      <ElEmpty v-if="!loading && data.length === 0" :description="t('components.v2Table.empty')" />
+      <ElPagination
+        :current-page="page"
+        :page-size="pageSize"
+        :page-sizes="[10, 20, 50]"
+        :total="total"
+        layout="total, sizes, prev, next"
+        :aria-label="t('components.v2Table.paginationAriaLabel')"
+        @current-change="(v: number) => emit('page-change', v)"
+        @size-change="(v: number) => emit('size-change', v)"
+      />
+    </section>
     <V2Table
+      v-else
       :columns="fullColumns"
       :data="data"
       :loading="loading"
@@ -22,7 +139,7 @@
 <script setup lang="ts">
 import { computed, h } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ElButton } from 'element-plus';
+import { ElButton, ElEmpty, ElPagination, ElTag } from 'element-plus';
 import V2Table from '@/components/V2Table/index.vue';
 import type { ColumnDef } from '@/components/V2Table/types';
 import type { SalesOrder } from '@/api/sales';
@@ -30,9 +147,15 @@ import { useUserStore } from '@/store/user';
 import { canAccessDetailPermission, hasRoutePermission } from '@/router';
 import { PERMISSIONS } from '@/constants/permissions';
 import { SALES_ORDER_CONVERTIBLE_TO_CONTRACT_STATUSES } from '@/utils/sales-status';
+import { useBreakpoint } from '@/composables/useBreakpoint';
+import { getStatusType, getStatusText, formatAmount } from '../composables/olvFmts';
 
 const { t } = useI18n({ useScope: 'global' });
 const userStore = useUserStore();
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
+const isConvertible = (status: string) =>
+  (SALES_ORDER_CONVERTIBLE_TO_CONTRACT_STATUSES as readonly string[]).includes(status);
 
 // "详情"回源 GET `/sales/orders/{id}`，该 URL 派生的权限资源段是 orders（sales 只是模块前缀，
 // 消歧映射未登记 sales+orders，保留 URL 段原名）。用 canAccessDetailPermission 与后端
@@ -299,5 +422,71 @@ const fullColumns = computed<ColumnDef<SalesOrder>[]>(() => [
   display: flex;
   gap: 4px;
   align-items: center;
+}
+
+/* 手机卡片（范式与 BPM 审批手机卡片一致） */
+.sales-order-mobile {
+  min-width: 0;
+}
+.order-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.order-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.order-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.order-fields > div {
+  min-width: 0;
+}
+.order-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.order-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.order-number dd {
+  font-weight: 600;
+}
+.order-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.order-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+.sales-order-mobile :deep(.el-pagination) {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.sales-order-mobile :deep(.el-pagination button),
+.sales-order-mobile :deep(.el-pager li),
+.sales-order-mobile :deep(.el-pagination__sizes .el-select__wrapper) {
+  min-width: 44px;
+  min-height: 44px;
 }
 </style>

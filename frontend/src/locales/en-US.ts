@@ -792,6 +792,12 @@ export default {
       reserve: 'Reserve Stock',
       bulkColor: 'Initiate Color',
       convertContract: 'Convert to Contract',
+      orderNo: 'Order No.',
+      customer: 'Customer',
+      orderDate: 'Order Date',
+      totalAmount: 'Order Amount',
+      status: 'Status',
+      mobileCardAria: 'Sales order mobile card list',
     },
     convert: {
       title: 'Convert Sales Order to Contract',
