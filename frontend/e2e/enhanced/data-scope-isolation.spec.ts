@@ -203,7 +203,9 @@ test.describe('数据范围行级隔离（self scope）', () => {
       expect(lead.owner_id).toBe(userA.userId);
 
       // 列表搜索也能看到（keyword 匹配 company_name 含前缀）
-      const list = await apiCallRaw<{ items: Array<{ id: number }> }>(
+      const list = await apiCallRaw<{
+        items: Array<{ id: number; lead_no: string; company_name: string }>;
+      }>(
         page,
         'GET',
         `/crm/leads?keyword=${encodeURIComponent('E2E-ADMIN-VIEW')}&page=1&page_size=50`
@@ -211,6 +213,18 @@ test.describe('数据范围行级隔离（self scope）', () => {
       const items = leadRows(list, 'admin');
       const found = items.find(l => l.id === userA.leadId);
       expect(found, 'admin(all scope) 列表应包含 User A 的行').toBeDefined();
+      // 命中存在之外再钉真实业务列：单号必须与建单入参逐字符相同，company_name 必须真实含
+      // 搜索前缀。只断行存在时，行内列串位或返回空壳都能蒙过，隔离取证就失去数值依据。
+      expect(
+        found!.lead_no,
+        `搜索命中行的 lead_no 应等于建单入参单号，实际=${JSON.stringify(found!.lead_no)}`
+      ).toBe(userA.leadNo);
+      expect(
+        typeof found!.company_name === 'string' && found!.company_name.includes('E2E-ADMIN-VIEW'),
+        `搜索命中行的 company_name 应真实含 keyword 前缀，实际=${JSON.stringify(
+          found!.company_name
+        )}`
+      ).toBe(true);
     } finally {
       await tryCleanup(userA.page, 'DELETE', `/crm/leads/${userA.leadId}`, 'crm_lead');
       await userA.context.close();
