@@ -95,8 +95,13 @@ test.describe('库存盘点完整流程', () => {
     // omni_audit classify_operation 归类为 event_type="APPROVE"（路径末段含 approve → APPROVE，
     // omni_audit.rs:410-413；audit/search 以 module 列按 event_type 过滤，omni_audit_handler.rs:235-239），
     // 而非 UPDATE——审批是动作类端点，库存调整在 handler 内部完成、不单独产生 UPDATE 审计请求。
-    const auditLogged = await verifyAuditLog(page, 'APPROVE', 'inventory');
-    expect(auditLogged).toBe(true);
+    await expect
+      .poll(async () => verifyAuditLog(page, 'APPROVE', 'inventory'), {
+        message: '盘点审批审计日志（APPROVE/inventory）应在异步写入后可检索',
+        timeout: 20_000,
+        intervals: [500, 1_000, 2_000, 5_000],
+      })
+      .toBe(true);
 
     // 验证库存已调整：审批后同一库存行的在库量/可用量都应等于录入的实盘数量
     // （后端 update_many 同时写 QuantityOnHand 与 QuantityAvailable）

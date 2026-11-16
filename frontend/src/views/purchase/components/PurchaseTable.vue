@@ -30,7 +30,14 @@
         align="right"
       >
         <template #default="{ row }">
-          <span class="amount">¥{{ row.total_amount.toLocaleString() }}</span>
+          <span class="amount"
+            >¥{{
+              Number(row.total_amount).toLocaleString('zh-CN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })
+            }}</span
+          >
         </template>
       </el-table-column>
       <el-table-column
