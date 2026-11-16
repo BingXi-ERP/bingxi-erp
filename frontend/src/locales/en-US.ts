@@ -2,6 +2,9 @@
 /* Namespace pattern: {module}.{section}.{key} */
 export default {
   common: {
+    offlineBannerTitle: 'Network Disconnected',
+    offlineBannerDescription:
+      'You are offline. Data may not be up to date. Reconnect will resume automatically.',
     returnReason: {
       customerCancel: 'Customer cancelled order',
       wrongShipment: 'Wrong goods shipped',
@@ -792,6 +795,12 @@ export default {
       reserve: 'Reserve Stock',
       bulkColor: 'Initiate Color',
       convertContract: 'Convert to Contract',
+      orderNo: 'Order No.',
+      customer: 'Customer',
+      orderDate: 'Order Date',
+      totalAmount: 'Order Amount',
+      status: 'Status',
+      mobileCardAria: 'Sales order mobile card list',
     },
     convert: {
       title: 'Convert Sales Order to Contract',
@@ -968,6 +977,8 @@ export default {
       edit: 'Edit Stock',
       export: 'Export',
       colOperation: 'Actions',
+      paginationAria: 'Stock ledger list pagination',
+      mobileCardAria: 'Stock ledger mobile card list',
     },
     stockDialog: {
       editReadonlyHint:
@@ -1105,6 +1116,7 @@ export default {
       submit: 'Submit',
       reject: 'Reject',
       paginationAria: 'Purchase order list pagination',
+      mobileCardAria: 'Purchase order mobile card list',
     },
     viewDlg: {
       title: 'Purchase Order Detail',
@@ -1303,6 +1315,7 @@ export default {
       buttonReview: 'Review',
       buttonPost: 'Post',
       paginationAriaLabel: 'Voucher List Pagination',
+      mobileCardAriaLabel: 'Voucher mobile card list',
     },
     subjectTab: {
       pageTitle: 'Accounting Subjects',
@@ -3866,6 +3879,7 @@ export default {
       buttonDelete: 'Delete',
       buttonBatchDelete: 'Batch Delete',
       paginationAriaLabel: 'Product list pagination',
+      mobileCardAriaLabel: 'Product mobile card list',
       messageFetchFailed: 'Failed to fetch product list',
       messageColorNoRequired: 'Please enter color no.',
       messageColorExtraCostInvalid:
@@ -7006,6 +7020,7 @@ export default {
       table: {
         ariaLabel: 'Customer List',
         paginationAria: 'Customer List Pagination',
+        mobileCardAria: 'Customer mobile card list',
         column: {
           customerCode: 'Customer Code',
           customerName: 'Customer Name',
@@ -7301,6 +7316,7 @@ export default {
       filterAriaLabel: 'Supplier Filter Form',
       tableAriaLabel: 'Supplier List',
       paginationAriaLabel: 'Supplier List Pagination',
+      mobileCardAriaLabel: 'Supplier mobile card list',
       filter: {
         keyword: 'Keyword',
         keywordPlaceholder: 'Supplier code/name',

@@ -127,7 +127,82 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
+      <!-- 手机卡片（<768 与 BPM 审批手机卡片同断点同范式） -->
+      <section v-if="isPhone" v-loading="loading" class="product-mobile">
+        <ul class="product-list" :aria-label="t('product.productListTab.mobileCardAriaLabel')">
+          <li v-for="row in products" :key="row.id" class="product-card">
+            <dl class="product-fields">
+              <div class="product-number">
+                <dt>{{ t('product.productListTab.colProductCode') }}</dt>
+                <dd>{{ row.product_code }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('product.productListTab.colProductName') }}</dt>
+                <dd>{{ row.product_name }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('product.productListTab.colCategory') }}</dt>
+                <dd>
+                  <el-tag v-if="row.category_name" type="info" size="small">{{
+                    row.category_name
+                  }}</el-tag>
+                  <span v-else>-</span>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ t('product.productListTab.colSpecification') }}</dt>
+                <dd>{{ row.specification || '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('product.productListTab.colPrice') }}</dt>
+                <dd>{{ row.price ? formatCurrency(row.price) : '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ t('product.productListTab.colStatus') }}</dt>
+                <dd>
+                  <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+                    {{
+                      row.is_active
+                        ? t('product.productListTab.statusActive')
+                        : t('product.productListTab.statusInactive')
+                    }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="product-actions">
+              <el-button type="primary" @click="emit('openForm', 'view', row)">{{
+                t('product.productListTab.buttonDetail')
+              }}</el-button>
+              <el-button type="primary" @click="emit('openForm', 'edit', row)">{{
+                t('product.productListTab.buttonEdit')
+              }}</el-button>
+              <el-button type="warning" @click="openColorDialog(row)">{{
+                t('product.productListTab.buttonColors')
+              }}</el-button>
+              <el-button type="danger" @click="handleDelete(row)">{{
+                t('product.productListTab.buttonDelete')
+              }}</el-button>
+            </div>
+          </li>
+        </ul>
+        <ElEmpty
+          v-if="!loading && products.length === 0"
+          :description="t('components.v2Table.empty')"
+        />
+        <ElPagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="total"
+          layout="total, sizes, prev, next"
+          :aria-label="t('product.productListTab.paginationAriaLabel')"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
+        />
+      </section>
       <el-table
+        v-else
         v-loading="loading"
         :data="products"
         stripe
@@ -453,9 +528,9 @@ import { formatCurrency } from '@/utils';
 import { logger, logAuxLoadFailure } from '@/utils/logger';
 import { msg } from '@/utils/message';
 // 批次 277：迁移到 useTableApi composable，移除手写分页逻辑
-import { ref, reactive, watch, onMounted, defineEmits, defineExpose } from 'vue';
+import { ref, reactive, watch, onMounted, computed, defineEmits, defineExpose } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElEmpty, ElPagination } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
 import {
   Plus,
@@ -492,8 +567,13 @@ import {
 } from '@/constants/export-approval';
 import { useUserStore } from '@/store/user';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+
+// 手机卡片断点（<768 与 BPM 审批手机卡片同断点）
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const emit = defineEmits<{
   openForm: [mode: 'create' | 'edit' | 'view', row: Product | null];
@@ -1006,6 +1086,72 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 手机卡片（范式与 BPM 审批手机卡片一致） */
+.product-mobile {
+  min-width: 0;
+}
+.product-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.product-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.product-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.product-fields > div {
+  min-width: 0;
+}
+.product-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.product-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.product-number dd {
+  font-weight: 600;
+}
+.product-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.product-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+.product-mobile :deep(.el-pagination) {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.product-mobile :deep(.el-pagination button),
+.product-mobile :deep(.el-pager li),
+.product-mobile :deep(.el-pagination__sizes .el-select__wrapper) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 .stats-row {
   margin-bottom: 20px;
 }

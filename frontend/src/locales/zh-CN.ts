@@ -2,6 +2,8 @@
 /* 命名空间：{module}.{section}.{key} */
 export default {
   common: {
+    offlineBannerTitle: '网络连接已断开',
+    offlineBannerDescription: '当前处于离线状态，数据可能不是最新；网络恢复后自动重连。',
     returnReason: {
       customerCancel: '客户取消订单',
       wrongShipment: '发错货',
@@ -788,6 +790,12 @@ export default {
       reserve: '预留库存',
       bulkColor: '发起批色',
       convertContract: '转合同',
+      orderNo: '订单号',
+      customer: '客户',
+      orderDate: '订单日期',
+      totalAmount: '订单金额',
+      status: '状态',
+      mobileCardAria: '销售订单手机卡片列表',
     },
     convert: {
       title: '由销售订单转销售合同',
@@ -964,6 +972,8 @@ export default {
       edit: '编辑库存',
       export: '导出',
       colOperation: '操作',
+      paginationAria: '库存台账列表分页',
+      mobileCardAria: '库存台账手机卡片列表',
     },
     stockDialog: {
       editReadonlyHint:
@@ -1100,6 +1110,7 @@ export default {
       submit: '提交',
       reject: '驳回',
       paginationAria: '采购订单列表分页',
+      mobileCardAria: '采购订单手机卡片列表',
     },
     viewDlg: {
       title: '采购单详情',
@@ -1296,6 +1307,7 @@ export default {
       buttonReview: '审核',
       buttonPost: '过账',
       paginationAriaLabel: '凭证列表分页',
+      mobileCardAriaLabel: '凭证手机卡片列表',
     },
     subjectTab: {
       pageTitle: '会计科目',
@@ -3840,6 +3852,7 @@ export default {
       buttonDelete: '删除',
       buttonBatchDelete: '批量删除',
       paginationAriaLabel: '产品列表分页',
+      mobileCardAriaLabel: '产品手机卡片列表',
       messageFetchFailed: '获取产品列表失败',
       messageColorNoRequired: '请输入色号',
       messageColorExtraCostInvalid: '特殊色号加价须为不小于 0 的数字，最多两位小数',
@@ -6958,6 +6971,7 @@ export default {
       table: {
         ariaLabel: '客户列表',
         paginationAria: '客户列表分页',
+        mobileCardAria: '客户手机卡片列表',
         column: {
           customerCode: '客户编码',
           customerName: '客户名称',
@@ -7251,6 +7265,7 @@ export default {
       filterAriaLabel: '供应商筛选表单',
       tableAriaLabel: '供应商列表',
       paginationAriaLabel: '供应商列表分页',
+      mobileCardAriaLabel: '供应商手机卡片列表',
       filter: {
         keyword: '关键词',
         keywordPlaceholder: '供应商编码/名称',
