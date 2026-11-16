@@ -20,12 +20,12 @@ import { loginViaUI, apiCall, apiCallRaw, getCtx, ensureTestEntities, tryCleanup
  *     document_id 恰为所建发票 id、amount 逐字等于发票 invoice_amount。
  *
  * 二、金额守恒
- *   - 同一客户建发票（金额 A）+ 收款（金额 B）并确认（status=CONFIRMED），
+ *   - 同一客户建发票（金额 A）+ 收款（金额 B）并确认（status=confirmed），
  *     生成对账后断言 total_invoices=A、total_collections=B、
  *     closing_balance=opening_balance + A - B。
  *   - opening_balance 取该客户 start_date 之前所有非取消发票的 unpaid_amount 之和；
  *     新建客户无历史发票，opening_balance=0，故 closing_balance=A-B。
- *   - 收款须先经 POST /ar/payments/{id}/confirm 置 CONFIRMED 才会被聚合
+ *   - 收款须先经 POST /ar/payments/{id}/confirm 置 confirmed 才会被聚合
  *     （fetch_collections_for_reconciliation 仅取 status=COLLECTION_CONFIRMED）。
  *
  * 三、红字对冲
@@ -222,7 +222,7 @@ test.describe.serial('522 应收对账三项账务口径（聚合唯一性/金�
       'POST',
       `/ar/payments/${payment.id}/confirm`
     );
-    expect(confirmed.status).toBe('CONFIRMED');
+    expect(confirmed.status).toBe('confirmed');
 
     const rec = await apiCallRaw<ReconciliationRow>(
       page,
