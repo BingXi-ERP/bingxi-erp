@@ -415,6 +415,12 @@ describe('AuditLogView（P13 批 1 P3-2）', () => {
     const wrapper = mountAuditLog();
     await flushPromises();
     mockRequestGet.mockClear();
+    // mock 的 total=2，maxPage=1；改用带页码的响应避免新钳位把 page 拉回 1
+    mockRequestGet.mockResolvedValue({
+      code: 200,
+      message: 'success',
+      data: { items: sampleLogs, total: 100, page: 3, page_size: 20 },
+    });
 
     const vm = wrapper.vm as any;
     await vm.handlePageChange(3);
