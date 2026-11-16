@@ -110,5 +110,15 @@ describe('useAndroidBack', () => {
     window.dispatchEvent(new PopStateEvent('popstate'));
     expect(state.pushStateCalls, '仅武装 1 次，未补哨兵').toBe(1);
     expect(state.backCalls, '未消费不应撤销哨兵').toBe(0);
+    // 未消费时哨兵位已被浏览器用掉：内部标记须回未武装，
+    // dispose 不得再按"还有哨兵"多触发一次 back。
+    resetAndroidBackForTest();
+  });
+
+  it('未消费后 dispose 不多触发 back', () => {
+    const dispose = pushAndroidBackHandler(() => false);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    dispose();
+    expect(state.backCalls, '哨兵已用掉，dispose 不应再 back').toBe(0);
   });
 });

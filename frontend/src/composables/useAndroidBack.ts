@@ -25,6 +25,10 @@ function onPopState(): void {
   if (top()) {
     // 处理器已消费本次返回：补一个哨兵位，保证下一次手势仍先进入本监听。
     window.history.pushState({ androidBackSentinel: true }, '');
+  } else {
+    // 未消费：浏览器已用掉哨兵位真实后退，标记须同步回未武装，
+    // 否则后续 dispose 会按"还有哨兵"多调一次 history.back() 造成多余后退。
+    sentinelArmed = false;
   }
 }
 
