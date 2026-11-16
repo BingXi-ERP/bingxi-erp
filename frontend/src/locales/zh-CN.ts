@@ -3849,6 +3849,7 @@ export default {
       buttonDelete: '删除',
       buttonBatchDelete: '批量删除',
       paginationAriaLabel: '产品列表分页',
+      mobileCardAriaLabel: '产品手机卡片列表',
       messageFetchFailed: '获取产品列表失败',
       messageColorNoRequired: '请输入色号',
       messageColorExtraCostInvalid: '特殊色号加价须为不小于 0 的数字，最多两位小数',

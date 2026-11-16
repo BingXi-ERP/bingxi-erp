@@ -3875,6 +3875,7 @@ export default {
       buttonDelete: 'Delete',
       buttonBatchDelete: 'Batch Delete',
       paginationAriaLabel: 'Product list pagination',
+      mobileCardAriaLabel: 'Product mobile card list',
       messageFetchFailed: 'Failed to fetch product list',
       messageColorNoRequired: 'Please enter color no.',
       messageColorExtraCostInvalid:
