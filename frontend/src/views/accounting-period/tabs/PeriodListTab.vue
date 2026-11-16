@@ -4,10 +4,10 @@
   拆分日期：2026-06-15 B3-2
 -->
 <template>
-  <div class="period-list-tab">
+  <div class="period-list-tab" :class="{ 'period-list-tab--phone': isPhone }">
     <div class="page-header">
       <h2 class="page-title">{{ $t('accountingPeriod.title') }}</h2>
-      <div>
+      <div class="period-header-actions">
         <el-button type="primary" @click="openDialog()">
           <el-icon><Plus /></el-icon>{{ $t('accountingPeriod.create') }}
         </el-button>
@@ -19,12 +19,17 @@
 
     <el-card shadow="hover" class="filter-card">
       <el-form
-        :inline="true"
+        :inline="!isPhone"
+        :label-position="isPhone ? 'top' : 'right'"
         :model="queryForm"
         :aria-label="$t('accountingPeriod.filter.ariaLabel')"
       >
         <el-form-item :label="$t('accountingPeriod.filter.year')">
-          <el-input v-model="queryForm.year" style="width: 140px" inputmode="numeric" />
+          <el-input
+            v-model="queryForm.year"
+            :style="{ width: isPhone ? '100%' : '140px' }"
+            inputmode="numeric"
+          />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">{{
@@ -40,6 +45,9 @@
         v-loading="loading"
         :data="filteredPeriods"
         stripe
+        :role="isPhone ? 'region' : undefined"
+        :scrollbar-tabindex="isPhone ? 0 : undefined"
+        :scrollbar-always-on="isPhone"
         :aria-label="$t('accountingPeriod.table.ariaLabel')"
       >
         <el-table-column
@@ -83,7 +91,12 @@
             row.closed_at ? formatDate(row.closed_at) : '-'
           }}</template>
         </el-table-column>
-        <el-table-column :label="$t('accountingPeriod.table.operation')" width="200" fixed="right">
+        <el-table-column
+          :label="$t('accountingPeriod.table.operation')"
+          width="200"
+          :fixed="isPhone ? false : 'right'"
+          class-name="period-actions"
+        >
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click="openDialog(row)">{{
               $t('accountingPeriod.table.edit')
@@ -122,7 +135,13 @@
       :title="
         isEdit ? $t('accountingPeriod.dialog.editTitle') : $t('accountingPeriod.dialog.createTitle')
       "
-      width="500px"
+      :width="
+        isPhone
+          ? 'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))'
+          : '500px'
+      "
+      class="period-dialog"
+      :class="{ 'period-dialog--phone': isPhone }"
       :aria-label="
         isEdit
           ? $t('accountingPeriod.dialog.editAriaLabel')
@@ -134,6 +153,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('accountingPeriod.dialog.ariaLabel')"
       >
         <template v-if="!isEdit">
@@ -188,8 +208,11 @@ import {
   type AccountingPeriodDetail,
 } from '@/api/accounting-period';
 import { logger } from '@/utils/logger';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const loading = ref(false);
 const submitLoading = ref(false);
@@ -386,7 +409,7 @@ const reopenPeriod = async (row: AccountingPeriodDetail) => {
         inputType: 'textarea',
         inputPlaceholder: t('accountingPeriod.message.reopenReasonPlaceholder'),
         inputValidator: (v: string) =>
-          (v && v.trim()) || t('accountingPeriod.message.reopenReasonRequired'),
+          !!v?.trim() || t('accountingPeriod.message.reopenReasonRequired'),
       }
     );
     await reopenPeriodApi(row.id, value.trim());
@@ -444,3 +467,96 @@ onMounted(() => {
   fetchPeriods();
 });
 </script>
+
+<style scoped>
+.period-list-tab--phone {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.period-list-tab--phone .page-header,
+.period-list-tab--phone .period-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.period-list-tab--phone .page-header {
+  align-items: flex-start;
+}
+
+.period-list-tab--phone .page-title {
+  overflow-wrap: anywhere;
+}
+
+.period-list-tab--phone :deep(.el-button),
+.period-list-tab :deep(.period-dialog--phone .el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.period-list-tab--phone :deep(.el-input__wrapper),
+.period-list-tab :deep(.period-dialog--phone .el-input__wrapper) {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.period-list-tab--phone :deep(.el-form-item__content),
+.period-list-tab--phone :deep(.period-actions .cell),
+.period-list-tab :deep(.period-dialog--phone .el-dialog__footer) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.period-list-tab--phone :deep(.el-table .cell) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.period-list-tab--phone :deep(.el-scrollbar__wrap:focus-visible) {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: -2px;
+}
+
+.period-list-tab :deep(.period-dialog) {
+  width: 500px !important;
+}
+
+.period-list-tab :deep(.period-dialog--phone) {
+  display: flex;
+  flex-direction: column;
+  width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)) !important;
+  box-sizing: border-box;
+}
+
+.period-list-tab :deep(.period-dialog--phone .el-dialog__header),
+.period-list-tab :deep(.period-dialog--phone .el-dialog__footer) {
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
+
+.period-list-tab :deep(.period-dialog--phone .el-dialog__body) {
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.period-list-tab :deep(.period-dialog--phone .el-dialog__footer) {
+  justify-content: flex-end;
+}
+</style>
