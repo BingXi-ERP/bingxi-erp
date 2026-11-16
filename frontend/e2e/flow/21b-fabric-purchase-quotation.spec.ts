@@ -122,6 +122,28 @@ test.describe('面料单据专用字段全链路验证', () => {
       // （"180.00"/"145.00"）。断言未对齐真实出参格式：比对前做数值归一（非放宽）。
       expect(Number(item.gram_weight)).toBe(Number(gramWeight));
       expect(Number(item.width)).toBe(Number(width));
+
+      // 写后逐列回读数量与金额：明细数量/辅助量按入参落库，行金额按数量乘单价计算；
+      // 主表三列合计是明细按列求和，本用例仅一条明细故逐列相等。
+      expect(Number(item.quantity), '明细数量应等于收货量 50').toBe(50);
+      expect(Number(item.quantity_alt), '明细辅助量应等于入参 15').toBe(15);
+      expect(Number(item.amount), '明细金额应等于 50×20.00=1000.00').toBeCloseTo(1000, 2);
+      expect(Number(detail.total_quantity), '主表总数量应为 50').toBe(50);
+      expect(Number(detail.total_quantity_alt), '主表辅助量合计应为 15').toBe(15);
+      expect(Number(detail.total_amount), '主表总金额应为 50×20.00=1000.00').toBeCloseTo(1000, 2);
+      // 守恒断言：主表合计应逐列等于明细行值
+      expect(Number(detail.total_quantity), '主表总数量应守恒为明细数量之和').toBeCloseTo(
+        Number(item.quantity),
+        2
+      );
+      expect(Number(detail.total_quantity_alt), '主表辅助量应守恒为明细辅助量之和').toBeCloseTo(
+        Number(item.quantity_alt),
+        2
+      );
+      expect(Number(detail.total_amount), '主表总额应守恒为明细金额之和').toBeCloseTo(
+        Number(item.amount),
+        2
+      );
     }
   });
 
@@ -186,6 +208,9 @@ test.describe('面料单据专用字段全链路验证', () => {
     if (quotationId) {
       const detail = await apiCallRaw<{
         status: string;
+        subtotal: number | string;
+        tax_amount: number | string;
+        total_amount: number | string;
         items: Array<Record<string, unknown>>;
       }>(page, 'GET', `/quotations/${quotationId}`);
 
@@ -200,6 +225,26 @@ test.describe('面料单据专用字段全链路验证', () => {
       if (colorId) {
         expect(Number(item.color_id)).toBe(colorId);
       }
+
+      // 写后逐列回读金额：含税单价按用例入参的浮点计算口径回读（25.50 乘 1.13 取两位小数为 28.81），
+      // 行含税金额按数量乘该含税单价收敛；单头为不含税态，税额按小计乘税率加计，总额为小计加税额。
+      expect(Number(item.unit_price_with_tax), '含税单价应按入参浮点口径回读为 28.81').toBeCloseTo(
+        28.81,
+        2
+      );
+      expect(Number(item.amount), '行净额应为 100×25.50=2550.00').toBeCloseTo(2550, 2);
+      expect(Number(item.amount_with_tax), '行含税金额应为 100×28.81=2881.00').toBeCloseTo(2881, 2);
+      expect(Number(detail.subtotal), '单头小计应等于行净额 2550.00').toBeCloseTo(2550, 2);
+      expect(Number(detail.tax_amount), '不含税态税额应为小计×13%=331.50').toBeCloseTo(331.5, 2);
+      expect(Number(detail.total_amount), '单头总额应为 2550.00+331.50=2881.50').toBeCloseTo(
+        2881.5,
+        2
+      );
+      // 守恒断言：单头总额恒等于小计加税额（不含税态口径，与行腿含税聚合是两条腿）
+      expect(Number(detail.total_amount), '单头总额应守恒为小计加税额').toBeCloseTo(
+        Number(detail.subtotal) + Number(detail.tax_amount),
+        2
+      );
     }
   });
 
