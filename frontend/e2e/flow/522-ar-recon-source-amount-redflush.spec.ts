@@ -245,23 +245,38 @@ test.describe.serial('522 应收对账三项账务口径（聚合唯一性/金�
   });
 
   test('三、红字对冲：退货审批生成红字发票，对账明细含负金额 INVOICE 行', async ({ page }) => {
-    // 本用例依赖仓库/产品/销售订单等前置实体，ensureTestEntities 已建 ctx.customerId
-    // 及其专属销售订单（明细引用 ctx.productIds[0]），退货单挂该订单以解析追溯字段
+    // 本用例依赖仓库/产品等前置实体，ensureTestEntities 已建 ctx.customerId 与产品。
     await ensureTestEntities(page);
     const ctx = getCtx();
     expect(ctx.customerId, '[522] ensureTestEntities 应建客户').toBeGreaterThan(0);
-    expect(ctx.salesOrderId, '[522] ensureTestEntities 应建销售订单').toBeGreaterThan(0);
     expect(ctx.warehouseIds[0], '[522] ensureTestEntities 应建仓库').toBeGreaterThan(0);
     expect(ctx.productIds[0], '[522] ensureTestEntities 应建产品').toBeGreaterThan(0);
 
     const productUnitPrice = 200;
     const productQuantity = '1';
 
-    // 建退货单挂 ctx.salesOrderId，退货明细引用 ctx.productIds[0]，
-    // 审批时按 total_amount 生成红字应收单（invoice_amount=-total_amount）
+    // 自建销售订单且明细唯一（仅 ctx.productIds[0] 一行）：退货明细回写追溯字段时，
+    // 后端按销售订单+商品唯一定位订单明细取权威税率与追溯三列；复用夹具共享订单会
+    // 因明细不唯一或商品不匹配而判 BUSINESS_ERROR。订单 submit+approve 即可，无需发货。
+    const so = await apiCallRaw<{ id: number }>(page, 'POST', '/sales/orders', {
+      customer_id: ctx.customerId,
+      order_date: TODAY,
+      items: [
+        {
+          product_id: ctx.productIds[0],
+          quantity: productQuantity,
+          unit_price: String(productUnitPrice),
+        },
+      ],
+    });
+    expect(so.id, '自建销售订单须返回主键').toBeGreaterThan(0);
+    await apiCallRaw(page, 'POST', `/sales/orders/${so.id}/submit`);
+    await apiCallRaw(page, 'POST', `/sales/orders/${so.id}/approve`);
+
+    // 建退货单挂自建订单，退货明细引用同一商品；审批时按 total_amount 生成红字应收单
     const ret = await apiCallRaw<SalesReturnRow>(page, 'POST', '/sales/sales-returns', {
       customer_id: ctx.customerId,
-      order_id: ctx.salesOrderId,
+      order_id: so.id,
       return_date: INVOICE_DATE,
       warehouse_id: ctx.warehouseIds[0],
       reason_type: '质量问题',
@@ -273,8 +288,8 @@ test.describe.serial('522 应收对账三项账务口径（聚合唯一性/金�
       product_id: ctx.productIds[0],
       quantity: productQuantity,
       unit_price: String(productUnitPrice),
-      tax_percent: 0,
-      discount_percent: 0,
+      tax_percent: '0',
+      reason: '红字对冲验证退货',
     });
 
     const submitted = await apiCallRaw<SalesReturnRow>(
