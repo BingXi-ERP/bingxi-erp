@@ -118,7 +118,14 @@ test.describe('03 审批端到端（通过/驳回）', () => {
 
     // 验证已办列表出现该任务（GET /bpm/tasks/completed?user_id=X）
     const completedList = await apiCallRaw<{
-      items?: Array<{ id: number; status: string }>;
+      items?: Array<{
+        id: number;
+        status: string;
+        actual_handler_id?: number | null;
+        actual_handler_name?: string | null;
+        approval_opinion?: string | null;
+        handled_at?: string | null;
+      }>;
     }>(page, 'GET', `/bpm/tasks/completed?user_id=${me.id}&page=1&page_size=50`);
     const completedItems =
       completedList?.items ?? (Array.isArray(completedList) ? completedList : []);
@@ -130,6 +137,14 @@ test.describe('03 审批端到端（通过/驳回）', () => {
       `已办列表应包含任务 id=${taskId}（审批通过后 status 变为 completed，小写）`
     ).toBeDefined();
     expect(foundCompleted!.status).toBe('completed');
+
+    // 裁决留痕逐列回读：处理人、姓名、意见、处理时间都由写入方落库并在任务出参暴露，
+    // 只断言状态与成功文案无法证明这些审计字段真的写入。处理人取已认证操作者，
+    // 不是请求体可伪造的 handler_id。
+    expect(foundCompleted!.actual_handler_id, '处理人应为已认证操作者').toBe(me.id);
+    expect(foundCompleted!.actual_handler_name, '处理人姓名应取后端档案真值').toMatch(/\S/);
+    expect(foundCompleted!.approval_opinion, '审批意见应原样落库').toBe('E2E 测试：审批同意');
+    expect(foundCompleted!.handled_at, '审批处理时间应落库').not.toBeNull();
   });
 
   test('03-02 审批拒绝：待办出现 → 拒绝 → 任务状态变 rejected', async ({ page }) => {
@@ -137,14 +152,17 @@ test.describe('03 审批端到端（通过/驳回）', () => {
     const me = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
 
     // 验证待办出现
-    const pendingList = await apiCallRaw<{ items?: Array<{ id: number }> }>(
+    const pendingList = await apiCallRaw<{ items?: Array<{ id: number; status: string }> }>(
       page,
       'GET',
       `/bpm/tasks/pending?user_id=${me.id}&page=1&page_size=50`
     );
     const pendingItems = pendingList?.items ?? (Array.isArray(pendingList) ? pendingList : []);
-    const foundPending = (pendingItems as Array<{ id: number }>).find(t => t.id === taskId);
+    const foundPending = (pendingItems as Array<{ id: number; status: string }>).find(
+      t => t.id === taskId
+    );
     expect(foundPending, `待办列表应包含任务 id=${taskId}`).toBeDefined();
+    expect(foundPending!.status, '驳回前任务应处于待办态').toBe('pending');
 
     // 执行审批拒绝
     await apiCall(page, 'POST', '/bpm/tasks/approve', {
@@ -156,15 +174,35 @@ test.describe('03 审批端到端（通过/驳回）', () => {
     });
 
     // 通过通用查询端点回读任务状态
-    const taskList = await apiCallRaw<{ items?: Array<{ id: number; status: string }> }>(
-      page,
-      'GET',
-      `/bpm/tasks?page=1&page_size=100`
-    );
+    const taskList = await apiCallRaw<{
+      items?: Array<{
+        id: number;
+        status: string;
+        actual_handler_id?: number | null;
+        actual_handler_name?: string | null;
+        approval_opinion?: string | null;
+        handled_at?: string | null;
+      }>;
+    }>(page, 'GET', `/bpm/tasks?page=1&page_size=100`);
     const allItems = taskList?.items ?? (Array.isArray(taskList) ? taskList : []);
-    const task = (allItems as Array<{ id: number; status: string }>).find(t => t.id === taskId);
+    const task = (
+      allItems as Array<{
+        id: number;
+        status: string;
+        actual_handler_id?: number | null;
+        actual_handler_name?: string | null;
+        approval_opinion?: string | null;
+        handled_at?: string | null;
+      }>
+    ).find(t => t.id === taskId);
     expect(task, `应能查到任务 id=${taskId}`).toBeDefined();
     expect(task!.status, '拒绝后任务状态应为 rejected（小写）').toBe('rejected');
+
+    // 驳回裁决留痕逐列回读，与同意路径核对同一组落库字段，确保两种裁决都真实落库。
+    expect(task!.actual_handler_id, '驳回处理人应为已认证操作者').toBe(me.id);
+    expect(task!.actual_handler_name, '驳回处理人姓名应取后端档案真值').toMatch(/\S/);
+    expect(task!.approval_opinion, '驳回意见应原样落库').toBe('E2E 测试：审批拒绝');
+    expect(task!.handled_at, '驳回处理时间应落库').not.toBeNull();
   });
 
   test('03-03 非法审批动作被 400 拒绝', async ({ page }) => {
