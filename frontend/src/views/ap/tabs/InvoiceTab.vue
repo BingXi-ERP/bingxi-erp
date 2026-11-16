@@ -49,7 +49,68 @@
     </el-card>
 
     <el-card shadow="hover">
+      <!-- 手机卡片（与 BPM 审批手机卡片同断点同范式） -->
+      <section v-if="isPhone" v-loading="invoiceLoading" class="ap-invoice-mobile">
+        <ul class="card-list" :aria-label="$t('apModule.invoice.listAria')">
+          <li v-for="row in invoices" :key="row.id" class="card-item">
+            <dl class="card-fields">
+              <div class="field-emphasis">
+                <dt>{{ $t('apModule.invoice.invoiceNo') }}</dt>
+                <dd>{{ row.invoice_no }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.invoice.supplier') }}</dt>
+                <dd>{{ supplierLabel(row.supplier_id) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.invoice.invoiceDate') }}</dt>
+                <dd>{{ row.invoice_date }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.invoice.invoiceAmount') }}</dt>
+                <dd>{{ formatMoney(row.amount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.invoice.unpaidAmount') }}</dt>
+                <dd :class="{ 'text-red': Number(row.unpaid_amount) > 0 }">
+                  {{ formatMoney(row.unpaid_amount) }}
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('common.status') }}</dt>
+                <dd>
+                  <el-tag :type="getInvoiceStatusType(row.invoice_status)" size="small">
+                    {{ getInvoiceStatusLabel(row.invoice_status) }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" @click="viewInvoice(row as APInvoice)">{{
+                $t('common.detail')
+              }}</el-button>
+              <el-button
+                v-if="row.invoice_status === 'DRAFT'"
+                type="success"
+                @click="approveInvoice(row as APInvoice)"
+                >{{ $t('apModule.invoice.approve') }}</el-button
+              >
+              <el-button
+                v-if="row.invoice_status === 'DRAFT'"
+                type="danger"
+                @click="cancelInvoice(row as APInvoice)"
+                >{{ $t('common.cancel') }}</el-button
+              >
+            </div>
+          </li>
+        </ul>
+        <ElEmpty
+          v-if="!invoiceLoading && invoices.length === 0"
+          :description="$t('components.v2Table.empty')"
+        />
+      </section>
       <el-table
+        v-else
         v-loading="invoiceLoading"
         :data="invoices"
         stripe
@@ -263,14 +324,15 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive, toRef, onMounted } from 'vue';
+import { ref, reactive, toRef, onMounted, computed } from 'vue';
 import { useNumberField } from '@/composables/useNumberField';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElEmpty } from 'element-plus';
 import { Plus, Printer, Download } from '@element-plus/icons-vue';
 import { promptCancelReason } from '@/composables/useActionPrompts';
 import printJS from 'print-js';
 import { printTableOnAndroid } from '@/utils/print';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type { FormInstance, FormRules } from 'element-plus';
 import {
   getAPInvoiceList,
@@ -288,6 +350,10 @@ import { getSupplierList, type Supplier } from '@/api/supplier';
 import { PERMISSIONS } from '@/constants/permissions';
 
 const { t } = useI18n({ useScope: 'global' });
+
+// 手机卡片断点（与 BPM 审批手机卡片同断点）
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 应付发票自动生成（按到期的采购收货单批量开票）
 const autoGenerating = ref(false);
@@ -640,6 +706,61 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 手机卡片（范式与 BPM 审批手机卡片一致） */
+.ap-invoice-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+
 .invoice-tab {
   background: #fff;
   border-radius: 4px;
