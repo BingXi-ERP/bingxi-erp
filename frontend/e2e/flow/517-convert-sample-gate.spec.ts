@@ -50,6 +50,53 @@ type Row = Record<string, unknown>;
 const num = (v: unknown): number => Number(String(v));
 const str = (v: unknown): string => (v == null ? '' : String(v));
 
+/**
+ * 写后逐列回读：转出的销售订单必须逐字段继承报价快照，不得引用实时主数据。
+ * 判据取自转换服务：单头 customer_id/subtotal/tax_amount/total_amount 直接复制报价，
+ * 行 product_id/quantity/unit_price/total_amount 逐列复制报价行；这些列是下单即锁价的落库事实。
+ * 金额出参为 DECIMAL 字符串，统一用 Number() 归一后逐列比对，不引入第二套舍入口径。
+ */
+async function expectOrderInheritsQuotationSnapshot(
+  page: Page,
+  quotationId: number,
+  orderId: number,
+  tag: string
+): Promise<void> {
+  const quote = await apiCallRaw<Row>(page, 'GET', `/quotations/${quotationId}`);
+  const order = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${orderId}`);
+  expect(Number(order.customer_id), `[${tag}] 转单客户应等于报价快照客户`).toBe(
+    Number(quote.customer_id)
+  );
+  expect(Number(order.subtotal), `[${tag}] 转单小计应等于报价小计`).toBe(Number(quote.subtotal));
+  expect(Number(order.tax_amount), `[${tag}] 转单税额应等于报价税额`).toBe(
+    Number(quote.tax_amount)
+  );
+  expect(Number(order.total_amount), `[${tag}] 转单总额应等于报价总额`).toBe(
+    Number(quote.total_amount)
+  );
+  if (!Array.isArray(quote.items)) throw new Error(`[${tag}] 报价详情缺 items 键，无法回读快照`);
+  if (!Array.isArray(order.items)) throw new Error(`[${tag}] 订单详情缺 items 键，无法逐列回读`);
+  expect(order.items.length, `[${tag}] 转单明细行数应等于报价明细行数`).toBe(quote.items.length);
+  expect(order.items.length, `[${tag}] 转单明细不得为空`).toBeGreaterThan(0);
+  for (let index = 0; index < order.items.length; index += 1) {
+    const source = quote.items[index] as Row;
+    const target = order.items[index] as Row;
+    expect(Number(target.product_id), `[${tag}] 第 ${index} 行产品应等于报价快照产品`).toBe(
+      Number(source.product_id)
+    );
+    expect(Number(target.quantity), `[${tag}] 第 ${index} 行数量应等于报价快照数量`).toBe(
+      Number(source.quantity)
+    );
+    expect(Number(target.unit_price), `[${tag}] 第 ${index} 行单价快照应等于报价单价`).toBe(
+      Number(source.unit_price)
+    );
+    expect(
+      Number(target.total_amount),
+      `[${tag}] 第 ${index} 行含税金额快照应等于报价行含税金额`
+    ).toBe(Number(source.total_amount));
+  }
+}
+
 /** psql 目标串：DATABASE_URL 单引号包裹并对内部单引号做 shell 标准转义（照抄 global-setup.ts）。 */
 function psqlTarget(): string {
   const dbUrl = process.env.DATABASE_URL;
@@ -257,6 +304,9 @@ test('517-01 常规报价（无定制订单关联）转单不拦：200 回销售
   expect(str(q.status), `[${tag}] 放行后报价单应推进 converted，实际 ${str(q.status)}`).toBe(
     'converted'
   );
+
+  // 写后逐列回读：原有断言只钉单号与状态，这里补钉订单逐字段继承报价快照，防转单落错列
+  await expectOrderInheritsQuotationSnapshot(page, quotationId, num(order.id), tag);
 });
 
 test('517-02 关联打样单未确认 OK 样：转单被拒 400 BUSINESS_ERROR + 中文文案', async ({ page }) => {
@@ -325,4 +375,7 @@ test('517-03 确认 OK 样后同链转单放行：200 回销售订单草稿', as
   expect(str(q.status), `[${tag}] 放行后报价单应推进 converted，实际 ${str(q.status)}`).toBe(
     'converted'
   );
+
+  // 写后逐列回读：确认样门放行后的转单同样必须逐字段继承报价快照
+  await expectOrderInheritsQuotationSnapshot(page, quotationId, num(order.id), tag);
 });
