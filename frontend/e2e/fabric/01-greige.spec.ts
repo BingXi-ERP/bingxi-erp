@@ -26,7 +26,7 @@ test.afterEach(async ({ page }) => {
 });
 
 async function seedGreige(
-  page: import('@playwright/test').Page,
+  page: import('@playwright/test').Page
 ): Promise<{ id: number; name: string }> {
   // 只建坯布档案，不带数量列。weight_kg 与 length_m 是当前库存两列，quantity_kg 与
   // quantity_meters 是累计入库两列，两组字段在 greige_fabric 表里独立存储，出库门控读的是
@@ -54,9 +54,11 @@ async function seedGreige(
 async function findGreigeByFabricNo(
   page: import('@playwright/test').Page,
   fabricNo: string
-): Promise<{ id?: number; fabric_no?: string; fabric_name?: string } | undefined> {
+): Promise<
+  { id?: number; fabric_no?: string; fabric_name?: string; fabric_type?: string } | undefined
+> {
   const res = await apiCall<{
-    items?: Array<{ id?: number; fabric_no?: string; fabric_name?: string }>;
+    items?: Array<{ id?: number; fabric_no?: string; fabric_name?: string; fabric_type?: string }>;
   }>(
     page,
     'GET',
@@ -191,12 +193,19 @@ test.describe('01 坯布管理', () => {
     const suffix = name.replace('E2E坯布', '');
     const created = await findGreigeByFabricNo(page, `E2E-GF${suffix}`);
     expect(created, `应能从后端回查到坯布`).toBeTruthy();
+    // 逐列回读建档三列，断 fabric_no、fabric_name、fabric_type 按提交值真实落库，
+    // 而不是只凭列表出现一行与类型文案可见就算建档成功。
+    expect(created?.fabric_no, `落库 fabric_no 应等于提交值 E2E-GF${suffix}`).toBe(
+      `E2E-GF${suffix}`
+    );
+    expect(created?.fabric_name, `落库 fabric_name 应等于提交值 ${name}`).toBe(name);
+    expect(created?.fabric_type, `落库 fabric_type 应等于提交值 梭织`).toBe('梭织');
     // seedGreige 已登记清理（CLEANUP.push 内含 id），此处无需重复
   });
 
   test('01-03 坯布入库操作', async ({ page }) => {
     const wh = await seedWarehouse(page);
-    const { name } = await seedGreige(page);
+    const { id: fabricId, name } = await seedGreige(page);
     const row = await openGreigeTabAndLocateRow(page, name);
     await row.getByRole('button', { name: '入库', exact: true }).click();
 
@@ -210,6 +219,27 @@ test.describe('01 坯布管理', () => {
     await dialog.getByRole('button', { name: '确认' }).click();
 
     await expect(page.getByText('入库成功')).toBeVisible({ timeout: 30000 });
+
+    // 写后读回：入库对话框填的重量 50、长度 100 必须逐列落到后端库存四列。
+    // 只认「入库成功」提示会漏掉「提示弹出但未写库」与「只抬当前库存不抬累计入库」两类假绿，
+    // 故用 readGreigeStock 读回同一行四列，正向钉当前库存与累计入库同源同步。
+    const afterInbound = await readGreigeStock(page, fabricId);
+    expect(
+      afterInbound.weight_kg,
+      `入库后当前库存 weight_kg 应等于提交的 50，实际读回 ${afterInbound.weight_kg}`
+    ).toBe(50);
+    expect(
+      afterInbound.length_m,
+      `入库后当前长度 length_m 应等于提交的 100，实际读回 ${afterInbound.length_m}`
+    ).toBe(100);
+    expect(
+      afterInbound.quantity_kg,
+      `入库后累计入库 quantity_kg 应同步抬到 50（stock_in 同源累加），实际读回 ${afterInbound.quantity_kg}`
+    ).toBe(50);
+    expect(
+      afterInbound.quantity_meters,
+      `入库后累计米数 quantity_meters 应同步抬到 100，实际读回 ${afterInbound.quantity_meters}`
+    ).toBe(100);
   });
 
   test('01-04 坯布出库操作', async ({ page }) => {

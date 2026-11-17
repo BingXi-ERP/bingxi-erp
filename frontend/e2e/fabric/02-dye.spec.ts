@@ -120,6 +120,11 @@ async function findDyeBatchByNo(
       color_code?: string;
       color_name?: string;
       color_no?: string;
+      actual_output_kg?: string | number | null;
+      actual_output_m?: string | number | null;
+      greige_input_kg?: string | number | null;
+      status?: string | null;
+      completed_at?: string | null;
     }
   | undefined
 > {
@@ -130,6 +135,11 @@ async function findDyeBatchByNo(
       color_code?: string;
       color_name?: string;
       color_no?: string;
+      actual_output_kg?: string | number | null;
+      actual_output_m?: string | number | null;
+      greige_input_kg?: string | number | null;
+      status?: string | null;
+      completed_at?: string | null;
     }>;
   }>(
     page,
@@ -216,5 +226,38 @@ test.describe('02 染色批次', () => {
     await page.keyboard.press('Tab');
     await completeDialog.getByRole('button', { name: '确认完工', exact: true }).click();
     await expect(page.getByText('完工登记成功')).toBeVisible({ timeout: 30000 });
+
+    // 写后读回：完工登记三值、状态与完工时间必须按提交值真实落到后端染色批次行。
+    // 只认「完工登记成功」提示会漏掉「提示弹出但未写库」与「三值落错列或被默认值覆盖」两类假绿，
+    // 故用列表端点按批次号回查真实行，逐列核对三值、状态翻到 stored、完工时间非空。
+    const completed = await findDyeBatchByNo(page, batchNo);
+    expect(completed, `完工后应能按批次号 ${batchNo} 回查到染色批次`).toBeTruthy();
+    expect(
+      Number(completed?.actual_output_kg),
+      `落库实际产出 actual_output_kg 应为 100，实际读回 ${String(completed?.actual_output_kg)}`
+    ).toBe(100);
+    expect(
+      Number(completed?.actual_output_m),
+      `落库实际米数 actual_output_m 应为 5000，实际读回 ${String(completed?.actual_output_m)}`
+    ).toBe(5000);
+    expect(
+      Number(completed?.greige_input_kg),
+      `落库坯布投料 greige_input_kg 应为 120，实际读回 ${String(completed?.greige_input_kg)}`
+    ).toBe(120);
+    expect(
+      completed?.status,
+      `完工后状态应为 stored（inspecting 合法流转到 stored），实际读回 ${String(completed?.status)}`
+    ).toBe('stored');
+    expect(
+      completed?.completed_at,
+      `完工后 completed_at 应非空，实际读回 ${String(completed?.completed_at)}`
+    ).toBeTruthy();
+    // 损耗率守恒：失重率 =（坯布投料 − 实际产出）/ 坯布投料，与后端失重率口径同源。
+    // 三值逐列相等但彼此关系错乱同样是假绿，故补断守恒关系（120 减 100 再除以 120）。
+    expect(
+      (Number(completed?.greige_input_kg) - Number(completed?.actual_output_kg)) /
+        Number(completed?.greige_input_kg),
+      `失重率应为（120−100）/120`
+    ).toBe((120 - 100) / 120);
   });
 });
