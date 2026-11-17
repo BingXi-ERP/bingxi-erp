@@ -278,6 +278,13 @@
 //!    （否则复用库删了行、新装库矩阵又种回）。mrp-history 是另一枚独立键、属缺省占位路由族、不删。
 //!    down 只回基线持有人 production_manager 的两枚键（ON CONFLICT 命中真实唯一索引列集合，重复回退
 //!    等价），属不完全可逆。置于链尾为新的顶层条目，依赖 system 建表与 v15 建的权限唯一索引早于本域
+//! 45. sample_dispatch: 调样单实体数据地基域（m0142）——新建 sample_dispatch_orders 主表
+//!    （document_no 唯一索引兜底取号并发，格式 {前缀}{YYMM}-{3位流水} 样例 BX-DY2607-1356；
+//!    customer_id 外键指 customers；opening_balance/total_amount/total_collections/closing_balance
+//!    四账务列与 ar_reconciliations 同语义位，开单时由调用方写入）与 sample_dispatch_items 明细表
+//!    （缸号/色号/成分/米数/单价/金额直接落列，成分免 product JOIN）。只新增两表，不改既有表、
+//!    不回填。置于链尾为新的顶层条目（并入 business 建表域会被台账整体跳过、建表永不执行），
+//!    customers 与 products 建表早于本域
 
 pub use sea_orm_migration::prelude::*;
 
@@ -375,6 +382,9 @@ impl MigratorTrait for Migrator {
             Box::new(domain::like_acceleration::Migration),
             // 周期任务执行历史表，链尾独立域（存量复用库上属 pending 必然执行）
             Box::new(domain::scheduler_observability::Migration),
+            // 调样单两表建表域（sample_dispatch_orders/sample_dispatch_items），链尾独立域
+            // （存量复用库上属 pending 必然执行；并入 business 域会被台账整体跳过、建表永不执行）
+            Box::new(domain::sample_dispatch::Migration),
         ]
     }
 }
