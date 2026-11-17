@@ -129,9 +129,16 @@ test.describe('03 审批端到端（通过/驳回）', () => {
     }>(page, 'GET', `/bpm/tasks/completed?user_id=${me.id}&page=1&page_size=50`);
     const completedItems =
       completedList?.items ?? (Array.isArray(completedList) ? completedList : []);
-    const foundCompleted = (completedItems as Array<{ id: number; status: string }>).find(
-      t => t.id === taskId
-    );
+    const foundCompleted = (
+      completedItems as Array<{
+        id: number;
+        status: string;
+        actual_handler_id?: number;
+        actual_handler_name?: string;
+        approval_opinion?: string;
+        handled_at?: string | null;
+      }>
+    ).find(t => t.id === taskId);
     expect(
       foundCompleted,
       `已办列表应包含任务 id=${taskId}（审批通过后 status 变为 completed，小写）`
