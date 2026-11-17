@@ -93,7 +93,7 @@ async function expectOrderInheritsQuotationSnapshot(
     expect(
       Number(target.total_amount),
       `[${tag}] 第 ${index} 行含税金额快照应等于报价行含税金额`
-    ).toBe(Number(source.total_amount));
+    ).toBe(Number(source.amount_with_tax));
   }
 }
 
