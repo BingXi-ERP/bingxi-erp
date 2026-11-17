@@ -3,7 +3,7 @@
 // 覆盖范围：流程定义创建 → 编辑 → 版本管理
 import { test, expect } from '../diagnose-fixture';
 import { applyAuthMocks } from '../smoke/_helpers';
-import { apiCall, genCode, tryCleanup } from '../flow/helpers';
+import { apiCall, apiCallRaw, genCode, tryCleanup } from '../flow/helpers';
 import { pickSelect, pickSelectIn } from '../flow/ui-helpers';
 
 /**
@@ -91,7 +91,9 @@ test.describe('01 流程定义', () => {
     // 全部限定在 .el-dialog 作用域内，避免 getByLabel strict-mode 命中多元素。
     // 提交按钮真实文案为「确定」（bpm.definitions.form.confirm），非「确认/提交」。
     const dlg = page.locator('.el-dialog');
-    await dlg.getByLabel('流程标识').fill(`e2e-${Date.now()}`);
+    // 记录界面填入的流程标识，提交后据此回读定义真实落库值
+    const processKey = `e2e-${Date.now()}`;
+    await dlg.getByLabel('流程标识').fill(processKey);
     await dlg.getByLabel('流程名称').fill('E2E 测试流程');
     // 分类是 el-select：用共享 helper pickSelectIn（root=dlg + 精确 label「分类」）打开下拉选首项，
     // label 精确匹配限定在弹窗作用域内，不直接点 readonly combobox input。
@@ -133,6 +135,22 @@ test.describe('01 流程定义', () => {
     await expect(page.locator('.el-message').filter({ hasText: '新增成功' })).toBeVisible({
       timeout: 30000,
     });
+
+    // 写后逐列回读：成功提示只证明接口返回成功，不能证明表单字段与节点配置真的落库。
+    // 定义列表按创建时间倒序返回分页对象，按本次唯一流程标识定位刚建的那一行。
+    const createdDefs = await apiCallRaw<{
+      items?: Array<{
+        code: string;
+        name: string;
+        description?: string | null;
+        config?: { nodes?: Array<{ type: string }> } | null;
+      }>;
+    }>(page, 'GET', '/bpm/definitions?page=1&page_size=50');
+    const created = createdDefs?.items?.find(d => d.code === processKey);
+    expect(created, `回读应能按流程标识 ${processKey} 找到刚建的定义`).toBeDefined();
+    expect(created!.name, '流程名称应按表单输入落库').toBe('E2E 测试流程');
+    expect(created!.description, '描述应按表单输入落库').toBe('E2E 测试流程定义');
+    expect(created!.config?.nodes?.length, '开始/审批/结束三节点配置应完整落库').toBe(3);
   });
 
   test('01-03 流程定义筛选功能可用', async ({ page }) => {
