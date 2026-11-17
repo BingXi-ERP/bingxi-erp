@@ -1211,6 +1211,17 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'API网关', icon: 'Setting', permission: 'users:read', requiresAuth: true }, // 该入口要求下方 meta.permission 列出的模块读权限键
       },
       {
+        path: 'system/payment-channels',
+        name: 'PaymentChannels',
+        component: () => import('@/views/system/payment-channels/index.vue'),
+        meta: {
+          title: '支付通道',
+          icon: 'Setting',
+          permission: 'payment-channels:read',
+          requiresAuth: true,
+        },
+      },
+      {
         path: 'system-update',
         name: 'SystemUpdate',
         component: () => import('@/views/system-update/index.vue'),
