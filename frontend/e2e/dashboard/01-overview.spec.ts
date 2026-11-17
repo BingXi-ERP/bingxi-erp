@@ -11,10 +11,40 @@ test.describe('仪表盘', () => {
   });
 
   test('仪表盘 KPI 统计卡片正常加载', async ({ page }) => {
+    // 导航前挂监听，取页面自身消费的那次概览响应做真值，避免二次请求与渲染之间的计数漂移。
+    // 概览由仪表盘挂载时调用 GET /dashboard/overview，八张统计卡逐卡绑定其整数字段。
+    const overviewResp = page.waitForResponse(
+      resp => resp.url().includes('/dashboard/overview') && resp.status() === 200,
+      { timeout: 30000 }
+    );
     await page.goto('/dashboard');
     await expect(page.locator('.el-card, .kpi-card, [class*="stat"]').first()).toBeVisible({
       timeout: 30000,
     });
+
+    // 原断言只认卡片可见：后端把计数回落成零或卡片绑错键时同样绿。这里逐卡与真实出参比对，
+    // 缺键与非整数一律判红，不做零值兜底。
+    const overview = (await (await overviewResp).json()).data as Record<string, unknown>;
+    expect(overview && typeof overview === 'object', '概览响应必须携带 data 信封').toBe(true);
+    const kpiBindings: Array<[string, string]> = [
+      ['面料总数', 'fabric_count'],
+      ['本月订单', 'total_orders'],
+      ['客户总数', 'customer_count'],
+      ['今日订单', 'today_orders'],
+      ['待处理订单', 'pending_orders'],
+      ['库存预警', 'low_stock_count'],
+    ];
+    for (const [label, key] of kpiBindings) {
+      const raw = overview[key];
+      const expected = Number(raw);
+      if (!Number.isInteger(expected) || expected < 0) {
+        throw new Error(`${label}的概览字段 ${key} 应为非负整数，实际=${JSON.stringify(raw)}`);
+      }
+      await expect(
+        page.locator('.stat-card').filter({ hasText: label }).locator('.stat-value'),
+        `${label}卡片应与概览出参 ${key} 同值，后端=${expected}`
+      ).toHaveText(String(expected));
+    }
   });
 
   test('仪表盘销售趋势图正常加载', async ({ page }) => {

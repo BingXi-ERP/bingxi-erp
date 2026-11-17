@@ -188,6 +188,12 @@ test.describe.serial('123-A advanced 报表与推荐族契约（AI 限流桶一�
     expect(Array.isArray(body.data)).toBe(true);
     expect(typeof body.total_count).toBe('number');
     expect(body.total_count).toBeGreaterThanOrEqual(0);
+    // 原断言只认 data 是数组、total_count 是非负数字：行数被写死或漏算时照样绿。
+    // 后端 total_count 直接取自行数，data 是同一批明细行逐条映射，故汇总必须与明细条数守恒。
+    expect(
+      body.total_count,
+      `报表汇总行数应等于明细行数，实际 total_count=${body.total_count} 明细=${body.data.length}`
+    ).toBe(body.data.length);
 
     const missing = await apiCallExpectFail(page, 'POST', '/advanced/reports/execute', {
       template_code: '__e2e_no_such_template__',
