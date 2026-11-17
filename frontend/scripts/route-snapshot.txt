@@ -1,4 +1,4 @@
-# layers=8 endpoints=1810
+# layers=8 endpoints=1816
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -197,6 +197,7 @@ GET	/api/v1/erp/ar-reconciliations-enhanced/disputes	ar_reconciliation_enhanced_
 GET	/api/v1/erp/ar-reconciliations-enhanced/disputes/*	ar_reconciliation_enhanced_handler::get_dispute	finance
 GET	/api/v1/erp/ar-reconciliations/*	ar_reconciliation_handler::get_reconciliation	finance
 GET	/api/v1/erp/ar-reconciliations/*/print	print_handler::ar_reconciliation_print_docx	finance
+GET	/api/v1/erp/ar-reconciliations/*/print-xlsx	print_xlsx_finance_handler::ar_reconciliation_print_xlsx	finance
 GET	/api/v1/erp/ar/collections/*/print	print_handler::ar_collection_print_docx	finance
 GET	/api/v1/erp/ar/invoices	ar_invoice_handler::list_ar_invoices	finance
 GET	/api/v1/erp/ar/invoices/*	ar_invoice_handler::get_ar_invoice	finance
@@ -887,8 +888,10 @@ GET	/api/v1/erp/sales/orders/*	sales_order_handler::get_order	sales
 GET	/api/v1/erp/sales/orders/*/deliveries	sales_order_handler::get_order_deliveries	sales
 GET	/api/v1/erp/sales/orders/*/deliveries/*/codex-sheet	print_handler::sales_delivery_codex_sheet_xlsx	sales
 GET	/api/v1/erp/sales/orders/*/deliveries/*/print	print_handler::sales_delivery_print_docx	sales
+GET	/api/v1/erp/sales/orders/*/deliveries/*/print-xlsx	print_handler::sales_delivery_print_xlsx	sales
 GET	/api/v1/erp/sales/orders/*/history	sales_order_handler::get_order_history	sales
 GET	/api/v1/erp/sales/orders/*/print	print_handler::sales_order_print_docx	sales
+GET	/api/v1/erp/sales/orders/*/print-xlsx	print_handler::sales_order_print_xlsx	sales
 GET	/api/v1/erp/sales/orders/export	sales_order_handler::export_orders	sales
 GET	/api/v1/erp/sales/orders/generate-no	sales_order_handler::generate_order_no	sales
 GET	/api/v1/erp/sales/orders/statistics	sales_order_handler::get_order_statistics	sales
