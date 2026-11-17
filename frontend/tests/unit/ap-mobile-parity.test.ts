@@ -5,6 +5,7 @@ import PaymentRequestTab from '@/views/ap/tabs/PaymentRequestTab.vue';
 import PaymentTab from '@/views/ap/tabs/PaymentTab.vue';
 import ReconciliationTab from '@/views/ap/tabs/ReconciliationTab.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
+import { getSupplierList } from '@/api/supplier';
 import zhCN from '@/locales/zh-CN';
 
 const api = vi.hoisted(() => ({
@@ -31,7 +32,7 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('@/api/ap', () => api);
 vi.mock('@/api/supplier', () => ({
-  getSupplierList: vi.fn().mockResolvedValue({ data: { items: [] } }),
+  getSupplierList: vi.fn(),
 }));
 vi.mock('@/composables/useBreakpoint', async () => {
   const { ref } = await import('vue');
@@ -87,15 +88,34 @@ const reconciliations = ['0.00', '12.50', '-12.50'].map((difference_amount, inde
   difference_amount,
   status: 'pending',
 }));
+const supplierOptions = [
+  {
+    id: 51,
+    supplier_code: 'SUP-51',
+    supplier_name: 'Test supplier',
+    status: 'ACTIVE',
+  },
+];
+const supplierListResponse = {
+  code: 200,
+  message: 'ok',
+  data: { items: supplierOptions, total: supplierOptions.length },
+};
+const requestListResponse = { data: { items: requests } };
+const paymentListResponse = { data: { items: payments } };
+const reconciliationListResponse = { data: { items: reconciliations } };
+const invoiceListResponse = { data: [] };
 const wrappers: VueWrapper[] = [];
 const common = zhCN.common;
 const labels = zhCN.apModule;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  api.getAPPaymentRequestList.mockResolvedValue({ data: { items: requests } });
-  api.getAPPaymentList.mockResolvedValue({ data: { items: payments } });
-  api.getAPReconciliationList.mockResolvedValue({ data: { items: reconciliations } });
+  api.getAPPaymentRequestList.mockResolvedValue(requestListResponse);
+  api.getAPPaymentList.mockResolvedValue(paymentListResponse);
+  api.getAPReconciliationList.mockResolvedValue(reconciliationListResponse);
+  api.getUnverifiedAPInvoices.mockResolvedValue(invoiceListResponse);
+  vi.mocked(getSupplierList).mockResolvedValue(supplierListResponse);
 });
 afterEach(() => {
   for (const wrapper of wrappers.splice(0)) wrapper.unmount();
@@ -161,6 +181,7 @@ for (const width of [320, 767, 768, 1280]) {
         });
         await button(dialog, common.cancel).trigger('click');
         expect(dialog.props('modelValue')).toBe(false);
+        await flushPromises();
       }
       expect(list[2].findAll('button').map(item => item.text())).not.toContain(common.edit);
       expect(api.createAPPaymentRequest).not.toHaveBeenCalled();
