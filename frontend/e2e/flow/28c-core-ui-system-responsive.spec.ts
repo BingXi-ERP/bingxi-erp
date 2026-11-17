@@ -106,6 +106,15 @@ test.describe('核心业务流程真实 UI 交互验证', () => {
     await page.locator('body').waitFor({ state: 'visible', timeout: 10_000 });
     const bodyVisible = await page.locator('body').isVisible();
     expect(bodyVisible).toBe(true);
+    // 假绿加固：原来只断言 body 可见，页面被固定宽元素撑破时 body 依旧可见，照样误判通过。
+    // 补一条真实的文档宽度数值比较，横向溢出超过容差即判红，覆盖竖屏矩阵未取的这个窄屏宽度。
+    const overflow768 = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(
+      overflow768,
+      `768px 窄屏 dashboard 不应整页横向溢出撑破，实测溢出 ${overflow768}px`
+    ).toBeLessThanOrEqual(2);
     await page.setViewportSize({ width: 1280, height: 800 });
   });
 
@@ -116,6 +125,15 @@ test.describe('核心业务流程真实 UI 交互验证', () => {
     await page.locator('body').waitFor({ state: 'visible', timeout: 10_000 });
     const bodyVisible = await page.locator('body').isVisible();
     expect(bodyVisible).toBe(true);
+    // 假绿加固：body 恒可见证明不了窄屏没被撑破，补文档宽度的真实数值比较。
+    // 这个宽度落在竖屏矩阵已覆盖档位之间，单独钉住主流手机宽度的整页横向溢出。
+    const overflow375 = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    );
+    expect(
+      overflow375,
+      `375px 竖屏 dashboard 不应整页横向溢出撑破，实测溢出 ${overflow375}px`
+    ).toBeLessThanOrEqual(2);
     await page.setViewportSize({ width: 1280, height: 800 });
   });
 
