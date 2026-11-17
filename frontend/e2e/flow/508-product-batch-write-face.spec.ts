@@ -107,7 +107,7 @@ test.describe('508 产品档案批量写面：批量创建/更新/删除三端�
     expect(got.data, '[508-01] 单条回读应命中').toBeTruthy();
     expect(got.data.code, '[508-01] 回读 code 应一致').toBe(rows[0].code);
     expect(got.data.name, '[508-01] 回读 name 应一致').toBe(rows[0].name);
-    expect(got.data.status, '[508-01] 回读 status 应为在册态').toBeTruthy();
+    expect(got.data.status, '[508-01] 回读 status 应为在册态').toBe('active');
 
     await tryCleanup(
       page,
