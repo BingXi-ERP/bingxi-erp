@@ -177,6 +177,7 @@ pub mod scheduling_handler;
 pub mod field_permission_handler;
 // 通用打印模块
 pub mod print_handler;
+pub mod print_xlsx_finance_handler;
 pub mod print_target_handler;
 pub mod print_task_handler;
 // 公司档案(单例抬头主数据,打印 letterhead 的数据源)
