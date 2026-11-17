@@ -22,8 +22,8 @@
 //! 避免 axum matchit 把 "run-provision"/"writeoffs" 当 :id 匹配。
 
 use axum::{
-    Router,
     routing::{get, post},
+    Router,
 };
 
 use crate::container::AppState;
@@ -65,5 +65,10 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/writeoffs/{id}/print",
             get(crate::handlers::print_handler::bad_debt_writeoff_print_docx),
+        )
+        // 坏账核销单 xlsx 打印腿（与 docx 版同路径族，版式走 XlsxRichTable 富表格）
+        .route(
+            "/writeoffs/{id}/print-xlsx",
+            get(crate::handlers::print_xlsx_finance_handler::bad_debt_writeoff_print_xlsx),
         )
 }
