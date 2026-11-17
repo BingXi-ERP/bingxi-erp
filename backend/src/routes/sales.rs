@@ -69,6 +69,10 @@ fn sales_order_delivery_report_routes() -> Router<AppState> {
             get(print_handler::sales_delivery_print_docx),
         )
         .route(
+            "/orders/{id}/deliveries/{delivery_id}/print-xlsx",
+            get(print_handler::sales_delivery_print_xlsx),
+        )
+        .route(
             "/orders/statistics",
             get(sales_order_handler::get_order_statistics),
         )
@@ -79,6 +83,10 @@ fn sales_order_delivery_report_routes() -> Router<AppState> {
         .route(
             "/orders/{id}/print",
             get(print_handler::sales_order_print_docx),
+        )
+        .route(
+            "/orders/{id}/print-xlsx",
+            get(print_handler::sales_order_print_xlsx),
         )
         .route("/orders/export", get(sales_order_handler::export_orders))
         .route(

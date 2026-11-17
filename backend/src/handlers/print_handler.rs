@@ -590,6 +590,68 @@ pub async fn sales_delivery_print_docx(
     record_print_audit(&state, &auth, "sales_delivery", delivery_id);
     Ok(resp)
 }
+
+/// 销售域 xlsx 打印腿审计（与 docx 版同一事件形状，格式标记 xlsx）
+fn record_print_xlsx_audit(state: &AppState, auth: &AuthContext, doc_type: &str, doc_id: i32) {
+    let event = AuditEvent {
+        user_id: Some(auth.user_id),
+        username: Some(auth.username.clone()),
+        operation_type: OperationType::Print,
+        severity: Severity::Info,
+        resource_type: Some(doc_type.to_string()),
+        resource_id: Some(doc_id.to_string()),
+        resource_name: Some(format!("{}_print.xlsx", doc_type)),
+        description: Some(format!(
+            "用户 {} 打印 {} #{} (xlsx)",
+            auth.username, doc_type, doc_id
+        )),
+        request_method: Some("GET".to_string()),
+        request_path: Some(format!("/api/v1/erp/{}/{}", doc_type, doc_id)),
+        before_snapshot: None,
+        after_snapshot: Some(serde_json::json!({
+            "doc_type": doc_type,
+            "doc_id": doc_id,
+            "format": "xlsx",
+        })),
+    };
+    let svc = Arc::new(AuditLogService::new(state.db.clone()));
+    svc.record_async(event, None);
+}
+
+/// 销售订单 xlsx 打印（doc_type sales_order，路由 /orders/{id}/print-xlsx）。
+/// 行级归属门与 docx 打印同一判定器（取数入口生效），版式铺排集中在
+/// `SalesXlsxPrintDoc::to_xlsx_table`（缸号块合并版式待 xlsx 引擎增强车道升级）。
+pub async fn sales_order_print_xlsx(
+    Path(doc_id): Path<i32>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    let service = PrintService::new(state.db.clone());
+    let scope_ctx = auth.to_data_scope_context();
+    let doc = service
+        .get_sales_order_xlsx_print_data(&scope_ctx, doc_id)
+        .await?;
+    let resp = crate::utils::xlsx_export::build_xlsx_response(&doc.to_xlsx_table(), &doc.filename)?;
+    record_print_xlsx_audit(&state, &auth, "sales_order", doc_id);
+    Ok(resp)
+}
+
+/// 销售发货单 xlsx 打印（doc_type sales_delivery，路由 /orders/{id}/deliveries/{delivery_id}/print-xlsx）。
+/// 与 docx 版同形的两段路径 tuple 提取；行级归属门与 docx 打印同一判定器。
+pub async fn sales_delivery_print_xlsx(
+    Path((_order_id, delivery_id)): Path<(i32, i32)>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    let service = PrintService::new(state.db.clone());
+    let scope_ctx = auth.to_data_scope_context();
+    let doc = service
+        .get_sales_delivery_xlsx_print_data(&scope_ctx, delivery_id)
+        .await?;
+    let resp = crate::utils::xlsx_export::build_xlsx_response(&doc.to_xlsx_table(), &doc.filename)?;
+    record_print_xlsx_audit(&state, &auth, "sales_delivery", delivery_id);
+    Ok(resp)
+}
 pub async fn sales_quotation_print_docx(
     Path(doc_id): Path<i64>,
     State(state): State<AppState>,
