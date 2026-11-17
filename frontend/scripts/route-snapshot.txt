@@ -1,4 +1,4 @@
-# layers=8 endpoints=1809
+# layers=8 endpoints=1814
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -424,6 +424,7 @@ GET	/api/v1/erp/custom-orders/*/after-sales/print	print_handler::after_sales_pri
 GET	/api/v1/erp/custom-orders/*/issues	custom_order_handler::list_quality_issues	custom_order
 GET	/api/v1/erp/custom-orders/*/nodes	custom_order_handler::get_timeline	custom_order
 GET	/api/v1/erp/custom-orders/*/print	print_handler::custom_order_print_docx	custom_order
+GET	/api/v1/erp/custom-orders/*/print-xlsx	print_handler::custom_order_print_xlsx	custom_order
 GET	/api/v1/erp/custom-orders/*/timeline	custom_order_handler::get_timeline	custom_order
 GET	/api/v1/erp/custom-orders/issues/*/print	print_handler::quality_issue_print_docx	custom_order
 GET	/api/v1/erp/customer-shares/by-customer	customer_team_share_handler::list_customer_shares	customer_team_share
@@ -883,8 +884,10 @@ GET	/api/v1/erp/sales/orders	sales_order_handler::list_orders	sales
 GET	/api/v1/erp/sales/orders/*	sales_order_handler::get_order	sales
 GET	/api/v1/erp/sales/orders/*/deliveries	sales_order_handler::get_order_deliveries	sales
 GET	/api/v1/erp/sales/orders/*/deliveries/*/print	print_handler::sales_delivery_print_docx	sales
+GET	/api/v1/erp/sales/orders/*/deliveries/*/print-xlsx	print_handler::sales_delivery_print_xlsx	sales
 GET	/api/v1/erp/sales/orders/*/history	sales_order_handler::get_order_history	sales
 GET	/api/v1/erp/sales/orders/*/print	print_handler::sales_order_print_docx	sales
+GET	/api/v1/erp/sales/orders/*/print-xlsx	print_handler::sales_order_print_xlsx	sales
 GET	/api/v1/erp/sales/orders/export	sales_order_handler::export_orders	sales
 GET	/api/v1/erp/sales/orders/generate-no	sales_order_handler::generate_order_no	sales
 GET	/api/v1/erp/sales/orders/statistics	sales_order_handler::get_order_statistics	sales
@@ -892,6 +895,7 @@ GET	/api/v1/erp/sales/sales-contracts	sales_contract_handler::list_contracts	sal
 GET	/api/v1/erp/sales/sales-contracts/*	sales_contract_handler::get_contract	sales
 GET	/api/v1/erp/sales/sales-contracts/*/items	sales_contract_handler::get_contract_items	sales
 GET	/api/v1/erp/sales/sales-contracts/*/print	print_handler::sales_contract_print_docx	sales
+GET	/api/v1/erp/sales/sales-contracts/*/print-xlsx	print_handler::sales_contract_print_xlsx	sales
 GET	/api/v1/erp/sales/sales-contracts/export	sales_contract_handler::export_contracts	sales
 GET	/api/v1/erp/sales/sales-contracts/preview-from-order/*	sales_contract_handler::preview_convert_from_order	sales
 GET	/api/v1/erp/sales/sales-prices	sales_price_handler::list_prices	sales
@@ -902,6 +906,7 @@ GET	/api/v1/erp/sales/sales-returns	list_sales_returns	sales_return_handler
 GET	/api/v1/erp/sales/sales-returns/*	get_sales_return	sales_return_handler
 GET	/api/v1/erp/sales/sales-returns/*/items	list_return_items	sales_return_handler
 GET	/api/v1/erp/sales/sales-returns/*/print	crate::handlers::print_handler::sales_return_print_docx	sales_return_handler
+GET	/api/v1/erp/sales/sales-returns/*/print-xlsx	crate::handlers::print_handler::sales_return_print_xlsx	sales_return_handler
 GET	/api/v1/erp/scanner/history	barcode_scanner_handler::scan_history	analytics
 GET	/api/v1/erp/scanner/scan-inventory	barcode_scanner_handler::scan_inventory	analytics
 GET	/api/v1/erp/scanner/scan-statistics	barcode_scanner_handler::scan_statistics	analytics

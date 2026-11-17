@@ -202,6 +202,10 @@ pub fn sales_contracts() -> Router<AppState> {
             "/sales-contracts/{id}/print",
             get(print_handler::sales_contract_print_docx),
         )
+        .route(
+            "/sales-contracts/{id}/print-xlsx",
+            get(print_handler::sales_contract_print_xlsx),
+        )
 }
 
 /// 销售价格路由（path 前缀 /sales-prices）

@@ -652,6 +652,59 @@ pub async fn sales_delivery_print_xlsx(
     record_print_xlsx_audit(&state, &auth, "sales_delivery", delivery_id);
     Ok(resp)
 }
+
+/// 销售合同 xlsx 打印（doc_type sales_contract，路由 /sales-contracts/{id}/print-xlsx）。
+/// 行级归属门与 docx 打印同一判定器（取数入口生效）；合同明细整表清空是合法状态，
+/// 取数腿允许零明细输出，主表 KV 与汇总照实呈现。
+pub async fn sales_contract_print_xlsx(
+    Path(doc_id): Path<i32>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    let service = PrintService::new(state.db.clone());
+    let scope_ctx = auth.to_data_scope_context();
+    let doc = service
+        .get_sales_contract_xlsx_print_data(&scope_ctx, doc_id)
+        .await?;
+    let resp = crate::utils::xlsx_export::build_xlsx_response(&doc.to_xlsx_table(), &doc.filename)?;
+    record_print_xlsx_audit(&state, &auth, "sales_contract", doc_id);
+    Ok(resp)
+}
+
+/// 销售退货单 xlsx 打印（doc_type sales_return，路由 /sales-returns/{id}/print-xlsx）。
+/// 行级归属门与 docx 打印同一判定器（取数入口生效）。
+pub async fn sales_return_print_xlsx(
+    Path(doc_id): Path<i32>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    let service = PrintService::new(state.db.clone());
+    let scope_ctx = auth.to_data_scope_context();
+    let doc = service
+        .get_sales_return_xlsx_print_data(&scope_ctx, doc_id)
+        .await?;
+    let resp = crate::utils::xlsx_export::build_xlsx_response(&doc.to_xlsx_table(), &doc.filename)?;
+    record_print_xlsx_audit(&state, &auth, "sales_return", doc_id);
+    Ok(resp)
+}
+
+/// 定制订单 xlsx 打印（doc_type custom_order，路由 /custom-orders/{id}/print-xlsx）。
+/// custom_orders 主键 i64，与 docx 版同形按 i64 提取后送 i32 取数腿；
+/// 行级归属门与 docx 打印同一判定器（取数入口生效）。
+pub async fn custom_order_print_xlsx(
+    Path(doc_id): Path<i64>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    let service = PrintService::new(state.db.clone());
+    let scope_ctx = auth.to_data_scope_context();
+    let doc = service
+        .get_custom_order_xlsx_print_data(&scope_ctx, doc_id as i32)
+        .await?;
+    let resp = crate::utils::xlsx_export::build_xlsx_response(&doc.to_xlsx_table(), &doc.filename)?;
+    record_print_xlsx_audit(&state, &auth, "custom_order", doc_id as i32);
+    Ok(resp)
+}
 pub async fn sales_quotation_print_docx(
     Path(doc_id): Path<i64>,
     State(state): State<AppState>,
