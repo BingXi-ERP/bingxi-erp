@@ -655,4 +655,117 @@ impl super::PrintService {
             image: None,
         })
     }
+
+    /// 应收对账单 xlsx 导出（规整表格版；缸号块合并版式待 xlsx 引擎富表格合并入干后升级）。
+    /// 存什么：主表四账务字段与单据头 + 明细行（ar_reconciliation_items 全量）。
+    /// 数据从哪来：复用 get_ar_reconciliation_print_data 的行级归属门取数（英文键），
+    /// 明细由本函数按 reconciliation_id 全量补查。
+    pub(super) async fn build_ar_reconciliation_xlsx(
+        &self,
+        id: i32,
+    ) -> Result<Vec<u8>, AppError> {
+        let print_data = self.get_ar_reconciliation_print_data(id).await?;
+        use crate::models::ar_reconciliation_item;
+        let items = ar_reconciliation_item::Entity::find()
+            .filter(ar_reconciliation_item::Column::ReconciliationId.eq(id))
+            .order_by_asc(ar_reconciliation_item::Column::Id)
+            .all(&*self.db)
+            .await?;
+
+        let table = build_recon_xlsx_table(&print_data.data, &items);
+        crate::utils::xlsx_export::build_xlsx(&table)
+    }
+}
+
+/// 对账明细 item_type 中文案（写入方词表见 models/ar_reconciliation_item.rs ItemType）。
+fn recon_item_label(item_type: &str) -> &'static str {
+    match item_type {
+        "OPENING" => "期初余额",
+        "INVOICE" => "销售发票",
+        "RECEIPT" => "收款单",
+        "ADJUSTMENT" => "调整",
+        "DISPUTE" => "争议",
+        _ => "其他",
+    }
+}
+
+/// 匹配状态中文案（写入方词表 MatchStatus）。
+fn recon_match_label(match_status: &str) -> &'static str {
+    match match_status {
+        "UNMATCHED" => "未匹配",
+        "MATCHED" => "已匹配",
+        "PARTIAL" => "部分匹配",
+        "DISPUTED" => "争议中",
+        "CANCELLED" => "已取消",
+        _ => "其他",
+    }
+}
+
+/// 组装应收对账单 xlsx 表（纯函数，可单测）。
+/// 行布局：标题行 → 单据头行 → 账务四字段行 → 明细表头 → 明细行×N → 合计行。
+fn build_recon_xlsx_table(
+    data: &HashMap<String, serde_json::Value>,
+    items: &[crate::models::ar_reconciliation_item::Model],
+) -> crate::utils::xlsx_export::XlsxTable {
+    let get = |key: &str| {
+        data.get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string()
+    };
+    let sheet_name = "应收对账单".to_string();
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    rows.push(vec![format!(
+        "应收对账单 {}（客户：{}）",
+        get("reconciliation_no"),
+        get("customer_name")
+    )]);
+    rows.push(vec![format!(
+        "对账日期：{}    对账期间：{} ~ {}",
+        get("reconciliation_date"),
+        get("period_start"),
+        get("period_end")
+    )]);
+    rows.push(vec![format!(
+        "上单结余：{}    本期应收合计：{}    本期实收合计：{}    期末欠款：{}    状态：{}",
+        get("opening_balance"),
+        get("total_invoices"),
+        get("total_collections"),
+        get("closing_balance"),
+        get("reconciliation_status")
+    )]);
+    for item in items {
+        rows.push(vec![
+            recon_item_label(&item.item_type).to_string(),
+            item.document_no.clone().unwrap_or_default(),
+            item.document_date
+                .map(|d| d.format("%Y-%m-%d").to_string())
+                .unwrap_or_default(),
+            item.dye_lot_no.clone().unwrap_or_default(),
+            item.color_no.clone().unwrap_or_default(),
+            item.piece_no.clone().unwrap_or_default(),
+            item.amount.to_string(),
+            item.matched_amount
+                .map(|m| m.to_string())
+                .unwrap_or_else(|| "0".to_string()),
+            recon_match_label(&item.match_status).to_string(),
+            item.remarks.clone().unwrap_or_default(),
+        ]);
+    }
+    crate::utils::xlsx_export::XlsxTable {
+        sheet_name,
+        headers: vec![
+            "类型".to_string(),
+            "单据号".to_string(),
+            "单据日期".to_string(),
+            "缸号".to_string(),
+            "色号".to_string(),
+            "匹号".to_string(),
+            "金额(元)".to_string(),
+            "已核销(元)".to_string(),
+            "匹配状态".to_string(),
+            "备注".to_string(),
+        ],
+        rows,
+    }
 }
