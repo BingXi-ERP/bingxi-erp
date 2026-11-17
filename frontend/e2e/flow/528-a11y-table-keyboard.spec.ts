@@ -99,15 +99,18 @@ test.describe('产品列表无障碍', () => {
     await tabUntilFocused(page, pageSizeSelect, '分页每页条数下拉');
     await expect(pageSizeSelect, 'Tab 遍历应能聚焦分页下拉').toBeFocused();
 
-    // Enter 展开选项面板作为键盘触发的真实判据；面板 teleport 到 body，按可见面板计数。
-    await expect(page.locator('.el-select-dropdown:visible'), '展开前应无可见下拉面板').toHaveCount(
-      0
+    // Enter 展开选项面板作为键盘触发的真实判据；el-select 的 combobox input 把
+    // dropdownMenuVisible 同步到 aria-expanded（element-plus select2.mjs），无障碍
+    // 测试以 ARIA 展开态为准（不写面板裸类名，口径归 ui-helpers 助手族）。
+    await expect(pageSizeSelect, '展开前 combobox aria-expanded 应为 false').toHaveAttribute(
+      'aria-expanded',
+      'false'
     );
     await page.keyboard.press('Enter');
-    await expect(
-      page.locator('.el-select-dropdown:visible'),
-      'Enter 应展开分页下拉面板'
-    ).not.toHaveCount(0);
+    await expect(pageSizeSelect, 'Enter 应展开下拉且 aria-expanded 同步为 true').toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
     await page.keyboard.press('Escape');
   });
 });
