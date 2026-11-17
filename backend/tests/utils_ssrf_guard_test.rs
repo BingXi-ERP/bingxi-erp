@@ -133,7 +133,7 @@ fn test_blocked_hostname_public_allowed() {
 fn test_validate_url_invalid_format() {
     let result = validate_url("not-a-url");
     assert!(result.is_err());
-    // 解析失败的原文携带 url crate 错误详情，只锁错误族与前缀（ssrf_guard.rs:36）
+    // 解析失败的原文携带 url crate 错误详情，只锁错误族与前缀
     let err = result.unwrap_err();
     assert_eq!(err.error_code(), "VALIDATION_ERROR");
     assert!(err.to_string().contains("URL 格式无效"), "实际: {err}");
@@ -145,13 +145,13 @@ fn test_validate_url_disallowed_scheme() {
     assert!(result.is_err());
     assert!(
         matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "URL 协议不允许：file（仅允许 http/https）"),
-        "file 协议必须被协议白名单拒绝（ssrf_guard.rs:42）"
+        "file 协议必须被协议白名单拒绝"
     );
     let result = validate_url("gopher://example.com");
     assert!(result.is_err());
     assert!(
         matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "URL 协议不允许：gopher（仅允许 http/https）"),
-        "gopher 协议必须被协议白名单拒绝（ssrf_guard.rs:42）"
+        "gopher 协议必须被协议白名单拒绝"
     );
 }
 
@@ -161,7 +161,7 @@ fn test_validate_url_localhost_blocked() {
     assert!(result.is_err());
     assert!(
         matches!(result.unwrap_err(), AppError::ValidationError(ref m) if m == "Webhook URL 主机名被禁止：localhost（可能指向本地或私有网络）"),
-        "localhost 必须被主机名黑名单拒绝（ssrf_guard.rs:56）"
+        "localhost 必须被主机名黑名单拒绝"
     );
 }
 
@@ -171,7 +171,7 @@ fn test_validate_url_loopback_ip_blocked() {
     assert!(result.is_err());
     assert!(
         matches!(result.unwrap_err(), AppError::ValidationError(ref m) if m == "Webhook URL 指向被禁止的 IP 地址：127.0.0.1"),
-        "loopback IP 必须被 IP 黑名单拒绝（ssrf_guard.rs:65）"
+        "loopback IP 必须被 IP 黑名单拒绝"
     );
 }
 
@@ -206,7 +206,7 @@ fn test_validate_url_metadata_service_blocked() {
     assert!(result.is_err());
     assert!(
         matches!(result.unwrap_err(), AppError::ValidationError(ref m) if m == "Webhook URL 指向被禁止的 IP 地址：169.254.169.254"),
-        "云元数据 IP 必须被 IP 黑名单拒绝（ssrf_guard.rs:65）"
+        "云元数据 IP 必须被 IP 黑名单拒绝"
     );
 }
 
