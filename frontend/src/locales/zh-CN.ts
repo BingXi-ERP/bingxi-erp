@@ -556,6 +556,7 @@ export default {
       printTemplates: '打印模板',
       printTargets: '打印目标',
       apiGateway: 'API 网关',
+      paymentChannels: '支付通道',
       systemUpdate: '系统更新',
       advanced: '高级设置',
       notification: '通知管理',

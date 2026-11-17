@@ -9,6 +9,7 @@ use super::error::AppError;
 
 const PREFIX: &str = "pc:v1:";
 const NONCE_LEN: usize = 12;
+#[cfg(test)]
 const TAG_LEN: usize = 16;
 
 fn unavailable() -> AppError {
@@ -43,7 +44,7 @@ fn encrypt(key: &[u8; 32], channel_code: &str, plaintext: &str) -> Result<String
         .map_err(|_| unavailable())?;
     let ciphertext = cipher
         .encrypt(
-            Nonce::from_slice(&nonce),
+            &Nonce::from(nonce),
             Payload {
                 msg: plaintext.as_bytes(),
                 aad: &aad(channel_code),
@@ -56,6 +57,8 @@ fn encrypt(key: &[u8; 32], channel_code: &str, plaintext: &str) -> Result<String
 }
 
 /// 显式传入密钥验证存储格式及认证标签；无明文兼容路径。
+/// 仅测试用于验证往返与认证；生产写入路径不读取密文。
+#[cfg(test)]
 pub fn decrypt(key: &[u8; 32], channel_code: &str, stored: &str) -> Result<String, AppError> {
     let payload = STANDARD
         .decode(stored.strip_prefix(PREFIX).ok_or_else(unavailable)?)
@@ -63,10 +66,11 @@ pub fn decrypt(key: &[u8; 32], channel_code: &str, stored: &str) -> Result<Strin
     if payload.len() < NONCE_LEN + TAG_LEN {
         return Err(unavailable());
     }
+    let nonce: [u8; NONCE_LEN] = payload[..NONCE_LEN].try_into().map_err(|_| unavailable())?;
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| unavailable())?;
     let plaintext = cipher
         .decrypt(
-            Nonce::from_slice(&payload[..NONCE_LEN]),
+            &Nonce::from(nonce),
             Payload {
                 msg: &payload[NONCE_LEN..],
                 aad: &aad(channel_code),

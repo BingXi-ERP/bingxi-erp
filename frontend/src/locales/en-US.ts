@@ -561,6 +561,7 @@ export default {
       printTemplates: 'Print Templates',
       printTargets: 'Print Targets',
       apiGateway: 'API Gateway',
+      paymentChannels: 'Payment Channels',
       systemUpdate: 'System Update',
       advanced: 'Advanced Settings',
       notification: 'Notification',
