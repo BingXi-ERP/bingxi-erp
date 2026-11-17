@@ -127,6 +127,22 @@ test.describe.serial('Shard 5: 系统管理 + 权限 + 合规', () => {
     );
     console.log(`[5-5] BPM 流程定义 items 长度=${defs?.items?.length ?? '(缺 key)'}`);
     expect(Array.isArray(defs?.items), 'BPM 流程定义应返回 items 数组').toBe(true);
+    // 流程定义为出厂种子在册，列表须非空，否则下面的逐行核对会空转退化成假绿。
+    expect(defs.items.length, 'BPM 流程定义种子应在册，列表不应为空').toBeGreaterThan(0);
+    // 逐行核对实体真源键与前端兼容别名：每行须有正整数主键、非空流程编码与名称，
+    // 且 process_key/process_name 与 code/name 同值（handler 同源映射），空壳行即判红。
+    for (const item of defs.items) {
+      const row = item as unknown as Record<string, unknown>;
+      expect(
+        Number.isInteger(row.id) && Number(row.id) > 0,
+        `流程定义 id 应为正整数，实际：${JSON.stringify(row.id)}`
+      ).toBe(true);
+      const code = String(row.code ?? '');
+      expect(code, '流程定义缺少非空实体真源键 code').not.toBe('');
+      expect(String(row.name ?? ''), '流程定义缺少非空实体真源键 name').not.toBe('');
+      expect(row.process_key, 'process_key 应与实体 code 同值').toBe(code);
+      expect(row.process_name, 'process_name 应与实体 name 同值').toBe(row.name);
+    }
   });
 
   test('5-6 BPM 审批任务', async ({ page }) => {
@@ -294,6 +310,31 @@ test.describe.serial('Shard 5: 系统管理 + 权限 + 合规', () => {
     // /dashboard/overview 对应聚合统计（dashboard_handler::get_dashboard_overview）。
     const dash = await apiCallRaw<Record<string, unknown>>(page, 'GET', '/dashboard/overview');
     expect(Object.keys(dash ?? {}).length, '仪表盘应返回非空统计对象').toBeGreaterThan(0);
+    // 概览出参是统计聚合对象，计数类字段为非负整数、金额类为十进制字符串，
+    // 逐字段核对类型与取值域，避免任意非空对象都能通过。
+    const countKeys = [
+      'total_products',
+      'total_warehouses',
+      'total_orders',
+      'low_stock_count',
+      'pending_orders',
+      'customer_count',
+      'today_orders',
+      'fabric_count',
+    ];
+    for (const key of countKeys) {
+      expect(
+        Number.isInteger(dash[key]) && (dash[key] as number) >= 0,
+        `仪表盘计数字段 ${key} 应为非负整数，实际：${JSON.stringify(dash[key])}`
+      ).toBe(true);
+    }
+    const amountKeys = ['total_sales', 'monthly_sales', 'inventory_total', 'inventory_weight_kg'];
+    for (const key of amountKeys) {
+      expect(
+        typeof dash[key] === 'string' && /^-?\d+(\.\d+)?$/.test(String(dash[key])),
+        `仪表盘金额字段 ${key} 应为十进制字符串，实际：${JSON.stringify(dash[key])}`
+      ).toBe(true);
+    }
   });
 
   test('5-15 系统健康状态', async ({ page }) => {

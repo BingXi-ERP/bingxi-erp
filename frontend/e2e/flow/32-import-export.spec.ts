@@ -75,6 +75,12 @@ test.describe.serial('P0 导入导出：真实 UI 点击验证', () => {
     const ext = path.extname(result.filename).toLowerCase();
     expect(['.xlsx', '.csv', '.json', '.xls']).toContain(ext);
     console.log(`[P0-导出-客户] ✅ 文件类型: ${ext}`);
+    // 客户导出后端固定走 xlsx 响应构造，落盘体必是 zip 容器（头两字节 PK）。
+    // 原断言只校扩展名与大小，改名的文本或网页同样能混过，这里用真实字节魔数钉死格式。
+    expect(
+      result.magic,
+      `[P0-导出-客户] 导出体必须是真 xlsx（PK 魔数），实际头两字节=${result.magic}`
+    ).toBe('PK');
   });
 
   // ===== 3. 供应商导出 =====
@@ -98,6 +104,11 @@ test.describe.serial('P0 导入导出：真实 UI 点击验证', () => {
     }
     expect(result.size, '导出文件应 >1KB').toBeGreaterThan(1024);
     console.log('[P0-导出-供应商] ✅ 导出验证完成');
+    // 供应商导出同样走 xlsx 响应构造，原断言只断大小未验内容，补真实字节魔数防错格式混过。
+    expect(
+      result.magic,
+      `[P0-导出-供应商] 导出体必须是真 xlsx（PK 魔数），实际头两字节=${result.magic}`
+    ).toBe('PK');
   });
 
   // ===== 4. 产品导入（模板下载→上传→结果验证） =====
@@ -260,5 +271,11 @@ test.describe.serial('P0 导入导出：真实 UI 点击验证', () => {
     const ext = path.extname(result.filename).toLowerCase();
     expect(['.xlsx', '.csv', '.json', '.xls']).toContain(ext);
     console.log(`[P0-导出-仓库] ✅ 文件类型: ${ext}`);
+    // 仓库导出固定走带水印的 xlsx 响应构造，原断言只看扩展名与大小，
+    // 补真实字节魔数，防止空壳文件或错格式文件以合规文件名蒙混过关。
+    expect(
+      result.magic,
+      `[P0-导出-仓库] 导出体必须是真 xlsx（PK 魔数），实际头两字节=${result.magic}`
+    ).toBe('PK');
   });
 });

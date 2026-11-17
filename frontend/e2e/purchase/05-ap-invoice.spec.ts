@@ -131,17 +131,48 @@ test.describe('05 AP 应付发票与付款', () => {
     // ② 后端回读列表确实落库新建单：发票编号后端自生成无法据以检索，改按本用例唯一可观测组合
     //   （发票金额 8000 ＋ 新建默认状态 DRAFT）检索，对齐既有绿用例 05-01/05-03 的回读口径。
     const created = await apiCallRaw<{
-      items: Array<{ id: number; amount: string | number; invoice_status: string }>;
+      items: Array<{
+        id: number;
+        amount: string | number;
+        invoice_status: string;
+        tax_amount: string | number;
+        paid_amount: string | number;
+        unpaid_amount: string | number;
+        invoice_date: string;
+        due_date: string;
+        invoice_type: string;
+      }>;
     }>(page, 'GET', '/ap/invoices?page=1&page_size=50');
     expect(
       created.items?.some(i => Number(i.amount) === 8000 && i.invoice_status === 'DRAFT'),
       `后端 /ap/invoices 未回读到新建单（amount=8000 且 DRAFT）`
     ).toBe(true);
+    // 加固：原存在性判定只要库里有一张金额 8000、状态 DRAFT 的历史单就会变绿，
+    // 无法证明本次提交的日期、税额、类型真的落库。用本用例逐字段录入的值精确定位
+    // 新建单，再逐列回读并校验金额恒等式，字段被后端忽略或改写即判红。
+    const typed = created.items?.find(
+      i =>
+        Number(i.amount) === 8000 &&
+        Number(i.tax_amount) === 0 &&
+        String(i.invoice_date).slice(0, 10) === '2026-08-01' &&
+        String(i.due_date).slice(0, 10) === '2026-08-31' &&
+        i.invoice_type === 'PURCHASE' &&
+        i.invoice_status === 'DRAFT'
+    );
+    expect(typed, '必须回读到本次提交的全部字段（金额/税额/两日期/类型/状态）').toBeTruthy();
+    expect(Number(typed!.amount), '应付金额逐列回读').toBe(8000);
+    expect(Number(typed!.tax_amount), '税额逐列回读（本次显式提交 0）').toBe(0);
+    expect(String(typed!.invoice_date).slice(0, 10), '应付日期逐列回读').toBe('2026-08-01');
+    expect(String(typed!.due_date).slice(0, 10), '到期日期逐列回读').toBe('2026-08-31');
+    expect(typed!.invoice_type, '应付类型逐列回读').toBe('PURCHASE');
+    // 守恒：草稿单尚无付款，已付必须为 0，未付等于应付减已付。
+    expect(Number(typed!.paid_amount), '草稿单已付金额必须为 0').toBe(0);
+    expect(Number(typed!.unpaid_amount), '未付=应付减已付（逐列守恒）').toBe(8000);
   });
 
   test('05-03 付款管理 Tab 可新建一笔付款', async ({ page }) => {
     // 前置：真实 API 建一张已审批付款申请（金额 5000，付款单从该申请只读派生）
-    const { request_no } = await seedApprovedPaymentRequest(page, '5000');
+    const { id: requestId, request_no } = await seedApprovedPaymentRequest(page, '5000');
 
     await page.goto('/ap');
     await page.getByRole('tab', { name: '付款管理' }).click();
@@ -157,5 +188,19 @@ test.describe('05 AP 应付发票与付款', () => {
     await expect(page.getByText('操作成功')).toBeVisible({ timeout: 30000 });
     // 列表刷新后该笔付款按金额列文本出现（PaymentTab.formatMoney 渲染 '5,000.00'）
     await expect(page.getByRole('row').filter({ hasText: '5,000.00' }).first()).toBeVisible();
+    // 加固：金额列文本可见只证明界面有此文本，既不能证明付款单确由本例申请派生，
+    // 也不能证明金额按申请派生值落库。按付款申请标识精确回查付款单，再逐列读取
+    // 付款金额与来源申请回指，校验金额派生守恒；来源错挂或金额漂移即判红。
+    const payList = await apiCallRaw<{
+      items: Array<{ id: number; request_id: number | null; payment_amount: string | number }>;
+    }>(page, 'GET', '/ap/payments?page=1&page_size=100');
+    const fromRequest = payList.items?.find(p => Number(p.request_id) === requestId);
+    expect(fromRequest, '必须回读到由本例付款申请派生的付款单').toBeTruthy();
+    const payDetail = await apiCallRaw<{
+      request_id: number | null;
+      payment_amount: string | number;
+    }>(page, 'GET', `/ap/payments/${fromRequest!.id}`);
+    expect(Number(payDetail.request_id), '付款单来源申请必须回指本例申请').toBe(requestId);
+    expect(Number(payDetail.payment_amount), '付款金额必须由申请金额派生为 5000').toBe(5000);
   });
 });

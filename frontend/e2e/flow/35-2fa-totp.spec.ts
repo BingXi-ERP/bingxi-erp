@@ -53,6 +53,21 @@ test.describe('P5.5 2FA TOTP', () => {
       `[35-totp] enable 应成功（secret=${secret?.slice(0, 8)}… code=${totpCode}）`
     ).toBeTruthy();
 
+    // 加固：enable 真实出参是 ApiResponse<bool>，data 逐字为布尔 true、message 为固定成功文案。
+    // 只判"响应非空"无法识别静默失败，必须把后端已暴露的两个真实值逐字锁死。
+    expect(enableResp.data, '[35-totp] enable 出参 data 应为布尔 true').toBe(true);
+    expect(enableResp.message, '[35-totp] enable 出参 message 应逐字符等于固定成功文案').toBe(
+      '双因素认证已成功开启'
+    );
+
+    // 加固：2FA 登录门控的前置是 is_totp_enabled 真正落库。/auth/me 由 UserInfo 原样回报该列，
+    // 若为 false 则前端恒判未开启、二次验证门控形同虚设，此处读取真实状态兜住持久化腿。
+    const meAfterEnable = await apiCall<{ is_totp_enabled: boolean }>(page, 'GET', '/auth/me');
+    expect(
+      meAfterEnable.data.is_totp_enabled,
+      '[35-totp] enable 后 /auth/me 应回报 is_totp_enabled 为 true'
+    ).toBe(true);
+
     await assertPageHealthy(page, collector, { consoleNoisePatterns: BROWSER_NETWORK_NOISE });
   });
 
@@ -111,6 +126,14 @@ test.describe('P5.5 2FA TOTP', () => {
     expect(
       codes.every(c => typeof c === 'string' && c.length > 0),
       `恢复码每条应为非空字符串，实际：${JSON.stringify(codes).slice(0, 200)}`
+    ).toBe(true);
+
+    // 加固：后端每次固定生成 10 条、每条 8 字符，字符集剔除易混淆的 0/O/1/I/L。
+    // 只判 length>0 与非空字符串会让"生成 1 条乱码"也假绿，按真实出参逐字锁死数量与格式。
+    expect(codes.length, '[35-totp] 每次应恰好生成 10 条恢复码').toBe(10);
+    expect(
+      codes.every(c => /^[A-HJ-NP-Z2-9]{8}$/.test(c)),
+      `[35-totp] 恢复码应为 8 位且不含易混淆字符，实际：${JSON.stringify(codes)}`
     ).toBe(true);
 
     // 恢复码应是一次性的

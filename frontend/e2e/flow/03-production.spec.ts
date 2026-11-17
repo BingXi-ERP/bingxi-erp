@@ -94,11 +94,11 @@ test.describe.serial('Shard 3: 染色生产闭环（缸号 14 态状态机）', 
     // 审批人取服务端会话身份（approve_recipe 无请求体）；本用例必须真审批而非停留草稿
     await apiCall(page, 'POST', `/production/dye-recipes/${id}/approve`);
 
-    const recipe = await apiCallRaw<{ status: string }>(
-      page,
-      'GET',
-      `/production/dye-recipes/${id}`
-    );
+    const recipe = await apiCallRaw<{
+      status: string;
+      approved_by?: number | null;
+      approved_at?: string | null;
+    }>(page, 'GET', `/production/dye-recipes/${id}`);
     const status = (recipe.status || '').toLowerCase();
     // submit 真实化后合法终态：已审核；异常路径：待审核/草稿/已停用
     expect([
@@ -113,6 +113,12 @@ test.describe.serial('Shard 3: 染色生产闭环（缸号 14 态状态机）', 
       'active',
       'inactive',
     ]).toContain(status ?? '(missing-status)');
+    // 上面的集合包含是恒真判据：草稿、待审核、已审核都在集合内，提交或审核任一步
+    // 静默不落库也会全绿。追加写后逐列回读：审核端点同步把状态置为小写 approved，
+    // 并写入审批人与审批时间，逐列精确比对，任一步未生效即判红。
+    expect(status, `审核后状态应为小写 approved，实际 ${recipe.status}`).toBe('approved');
+    expect(recipe.approved_by, '审批人应写入 approved_by，取服务端会话身份').not.toBeNull();
+    expect(recipe.approved_at, '审批时间应写入 approved_at').not.toBeNull();
   });
 
   test('3-3 创建染色批次（缸号）', async ({ page }) => {
@@ -219,6 +225,15 @@ test.describe.serial('Shard 3: 染色生产闭环（缸号 14 态状态机）', 
         'on_hold',
         'failed',
       ]).toContain((batch.status || '').trim());
+      // 上面的集合包含是恒真判据：后端只会回合法状态，任何一次流转失败停在旧态也不会
+      // 让断言为假。追加写后逐列回读：后端按流转规则同步把 status 置为本次提交的目标态，
+      // 逐步精确比对，任一步未真正推进即判红。
+      expect(
+        (batch.status || '').trim(),
+        `第 ${legalFlow.indexOf(step) + 1} 步流转应把缸号推进到 ${step.status}，实际回读 ${
+          batch.status || '(missing-status)'
+        }`
+      ).toBe(step.status);
     }
   });
 

@@ -195,6 +195,44 @@ test.describe('库存管理 - 03 库存调拨（正规页 /inventory-transfer）
       String(created[0].status).toLowerCase(),
       `新建调拨单初始态应为 pending，实际=${created[0].status}`
     ).toBe('pending');
+
+    // 写后逐列回读：列表命中与 pending 态只证明单据存在，不证明明细数量与四维已按录入落库。
+    // 以本用例 seed 色号（唯一 tag）从新建单据中锁定自己那张，避免并发下同仓他人单据串位。
+    let targetItems: Record<string, unknown>[] | null = null;
+    for (const t of created) {
+      const candidate = await apiCallRaw<unknown>(
+        page,
+        'GET',
+        `/inventory/transfers/${t.id}/items`
+      );
+      if (!Array.isArray(candidate)) {
+        throw new Error('调拨明细回读未返回数组，逐列核对无法成立，显式判红');
+      }
+      if (
+        (candidate as Array<Record<string, unknown>>).some(
+          it => String(it.color_no) === seed.seedColorNo
+        )
+      ) {
+        targetItems = candidate as Array<Record<string, unknown>>;
+        break;
+      }
+    }
+    if (targetItems === null) {
+      throw new Error('未能在新建调拨单中按 seed 色号定位本用例明细，写后回读前置不成立，显式判红');
+    }
+    expect(
+      targetItems.length,
+      `经正规页新建的调拨单应恰有 1 条明细，实际 ${targetItems.length}`
+    ).toBe(1);
+    const item = targetItems[0]!;
+    expect(Number(item.quantity), '调拨明细数量应等于界面录入的 5').toBe(5);
+    expect(Number(item.product_id), '调拨明细产品应等于界面选定的产品').toBe(seed.productId);
+    expect(String(item.color_no), '调拨明细色号应等于库存行下拉选中的 seed 色号').toBe(
+      seed.seedColorNo
+    );
+    expect(String(item.piece_no), '调拨明细匹号应等于匹号下拉选中的 seed 匹号').toBe(
+      seed.seedPieceNos[0]
+    );
   });
 
   test('审批待审批调拨单', async ({ page }) => {

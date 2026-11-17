@@ -28,6 +28,116 @@ import {
 } from '../flow/helpers';
 import { fillFieldByLabel, formItemByExactLabel, pickSelectIn } from '../flow/ui-helpers';
 
+/**
+ * 功能：把后端 Decimal 序列化出的十进制字符串或数字归一为 number，缺列或类型异常即显式判红。
+ * 调用方：本文件盘盈、盘亏写后逐列回读断言。
+ * 入参：row 为调整单或调整明细的出参对象；field 为后端真实 snake_case 列名；context 为失败定位前缀。
+ * 传给谁：调用方的 expect 比较左值。
+ * 存什么：不持久化。
+ * 存哪里：无。
+ */
+function adjDecimal(row: Record<string, unknown>, field: string, context: string): number {
+  const raw = row[field];
+  if (typeof raw !== 'string' && typeof raw !== 'number') {
+    throw new Error(
+      `库存调整写后回读：${context} 的字段 ${field} 不是十进制字符串或数字，` +
+        `实际类型=${typeof raw} 值=${JSON.stringify(raw)}——取不到真实列即判红，不兜底`
+    );
+  }
+  const num = Number(raw);
+  if (!Number.isFinite(num)) {
+    throw new Error(
+      `库存调整写后回读：${context} 的字段 ${field}=${JSON.stringify(raw)} 无法归一为数字`
+    );
+  }
+  return num;
+}
+
+/**
+ * 功能：提交前快照现有调整单 id，供提交后按差集定位本用例新建的单据。
+ * 调用方：本文件盘盈、盘亏用例在点击确定之前调用。
+ * 入参：page 会话。
+ * 传给谁：expectAdjustmentReadback 的 beforeIds 入参。
+ * 存什么：不持久化。
+ * 存哪里：读的是 GET /inventory/adjustments 的出参 adjustments 列表。
+ */
+async function snapshotAdjustmentIds(page: Page): Promise<Set<number>> {
+  const list = await apiCallRaw<{ adjustments?: unknown }>(
+    page,
+    'GET',
+    '/inventory/adjustments?page=1&page_size=100'
+  );
+  if (!Array.isArray(list.adjustments)) {
+    throw new Error(
+      '提交前 GET /inventory/adjustments 未返回 adjustments 数组，写后回读前置不成立，显式判红'
+    );
+  }
+  return new Set((list.adjustments as Array<Record<string, unknown>>).map(a => Number(a.id)));
+}
+
+/**
+ * 功能：写后逐列回读本次新建调整单，按明细调整前/调整后数量钉住库存守恒与调整方向。
+ * 调用方：本文件盘盈、盘亏用例在成功提示之后追加的可失败断言。
+ * 入参：page 会话；beforeIds 为提交前快照的调整单 id 集合；expectedType 为 increase 或 decrease；
+ *       expectedDelta 为带符号调整量（盘盈为正、盘亏为负）。
+ * 传给谁：本 helper 内的 expect 判定。
+ * 存什么：不持久化。
+ * 存哪里：读的是 GET /inventory/adjustments 与 /inventory/adjustments/{id} 的出参。
+ */
+async function expectAdjustmentReadback(
+  page: Page,
+  beforeIds: Set<number>,
+  expectedType: 'increase' | 'decrease',
+  expectedDelta: number
+): Promise<void> {
+  const list = await apiCallRaw<{ adjustments?: unknown }>(
+    page,
+    'GET',
+    '/inventory/adjustments?page=1&page_size=100'
+  );
+  if (!Array.isArray(list.adjustments)) {
+    throw new Error(
+      '写后 GET /inventory/adjustments 未返回 adjustments 数组，逐列回读无法成立，显式判红'
+    );
+  }
+  const absDelta = Math.abs(expectedDelta);
+  const created = (list.adjustments as Array<Record<string, unknown>>).find(
+    a =>
+      !beforeIds.has(Number(a.id)) &&
+      a.adjustment_type === expectedType &&
+      adjDecimal(a, 'total_quantity', '新建调整单总数量') === absDelta
+  );
+  if (!created) {
+    throw new Error(
+      `写后未能按差集加类型(${expectedType})加总数量(${absDelta})定位新建调整单，` +
+        `逐列回读前置不成立，显式判红`
+    );
+  }
+  const detail = await apiCallRaw<{ items?: unknown }>(
+    page,
+    'GET',
+    `/inventory/adjustments/${Number(created.id)}`
+  );
+  if (!Array.isArray(detail.items) || detail.items.length < 1) {
+    throw new Error('新建调整单详情未返回非空 items 数组，逐列回读无法成立，显式判红');
+  }
+  const item = (detail.items as Array<Record<string, unknown>>)[0]!;
+  const before = adjDecimal(item, 'quantity_before', '调整明细调整前数量');
+  const after = adjDecimal(item, 'quantity_after', '调整明细调整后数量');
+  expect(
+    adjDecimal(item, 'quantity', '调整明细数量'),
+    `调整明细数量应等于界面录入的 ${absDelta}`
+  ).toBe(absDelta);
+  expect(
+    after - before,
+    `库存守恒：调整后(${after}) 减 调整前(${before}) 应恰为带符号调整量 ${expectedDelta}`
+  ).toBe(expectedDelta);
+  expect(
+    adjDecimal(created, 'total_quantity', '新建调整单总数量'),
+    `调整单总数量应回读为 ${absDelta}`
+  ).toBe(absDelta);
+}
+
 test.describe('库存管理 - 02 库存调整', () => {
   test.beforeEach(async ({ page, context }) => {
     await applyAuthMocks(context);
@@ -98,8 +208,12 @@ test.describe('库存管理 - 02 库存调整', () => {
       .locator('textarea')
       .first()
       .fill('E2E 测试盘盈调整');
+    // 写后回读前置：提交前快照现有调整单 id，提交后按差集定位本用例新建单据
+    const beforeIds = await snapshotAdjustmentIds(page);
     await dialog.getByRole('button', { name: '确定' }).click();
     await expect(page.getByText('库存调整成功')).toBeVisible({ timeout: 30000 });
+    // 成功提示只证明请求被接受；逐列回读明细调整前/调整后数量并钉住守恒与方向
+    await expectAdjustmentReadback(page, beforeIds, 'increase', 50);
   });
 
   test('库存调整 - 盘亏', async ({ page }) => {
@@ -121,8 +235,12 @@ test.describe('库存管理 - 02 库存调整', () => {
       .locator('textarea')
       .first()
       .fill('E2E 测试盘亏调整');
+    // 写后回读前置：提交前快照现有调整单 id，提交后按差集定位本用例新建单据
+    const beforeIds = await snapshotAdjustmentIds(page);
     await dialog.getByRole('button', { name: '确定' }).click();
     await expect(page.getByText('库存调整成功')).toBeVisible({ timeout: 30000 });
+    // 成功提示只证明请求被接受；逐列回读明细调整前/调整后数量并钉住守恒与方向
+    await expectAdjustmentReadback(page, beforeIds, 'decrease', -30);
   });
 
   // ============================================================
