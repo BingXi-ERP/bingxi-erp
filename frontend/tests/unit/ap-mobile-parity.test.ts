@@ -125,8 +125,9 @@ afterEach(() => {
 async function render(
   component: typeof PaymentTab | typeof PaymentRequestTab | typeof ReconciliationTab
 ) {
+  // 本测试锁字段与动作等价，不验证 Element Plus 下拉在 jsdom 的内部选中态更新
   const wrapper = mount(component, {
-    global: { plugins: [ElementPlus], stubs: { teleport: true } },
+    global: { plugins: [ElementPlus], stubs: { teleport: true, ElSelect: true } },
   });
   wrappers.push(wrapper);
   await flushPromises();
