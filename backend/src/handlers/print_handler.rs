@@ -1922,3 +1922,136 @@ pub async fn copy_print_template(
         "打印模板复制成功",
     )))
 }
+
+/// 销售发货单面料细码单 xlsx 导出（路由 /orders/{id}/deliveries/{delivery_id}/codex-sheet）。
+///
+/// 鉴权与既有 docx 打印端点同一形态（AuthContext 提取器 + 同一路由前缀，权限键同为
+/// /api/v1/erp/sales/orders）；明细取数按 id 升序逐匹成行，产品名称走 LoaderTrait
+/// `load_one` 单次查询范式（禁止逐行再查），缸号聚合与版式全部收敛在
+/// [`crate::services::print_service::codex_sheet`]，本 handler 只装配入参。
+/// 货款总计大写金额与结余类占位金额本切片不接生成器/转换器，待 A 车道合并后接入。
+pub async fn sales_delivery_codex_sheet_xlsx(
+    // 路由为 /orders/{id}/deliveries/{delivery_id}/codex-sheet（两段参数），
+    // axum Path 单值提取多段路径会 500，必须用 tuple 提取并取第二段
+    Path((_order_id, delivery_id)): Path<(i32, i32)>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    use crate::models::{customer, product, sales_delivery, sales_delivery_item, user};
+    use crate::services::print_service::codex_sheet::{
+        self, CodexSheetCompanyInfo, CodexSheetInput, DEFAULT_BRANCH_OFFICE_ADDRESS,
+        DEFAULT_BRANCH_OFFICE_NAME, DEFAULT_COMPANY_NAME, DEFAULT_DEPARTMENT, DEFAULT_DOC_NAME,
+        DEFAULT_HQ_ADDRESS, DEFAULT_PHONE,
+    };
+    use rust_decimal::Decimal;
+    use sea_orm::{LoaderTrait, ModelTrait};
+
+    let db = &*state.db;
+    let delivery = sales_delivery::Entity::find_by_id(delivery_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("销售发货单 {} 未找到", delivery_id)))?;
+    let customer = delivery
+        .find_related(customer::Entity)
+        .one(db)
+        .await?
+        .ok_or_else(|| {
+            AppError::not_found(format!(
+                "销售发货单 {} 的客户档案(ID={})缺失",
+                delivery_id, delivery.customer_id
+            ))
+        })?;
+    let creator = delivery
+        .find_related(user::Entity)
+        .one(db)
+        .await?
+        .ok_or_else(|| {
+            AppError::not_found(format!(
+                "销售发货单 {} 的制单人账号(ID={})缺失",
+                delivery_id, delivery.created_by
+            ))
+        })?;
+    let items = sales_delivery_item::Entity::find()
+        .filter(sales_delivery_item::Column::DeliveryId.eq(delivery_id))
+        .order_by(sales_delivery_item::Column::Id, sea_orm::Order::Asc)
+        .all(db)
+        .await?;
+    let loaded = items.load_one(product::Entity, db).await?;
+    let product_names: Vec<String> = items
+        .iter()
+        .zip(loaded)
+        .map(|(item, found)| {
+            found.map(|p| p.name).ok_or_else(|| {
+                AppError::not_found(format!(
+                    "销售发货单 {} 的明细产品档案(ID={})缺失",
+                    delivery_id, item.product_id
+                ))
+            })
+        })
+        .collect::<Result<Vec<_>, AppError>>()?;
+
+    let rows = codex_sheet::group_items_by_dye_lot(&items, &product_names)?;
+    let input = CodexSheetInput {
+        // 单号占位参数：本切片直接用发货单号，不接单据号生成器
+        sheet_no: delivery.delivery_no.clone(),
+        customer_name: customer.customer_name.clone(),
+        delivery_address: customer.address.clone().unwrap_or_default(),
+        department: DEFAULT_DEPARTMENT.to_string(),
+        sheet_date: delivery.delivery_date.to_string(),
+        rows,
+        // 结余类占位金额：本切片无对账数据源，占位为零，A 车道合并后接入
+        previous_balance: Decimal::ZERO,
+        received_amount: Decimal::ZERO,
+        receivable_amount: Decimal::ZERO,
+        previous_debt: Decimal::ZERO,
+        prepared_by: creator.username.clone(),
+        remark: delivery.remarks.clone().unwrap_or_default(),
+        company: CodexSheetCompanyInfo {
+            company_name: DEFAULT_COMPANY_NAME.to_string(),
+            doc_name: DEFAULT_DOC_NAME.to_string(),
+            hq_address: DEFAULT_HQ_ADDRESS.to_string(),
+            branch_office_name: DEFAULT_BRANCH_OFFICE_NAME.to_string(),
+            branch_office_address: DEFAULT_BRANCH_OFFICE_ADDRESS.to_string(),
+            phone: DEFAULT_PHONE.to_string(),
+        },
+    };
+    // 货款总计大写金额：A 车道（amount_in_words）合并后接入，本切片传 None 落空串
+    let bytes = codex_sheet::build_codex_sheet_xlsx(&input, None)?;
+    record_codex_sheet_audit(&state, &auth, delivery_id);
+    Ok(crate::utils::xlsx_export::xlsx_response(
+        bytes,
+        &format!("sales_delivery_codex_sheet_{}", delivery_id),
+    ))
+}
+
+/// 细码单 xlsx 导出审计（best-effort，不阻塞响应；口径同 record_print_audit，
+/// 资源名与快照格式如实记 xlsx，不冒充 docx）
+fn record_codex_sheet_audit(state: &AppState, auth: &AuthContext, delivery_id: i32) {
+    let event = AuditEvent {
+        user_id: Some(auth.user_id),
+        username: Some(auth.username.clone()),
+        operation_type: OperationType::Print,
+        severity: Severity::Info,
+        resource_type: Some("sales_delivery".to_string()),
+        resource_id: Some(delivery_id.to_string()),
+        resource_name: Some(format!("sales_delivery_codex_sheet_{}.xlsx", delivery_id)),
+        description: Some(format!(
+            "用户 {} 导出销售发货单 #{} 的面料细码单 xlsx",
+            auth.username, delivery_id
+        )),
+        request_method: Some("GET".to_string()),
+        request_path: Some(format!(
+            "/api/v1/erp/sales/orders/0/deliveries/{}/codex-sheet",
+            delivery_id
+        )),
+        before_snapshot: None,
+        after_snapshot: Some(serde_json::json!({
+            "doc_type": "sales_delivery",
+            "doc_id": delivery_id,
+            "format": "xlsx",
+            "template": "codex_sheet",
+        })),
+    };
+    let svc = Arc::new(AuditLogService::new(state.db.clone()));
+    svc.record_async(event, None);
+}
