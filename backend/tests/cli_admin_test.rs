@@ -46,6 +46,11 @@ fn test_read_password_empty_env_ignored() {
     }
     let result = read_password(false);
     assert!(result.is_err());
+    // 空环境变量被忽略后无任何密码来源，必须落到同一个"未提供密码"错误（cli/admin.rs:55）
+    assert!(
+        result.unwrap_err().contains("未提供密码"),
+        "空 BINGXI_ADMIN_PASSWORD 应等同未提供密码"
+    );
     unsafe {
         std::env::remove_var("BINGXI_ADMIN_PASSWORD");
     }
