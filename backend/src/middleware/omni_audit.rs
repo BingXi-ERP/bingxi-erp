@@ -507,23 +507,6 @@ fn is_sensitive_request_body_path(uri: &str) -> bool {
         .any(|p| path == *p || path.ends_with(p))
 }
 
-#[cfg(test)]
-mod payment_channel_tests {
-    use super::is_sensitive_request_body_path;
-
-    #[test]
-    fn payment_channel_credentials_are_redacted_from_audit() {
-        for code in ["wechat_pay", "alipay"] {
-            assert!(is_sensitive_request_body_path(&format!(
-                "/api/v1/erp/payment-channels/{code}?action=update"
-            )));
-        }
-        assert!(!is_sensitive_request_body_path(
-            "/api/v1/erp/company-profile/full"
-        ));
-    }
-}
-
 /// 根据请求路径推断模块名称
 /// 跳过 API 前缀（/api/v1/erp）后取首个业务段：
 /// /api/v1/erp/purchase/orders → "purchase"、/api/v1/erp/finance/ap/invoices → "finance"。
@@ -550,4 +533,21 @@ fn extract_resource_id(path: &str) -> Option<String> {
             None
         }
     })
+}
+
+#[cfg(test)]
+mod payment_channel_tests {
+    use super::is_sensitive_request_body_path;
+
+    #[test]
+    fn payment_channel_credentials_are_redacted_from_audit() {
+        for code in ["wechat_pay", "alipay"] {
+            assert!(is_sensitive_request_body_path(&format!(
+                "/api/v1/erp/payment-channels/{code}?action=update"
+            )));
+        }
+        assert!(!is_sensitive_request_body_path(
+            "/api/v1/erp/company-profile/full"
+        ));
+    }
 }
