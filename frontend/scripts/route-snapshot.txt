@@ -742,6 +742,7 @@ GET	/api/v1/erp/production/outsourcing-orders/report	outsourcing_handler::get_ou
 GET	/api/v1/erp/production/outsourcing-receipts	outsourcing_handler::list_outsourcing_receipts	production
 GET	/api/v1/erp/production/outsourcing-receipts/*	outsourcing_handler::get_outsourcing_receipt	production
 GET	/api/v1/erp/production/outsourcing-receipts/*/print	print_handler::outsourcing_receipt_print_docx	production
+GET	/api/v1/erp/production/outsourcing-receipts/*/print-xlsx	print_xlsx_purchase_handler::outsourcing_receipt_print_xlsx	production
 GET	/api/v1/erp/production/outsourcing-receipts/by-no/*	outsourcing_handler::get_outsourcing_receipt_by_no	production
 GET	/api/v1/erp/production/outsourcing-vouchers	outsourcing_handler::list_outsourcing_vouchers	production
 GET	/api/v1/erp/production/outsourcing-vouchers/by-no/*	outsourcing_handler::get_outsourcing_voucher_by_no	production
@@ -793,6 +794,7 @@ GET	/api/v1/erp/purchase/orders	purchase_order_handler::list_orders	purchase
 GET	/api/v1/erp/purchase/orders/*	purchase_order_handler::get_order	purchase
 GET	/api/v1/erp/purchase/orders/*/items	purchase_order_handler::list_order_items	purchase
 GET	/api/v1/erp/purchase/orders/*/print	print_handler::purchase_order_print_docx	purchase
+GET	/api/v1/erp/purchase/orders/*/print-xlsx	print_xlsx_purchase_handler::purchase_order_print_xlsx	purchase
 GET	/api/v1/erp/purchase/orders/export	purchase_order_handler::export_orders	purchase
 GET	/api/v1/erp/purchase/orders/generate-no	purchase_order_handler::generate_order_no	purchase
 GET	/api/v1/erp/purchase/purchase-contracts	purchase_contract_handler::list_contracts	purchase
@@ -809,6 +811,7 @@ GET	/api/v1/erp/purchase/receipts	purchase_receipt_handler::list_receipts	purcha
 GET	/api/v1/erp/purchase/receipts/*	purchase_receipt_handler::get_receipt	purchase
 GET	/api/v1/erp/purchase/receipts/*/items	purchase_receipt_handler::list_receipt_items	purchase
 GET	/api/v1/erp/purchase/receipts/*/print	print_handler::purchase_receipt_print_docx	purchase
+GET	/api/v1/erp/purchase/receipts/*/print-xlsx	print_xlsx_purchase_handler::purchase_receipt_print_xlsx	purchase
 GET	/api/v1/erp/purchase/receipts/generate-no	purchase_receipt_handler::generate_no	purchase
 GET	/api/v1/erp/purchase/returns	purchase_return_handler::list_purchase_returns	purchase
 GET	/api/v1/erp/purchase/returns/*	purchase_return_handler::get_purchase_return	purchase

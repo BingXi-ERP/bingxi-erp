@@ -259,6 +259,9 @@ const PATH_ACTION_KEYWORDS: &[&str] = &[
 const PATH_ACTION_SEGMENT_MAP: &[(&str, &str)] = &[
     ("manager-approve", "managerapprove"),
     ("director-approve", "directorapprove"),
+    // xlsx 打印腿末段（GET .../{id}/print-xlsx）：显式映射为与 docx 版相同的 `print` 动作，
+    // 保证 xlsx 腿与 docx 腿鉴权键逐字符一致（不映射则回退方法派生 read，弱于 docx 的 print 门）。
+    ("print-xlsx", "print"),
 ];
 
 /// 判定一个路径段是否为"动作段形态"：命中关键字表或映射表左列即是。
