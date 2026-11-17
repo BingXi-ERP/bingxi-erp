@@ -660,10 +660,7 @@ impl super::PrintService {
     /// 存什么：主表四账务字段与单据头 + 明细行（ar_reconciliation_items 全量）。
     /// 数据从哪来：复用 get_ar_reconciliation_print_data 的行级归属门取数（英文键），
     /// 明细由本函数按 reconciliation_id 全量补查。
-    pub async fn build_ar_reconciliation_xlsx(
-        &self,
-        id: i32,
-    ) -> Result<Vec<u8>, AppError> {
+    pub async fn build_ar_reconciliation_xlsx(&self, id: i32) -> Result<Vec<u8>, AppError> {
         let print_data = self.get_ar_reconciliation_print_data(id).await?;
         use crate::models::ar_reconciliation_item;
         let items = ar_reconciliation_item::Entity::find()
@@ -728,11 +725,7 @@ fn build_recon_xlsx_table(
     ]);
     rows.push(vec![
         XlsxRichCell::merged(
-            format!(
-                "对账期间：{} ~ {}",
-                get("period_start"),
-                get("period_end")
-            ),
+            format!("对账期间：{} ~ {}", get("period_start"), get("period_end")),
             5,
         ),
         XlsxRichCell::merged("部门：____________________", 5),
@@ -789,10 +782,7 @@ fn build_recon_xlsx_table(
     ]);
     rows.push(vec![
         XlsxRichCell::merged(
-            format!(
-                "货款总计(大写)：{}",
-                amount_in_words.unwrap_or_default()
-            ),
+            format!("货款总计(大写)：{}", amount_in_words.unwrap_or_default()),
             5,
         ),
         XlsxRichCell::merged(format!("期末欠款(上期欠款)：{}", get("closing_balance")), 5),
@@ -808,7 +798,9 @@ fn build_recon_xlsx_table(
     XlsxRichTable {
         sheet_name: "应收对账单".to_string(),
         rows,
-        column_widths: Some(vec![12.0, 18.0, 12.0, 10.0, 10.0, 10.0, 12.0, 12.0, 10.0, 16.0]),
+        column_widths: Some(vec![
+            12.0, 18.0, 12.0, 10.0, 10.0, 10.0, 12.0, 12.0, 10.0, 16.0,
+        ]),
         column_count: Some(COLS),
         header_row: false,
     }
@@ -821,7 +813,13 @@ mod recon_xlsx_tests {
     use rust_decimal::Decimal;
     use std::collections::HashMap;
 
-    fn item(item_type: &str, doc_no: &str, dye: &str, amount: &str, matched: Option<&str>) -> ar_reconciliation_item::Model {
+    fn item(
+        item_type: &str,
+        doc_no: &str,
+        dye: &str,
+        amount: &str,
+        matched: Option<&str>,
+    ) -> ar_reconciliation_item::Model {
         ar_reconciliation_item::Model {
             id: 0,
             piece_no: Some("P-01".to_string()),

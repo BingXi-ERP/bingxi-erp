@@ -20,13 +20,13 @@ use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use crate::models::audit_log::{OperationType, Severity};
 use crate::services::audit_log_service::{AuditEvent, AuditLogService};
+use crate::services::print_service::PrintData;
+use crate::services::print_service::PrintService;
 use crate::services::print_service::purchase::{
     build_outsource_receipt_xlsx, build_purchase_order_xlsx, build_purchase_receipt_xlsx,
 };
-use crate::services::print_service::PrintData;
-use crate::services::print_service::PrintService;
 use crate::utils::error::AppError;
-use crate::utils::xlsx_export::{build_xlsx_response, XlsxTable};
+use crate::utils::xlsx_export::{XlsxTable, build_xlsx_response};
 
 /// 按单据类型分派到对应 xlsx 构建器（未接入 xlsx 腿的 doc_type 显式报错，不静默兜底）
 fn build_xlsx_table(doc_type: &str, print_data: &PrintData) -> Result<XlsxTable, AppError> {

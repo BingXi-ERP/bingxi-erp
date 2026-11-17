@@ -755,7 +755,16 @@ pub(crate) struct PurchaseReceiptXlsxRow {
 }
 
 const PURCHASE_RECEIPT_XLSX_HEADERS: [&str; 10] = [
-    "序号", "物料编码", "物料名称", "批号", "色号", "缸号", "数量", "单位", "单价", "金额",
+    "序号",
+    "物料编码",
+    "物料名称",
+    "批号",
+    "色号",
+    "缸号",
+    "数量",
+    "单位",
+    "单价",
+    "金额",
 ];
 
 /// 渲染采购收货单 xlsx：主表 KV 行 → 分隔空行 → 明细行 → 合计行（数量 Σ 恒算；
@@ -864,7 +873,14 @@ pub(crate) struct PurchaseOrderXlsxRow {
 }
 
 const PURCHASE_ORDER_XLSX_HEADERS: [&str; 8] = [
-    "序号", "产品编码", "产品名称", "数量", "单价", "税率%", "金额", "已收数量",
+    "序号",
+    "产品编码",
+    "产品名称",
+    "数量",
+    "单价",
+    "税率%",
+    "金额",
+    "已收数量",
 ];
 
 /// 渲染采购订单 xlsx：主表 KV 行 → 分隔空行 → 明细行 → 合计行（数量/金额 Σ 逐行累加）
@@ -921,8 +937,14 @@ pub(crate) fn build_purchase_order_xlsx(print_data: &PrintData) -> Result<XlsxTa
         ("单据编号", xlsx_string_cell(data, "order_no")?),
         ("供应商", xlsx_string_cell(data, "supplier_name")?),
         ("下单日期", xlsx_string_cell(data, "order_date")?),
-        ("期望交期", xlsx_string_cell(data, "expected_delivery_date")?),
-        ("实际交货日期", xlsx_string_cell(data, "actual_delivery_date")?),
+        (
+            "期望交期",
+            xlsx_string_cell(data, "expected_delivery_date")?,
+        ),
+        (
+            "实际交货日期",
+            xlsx_string_cell(data, "actual_delivery_date")?,
+        ),
         ("仓库", xlsx_string_cell(data, "warehouse_name")?),
         ("币种", xlsx_string_cell(data, "currency")?),
         // 大写金额待 A 车道（feat/amount-in-words）utils 接入后在此追加"大写金额"行
@@ -955,7 +977,10 @@ pub(crate) fn build_outsource_receipt_xlsx(print_data: &PrintData) -> Result<Xls
     let pairs: Vec<(&'static str, String)> = vec![
         ("单据编号", xlsx_string_cell(data, "receipt_no")?),
         // 委外订单为数值 ID（打印数据无订单号/供应商名称字段，注明取不到）
-        ("委外订单ID", xlsx_display_cell(data, "outsourcing_order_id")?),
+        (
+            "委外订单ID",
+            xlsx_display_cell(data, "outsourcing_order_id")?,
+        ),
         ("收货日期", xlsx_string_cell(data, "receipt_date")?),
         ("色号", xlsx_string_cell(data, "color_no")?),
         ("缸号", xlsx_string_cell(data, "dye_lot_no")?),

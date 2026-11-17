@@ -19,7 +19,7 @@
 //! 原 `XlsxTable` / `build_xlsx` 行为不变，两者互不影响。
 
 use crate::utils::error::AppError;
-use axum::http::{header, HeaderValue};
+use axum::http::{HeaderValue, header};
 use axum::response::Response;
 use rust_xlsxwriter::{Format, FormatAlign, FormatBorder, Workbook, Worksheet};
 
