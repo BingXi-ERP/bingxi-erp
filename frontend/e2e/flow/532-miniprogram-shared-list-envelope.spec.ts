@@ -5,14 +5,15 @@
 // 四要素（items/total/page/page_size）。
 //
 // 端点选取（Explore 已核实小程序真实调用，且后端出参键已逐一定位）：
-//   - /products            → PaginatedResponse，items（product_handler.rs:340/399）
-//   - /crm/customers       → PaginatedResponse，items（customer_handler.rs:175）
-//   - /ar-reconciliations  → PaginatedResponse，items（ar_reconciliation_handler.rs:156/178）
-//   - /color-cards         → PagedResponse，   items（color_card_response_dto.rs:12）
+//   - /products            → PaginatedResponse，items（product_handler.rs）
+//   - /crm/customers       → PaginatedResponse，items（customer_handler.rs）
+//   - /ar-reconciliations  → PaginatedResponse，items（ar_reconciliation_handler.rs）
+//   - /color-cards         → PagedResponse，   items（color_card_response_dto.rs）
 // 四者键名一致（items/total/page/page_size），逐字段对后端结构体核过，非臆造。
+// 端点出参键以对应 handler/DTO 为准，不写行号（行号随迭代飘移，指文件名即可）。
 //
 // 为何不含 /sales/orders：其 service 返回 PaginatedResponse（items），但 handler
-// 走 get_mut("list") → fallback get_mut("data") 做脱敏过滤（sales_order_handler.rs:105-139），
+// 走 get_mut("list") → fallback get_mut("data") 做脱敏过滤（sales_order_handler.rs），
 // 运行时列表键不固定为 items；在未钉死该端点契约前不写死键名断言，避免假绿。
 // 该端点的列表形状另由既有 120/213 等 spec 覆盖。
 //
