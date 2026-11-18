@@ -736,7 +736,7 @@ function selfTest() {
     };
   }
   // 探针基线从当前路由面（cur）构造，不从工作树快照（base）构造：merge-ref 形态下快照
-  // 可能滞后于已注册的路由（实测 #1289：finance 域 10 枚 print-xlsx 端点在路由里、不在
+  // 可能滞后于已注册的路由（实测：finance 域 10 枚 print-xlsx 端点在路由里、不在
   // 工作树快照里），从 base 构造会让判定集混进这些快照外的真端点，零语料引用即判红，
   // 三道绿探针（paired/exemptWithReason/prefixAsymmetry MustBeGreen）被无关红拉爆
   // （got=1），自证误报 TOOL_BUG。从 cur 构造后判定集恒等于被挖掉的那一枚，形态无关；
