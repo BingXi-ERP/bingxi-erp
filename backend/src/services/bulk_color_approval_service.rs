@@ -48,7 +48,7 @@ use crate::models::status::purchase_inventory::inventory_stock_grade;
 use crate::models::status::purchase_inventory::inventory_stock_quality_status as quality_status;
 use crate::models::status::quality_dyeing::dye_batch_lifecycle_status as batch_status;
 use crate::models::user;
-use crate::utils::data_scope::{apply_department_scope, DataScopeContext};
+use crate::utils::data_scope::{DataScopeContext, apply_department_scope};
 
 /// 业务错误
 #[derive(Debug, Error)]
