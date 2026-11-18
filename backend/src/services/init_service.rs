@@ -268,6 +268,10 @@ pub const PERMISSION_RESOURCES: &[&str] = &[
     // 命中不了任何授权行、对非超管恒 fail-closed 403。
     "print-tasks",
     "print-targets",
+    // 调样单 CRUD 与 xlsx 打印腿（/sample-dispatches*，routes/sample_dispatch.rs 根级挂载）：
+    // URL 段即权威资源名，未登记则运行时派生死键、对非超管恒 fail-closed 403。
+    // 动作面 = read/create/update/delete/print（print-xlsx 末段映射见 permission.rs）。
+    "sample-dispatches",
     // 公司档案：`GET/PUT /company-profile/full` 的 seg3 派生资源键 company-profile
     // （GET→read、PUT→update）；公开投影 `GET /company-profile` 走 AUTH_ONLY 精确豁免、
     // 不经业务权限码，但全量面必须在本注册表登记，否则 fail-closed 403。

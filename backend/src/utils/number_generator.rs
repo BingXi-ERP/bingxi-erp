@@ -36,6 +36,16 @@ pub struct DocumentNumberGenerator;
 /// 超限显式报错，由数据侧排查，不静默跳过）
 const NO_PROBE_MAX: u64 = 100;
 
+/// 单号格式分派键：`insert_with_no_retry` 两种取号格式共用一套重试循环，
+/// 只以本键选择取号入口。
+#[derive(Copy, Clone)]
+enum DocNoStyle {
+    /// `{前缀}{YYYYMMDD}{流水}`（既有标准格式）
+    FullDate,
+    /// `{前缀}{YYMM}-{流水}`（年月号段，真实样例 BX-DY2607-1356）
+    YearMonth,
+}
+
 /// INSERT 撞唯一约束(23505)时的最大重试次数（每次在保存点内重新取号）
 const NO_INSERT_MAX_RETRY: usize = 5;
 
@@ -199,6 +209,67 @@ impl DocumentNumberGenerator {
         E::Model: IntoActiveModel<A>,
         F: Fn(String) -> A,
     {
+        Self::insert_with_no_retry_by_style(
+            txn,
+            prefix,
+            _entity,
+            column,
+            DocNoStyle::FullDate,
+            build_active_model,
+        )
+        .await
+    }
+
+    /// `insert_with_no_retry` 的年月格式变体：取号走
+    /// `generate_no_ym_with_txn`（`{前缀}{YYMM}-{3位流水}` 号段），重试语义
+    /// （保存点、23505 分诊、非唯一类错误直抛）与标准变体完全同源。
+    /// 调用方：services/sample_dispatch_service.rs（BX-DY 调样单号段）。
+    pub async fn insert_with_no_retry_ym<'db, E, A, F>(
+        txn: &'db DatabaseTransaction,
+        prefix: &str,
+        _entity: E,
+        column: E::Column,
+        build_active_model: F,
+    ) -> Result<E::Model, AppError>
+    where
+        E: EntityTrait + Copy,
+        E::Column: Copy,
+        <<E as EntityTrait>::Column as std::str::FromStr>::Err: std::fmt::Debug,
+        E::Model: Sync + Send + FromQueryResult + 'db,
+        A: ActiveModelTrait<Entity = E> + ActiveModelBehavior + Send,
+        E::Model: IntoActiveModel<A>,
+        F: Fn(String) -> A,
+    {
+        Self::insert_with_no_retry_by_style(
+            txn,
+            prefix,
+            _entity,
+            column,
+            DocNoStyle::YearMonth,
+            build_active_model,
+        )
+        .await
+    }
+
+    /// 「取号 + 插入 + 保存点重试」的共享实现：标准/年月两种格式只差取号入口，
+    /// 其余循环体逐行同源，不复制第二份重试逻辑。
+    async fn insert_with_no_retry_by_style<'db, E, A, F>(
+        txn: &'db DatabaseTransaction,
+        prefix: &str,
+        _entity: E,
+        column: E::Column,
+        style: DocNoStyle,
+        build_active_model: F,
+    ) -> Result<E::Model, AppError>
+    where
+        E: EntityTrait + Copy,
+        E::Column: Copy,
+        <<E as EntityTrait>::Column as std::str::FromStr>::Err: std::fmt::Debug,
+        E::Model: Sync + Send + FromQueryResult + 'db,
+        A: ActiveModelTrait<Entity = E> + ActiveModelBehavior + Send,
+        E::Model: IntoActiveModel<A>,
+        F: Fn(String) -> A,
+    {
         for attempt in 1..=NO_INSERT_MAX_RETRY {
             // SeaORM 对已开启事务的 begin() 发 SAVEPOINT，commit/rollback
             // 对应 RELEASE/ROLLBACK TO（见 sea-orm 2.0.2 transaction.rs:147
@@ -208,29 +279,22 @@ impl DocumentNumberGenerator {
                 .await
                 .map_err(|e| AppError::database(format!("创建取号保存点失败: {e}")))?;
 
-            let candidate = match Self::generate_no_with_width_txn(
-                &sp,
-                prefix,
-                _entity,
-                column,
-                Self::DEFAULT_SEQ_WIDTH,
-            )
-            .await
-            {
-                Ok(no) => no,
-                Err(e) => {
-                    // 取号失败的原始 AppError 必须原样透传；保存点回滚失败是
-                    // 另一笔 DbErr，单独显式记录（归口 database），不得顶替真实原因。
-                    if let Err(re) = sp.rollback().await {
-                        tracing::error!(
-                            error = %re,
-                            original_error = %e,
-                            "回滚取号保存点失败（取号原始错误继续上抛）"
-                        );
+            let candidate =
+                match Self::generate_no_by_style(&sp, prefix, _entity, column, style).await {
+                    Ok(no) => no,
+                    Err(e) => {
+                        // 取号失败的原始 AppError 必须原样透传；保存点回滚失败是
+                        // 另一笔 DbErr，单独显式记录（归口 database），不得顶替真实原因。
+                        if let Err(re) = sp.rollback().await {
+                            tracing::error!(
+                                error = %re,
+                                original_error = %e,
+                                "回滚取号保存点失败（取号原始错误继续上抛）"
+                            );
+                        }
+                        return Err(e);
                     }
-                    return Err(e);
-                }
-            };
+                };
 
             match build_active_model(candidate.clone()).insert(&sp).await {
                 Ok(model) => {
@@ -286,6 +350,37 @@ impl DocumentNumberGenerator {
 
     /// `insert_with_no_retry` 使用的默认流水位数，与 `generate_no` 的默认一致
     pub const DEFAULT_SEQ_WIDTH: usize = 3;
+
+    /// 按格式分派取号入口（两种格式共用 lock/探测/保存点重试结构）
+    async fn generate_no_by_style<'db, E, C>(
+        txn: &'db DatabaseTransaction,
+        prefix: &str,
+        _entity: E,
+        column: C,
+        style: DocNoStyle,
+    ) -> Result<String, AppError>
+    where
+        E: EntityTrait,
+        <<E as EntityTrait>::Column as std::str::FromStr>::Err: std::fmt::Debug,
+        E::Model: Sync + Send + FromQueryResult + 'db,
+        C: ColumnTrait,
+    {
+        match style {
+            DocNoStyle::FullDate => {
+                Self::generate_no_with_width_txn(
+                    txn,
+                    prefix,
+                    _entity,
+                    column,
+                    Self::DEFAULT_SEQ_WIDTH,
+                )
+                .await
+            }
+            DocNoStyle::YearMonth => {
+                Self::generate_no_ym_with_txn(txn, prefix, _entity, column).await
+            }
+        }
+    }
 
     /// 取 `prefix+date` 的事务咨询锁（同会话重复获取不阻塞；
     /// 最外层事务提交时释放，保存点回滚会释放该保存点之后获取的部分，
@@ -439,7 +534,8 @@ pub async fn is_document_no_taken<C: ConnectionTrait>(
         inventory_adjustment, inventory_count, inventory_transfer, outsourcing_order,
         outsourcing_receipt, outsourcing_voucher, process_wage_rate, product, purchase_inspection,
         purchase_order, purchase_receipt, purchase_return, sales_delivery, sales_order,
-        sales_quotation, sales_return, supplier, voucher, wage_record, warehouse,
+        sales_quotation, sales_return, sample_dispatch_order, supplier, voucher, wage_record,
+        warehouse,
     };
 
     let taken = match doc_type {
@@ -508,6 +604,12 @@ pub async fn is_document_no_taken<C: ConnectionTrait>(
         //    取号方 services/wage_ops/{record,rate}.rs）——
         "wage_record" => wage_record::Entity::find()
             .filter(wage_record::Column::RecordNo.eq(no))
+            .one(db)
+            .await?
+            .is_some(),
+        // —— 调样域（BX-DY 年月号段，取号方 services/sample_dispatch_service.rs）——
+        "sample_dispatch" => sample_dispatch_order::Entity::find()
+            .filter(sample_dispatch_order::Column::DocumentNo.eq(no))
             .one(db)
             .await?
             .is_some(),

@@ -1,4 +1,4 @@
-# layers=8 endpoints=1816
+# layers=8 endpoints=1822
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -123,6 +123,7 @@ DELETE	/api/v1/erp/sales/sales-contracts/*	sales_contract_handler::delete_contra
 DELETE	/api/v1/erp/sales/sales-prices/*	sales_price_handler::delete_price	sales
 DELETE	/api/v1/erp/sales/sales-returns/*	delete_sales_return	sales_return_handler
 DELETE	/api/v1/erp/sales/sales-returns/*/items/*	delete_return_item	sales_return_handler
+DELETE	/api/v1/erp/sample-dispatches/*	sample_dispatch_handler::delete_sample_dispatch	sample_dispatch
 DELETE	/api/v1/erp/subjects/*	account_subject_handler::delete_subject	finance
 DELETE	/api/v1/erp/textile-export-requirements/*	textile_safety_master_handler::delete_export_requirement	textile_safety
 DELETE	/api/v1/erp/textile-limit-rules/*	textile_safety_master_handler::delete_limit_rule	textile_safety
@@ -909,6 +910,9 @@ GET	/api/v1/erp/sales/sales-returns	list_sales_returns	sales_return_handler
 GET	/api/v1/erp/sales/sales-returns/*	get_sales_return	sales_return_handler
 GET	/api/v1/erp/sales/sales-returns/*/items	list_return_items	sales_return_handler
 GET	/api/v1/erp/sales/sales-returns/*/print	crate::handlers::print_handler::sales_return_print_docx	sales_return_handler
+GET	/api/v1/erp/sample-dispatches	sample_dispatch_handler::list_sample_dispatches	sample_dispatch
+GET	/api/v1/erp/sample-dispatches/*	sample_dispatch_handler::get_sample_dispatch	sample_dispatch
+GET	/api/v1/erp/sample-dispatches/*/print-xlsx	print_xlsx_sample_dispatch_handler::sample_dispatch_print_xlsx	sample_dispatch
 GET	/api/v1/erp/scanner/history	barcode_scanner_handler::scan_history	analytics
 GET	/api/v1/erp/scanner/scan-inventory	barcode_scanner_handler::scan_inventory	analytics
 GET	/api/v1/erp/scanner/scan-statistics	barcode_scanner_handler::scan_statistics	analytics
@@ -1595,6 +1599,7 @@ POST	/api/v1/erp/sales/sales-returns/*/execute	execute_sales_return	sales_return
 POST	/api/v1/erp/sales/sales-returns/*/items	create_return_item	sales_return_handler
 POST	/api/v1/erp/sales/sales-returns/*/reject	reject_sales_return	sales_return_handler
 POST	/api/v1/erp/sales/sales-returns/*/submit	submit_sales_return	sales_return_handler
+POST	/api/v1/erp/sample-dispatches	sample_dispatch_handler::create_sample_dispatch	sample_dispatch
 POST	/api/v1/erp/scanner/scan-receipt	barcode_scanner_handler::scan_receipt_post	analytics
 POST	/api/v1/erp/scanner/scan-to-ship	barcode_scanner_handler::scan_to_ship_post	analytics
 POST	/api/v1/erp/scanner/ship-by-piece	barcode_scanner_handler::ship_by_piece_no	analytics
@@ -1794,6 +1799,7 @@ PUT	/api/v1/erp/sales/sales-contracts/*/execute	sales_contract_handler::execute_
 PUT	/api/v1/erp/sales/sales-prices/*	sales_price_handler::update_price	sales
 PUT	/api/v1/erp/sales/sales-returns/*	update_sales_return	sales_return_handler
 PUT	/api/v1/erp/sales/sales-returns/*/items/*	update_return_item	sales_return_handler
+PUT	/api/v1/erp/sample-dispatches/*	sample_dispatch_handler::update_sample_dispatch	sample_dispatch
 PUT	/api/v1/erp/scheduling/*	scheduling_handler::adjust_schedule	mod
 PUT	/api/v1/erp/scheduling/tasks/*/adjust	scheduling_handler::adjust_schedule_task	mod
 PUT	/api/v1/erp/slow-queries/*/optimization	slow_query_handler::update_slow_query_optimization	system

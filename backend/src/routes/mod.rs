@@ -99,6 +99,8 @@ pub mod period_adjustment;
 pub mod export_inspection_routes;
 // 纺织品安全合规域（送检单、第三方报告、限值矩阵与出口要求主数据）
 pub mod textile_safety;
+// 调样单路由（CRUD + xlsx 打印腿，path 资源 /sample-dispatches）
+pub mod sample_dispatch;
 #[path = "static.rs"]
 pub mod static_routes;
 pub mod search_api;
@@ -564,6 +566,8 @@ pub fn create_router(state: AppState) -> Router<()> {
         .nest("/api/v1/erp/export-inspections", export_inspection_routes::routes())
         // 纺织品安全合规域路由（GB 18401 与 GB 31701 送检、第三方报告完整性门、判定表与出口要求主数据）
         .nest("/api/v1/erp", textile_safety::routes())
+        // 调样单路由（CRUD + xlsx 打印腿，path 资源 /sample-dispatches）
+        .nest("/api/v1/erp", sample_dispatch::routes())
         .nest("/api/v1/erp/purchase", purchase::routes())
         .nest("/api/v1/erp/finance", finance::routes(state.clone()))
         .nest("/api/v1/erp", finance::sub_routes())

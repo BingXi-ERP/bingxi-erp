@@ -408,3 +408,5 @@ pub mod textile_safety_master_service;
 // 公众号通知失败重试队列（直发失败入队,后台 worker 指数退避重投,3 次死信）
 pub mod wechat_mp_notification_outbox_service;
 pub mod wechat_mp_notification_outbox_worker;
+// 调样单（主表 CRUD + 行级明细；BX-DY 年月号段后端取号）
+pub mod sample_dispatch_service;

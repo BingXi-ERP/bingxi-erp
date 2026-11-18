@@ -1248,6 +1248,14 @@ pub fn builtin_print_templates() -> Vec<PrintTemplateDto> {
             is_default: true,
             created_at: "2026-01-01T00:00:00Z".to_string(),
         },
+        PrintTemplateDto {
+            id: 64,
+            name: "调样单打印模板".to_string(),
+            doc_type: "sample_dispatch".to_string(),
+            template_content: "调样单打印模板（含单号、客户、账务四列、明细品名/缸号/色号/成分/米数/单价/金额、合计与签收）".to_string(),
+            is_default: true,
+            created_at: "2026-01-01T00:00:00Z".to_string(),
+        },
     ]
 }
 

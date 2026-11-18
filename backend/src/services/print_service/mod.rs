@@ -141,6 +141,7 @@ pub const SUPPORTED_DOC_TYPES: &[&str] = &[
     "quality_issue",
     "ar_reconciliation",
     "inventory_piece_label",
+    "sample_dispatch",
 ];
 
 /// 已启用行级归属门的打印单据类型（本批＝财务域 7 枚，前七枚表模型均含 created_by）。
@@ -157,6 +158,8 @@ pub const PRINT_SCOPE_GATED: &[&str] = &[
     "ap_reconciliation",
     "ar_collection",
     "ar_reconciliation",
+    // 调样单主表含 created_by，归属门与财务域同口径（按创建人行级归属）
+    "sample_dispatch",
 ];
 
 /// 永久无归属列的打印单据类型（豁免行级门，每条写清为什么无法过门）。
@@ -256,6 +259,7 @@ pub mod inventory;
 pub mod production;
 pub mod purchase;
 pub mod quality;
+pub mod sample_dispatch;
 pub mod sales;
 
 impl PrintService {
@@ -319,6 +323,10 @@ impl PrintService {
                 .await?
                 .map(|row| Some(row.created_by)),
             "ar_reconciliation" => crate::models::ar_reconciliation::Entity::find_by_id(doc_id)
+                .one(db)
+                .await?
+                .map(|row| row.created_by),
+            "sample_dispatch" => crate::models::sample_dispatch_order::Entity::find_by_id(doc_id)
                 .one(db)
                 .await?
                 .map(|row| row.created_by),
@@ -443,6 +451,7 @@ impl PrintService {
             "quality_issue" => self.get_quality_issue_print_data(doc_id).await,
             "ar_reconciliation" => self.get_ar_reconciliation_print_data(doc_id).await,
             "inventory_piece_label" => self.get_inventory_piece_label_print_data(doc_id).await,
+            "sample_dispatch" => self.get_sample_dispatch_print_data(doc_id).await,
             _ => Err(AppError::not_found(format!(
                 "Unknown document type: {}",
                 doc_type

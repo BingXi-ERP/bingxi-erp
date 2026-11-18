@@ -123,6 +123,8 @@ pub mod webhook_handler;
 pub mod ai_analysis_handler;
 pub mod ar_reconciliation_enhanced_handler;
 pub mod ar_reconciliation_handler;
+// 调样单 CRUD（/sample-dispatches；单号后端取号 BX-DY 年月号段）
+pub mod sample_dispatch_handler;
 pub mod currency_handler;
 pub mod report_engine_handler;
 // P2-4 AI 分析深化（工艺优化 + 质量预测）
@@ -178,6 +180,8 @@ pub mod field_permission_handler;
 // 通用打印模块
 pub mod print_handler;
 pub mod print_xlsx_finance_handler;
+// 调样单 xlsx 打印腿（独立文件避让 print_handler 共享热点）
+pub mod print_xlsx_sample_dispatch_handler;
 pub mod print_target_handler;
 pub mod print_task_handler;
 // 采购域单据 xlsx 打印腿（独立文件：print_handler.rs 为多车道共享热点，见模块注释）
