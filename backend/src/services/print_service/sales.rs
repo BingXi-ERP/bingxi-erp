@@ -1003,7 +1003,7 @@ impl super::PrintService {
 /// 首行为明细表头（冻结行），数据区顶部为主表 KV 行（label/value 两列，其余列空串），
 /// 空行分隔后接明细行，再空行接汇总 KV 行。
 #[derive(Debug)]
-pub(crate) struct SalesXlsxPrintDoc {
+pub struct SalesXlsxPrintDoc {
     /// 工作表名（如 "销售订单" / "销售发货单"）
     pub sheet_name: String,
     /// 下载文件名（不含扩展名，如 "销售订单_SO20260101001"）
@@ -1023,6 +1023,10 @@ pub(crate) struct SalesXlsxPrintDoc {
 }
 
 impl SalesXlsxPrintDoc {
+    pub fn total_amount(&self) -> rust_decimal::Decimal {
+        self.total_amount
+    }
+
     /// KV 行铺排：前两列放 label/value，其余列空串补齐到表宽
     fn kv_row(label: &str, value: &str, width: usize) -> Vec<String> {
         let mut row = vec![String::new(); width];
