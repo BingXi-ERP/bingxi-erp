@@ -1561,34 +1561,6 @@ fn bpm_writeback_dead_letter_payload(
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn bpm回写死信payload携带可重放的四元组() {
-        let payload = bpm_writeback_dead_letter_payload("purchase_order", 7, false, 3);
-        assert_eq!(payload["business_type"], "purchase_order");
-        assert_eq!(payload["business_id"], 7);
-        assert_eq!(payload["approved"], false);
-        assert_eq!(payload["approver_id"], 3);
-    }
-
-    #[test]
-    fn bpm回写死信payload是对象且四键齐全() {
-        let payload = bpm_writeback_dead_letter_payload("export_approval", 9, true, 1);
-        let obj = payload.as_object().expect("payload 必须是 JSON 对象");
-        assert_eq!(
-            obj.len(),
-            4,
-            "payload 只允许四元组键，多余键会造成重放口径漂移"
-        );
-        for key in ["business_type", "business_id", "approved", "approver_id"] {
-            assert!(obj.contains_key(key), "缺键 {key}");
-        }
-    }
-}
-
 /// 处理低库存预警事件：幂等校验 + 创建采购建议 + 通知 admin/manager 角色用户
 async fn handle_low_stock_alert(
     db: Arc<DatabaseConnection>,
@@ -2094,4 +2066,32 @@ async fn refresh_supplier_name_redundancy(
         new_name
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bpm回写死信payload携带可重放的四元组() {
+        let payload = bpm_writeback_dead_letter_payload("purchase_order", 7, false, 3);
+        assert_eq!(payload["business_type"], "purchase_order");
+        assert_eq!(payload["business_id"], 7);
+        assert_eq!(payload["approved"], false);
+        assert_eq!(payload["approver_id"], 3);
+    }
+
+    #[test]
+    fn bpm回写死信payload是对象且四键齐全() {
+        let payload = bpm_writeback_dead_letter_payload("export_approval", 9, true, 1);
+        let obj = payload.as_object().expect("payload 必须是 JSON 对象");
+        assert_eq!(
+            obj.len(),
+            4,
+            "payload 只允许四元组键，多余键会造成重放口径漂移"
+        );
+        for key in ["business_type", "business_id", "approved", "approver_id"] {
+            assert!(obj.contains_key(key), "缺键 {key}");
+        }
+    }
 }
