@@ -230,8 +230,8 @@ mod tests {
             model.status.unwrap(),
             event_dead_letter::status::DEAD.to_string()
         );
-        assert_eq!(model.resolved_at.into_value(), None);
-        assert_eq!(model.resolved_by.into_value(), None);
+        assert_eq!(model.resolved_at.unwrap(), None);
+        assert_eq!(model.resolved_by.unwrap(), None);
         assert!(model.last_retry_at.into_value().is_some());
         assert!(model.first_failed_at.into_value().is_some());
 
@@ -263,7 +263,7 @@ mod tests {
             model.status.unwrap(),
             event_dead_letter::status::DEAD.to_string()
         );
-        assert_eq!(model.resolved_at.into_value(), None);
-        assert_eq!(model.resolved_by.into_value(), None);
+        assert_eq!(model.resolved_at.unwrap(), None);
+        assert_eq!(model.resolved_by.unwrap(), None);
     }
 }
