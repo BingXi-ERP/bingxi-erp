@@ -5,7 +5,7 @@
 //! 主表承载单据号/客户/制单部门/调样日期与四个账务汇总列
 //! （opening_balance=上单结余 / total_amount=货款总计即应收 /
 //!   total_collections=实收 / closing_balance=上期欠款，与
-//! `ar_reconciliation.rs:17-20` 一一对应；开单时由调用方写入）。
+//! `ar_reconciliation.rs` 一一对应；开单时由调用方写入）。
 //! 表由 `migration/src/domain/sample_dispatch` 域 m0142 建立；
 //! 单号格式 `{前缀}{YYMM}-{3位流水}`（样例 BX-DY2607-1356），取号方
 //! `utils/number_generator.rs::generate_no_ym_with_txn`（下切片接线）。

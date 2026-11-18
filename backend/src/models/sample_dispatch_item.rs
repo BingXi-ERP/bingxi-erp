@@ -25,7 +25,7 @@ pub struct Model {
     /// 产品 ID（外键）
     pub product_id: i32,
 
-    /// 缸号（照 sales_delivery_item v14 缸号字段族）
+    /// 缸号（与 sales_delivery_item 的缸号字段族同源）
     pub dye_lot_no: String,
 
     /// 色号
