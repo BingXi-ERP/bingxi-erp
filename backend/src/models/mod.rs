@@ -20,6 +20,7 @@ pub mod dto;
 pub mod user_department;
 pub mod finance_invoice;
 pub mod finance_payment;
+pub mod payment_channel_config;
 pub mod inventory_adjustment;
 pub mod inventory_adjustment_item;
 pub mod inventory_count;

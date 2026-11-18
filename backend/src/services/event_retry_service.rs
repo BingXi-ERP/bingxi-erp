@@ -80,6 +80,86 @@ impl EventRetryService {
         Duration::from_secs(delay_secs)
     }
 
+    /// 立即落死信：commit 后联动腿专用
+    ///
+    /// 功能：主事务已提交、失败无法靠回滚挽回的联动腿（BPM 审批回写、凭证补生成等），
+    /// 首次失败即写入死信表作为可重放的补偿记录。与 [`Self::handle_failure`] 的区别：
+    /// `handle_failure` 依赖外部重试调度递增 retry_count、未达上限时只留 warn 零持久化，
+    /// 而事件总线对这类 commit 后联动腿没有重放调度器，必须首次失败即落死信，
+    /// 否则失败痕迹只存在于滚动日志里，进程重启后无从补录。
+    /// 调用方：`event_bus_ops/listener`（BPM 回写失败登记）、本文件
+    /// [`Self::record_voucher_generation_failure`]（凭证生成失败登记）。
+    /// 入参：`event_type` 事件类型、`event_payload` 重放所需业务要素 JSON、
+    /// `failure_reason` 失败原因摘要、`full_error` 完整错误信息。
+    /// 传给谁：[`Self::write_to_dead_letter`]。
+    /// 存什么：重放所需业务要素 + 失败原因摘要 + 完整错误，retry_count 记为 MAX_RETRY_COUNT。
+    /// 存哪里：`event_dead_letters` 表，status=DEAD（待人工/补偿任务处理）。
+    pub async fn dead_letter_now(
+        &self,
+        event_type: &str,
+        event_payload: serde_json::Value,
+        failure_reason: &str,
+        full_error: &str,
+    ) -> Result<(), AppError> {
+        self.write_to_dead_letter(
+            event_type,
+            event_payload,
+            failure_reason,
+            full_error,
+            MAX_RETRY_COUNT,
+        )
+        .await
+    }
+
+    /// 凭证生成失败死信登记（commit 后联动腿共享入口）
+    ///
+    /// 功能：单据主流程已 commit（付款/收款确认、发货、对账关闭、能耗分摊、工资发放等），
+    /// 后续 `VoucherService::create_and_post` 失败时把可重放的凭证来源四要素写入死信表，
+    /// 供人工或补偿任务按 payload 补生成凭证；总账不再静默缺凭证。
+    /// 调用方：ap_payment_service、ar_ops/collection、so/delivery_ops/ship、
+    /// ap_invoice_ops/receipt、ar/recon_ops/lifecycle、ap_reconciliation_ops/confirm、
+    /// energy_ops/allocation_record、wage_ops/record。
+    /// 入参：`db` 连接、`source_module`/`source_type`/`source_bill_id`/`source_bill_no`
+    /// 凭证来源四要素（与 CreateVoucherRequest 同口径）、`failure` 失败错误。
+    /// 传给谁：[`Self::dead_letter_now`]。
+    /// 存什么：凭证来源四要素 JSON + 失败原因摘要 + 完整错误。
+    /// 存哪里：`event_dead_letters` 表，event_type=VoucherGenerationFailed，status=DEAD。
+    pub async fn record_voucher_generation_failure(
+        db: Arc<DatabaseConnection>,
+        source_module: &str,
+        source_type: &str,
+        source_bill_id: i64,
+        source_bill_no: &str,
+        failure: impl std::fmt::Display,
+    ) {
+        let failure_str = failure.to_string();
+        let payload = voucher_generation_failure_payload(
+            source_module,
+            source_type,
+            source_bill_id,
+            source_bill_no,
+        );
+        let reason = format!(
+            "单据 {source_bill_no}（{source_module}/{source_type} #{source_bill_id}）主流程已 commit，\
+             凭证生成失败：{failure_str}；需按 payload 重放 create_and_post 补生成凭证"
+        );
+        let retry_service = EventRetryService::new(db);
+        if let Err(e) = retry_service
+            .dead_letter_now("VoucherGenerationFailed", payload, &reason, &failure_str)
+            .await
+        {
+            tracing::error!(
+                source_bill_no,
+                source_module,
+                source_type,
+                source_bill_id,
+                error = %e,
+                "凭证生成失败的死信登记也失败（原始错误：{failure_str}），\
+                 请人工核查该单据并补生成凭证"
+            );
+        }
+    }
+
     /// 将失败事件写入死信队列表
     async fn write_to_dead_letter(
         &self,
@@ -154,5 +234,54 @@ impl EventRetryService {
         }
         let count = query.count(&*self.db).await?;
         Ok(count)
+    }
+}
+
+/// 构造凭证生成失败死信的 payload（凭证来源四要素，与 CreateVoucherRequest 同口径，
+/// 补偿任务按此重放 VoucherService::create_and_post）
+fn voucher_generation_failure_payload(
+    source_module: &str,
+    source_type: &str,
+    source_bill_id: i64,
+    source_bill_no: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "source_module": source_module,
+        "source_type": source_type,
+        "source_bill_id": source_bill_id,
+        "source_bill_no": source_bill_no,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn 凭证死信payload携带可重放的四要素() {
+        let payload = voucher_generation_failure_payload("ap", "AP_PAYMENT", 42, "FK-001");
+        assert_eq!(payload["source_module"], "ap");
+        assert_eq!(payload["source_type"], "AP_PAYMENT");
+        assert_eq!(payload["source_bill_id"], 42);
+        assert_eq!(payload["source_bill_no"], "FK-001");
+    }
+
+    #[test]
+    fn 凭证死信payload是对象且四键齐全() {
+        let payload = voucher_generation_failure_payload("sales", "SALES_DELIVERY", 7, "FH-002");
+        let obj = payload.as_object().expect("payload 必须是 JSON 对象");
+        assert_eq!(
+            obj.len(),
+            4,
+            "payload 只允许四要素键，多余键会造成重放口径漂移"
+        );
+        for key in [
+            "source_module",
+            "source_type",
+            "source_bill_id",
+            "source_bill_no",
+        ] {
+            assert!(obj.contains_key(key), "缺键 {key}");
+        }
     }
 }

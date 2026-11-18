@@ -409,13 +409,18 @@ impl PeriodAdjustmentService {
             // 即不加行级归属门，等价于系统按期间全量处理本域 draft，与既有行为一致。
             match self.confirm(adj.id, user_id, None).await {
                 Ok(_) => confirmed += 1,
-                Err(e) => tracing::warn!(
-                    adjustment_id = adj.id,
-                    adjustment_no = %adj.adjustment_no,
-                    period = %period,
-                    error = %e,
-                    "期末调整自动确认失败（不阻断结账，B05-P2-10）"
-                ),
+                Err(e) => {
+                    // 唯一调用方是结账前置腿：任一调整确认失败都必须让结账失败，
+                    // 否则期间关闭后未确认的暂估/摊销/预提凭证永久漏账（B05-P2-10）。
+                    tracing::error!(
+                        adjustment_id = adj.id,
+                        adjustment_no = %adj.adjustment_no,
+                        period = %period,
+                        error = %e,
+                        "期末调整自动确认失败，中止结账"
+                    );
+                    return Err(e);
+                }
             }
         }
         tracing::info!(

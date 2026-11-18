@@ -1,0 +1,256 @@
+{
+  "version": 1,
+  "note": "链路影响登记，供 report-e2e-linkage.mjs 输出人工回归参考；不是 CI 门禁。modules[].match 为规范化后的仓库相对路径前缀或模块关键词（按子串匹配，分隔符统一为 /）。chains 的 specs 均为真实存在的 e2e 文件。",
+  "chains": {
+    "sale-to-cash": {
+      "description": "报价→订单→锁缸→出库→送货→对账→开票→收款（销售到回款全链）",
+      "specs": [
+        "frontend/e2e/fullflow/21-sale-to-cash.spec.ts",
+        "frontend/e2e/fullflow/40-quotation-role-journey.spec.ts",
+        "frontend/e2e/flow/513-delivery-signoff-and-reconciliation-gate.spec.ts",
+        "frontend/e2e/flow/91-ship-auto-ar-amounts.spec.ts",
+        "frontend/e2e/flow/468-ar-invoice-precheck-statement-confirmed.spec.ts"
+      ]
+    },
+    "purchase-to-pay": {
+      "description": "采购→入库→质检→库存→应付→付款（采购到付款全链）",
+      "specs": [
+        "frontend/e2e/fullflow/20-purchase-to-pay.spec.ts",
+        "frontend/e2e/flow/95-purchase-receipt-pay-chain.spec.ts",
+        "frontend/e2e/flow/461-purchase-receipt-to-ap-conservation.spec.ts",
+        "frontend/e2e/flow/97-quality-standard-and-8d-chain.spec.ts"
+      ]
+    },
+    "outsource-to-cost": {
+      "description": "委外→回布→入库→成本→对账（外协加工到成本核算）",
+      "specs": [
+        "frontend/e2e/fullflow/23-outsource-issue-receipt.spec.ts",
+        "frontend/e2e/flow/21d-fabric-outsourcing-costing-voucher-batch.spec.ts",
+        "frontend/e2e/flow/457-outsource-rework-and-rejection-deduction.spec.ts"
+      ]
+    },
+    "returns-to-report": {
+      "description": "退货→库存→应收→成本→报表（退货回溯与财务口径）",
+      "specs": [
+        "frontend/e2e/flow/11-returns.spec.ts",
+        "frontend/e2e/flow/522-ar-recon-source-amount-redflush.spec.ts",
+        "frontend/e2e/fullflow/11-ar.spec.ts",
+        "frontend/e2e/fullflow/22-inspection-to-return.spec.ts"
+      ]
+    }
+  },
+  "modules": [
+    {
+      "match": "backend/src/routes/sales.rs",
+      "chains": ["sale-to-cash", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/routes/quotations.rs",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/routes/logistics_tracking.rs",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/routes/finance.rs",
+      "chains": ["sale-to-cash", "purchase-to-pay"]
+    },
+    {
+      "match": "backend/src/routes/purchase.rs",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "backend/src/routes/inventory.rs",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/handlers/sales_",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/handlers/quotation_",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/handlers/ar_",
+      "chains": ["sale-to-cash", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/handlers/logistics",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/handlers/purchase_",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "backend/src/handlers/ap_",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "backend/src/handlers/quality_",
+      "chains": ["purchase-to-pay", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/handlers/outsourcing_",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "backend/src/handlers/greige_fabric_",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "backend/src/handlers/cost_collection_",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "backend/src/handlers/sales_return_",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "backend/src/handlers/report_",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "backend/src/handlers/inventory_",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/services/sales_",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/services/so/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/services/quotation_",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/services/ar",
+      "chains": ["sale-to-cash", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/services/logistics_",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/services/dye_vat_occupation",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/services/purchase_",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "backend/src/services/po/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "backend/src/services/ap",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "backend/src/services/quality_",
+      "chains": ["purchase-to-pay", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/services/outsourcing_",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "backend/src/services/cost_collection_",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "backend/src/services/dye_batch_cost_bridge",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "backend/src/services/sales_return",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "backend/src/services/report",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "backend/src/services/inventory_",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/services/inv/",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/models/sales_order",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/models/sales_delivery",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/models/sales_quotation",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/models/quotation_",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/models/ar_",
+      "chains": ["sale-to-cash", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/models/logistics_",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/models/dye_vat_occupation",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "backend/src/models/purchase_",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "backend/src/models/ap_",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "backend/src/models/quality_",
+      "chains": ["purchase-to-pay", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/models/outsourcing_order",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "backend/src/models/cost_",
+      "chains": ["outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/models/sales_return",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "backend/src/models/after_sales",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "backend/src/models/report_",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "backend/src/models/inventory_",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "backend/src/models/warehouse",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    }
+  ]
+}
