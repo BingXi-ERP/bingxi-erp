@@ -656,11 +656,15 @@ impl super::PrintService {
         })
     }
 
-    /// 应收对账单 xlsx 导出（规整表格版；缸号块合并版式待 xlsx 引擎富表格合并入干后升级）。
+    /// 应收对账单 xlsx 导出（富表格版；带操作员/时间水印，金额大写按本期应收合计生成）。
     /// 存什么：主表四账务字段与单据头 + 明细行（ar_reconciliation_items 全量）。
     /// 数据从哪来：复用 get_ar_reconciliation_print_data 的行级归属门取数（英文键），
     /// 明细由本函数按 reconciliation_id 全量补查。
-    pub async fn build_ar_reconciliation_xlsx(&self, id: i32) -> Result<Vec<u8>, AppError> {
+    pub async fn build_ar_reconciliation_xlsx(
+        &self,
+        id: i32,
+        watermark: &crate::utils::xlsx_export::WatermarkConfig,
+    ) -> Result<Vec<u8>, AppError> {
         let print_data = self.get_ar_reconciliation_print_data(id).await?;
         use crate::models::ar_reconciliation_item;
         let items = ar_reconciliation_item::Entity::find()
@@ -669,8 +673,16 @@ impl super::PrintService {
             .all(&*self.db)
             .await?;
 
-        let table = build_recon_xlsx_table(&print_data.data, &items, None);
-        crate::utils::xlsx_export::build_xlsx_rich(&table)
+        let total_invoices = print_data
+            .data
+            .get("total_invoices")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| AppError::internal("应收对账单取数缺少 total_invoices"))?
+            .parse::<rust_decimal::Decimal>()
+            .map_err(|e| AppError::internal(format!("应收对账单货款总计解析失败: {e}")))?;
+        let words = crate::utils::amount_in_words::amount_in_words(total_invoices);
+        let table = build_recon_xlsx_table(&print_data.data, &items, Some(&words));
+        crate::utils::xlsx_export::build_xlsx_rich_with_watermark(&table, watermark)
     }
 }
 
@@ -701,8 +713,8 @@ fn recon_match_label(match_status: &str) -> &'static str {
 /// 组装应收对账单 xlsx 富表格（纯函数，可单测）。
 /// 10 列基准，自由布局：标题 → 客户/日期 → 期间/部门 → 账务四字段 → 明细表头
 /// → 明细行×N → 合计 → 大写金额 → 签收 → 质量条款。
-/// `amount_in_words`：大写金额文案由调用方注入（金额大写工具车道合并后传 Some），
-/// None 时该格留空，禁在本函数内造第二套大写实现。
+/// `amount_in_words`：大写金额文案由调用方注入，None 时该格留空，
+/// 禁在本函数内造第二套大写实现。
 fn build_recon_xlsx_table(
     data: &HashMap<String, serde_json::Value>,
     items: &[crate::models::ar_reconciliation_item::Model],

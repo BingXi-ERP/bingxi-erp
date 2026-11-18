@@ -8,7 +8,7 @@
 //! 映射为与 docx 版相同的 `print` 动作（动作码不容连字符，显式映射，非方法派生 read 兜底）。
 //!
 //! 版式：XlsxRichTable（feat/xlsx-engine-merge 引擎）——标题合并/账务四字段/明细/大写占位。
-//! 大写金额文案由 `feat/amount-in-words` 车道的工具注入（当前 None 占位，合并后接入）。
+//! 大写金额文案由金额大写工具按本期应收合计注入，水印记录操作员与导出时间。
 
 use std::sync::Arc;
 
@@ -23,7 +23,7 @@ use crate::models::audit_log::{OperationType, Severity};
 use crate::services::audit_log_service::{AuditEvent, AuditLogService};
 use crate::services::print_service::PrintService;
 use crate::utils::error::AppError;
-use crate::utils::xlsx_export::xlsx_response;
+use crate::utils::xlsx_export::{WatermarkConfig, xlsx_response};
 
 /// 应收对账单 xlsx 打印（镜像 ar_reconciliation_print_docx 鉴权与参数）：
 /// 先走 get_print_data 的行级归属门/业务门控（未通过即报错，不产文件），
@@ -38,7 +38,15 @@ pub async fn ar_reconciliation_print_xlsx(
     service
         .get_print_data(&scope_ctx, "ar_reconciliation", doc_id)
         .await?;
-    let bytes = service.build_ar_reconciliation_xlsx(doc_id).await?;
+    let watermark = WatermarkConfig {
+        operator: Some(auth.username.clone()),
+        ip_address: None,
+        exported_at: Some(chrono::Utc::now().to_rfc3339()),
+        extra: Some("应收对账单打印".to_string()),
+    };
+    let bytes = service
+        .build_ar_reconciliation_xlsx(doc_id, &watermark)
+        .await?;
     record_print_audit(&state, &auth, "ar_reconciliation", doc_id);
     Ok(xlsx_response(bytes, &format!("ar_reconciliation_{doc_id}")))
 }

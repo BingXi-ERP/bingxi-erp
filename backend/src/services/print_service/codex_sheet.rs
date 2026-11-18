@@ -360,7 +360,7 @@ fn fmt_decimal(value: &Decimal) -> String {
 /// 表级列宽：匹列窄列，金额/品名宽列
 fn column_widths(piece_cols: usize) -> Vec<f64> {
     let mut widths = vec![14.0, 12.0, 10.0];
-    widths.extend(std::iter::repeat(7.0).take(piece_cols));
+    widths.extend(std::iter::repeat_n(7.0, piece_cols));
     widths.extend([6.0, 10.0, 4.0, 10.0, 12.0]);
     widths
 }
@@ -374,6 +374,8 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use rust_decimal_macros::dec;
+
+    type MergedRanges = Vec<(u32, u32, u32, u32)>;
 
     fn item(
         id: i32,
@@ -526,7 +528,7 @@ mod tests {
     // ---------- 版式（calamine 读回） ----------
 
     /// 读回 xlsx：返回 (单元格文本, 合并区 (首行,首列,末行,末列) 集合)
-    fn read_back(bytes: &[u8]) -> (calamine::Range<calamine::Data>, Vec<(u32, u32, u32, u32)>) {
+    fn read_back(bytes: &[u8]) -> (calamine::Range<calamine::Data>, MergedRanges) {
         use calamine::{Reader, Xlsx};
         let cursor = std::io::Cursor::new(bytes.to_vec());
         let mut workbook = Xlsx::new(cursor).expect("读回 xlsx 应成功");

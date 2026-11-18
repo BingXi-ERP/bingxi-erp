@@ -628,11 +628,13 @@ mod rich_table_tests {
     use super::*;
     use calamine::{Data, Reader, Xlsx};
 
+    type MergedRanges = Vec<(u32, u32, u32, u32)>;
+
     /// 用 calamine 从内存字节读回 xlsx：返回 (值矩阵, 合并区列表)
     fn read_back(
         bytes: &[u8],
         sheet_name: &str,
-    ) -> Result<(calamine::Range<Data>, Vec<(u32, u32, u32, u32)>), String> {
+    ) -> Result<(calamine::Range<Data>, MergedRanges), String> {
         let mut workbook: Xlsx<std::io::Cursor<&[u8]>> =
             Xlsx::new(std::io::Cursor::new(bytes)).map_err(|e| e.to_string())?;
         let range = workbook

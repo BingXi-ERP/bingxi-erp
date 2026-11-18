@@ -2,8 +2,7 @@
 //!
 //! 真实业务单据（WPS 表格取证）：行级明细（品名/缸号/颜色/色号/成分/米/单价/金额），
 //! 汇总（货款总计/上单结余/上期欠款/实收/应收），制单/客户签收；单号格式
-//! `BX-DY2607-1356`（前缀 + YYMM + 横杠 + 3 位流水，由
-//! `utils/number_generator.rs::generate_no_ym_with_txn` 承接）。
+//! `BX-DY2607-1356`（前缀 + YYMM + 横杠 + 3 位流水，由开单方按该号段写入）。
 //!
 //! 列语义（判据逐条对应）：
 //! - `document_no`：单据号，`uq_sample_dispatch_orders_document_no` 唯一索引兜底
@@ -70,7 +69,7 @@ CREATE INDEX IF NOT EXISTS "idx_sample_dispatch_orders_customer"
     ON "sample_dispatch_orders" ("customer_id");
 
 COMMENT ON TABLE "sample_dispatch_orders" IS '调样单主表：行级明细见 sample_dispatch_items';
-COMMENT ON COLUMN "sample_dispatch_orders"."document_no" IS '单据号（{前缀}{YYMM}-{3位流水}，样例 BX-DY2607-1356，取号方 generate_no_ym_with_txn）';
+COMMENT ON COLUMN "sample_dispatch_orders"."document_no" IS '单据号（{前缀}{YYMM}-{3位流水}，样例 BX-DY2607-1356，开单方按该号段写入）';
 COMMENT ON COLUMN "sample_dispatch_orders"."customer_id" IS '客户 ID（customers.id，同宽 INTEGER）';
 COMMENT ON COLUMN "sample_dispatch_orders"."department" IS '制单部门';
 COMMENT ON COLUMN "sample_dispatch_orders"."dispatch_date" IS '调样日期';

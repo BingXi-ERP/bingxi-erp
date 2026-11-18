@@ -1929,7 +1929,7 @@ pub async fn copy_print_template(
 /// /api/v1/erp/sales/orders）；明细取数按 id 升序逐匹成行，产品名称走 LoaderTrait
 /// `load_one` 单次查询范式（禁止逐行再查），缸号聚合与版式全部收敛在
 /// [`crate::services::print_service::codex_sheet`]，本 handler 只装配入参。
-/// 货款总计大写金额与结余类占位金额本切片不接生成器/转换器，待 A 车道合并后接入。
+/// 货款总计大写金额由发货单总金额经金额大写工具生成后注入版式。
 pub async fn sales_delivery_codex_sheet_xlsx(
     // 路由为 /orders/{id}/deliveries/{delivery_id}/codex-sheet（两段参数），
     // axum Path 单值提取多段路径会 500，必须用 tuple 提取并取第二段
@@ -1999,7 +1999,7 @@ pub async fn sales_delivery_codex_sheet_xlsx(
         department: DEFAULT_DEPARTMENT.to_string(),
         sheet_date: delivery.delivery_date.to_string(),
         rows,
-        // 结余类占位金额：本切片无对账数据源，占位为零，A 车道合并后接入
+        // 结余类金额本端点无对账数据源，仍按零占位；货款总计大写另由总金额生成
         previous_balance: Decimal::ZERO,
         received_amount: Decimal::ZERO,
         receivable_amount: Decimal::ZERO,
@@ -2015,8 +2015,8 @@ pub async fn sales_delivery_codex_sheet_xlsx(
             phone: DEFAULT_PHONE.to_string(),
         },
     };
-    // 货款总计大写金额：A 车道（amount_in_words）合并后接入，本切片传 None 落空串
-    let bytes = codex_sheet::build_codex_sheet_xlsx(&input, None)?;
+    let total_amount_words = crate::utils::amount_in_words::amount_in_words(delivery.total_amount);
+    let bytes = codex_sheet::build_codex_sheet_xlsx(&input, Some(&total_amount_words))?;
     record_codex_sheet_audit(&state, &auth, delivery_id);
     Ok(crate::utils::xlsx_export::xlsx_response(
         bytes,
