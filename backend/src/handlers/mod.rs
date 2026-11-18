@@ -15,6 +15,7 @@ pub mod department_handler;
 pub mod dual_unit_converter_handler;
 pub mod finance_invoice_handler;
 pub mod finance_payment_handler;
+pub mod payment_channel_handler;
 pub mod finance_report_handler;
 pub mod five_dimension_handler;
 pub mod health_handler;
