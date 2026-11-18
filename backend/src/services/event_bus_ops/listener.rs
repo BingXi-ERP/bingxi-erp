@@ -12,7 +12,7 @@
 
 use crate::search::SearchClient;
 use crate::services::event_bus::{
-    lock_event_bus_state, BusinessEvent, EVENT_BUS, MAIN_LISTENER_HANDLE,
+    BusinessEvent, EVENT_BUS, MAIN_LISTENER_HANDLE, lock_event_bus_state,
 };
 use crate::services::event_retry_service::EventRetryService;
 use crate::utils::error::AppError;
@@ -2004,10 +2004,10 @@ async fn refresh_supplier_name_redundancy(
     supplier_id: i32,
     new_name: &str,
 ) -> Result<(), AppError> {
-    use sea_orm::sea_query::Expr;
     use sea_orm::ColumnTrait;
     use sea_orm::EntityTrait;
     use sea_orm::QueryFilter;
+    use sea_orm::sea_query::Expr;
 
     let now = chrono::Utc::now();
     // purchase_contracts
