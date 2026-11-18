@@ -35,7 +35,9 @@
         prop="payment_method"
         :label="t('apModule.payment.paymentMethod')"
         width="110"
-      />
+      >
+        <template #default="{ row }">{{ paymentMethodLabel(row.payment_method) }}</template>
+      </el-table-column>
       <el-table-column
         prop="request_amount"
         :label="t('apModule.paymentRequest.requestAmount')"
@@ -138,12 +140,41 @@
           </el-select>
         </el-form-item>
         <el-form-item :label="t('apModule.payment.paymentMethod')" prop="payment_method">
-          <el-select v-model="form.payment_method">
-            <el-option label="银行转账" value="bank_transfer" />
-            <el-option label="现金" value="cash" />
-            <el-option label="支票" value="check" />
-            <el-option label="承兑" value="bill" />
+          <el-select
+            v-model="form.payment_method"
+            :loading="methodsLoading"
+            :disabled="methodsLoading"
+            data-testid="payment-method"
+          >
+            <el-option
+              v-for="option in methodOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+            <el-option
+              v-if="
+                form.payment_method &&
+                !methodOptions.some(option => option.value === form.payment_method)
+              "
+              :value="form.payment_method"
+              :label="
+                paymentMethodLabel(form.payment_method) +
+                ' · ' +
+                t('paymentChannels.historicalMethod')
+              "
+              disabled
+            />
           </el-select>
+          <el-alert
+            v-if="methodsFailed"
+            :title="t('paymentChannels.optionsFailed')"
+            type="error"
+            :closable="false"
+            data-testid="payment-method-error"
+          >
+            <el-button @click="refreshMethods">{{ t('common.refresh') }}</el-button>
+          </el-alert>
         </el-form-item>
         <el-form-item :label="t('apModule.paymentRequest.requestAmount')" prop="request_amount">
           <el-input v-model="requestAmountField.text" @blur="requestAmountField.normalize()" />
@@ -314,6 +345,7 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
+import { paymentMethodLabel, usePaymentMethods } from '@/composables/usePaymentMethods';
 import { ref, reactive, toRef, watch, onMounted } from 'vue';
 import {
   createNumberFieldPool,
@@ -344,6 +376,12 @@ import {
 } from '@/api/ap';
 
 const { t } = useI18n({ useScope: 'global' });
+const {
+  options: methodOptions,
+  loading: methodsLoading,
+  failed: methodsFailed,
+  refresh: refreshMethods,
+} = usePaymentMethods();
 
 const requests = ref<APPaymentRequest[]>([]);
 const loading = ref(false);
@@ -618,10 +656,11 @@ const resetForm = () => {
   applyAmountField.forget();
 };
 
-const openCreateDialog = () => {
+const openCreateDialog = async () => {
   editId.value = null;
   resetForm();
   dialogVisible.value = true;
+  await refreshMethods();
 };
 
 const openEditDialog = (row: APPaymentRequest) => {
@@ -637,6 +676,7 @@ const openEditDialog = (row: APPaymentRequest) => {
   form.bank_name = row.bank_name || '';
   form.notes = row.notes || '';
   dialogVisible.value = true;
+  void refreshMethods();
 };
 
 const handleSubmit = async () => {

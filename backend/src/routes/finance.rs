@@ -731,6 +731,10 @@ fn ap_payment_request_routes() -> Router<AppState> {
             post(ap_payment_request_handler::create_request),
         )
         .route(
+            "/ap/payment-requests/payment-methods",
+            get(crate::handlers::payment_channel_handler::list_payment_channel_options),
+        )
+        .route(
             "/ap/payment-requests/{id}",
             get(ap_payment_request_handler::get_request),
         )

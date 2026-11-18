@@ -21,6 +21,7 @@ pub mod error;
 // 批次 348 v12 复审 P2-2：fabric_five_dimension 模块已删除（死代码，仅被已删除的 five_dimension_query_service 引用）
 pub mod incoterms;
 pub mod password_validator;
+pub mod payment_channel_crypto;
 pub mod path_utils;
 // 查询参数边界归一化：把「空串查询参数」在 HTTP 边界一次性视为「未提供」（见模块文档）
 pub mod query_params;

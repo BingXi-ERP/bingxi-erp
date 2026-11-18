@@ -132,6 +132,7 @@ export const ROUTE_PERMISSIONS: Record<string, RoutePermValue> = {
   'system-audit-log': 'audit-logs:read',
   'system-export-approvals': 'audit-logs:read',
   'system-slow-query': 'audit-logs:read',
+  'payment-channels': 'payment-channels:read',
   finance: 'finance:read',
   // /ap 的门控已从粗域键收成九枚应付族细键（六页签入口判据的并集），
   // 值顺序与 router 源文本内的字面量数组逐项对应；出纳等只持财务域其他细读权的岗位

@@ -3,6 +3,7 @@
 // 覆盖范围：客户创建 → 编辑 → 删除 + 客户 360 详情
 import { test, expect } from '../diagnose-fixture';
 import { applyAuthMocks } from '../smoke/_helpers';
+import { apiCallRaw } from '../flow/helpers';
 
 test.describe('01 客户管理', () => {
   test.beforeEach(async ({ page, context }) => {
@@ -34,9 +35,13 @@ test.describe('01 客户管理', () => {
     // 对 readonly 元素 fill 会被 Playwright 判 not editable（同型先例见 fabric 染色批次），故不填写，只断只读。
     const codeInput = dlg.getByLabel('客户编码');
     expect(await codeInput.isEditable(), '新建客户：客户编码应只读（后端自动取号）').toBe(false);
-    await dlg.getByLabel('客户名称').fill(`E2E 测试客户 ${Date.now()}`);
-    await dlg.getByLabel('联系人').fill('张三');
-    await dlg.getByLabel('联系电话').fill('13800138000');
+    // 录入值收口成变量，供写后逐列回读逐字比对，避免回读时另写一套字面量
+    const customerName = `E2E 测试客户 ${Date.now()}`;
+    const contactPerson = '张三';
+    const customerPhone = '13800138000';
+    await dlg.getByLabel('客户名称').fill(customerName);
+    await dlg.getByLabel('联系人').fill(contactPerson);
+    await dlg.getByLabel('联系电话').fill(customerPhone);
     await dlg.getByLabel('邮箱').fill('test@example.com');
     // 抓取前端真实提交请求体 + 响应（跳过 CSRF 瞬态 403 重放，同 flow/68 captureUiSubmit 口径；
     // 持续真 403 会因等不到非 403 响应而超时判红，不被掩盖）
@@ -64,13 +69,29 @@ test.describe('01 客户管理', () => {
       Object.prototype.hasOwnProperty.call(body, 'customer_code'),
       `[01-02] 请求体必须省略 customer_code 键（后端自动取号），实际=${raw}`
     ).toBe(false);
-    const json = (await resp.json()) as { code?: number };
+    const json = (await resp.json()) as { code?: number; data?: { id?: number } };
     expect(json.code, `[01-02] 成功信封 code=200，实际请求体=${raw}`).toBe(200);
     // 只读化要点已由 isEditable=false + 请求省略 customer_code 键 + 成功 200 充分证明；
     // 建码由后端 CustomerFormTab 提交路径触发服务端取号，响应回读属列表用例覆盖。
     await expect(page.getByText(/创建成功|保存成功/)).toBeVisible({
       timeout: 30000,
     });
+
+    // 写后逐列回读：toast 与 200 只证明前端提示，真值以详情接口回读为准，
+    // 防"提示成功但未落库/落错列"的假绿。手机号/邮箱属按角色脱敏列，这里只钉非 PII 的三列。
+    const createdId = Number(json.data?.id);
+    expect(createdId, '[01-02] 建客户响应应返回真实主键').toBeGreaterThan(0);
+    const detail = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/crm/customers/${createdId}`
+    );
+    expect(detail.customer_name, '[01-02] 客户名称应逐字落库').toBe(customerName);
+    expect(detail.contact_person, '[01-02] 联系人应逐字落库').toBe(contactPerson);
+    expect(
+      typeof detail.customer_code === 'string' && detail.customer_code.length > 0,
+      '[01-02] 客户编码应由服务端自动取号且非空'
+    ).toBe(true);
   });
 
   test('01-03 客户列表支持筛选', async ({ page }) => {
