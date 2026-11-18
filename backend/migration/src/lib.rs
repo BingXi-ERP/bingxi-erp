@@ -375,6 +375,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::like_acceleration::Migration),
             // 周期任务执行历史表，链尾独立域（存量复用库上属 pending 必然执行）
             Box::new(domain::scheduler_observability::Migration),
+            // 批色库存联动失败持久化待补标记两列，链尾独立域（存量复用库上属 pending 必然执行）
+            Box::new(domain::bulk_color_stock_sync_pending::Migration),
         ]
     }
 }

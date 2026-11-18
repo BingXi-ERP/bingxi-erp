@@ -24,9 +24,9 @@
 use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, FromQueryResult,
-    JoinType, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait, Select, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, EntityTrait,
+    FromQueryResult, JoinType, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+    Select, Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -48,7 +48,7 @@ use crate::models::status::purchase_inventory::inventory_stock_grade;
 use crate::models::status::purchase_inventory::inventory_stock_quality_status as quality_status;
 use crate::models::status::quality_dyeing::dye_batch_lifecycle_status as batch_status;
 use crate::models::user;
-use crate::utils::data_scope::{DataScopeContext, apply_department_scope};
+use crate::utils::data_scope::{apply_department_scope, DataScopeContext};
 
 /// 业务错误
 #[derive(Debug, Error)]
@@ -283,6 +283,69 @@ pub fn evaluate_delta_e(delta_e: f64, high_light_sensitive: bool) -> DeltaEResul
     }
 }
 
+/// 库存联动待补标记腿（is_err 审计条目 14）：
+/// `Grade` 对应降级腿的 `stock_grade_sync_pending` 列，
+/// `Scrap` 对应报废腿的 `stock_scrap_sync_pending` 列。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StockSyncLeg {
+    /// 降级腿：inventory_stocks.grade 联动失败待补
+    Grade,
+    /// 报废腿：inventory_stocks.stock_status/quality_status 联动失败待补
+    Scrap,
+}
+
+/// 构建库存联动待补标记的更新行（纯函数，供 [`BulkColorApprovalService::set_stock_sync_pending`]
+/// 与契约测试共用）：仅 Set 主键与对应腿的标记列，另一腿列保持 NotSet 不被误改写。
+pub fn build_stock_sync_pending_active(
+    id: i64,
+    leg: StockSyncLeg,
+    pending: bool,
+) -> bulk_color_approval::ActiveModel {
+    let mut active: bulk_color_approval::ActiveModel = Default::default();
+    active.id = Set(id);
+    match leg {
+        StockSyncLeg::Grade => active.stock_grade_sync_pending = Set(pending),
+        StockSyncLeg::Scrap => active.stock_scrap_sync_pending = Set(pending),
+    }
+    active
+}
+
+/// 构建批色状态变更历史行（纯函数，供 [`BulkColorApprovalService::record_history`]
+/// 与契约测试共用）：`to_status`/`bulk_color_approval_id`/快照取自转换后的行模型，
+/// `from_status`/`reason` 取自调用方上下文。
+pub fn build_history_active(
+    from_status: Option<&str>,
+    model: &bulk_color_approval::Model,
+    operator_id: Option<i32>,
+    reason: Option<&str>,
+) -> bulk_color_approval_history::ActiveModel {
+    let snapshot = serde_json::json!({
+        "id": model.id,
+        "sales_order_id": model.sales_order_id,
+        "dye_batch_id": model.dye_batch_id,
+        "customer_id": model.customer_id,
+        "approval_status": model.approval_status,
+        "approver_id": model.approver_id,
+        "sent_to_customer_at": model.sent_to_customer_at,
+        "delta_e_value": model.delta_e_value,
+        "delivery_blocking": model.delivery_blocking,
+        "reject_reason": model.reject_reason,
+        "customer_feedback": model.customer_feedback,
+        "updated_at": model.updated_at,
+    });
+
+    bulk_color_approval_history::ActiveModel {
+        id: Default::default(),
+        bulk_color_approval_id: Set(model.id),
+        from_status: Set(from_status.map(|s| s.to_string())),
+        to_status: Set(model.approval_status.clone()),
+        operator_id: Set(operator_id),
+        reason: Set(reason.map(|s| s.to_string())),
+        snapshot: Set(Some(snapshot)),
+        created_at: Set(Utc::now()),
+    }
+}
+
 /// 批色时限配置（V15 P0-F17 审计报告 11.3）
 pub struct ApprovalTimeoutConfig {
     /// 提醒天数（默认 3 天）
@@ -379,13 +442,18 @@ impl BulkColorApprovalService {
             reject_reason: Set(None),
             delivery_blocking: Set(true),
             attachment_url: Set(None),
+            stock_grade_sync_pending: Set(false),
+            stock_scrap_sync_pending: Set(false),
             remark: Set(params.remark),
             created_at: Set(now),
             updated_at: Set(now),
         };
-        let model = active.insert(&*self.db).await?;
-        // P1-10：记录历史追溯（from=None → pending）
-        self.record_history(None, &model, None, None).await;
+        // is_err 审计条目 19：创建行的历史追溯与建行落在同一事务，历史写失败整体回滚上抛，
+        // 不允许出现"有单无史"的审批链断行。
+        let txn = self.db.begin().await?;
+        let model = active.insert(&txn).await?;
+        self.record_history(&txn, None, &model, None, None).await?;
+        txn.commit().await?;
         Ok(model)
     }
 
@@ -693,10 +761,11 @@ impl BulkColorApprovalService {
         active.updated_at = Set(now);
 
         let updated = active.update(&txn).await?;
-        txn.commit().await?;
 
         // 业务规则 5：剪样追溯
-        // 记录历史追溯（包含样布 ID 和库存扣减信息）
+        // 记录历史追溯（包含样布 ID 和库存扣减信息）。
+        // is_err 审计条目 19：历史写入并入本事务（状态更新/库存扣减/样布建行同事务），
+        // 失败整体回滚上抛，审批链不留缺行。
         if let Some(existing_piece_id) = params.sample_piece_id {
             tracing::debug!(
                 piece_id = existing_piece_id,
@@ -704,12 +773,14 @@ impl BulkColorApprovalService {
             );
         }
         self.record_history(
+            &txn,
             from_status.as_deref(),
             &updated,
             Some(params.operator_id),
             None,
         )
-        .await;
+        .await?;
+        txn.commit().await?;
 
         Ok(updated)
     }
@@ -744,10 +815,10 @@ impl BulkColorApprovalService {
         active.updated_at = Set(now);
 
         let updated = active.update(&txn).await?;
+        // is_err 审计条目 19：历史写入并入本事务，失败整体回滚上抛。
+        self.record_history(&txn, from_status.as_deref(), &updated, None, None)
+            .await?;
         txn.commit().await?;
-        // P1-10：记录历史追溯
-        self.record_history(from_status.as_deref(), &updated, None, None)
-            .await;
         Ok(updated)
     }
 
@@ -1009,13 +1080,26 @@ impl BulkColorApprovalService {
             .await?;
 
         // P0-F18：联动库存等级降级（审计报告：降级流程需更新 inventory_stocks.grade）
-        // 失败时仅记录警告，不阻塞状态转换（状态已提交，库存等级可后续补降）
-        if let Err(e) = self.apply_stock_downgrade(&model).await {
+        // 失败时记录警告，不阻塞状态转换（状态已提交）；同时落持久化待补标记
+        // （is_err 审计条目 14，m0142 补列 stock_grade_sync_pending）：
+        // warn 只进日志、重启即失忆，标记列让人工/后续对账能从库内点名哪条批色单待补降。
+        let sync_result = self.apply_stock_downgrade(&model).await;
+        if let Err(e) = &sync_result {
             tracing::warn!(
                 bulk_color_approval_id = model.id,
                 dye_batch_id = model.dye_batch_id,
                 error = %e,
                 "P0-F18: 库存等级降级失败，状态已转换，请人工补降库存等级"
+            );
+        }
+        if let Err(marker_err) = self
+            .set_stock_sync_pending(model.id, StockSyncLeg::Grade, sync_result.is_err())
+            .await
+        {
+            tracing::error!(
+                bulk_color_approval_id = model.id,
+                error = %marker_err,
+                "库存等级降级待补标记写入失败：补偿信号未持久化，需人工核对 inventory_stocks.grade 与本单"
             );
         }
 
@@ -1063,11 +1147,25 @@ impl BulkColorApprovalService {
         // scrapped 保持 delivery_blocking=true（需重新生产或换缸）
 
         let updated = active.update(&txn).await?;
+
+        // P1-10：记录历史追溯。
+        // is_err 审计条目 19：历史写入并入报废状态转换同一事务，失败整体回滚上抛。
+        self.record_history(
+            &txn,
+            from_status.as_deref(),
+            &updated,
+            None,
+            Some(&reject_reason),
+        )
+        .await?;
         txn.commit().await?;
 
         // P0-F18：联动库存报废（审计报告：报废流程需更新 inventory_stocks.stock_status='报废'）
-        // 失败时仅记录警告，不阻塞状态转换（状态已提交，库存报废可后续补执行）
-        if let Err(e) = self.apply_stock_scrap(&updated, &reject_reason).await {
+        // 失败时记录警告，不阻塞状态转换（状态已提交）；同时落持久化待补标记
+        // （is_err 审计条目 14，m0142 补列 stock_scrap_sync_pending）：
+        // warn 只进日志、重启即失忆，标记列让人工/后续对账能从库内点名哪条批色单待补报废。
+        let sync_result = self.apply_stock_scrap(&updated, &reject_reason).await;
+        if let Err(e) = &sync_result {
             tracing::warn!(
                 bulk_color_approval_id = updated.id,
                 dye_batch_id = updated.dye_batch_id,
@@ -1075,10 +1173,16 @@ impl BulkColorApprovalService {
                 "P0-F18: 库存报废标记失败，状态已转换，请人工补执行库存报废"
             );
         }
-
-        // P1-10：记录历史追溯
-        self.record_history(from_status.as_deref(), &updated, None, Some(&reject_reason))
-            .await;
+        if let Err(marker_err) = self
+            .set_stock_sync_pending(updated.id, StockSyncLeg::Scrap, sync_result.is_err())
+            .await
+        {
+            tracing::error!(
+                bulk_color_approval_id = updated.id,
+                error = %marker_err,
+                "库存报废待补标记写入失败：补偿信号未持久化，需人工核对 inventory_stocks 报废状态与本单"
+            );
+        }
 
         Ok(updated)
     }
@@ -1262,59 +1366,51 @@ impl BulkColorApprovalService {
         active.updated_at = Set(now);
 
         let updated = active.update(&txn).await?;
-        txn.commit().await?;
-        // P1-10：记录历史追溯
+        // is_err 审计条目 19：历史写入并入状态转换同一事务，失败整体回滚上抛，
+        // 不允许状态已推进而历史缺行。
         self.record_history(
+            &txn,
             from_status.as_deref(),
             &updated,
             approver_id,
             reason_for_history.as_deref(),
         )
-        .await;
+        .await?;
+        txn.commit().await?;
         Ok(updated)
     }
 
-    /// P1-10：记录批色状态变更历史（内部方法）（在事务提交后调用；若记录失败仅 warn，不阻塞主流程（状态已落库）。）
-    async fn record_history(
+    /// P1-10：记录批色状态变更历史（内部方法）。
+    /// is_err 审计条目 19：`db` 参数由调用方传入本状态转换的事务连接（`&txn`），
+    /// 历史行与状态更新同事务落库；insert 失败经 `?` 上抛、调用方在 commit 前短路，
+    /// 整体回滚——审批链绝不留"状态已推进、历史缺行"的断链。
+    async fn record_history<C: ConnectionTrait>(
         &self,
+        db: &C,
         from_status: Option<&str>,
         model: &bulk_color_approval::Model,
         operator_id: Option<i32>,
         reason: Option<&str>,
-    ) {
-        let snapshot = serde_json::json!({
-            "id": model.id,
-            "sales_order_id": model.sales_order_id,
-            "dye_batch_id": model.dye_batch_id,
-            "customer_id": model.customer_id,
-            "approval_status": model.approval_status,
-            "approver_id": model.approver_id,
-            "sent_to_customer_at": model.sent_to_customer_at,
-            "delta_e_value": model.delta_e_value,
-            "delivery_blocking": model.delivery_blocking,
-            "reject_reason": model.reject_reason,
-            "customer_feedback": model.customer_feedback,
-            "updated_at": model.updated_at,
-        });
+    ) -> Result<(), BulkColorApprovalError> {
+        let active = build_history_active(from_status, model, operator_id, reason);
+        active.insert(db).await?;
+        Ok(())
+    }
 
-        let active = bulk_color_approval_history::ActiveModel {
-            id: Default::default(),
-            bulk_color_approval_id: Set(model.id),
-            from_status: Set(from_status.map(|s| s.to_string())),
-            to_status: Set(model.approval_status.clone()),
-            operator_id: Set(operator_id),
-            reason: Set(reason.map(|s| s.to_string())),
-            snapshot: Set(Some(snapshot)),
-            created_at: Set(Utc::now()),
-        };
-
-        if let Err(e) = active.insert(&*self.db).await {
-            tracing::warn!(
-                bulk_color_approval_id = model.id,
-                error = %e,
-                "P1-10: 批色历史记录失败，状态已转换，请人工补录"
-            );
-        }
+    /// P0-F18：库存联动待补标记落库（is_err 审计条目 14，m0142 补列）。
+    /// `pending=true` 表示等级降级/报废联动失败、需人工按标记补执行；
+    /// `pending=false` 表示联动已成功（含对既有待补标记的清除）。
+    /// 标记写入自身失败由调用方以 error 级日志点名（不静默）。
+    async fn set_stock_sync_pending(
+        &self,
+        id: i64,
+        leg: StockSyncLeg,
+        pending: bool,
+    ) -> Result<(), BulkColorApprovalError> {
+        build_stock_sync_pending_active(id, leg, pending)
+            .update(&*self.db)
+            .await?;
+        Ok(())
     }
 
     /// P1-10：列出批色状态变更历史

@@ -215,3 +215,5 @@ pub mod delivery_signoff;
 pub mod like_acceleration;
 // 周期任务执行可观测域：scheduler_job_runs 执行历史表，链尾独立域（并入已应用域会被台账整体跳过）。
 pub mod scheduler_observability;
+// 批色库存联动失败持久化待补标记域：bulk_color_approval 补两列布尔标记，链尾独立域（存量复用库上属 pending 必然执行）。
+pub mod bulk_color_stock_sync_pending;
