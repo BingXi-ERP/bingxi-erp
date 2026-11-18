@@ -2015,8 +2015,18 @@ pub async fn sales_delivery_codex_sheet_xlsx(
             phone: DEFAULT_PHONE.to_string(),
         },
     };
-    // 货款总计大写金额：A 车道（amount_in_words）合并后接入，本切片传 None 落空串
-    let bytes = codex_sheet::build_codex_sheet_xlsx(&input, None)?;
+    let mut total_amount = rust_decimal::Decimal::ZERO;
+    for row in &input.rows {
+        let amount = row.unit_price.checked_mul(row.quantity).ok_or_else(|| {
+            AppError::validation(format!(
+                "细码单构建失败: 缸号 {} 金额计算溢出（单价 {} × 数量 {}）",
+                row.dye_lot_no, row.unit_price, row.quantity
+            ))
+        })?;
+        total_amount += amount;
+    }
+    let amount_words = crate::utils::amount_in_words::amount_in_words(total_amount);
+    let bytes = codex_sheet::build_codex_sheet_xlsx(&input, Some(&amount_words))?;
     record_codex_sheet_audit(&state, &auth, delivery_id);
     Ok(crate::utils::xlsx_export::xlsx_response(
         bytes,

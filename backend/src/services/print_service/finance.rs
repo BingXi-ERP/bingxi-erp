@@ -669,7 +669,9 @@ impl super::PrintService {
             .all(&*self.db)
             .await?;
 
-        let table = build_recon_xlsx_table(&print_data.data, &items, None);
+        let total_amount: rust_decimal::Decimal = items.iter().map(|item| item.amount).sum();
+        let amount_words = crate::utils::amount_in_words::amount_in_words(total_amount);
+        let table = build_recon_xlsx_table(&print_data.data, &items, Some(&amount_words));
         crate::utils::xlsx_export::build_xlsx_rich(&table)
     }
 }
@@ -701,8 +703,8 @@ fn recon_match_label(match_status: &str) -> &'static str {
 /// 组装应收对账单 xlsx 富表格（纯函数，可单测）。
 /// 10 列基准，自由布局：标题 → 客户/日期 → 期间/部门 → 账务四字段 → 明细表头
 /// → 明细行×N → 合计 → 大写金额 → 签收 → 质量条款。
-/// `amount_in_words`：大写金额文案由调用方注入（金额大写工具车道合并后传 Some），
-/// None 时该格留空，禁在本函数内造第二套大写实现。
+/// `amount_in_words`：大写金额文案由调用方注入，`None` 时该格留空，
+/// 禁在本函数内造第二套大写实现。
 fn build_recon_xlsx_table(
     data: &HashMap<String, serde_json::Value>,
     items: &[crate::models::ar_reconciliation_item::Model],

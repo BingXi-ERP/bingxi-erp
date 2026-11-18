@@ -177,7 +177,7 @@ pub fn group_items_by_dye_lot(
 
 /// 按细码单版式构建 xlsx 字节流。
 ///
-/// `amount_in_words` 为货款总计大写金额（A 车道合并后接入）；`None` 时大写格填空串。
+/// `amount_in_words` 为货款总计大写金额；`None` 时大写格填空串。
 /// 匹列数取明细最大匹数（下限 1 保住版式，上限 [`MAX_PIECE_COLUMNS`]，超出报 validation 错）。
 pub fn build_codex_sheet_xlsx(
     input: &CodexSheetInput,
