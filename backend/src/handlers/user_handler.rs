@@ -2,7 +2,7 @@ use crate::container::AppState;
 use crate::middleware::audit_context::AuditContext;
 use crate::middleware::auth_context::AuthContext;
 use crate::models::audit_log::{OperationType, Severity};
-use crate::models::{department, role, user};
+use crate::models::{department, event_dead_letter, role, user};
 use crate::services::audit_log_service::{AuditEvent, AuditLogService};
 use crate::services::auth_service::{self, AuthService};
 use crate::services::role_permission_service::RolePermissionService;
@@ -20,12 +20,12 @@ use crate::services::auth::password_policy_service::{
 use crate::utils::response::ApiResponse;
 use crate::utils::sql_escape::safe_like_pattern;
 use axum::{
-    Json,
     extract::{Extension, Multipart, Path, Query, State},
+    Json,
 };
 use sea_orm::{
     ColumnTrait, Condition, DatabaseConnection, EntityTrait, FromQueryResult, JoinType, Order,
-    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait, Set,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -555,16 +555,11 @@ pub async fn update_user(
         )
         .await?;
 
-    // V15 P1 12.8：role_id 变更后吊销目标用户所有旧 session（best-effort，失败仅 warn）
+    // V15 P1 12.8：role_id 变更后吊销目标用户所有旧 session
+    // 吊销失败会先重试 1 次、仍失败落 event_dead_letters（旧 JWT 在有效期内仍持旧权限，必须有持久化补偿载体）
     if role_changed {
         // 1. 吊销该用户所有历史 JWT（任何 iat < 当前时间戳的 Token 将被拒绝）
-        if let Err(e) = auth_service::revoke_user_jtis(id, "USER_ROLE_CHANGED").await {
-            tracing::warn!(
-                user_id = id,
-                error = %e,
-                "会话固定防护：吊销用户 JWT 失败（best-effort，不阻塞业务）"
-            );
-        } else {
+        if revoke_user_jtis_with_compensation(&state.db, id, "USER_ROLE_CHANGED").await {
             tracing::info!(
                 user_id = id,
                 operator = auth.user_id,
@@ -939,10 +934,99 @@ async fn update_password_and_revoke(
     user_model.password_changed_at = sea_orm::Set(Some(chrono::Utc::now()));
     user_model.update(db).await?;
 
-    if let Err(e) = auth_service::revoke_user_jtis(auth_user_id, "PASSWORD_CHANGED").await {
-        tracing::warn!(target: "security_audit", event = "TOKEN_REVOKE_FAILED", user_id = auth_user_id, error = %e, "[SECURITY] 修改密码后吊销用户 {} 的活跃 JWT 失败", auth_user_id);
-    }
+    revoke_user_jtis_with_compensation(db, auth_user_id, "PASSWORD_CHANGED").await;
     Ok(())
+}
+
+/// JWT 吊销死信的事件类型标识（写入方：user_handler 补偿逻辑；消费方：死信人工处理）
+const USER_JTI_REVOKE_DEAD_LETTER_EVENT: &str = "USER_JTI_REVOKE_FAILED";
+
+/// 角色变更/改密后吊销用户全部 JWT 的补偿封装。
+/// 调用方：update_user（角色变更）与 update_password_and_revoke（改密）。
+/// 入参 db 用于失败补偿时写 event_dead_letters（status=DEAD，payload 带 user_id/reason）。
+/// 返回 true 表示吊销成功；false 表示重试后仍失败且死信已落（或死信写入本身失败，仅显式日志）。
+async fn revoke_user_jtis_with_compensation(
+    db: &DatabaseConnection,
+    user_id: i32,
+    reason: &str,
+) -> bool {
+    if let Err(first_err) = auth_service::revoke_user_jtis(user_id, reason).await {
+        tracing::warn!(
+            target: "security_audit",
+            event = "TOKEN_REVOKE_RETRY_SCHEDULED",
+            user_id,
+            reason,
+            error = %first_err,
+            "[SECURITY] 吊销用户 JWT 首次失败，准备重试 1 次"
+        );
+    }
+    match auth_service::revoke_user_jtis(user_id, reason).await {
+        Ok(()) => {
+            tracing::info!(
+                target: "security_audit",
+                event = "TOKEN_REVOKE_RETRY_SUCCEEDED",
+                user_id,
+                reason,
+                "[SECURITY] 吊销用户 JWT 重试成功"
+            );
+            true
+        }
+        Err(retry_err) => {
+            tracing::error!(
+                target: "security_audit",
+                event = "TOKEN_REVOKE_FAILED",
+                user_id,
+                reason,
+                error = %retry_err,
+                "[SECURITY] 吊销用户 JWT 重试后仍失败，旧 JWT 有效期内仍可调用 API，落 event_dead_letters 补偿"
+            );
+            write_jti_revoke_dead_letter(db, user_id, reason, &retry_err.to_string()).await;
+            false
+        }
+    }
+}
+
+/// 把 JWT 吊销失败补偿记录落 event_dead_letters 表：event_type 固定为
+/// USER_JTI_REVOKE_FAILED，event_payload 存 {user_id, reason} 供人工按用户补吊销/强制下线。
+/// 死信写入自身失败时仅显式 error 日志（无更外层持久化载体）。
+async fn write_jti_revoke_dead_letter(
+    db: &DatabaseConnection,
+    user_id: i32,
+    reason: &str,
+    last_error: &str,
+) {
+    let now = chrono::Utc::now();
+    let dead_letter = event_dead_letter::ActiveModel {
+        event_type: Set(USER_JTI_REVOKE_DEAD_LETTER_EVENT.to_string()),
+        event_payload: Set(serde_json::json!({
+            "user_id": user_id,
+            "reason": reason,
+        })),
+        failure_reason: Set(
+            "吊销用户 JWT 重试 1 次后仍失败，旧 JWT 在有效期内仍持旧权限（待人工吊销/强制下线）"
+                .to_string(),
+        ),
+        last_error: Set(Some(last_error.to_string())),
+        retry_count: Set(1),
+        max_retries: Set(1),
+        status: Set(event_dead_letter::status::DEAD.to_string()),
+        first_failed_at: Set(now),
+        last_retry_at: Set(Some(now)),
+        resolved_at: Set(None),
+        resolved_by: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+        ..Default::default()
+    };
+    if let Err(e) = dead_letter.insert(db).await {
+        tracing::error!(
+            target: "security_audit",
+            user_id,
+            reason,
+            error = %e,
+            "[SECURITY] JWT 吊销死信写入 event_dead_letters 失败"
+        );
+    }
 }
 
 async fn save_password_history(
