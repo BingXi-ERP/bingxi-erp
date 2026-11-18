@@ -420,7 +420,7 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   // ---- 3. 产品色号（建色宿主产品自建自持，色号真实创建）----
   // 共享产品（readEntityIds 读到的列表行，如 seed id=20）可能在本 worker 建色时
   // 已被并行 worker 的收尾清理，POST /products/{id}/colors 会撞
-  // fk_product_colors_product 外键违例回 500 DATABASE_ERROR（#1272 run 实证
+  // fk_product_colors_product 外键违例回 500 DATABASE_ERROR（既往 CI run 实证
   // POST /products/20/colors）。且上面的补齐段只在基数不足 3 时才建产品：库中
   // 已有 ≥3 支共享行时一支都不建，末位并不归属本 worker。故建色宿主一律现建
   // 一支本 worker 专属产品（新建行不会进任何分片的收尾清理名单），与供应商/客户段
