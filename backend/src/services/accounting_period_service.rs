@@ -79,7 +79,10 @@ impl AccountingPeriodService {
         user_id: i32,
     ) -> Result<accounting_period::Model, AppError> {
         // V15 P2 B05-P2-10：期末调整（暂估/摊销/预提）自动确认。
-        // 在结账事务前处理，确保调整凭证计入本期试算平衡；失败仅 warn 不阻断结账。
+        // 在结账事务前处理，确保调整凭证计入本期试算平衡。确认失败必须中止结账：
+        // 此时期间尚未进入 CLOSING，中断零成本；若放行结账，期间 CLOSED 后这些调整
+        // 凭证既无法确认入账、也无法计入本期试算，损益与资产负债永久错报。
+        // 不接死信：期间关闭后重放补偿也无法把凭证计入已关闭的期间。
         if let Some(period_for_adjust) = accounting_period::Entity::find_by_id(period_id)
             .one(self.db.as_ref())
             .await?
@@ -93,12 +96,13 @@ impl AccountingPeriodService {
                     self.db.clone(),
                 );
             if let Err(e) = adjust_service.confirm_pending(&period_str, user_id).await {
-                tracing::warn!(
+                tracing::error!(
                     period_id,
                     period = %period_str,
-                    "期末调整自动确认失败（不阻断结账，B05-P2-10）：{}",
-                    e
+                    error = %e,
+                    "期末调整自动确认失败，中止结账"
                 );
+                return Err(e);
             }
         }
 
