@@ -40,11 +40,12 @@ interface NotificationSettingModel {
   system_notification_type: string;
 }
 
-/** 仓库实体（backend/src/models/warehouse.rs，出参键为 warehouse_code/name，非 code） */
+/** 仓库实体（backend/src/models/warehouse.rs：warehouse_code 无 rename；name 列 serde rename
+ * 为 warehouse_name，故出参键是 warehouse_code/warehouse_name，请求体字段才是 name）。 */
 interface WarehouseModel {
   id: number;
   warehouse_code: string;
-  name: string;
+  warehouse_name: string;
   address: string | null;
 }
 
@@ -177,7 +178,9 @@ test.describe('PUT 更新族五端点契约', () => {
       expect(updated.code, '更新仓库应成功').toBe(200);
       expect(updated.message, '更新仓库应带固定成功文案').toBe('更新成功');
       expect(updated.data.id, '更新回显 id 应不变').toBe(created.data.id);
-      expect(updated.data.name, 'name 应回显写入值').toBe(`E2E 更新契约仓改 ${stamp}`);
+      expect(updated.data.warehouse_name, 'warehouse_name 应回显写入值').toBe(
+        `E2E 更新契约仓改 ${stamp}`
+      );
       expect(updated.data.address, 'address 应回显写入值').toBe('e2e 改后地址');
       expect(updated.data.warehouse_code, 'warehouse_code 不应被更新改动').toBe(`E2E-PUT-${stamp}`);
     } finally {
