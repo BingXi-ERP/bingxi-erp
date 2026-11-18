@@ -213,29 +213,29 @@ mod tests {
         );
 
         assert_eq!(
-            model.event_type.into_value(),
-            Some("purchase_receipt_ap_generate_failed".to_string())
+            model.event_type.unwrap(),
+            "purchase_receipt_ap_generate_failed".to_string()
         );
         assert_eq!(
-            model.failure_reason.into_value(),
-            Some("入库单确认后自动生成应付账单失败".to_string())
+            model.failure_reason.unwrap(),
+            "入库单确认后自动生成应付账单失败".to_string()
         );
         assert_eq!(
-            model.last_error.into_value(),
+            model.last_error.unwrap(),
             Some("AP service unavailable".to_string())
         );
-        assert_eq!(model.retry_count.into_value(), Some(0));
-        assert_eq!(model.max_retries.into_value(), Some(MAX_RETRY_COUNT));
+        assert_eq!(model.retry_count.unwrap(), 0);
+        assert_eq!(model.max_retries.unwrap(), MAX_RETRY_COUNT);
         assert_eq!(
-            model.status.into_value(),
-            Some(event_dead_letter::status::DEAD.to_string())
+            model.status.unwrap(),
+            event_dead_letter::status::DEAD.to_string()
         );
         assert_eq!(model.resolved_at.into_value(), None);
         assert_eq!(model.resolved_by.into_value(), None);
         assert!(model.last_retry_at.into_value().is_some());
         assert!(model.first_failed_at.into_value().is_some());
 
-        let stored_payload = model.event_payload.into_value().expect("payload 必须落库");
+        let stored_payload = model.event_payload.unwrap();
         assert_eq!(stored_payload["receipt_id"], 7);
         assert_eq!(stored_payload["receipt_no"], "PR-20261117-0001");
         assert_eq!(stored_payload["user_id"], 3);
@@ -254,14 +254,14 @@ mod tests {
         );
 
         assert_eq!(
-            model.event_type.into_value(),
-            Some("dye_vat_release_failed".to_string())
+            model.event_type.unwrap(),
+            "dye_vat_release_failed".to_string()
         );
-        assert_eq!(model.retry_count.into_value(), Some(MAX_RETRY_COUNT));
-        assert_eq!(model.max_retries.into_value(), Some(MAX_RETRY_COUNT));
+        assert_eq!(model.retry_count.unwrap(), MAX_RETRY_COUNT);
+        assert_eq!(model.max_retries.unwrap(), MAX_RETRY_COUNT);
         assert_eq!(
-            model.status.into_value(),
-            Some(event_dead_letter::status::DEAD.to_string())
+            model.status.unwrap(),
+            event_dead_letter::status::DEAD.to_string()
         );
         assert_eq!(model.resolved_at.into_value(), None);
         assert_eq!(model.resolved_by.into_value(), None);
