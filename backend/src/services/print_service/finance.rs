@@ -1118,36 +1118,34 @@ fn build_ar_collection_xlsx_table(data: &PrintData) -> crate::utils::xlsx_export
     let get = |key: &str| cell_str(&data.data, key);
     const COLS: u16 = 4;
     let title = format!("应收收款单 {}", get("collection_no"));
-    let mut rows: Vec<Vec<XlsxRichCell>> = Vec::new();
-    rows.push(vec![XlsxRichCell::merged(title, COLS).bold().center()]);
-    rows.push(form_row(
-        "收款单号",
-        get("collection_no"),
-        "收款日期",
-        get("collection_date"),
-    ));
-    rows.push(form_row(
-        "客户ID",
-        get("customer_id"),
-        "客户名称",
-        get("customer_name"),
-    ));
-    rows.push(form_row(
-        "收款金额(元)",
-        get("collection_amount"),
-        "收款方式",
-        get("collection_method"),
-    ));
-    rows.push(form_row(
-        "银行账户",
-        get("bank_account"),
-        "单据状态",
-        collection_status_label(&get("status")).to_string(),
-    ));
-    rows.push(form_sign_row(
-        "经办人：__________  客户确认：__________",
-        COLS,
-    ));
+    let rows: Vec<Vec<XlsxRichCell>> = vec![
+        vec![XlsxRichCell::merged(title, COLS).bold().center()],
+        form_row(
+            "收款单号",
+            get("collection_no"),
+            "收款日期",
+            get("collection_date"),
+        ),
+        form_row(
+            "客户ID",
+            get("customer_id"),
+            "客户名称",
+            get("customer_name"),
+        ),
+        form_row(
+            "收款金额(元)",
+            get("collection_amount"),
+            "收款方式",
+            get("collection_method"),
+        ),
+        form_row(
+            "银行账户",
+            get("bank_account"),
+            "单据状态",
+            collection_status_label(&get("status")).to_string(),
+        ),
+        form_sign_row("经办人：__________  客户确认：__________", COLS),
+    ];
     XlsxRichTable {
         sheet_name: "应收收款单".to_string(),
         rows,
@@ -1163,38 +1161,31 @@ fn build_ap_payment_xlsx_table(data: &PrintData) -> crate::utils::xlsx_export::X
     let get = |key: &str| cell_str(&data.data, key);
     const COLS: u16 = 4;
     let title = format!("付款单 {}", get("payment_no"));
-    let mut rows: Vec<Vec<XlsxRichCell>> = Vec::new();
-    rows.push(vec![XlsxRichCell::merged(title, COLS).bold().center()]);
-    rows.push(form_row(
-        "付款单号",
-        get("payment_no"),
-        "付款日期",
-        get("payment_date"),
-    ));
-    rows.push(form_row(
-        "供应商ID",
-        get("supplier_id"),
-        "币种",
-        get("currency"),
-    ));
-    rows.push(form_row(
-        "付款金额",
-        get("payment_amount"),
-        "付款方式",
-        get("payment_method"),
-    ));
-    rows.push(form_row(
-        "付款状态",
-        payment_status_label(&get("payment_status")).to_string(),
-        "交易流水号",
-        get("transaction_no"),
-    ));
-    rows.push(form_row_wide("开户行", get("bank_name")));
-    rows.push(form_row_wide("银行账户", get("bank_account")));
-    rows.push(form_sign_row(
-        "经办人：__________  审批人：__________",
-        COLS,
-    ));
+    let rows: Vec<Vec<XlsxRichCell>> = vec![
+        vec![XlsxRichCell::merged(title, COLS).bold().center()],
+        form_row(
+            "付款单号",
+            get("payment_no"),
+            "付款日期",
+            get("payment_date"),
+        ),
+        form_row("供应商ID", get("supplier_id"), "币种", get("currency")),
+        form_row(
+            "付款金额",
+            get("payment_amount"),
+            "付款方式",
+            get("payment_method"),
+        ),
+        form_row(
+            "付款状态",
+            payment_status_label(&get("payment_status")).to_string(),
+            "交易流水号",
+            get("transaction_no"),
+        ),
+        form_row_wide("开户行", get("bank_name")),
+        form_row_wide("银行账户", get("bank_account")),
+        form_sign_row("经办人：__________  审批人：__________", COLS),
+    ];
     XlsxRichTable {
         sheet_name: "付款单".to_string(),
         rows,
@@ -1210,41 +1201,29 @@ fn build_ap_invoice_xlsx_table(data: &PrintData) -> crate::utils::xlsx_export::X
     let get = |key: &str| cell_str(&data.data, key);
     const COLS: u16 = 4;
     let title = format!("应付发票 {}", get("invoice_no"));
-    let mut rows: Vec<Vec<XlsxRichCell>> = Vec::new();
-    rows.push(vec![XlsxRichCell::merged(title, COLS).bold().center()]);
-    rows.push(form_row(
-        "发票号",
-        get("invoice_no"),
-        "发票类型",
-        get("invoice_type"),
-    ));
-    rows.push(form_row(
-        "供应商ID",
-        get("supplier_id"),
-        "开票日期",
-        get("invoice_date"),
-    ));
-    rows.push(form_row("到期日", get("due_date"), "币种", get("currency")));
-    rows.push(form_row(
-        "发票金额",
-        get("amount"),
-        "税额",
-        get("tax_amount"),
-    ));
-    rows.push(form_row(
-        "已付金额",
-        get("paid_amount"),
-        "未付金额",
-        get("unpaid_amount"),
-    ));
-    rows.push(form_row_wide(
-        "发票状态",
-        invoice_status_label(&get("invoice_status")).to_string(),
-    ));
-    rows.push(form_sign_row(
-        "经办人：__________  审批人：__________",
-        COLS,
-    ));
+    let rows: Vec<Vec<XlsxRichCell>> = vec![
+        vec![XlsxRichCell::merged(title, COLS).bold().center()],
+        form_row("发票号", get("invoice_no"), "发票类型", get("invoice_type")),
+        form_row(
+            "供应商ID",
+            get("supplier_id"),
+            "开票日期",
+            get("invoice_date"),
+        ),
+        form_row("到期日", get("due_date"), "币种", get("currency")),
+        form_row("发票金额", get("amount"), "税额", get("tax_amount")),
+        form_row(
+            "已付金额",
+            get("paid_amount"),
+            "未付金额",
+            get("unpaid_amount"),
+        ),
+        form_row_wide(
+            "发票状态",
+            invoice_status_label(&get("invoice_status")).to_string(),
+        ),
+        form_sign_row("经办人：__________  审批人：__________", COLS),
+    ];
     XlsxRichTable {
         sheet_name: "应付发票".to_string(),
         rows,
@@ -1262,36 +1241,30 @@ fn build_ap_payment_request_xlsx_table(
     let get = |key: &str| cell_str(&data.data, key);
     const COLS: u16 = 4;
     let title = format!("付款申请单 {}", get("request_no"));
-    let mut rows: Vec<Vec<XlsxRichCell>> = Vec::new();
-    rows.push(vec![XlsxRichCell::merged(title, COLS).bold().center()]);
-    rows.push(form_row(
-        "申请单号",
-        get("request_no"),
-        "申请日期",
-        get("request_date"),
-    ));
-    rows.push(form_row(
-        "供应商ID",
-        get("supplier_id"),
-        "付款类型",
-        get("payment_type"),
-    ));
-    rows.push(form_row(
-        "付款方式",
-        get("payment_method"),
-        "币种",
-        get("currency"),
-    ));
-    rows.push(form_row(
-        "申请金额",
-        get("request_amount"),
-        "期望付款日期",
-        get("expected_payment_date"),
-    ));
-    rows.push(form_row_wide("开户行", get("bank_name")));
-    rows.push(vec![
-        XlsxRichCell::merged("关联发票明细", COLS).bold().center(),
-    ]);
+    let mut rows: Vec<Vec<XlsxRichCell>> = vec![
+        vec![XlsxRichCell::merged(title, COLS).bold().center()],
+        form_row(
+            "申请单号",
+            get("request_no"),
+            "申请日期",
+            get("request_date"),
+        ),
+        form_row(
+            "供应商ID",
+            get("supplier_id"),
+            "付款类型",
+            get("payment_type"),
+        ),
+        form_row("付款方式", get("payment_method"), "币种", get("currency")),
+        form_row(
+            "申请金额",
+            get("request_amount"),
+            "期望付款日期",
+            get("expected_payment_date"),
+        ),
+        form_row_wide("开户行", get("bank_name")),
+        vec![XlsxRichCell::merged("关联发票明细", COLS).bold().center()],
+    ];
     for item in &data.items {
         rows.push(form_row(
             "发票ID",
@@ -1418,40 +1391,30 @@ fn build_foreign_exchange_verification_xlsx_table(
     let get = |key: &str| cell_str(&data.data, key);
     const COLS: u16 = 4;
     let title = format!("外汇核销单 {}", get("verification_no"));
-    let mut rows: Vec<Vec<XlsxRichCell>> = Vec::new();
-    rows.push(vec![XlsxRichCell::merged(title, COLS).bold().center()]);
-    rows.push(form_row(
-        "核销单号",
-        get("verification_no"),
-        "核销日期",
-        get("verification_date"),
-    ));
-    rows.push(form_row(
-        "报关单ID",
-        get("customs_declaration_id"),
-        "销售订单ID",
-        get("sales_order_id"),
-    ));
-    rows.push(form_row(
-        "外币金额",
-        get("foreign_currency_amount"),
-        "人民币金额",
-        get("rmb_amount"),
-    ));
-    rows.push(form_row(
-        "汇率",
-        get("exchange_rate"),
-        "银行编码",
-        get("bank_code"),
-    ));
-    rows.push(form_row_wide(
-        "单据状态",
-        fx_status_label(&get("status")).to_string(),
-    ));
-    rows.push(form_sign_row(
-        "经办人：__________  复核人：__________",
-        COLS,
-    ));
+    let rows: Vec<Vec<XlsxRichCell>> = vec![
+        vec![XlsxRichCell::merged(title, COLS).bold().center()],
+        form_row(
+            "核销单号",
+            get("verification_no"),
+            "核销日期",
+            get("verification_date"),
+        ),
+        form_row(
+            "报关单ID",
+            get("customs_declaration_id"),
+            "销售订单ID",
+            get("sales_order_id"),
+        ),
+        form_row(
+            "外币金额",
+            get("foreign_currency_amount"),
+            "人民币金额",
+            get("rmb_amount"),
+        ),
+        form_row("汇率", get("exchange_rate"), "银行编码", get("bank_code")),
+        form_row_wide("单据状态", fx_status_label(&get("status")).to_string()),
+        form_sign_row("经办人：__________  复核人：__________", COLS),
+    ];
     XlsxRichTable {
         sheet_name: "外汇核销单".to_string(),
         rows,
