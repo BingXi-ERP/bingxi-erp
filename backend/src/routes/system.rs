@@ -512,4 +512,13 @@ pub fn routes() -> Router<AppState> {
         .merge(slow_queries())
         .merge(document_no())
         .merge(company_profile())
+        .route(
+            "/payment-channels",
+            get(crate::handlers::payment_channel_handler::list_payment_channels),
+        )
+        .route(
+            "/payment-channels/{channel_code}",
+            get(crate::handlers::payment_channel_handler::get_payment_channel)
+                .put(crate::handlers::payment_channel_handler::update_payment_channel),
+        )
 }
