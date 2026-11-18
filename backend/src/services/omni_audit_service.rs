@@ -21,11 +21,11 @@ static INSERT_WRITTEN_COUNT: OnceLock<AtomicU64> = OnceLock::new();
 static INSERT_DISCARD_COUNT: OnceLock<AtomicU64> = OnceLock::new();
 
 fn written_counter() -> &'static AtomicU64 {
-    INSERT_WRITTEN_COUNT.get_or_init(AtomicU64::new)
+    INSERT_WRITTEN_COUNT.get_or_init(|| AtomicU64::new(0))
 }
 
 fn discard_counter() -> &'static AtomicU64 {
-    INSERT_DISCARD_COUNT.get_or_init(AtomicU64::new)
+    INSERT_DISCARD_COUNT.get_or_init(|| AtomicU64::new(0))
 }
 
 /// 读取审计写入/丢弃累计计数（写入=成功 insert 总数，丢弃=首次写入失败总数）。

@@ -20,12 +20,12 @@ use crate::services::auth::password_policy_service::{
 use crate::utils::response::ApiResponse;
 use crate::utils::sql_escape::safe_like_pattern;
 use axum::{
-    extract::{Extension, Multipart, Path, Query, State},
     Json,
+    extract::{Extension, Multipart, Path, Query, State},
 };
 use sea_orm::{
-    ColumnTrait, Condition, DatabaseConnection, EntityTrait, FromQueryResult, JoinType, Order,
-    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait, Set,
+    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, FromQueryResult,
+    JoinType, Order, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait, Set,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
