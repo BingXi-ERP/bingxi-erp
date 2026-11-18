@@ -51,8 +51,8 @@ impl super::PrintService {
         let customer_name = crate::models::customer::Entity::find_by_id(record.customer_id)
             .one(&*self.db)
             .await?
-            .map(|c| c.customer_name)
-            .unwrap_or_default();
+            .ok_or_else(|| AppError::not_found(format!("客户 {} 不存在", record.customer_id)))?
+            .customer_name;
         tracing::debug!(dispatch_id = id, "调样单打印取数完成");
 
         let mut data = HashMap::new();

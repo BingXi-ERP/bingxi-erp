@@ -1,4 +1,4 @@
-# layers=8 endpoints=1822
+# layers=8 endpoints=1826
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -169,6 +169,7 @@ GET	/api/v1/erp/ap/invoices/statistics	ap_invoice_handler::get_statistics	financ
 GET	/api/v1/erp/ap/payment-requests	ap_payment_request_handler::list_requests	finance
 GET	/api/v1/erp/ap/payment-requests/*	ap_payment_request_handler::get_request	finance
 GET	/api/v1/erp/ap/payment-requests/*/print	print_handler::ap_payment_request_print_docx	finance
+GET	/api/v1/erp/ap/payment-requests/payment-methods	crate::handlers::payment_channel_handler::list_payment_channel_options	finance
 GET	/api/v1/erp/ap/payments	ap_payment_handler::list_payments	finance
 GET	/api/v1/erp/ap/payments/*	ap_payment_handler::get_payment	finance
 GET	/api/v1/erp/ap/payments/*/print	print_handler::ap_payment_print_docx	finance
@@ -617,6 +618,8 @@ GET	/api/v1/erp/occupational-health/ppe-distributions/*/print	crate::handlers::p
 GET	/api/v1/erp/optimize-inventory	ai_analysis_handler::optimize_inventory	analytics
 GET	/api/v1/erp/page-view/stats	tracking_handler::get_page_view_stats	analytics
 GET	/api/v1/erp/page-view/stats/by-day	tracking_handler::get_page_view_stats_by_day	analytics
+GET	/api/v1/erp/payment-channels	crate::handlers::payment_channel_handler::list_payment_channels	system
+GET	/api/v1/erp/payment-channels/*	crate::handlers::payment_channel_handler::get_payment_channel	system
 GET	/api/v1/erp/period-adjustments	period_adjustment_handler::list_adjustments	period_adjustment
 GET	/api/v1/erp/period-adjustments/*	period_adjustment_handler::get_adjustment	period_adjustment
 GET	/api/v1/erp/period-report-snapshots	crate::handlers::period_report_snapshot_handler::list_snapshots	finance
@@ -1727,6 +1730,7 @@ PUT	/api/v1/erp/labor-contracts/*	labor_contract_handler::update	labor_contract
 PUT	/api/v1/erp/material-shortage/*/status	material_shortage_handler::update_shortage_status	mod
 PUT	/api/v1/erp/notifications/settings	notification_handler::update_setting	analytics
 PUT	/api/v1/erp/oa-announcements/*	oa_announcement_handler::update	oa_announcement
+PUT	/api/v1/erp/payment-channels/*	crate::handlers::payment_channel_handler::update_payment_channel	system
 PUT	/api/v1/erp/pollution-monitoring/solid-waste-disposals/*/status	pollution_monitoring_handler::update_waste_status	pollution_monitoring
 PUT	/api/v1/erp/print-targets/*	print_target_handler::update_print_target	mod
 PUT	/api/v1/erp/print-templates/*	print_handler::update_print_template	mod

@@ -154,10 +154,13 @@ async fn is_document_no_taken_covers_sample_dispatch() {
         .await
         .expect("查重应成功");
     assert!(!absent, "未落库号不应命中");
-    let unknown = is_document_no_taken(db.as_ref(), "no_such_doc_type", "X")
+    let err = is_document_no_taken(db.as_ref(), "no_such_doc_type", "X")
         .await
-        .expect("未知 doc_type 应走 fail-closed 分支");
-    assert!(!unknown, "未知 doc_type 恒 false（fail-closed）");
+        .expect_err("未知 doc_type 应显式拒绝");
+    assert!(
+        err.to_string().contains("未知的单据类型"),
+        "未知 doc_type 必须返回明确的 bad_request"
+    );
 }
 
 /// 列表：customer_id 精确筛选 + 分页四键回传

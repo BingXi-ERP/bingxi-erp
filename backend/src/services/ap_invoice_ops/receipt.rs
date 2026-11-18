@@ -463,8 +463,8 @@ impl ApInvoiceService {
     /// （仅 tax_amount 大于 0 时插入）、贷 2202 应付账款（含税总额，挂供应商辅助核算）。
     /// 调用方为采购入库确认链路；入参 ctx 携带金额、税额与供应商；产出发票凭证并回写
     /// 应付单的 voucher_id，落 account_voucher 与 voucher_items。
-    /// 生成失败只 warn 不阻断主流程（与 confirm_receipt 的容错口径一致），避免因凭证
-    /// 侧异常回滚已完成的收货业务，缺失凭证由留痕日志指向人工补偿。
+    /// 非阻断：生成失败不回滚已完成的收货业务，但落 event_dead_letters 死信补偿记录
+    /// 等待按来源四要素补生成，缺失凭证不再只靠滚动日志指向人工补偿。
     async fn try_generate_receipt_voucher(
         db: &Arc<DatabaseConnection>,
         ctx: ReceiptVoucherContext,
@@ -495,11 +495,21 @@ impl ApInvoiceService {
         };
         let voucher_service = VoucherService::new(db.clone());
         if let Err(e) = voucher_service.create_and_post(voucher_req, user_id).await {
-            tracing::warn!(
-                "应付单 {} 应付凭证生成失败，需人工补生成：{}",
+            tracing::error!(
+                "应付单 {} 应付凭证生成失败，已落死信补偿记录等待补生成：{}",
                 ctx.invoice_no,
                 e
             );
+            crate::services::event_retry_service::EventRetryService::
+                record_voucher_generation_failure(
+                    db.clone(),
+                    "purchase",
+                    AP_SOURCE_TYPE_PURCHASE_RECEIPT,
+                    i64::from(ctx.invoice_id),
+                    &ctx.invoice_no,
+                    &e,
+                )
+                .await;
         }
     }
 

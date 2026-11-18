@@ -112,8 +112,10 @@ pub async fn update_sample_dispatch(
     AppError,
 > {
     let scope_ctx = auth.to_data_scope_context();
-    ensure_customer_access(&state.db, &scope_ctx, req.customer_id).await?;
     let service = SampleDispatchService::new(state.db.clone());
+    let existing = service.get_detail(id).await?;
+    ensure_customer_access(&state.db, &scope_ctx, existing.order.customer_id).await?;
+    ensure_customer_access(&state.db, &scope_ctx, req.customer_id).await?;
     let detail = service.update(id, req).await?;
     Ok(Json(ApiResponse::success_with_message(detail, "更新成功")))
 }

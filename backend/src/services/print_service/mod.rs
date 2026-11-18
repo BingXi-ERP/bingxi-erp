@@ -297,6 +297,40 @@ impl PrintService {
             return Ok(());
         }
         let db = self.db.as_ref();
+        // 调样单无自身部门列，归属继承父客户；打印门与 CRUD 详情腿共用
+        // `check_resource_owner(owner_id, department_id)`，不以 created_by 代替。
+        if doc_type == "sample_dispatch" {
+            let Some(order) = crate::models::sample_dispatch_order::Entity::find_by_id(doc_id)
+                .one(db)
+                .await?
+            else {
+                return Ok(());
+            };
+            let Some(customer) = crate::models::customer::Entity::find_by_id(order.customer_id)
+                .one(db)
+                .await?
+            else {
+                tracing::warn!(dispatch_id = doc_id, "调样单打印归属门找不到父客户");
+                return Err(AppError::not_found("客户不存在".to_string()));
+            };
+            if crate::utils::data_scope::check_resource_owner(
+                ctx,
+                Some(customer.owner_id),
+                customer.department_id,
+            ) {
+                return Ok(());
+            }
+            tracing::warn!(
+                actor = ctx.user_id,
+                scope = ctx.scope.as_str(),
+                doc_id,
+                customer_id = order.customer_id,
+                "调样单打印归属门拒绝（父客户不在数据范围内）"
+            );
+            return Err(AppError::permission_denied(
+                "无权打印该单据（数据范围限制）".to_string(),
+            ));
+        }
         let owner = match doc_type {
             "voucher" => crate::models::voucher::Entity::find_by_id(doc_id)
                 .one(db)
@@ -323,10 +357,6 @@ impl PrintService {
                 .await?
                 .map(|row| Some(row.created_by)),
             "ar_reconciliation" => crate::models::ar_reconciliation::Entity::find_by_id(doc_id)
-                .one(db)
-                .await?
-                .map(|row| row.created_by),
-            "sample_dispatch" => crate::models::sample_dispatch_order::Entity::find_by_id(doc_id)
                 .one(db)
                 .await?
                 .map(|row| row.created_by),

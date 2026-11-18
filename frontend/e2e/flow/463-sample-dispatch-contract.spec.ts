@@ -94,7 +94,8 @@ test.describe('调样单族契约（真实 API 级）', () => {
     expect(typeof env.total, 'total 应为 number').toBe('number');
     expect(env.page, 'page 应回显请求页').toBe(1);
     expect(typeof env.page_size, 'page_size 应为 number').toBe('number');
-    expect(env.total, 'total 应等于 items 长度').toBe(env.items.length);
+    expect(env.total, 'total 应不小于当前页 items 长度').toBeGreaterThanOrEqual(env.items.length);
+    expect(env.items.length, '单页 items 不应超过 page_size').toBeLessThanOrEqual(env.page_size);
   });
 
   test('创建/详情/更新/打印/删除全链路：单号 BX-DY 年月格式、金额后端计算、xlsx 二进制', async ({

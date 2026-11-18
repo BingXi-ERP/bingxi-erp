@@ -746,7 +746,7 @@ impl ArService {
         Ok(updated)
     }
 
-    /// 生成收款凭证（best-effort，失败仅 warn 不阻塞主流程）
+    /// 生成收款凭证（非阻断：失败落 event_dead_letters 死信补偿记录，等待补生成）
     async fn generate_collection_voucher(&self, updated: &ar_collection::Model, user_id: i32) {
         let collection_amount = updated.collection_amount;
         let collection_method = updated
@@ -766,11 +766,21 @@ impl ArService {
         let voucher_service =
             crate::services::voucher_service::VoucherService::new(self.db.clone());
         if let Err(e) = voucher_service.create_and_post(voucher_req, user_id).await {
-            tracing::warn!(
-                "收款单 {} 确认成功，但生成收款凭证失败：{}",
+            tracing::error!(
+                "收款单 {} 确认成功，但生成收款凭证失败，已落死信补偿记录等待补生成：{}",
                 updated.collection_no,
                 e
             );
+            crate::services::event_retry_service::EventRetryService::
+                record_voucher_generation_failure(
+                    self.db.clone(),
+                    "ar",
+                    "AR_COLLECTION",
+                    i64::from(updated.id),
+                    &updated.collection_no,
+                    &e,
+                )
+                .await;
         }
     }
 

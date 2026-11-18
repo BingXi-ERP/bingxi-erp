@@ -276,6 +276,7 @@ pub const PERMISSION_RESOURCES: &[&str] = &[
     // （GET→read、PUT→update）；公开投影 `GET /company-profile` 走 AUTH_ONLY 精确豁免、
     // 不经业务权限码，但全量面必须在本注册表登记，否则 fail-closed 403。
     "company-profile",
+    "payment-channels",
     "data-import",
     "permission-audits",
     // ===== 系统更新域（高危敏感面，资源键统一带 system-update- 前缀与其余业务隔离）=====

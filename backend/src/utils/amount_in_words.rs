@@ -45,25 +45,25 @@ pub fn amount_in_words(amount: Decimal) -> String {
 
     // Decimal 尾数是 96 位有符号整数，×100 后仍远小于 i128 上界，乘法不溢出。
     let scale = magnitude.scale();
-    let total_cents = magnitude.mantissa() * 10_i128.pow(2 - scale as u32);
+    let total_cents = magnitude.mantissa() * 10_i128.pow(2 - scale);
     let yuan = total_cents / 100;
     let jiao = (total_cents / 10 % 10) as usize;
     let fen = (total_cents % 10) as usize;
 
     let mut out = String::new();
     if is_negative {
-        out.push_str("负");
+        out.push('负');
     }
 
     if yuan > 0 {
         out.push_str(&integer_to_words(yuan));
-        out.push_str("元");
+        out.push('元');
     }
 
     match (jiao, fen) {
         (0, 0) => {
             if yuan > 0 {
-                out.push_str("整");
+                out.push('整');
             } else {
                 // 零元整：0 / 0.00 的唯一合法读法。
                 out.push_str("零元整");
@@ -72,22 +72,22 @@ pub fn amount_in_words(amount: Decimal) -> String {
         (j, 0) => {
             // 到角为止不写「整」，与取证样例 110.40 → 壹佰壹拾元肆角一致。
             out.push_str(DIGITS[j]);
-            out.push_str("角");
+            out.push('角');
         }
         (0, f) => {
             // 元位为 0、角位为 0、分位非 0：「元」后写「零」（《支付结算办法》例式）。
             // 整数部分本身为 0 时（如 0.03）不写「元」也不写该「零」。
             if yuan > 0 {
-                out.push_str("零");
+                out.push('零');
             }
             out.push_str(DIGITS[f]);
-            out.push_str("分");
+            out.push('分');
         }
         (j, f) => {
             out.push_str(DIGITS[j]);
-            out.push_str("角");
+            out.push('角');
             out.push_str(DIGITS[f]);
-            out.push_str("分");
+            out.push('分');
         }
     }
     out
@@ -117,7 +117,7 @@ fn integer_to_words(yuan: i128) -> String {
                 zero_pending = true;
             }
             // 组边界上的 0：该组若含非 0 数字，仍要补节单位（如 107000 的「万」）。
-            if power % 4 == 0 && power > 0 {
+            if power.is_multiple_of(4) && power > 0 {
                 // 整组理论覆盖 4 位，但最高组的实际位数可能不足（如 107000 的万组只有 2 位），
                 // 用 saturating_sub 收敛到 0 防下溢。
                 let group_start = len.saturating_sub(4 * (power / 4 + 1));
@@ -127,12 +127,12 @@ fn integer_to_words(yuan: i128) -> String {
             }
         } else {
             if zero_pending {
-                out.push_str("零");
+                out.push('零');
                 zero_pending = false;
             }
             out.push_str(DIGITS[d]);
             out.push_str(UNIT_IN_GROUP[power % 4]);
-            if power % 4 == 0 {
+            if power.is_multiple_of(4) {
                 // 非 0 数字落在组边界时该组必然非全 0，直接补节单位。
                 out.push_str(SECTION_UNITS[power / 4]);
             }

@@ -35,11 +35,24 @@ pub async fn sample_dispatch_print_xlsx(
 ) -> Result<Response, AppError> {
     let service = PrintService::new(state.db.clone());
     let scope_ctx = auth.to_data_scope_context();
-    service
+    tracing::info!(doc_id, actor = auth.user_id, "调样单 xlsx 打印请求开始");
+    if let Err(err) = service
         .get_print_data(&scope_ctx, "sample_dispatch", doc_id)
-        .await?;
-    let bytes = service.build_sample_dispatch_xlsx(doc_id).await?;
+        .await
+    {
+        tracing::error!(doc_id, error = ?err, "调样单 xlsx 打印取数或归属门失败");
+        return Err(err);
+    }
+    tracing::info!(doc_id, "调样单 xlsx 打印取数与归属门通过");
+    let bytes = match service.build_sample_dispatch_xlsx(doc_id).await {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            tracing::error!(doc_id, error = ?err, "调样单 xlsx 文件构建失败");
+            return Err(err);
+        }
+    };
     record_print_audit(&state, &auth, "sample_dispatch", doc_id);
+    tracing::info!(doc_id, bytes = bytes.len(), "调样单 xlsx 打印成功");
     Ok(xlsx_response(bytes, &format!("sample_dispatch_{doc_id}")))
 }
 
@@ -58,7 +71,10 @@ fn record_print_audit(state: &AppState, auth: &AuthContext, doc_type: &str, doc_
             auth.username, doc_type, doc_id
         )),
         request_method: Some("GET".to_string()),
-        request_path: Some(format!("/api/v1/erp/{}/{}", doc_type, doc_id)),
+        request_path: Some(format!(
+            "/api/v1/erp/sample-dispatches/{}/print-xlsx",
+            doc_id
+        )),
         before_snapshot: None,
         after_snapshot: Some(serde_json::json!({
             "doc_type": doc_type,

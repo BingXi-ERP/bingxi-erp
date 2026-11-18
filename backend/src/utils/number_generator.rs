@@ -9,8 +9,6 @@ use sea_orm::{
 /// 通用单号生成器
 ///
 /// 标准格式：`{前缀}{YYYYMMDD}{左补零流水号}`（默认 3 位，可指定位数）。
-/// 年月格式变体：`{前缀}{YYMM}-{3位流水}`（`generate_no_ym_with_txn`，
-/// 真实业务样例 `BX-DY2607-1356`——调样单号段）。
 ///
 /// ## 并发与唯一性约定（与调用方共同遵守）
 /// - 取号前先取 `pg_advisory_xact_lock(prefix+date)` 事务咨询锁，
@@ -153,17 +151,14 @@ impl DocumentNumberGenerator {
         Self::allocate_no::<E, C>(txn, column, &date_prefix, width).await
     }
 
-    /// 在外部事务内生成年月格式单号：`{前缀}{YYMM}-{3位流水}`
+    /// 年月格式变体：`{前缀}{YYMM}-{3位流水}` 的事务内取号入口。
     ///
-    /// 真实业务样例 `BX-DY2607-1356`（前缀 BX-DY + 年月 2607 + 横杠 + 3 位流水，
-    /// 调样单号段）。与既有函数共用 `lock_prefix`/`allocate_no`/UNIQUE 兜底结构，
-    /// 只换日期段拼装与锁粒度：
-    /// - 号段按月：基数 = `max(同前缀同月已有单号横杠后流水) + 1`；月份翻篇后
-    ///   旧月单号不再命中 `starts_with(前缀+YYMM-)`，流水自然按月重置
-    ///   （照既有实现语义，见 `allocate_no` 文档）；
-    /// - 咨询锁 key 取 `prefix+YYMM`：同前缀同月的并发取号串行化；
-    /// - 既有 `{前缀}{YYYYMMDD}{流水}` 格式的各函数行为不变（格式拼装点抽成
-    ///   `full_date_prefix` 纯函数，输出逐字符不变，由单测锁定）。
+    /// 号段按月：基数 = `max(同前缀同月已有单号横杠后流水) + 1`；月份翻篇后
+    /// 旧月单号不再命中 `starts_with(前缀+YYMM-)`，流水自然按月重置；
+    /// 咨询锁 key 取 `prefix+YYMM`：同前缀同月的并发取号串行化；既有
+    /// `{前缀}{YYYYMMDD}{流水}` 格式的各函数行为不变。
+    /// 调用方：`insert_with_no_retry_ym`（调样单 BX-DY 号段）；入参为事务、前缀、
+    /// 实体与单号列；结果交给保存点重试循环构建 ActiveModel；不写库、不存盘。
     pub async fn generate_no_ym_with_txn<'db, E, C>(
         txn: &'db DatabaseTransaction,
         prefix: &str,
@@ -407,8 +402,9 @@ impl DocumentNumberGenerator {
         format!("{}{}", prefix, now.format("%Y%m%d"))
     }
 
-    /// 年月格式变体的日期段拼装点：`{前缀}{YYMM}-`（横杠分隔，
-    /// 真实样例 `BX-DY2607-`）。`generate_no_ym_with_txn` 的唯一调用点。
+    /// 年月格式日期段：`{前缀}{YYMM}-`（横杠分隔，真实样例 `BX-DY2607-`）。
+    /// 调用方：`generate_no_ym_with_txn`；入参前缀与 UTC 时间；传给 `allocate_no`
+    /// 作为 `starts_with` 前缀；不写库、不存盘。
     fn ym_date_prefix(prefix: &str, now: DateTime<Utc>) -> String {
         format!("{}{}-", prefix, now.format("%y%m"))
     }
