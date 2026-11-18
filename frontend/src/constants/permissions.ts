@@ -37,6 +37,8 @@ export const ACTION = {
 // 权限码常量（与后端 init_service.rs 权限矩阵对齐）
 // ============================================================================
 export const PERMISSIONS = {
+  PAYMENT_CHANNELS_READ: 'payment-channels:read',
+  PAYMENT_CHANNELS_UPDATE: 'payment-channels:update',
   // 用户管理（后端资源：users）
   USER_READ: 'users:read',
   USER_CREATE: 'users:create',
