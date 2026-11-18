@@ -12,7 +12,7 @@
 //! 存哪里：不适用（无落库）。
 
 use bingxi_backend::middleware::public_routes::{
-    is_auth_only_path, is_public_path, AUTH_ONLY_PATHS,
+    AUTH_ONLY_PATHS, is_auth_only_path, is_public_path,
 };
 use bingxi_backend::utils::path_utils::is_known_resource_segment;
 
