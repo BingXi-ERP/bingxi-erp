@@ -1,6 +1,6 @@
 use chrono::Utc;
 use futures::FutureExt;
-use sea_orm::{ActiveModelTrait, ActiveValue, DatabaseConnection, EntityTrait, Set};
+use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait, Set};
 use serde_json::Value;
 use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -238,12 +238,13 @@ impl OmniAuditEngine {
                     }
                 }
             }
+            let (written, discarded) = audit_write_counters();
             tracing::error!(
                 trace_id = %msg.trace_id,
                 attempts = COMPENSATION_RETRY_ATTEMPTS,
                 last_error = %last_error,
-                written = written_counter().load(Ordering::Relaxed),
-                discarded = discard_counter().load(Ordering::Relaxed),
+                written = written,
+                discarded = discarded,
                 "审计日志补偿重试全部失败，落 event_dead_letters 等待人工补录"
             );
             let dead_letter =

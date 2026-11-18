@@ -624,7 +624,7 @@ async fn record_audit_log_export_tamper_proof(
         ..Default::default()
     };
 
-    let mut last_error = match build_export_log().insert(state.db.as_ref()).await {
+    match build_export_log().insert(state.db.as_ref()).await {
         Ok(_) => return Ok(()),
         Err(e) => {
             tracing::error!(
@@ -633,11 +633,10 @@ async fn record_audit_log_export_tamper_proof(
                 user_id = auth.user_id,
                 "[SECURITY] 写入 audit_log_export_log 防篡改表失败，准备重试 1 次"
             );
-            e.to_string()
         }
-    };
+    }
 
-    match build_export_log().insert(state.db.as_ref()).await {
+    let last_error = match build_export_log().insert(state.db.as_ref()).await {
         Ok(_) => {
             tracing::info!(
                 target: "security_audit",
@@ -647,15 +646,16 @@ async fn record_audit_log_export_tamper_proof(
             return Ok(());
         }
         Err(e) => {
-            last_error = e.to_string();
+            let err = e.to_string();
             tracing::error!(
                 target: "security_audit",
-                error = %last_error,
+                error = %err,
                 user_id = auth.user_id,
                 "[SECURITY] audit_log_export_log 防篡改行重试仍失败，落 event_dead_letters 补偿（导出响应附加警告头）"
             );
+            err
         }
-    }
+    };
 
     let dead_letter = build_export_dead_letter_model(
         auth.user_id,
