@@ -327,10 +327,12 @@ impl super::PrintService {
         );
         data.insert(
             "expected_payment_date".to_string(),
-            serde_json::json!(record
-                .expected_payment_date
-                .map(|d| d.format("%Y-%m-%d").to_string())
-                .unwrap_or_default()),
+            serde_json::json!(
+                record
+                    .expected_payment_date
+                    .map(|d| d.format("%Y-%m-%d").to_string())
+                    .unwrap_or_default()
+            ),
         );
         data.insert(
             "bank_name".to_string(),
@@ -1287,9 +1289,9 @@ fn build_ap_payment_request_xlsx_table(
         get("expected_payment_date"),
     ));
     rows.push(form_row_wide("开户行", get("bank_name")));
-    rows.push(vec![XlsxRichCell::merged("关联发票明细", COLS)
-        .bold()
-        .center()]);
+    rows.push(vec![
+        XlsxRichCell::merged("关联发票明细", COLS).bold().center(),
+    ]);
     for item in &data.items {
         rows.push(form_row(
             "发票ID",
