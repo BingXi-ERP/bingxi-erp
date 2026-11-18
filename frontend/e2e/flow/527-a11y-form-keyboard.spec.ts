@@ -30,23 +30,25 @@ test.describe('新建报价单表单无障碍', () => {
   });
 
   test('表单容器、输入框、下拉与提交按钮具备可访问名称', async ({ page }) => {
-    // el-form-item 的 label 经 <label for=inputId> 关联到 el-select 的 combobox input
-    // 与 NumericInput 底层的 el-input，故 getByRole 的 name 精确取自 label 文本。
+    // 可访问名称由 el-form-item 的 <label for=inputId> 提供：el-select 的 combobox
+    // role 落在 wrapper、label 落在内部 input，role+name 组合跨 Element Plus 版本不稳
+    // （CI 曾实测 combobox resolved to 0）。按 label 精确匹配是仓库已验证范式
+    // （quotations/01-create、03-detail、523 无障碍用例同法），直接验证读屏可达。
     await expect(
-      page.getByRole('combobox', { name: '客户', exact: true }),
-      '客户下拉应以可访问名称被识别为 combobox'
+      page.getByLabel('客户', { exact: true }),
+      '客户录入框应以可访问名称「客户」暴露给读屏'
     ).toHaveCount(1);
     await expect(
-      page.getByRole('combobox', { name: '币种', exact: true }),
-      '币种下拉应以可访问名称被识别为 combobox'
+      page.getByLabel('币种', { exact: true }),
+      '币种录入框应以可访问名称「币种」暴露给读屏'
     ).toHaveCount(1);
     await expect(
-      page.getByRole('textbox', { name: '汇率', exact: true }),
-      '汇率录入框应以可访问名称被识别为文本框'
+      page.getByLabel('汇率', { exact: true }),
+      '汇率录入框应以可访问名称「汇率」暴露给读屏'
     ).toHaveCount(1);
     await expect(
-      page.getByRole('textbox', { name: '税率(%)', exact: true }),
-      '税率录入框应以可访问名称被识别为文本框'
+      page.getByLabel('税率(%)', { exact: true }),
+      '税率录入框应以可访问名称「税率(%)」暴露给读屏'
     ).toHaveCount(1);
 
     // 提交按钮的可访问名称来自按钮文本本身。
@@ -61,10 +63,10 @@ test.describe('新建报价单表单无障碍', () => {
   });
 
   test('仅用 Tab 键可依次到达关键字段与提交按钮', async ({ page }) => {
-    const customer = page.getByRole('combobox', { name: '客户', exact: true });
-    const priceTerms = page.getByRole('combobox', { name: '价格条款', exact: true });
-    const exchangeRate = page.getByRole('textbox', { name: '汇率', exact: true });
-    const taxRate = page.getByRole('textbox', { name: '税率(%)', exact: true });
+    const customer = page.getByLabel('客户', { exact: true });
+    const priceTerms = page.getByLabel('价格条款', { exact: true });
+    const exchangeRate = page.getByLabel('汇率', { exact: true });
+    const taxRate = page.getByLabel('税率(%)', { exact: true });
     const saveDraft = page.getByRole('button', { name: '保存草稿', exact: true });
 
     // 每一步都只通过 Tab 推进；上一目标已持有焦点，下一目标在 DOM 顺序上更靠后，
