@@ -197,20 +197,15 @@ fn extract_client_ip_from_headers(
     crate::middleware::audit_context::client_ip_from_parts(headers, peer_ip).0
 }
 
-// 强制轮换 CSRF Token：清除旧 token + 写入新 token（会话与用户绑定，TTL 1800s）
+// 刷新链路签发新 CSRF Token（会话与用户绑定，TTL 1800s）：旧会话的 access token 已由
+// revoke_old_token 吊销（调用方），旧 CSRF Token 因「用户 + 会话」绑定核验不能被新会话复用，
+// 因此无需按用户整集清除——按用户清除只保留给改角色/停用等吊销场景。
 fn rotate_csrf_token(
     state: &AppState,
     claims: &crate::services::auth_service::AppClaims,
     new_session_id: String,
     refresh_ip: String,
 ) -> String {
-    if state.cache.clear_old_csrf_token_for_user(claims.sub) {
-        tracing::info!(
-            user_id = claims.sub,
-            username = %claims.username,
-            "Token 刷新：已清除该用户的旧 CSRF Token（强制轮换）"
-        );
-    }
     let csrf_token = uuid::Uuid::new_v4().to_string();
     state.cache.set_csrf_token(
         csrf_token.clone(),
