@@ -157,6 +157,18 @@ where
         }
     }
 
+    /// 功能：仅当指定键的缓存项已过期时原子移除该项，未过期或不存在则原样保留。
+    /// 调用方：AppCache::install_csrf_token 在写入新 CSRF Token 前回收该用户索引中的过期项。
+    /// 入参：缓存键 key；返回 true=移除了一个已过期项，false=无项或项未过期。
+    /// 行为：remove_if 在同一分片锁内判过期并删除，不会误删并发重新写入的存活项。
+    /// 存储位置：storage（DashMap），过期项删除后不进任何统计计数（区别于 take 的 miss 语义）。
+    pub fn remove_expired(&self, key: &K) -> bool {
+        let now = Instant::now();
+        self.storage
+            .remove_if(key, |_, v| v.expires_at.is_some_and(|exp| now > exp))
+            .is_some()
+    }
+
     pub fn cleanup(&self) {
         let now = Instant::now();
         let mut removed = 0u64;
@@ -487,7 +499,7 @@ impl AppCache {
     }
 
     /// 获取 CSRF Token 缓存（保留用于测试与内部维护）
-    /// 优先使用 set_csrf_token / consume_csrf_token / clear_old_csrf_token_for_user 高层 API（封装绑定核验 + 强制轮换）
+    /// 优先使用 set_csrf_token / consume_csrf_token / clear_old_csrf_token_for_user 高层 API（封装绑定核验 + 一次性消费）
     pub fn get_csrf_token_cache(&self) -> Arc<MemoryCache<String, CsrfTokenBinding>> {
         self.csrf_token_cache.clone()
     }
@@ -505,14 +517,16 @@ impl AppCache {
     ) {
         let effective_ttl = ttl.unwrap_or(Duration::from_secs(CSRF_TOKEN_DEFAULT_TTL_SECS));
         self.install_csrf_token(token, session_id, ip_address, user_id, effective_ttl);
-        // 用户索引不显式 TTL：其生命周期由 clear_old_csrf_token_for_user（登录/刷新轮换时
-        // 整集清除）与 consume_csrf_token（消费后从集合移除）驱动；残留的已过期 token 集合项
-        // 在该用户下次轮换时随整集清理，不会无限增长
+        // 用户索引不显式 TTL：其生命周期由 consume_csrf_token（消费后从集合移除）、
+        // install_csrf_token 写入前回收已过期项 与 clear_old_csrf_token_for_user
+        // （改角色/停用等吊销场景整集清除）共同驱动，索引不会无限增长
     }
 
     /// 把一条 CSRF Token 绑定写入缓存并登记用户索引。
     /// set_csrf_token 的正常签发与 IP 漂移的宽限副本共用这一条路径，保证两者都必然进用户索引，
-    /// 从而都能被登录/刷新的强制轮换整集清除。
+    /// 从而都能被吊销场景的整集清除覆盖。写入前先回收该用户索引中已过期的 token 项
+    /// （缓存项与索引项一并移除）：登录/刷新不再整集轮换后，索引收缩依赖
+    /// 消费时移除 + 本回收点，维持"索引不无限增长"不变量。
     fn install_csrf_token(
         &self,
         token: String,
@@ -521,6 +535,19 @@ impl AppCache {
         user_id: i32,
         ttl: Duration,
     ) {
+        let expired_tokens: Vec<String> = self
+            .csrf_user_index
+            .get(&user_id)
+            .map(|set| {
+                set.iter()
+                    .filter(|t| self.csrf_token_cache.remove_expired(t))
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default();
+        for expired in &expired_tokens {
+            self.detach_csrf_token_from_user_index(expired, user_id);
+        }
         self.csrf_token_cache.set(
             token.clone(),
             CsrfTokenBinding {
@@ -631,14 +658,10 @@ impl AppCache {
         }
     }
 
-    /// 强制轮换：清除指定用户的全部活跃 CSRF Token（Wave 3 安全漏洞 #7 修复）
-    /// 重新登录/刷新时调用使历史 token 立即失效防多设备残留；返回 true=清除了至少一个活跃 token，false=无活跃 token（首次登录）
-    ///
-    /// 多会话语义说明：重新登录使该用户全部旧 token 失效是本函数的安全本意
-    /// （旧 token 一旦被踢，持有方下一次请求即收到 CSRF_TOKEN_INVALID，重新登录即可恢复）。
-    /// E2E CI 各分片使用独立分片账号（e2e_admin_s{N}，见 e2e/global-setup.ts），
-    /// 按用户清除不会跨分片踢 token；同账号多设备场景下，后登录方踢掉先登录方的
-    /// token 属预期安全行为（后者随下次请求自动恢复会话）。
+    /// 整集清除指定用户的全部活跃 CSRF Token。调用方：user_handler 角色变更等吊销场景
+    /// （改角色/停用）；登录与刷新链路不使用本函数——同账号多会话并存时残留 token 的
+    /// 安全边界由一次性消费 + 用户+会话绑定核验 + TTL 保证（跨会话复用本就被绑定核验拒绝）。
+    /// 返回 true=清除了至少一个活跃 token，false=该用户索引无登记项。
     pub fn clear_old_csrf_token_for_user(&self, user_id: i32) -> bool {
         // 取走该用户的全部存活 token 并从 csrf_token_cache 逐个移除，
         // 实现"重新登录使历史 token 立即失效"
