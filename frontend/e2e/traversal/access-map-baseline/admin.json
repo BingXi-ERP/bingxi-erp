@@ -93,6 +93,7 @@
     "/system-update",
     "/system/audit-log",
     "/system/export-approvals",
+    "/system/payment-channels",
     "/system/profile",
     "/system/slow-query",
     "/textile-safety",
