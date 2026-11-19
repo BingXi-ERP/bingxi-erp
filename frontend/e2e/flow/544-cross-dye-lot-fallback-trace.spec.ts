@@ -212,9 +212,10 @@ test('544-01 指定缸不足时跨缸回退 两笔流水留痕与两缸库存守
     SHIP_QTY - requestedAvailableBefore,
     2
   );
-  const exactNote = requiredText(exactTxn, 'notes', '精确缸流水');
+  // 流水出参键以 TransactionResponse DTO 为准：notes 字段序列化为 remarks
+  const exactNote = requiredText(exactTxn, 'remarks', '精确缸流水');
   expect(exactNote, '精确缸流水不应标记跨缸回退').not.toContain('跨缸回退');
-  const crossNote = requiredText(crossTxn, 'notes', '跨缸流水');
+  const crossNote = requiredText(crossTxn, 'remarks', '跨缸流水');
   expect(crossNote, '流水备注应写明跨缸回退').toContain('跨缸回退');
   expect(crossNote, `流水备注应含指定缸 ${requestedDyeLot}`).toContain(requestedDyeLot);
   expect(crossNote, `流水备注应含实扣缸 ${fallbackDyeLot}`).toContain(fallbackDyeLot);
