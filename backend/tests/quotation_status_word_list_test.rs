@@ -68,7 +68,7 @@ fn approval_service_has_no_bare_status_literals() {
     let svc = read_rel("src/services/quotation_approval_service.rs");
     for word in ["draft", "pending_approval", "approved", "rejected"] {
         let quoted = format!("\"{word}\"");
-        let bare_value = svc.match_indices(&quoted).any(|idx| {
+        let bare_value = svc.match_indices(&quoted).any(|(idx, _)| {
             let after = &svc[idx + quoted.len()..];
             !after.trim_start().starts_with(':')
         });
