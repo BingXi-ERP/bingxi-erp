@@ -550,7 +550,7 @@ mod tests {
             model.last_error,
             ActiveValue::Set(Some("db down".to_string()))
         );
-        assert_eq!(model.resolved_at, ActiveValue::NotSet);
+        assert_eq!(model.resolved_at, ActiveValue::Set(None));
     }
 
     /// 计数器访问器在未初始化时应返回 0（OnceLock 惰性初始化）
