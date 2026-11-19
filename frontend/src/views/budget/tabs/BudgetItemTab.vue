@@ -8,7 +8,7 @@
     实时显示 Σ期间，与 planned_amount 不一致时前端提示（后端 400 为最终裁决，前端不做覆盖/兜底）
 -->
 <template>
-  <div class="budget-item-tab">
+  <div class="budget-item-tab" :class="{ 'budget-item-tab--phone': isPhone }">
     <div class="page-header">
       <div class="header-left">
         <el-button link @click="emit('back')">
@@ -27,7 +27,11 @@
     </div>
 
     <el-card shadow="hover" class="filter-card">
-      <el-form :inline="true" :aria-label="$t('budget.filter.ariaLabel')">
+      <el-form
+        :inline="!isPhone"
+        :label-position="isPhone ? 'top' : 'right'"
+        :aria-label="$t('budget.filter.ariaLabel')"
+      >
         <el-form-item :label="$t('budget.filter.status')">
           <el-select
             v-model="queryStatus"
@@ -51,7 +55,69 @@
     </el-card>
 
     <el-card shadow="hover">
+      <section v-if="isPhone" v-loading="loading" class="budget-item-mobile">
+        <ul v-if="items.length" class="card-list" :aria-label="$t('budget.item.table.ariaLabel')">
+          <li v-for="row in items" :key="row.id" class="card-item">
+            <dl class="card-fields">
+              <div class="field-emphasis">
+                <dt>{{ $t('budget.item.table.itemCode') }}</dt>
+                <dd>{{ row.item_code || '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.item.table.itemName') }}</dt>
+                <dd>{{ row.item_name }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.item.table.itemType') }}</dt>
+                <dd>{{ row.item_type || '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.item.table.plannedAmount') }}</dt>
+                <dd>¥{{ amountOf(row.planned_amount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.item.table.status') }}</dt>
+                <dd>
+                  <el-tag :type="itemTagType(row.status)">{{ itemStatusLabel(row.status) }}</el-tag>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.item.table.remark') }}</dt>
+                <dd>{{ row.remark }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button
+                v-permission="PERMISSIONS.BUDGET_UPDATE"
+                size="small"
+                type="primary"
+                @click="openDialog(row)"
+              >
+                {{ $t('budget.item.table.edit') }}
+              </el-button>
+              <el-button
+                v-permission="PERMISSIONS.BUDGET_UPDATE"
+                size="small"
+                type="warning"
+                @click="openAdjust(row)"
+              >
+                {{ $t('budget.item.table.adjust') }}
+              </el-button>
+              <el-button
+                v-permission="PERMISSIONS.BUDGET_DELETE"
+                size="small"
+                type="danger"
+                @click="handleDelete(row)"
+              >
+                {{ $t('budget.item.table.delete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <el-empty v-else :description="$t('components.v2Table.empty')" />
+      </section>
       <el-table
+        v-else
         v-loading="loading"
         :data="items"
         stripe
@@ -133,7 +199,9 @@
     <el-dialog
       v-model="dialogVisible"
       :title="form.id ? $t('budget.item.dialog.editTitle') : $t('budget.item.dialog.createTitle')"
-      width="720px"
+      :width="isPhone ? phoneDialogWidth : '720px'"
+      class="budget-item-dialog"
+      :class="{ 'budget-item-dialog--phone': isPhone }"
       :aria-label="$t('budget.item.dialog.ariaLabel')"
     >
       <el-form
@@ -141,6 +209,7 @@
         :model="form"
         :rules="rules"
         label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('budget.item.dialog.formAriaLabel')"
       >
         <el-form-item :label="$t('budget.item.dialog.planId')">
@@ -264,8 +333,14 @@
     </el-dialog>
 
     <!-- 预算调整 -->
-    <el-dialog v-model="adjustVisible" :title="$t('budget.item.table.adjust')" width="460px">
-      <el-form :model="adjustForm" label-width="100px">
+    <el-dialog
+      v-model="adjustVisible"
+      :title="$t('budget.item.table.adjust')"
+      :width="isPhone ? phoneDialogWidth : '460px'"
+      class="budget-adjust-dialog"
+      :class="{ 'budget-adjust-dialog--phone': isPhone }"
+    >
+      <el-form :model="adjustForm" label-width="100px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item :label="$t('budget.item.table.plannedAmount')">
           <el-input
             v-model="adjustAmountField.text"
@@ -313,11 +388,17 @@ import { isDialogDismissal } from '@/utils/monitor';
 import { sumDecimalAmounts } from '@/utils/money';
 import { exportFromBackend } from '@/utils/export';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
+
+const phoneDialogWidth =
+  'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))';
 
 const props = defineProps<{ plan: BudgetPlan }>();
 const emit = defineEmits<{ (e: 'back'): void }>();
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const amountOf = (value: string | number | null | undefined): string =>
   Number(value ?? 0).toFixed(2);
@@ -634,6 +715,100 @@ const handleExport = async () => {
 <style scoped>
 .budget-item-tab {
   min-height: 100%;
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.page-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.budget-item-tab--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+}
+.budget-item-tab--phone :deep(.el-form-item__label) {
+  padding-bottom: 4px;
+}
+.card-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.field-emphasis {
+  grid-column: 1 / -1;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+.budget-item-tab :deep(.budget-item-dialog--phone),
+.budget-item-tab :deep(.budget-adjust-dialog--phone) {
+  display: flex;
+  flex-direction: column;
+  width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)) !important;
+  box-sizing: border-box;
+}
+.budget-item-tab :deep(.budget-item-dialog--phone .el-dialog__body),
+.budget-item-tab :deep(.budget-adjust-dialog--phone .el-dialog__body) {
+  min-height: 0;
+  overflow-y: auto;
 }
 .header-left {
   display: flex;

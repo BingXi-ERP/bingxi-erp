@@ -78,3 +78,5 @@ pub mod scheduler_framework;
 pub mod optional_json;
 // 增值税税额计算内核，税率单位口径（百分数）与税额公式的唯一真源
 pub mod tax;
+// 中文金额大写工具，打印单据「货款总计(大写)」字段的唯一取值来源
+pub mod amount_in_words;

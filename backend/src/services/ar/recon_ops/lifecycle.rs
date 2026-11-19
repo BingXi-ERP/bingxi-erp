@@ -206,17 +206,27 @@ impl ArReconciliationService {
         }
     }
 
-    /// 生成对账确认凭证（失败仅 warn 不阻断主流程）
+    /// 生成对账确认凭证（非阻断：失败落 event_dead_letters 死信补偿记录，等待补生成）
     async fn create_close_voucher(&self, result: &ReconciliationModel, user_id: i32) {
         let voucher_req = Self::build_close_voucher_request(result);
         let voucher_service =
             crate::services::voucher_service::VoucherService::new(self.db.clone());
         if let Err(e) = voucher_service.create_and_post(voucher_req, user_id).await {
-            tracing::warn!(
-                "AR 对账单 {} 关闭成功，但生成对账确认凭证失败：{}",
+            tracing::error!(
+                "AR 对账单 {} 关闭成功，但生成对账确认凭证失败，已落死信补偿记录等待补生成：{}",
                 result.reconciliation_no,
                 e
             );
+            crate::services::event_retry_service::EventRetryService::
+                record_voucher_generation_failure(
+                    self.db.clone(),
+                    "ar",
+                    "AR_RECONCILIATION",
+                    i64::from(result.id),
+                    &result.reconciliation_no,
+                    &e,
+                )
+                .await;
         }
     }
 

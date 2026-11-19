@@ -215,3 +215,6 @@ pub mod delivery_signoff;
 pub mod like_acceleration;
 // 周期任务执行可观测域：scheduler_job_runs 执行历史表，链尾独立域（并入已应用域会被台账整体跳过）。
 pub mod scheduler_observability;
+// 调样单实体数据地基域：sample_dispatch_orders/sample_dispatch_items 两表，链尾独立域
+// （并入已应用域会被台账整体跳过，建表永不执行）。
+pub mod sample_dispatch;
