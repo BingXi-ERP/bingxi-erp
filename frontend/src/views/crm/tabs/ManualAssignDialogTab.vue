@@ -6,7 +6,7 @@
   <el-dialog
     v-model="visible"
     :title="t('crmManualAssignDialog.title')"
-    width="500px"
+    :width="isPhone ? '95%' : '500px'"
     :aria-label="t('crmManualAssignDialog.ariaLabel')"
   >
     <p>
@@ -15,6 +15,7 @@
     <el-form
       :model="form"
       label-width="80px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('crmManualAssignDialog.formAriaLabel')"
     >
       <el-form-item :label="t('crmManualAssignDialog.newOwner')">
@@ -45,14 +46,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 // D14 Batch 5b：原 crmEnhancedApi 对象已转风格 B 函数
 import { assignCustomer, type SalesUser } from '@/api/crm-enhanced';
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;
