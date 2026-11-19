@@ -118,7 +118,91 @@
             </el-form-item>
           </el-form>
 
+          <!-- 手机端：单列卡片，字段与动作与桌面表格等价 -->
+          <section v-if="isPhone" class="cprice-mobile">
+            <ul class="card-list" :aria-label="$t('colorPrices.list.table.ariaLabel')">
+              <li v-for="(row, index) in tableData" :key="row.id ?? index" class="card-item">
+                <dl class="card-fields">
+                  <div class="field field-emphasis">
+                    <dt>{{ $t('colorPrices.list.table.id') }}</dt>
+                    <dd>{{ row.id }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.list.table.product') }}</dt>
+                    <dd>{{ row.product_id }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.list.table.color') }}</dt>
+                    <dd>{{ row.color_id }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.list.table.customerLevel') }}</dt>
+                    <dd>
+                      <el-tag v-if="row.customer_level" :type="getLevelColor(row.customer_level)">
+                        {{ getLevelLabel(row.customer_level) }}
+                      </el-tag>
+                      <span v-else>-</span>
+                    </dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.list.table.season') }}</dt>
+                    <dd>
+                      <el-tag v-if="row.season" :type="getSeasonColor(row.season)">
+                        {{ getSeasonLabel(row.season) }}
+                      </el-tag>
+                      <span v-else>-</span>
+                    </dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.list.table.basePrice') }}</dt>
+                    <dd>{{ formatPrice(row.base_price, row.currency) }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.list.table.currency') }}</dt>
+                    <dd>{{ row.currency }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.list.table.approvalStatus') }}</dt>
+                    <dd>
+                      <el-tag :type="getApprovalColor(row.approval_status)">
+                        {{ getApprovalLabel(row.approval_status) }}
+                      </el-tag>
+                    </dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.list.table.effectiveFrom') }}</dt>
+                    <dd>{{ row.effective_from }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.list.table.status') }}</dt>
+                    <dd>
+                      <el-tag :type="row.is_active ? 'success' : 'info'">
+                        {{
+                          row.is_active
+                            ? $t('colorPrices.common.enable')
+                            : $t('colorPrices.common.disable')
+                        }}
+                      </el-tag>
+                    </dd>
+                  </div>
+                </dl>
+                <div class="card-actions">
+                  <el-button type="primary" plain @click="handleView(row)">
+                    {{ $t('colorPrices.common.detail') }}
+                  </el-button>
+                  <el-button type="warning" @click="handleAdjust(row)">
+                    {{ $t('colorPrices.list.table.adjust') }}
+                  </el-button>
+                  <el-button v-if="row.is_active" type="danger" @click="handleDelete(row)">
+                    {{ $t('colorPrices.common.delete') }}
+                  </el-button>
+                </div>
+              </li>
+            </ul>
+          </section>
+
           <el-table
+            v-if="!isPhone"
             v-loading="loading"
             :data="tableData"
             border
@@ -232,8 +316,9 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Search, Refresh, Edit } from '@element-plus/icons-vue';
@@ -251,6 +336,8 @@ import SeasonalRulesTab from './tabs/SeasonalRulesTab.vue';
 import CustomerSpecialTab from './tabs/CustomerSpecialTab.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 三合一页签：色号价格 / 季节性规则 / 客户专属价（合并独立页面，统一入口）
 const activeTab = ref('prices');
@@ -375,5 +462,53 @@ const handleSelectionChange = (rows: ColorPriceListItem[]) => {
 .pagination-wrapper {
   margin-top: 16px;
   text-align: right;
+}
+
+.cprice-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cprice-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.cprice-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.cprice-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.cprice-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.cprice-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.cprice-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.cprice-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>
