@@ -22,6 +22,7 @@ DC-002 第一批验收标准（7.4）：两个不同 user_id 的 self 角色，�
 | DC-002（余项） | 功能补齐 | P1 | 询样/对账跨端互通与分享卡片越权正向用例 | 第一批写 IDOR 已进验证中；询样提交、客户对账确认、分享卡片越权（4.35/第五章）仍空白；正向可见性受客户业务账号缺失约束（见 DC-007），须先明账号体系 | 待第一批 CI 终态后同专支追加 | 测试 |
 | DC-003 | 功能补齐 | P1 | 统一测试数据工厂 builder API | 造数逻辑散落 `flow/helpers.ts:266` ensureTestEntities、`global-setup.ts:1440` ensureGlobalBusinessSeed、`helpers.ts:4105` seedColorCardArchive，无统一入口 | 单开测试基建支 | 测试 |
 | DC-004 | 功能补齐 | P2 | 分环境预制脚本与独立库隔离 | `playwright.config.ts:48` baseURL 写死 localhost，CI 45 分片共用同库，仅靠账号前缀+时间戳唯一名隔离 | 与 DC-003 同域 | 测试 / 运维 |
+| DC-008（重开） | 功能补齐 | P1 | 联动影响矩阵 PR 门禁（4.41.N）——原误判已关闭，抽检证实未落地 | blob 级取证：#1306 open/merged=false，`check-e2e-linkage-gate.mjs`/`e2e-linkage-gate.yml` 在 main NOT_CARRIED，main 的 ci-cd/e2e-batch/e2e-pairing 对 linkage 引用均为 0，主干仅有「信息工具，不是门禁」的 report 脚本；对应任务 #41/#47 仍 in_progress | 基于 report-e2e-linkage 升级为 fail-closed 门禁并真实挂载 workflow job，核对退出码语义后方可重关 | 测试 / CI |
 
 ### 待评估
 
@@ -45,17 +46,18 @@ DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动
 
 | 编号 | 类型 | 优先级 | 标题 | 闭环证据 |
 |------|------|--------|------|----------|
-| DC-008 | 功能补齐 | P1 | 联动影响矩阵 PR 门禁（4.41.N） | #1306 扩展版 159 规则、16 spec 引用全部存在、fail-closed、authenticity guard、入收尾聚合器 needs |
 | DC-009 | 功能补齐 | P1 | 新增功能配 E2E 配对门 | `.github/workflows/e2e-pairing.yml` 九道 self-test + 增量零引用判负 + 棘轮基线，真 fail-closed |
 | DC-010 | Bug 缺陷 | P1 | AP 手机卡片支付方式断言共享红 | #1303 权威修复（桌面用 label、手机保留 token），11 支 cherry-pick 解锁推送 |
+
+**抽检审计纠正（8.5，2026-11-19）**：DC-008（联动影响矩阵 PR 门禁）原记「已关闭」，经 blob 级复核判定为**假闭环，已重开**（见待开发段 DC-008 标注）。原闭环证据「#1306 入收尾聚合器 needs」不成立：#1306 至审计时仍 open/merged=false，其 `check-e2e-linkage-gate.mjs` 与 `e2e-linkage-gate.yml` 在 main 上 NOT_CARRIED；main 的 ci-cd.yml/e2e-batch.yml/e2e-pairing.yml 对 linkage 引用均为 0；主干仅有 `report-e2e-linkage.mjs`，其源码首部明写「信息工具，不是门禁，不设置非零退出码」。根因：把「信息报告工具」误当成「fail-closed PR 门禁」验收关单，验收标准未要求核对门禁是否真正挂载到 CI。同类防线：今后凡「门禁类」工单关单，必须核对 workflow job 实际挂载与退出码语义，不能只凭脚本存在。DC-010 行级复核见待办备注（主干测试仍需确认手机端 token 口径）。
 
 ## 二、周报（7.2.3 固定字段）
 
 统计周期：2026-11-19。数据来自本轮 completion audit 与远端 PR 现状。
 
 - 新增清单：DC-001（小程序接口层越权 E2E，PR #1320）、DC-002 第一批（写操作参数篡改 IDOR，PR #1320 head fcff7e120）、DC-005/DC-006（audit 新识别待评估项）。
-- 已闭环清单：DC-008/DC-009/DC-010（门禁与共享红，证据见上）。
-- 积压清单：待开发 3（DC-002 余项/003/004），验证中 2（DC-001/DC-002 第一批），待评估 2（DC-005/006），搁置 1（DC-007）。
+- 已闭环清单：DC-009/DC-010（门禁与共享红，证据见上；DC-008 经本周抽检判定假闭环，已重开，不再计入闭环）。
+- 积压清单：待开发 4（DC-002 余项/003/004/008 重开），验证中 2（DC-001/DC-002 第一批），待评估 2（DC-005/006），搁置 1（DC-007）。
 - P0 风险项：DC-006（#1302 脏支阻塞合并）——收口末期处理，不需 force 时走 merge origin/main。
 - P1 积压清单：DC-001/002/003/005；DC-006 为 P0。
 - 本周新增固化 E2E 用例数量：7（DC-001 的 5 端点越权断言 + DC-002 第一批 2 条写越权断言，均 PR #1320）。
