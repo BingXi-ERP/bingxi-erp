@@ -24,9 +24,9 @@
 use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseConnection, EntityTrait,
-    FromQueryResult, JoinType, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, RelationTrait,
-    Select, Set, TransactionTrait,
+    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, ConnectionTrait, DatabaseConnection,
+    EntityTrait, FromQueryResult, JoinType, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect,
+    RelationTrait, Select, Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -301,13 +301,16 @@ pub fn build_stock_sync_pending_active(
     leg: StockSyncLeg,
     pending: bool,
 ) -> bulk_color_approval::ActiveModel {
-    let mut active: bulk_color_approval::ActiveModel = Default::default();
-    active.id = Set(id);
-    match leg {
-        StockSyncLeg::Grade => active.stock_grade_sync_pending = Set(pending),
-        StockSyncLeg::Scrap => active.stock_scrap_sync_pending = Set(pending),
+    let (stock_grade_sync_pending, stock_scrap_sync_pending) = match leg {
+        StockSyncLeg::Grade => (Set(pending), ActiveValue::NotSet),
+        StockSyncLeg::Scrap => (ActiveValue::NotSet, Set(pending)),
+    };
+    bulk_color_approval::ActiveModel {
+        id: Set(id),
+        stock_grade_sync_pending,
+        stock_scrap_sync_pending,
+        ..Default::default()
     }
-    active
 }
 
 /// 构建批色状态变更历史行（纯函数，供 [`BulkColorApprovalService::record_history`]
