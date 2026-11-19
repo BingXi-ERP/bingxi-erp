@@ -69,13 +69,18 @@ async function seedShippablePiece(page: Page): Promise<SeededPiece> {
   const warehouse = warehouses.items?.find(row => row.warehouse_type !== 'finished');
   expect(warehouse?.id, '前置：需至少一个非成品仓承接报工布卷').toBeTruthy();
 
-  const orderNo = genCode('PO');
-  const po = await apiCall<{ id?: number }>(page, 'POST', '/production/production-orders/orders', {
-    order_no: orderNo,
-    product_id: productId,
-    planned_quantity: 100,
-  });
+  // 单据号由服务端统一生成（PO+yyyyMMdd+序号），请求体不承载单号；断言一律回读服务端真实单号
+  const po = await apiCall<{ id?: number; order_no?: string }>(
+    page,
+    'POST',
+    '/production/production-orders/orders',
+    { product_id: productId, planned_quantity: 100 }
+  );
   expect(po.data?.id, '前置：生产订单应返回真实 id').toBeGreaterThan(0);
+  const orderNo = po.data?.order_no;
+  if (typeof orderNo !== 'string' || orderNo.length === 0) {
+    throw new Error('前置：生产订单未返回服务端生成的真实单号');
+  }
 
   const card = await apiCall<{ id?: number }>(page, 'POST', '/production/flow-cards', {
     production_order_id: po.data!.id,
