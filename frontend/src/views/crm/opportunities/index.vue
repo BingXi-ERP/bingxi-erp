@@ -87,7 +87,122 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
+      <!-- 手机端：单列卡片，字段与动作与桌面表格等价 -->
+      <section v-if="isPhone" v-loading="loading" class="opportunities-mobile">
+        <ul class="card-list" :aria-label="t('crmOpportunities.table.ariaLabel')">
+          <li v-for="(row, index) in opportunityList" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('crmOpportunities.table.opportunityNo') }}</dt>
+                <dd>{{ row.opportunity_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmOpportunities.table.opportunityName') }}</dt>
+                <dd>{{ row.opportunity_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmOpportunities.table.customer') }}</dt>
+                <dd>{{ row.customer_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmOpportunities.table.estimatedAmount') }}</dt>
+                <dd>{{ displayEstimatedAmount(row) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmOpportunities.table.winProbability') }}</dt>
+                <dd>{{ displayWinProbability(row) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmOpportunities.table.stage') }}</dt>
+                <dd>
+                  <el-tag :type="getStageType(row.opportunity_stage ?? '')">{{
+                    getStageLabel(row.opportunity_stage ?? '')
+                  }}</el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmOpportunities.table.expectedCloseDate') }}</dt>
+                <dd>{{ row.expected_close_date }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmOpportunities.table.owner') }}</dt>
+                <dd>{{ row.owner_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmOpportunities.table.lastFollowUp') }}</dt>
+                <dd>{{ row.last_follow_up_date }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="handleView(row)">
+                {{ t('crmOpportunities.table.view') }}
+              </el-button>
+              <el-button
+                v-if="
+                  row.opportunity_stage !== OPPORTUNITY_STAGE.CLOSED_WON &&
+                  row.opportunity_stage !== OPPORTUNITY_STAGE.CLOSED_LOST
+                "
+                v-permission="PERMISSIONS.CRM_OPPORTUNITY_UPDATE"
+                @click="openEditDialog(row)"
+              >
+                {{ t('crmOpportunities.table.edit') }}
+              </el-button>
+              <el-button
+                v-if="
+                  row.opportunity_stage !== OPPORTUNITY_STAGE.CLOSED_WON &&
+                  row.opportunity_stage !== OPPORTUNITY_STAGE.CLOSED_LOST
+                "
+                type="warning"
+                @click="openFollowDialog(row)"
+              >
+                {{ t('crmOpportunities.table.follow') }}
+              </el-button>
+              <el-button
+                v-if="row.opportunity_stage === OPPORTUNITY_STAGE.NEGOTIATION"
+                type="success"
+                @click="handleWin(row)"
+              >
+                {{ t('crmOpportunities.table.win') }}
+              </el-button>
+              <el-button
+                v-if="
+                  row.opportunity_stage !== OPPORTUNITY_STAGE.CLOSED_WON &&
+                  row.opportunity_stage !== OPPORTUNITY_STAGE.CLOSED_LOST
+                "
+                type="danger"
+                @click="handleLost(row)"
+              >
+                {{ t('crmOpportunities.table.lost') }}
+              </el-button>
+              <el-button
+                v-if="row.opportunity_stage === OPPORTUNITY_STAGE.CLOSED_WON"
+                type="success"
+                @click="handleConvertToOrder(row)"
+              >
+                {{ t('crmOpportunities.table.toOrder') }}
+              </el-button>
+              <el-button type="info" @click="handleCrmAnalytics(row)">
+                {{ t('crmOpportunities.table.analytics') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="total"
+            layout="total, sizes, prev, next"
+            :aria-label="t('crmOpportunities.table.paginationAriaLabel')"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
+        </div>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="opportunityList"
         border
@@ -328,7 +443,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -353,10 +468,13 @@ import {
   opportunityStageLabelKey,
   opportunityStageTagType,
 } from '@/utils/crm-status';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import OpportunityFormTab from './tabs/OpportunityFormTab.vue';
 import OpportunityFollowTab from './tabs/OpportunityFollowTab.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const hasLoaded = createLazyLoader();
 
@@ -675,5 +793,58 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+.opportunities-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.opportunities-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.opportunities-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.opportunities-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.opportunities-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.opportunities-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.opportunities-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.opportunities-mobile .card-actions .el-button {
+  margin: 0;
+}
+
+.opportunities-mobile .pagination-container {
+  justify-content: center;
+  flex-wrap: wrap;
 }
 </style>
