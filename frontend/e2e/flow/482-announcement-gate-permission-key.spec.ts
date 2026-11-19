@@ -85,7 +85,8 @@ async function createScratchUser(
       .toString()
       .padStart(2, '0');
   const username = `e2ag_${nameTag.toLowerCase()}${stamp}`;
-  const password = `Ag@${stamp.slice(0, 3)}k${stamp.slice(3)}Z7`;
+  // 数字段最长 3 位且段间被字母隔断，不可能出现后端键盘序列判据所需的 4 连字符
+  const password = `Ag@${stamp.slice(0, 3)}k${stamp.slice(3, 6)}R${stamp.slice(6)}Z7`;
   const created = await apiCallRaw<{ id: number }>(page, 'POST', '/users', {
     username,
     password,

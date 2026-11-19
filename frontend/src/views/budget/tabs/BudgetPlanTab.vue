@@ -4,7 +4,7 @@
   方案与明细的关联通过 budget_items.plan_id（见 BudgetItemTab.vue）。
 -->
 <template>
-  <div class="budget-plan-tab">
+  <div class="budget-plan-tab" :class="{ 'budget-plan-tab--phone': isPhone }">
     <div class="page-header">
       <h2 class="page-title">{{ $t('budget.plan.title') }}</h2>
       <div>
@@ -15,7 +15,70 @@
     </div>
 
     <el-card shadow="hover">
+      <section v-if="isPhone" v-loading="loading" class="budget-plan-mobile">
+        <ul v-if="plans.length" class="card-list" :aria-label="$t('budget.plan.table.ariaLabel')">
+          <li v-for="row in plans" :key="row.id" class="card-item">
+            <dl class="card-fields">
+              <div class="field-emphasis">
+                <dt>{{ $t('budget.plan.table.planNo') }}</dt>
+                <dd>{{ row.plan_no }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.plan.table.planName') }}</dt>
+                <dd>{{ row.plan_name }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.plan.table.budgetYear') }}</dt>
+                <dd>{{ row.budget_year }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.plan.table.budgetType') }}</dt>
+                <dd>{{ row.budget_type }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.plan.table.departmentId') }}</dt>
+                <dd>{{ row.department_id ?? '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.plan.table.totalAmount') }}</dt>
+                <dd>¥{{ amountOf(row.total_amount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('budget.plan.table.status') }}</dt>
+                <dd>
+                  <el-tag :type="planTagType(row.status)">{{ planStatusLabel(row.status) }}</el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button size="small" type="primary" @click="emit('select', row)">
+                {{ $t('budget.plan.viewItems') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'draft'"
+                v-permission="PERMISSIONS.BUDGET_APPROVE"
+                size="small"
+                type="success"
+                @click="handleApprove(row)"
+              >
+                {{ $t('budget.plan.table.approve') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'draft'"
+                v-permission="PERMISSIONS.BUDGET_APPROVE"
+                size="small"
+                type="warning"
+                @click="handleReject(row)"
+              >
+                {{ $t('budget.plan.table.reject') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <el-empty v-else :description="$t('components.v2Table.empty')" />
+      </section>
       <el-table
+        v-else
         v-loading="loading"
         :data="plans"
         stripe
@@ -84,7 +147,9 @@
     <el-dialog
       v-model="dialogVisible"
       :title="$t('budget.plan.dialog.createTitle')"
-      width="520px"
+      :width="isPhone ? phoneDialogWidth : '520px'"
+      class="budget-plan-dialog"
+      :class="{ 'budget-plan-dialog--phone': isPhone }"
       :aria-label="$t('budget.plan.dialog.formAriaLabel')"
     >
       <el-form
@@ -92,6 +157,7 @@
         :model="form"
         :rules="rules"
         label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('budget.plan.dialog.formAriaLabel')"
       >
         <el-form-item :label="$t('budget.plan.dialog.planNo')" prop="plan_no">
@@ -145,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, toRef } from 'vue';
+import { ref, reactive, toRef, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
@@ -159,8 +225,14 @@ import {
 } from '@/api/budget';
 import { PERMISSIONS } from '@/constants/permissions';
 import { isDialogDismissal } from '@/utils/monitor';
+import { useBreakpoint } from '@/composables/useBreakpoint';
+
+const phoneDialogWidth =
+  'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const emit = defineEmits<{ (e: 'select', plan: BudgetPlan): void }>();
 
 const loading = ref(false);
@@ -326,5 +398,94 @@ const handleReject = async (row: BudgetPlan) => {
 <style scoped>
 .budget-plan-tab {
   min-height: 100%;
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.page-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.budget-plan-tab--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+}
+.card-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.field-emphasis {
+  grid-column: 1 / -1;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+.budget-plan-tab :deep(.budget-plan-dialog--phone) {
+  display: flex;
+  flex-direction: column;
+  width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)) !important;
+  box-sizing: border-box;
+}
+.budget-plan-tab :deep(.budget-plan-dialog--phone .el-dialog__body) {
+  min-height: 0;
+  overflow-y: auto;
 }
 </style>
