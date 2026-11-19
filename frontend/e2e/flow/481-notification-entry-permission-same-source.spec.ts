@@ -126,8 +126,14 @@ test.describe('481 通知中心路由权限键与读面同源', () => {
       scratchUsername = user.username;
       scratchPassword = user.password;
 
-      // 自建通知数据：同时发给自建用户与 admin 自身（超管用例断言列表非空）
+      // 自建通知数据：同时发给自建用户与 admin 自身（超管用例断言列表非空）。
+      // admin 的通知偏好行属共享库状态，可能被其他用例关闭站内信；
+      // 公告投递按该偏好门控，本用例必须显式打开后再发，前置不赌库中恰好是默认值。
       const me = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
+      await apiCallRaw(page, 'PUT', '/user-notification-settings', {
+        internal_enabled: true,
+        system_notification_type: 'internal',
+      });
       await seedNotification(page, [scratchUserId, me.id]);
     } finally {
       await seedContext.close();
