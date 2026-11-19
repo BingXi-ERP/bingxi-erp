@@ -443,6 +443,238 @@
     {
       "match": "backend/src/handlers/textile_safety_report_handler.rs",
       "chains": ["returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/sales/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/sales-contract/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/sales-price/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/sales-returns/",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/sales-analysis/",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/quotations/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/custom-orders/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/color-cards/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/color-prices/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/bulk-color-approval/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/lab-dip/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/logistics/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/customer/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/customer-collab/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/customer-credit/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/crm/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/ar/",
+      "chains": ["sale-to-cash", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/ar-reconciliation/",
+      "chains": ["sale-to-cash", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/invoice-details/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/bad-debts/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/tax-rebates/",
+      "chains": ["sale-to-cash"]
+    },
+    {
+      "match": "frontend/src/views/finance/",
+      "chains": ["sale-to-cash", "purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/finance-report/",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/financial-analysis/",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/voucher/",
+      "chains": ["sale-to-cash", "purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/bi/",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/report-templates/",
+      "chains": ["returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/purchase/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/purchase-contract/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/purchase-inspection/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/purchase-price/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/purchase-receipt/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/purchase-return/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/ap/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/supplier/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/supplier-evaluation/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/supplier-product/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/quality/",
+      "chains": ["purchase-to-pay", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/quality-8d/",
+      "chains": ["purchase-to-pay", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/quality-standards/",
+      "chains": ["purchase-to-pay", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/fabric-inspections/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/chemicals/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/material-shortage/",
+      "chains": ["purchase-to-pay"]
+    },
+    {
+      "match": "frontend/src/views/outsourcing/",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "frontend/src/views/greige-fabrics/",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "frontend/src/views/dye-batch/",
+      "chains": ["sale-to-cash", "outsource-to-cost"]
+    },
+    {
+      "match": "frontend/src/views/dye-recipe/",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "frontend/src/views/production/",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "frontend/src/views/production-recipes/",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "frontend/src/views/scheduling/",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "frontend/src/views/capacity/",
+      "chains": ["outsource-to-cost"]
+    },
+    {
+      "match": "frontend/src/views/cost/",
+      "chains": ["outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/inventory/",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/inventory-adjustment/",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/inventory-batch/",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/inventory-count/",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/inventory-transfer/",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
+    },
+    {
+      "match": "frontend/src/views/warehouse/",
+      "chains": ["sale-to-cash", "purchase-to-pay", "outsource-to-cost", "returns-to-report"]
     }
   ]
 }
