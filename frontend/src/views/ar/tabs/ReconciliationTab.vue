@@ -4,7 +4,7 @@
   拆分日期：2026-06-15 B3-2
 -->
 <template>
-  <div class="reconciliation-tab">
+  <div class="reconciliation-tab" :class="{ 'reconciliation-tab--phone': isPhone }">
     <div class="page-header">
       <h2 class="page-title">{{ $t('arModule.reconciliation.title') }}</h2>
       <el-button type="primary" @click="openReconciliationDialog()">
@@ -14,7 +14,75 @@
     </div>
 
     <el-card shadow="hover">
+      <section
+        v-if="isPhone"
+        v-loading="reconciliationLoading"
+        class="ar-reconciliation-mobile"
+        :aria-label="$t('arModule.reconciliation.listAria')"
+      >
+        <ul class="card-list">
+          <li v-for="row in reconciliations" :key="row.id" class="card-item">
+            <dl class="card-fields">
+              <div class="field-emphasis">
+                <dt>{{ $t('arModule.reconciliation.reconciliationNo') }}</dt>
+                <dd>{{ row.reconciliation_no }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.reconciliation.customer') }}</dt>
+                <dd>{{ row.customer_name }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.reconciliation.reconciliationDate') }}</dt>
+                <dd>{{ row.period_start }} ~ {{ row.period_end }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.reconciliation.invoiceAmount') }}</dt>
+                <dd>{{ formatMoney(row.total_invoices) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.reconciliation.paymentAmount') }}</dt>
+                <dd>{{ formatMoney(row.total_collections) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.reconciliation.difference') }}</dt>
+                <dd :class="{ 'text-red': Number(row.closing_balance) !== 0 }">
+                  {{ formatMoney(row.closing_balance) }}
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('common.status') }}</dt>
+                <dd>
+                  <el-tag
+                    :type="getReconciliationStatusType(row.reconciliation_status)"
+                    size="small"
+                  >
+                    {{ getReconciliationStatusLabel(row.reconciliation_status) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.reconciliation.confirmedAt') }}</dt>
+                <dd>{{ row.created_at }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button
+                v-if="row.reconciliation_status === 'draft'"
+                type="success"
+                @click="confirmReconciliation(row)"
+              >
+                {{ $t('arModule.reconciliation.confirm') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <ElEmpty
+          v-if="!reconciliationLoading && reconciliations.length === 0"
+          :description="$t('components.v2Table.empty')"
+        />
+      </section>
       <el-table
+        v-else
         v-loading="reconciliationLoading"
         :data="reconciliations"
         stripe
@@ -97,13 +165,20 @@
     <el-dialog
       v-model="reconciliationDialogVisible"
       :title="$t('arModule.reconciliation.createTitle')"
-      width="500px"
+      :width="
+        isPhone
+          ? 'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))'
+          : '500px'
+      "
+      class="reconciliation-dialog"
+      :class="{ 'reconciliation-dialog--phone': isPhone }"
       :aria-label="$t('arModule.reconciliation.createAria')"
     >
       <el-form
         ref="reconciliationFormRef"
         :model="reconciliationForm"
         label-width="80px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('arModule.reconciliation.formAria')"
       >
         <el-form-item :label="$t('arModule.reconciliation.reconciliationNo')">
@@ -162,11 +237,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, toRef, onMounted } from 'vue';
+import { ref, reactive, toRef, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElEmpty } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import type { FormInstance } from 'element-plus';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   useNumberField,
   validateNumberValue,
@@ -182,6 +258,9 @@ import type { Customer } from '@/api/customer';
 import { isDialogDismissal } from '@/utils/monitor';
 
 const { t } = useI18n({ useScope: 'global' });
+
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const reconciliations = ref<ARReconciliation[]>([]);
 const customers = ref<Customer[]>([]);
@@ -335,5 +414,121 @@ onMounted(() => {
 <style scoped>
 .text-red {
   color: #f56c6c;
+}
+
+.ar-reconciliation-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+
+.reconciliation-tab--phone .page-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+.reconciliation-tab--phone .page-title {
+  overflow-wrap: anywhere;
+}
+.reconciliation-tab--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.reconciliation-tab--phone :deep(.el-input__wrapper),
+.reconciliation-tab--phone :deep(.el-select__wrapper) {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.reconciliation-tab--phone :deep(.el-form-item__content) {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reconciliation-tab :deep(.reconciliation-dialog--phone) {
+  display: flex;
+  flex-direction: column;
+  width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)) !important;
+  box-sizing: border-box;
+}
+.reconciliation-tab :deep(.reconciliation-dialog--phone .el-dialog__header),
+.reconciliation-tab :deep(.reconciliation-dialog--phone .el-dialog__footer) {
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
+.reconciliation-tab :deep(.reconciliation-dialog--phone .el-dialog__body) {
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+.reconciliation-tab :deep(.reconciliation-dialog--phone .el-dialog__footer) {
+  justify-content: flex-end;
+}
+.reconciliation-tab :deep(.reconciliation-dialog--phone .el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
 }
 </style>

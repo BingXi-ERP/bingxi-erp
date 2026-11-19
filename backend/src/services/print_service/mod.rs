@@ -248,6 +248,7 @@ pub const PRINT_SCOPE_PENDING: &[&str] = &[
 ];
 
 pub mod asset_hr;
+pub mod codex_sheet;
 pub mod docx;
 pub mod export_trade;
 pub mod finance;

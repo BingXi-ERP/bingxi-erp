@@ -19,7 +19,78 @@
     </div>
 
     <el-card shadow="hover">
+      <!-- 手机卡片（与 BPM 审批手机卡片同断点同范式） -->
+      <section v-if="isPhone" v-loading="reconciliationLoading" class="ap-recon-mobile">
+        <ul class="card-list" :aria-label="$t('apModule.reconciliation.listAria')">
+          <li v-for="row in reconciliations" :key="row.id" class="card-item">
+            <dl class="card-fields">
+              <div class="field-emphasis">
+                <dt>{{ $t('apModule.reconciliation.reconciliationNo') }}</dt>
+                <dd>{{ row.reconciliation_no }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.reconciliation.supplier') }}</dt>
+                <dd>{{ row.supplier_name ?? '-' }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.reconciliation.startDate') }}</dt>
+                <dd>{{ row.start_date }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.reconciliation.endDate') }}</dt>
+                <dd>{{ row.end_date }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.reconciliation.invoiceAmount') }}</dt>
+                <dd>{{ formatMoney(row.total_invoice_amount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.reconciliation.paymentAmount') }}</dt>
+                <dd>{{ formatMoney(row.total_payment_amount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.reconciliation.difference') }}</dt>
+                <dd :class="{ 'text-red': Number(row.difference_amount) !== 0 }">
+                  {{ formatMoney(row.difference_amount) }}
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('common.status') }}</dt>
+                <dd>
+                  <el-tag :type="getReconciliationStatusType(row.status)" size="small">
+                    {{ getReconciliationStatusLabel(row.status) }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button
+                v-if="row.status === 'pending'"
+                type="success"
+                @click="confirmReconciliation(row as unknown as APReconciliation)"
+              >
+                {{ $t('apModule.reconciliation.confirm') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'pending'"
+                type="warning"
+                @click="disputeReconciliation(row as unknown as APReconciliation)"
+              >
+                {{ $t('apModule.reconciliation.dispute') }}
+              </el-button>
+              <el-button @click="showReconciliationDetail(row as APReconciliation)">
+                {{ $t('common.detail') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <ElEmpty
+          v-if="!reconciliationLoading && reconciliations.length === 0"
+          :description="$t('components.v2Table.empty')"
+        />
+      </section>
       <el-table
+        v-else
         v-loading="reconciliationLoading"
         :data="reconciliations"
         stripe
@@ -36,8 +107,13 @@
           width="150"
         />
         <el-table-column
-          prop="reconciliation_date"
-          :label="$t('apModule.reconciliation.reconciliationDate')"
+          prop="start_date"
+          :label="$t('apModule.reconciliation.startDate')"
+          width="120"
+        />
+        <el-table-column
+          prop="end_date"
+          :label="$t('apModule.reconciliation.endDate')"
           width="120"
         />
         <el-table-column
@@ -64,7 +140,7 @@
           align="right"
         >
           <template #default="{ row }">
-            <span :class="{ 'text-red': row.difference_amount !== 0 }">
+            <span :class="{ 'text-red': Number(row.difference_amount) !== 0 }">
               {{ formatMoney(row.difference_amount) }}
             </span>
           </template>
@@ -180,12 +256,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { logger } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElEmpty } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
 import { Plus } from '@element-plus/icons-vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   getAPReconciliationList,
   getAPReconciliation,
@@ -199,12 +276,17 @@ import type { Supplier } from '@/api/supplier';
 
 const { t } = useI18n({ useScope: 'global' });
 
+// 手机卡片断点（与 BPM 审批手机卡片同断点）
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
+
 const reconciliations = ref<APReconciliation[]>([]);
 const reconciliationLoading = ref(false);
 const suppliers = ref<Supplier[]>([]);
 
-const formatMoney = (amount: number | undefined) => {
-  return amount?.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) || '0.00';
+const formatMoney = (amount: number | string | undefined) => {
+  const v = typeof amount === 'string' ? Number(amount) : amount;
+  return v?.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) || '0.00';
 };
 
 const getReconciliationStatusType = (status: string) => {
@@ -401,6 +483,61 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 手机卡片（范式与 BPM 审批手机卡片一致） */
+.ap-recon-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
