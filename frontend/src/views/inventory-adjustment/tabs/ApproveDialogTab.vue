@@ -7,7 +7,7 @@
   <el-dialog
     :model-value="modelValue"
     :title="t('inventoryAdjustment.approveDialogTab.title')"
-    width="500px"
+    :width="isPhone ? '95%' : '500px'"
     :aria-label="t('inventoryAdjustment.approveDialogTab.ariaLabel')"
     @update:model-value="(val: boolean) => emit('update:modelValue', val)"
   >
@@ -15,6 +15,7 @@
       ref="formRef"
       :model="formData"
       label-width="80px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('inventoryAdjustment.approveDialogTab.ariaLabelForm')"
     >
       <el-form-item :label="t('inventoryAdjustment.approveDialogTab.labelAdjustNo')">
@@ -57,8 +58,9 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive, watch } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance } from 'element-plus';
 import {
@@ -69,6 +71,8 @@ import {
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

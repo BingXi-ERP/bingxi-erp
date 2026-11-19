@@ -8,7 +8,7 @@
   <el-dialog
     :model-value="modelValue"
     :title="t('inventoryCount.detailDialogTab.titleDetail')"
-    width="900px"
+    :width="isPhone ? '95%' : '900px'"
     :aria-label="t('inventoryCount.detailDialogTab.ariaLabelDetail')"
     @update:model-value="(val: boolean) => onVisibleChange(val)"
   >
@@ -117,6 +117,7 @@
 import { ref, computed, watch } from 'vue';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
 import {
@@ -134,6 +135,8 @@ import {
 } from '@/utils/inventory-count-status';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

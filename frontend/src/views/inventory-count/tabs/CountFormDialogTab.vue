@@ -11,7 +11,7 @@
         ? t('inventoryCount.formDialogTab.titleEdit')
         : t('inventoryCount.formDialogTab.titleCreate')
     "
-    width="600px"
+    :width="isPhone ? '95%' : '600px'"
     :aria-label="
       mode === 'view'
         ? t('inventoryCount.formDialogTab.ariaLabelDetail')
@@ -25,6 +25,7 @@
       ref="formRef"
       :model="formData"
       label-width="100px"
+      :label-position="isPhone ? 'top' : 'right'"
       :disabled="mode === 'view'"
       :aria-label="t('inventoryCount.formDialogTab.ariaLabelForm')"
     >
@@ -74,8 +75,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted } from 'vue';
+import { computed, ref, reactive, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import type { FormInstance } from 'element-plus';
 import {
@@ -88,6 +90,8 @@ import type { Warehouse } from '@/api/warehouse';
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;
