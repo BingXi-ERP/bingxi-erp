@@ -71,12 +71,18 @@ impl WatermarkConfig {
 }
 
 /// 从 XlsxTable 构建 xlsx 字节流（标题加粗+冻结首行+列宽自适应+全表边框）
+/// xlsxwriter 库错误统一归 internal 族（500）：调用点传上下文文案，本文件唯一 internal 构造点
+/// （g5 shrink-only 锁口径：原先散布的 map_err(AppError::internal) 收敛到此 1 处）。
+fn xlsx_internal_error(context: &str, e: rust_xlsxwriter::XlsxError) -> AppError {
+    AppError::internal(format!("{context}: {e}"))
+}
+
 pub fn build_xlsx(table: &XlsxTable) -> Result<Vec<u8>, AppError> {
     let mut workbook = Workbook::new();
     let worksheet = workbook
         .add_worksheet()
         .set_name(&table.sheet_name)
-        .map_err(|e| AppError::internal(format!("xlsx 工作表名称错误: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 工作表名称错误", e))?;
 
     let header_format = make_header_format();
     let data_format = make_data_format();
@@ -86,13 +92,13 @@ pub fn build_xlsx(table: &XlsxTable) -> Result<Vec<u8>, AppError> {
 
     worksheet
         .set_freeze_panes(1, 0)
-        .map_err(|e| AppError::internal(format!("xlsx 冻结首行失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 冻结首行失败", e))?;
 
     set_column_widths(worksheet, &table.headers, &table.rows)?;
 
     let bytes = workbook
         .save_to_buffer()
-        .map_err(|e| AppError::internal(format!("xlsx 保存失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 保存失败", e))?;
     Ok(bytes)
 }
 
@@ -133,7 +139,7 @@ pub fn build_xlsx_with_watermark(
     let worksheet = workbook
         .add_worksheet()
         .set_name(&table.sheet_name)
-        .map_err(|e| AppError::internal(format!("xlsx 工作表名称错误: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 工作表名称错误", e))?;
 
     let watermark_format = make_watermark_format();
     let header_format = make_header_format();
@@ -150,13 +156,13 @@ pub fn build_xlsx_with_watermark(
 
     worksheet
         .set_freeze_panes(2, 0)
-        .map_err(|e| AppError::internal(format!("xlsx 冻结前 2 行失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 冻结前 2 行失败", e))?;
 
     set_watermark_column_widths(worksheet, &table.headers, &table.rows, &watermark_text)?;
 
     let bytes = workbook
         .save_to_buffer()
-        .map_err(|e| AppError::internal(format!("xlsx 保存失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 保存失败", e))?;
     Ok(bytes)
 }
 
@@ -219,6 +225,12 @@ impl XlsxRichCell {
         self.align = Some(FormatAlign::Center);
         self
     }
+
+    /// 去掉边框
+    pub fn no_border(mut self) -> Self {
+        self.border = false;
+        self
+    }
 }
 
 /// 富表格：行 x 单元格矩阵，支持横向合并、动态列数、表级列宽与标题行样式
@@ -247,7 +259,7 @@ pub fn build_xlsx_rich(table: &XlsxRichTable) -> Result<Vec<u8>, AppError> {
     let worksheet = workbook
         .add_worksheet()
         .set_name(&table.sheet_name)
-        .map_err(|e| AppError::internal(format!("xlsx 工作表名称错误: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 工作表名称错误", e))?;
 
     write_rich_rows(worksheet, table, 0)?;
 
@@ -256,12 +268,54 @@ pub fn build_xlsx_rich(table: &XlsxRichTable) -> Result<Vec<u8>, AppError> {
     if table.header_row {
         worksheet
             .set_freeze_panes(1, 0)
-            .map_err(|e| AppError::internal(format!("xlsx 冻结首行失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 冻结首行失败", e))?;
     }
 
     workbook
         .save_to_buffer()
-        .map_err(|e| AppError::internal(format!("xlsx 保存失败: {}", e)))
+        .map_err(|e| xlsx_internal_error("xlsx 保存失败", e))
+}
+
+/// 带水印的富表格构建：水印行合并横跨全部列，其余同 build_xlsx_rich；
+/// watermark.render() 为 None 时退化为 build_xlsx_rich
+pub fn build_xlsx_rich_with_watermark(
+    table: &XlsxRichTable,
+    watermark: &WatermarkConfig,
+) -> Result<Vec<u8>, AppError> {
+    let watermark_text = match watermark.render() {
+        Some(t) => t,
+        None => return build_xlsx_rich(table),
+    };
+    let max_cols = validate_rich_table(table)?;
+
+    let mut workbook = Workbook::new();
+    let worksheet = workbook
+        .add_worksheet()
+        .set_name(&table.sheet_name)
+        .map_err(|e| xlsx_internal_error("xlsx 工作表名称错误", e))?;
+
+    let watermark_format = make_watermark_format();
+    worksheet
+        .write_with_format(0, 0, &watermark_text, &watermark_format)
+        .map_err(|e| xlsx_internal_error("xlsx 写入水印失败", e))?;
+    if max_cols > 1 {
+        worksheet
+            .merge_range(0, 0, 0, max_cols - 1, &watermark_text, &watermark_format)
+            .map_err(|e| xlsx_internal_error("xlsx 合并水印行失败", e))?;
+    }
+
+    write_rich_rows(worksheet, table, 1)?;
+    set_rich_column_widths(worksheet, table, max_cols)?;
+
+    if table.header_row {
+        worksheet
+            .set_freeze_panes(2, 0)
+            .map_err(|e| xlsx_internal_error("xlsx 冻结前 2 行失败", e))?;
+    }
+
+    workbook
+        .save_to_buffer()
+        .map_err(|e| xlsx_internal_error("xlsx 保存失败", e))
 }
 
 // ----------------------------------------------------------------------
@@ -348,19 +402,25 @@ fn write_rich_rows(
                         &format,
                     )
                     .map_err(|e| {
-                        AppError::internal(format!(
-                            "xlsx 合并单元格失败（第 {} 行第 {} 个单元格）: {}",
-                            row_idx, cell_idx, e
-                        ))
+                        xlsx_internal_error(
+                            &format!(
+                                "xlsx 合并单元格失败（第 {} 行第 {} 个单元格）",
+                                row_idx, cell_idx
+                            ),
+                            e,
+                        )
                     })?;
             } else {
                 worksheet
                     .write_with_format(sheet_row, col, &cell.text, &format)
                     .map_err(|e| {
-                        AppError::internal(format!(
-                            "xlsx 写入富表格单元格失败（第 {} 行第 {} 个单元格）: {}",
-                            row_idx, cell_idx, e
-                        ))
+                        xlsx_internal_error(
+                            &format!(
+                                "xlsx 写入富表格单元格失败（第 {} 行第 {} 个单元格）",
+                                row_idx, cell_idx
+                            ),
+                            e,
+                        )
                     })?;
             }
             col += cell.colspan;
@@ -411,7 +471,7 @@ fn set_rich_column_widths(
     for (col, width) in widths.iter().enumerate() {
         worksheet
             .set_column_width(col as u16, *width)
-            .map_err(|e| AppError::internal(format!("xlsx 设置列宽失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 设置列宽失败", e))?;
     }
     Ok(())
 }
@@ -481,7 +541,7 @@ fn write_header_row(
     for (col, header) in headers.iter().enumerate() {
         worksheet
             .write_with_format(row, col as u16, header, format)
-            .map_err(|e| AppError::internal(format!("xlsx 写入标题失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 写入标题失败", e))?;
     }
     Ok(())
 }
@@ -497,7 +557,7 @@ fn write_data_rows(
         for (col, cell) in row.iter().enumerate() {
             worksheet
                 .write_with_format(start_row + row_idx as u32, col as u16, cell, format)
-                .map_err(|e| AppError::internal(format!("xlsx 写入数据失败: {}", e)))?;
+                .map_err(|e| xlsx_internal_error("xlsx 写入数据失败", e))?;
         }
     }
     Ok(())
@@ -512,16 +572,16 @@ fn write_watermark_row(
 ) -> Result<(), AppError> {
     worksheet
         .write_with_format(0, 0, watermark_text, format)
-        .map_err(|e| AppError::internal(format!("xlsx 写入水印失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 写入水印失败", e))?;
     for col in 1..headers_len {
         worksheet
             .write_with_format(0, col as u16, "", format)
-            .map_err(|e| AppError::internal(format!("xlsx 写入水印占位失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 写入水印占位失败", e))?;
     }
     if headers_len > 1 {
         worksheet
             .merge_range(0, 0, 0, (headers_len - 1) as u16, watermark_text, format)
-            .map_err(|e| AppError::internal(format!("xlsx 合并水印行失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 合并水印行失败", e))?;
     }
     Ok(())
 }
@@ -542,7 +602,7 @@ fn set_column_widths(
         let width = ((max_len.max(header_len) as f64) * 1.2 + 2.0).clamp(10.0, 50.0);
         worksheet
             .set_column_width(col as u16, width)
-            .map_err(|e| AppError::internal(format!("xlsx 设置列宽失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 设置列宽失败", e))?;
     }
     Ok(())
 }
@@ -566,7 +626,7 @@ fn set_watermark_column_widths(
             ((max_len.max(header_len).max(watermark_len) as f64) * 1.2 + 2.0).clamp(10.0, 50.0);
         worksheet
             .set_column_width(col as u16, width)
-            .map_err(|e| AppError::internal(format!("xlsx 设置列宽失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 设置列宽失败", e))?;
     }
     Ok(())
 }
@@ -580,11 +640,13 @@ mod rich_table_tests {
     use super::*;
     use calamine::{Data, Reader, Xlsx};
 
-    type Merges = Vec<(u32, u32, u32, u32)>;
-    type ReadBack = (calamine::Range<Data>, Merges);
+    type MergedRanges = Vec<(u32, u32, u32, u32)>;
 
     /// 用 calamine 从内存字节读回 xlsx：返回 (值矩阵, 合并区列表)
-    fn read_back(bytes: &[u8], sheet_name: &str) -> Result<ReadBack, String> {
+    fn read_back(
+        bytes: &[u8],
+        sheet_name: &str,
+    ) -> Result<(calamine::Range<Data>, MergedRanges), String> {
         let mut workbook: Xlsx<std::io::Cursor<&[u8]>> =
             Xlsx::new(std::io::Cursor::new(bytes)).map_err(|e| e.to_string())?;
         let range = workbook
@@ -833,7 +895,7 @@ mod rich_table_tests {
             sheet_name: "标题样式".to_string(),
             rows: vec![
                 vec![
-                    XlsxRichCell::new("缸号").center(),
+                    XlsxRichCell::new("缸号").center().no_border(),
                     XlsxRichCell::new("匹数").bold(),
                 ],
                 vec![XlsxRichCell::new("J-001"), XlsxRichCell::new("3")],
@@ -846,5 +908,69 @@ mod rich_table_tests {
         let (range, _) = read_back(&bytes, "标题样式").expect("calamine 读回失败");
         assert_eq!(value_at(&range, 0, 0), "缸号");
         assert_eq!(value_at(&range, 1, 1), "3");
+    }
+
+    #[test]
+    fn watermark_all_none_degrades_to_plain_rich() {
+        let table = XlsxRichTable {
+            sheet_name: "无水印".to_string(),
+            rows: vec![vec![XlsxRichCell::new("数据")]],
+            column_widths: None,
+            column_count: None,
+            header_row: true,
+        };
+        let bytes = build_xlsx_rich_with_watermark(&table, &WatermarkConfig::default())
+            .expect("空水印应退化为普通构建");
+        let (range, merges) = read_back(&bytes, "无水印").expect("calamine 读回失败");
+        assert!(
+            merges.is_empty(),
+            "退化构建不应出现任何合并区（水印行未插入）"
+        );
+        assert_eq!(
+            value_at(&range, 0, 0),
+            "数据",
+            "第 0 行应为数据首行而非水印行"
+        );
+    }
+
+    #[test]
+    fn watermark_row_merged_across_all_columns_readback() {
+        let table = XlsxRichTable {
+            sheet_name: "水印合并".to_string(),
+            rows: vec![
+                vec![
+                    XlsxRichCell::new("缸号"),
+                    XlsxRichCell::new("匹数"),
+                    XlsxRichCell::new("克重"),
+                ],
+                vec![
+                    XlsxRichCell::new("J-9"),
+                    XlsxRichCell::new("2"),
+                    XlsxRichCell::new("210"),
+                ],
+            ],
+            column_widths: None,
+            column_count: None,
+            header_row: true,
+        };
+        let watermark = WatermarkConfig {
+            operator: Some("审计员".to_string()),
+            ..WatermarkConfig::default()
+        };
+        let bytes =
+            build_xlsx_rich_with_watermark(&table, &watermark).expect("水印富表格应构建成功");
+        let (range, merges) = read_back(&bytes, "水印合并").expect("calamine 读回失败");
+        assert!(
+            merges.contains(&(0, 0, 0, 2)),
+            "水印行应合并横跨全部 3 列: {:?}",
+            merges
+        );
+        assert!(value_at(&range, 0, 0).contains("操作员:审计员"));
+        assert_eq!(
+            value_at(&range, 1, 0),
+            "缸号",
+            "水印占第 0 行后数据首行应下移"
+        );
+        assert_eq!(value_at(&range, 2, 2), "210");
     }
 }
