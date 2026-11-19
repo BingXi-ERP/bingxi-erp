@@ -54,6 +54,7 @@ export const TRAVERSAL_MODULES: TraversalModule[] = [
   { id: 'workflow', route: '/workflow', domain: 'core', tier: 'C', noCreate: true },
 
   // ===== system 域 =====
+  { id: 'payment-channels', route: '/system/payment-channels', domain: 'system', tier: 'C', listApi: '/payment-channels', noCreate: true },
   { id: 'system-audit-log', route: '/system/audit-log', domain: 'system', tier: 'C', listApi: '/audit-logs', noCreate: true },
   { id: 'system-export-approvals', route: '/system/export-approvals', domain: 'system', tier: 'C', listApi: '/export-approvals', noCreate: true },
   { id: 'system-slow-query', route: '/system/slow-query', domain: 'system', tier: 'C', noCreate: true },

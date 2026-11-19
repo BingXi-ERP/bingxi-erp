@@ -78,7 +78,7 @@ impl ApReconciliationService {
         }
     }
 
-    /// 生成对账确认凭证（失败仅 warn 不阻断主流程）
+    /// 生成对账确认凭证（非阻断：失败落 event_dead_letters 死信补偿记录，等待补生成）
     async fn create_confirm_voucher(
         &self,
         reconciliation: &ap_reconciliation::Model,
@@ -88,11 +88,21 @@ impl ApReconciliationService {
         let voucher_service =
             crate::services::voucher_service::VoucherService::new(self.db.clone());
         if let Err(e) = voucher_service.create_and_post(voucher_req, user_id).await {
-            tracing::warn!(
-                "对账单 {} 确认成功，但生成对账确认凭证失败：{}",
+            tracing::error!(
+                "对账单 {} 确认成功，但生成对账确认凭证失败，已落死信补偿记录等待补生成：{}",
                 reconciliation.reconciliation_no,
                 e
             );
+            crate::services::event_retry_service::EventRetryService::
+                record_voucher_generation_failure(
+                    self.db.clone(),
+                    "ap",
+                    "AP_RECONCILIATION",
+                    i64::from(reconciliation.id),
+                    &reconciliation.reconciliation_no,
+                    &e,
+                )
+                .await;
         }
     }
 
