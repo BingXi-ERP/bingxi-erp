@@ -24,8 +24,13 @@
 
 | 编号 | 类型 | 优先级 | 标题 | 判定要点 | 卡点 |
 |------|------|--------|------|----------|------|
-| DC-005 | 功能补齐 | P1 | 小程序真机 UI 深度专项（分包/页面栈/隐私协议/WebView/杀后台） | 仓库无 miniprogram-automulator、CI 无微信开发者工具，无法跑真机自动化（4.35 实量） | 需产品/项目负责人拍板是否投入微信开发者工具 CI 环境 |
 | DC-006 | Bug 缺陷 | P0 | #1302 合并阻塞（mergeable=false / state=dirty） | 23 支开放 PR 中唯一脏支，46 文件与已合并移动端支冲突，CI 绿也无法 squash 合并 | 收口末期处理：fetch --unshallow → merge origin/main 解冲突 → 普通 push；force push 属另一档需单独授权 |
+
+DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动联网查询，结合行业标准给出最优拍板方案"），结论为**不可行，转入搁置**：
+- 硬约束：全仓 CI job 均为 `runs-on: ubuntu-latest`（.github/workflows/ci-cd.yml:97 等、miniprogram-checks.yml:65）；微信开发者工具仅 Windows/macOS 版，Linux 无法安装。
+- 工具现状（GitHub API 与 npm registry 实量）：`open-wxa/wxa-runner`（唯一能在 Linux 浏览器跑小程序 E2E、无需开发者工具的方案）仓库描述明确为"已应腾讯公司要求下线"，pushed_at 2026-11-16，不可再作为长期依赖；`miniprogram-automator` npm 包仍在（0.13.0）但依赖微信开发者工具；`miniprogram-ci` 仅做上传/预览，无 E2E 能力。
+- 拍板：不在 CI 引入小程序真机/运行时 E2E；以接口层 E2E（DC-001/002，走 /api/v1/erp/*）+ 7 道静态门为当前可行上限。4.35 的真机深度项（分包加载、页面栈、隐私协议弹窗、WebView、杀后台）改由手工回归清单覆盖，不进自动化 CI。
+- 触发重启条件：若后续出现官方支持的 Linux 无头小程序运行时，或团队提供专用 macOS/Windows runner，再重开本项立项。
 
 ### 搁置
 
