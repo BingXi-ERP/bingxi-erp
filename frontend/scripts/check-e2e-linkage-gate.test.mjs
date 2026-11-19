@@ -5,7 +5,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -84,6 +84,49 @@ test('--changed-from 与位置参数混用 → UNVERIFIED，退出 2，不判红
     j.unverified.some(x => x.includes('不能与位置参数混用')),
     JSON.stringify(j.unverified)
   );
+});
+
+test('--specs-out 写出受影响用例清单，空命中写空文件', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'linkage-specs-'));
+  const hitFile = path.join(dir, 'hit.txt');
+  const emptyFile = path.join(dir, 'empty.txt');
+  try {
+    const hit = run(['--json', '--specs-out', hitFile, 'backend/src/routes/sales.rs']);
+    assert.equal(hit.status, 0, hit.stdout + hit.stderr);
+    assert.deepEqual(readFileSync(hitFile, 'utf8').trimEnd().split('\n'), [
+      'frontend/e2e/fullflow/21-sale-to-cash.spec.ts',
+      'frontend/e2e/fullflow/40-quotation-role-journey.spec.ts',
+      'frontend/e2e/flow/513-delivery-signoff-and-reconciliation-gate.spec.ts',
+      'frontend/e2e/flow/91-ship-auto-ar-amounts.spec.ts',
+      'frontend/e2e/flow/468-ar-invoice-precheck-statement-confirmed.spec.ts',
+      'frontend/e2e/flow/11-returns.spec.ts',
+      'frontend/e2e/flow/522-ar-recon-source-amount-redflush.spec.ts',
+      'frontend/e2e/fullflow/11-ar.spec.ts',
+      'frontend/e2e/fullflow/22-inspection-to-return.spec.ts',
+    ]);
+
+    const empty = run(['--json', '--specs-out', emptyFile, 'README.md']);
+    assert.equal(empty.status, 0, empty.stdout + empty.stderr);
+    assert.equal(readFileSync(emptyFile, 'utf8'), '');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('矩阵 RED 时不写 spec 清单，避免消费损坏矩阵的执行列表', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'linkage-specs-red-'));
+  const specsFile = path.join(dir, 'specs.txt');
+  try {
+    const { file } = tempMatrix(m => {
+      m.chains = {};
+      m.modules = [];
+    });
+    const r = run(['--json', '--matrix', file, '--specs-out', specsFile]);
+    assert.equal(r.status, 1, r.stdout + r.stderr);
+    assert.equal(existsSync(specsFile), false);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('无效布尔参数仍按 JSON 形式输出 UNVERIFIED', () => {

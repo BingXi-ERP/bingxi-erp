@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "链路影响登记，供 report-e2e-linkage.mjs 输出人工回归参考；不是 CI 门禁。modules[].match 为规范化后的仓库相对路径前缀或模块关键词（按子串匹配，分隔符统一为 /）。chains 的 specs 均为真实存在的 e2e 文件。",
+  "note": "链路影响登记，供 PR 联动门禁与 report-e2e-linkage.mjs 共用。命中模块后由 ci-cd.yml 的 ci-e2e-linkage job 真实执行 chains.specs；无命中仅记 NOT_APPLICABLE，不冒充回归通过。modules[].match 为规范化后的仓库相对路径前缀或模块关键词（按子串匹配，分隔符统一为 /）。chains 的 specs 均为真实存在的 e2e 文件。",
   "chains": {
     "sale-to-cash": {
       "description": "报价→订单→锁缸→出库→送货→对账→开票→收款（销售到回款全链）",

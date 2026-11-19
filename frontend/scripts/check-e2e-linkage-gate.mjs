@@ -4,12 +4,12 @@
 //         --self-test 由同一文件跑内置正向对照，证明判定器有检测力。
 // 入参：位置参数为仓库相对变更文件路径；--changed-from <ref> 从该 ref 到 HEAD 的 git diff 取变更；
 //       --matrix <path> 覆盖矩阵文件（自证注入损坏矩阵用）；--self-test 跑夹具并核对命中数；
-//       --json 以机器可读形式输出结论。
+//       --json 以机器可读形式输出结论；--specs-out <path> 把受影响 spec 清单写到调用方指定路径。
 // 传给谁：只写标准输出与退出码：0=绿（含仅报告）、1=矩阵完整性破坏判红、2=工具或矩阵故障未验证；
 //       CI 按退出码判负，报告正文供 step summary 采信，不回调任何服务。
-// 存什么：不写仓内任何文件；正向对照的夹具只在内存构造，不落盘、不清理。
+// 存什么：默认不写仓内文件；仅 --specs-out 明确指定时写清单，正向对照夹具只在内存构造。
 // 存哪里：无持久化；唯一读源是 frontend/scripts/e2e-linkage-matrix.json。
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -235,6 +235,7 @@ function main() {
         'self-test': { type: 'boolean' },
         'changed-from': { type: 'string' },
         matrix: { type: 'string' },
+        'specs-out': { type: 'string' },
       },
     });
   } catch (e) {
@@ -268,6 +269,15 @@ function main() {
   const reds = integrity(matrix, REPO_ROOT);
   const affected = reds.length ? { hitRules: [], chains: [], specs: [] } : impact(changed, matrix);
   const code = verdict(reds, unverified);
+
+  if (values['specs-out'] !== undefined && code === 0) {
+    try {
+      const list = affected.specs.map(normalize).join('\n');
+      writeFileSync(values['specs-out'], list ? `${list}\n` : '', 'utf8');
+    } catch (e) {
+      unverifiedResult(asJson, `写 spec 清单失败：${e.message}`);
+    }
+  }
 
   if (asJson) {
     process.stdout.write(

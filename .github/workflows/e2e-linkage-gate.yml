@@ -4,12 +4,12 @@ name: 联动影响矩阵静态检查
 on:
   pull_request:
     paths:
-      - 'backend/src/**'
-      - 'frontend/src/**'
-      - 'frontend/e2e/**'
+      - 'backend/**'
+      - 'frontend/**'
       - 'frontend/scripts/e2e-linkage-matrix.json'
       - 'frontend/scripts/report-e2e-linkage*.mjs'
       - 'frontend/scripts/check-e2e-linkage-gate*.mjs'
+      - '.github/workflows/ci-cd.yml'
       - '.github/workflows/e2e-linkage-gate.yml'
   workflow_dispatch:
 
