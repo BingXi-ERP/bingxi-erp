@@ -49,6 +49,24 @@ describe('个人中心移动端适配契约锁', () => {
     }
   });
 
+  it('手机端资料表单保留桌面端全部 6 字段，删除任一字段即失败', () => {
+    const phoneStart = PROFILE_SRC.indexOf('<template v-if="isPhone"');
+    const phoneEnd = PROFILE_SRC.indexOf('<template v-else');
+    const phoneBlock = PROFILE_SRC.slice(phoneStart, phoneEnd);
+    // 与桌面分支等价的字段集合：用户名不可编辑、姓名/邮箱/手机可编辑、部门/角色只读
+    const fields = [
+      'v-model="profileForm.username"',
+      'v-model="profileForm.real_name"',
+      'v-model="profileForm.email"',
+      'v-model="profileForm.phone"',
+      'v-model="profileForm.department_name"',
+      "profileForm.role_names?.join(', ')",
+    ];
+    for (const field of fields) {
+      expect(phoneBlock, `手机端资料表单缺少字段 ${field}`).toContain(field);
+    }
+  });
+
   it('手机端表单字段 label 顶部对齐，避免窄屏挤压', () => {
     const phoneStart = PROFILE_SRC.indexOf('<template v-if="isPhone"');
     const phoneEnd = PROFILE_SRC.indexOf('<template v-else');
