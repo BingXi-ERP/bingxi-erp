@@ -34,6 +34,7 @@ form_urlencoded = "1.2"
 
 # 认证与安全
 argon2 = "0.5"
+aes-gcm = "=0.10.3"
 uuid = { version = "1.0", default-features = false, features = ["serde", "v4"] }
 jsonwebtoken = { version = "11.0", features = ["rust_crypto"] }
 # URL 解析（用于 SSRF 防护：解析 Webhook URL 主机名后校验内网地址）

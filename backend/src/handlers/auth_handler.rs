@@ -717,14 +717,16 @@ fn build_failure_audit_event(username: &str, error: &AppError) -> AuditEvent {
     }
 }
 
-/// 生成 CSRF Token + 解析 session_id，并执行登录前强制轮换旧 Token。
+/// 生成登录会话的 CSRF Token 并解析 session_id，交给登录响应（Json 体）与 Cookie 下发链路。
+/// 入参：state/token（新签发的 access JWT）/audit_ctx/client_ip/user；
+/// 返回 (csrf_token, session_id)。登录不再按用户整集清除旧 Token：同账号多会话并存，
+/// 残留 token 的安全边界由一次性消费 + 用户+会话绑定核验 + TTL 保证。
 fn prepare_csrf_state(
     state: &AppState,
     token: &str,
     audit_ctx: &Option<Extension<AuditContext>>,
     client_ip: &str,
     user: &crate::models::user::Model,
-    username: &str,
 ) -> Result<(String, String), AppError> {
     let claims = AuthService::validate_token_static(token, &state.jwt_secret).map_err(|e| {
         tracing::error!("Failed to decode JWT token: {}", e);
@@ -741,20 +743,10 @@ fn prepare_csrf_state(
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| client_ip.to_string());
 
-    // 强制轮换：登录前清除该 user_id 关联的全部旧 CSRF Token（多设备残留 token 一次性作废）
-    let rotated = state.cache.clear_old_csrf_token_for_user(user.id);
-    if rotated {
-        tracing::info!(
-            user_id = user.id,
-            username = %username,
-            "已清除该用户的旧 CSRF Token（强制轮换）"
-        );
-    }
-
     // 生成随机 CSRF Token 并写入缓存：
     // - 缓存值 CsrfTokenBinding 携带 session_id、观测 ip_address、user_id
     //   消费时以「用户 + 会话」做拒绝判定，观测 IP 只判漂移并重发（移动与 NAT 客户端 IP 必然变化）
-    // - 反向索引 user_id 对存活 csrf_token 的集合，支撑上面的强制轮换
+    // - 反向索引 user_id 对存活 csrf_token 的集合，支撑消费时移除与写入前回收过期项
     // - TTL = CSRF_TOKEN_DEFAULT_TTL_SECS (1800s = 30min)，与 access_token Cookie 对齐
     let csrf_token = uuid::Uuid::new_v4().to_string();
     state.cache.set_csrf_token(
@@ -837,14 +829,7 @@ async fn handle_login_success(
     let user_info = UserInfo::build_with_permissions(state.db.as_ref(), &user).await;
     let permissions = user_info.permissions.clone();
 
-    let (csrf_token, session_id) = prepare_csrf_state(
-        state,
-        &token,
-        audit_ctx,
-        client_ip,
-        &user,
-        &payload.username,
-    )?;
+    let (csrf_token, session_id) = prepare_csrf_state(state, &token, audit_ctx, client_ip, &user)?;
 
     // 生成 refresh_token：JWT 形式（P1 7-1 修复），session_id 与 access_token 共享
     let refresh_token = auth_service

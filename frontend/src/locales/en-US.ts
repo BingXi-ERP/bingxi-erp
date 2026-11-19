@@ -1,6 +1,30 @@
 /* English (US) translation - Bingxi Management Platform */
 /* Namespace pattern: {module}.{section}.{key} */
 export default {
+  paymentChannels: {
+    title: 'Payment channels',
+    description: 'Configuration and payment-method records only. No payment gateway is called.',
+    readonly: 'Read-only access. Update permission is required to save.',
+    enabled: 'Enabled',
+    sandboxMode: 'Sandbox mode',
+    appId: 'Application ID',
+    mchId: 'Merchant ID',
+    apiKey: 'API key',
+    callbackUrl: 'HTTPS callback URL',
+    keyHint: 'Leave blank to keep the existing key. Saved keys are never displayed.',
+    loadFailed: 'Unable to load payment channels. Retry to load server configuration.',
+    saveFailed:
+      'Save or server readback failed. Your form has been retained; verify before retrying.',
+    optionsFailed: 'Payment channels could not be loaded. Retry before selecting a channel.',
+    historicalMethod: 'Historical method (unavailable for new selection)',
+    wechatPay: 'WeChat Pay',
+    alipay: 'Alipay',
+    validation: {
+      httpsRequired:
+        'Enter an HTTPS URL without credentials, spaces or backslashes, or leave blank.',
+      maskedKey: 'The masked value cannot be used as a key.',
+    },
+  },
   common: {
     offlineBannerTitle: 'Network Disconnected',
     offlineBannerDescription:
@@ -537,6 +561,7 @@ export default {
       printTemplates: 'Print Templates',
       printTargets: 'Print Targets',
       apiGateway: 'API Gateway',
+      paymentChannels: 'Payment Channels',
       systemUpdate: 'System Update',
       advanced: 'Advanced Settings',
       notification: 'Notification',
