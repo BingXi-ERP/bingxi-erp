@@ -430,17 +430,27 @@ impl ApPaymentService {
         Ok(())
     }
 
-    /// 确认付款后生成付款凭证（非阻断，失败仅 warn）。
+    /// 确认付款后生成付款凭证（非阻断：失败落 event_dead_letters 死信补偿记录，等待补生成）。
     async fn generate_payment_voucher(&self, payment: &ap_payment::Model, user_id: i32) {
         let voucher_req = Self::build_payment_voucher_request(payment);
         let voucher_service =
             crate::services::voucher_service::VoucherService::new(self.db.clone());
         if let Err(e) = voucher_service.create_and_post(voucher_req, user_id).await {
-            tracing::warn!(
-                "付款单 {} 确认成功，但生成付款凭证失败：{}",
+            tracing::error!(
+                "付款单 {} 确认成功，但生成付款凭证失败，已落死信补偿记录等待补生成：{}",
                 payment.payment_no,
                 e
             );
+            crate::services::event_retry_service::EventRetryService::
+                record_voucher_generation_failure(
+                    self.db.clone(),
+                    "ap",
+                    "AP_PAYMENT",
+                    i64::from(payment.id),
+                    &payment.payment_no,
+                    &e,
+                )
+                .await;
         }
     }
 

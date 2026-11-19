@@ -667,7 +667,7 @@ impl SalesService {
         // 每次发货都生成收入确认凭证
         // 借：应收账款（含税总额，挂客户辅助核算）
         // 贷：主营业务收入（不含税）/ 应交税费-销项税额
-        // 失败时仅 warn 不阻断主流程（与采购入库容错模式一致）
+        // 非阻断：失败落 event_dead_letters 死信补偿记录等待补生成
         self.create_revenue_voucher_for_delivery(
             delivery,
             items_result.delivery_total_amount,
@@ -704,7 +704,7 @@ impl SalesService {
     }
 
     /// 为发货单生成收入确认凭证（借应收/贷收入+销项税）
-    /// 失败时仅 warn 不阻断主流程（与采购入库容错模式一致）
+    /// 非阻断：失败落 event_dead_letters 死信补偿记录等待补生成
     async fn create_revenue_voucher_for_delivery(
         &self,
         delivery: &sales_delivery::Model,
@@ -716,12 +716,25 @@ impl SalesService {
         let delivery_total_incl_tax = delivery_total_amount + delivery_total_tax;
         if delivery_total_incl_tax <= Decimal::ZERO {
             // 货物已出库却不确认收入，属账实脱节：金额为零必然订单明细缺单价，
-            // 静默返回会让发货单长期没有收入凭证且无人知晓
-            tracing::warn!(
-                "发货单 {}（订单 {}）含税金额为 0，跳过收入确认凭证：请核对订单明细单价是否维护",
+            // 静默返回会让发货单长期没有收入凭证且无人知晓，必须落死信标记供对账补录
+            tracing::error!(
+                "发货单 {}（订单 {}）含税金额为 0，跳过收入确认凭证：订单明细缺单价，已落死信补偿记录",
                 delivery.delivery_no,
                 delivery.order_id
             );
+            crate::services::event_retry_service::EventRetryService::
+                record_voucher_generation_failure(
+                    self.db.clone(),
+                    "sales",
+                    "SALES_DELIVERY",
+                    i64::from(delivery.id),
+                    &delivery.delivery_no,
+                    format!(
+                        "发货单 {}（订单 {}）含税金额为 0，未生成收入确认凭证",
+                        delivery.delivery_no, delivery.order_id
+                    ),
+                )
+                .await;
             return;
         }
         let voucher_req = Self::build_revenue_voucher_request(
@@ -734,7 +747,21 @@ impl SalesService {
         let voucher_service =
             crate::services::voucher_service::VoucherService::new(self.db.clone());
         if let Err(e) = voucher_service.create_and_post(voucher_req, user_id).await {
-            tracing::warn!("发货单 {} 收入凭证生成失败：{}", delivery.delivery_no, e);
+            tracing::error!(
+                "发货单 {} 收入凭证生成失败，已落死信补偿记录等待补生成：{}",
+                delivery.delivery_no,
+                e
+            );
+            crate::services::event_retry_service::EventRetryService::
+                record_voucher_generation_failure(
+                    self.db.clone(),
+                    "sales",
+                    "SALES_DELIVERY",
+                    i64::from(delivery.id),
+                    &delivery.delivery_no,
+                    &e,
+                )
+                .await;
         }
     }
 
