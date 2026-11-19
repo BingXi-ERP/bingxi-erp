@@ -580,6 +580,15 @@ test.describe('10 财务报表与导出', () => {
       `vouchers/${voucherId}/print-xlsx`,
       /voucher_\d+\.xlsx/
     );
+    // 凭证打印 fail-closed：不存在的凭证断真实 404，不能 200 吐空壳 xlsx。
+    const missingVoucherId = 999999999;
+    const voucherFail = await apiCallExpectFail(
+      page,
+      'GET',
+      `/vouchers/${missingVoucherId}/print-xlsx`
+    );
+    expect(voucherFail.status, '不存在的凭证打印应真实 404').toBe(404);
+    expect(failureCode(voucherFail), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
 
     // 2) 应收收款单：/ar/payments 建单落 ar_collections 行（print 取数表）。
     const customerId = ctx.customerId;
@@ -631,6 +640,15 @@ test.describe('10 财务报表与导出', () => {
       `export-refunds/${declId}/print-xlsx`,
       /export_refund_declaration_\d+\.xlsx/
     );
+    // 退税申报打印 fail-closed：不存在的申报断真实 404，不能 200 吐空壳 xlsx。
+    const missingDeclId = 999999999;
+    const declFail = await apiCallExpectFail(
+      page,
+      'GET',
+      `/export-refunds/${missingDeclId}/print-xlsx`
+    );
+    expect(declFail.status, '不存在的退税申报打印应真实 404').toBe(404);
+    expect(failureCode(declFail), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
 
     // 4) 外汇核销单打印：见上，后端无建单 API，断真实 404 标准信封。
     const missingFxId = 999999999;
