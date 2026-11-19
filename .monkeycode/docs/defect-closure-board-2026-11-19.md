@@ -10,6 +10,7 @@
 |------|------|--------|------|----------|---------------|--------|
 | DC-001 | 功能补齐 | P1 | 小程序接口层客户越权 E2E 用例集 | miniprogram/ 有工程但 6 条独有链路零 E2E，仅 7 道静态门（completion audit 实量） | `frontend/e2e/miniprogram/01-customer-access.spec.ts` / PR #1320 | 测试 |
 | DC-002（第一批） | 功能补齐 | P1 | 写操作参数篡改 IDOR（目标 4.1-P / 3.6） | 现有 data-scope-isolation 仅覆盖读越权；换他人 ID 改金额 0.01、DELETE 他人单据的写越权为真实缺口 | `frontend/e2e/miniprogram/02-write-idor.spec.ts` / PR #1320（head fcff7e120） | 测试 |
+| DC-010（回归失效） | Bug 缺陷 | P1 | AP 手机卡片支付方式断言共享红——原记已关闭，抽检证实修复未入主干 | blob 级取证：#1303 open/merged=false，主干 `ap-mobile-parity.test.ts` 最后提交是 #1252、仍无 `paymentMethodLabel`/`expectedPaymentMethod`、断言全宽度 `toBe('bank_transfer')`；而主干组件桌面列 `paymentMethodLabel` →「银行转账」/「Bank Transfer」，手机卡片用原始 token | 待 #1303 或其 cherry-pick 载体（#1308/#1307/#1297）合并入主干后，blob 回读测试已按宽度分治再重关 | 测试 |
 
 验收标准（7.4）：客户角色越权访问 5 个内部单据端点（sales/orders、products、ar-reconciliations、crm/customers、purchase/orders）由后端返回 401/403；CI 全量面绿；不依赖前端按钮隐藏。事实核对已记入 PR #1320 描述（端点在 route-snapshot、权限码在册、不在 AUTH_ONLY、customer 可登录）。
 
@@ -47,19 +48,18 @@ DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动
 | 编号 | 类型 | 优先级 | 标题 | 闭环证据 |
 |------|------|--------|------|----------|
 | DC-009 | 功能补齐 | P1 | 新增功能配 E2E 配对门 | `.github/workflows/e2e-pairing.yml` 九道 self-test + 增量零引用判负 + 棘轮基线，真 fail-closed |
-| DC-010 | Bug 缺陷 | P1 | AP 手机卡片支付方式断言共享红 | #1303 权威修复（桌面用 label、手机保留 token），11 支 cherry-pick 解锁推送 |
 
-**抽检审计纠正（8.5，2026-11-19）**：DC-008（联动影响矩阵 PR 门禁）原记「已关闭」，经 blob 级复核判定为**假闭环，已重开**（见待开发段 DC-008 标注）。原闭环证据「#1306 入收尾聚合器 needs」不成立：#1306 至审计时仍 open/merged=false，其 `check-e2e-linkage-gate.mjs` 与 `e2e-linkage-gate.yml` 在 main 上 NOT_CARRIED；main 的 ci-cd.yml/e2e-batch.yml/e2e-pairing.yml 对 linkage 引用均为 0；主干仅有 `report-e2e-linkage.mjs`，其源码首部明写「信息工具，不是门禁，不设置非零退出码」。根因：把「信息报告工具」误当成「fail-closed PR 门禁」验收关单，验收标准未要求核对门禁是否真正挂载到 CI。同类防线：今后凡「门禁类」工单关单，必须核对 workflow job 实际挂载与退出码语义，不能只凭脚本存在。DC-010 行级复核见待办备注（主干测试仍需确认手机端 token 口径）。
+**抽检审计纠正（8.5，2026-11-19）**：DC-008（联动影响矩阵 PR 门禁）原记「已关闭」，经 blob 级复核判定为**假闭环，已重开**（见待开发段 DC-008 标注）。原闭环证据「#1306 入收尾聚合器 needs」不成立：#1306 至审计时仍 open/merged=false，其 `check-e2e-linkage-gate.mjs` 与 `e2e-linkage-gate.yml` 在 main 上 NOT_CARRIED；main 的 ci-cd.yml/e2e-batch.yml/e2e-pairing.yml 对 linkage 引用均为 0；主干仅有 `report-e2e-linkage.mjs`，其源码首部明写「信息工具，不是门禁，不设置非零退出码」。根因：把「信息报告工具」误当成「fail-closed PR 门禁」验收关单，验收标准未要求核对门禁是否真正挂载到 CI。同类防线：今后凡「门禁类」工单关单，必须核对 workflow job 实际挂载与退出码语义，不能只凭脚本存在。DC-010（AP 手机卡片支付方式断言）同样经 blob 级复核判定为**回归失效，已重开**：#1303 修复仍 open/merged=false，主干 `ap-mobile-parity.test.ts` 最后提交停在 #1252、无 `paymentMethodLabel`/`expectedPaymentMethod`、仍全宽度 `toBe('bank_transfer')`，而组件桌面列已走标签映射、手机卡片用原始 token；原闭环证据未入主干。待 #1303 或其 cherry-pick 载体（#1308/#1307/#1297）合并后 blob 回读断言已按宽度分治再关单。
 
 ## 二、周报（7.2.3 固定字段）
 
 统计周期：2026-11-19。数据来自本轮 completion audit 与远端 PR 现状。
 
 - 新增清单：DC-001（小程序接口层越权 E2E，PR #1320）、DC-002 第一批（写操作参数篡改 IDOR，PR #1320 head fcff7e120）、DC-005/DC-006（audit 新识别待评估项）。
-- 已闭环清单：DC-009/DC-010（门禁与共享红，证据见上；DC-008 经本周抽检判定假闭环，已重开，不再计入闭环）。
-- 积压清单：待开发 4（DC-002 余项/003/004/008 重开），验证中 2（DC-001/DC-002 第一批），待评估 2（DC-005/006），搁置 1（DC-007）。
+- 已闭环清单：DC-009（配对门，self-test 16/16 通过；DC-008/DC-010 经本周抽检判定假闭环/回归失效，已移出，不再计入闭环）。
+- 积压清单：待开发 4（DC-002 余项/003/004/008 重开），验证中 3（DC-001/DC-002 第一批/DC-010 回归失效），待评估 2（DC-005/006），搁置 1（DC-007）。
 - P0 风险项：DC-006（#1302 脏支阻塞合并）——收口末期处理，不需 force 时走 merge origin/main。
-- P1 积压清单：DC-001/002/003/005；DC-006 为 P0。
+- P1 积压清单：DC-001/002/003/005/010；DC-006 为 P0。
 - 本周新增固化 E2E 用例数量：7（DC-001 的 5 端点越权断言 + DC-002 第一批 2 条写越权断言，均 PR #1320）。
 - 逾期工单清单：无（本看板为首期建立，无历史逾期基准）。
 - 来源统计：completion audit 实量 8 条（DC-001~007 中除 DC-010 外），E2E 断言失败 1 条（DC-010）。
