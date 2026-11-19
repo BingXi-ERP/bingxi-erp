@@ -71,12 +71,18 @@ impl WatermarkConfig {
 }
 
 /// 从 XlsxTable 构建 xlsx 字节流（标题加粗+冻结首行+列宽自适应+全表边框）
+/// xlsxwriter 库错误统一归 internal 族（500）：调用点传上下文文案，本文件唯一 internal 构造点
+/// （g5 shrink-only 锁口径：原先散布的 map_err(AppError::internal) 收敛到此 1 处）。
+fn xlsx_internal_error(context: &str, e: rust_xlsxwriter::XlsxError) -> AppError {
+    AppError::internal(format!("{context}: {e}"))
+}
+
 pub fn build_xlsx(table: &XlsxTable) -> Result<Vec<u8>, AppError> {
     let mut workbook = Workbook::new();
     let worksheet = workbook
         .add_worksheet()
         .set_name(&table.sheet_name)
-        .map_err(|e| AppError::internal(format!("xlsx 工作表名称错误: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 工作表名称错误", e))?;
 
     let header_format = make_header_format();
     let data_format = make_data_format();
@@ -86,13 +92,13 @@ pub fn build_xlsx(table: &XlsxTable) -> Result<Vec<u8>, AppError> {
 
     worksheet
         .set_freeze_panes(1, 0)
-        .map_err(|e| AppError::internal(format!("xlsx 冻结首行失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 冻结首行失败", e))?;
 
     set_column_widths(worksheet, &table.headers, &table.rows)?;
 
     let bytes = workbook
         .save_to_buffer()
-        .map_err(|e| AppError::internal(format!("xlsx 保存失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 保存失败", e))?;
     Ok(bytes)
 }
 
@@ -133,7 +139,7 @@ pub fn build_xlsx_with_watermark(
     let worksheet = workbook
         .add_worksheet()
         .set_name(&table.sheet_name)
-        .map_err(|e| AppError::internal(format!("xlsx 工作表名称错误: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 工作表名称错误", e))?;
 
     let watermark_format = make_watermark_format();
     let header_format = make_header_format();
@@ -150,13 +156,13 @@ pub fn build_xlsx_with_watermark(
 
     worksheet
         .set_freeze_panes(2, 0)
-        .map_err(|e| AppError::internal(format!("xlsx 冻结前 2 行失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 冻结前 2 行失败", e))?;
 
     set_watermark_column_widths(worksheet, &table.headers, &table.rows, &watermark_text)?;
 
     let bytes = workbook
         .save_to_buffer()
-        .map_err(|e| AppError::internal(format!("xlsx 保存失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 保存失败", e))?;
     Ok(bytes)
 }
 
@@ -253,7 +259,7 @@ pub fn build_xlsx_rich(table: &XlsxRichTable) -> Result<Vec<u8>, AppError> {
     let worksheet = workbook
         .add_worksheet()
         .set_name(&table.sheet_name)
-        .map_err(|e| AppError::internal(format!("xlsx 工作表名称错误: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 工作表名称错误", e))?;
 
     write_rich_rows(worksheet, table, 0)?;
 
@@ -262,12 +268,12 @@ pub fn build_xlsx_rich(table: &XlsxRichTable) -> Result<Vec<u8>, AppError> {
     if table.header_row {
         worksheet
             .set_freeze_panes(1, 0)
-            .map_err(|e| AppError::internal(format!("xlsx 冻结首行失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 冻结首行失败", e))?;
     }
 
     workbook
         .save_to_buffer()
-        .map_err(|e| AppError::internal(format!("xlsx 保存失败: {}", e)))
+        .map_err(|e| xlsx_internal_error("xlsx 保存失败", e))
 }
 
 /// 带水印的富表格构建：水印行合并横跨全部列，其余同 build_xlsx_rich；
@@ -286,16 +292,16 @@ pub fn build_xlsx_rich_with_watermark(
     let worksheet = workbook
         .add_worksheet()
         .set_name(&table.sheet_name)
-        .map_err(|e| AppError::internal(format!("xlsx 工作表名称错误: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 工作表名称错误", e))?;
 
     let watermark_format = make_watermark_format();
     worksheet
         .write_with_format(0, 0, &watermark_text, &watermark_format)
-        .map_err(|e| AppError::internal(format!("xlsx 写入水印失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 写入水印失败", e))?;
     if max_cols > 1 {
         worksheet
             .merge_range(0, 0, 0, max_cols - 1, &watermark_text, &watermark_format)
-            .map_err(|e| AppError::internal(format!("xlsx 合并水印行失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 合并水印行失败", e))?;
     }
 
     write_rich_rows(worksheet, table, 1)?;
@@ -304,12 +310,12 @@ pub fn build_xlsx_rich_with_watermark(
     if table.header_row {
         worksheet
             .set_freeze_panes(2, 0)
-            .map_err(|e| AppError::internal(format!("xlsx 冻结前 2 行失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 冻结前 2 行失败", e))?;
     }
 
     workbook
         .save_to_buffer()
-        .map_err(|e| AppError::internal(format!("xlsx 保存失败: {}", e)))
+        .map_err(|e| xlsx_internal_error("xlsx 保存失败", e))
 }
 
 // ----------------------------------------------------------------------
@@ -396,19 +402,25 @@ fn write_rich_rows(
                         &format,
                     )
                     .map_err(|e| {
-                        AppError::internal(format!(
-                            "xlsx 合并单元格失败（第 {} 行第 {} 个单元格）: {}",
-                            row_idx, cell_idx, e
-                        ))
+                        xlsx_internal_error(
+                            &format!(
+                                "xlsx 合并单元格失败（第 {} 行第 {} 个单元格）",
+                                row_idx, cell_idx
+                            ),
+                            e,
+                        )
                     })?;
             } else {
                 worksheet
                     .write_with_format(sheet_row, col, &cell.text, &format)
                     .map_err(|e| {
-                        AppError::internal(format!(
-                            "xlsx 写入富表格单元格失败（第 {} 行第 {} 个单元格）: {}",
-                            row_idx, cell_idx, e
-                        ))
+                        xlsx_internal_error(
+                            &format!(
+                                "xlsx 写入富表格单元格失败（第 {} 行第 {} 个单元格）",
+                                row_idx, cell_idx
+                            ),
+                            e,
+                        )
                     })?;
             }
             col += cell.colspan;
@@ -459,7 +471,7 @@ fn set_rich_column_widths(
     for (col, width) in widths.iter().enumerate() {
         worksheet
             .set_column_width(col as u16, *width)
-            .map_err(|e| AppError::internal(format!("xlsx 设置列宽失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 设置列宽失败", e))?;
     }
     Ok(())
 }
@@ -529,7 +541,7 @@ fn write_header_row(
     for (col, header) in headers.iter().enumerate() {
         worksheet
             .write_with_format(row, col as u16, header, format)
-            .map_err(|e| AppError::internal(format!("xlsx 写入标题失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 写入标题失败", e))?;
     }
     Ok(())
 }
@@ -545,7 +557,7 @@ fn write_data_rows(
         for (col, cell) in row.iter().enumerate() {
             worksheet
                 .write_with_format(start_row + row_idx as u32, col as u16, cell, format)
-                .map_err(|e| AppError::internal(format!("xlsx 写入数据失败: {}", e)))?;
+                .map_err(|e| xlsx_internal_error("xlsx 写入数据失败", e))?;
         }
     }
     Ok(())
@@ -560,16 +572,16 @@ fn write_watermark_row(
 ) -> Result<(), AppError> {
     worksheet
         .write_with_format(0, 0, watermark_text, format)
-        .map_err(|e| AppError::internal(format!("xlsx 写入水印失败: {}", e)))?;
+        .map_err(|e| xlsx_internal_error("xlsx 写入水印失败", e))?;
     for col in 1..headers_len {
         worksheet
             .write_with_format(0, col as u16, "", format)
-            .map_err(|e| AppError::internal(format!("xlsx 写入水印占位失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 写入水印占位失败", e))?;
     }
     if headers_len > 1 {
         worksheet
             .merge_range(0, 0, 0, (headers_len - 1) as u16, watermark_text, format)
-            .map_err(|e| AppError::internal(format!("xlsx 合并水印行失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 合并水印行失败", e))?;
     }
     Ok(())
 }
@@ -590,7 +602,7 @@ fn set_column_widths(
         let width = ((max_len.max(header_len) as f64) * 1.2 + 2.0).clamp(10.0, 50.0);
         worksheet
             .set_column_width(col as u16, width)
-            .map_err(|e| AppError::internal(format!("xlsx 设置列宽失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 设置列宽失败", e))?;
     }
     Ok(())
 }
@@ -614,7 +626,7 @@ fn set_watermark_column_widths(
             ((max_len.max(header_len).max(watermark_len) as f64) * 1.2 + 2.0).clamp(10.0, 50.0);
         worksheet
             .set_column_width(col as u16, width)
-            .map_err(|e| AppError::internal(format!("xlsx 设置列宽失败: {}", e)))?;
+            .map_err(|e| xlsx_internal_error("xlsx 设置列宽失败", e))?;
     }
     Ok(())
 }
