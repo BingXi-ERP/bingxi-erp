@@ -1,4 +1,4 @@
-# layers=8 endpoints=1818
+# layers=8 endpoints=1823
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -198,6 +198,7 @@ GET	/api/v1/erp/ar-reconciliations-enhanced/disputes	ar_reconciliation_enhanced_
 GET	/api/v1/erp/ar-reconciliations-enhanced/disputes/*	ar_reconciliation_enhanced_handler::get_dispute	finance
 GET	/api/v1/erp/ar-reconciliations/*	ar_reconciliation_handler::get_reconciliation	finance
 GET	/api/v1/erp/ar-reconciliations/*/print	print_handler::ar_reconciliation_print_docx	finance
+GET	/api/v1/erp/ar-reconciliations/*/print-xlsx	print_xlsx_finance_handler::ar_reconciliation_print_xlsx	finance
 GET	/api/v1/erp/ar/collections/*/print	print_handler::ar_collection_print_docx	finance
 GET	/api/v1/erp/ar/invoices	ar_invoice_handler::list_ar_invoices	finance
 GET	/api/v1/erp/ar/invoices/*	ar_invoice_handler::get_ar_invoice	finance
@@ -746,6 +747,7 @@ GET	/api/v1/erp/production/outsourcing-orders/report	outsourcing_handler::get_ou
 GET	/api/v1/erp/production/outsourcing-receipts	outsourcing_handler::list_outsourcing_receipts	production
 GET	/api/v1/erp/production/outsourcing-receipts/*	outsourcing_handler::get_outsourcing_receipt	production
 GET	/api/v1/erp/production/outsourcing-receipts/*/print	print_handler::outsourcing_receipt_print_docx	production
+GET	/api/v1/erp/production/outsourcing-receipts/*/print-xlsx	print_xlsx_purchase_handler::outsourcing_receipt_print_xlsx	production
 GET	/api/v1/erp/production/outsourcing-receipts/by-no/*	outsourcing_handler::get_outsourcing_receipt_by_no	production
 GET	/api/v1/erp/production/outsourcing-vouchers	outsourcing_handler::list_outsourcing_vouchers	production
 GET	/api/v1/erp/production/outsourcing-vouchers/by-no/*	outsourcing_handler::get_outsourcing_voucher_by_no	production
@@ -797,6 +799,7 @@ GET	/api/v1/erp/purchase/orders	purchase_order_handler::list_orders	purchase
 GET	/api/v1/erp/purchase/orders/*	purchase_order_handler::get_order	purchase
 GET	/api/v1/erp/purchase/orders/*/items	purchase_order_handler::list_order_items	purchase
 GET	/api/v1/erp/purchase/orders/*/print	print_handler::purchase_order_print_docx	purchase
+GET	/api/v1/erp/purchase/orders/*/print-xlsx	print_xlsx_purchase_handler::purchase_order_print_xlsx	purchase
 GET	/api/v1/erp/purchase/orders/export	purchase_order_handler::export_orders	purchase
 GET	/api/v1/erp/purchase/orders/generate-no	purchase_order_handler::generate_order_no	purchase
 GET	/api/v1/erp/purchase/purchase-contracts	purchase_contract_handler::list_contracts	purchase
@@ -813,6 +816,7 @@ GET	/api/v1/erp/purchase/receipts	purchase_receipt_handler::list_receipts	purcha
 GET	/api/v1/erp/purchase/receipts/*	purchase_receipt_handler::get_receipt	purchase
 GET	/api/v1/erp/purchase/receipts/*/items	purchase_receipt_handler::list_receipt_items	purchase
 GET	/api/v1/erp/purchase/receipts/*/print	print_handler::purchase_receipt_print_docx	purchase
+GET	/api/v1/erp/purchase/receipts/*/print-xlsx	print_xlsx_purchase_handler::purchase_receipt_print_xlsx	purchase
 GET	/api/v1/erp/purchase/receipts/generate-no	purchase_receipt_handler::generate_no	purchase
 GET	/api/v1/erp/purchase/returns	purchase_return_handler::list_purchase_returns	purchase
 GET	/api/v1/erp/purchase/returns/*	purchase_return_handler::get_purchase_return	purchase
@@ -886,6 +890,7 @@ GET	/api/v1/erp/sales/fabric-orders/*	sales_fabric_order_handler::get_fabric_ord
 GET	/api/v1/erp/sales/orders	sales_order_handler::list_orders	sales
 GET	/api/v1/erp/sales/orders/*	sales_order_handler::get_order	sales
 GET	/api/v1/erp/sales/orders/*/deliveries	sales_order_handler::get_order_deliveries	sales
+GET	/api/v1/erp/sales/orders/*/deliveries/*/codex-sheet	print_handler::sales_delivery_codex_sheet_xlsx	sales
 GET	/api/v1/erp/sales/orders/*/deliveries/*/print	print_handler::sales_delivery_print_docx	sales
 GET	/api/v1/erp/sales/orders/*/deliveries/*/print-xlsx	print_handler::sales_delivery_print_xlsx	sales
 GET	/api/v1/erp/sales/orders/*/history	sales_order_handler::get_order_history	sales
