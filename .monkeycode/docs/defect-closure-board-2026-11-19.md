@@ -22,7 +22,7 @@ DC-002 第一批验收标准（7.4）：两个不同 user_id 的 self 角色，�
 | DC-002（余项） | 功能补齐 | P1 | 询样/对账跨端互通与分享卡片越权正向用例 | 第一批写 IDOR 已进验证中；询样提交、客户对账确认、分享卡片越权（4.35/第五章）仍空白；正向可见性受客户业务账号缺失约束（见 DC-007），须先明账号体系 | 待第一批 CI 终态后同专支追加 | 测试 |
 | DC-003 | 功能补齐 | P1 | 统一测试数据工厂 builder API | 造数逻辑散落 `flow/helpers.ts:266` ensureTestEntities、`global-setup.ts:1440` ensureGlobalBusinessSeed、`helpers.ts:4105` seedColorCardArchive，无统一入口 | 单开测试基建支 | 测试 |
 | DC-004 | 功能补齐 | P2 | 分环境预制脚本与独立库隔离 | `playwright.config.ts:48` baseURL 写死 localhost，CI 45 分片共用同库，仅靠账号前缀+时间戳唯一名隔离 | 与 DC-003 同域 | 测试 / 运维 |
-| DC-008（重开） | 功能补齐 | P1 | 联动影响矩阵 PR 门禁（4.41.N）——原误判已关闭，抽检证实未落地 | blob 级取证：#1306 open/merged=false，`check-e2e-linkage-gate.mjs`/`e2e-linkage-gate.yml` 在 main NOT_CARRIED，main 的 ci-cd/e2e-batch/e2e-pairing 对 linkage 引用均为 0，主干仅有「信息工具，不是门禁」的 report 脚本；对应任务 #41/#47 仍 in_progress | 基于 report-e2e-linkage 升级为 fail-closed 门禁并真实挂载 workflow job，核对退出码语义后方可重关 | 测试 / CI |
+| DC-008（重开） | 功能补齐 | P1 | 联动影响矩阵 PR 门禁（4.41.N）——原误判已关闭，抽检证实未落地 | blob 级取证：#1306 open/merged=false，`check-e2e-linkage-gate.mjs`/`e2e-linkage-gate.yml` 在 main NOT_CARRIED，main 的 ci-cd/e2e-batch/e2e-pairing 对 linkage 引用均为 0，主干仅有「信息工具，不是门禁」的 report 脚本；对应任务 #41/#47 仍 in_progress | 兑现载体已验证：#1306 的 `check-e2e-linkage-gate.mjs` 有 `process.exit(0/2/3)` + `--self-test` 正向对照，ci-cd.yml 新增 `ci-e2e-linkage` job 并挂进 `ci-cleanup-retry` needs，是真 fail-closed；其旁路门「联动影响矩阵静态检查」已 success、全量门 queued。待 #1306 合并后 blob 回读再关单，不再凭脚本存在关单 | 测试 / CI |
 
 ### 待评估
 
