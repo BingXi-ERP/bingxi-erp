@@ -655,4 +655,288 @@ impl super::PrintService {
             image: None,
         })
     }
+
+    /// 应收对账单 xlsx 导出（富表格版；带操作员/时间水印，金额大写按本期应收合计生成）。
+    /// 存什么：主表四账务字段与单据头 + 明细行（ar_reconciliation_items 全量）。
+    /// 数据从哪来：复用 get_ar_reconciliation_print_data 的行级归属门取数（英文键），
+    /// 明细由本函数按 reconciliation_id 全量补查。
+    pub async fn build_ar_reconciliation_xlsx(
+        &self,
+        id: i32,
+        watermark: &crate::utils::xlsx_export::WatermarkConfig,
+    ) -> Result<Vec<u8>, AppError> {
+        let print_data = self.get_ar_reconciliation_print_data(id).await?;
+        use crate::models::ar_reconciliation_item;
+        let items = ar_reconciliation_item::Entity::find()
+            .filter(ar_reconciliation_item::Column::ReconciliationId.eq(id))
+            .order_by_asc(ar_reconciliation_item::Column::Id)
+            .all(&*self.db)
+            .await?;
+
+        let total_invoices = print_data
+            .data
+            .get("total_invoices")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| AppError::internal("应收对账单取数缺少 total_invoices"))?
+            .parse::<rust_decimal::Decimal>()
+            .map_err(|e| AppError::internal(format!("应收对账单货款总计解析失败: {e}")))?;
+        let words = crate::utils::amount_in_words::amount_in_words(total_invoices);
+        let table = build_recon_xlsx_table(&print_data.data, &items, Some(&words));
+        crate::utils::xlsx_export::build_xlsx_rich_with_watermark(&table, watermark)
+    }
+}
+
+/// 对账明细 item_type 中文案（写入方词表见 models/ar_reconciliation_item.rs ItemType）。
+fn recon_item_label(item_type: &str) -> &'static str {
+    match item_type {
+        "OPENING" => "期初余额",
+        "INVOICE" => "销售发票",
+        "RECEIPT" => "收款单",
+        "ADJUSTMENT" => "调整",
+        "DISPUTE" => "争议",
+        _ => "其他",
+    }
+}
+
+/// 匹配状态中文案（写入方词表 MatchStatus）。
+fn recon_match_label(match_status: &str) -> &'static str {
+    match match_status {
+        "UNMATCHED" => "未匹配",
+        "MATCHED" => "已匹配",
+        "PARTIAL" => "部分匹配",
+        "DISPUTED" => "争议中",
+        "CANCELLED" => "已取消",
+        _ => "其他",
+    }
+}
+
+/// 组装应收对账单 xlsx 富表格（纯函数，可单测）。
+/// 10 列基准，自由布局：标题 → 客户/日期 → 期间/部门 → 账务四字段 → 明细表头
+/// → 明细行×N → 合计 → 大写金额 → 签收 → 质量条款。
+/// `amount_in_words`：大写金额文案由调用方注入，None 时该格留空，
+/// 禁在本函数内造第二套大写实现。
+fn build_recon_xlsx_table(
+    data: &HashMap<String, serde_json::Value>,
+    items: &[crate::models::ar_reconciliation_item::Model],
+    amount_in_words: Option<&str>,
+) -> crate::utils::xlsx_export::XlsxRichTable {
+    use crate::utils::xlsx_export::{XlsxRichCell, XlsxRichTable};
+    let get = |key: &str| {
+        data.get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string()
+    };
+    const COLS: u16 = 10;
+    let title = format!("应收对账单 {}", get("reconciliation_no"));
+    let mut rows: Vec<Vec<XlsxRichCell>> = Vec::new();
+    rows.push(vec![XlsxRichCell::merged(title, COLS).bold().center()]);
+    rows.push(vec![
+        XlsxRichCell::merged(format!("客户名称：{}", get("customer_name")), 5),
+        XlsxRichCell::merged(format!("对账日期：{}", get("reconciliation_date")), 5),
+    ]);
+    rows.push(vec![
+        XlsxRichCell::merged(
+            format!("对账期间：{} ~ {}", get("period_start"), get("period_end")),
+            5,
+        ),
+        XlsxRichCell::merged("部门：____________________", 5),
+    ]);
+    rows.push(vec![
+        XlsxRichCell::merged(format!("上单结余：{}", get("opening_balance")), 2).center(),
+        XlsxRichCell::merged(format!("本期应收合计：{}", get("total_invoices")), 3).center(),
+        XlsxRichCell::merged(format!("本期实收合计：{}", get("total_collections")), 3).center(),
+        XlsxRichCell::merged(format!("期末欠款：{}", get("closing_balance")), 2).center(),
+    ]);
+    rows.push(vec![
+        XlsxRichCell::new("类型").bold().center(),
+        XlsxRichCell::new("单据号").bold().center(),
+        XlsxRichCell::new("单据日期").bold().center(),
+        XlsxRichCell::new("缸号").bold().center(),
+        XlsxRichCell::new("色号").bold().center(),
+        XlsxRichCell::new("匹号").bold().center(),
+        XlsxRichCell::new("金额(元)").bold().center(),
+        XlsxRichCell::new("已核销(元)").bold().center(),
+        XlsxRichCell::new("匹配状态").bold().center(),
+        XlsxRichCell::new("备注").bold().center(),
+    ]);
+    let mut total_amount = rust_decimal::Decimal::ZERO;
+    let mut total_matched = rust_decimal::Decimal::ZERO;
+    for item in items {
+        total_amount += item.amount;
+        total_matched += item.matched_amount.unwrap_or_default();
+        rows.push(vec![
+            XlsxRichCell::new(recon_item_label(&item.item_type)),
+            XlsxRichCell::new(item.document_no.clone().unwrap_or_default()),
+            XlsxRichCell::new(
+                item.document_date
+                    .map(|d| d.format("%Y-%m-%d").to_string())
+                    .unwrap_or_default(),
+            ),
+            XlsxRichCell::new(item.dye_lot_no.clone().unwrap_or_default()),
+            XlsxRichCell::new(item.color_no.clone().unwrap_or_default()),
+            XlsxRichCell::new(item.piece_no.clone().unwrap_or_default()),
+            XlsxRichCell::new(item.amount.to_string()),
+            XlsxRichCell::new(
+                item.matched_amount
+                    .map(|m| m.to_string())
+                    .unwrap_or_else(|| "0".to_string()),
+            ),
+            XlsxRichCell::new(recon_match_label(&item.match_status)),
+            XlsxRichCell::new(item.remarks.clone().unwrap_or_default()),
+        ]);
+    }
+    rows.push(vec![
+        XlsxRichCell::merged("合计", 6).bold(),
+        XlsxRichCell::new(total_amount.to_string()).bold(),
+        XlsxRichCell::new(total_matched.to_string()).bold(),
+        XlsxRichCell::merged("—", 2),
+    ]);
+    rows.push(vec![
+        XlsxRichCell::merged(
+            format!("货款总计(大写)：{}", amount_in_words.unwrap_or_default()),
+            5,
+        ),
+        XlsxRichCell::merged(format!("期末欠款(上期欠款)：{}", get("closing_balance")), 5),
+    ]);
+    rows.push(vec![
+        XlsxRichCell::merged("制单：________________", 5),
+        XlsxRichCell::merged("客户签收：________________", 5),
+    ]);
+    rows.push(vec![XlsxRichCell::merged(
+        "注：请检查好本单货物，如发现质量问题请在三天内联系本行，逾期或裁剪，本布行恕不负责，谢谢合作!",
+        COLS,
+    )]);
+    XlsxRichTable {
+        sheet_name: "应收对账单".to_string(),
+        rows,
+        column_widths: Some(vec![
+            12.0, 18.0, 12.0, 10.0, 10.0, 10.0, 12.0, 12.0, 10.0, 16.0,
+        ]),
+        column_count: Some(COLS),
+        header_row: false,
+    }
+}
+
+#[cfg(test)]
+mod recon_xlsx_tests {
+    use super::{build_recon_xlsx_table, recon_item_label, recon_match_label};
+    use crate::models::ar_reconciliation_item;
+    use rust_decimal::Decimal;
+    use std::collections::HashMap;
+
+    fn item(
+        item_type: &str,
+        doc_no: &str,
+        dye: &str,
+        amount: &str,
+        matched: Option<&str>,
+    ) -> ar_reconciliation_item::Model {
+        ar_reconciliation_item::Model {
+            id: 0,
+            piece_no: Some("P-01".to_string()),
+            batch_no: None,
+            color_no: Some("33#浅蓝".to_string()),
+            dye_lot_no: Some(dye.to_string()),
+            reconciliation_id: 1,
+            item_type: item_type.to_string(),
+            document_type: None,
+            document_id: None,
+            document_no: Some(doc_no.to_string()),
+            document_date: Some(chrono::NaiveDate::from_ymd_opt(2026, 3, 25).unwrap()),
+            amount: Decimal::from_str_exact(amount).unwrap(),
+            matched_amount: matched.map(|m| Decimal::from_str_exact(m).unwrap()),
+            match_status: "UNMATCHED".to_string(),
+            matched_item_id: None,
+            remarks: None,
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    fn data_map() -> HashMap<String, serde_json::Value> {
+        let mut data = HashMap::new();
+        for (k, v) in [
+            ("reconciliation_no", "AR2603-001"),
+            ("customer_name", "辉哥"),
+            ("reconciliation_date", "2026-03-25"),
+            ("period_start", "2026-03-01"),
+            ("period_end", "2026-03-31"),
+            ("opening_balance", "0"),
+            ("total_invoices", "5545.35"),
+            ("total_collections", "3000"),
+            ("closing_balance", "2545.35"),
+            ("reconciliation_status", "CONFIRMED"),
+        ] {
+            data.insert(k.to_string(), serde_json::json!(v));
+        }
+        data
+    }
+
+    #[test]
+    fn item_type_label_covers_word_table() {
+        assert_eq!(recon_item_label("OPENING"), "期初余额");
+        assert_eq!(recon_item_label("INVOICE"), "销售发票");
+        assert_eq!(recon_item_label("RECEIPT"), "收款单");
+        assert_eq!(recon_item_label("ADJUSTMENT"), "调整");
+        assert_eq!(recon_item_label("DISPUTE"), "争议");
+        assert_eq!(recon_item_label("UNKNOWN_X"), "其他");
+    }
+
+    #[test]
+    fn match_status_label_covers_word_table() {
+        assert_eq!(recon_match_label("UNMATCHED"), "未匹配");
+        assert_eq!(recon_match_label("MATCHED"), "已匹配");
+        assert_eq!(recon_match_label("PARTIAL"), "部分匹配");
+        assert_eq!(recon_match_label("DISPUTED"), "争议中");
+        assert_eq!(recon_match_label("CANCELLED"), "已取消");
+    }
+
+    #[test]
+    fn rich_table_layout_and_totals() {
+        let items = vec![
+            item("INVOICE", "XS2603-100", "9002", "963.75", None),
+            item("RECEIPT", "SK2603-050", "3038", "3000", Some("3000")),
+        ];
+        let table = build_recon_xlsx_table(&data_map(), &items, Some("伍仟伍佰肆拾伍元叁角伍分"));
+        assert_eq!(table.sheet_name, "应收对账单");
+        // 标题+客户+期间+账务+表头+2明细+合计+大写+签收+条款 = 11 行
+        assert_eq!(table.rows.len(), 11);
+        // 标题合并整行且含单号
+        assert_eq!(table.rows[0][0].colspan, 10);
+        assert!(table.rows[0][0].text.contains("AR2603-001"));
+        // 账务四字段行：合并格按起点索引存放（跨度计入列宽不入 Vec）
+        assert!(table.rows[3][0].text.contains("上单结余：0"));
+        assert!(table.rows[3][1].text.contains("本期应收合计：5545.35"));
+        assert!(table.rows[3][2].text.contains("本期实收合计：3000"));
+        assert!(table.rows[3][3].text.contains("期末欠款：2545.35"));
+        // 明细行逐字段（第 5 行=表头后第一条明细）
+        assert_eq!(table.rows[5][0].text, "销售发票");
+        assert_eq!(table.rows[5][1].text, "XS2603-100");
+        assert_eq!(table.rows[5][3].text, "9002");
+        assert_eq!(table.rows[5][6].text, "963.75");
+        assert_eq!(table.rows[6][0].text, "收款单");
+        // 合计行：起点格 merged(6)="合计"，index 1=Σ金额=963.75+3000
+        assert_eq!(table.rows[7][0].text, "合计");
+        assert!(table.rows[7][1].text.contains("3963.75"));
+        // 大写注入渲染（大写行 Vec 长 2：merged(5) 大写 + merged(5) 欠款）
+        assert!(table.rows[8][0].text.contains("伍仟伍佰肆拾伍元叁角伍分"));
+        // None 时大写格留空
+        let empty = build_recon_xlsx_table(&data_map(), &items, None);
+        assert_eq!(empty.rows[8][0].text, "货款总计(大写)：");
+        // 条款行含三天条款
+        assert!(table.rows[10][0].text.contains("三天内"));
+    }
+
+    #[test]
+    fn empty_items_still_renders_summary() {
+        let table = build_recon_xlsx_table(&data_map(), &[], None);
+        // 标题/客户/期间/账务/表头/合计/大写/签收/条款 = 9 行（无明细行）
+        assert_eq!(table.rows.len(), 9);
+        // 无明细行：合计行前移至 rows[5]（标题/客户/期间/账务/表头/合计），大写 rows[6]
+        assert_eq!(table.rows[5][0].text, "合计");
+        assert!(table.rows[5][1].text.contains("0"));
+        assert!(table.rows[5][2].text.contains("0"));
+        assert_eq!(table.rows[6][0].text, "货款总计(大写)：");
+    }
 }

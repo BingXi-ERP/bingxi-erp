@@ -5998,7 +5998,6 @@ export default {
       listAria: 'Reconciliation list',
       reconciliationNo: 'Reconciliation No.',
       supplier: 'Supplier',
-      reconciliationDate: 'Reconciliation Date',
       invoiceAmount: 'Invoice Amount',
       paymentAmount: 'Payment Amount',
       difference: 'Difference',
@@ -6030,6 +6029,7 @@ export default {
     paymentRequest: {
       create: 'New Payment Request',
       edit: 'Edit Payment Request',
+      listAria: 'Payment request list',
       requestNo: 'Request No.',
       requestDate: 'Request Date',
       paymentType: 'Payment Type',

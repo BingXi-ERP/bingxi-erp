@@ -30,7 +30,7 @@ use crate::handlers::{
     ar_verification_handler, budget_management_handler, currency_enhanced_handler,
     currency_handler, finance_invoice_handler, finance_payment_handler, finance_report_handler,
     financial_analysis_handler, fixed_asset_handler, fund_management_handler, missing_handlers,
-    omni_audit_handler, print_handler, voucher_handler,
+    omni_audit_handler, print_handler, print_xlsx_finance_handler, voucher_handler,
 };
 
 /// 财务支付与发票路由（/payments、/invoices）
@@ -1066,6 +1066,10 @@ pub fn ar_reconciliations() -> Router<AppState> {
         .route(
             "/ar-reconciliations/{id}/print",
             get(print_handler::ar_reconciliation_print_docx),
+        )
+        .route(
+            "/ar-reconciliations/{id}/print-xlsx",
+            get(print_xlsx_finance_handler::ar_reconciliation_print_xlsx),
         )
 }
 

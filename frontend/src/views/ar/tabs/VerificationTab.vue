@@ -4,7 +4,7 @@
   数据源：/ar/verifications（api/ar.ts 封装）
 -->
 <template>
-  <div class="ar-verification-tab">
+  <div class="ar-verification-tab" :class="{ 'ar-verification-tab--phone': isPhone }">
     <div class="tab-toolbar">
       <el-button type="primary" @click="openManualDialog">
         {{ t('arModule.verification.manual') }}
@@ -15,7 +15,65 @@
       <el-button @click="fetchVerifications">{{ t('common.refresh') }}</el-button>
     </div>
 
-    <el-table v-loading="loading" :data="verifications" border stripe>
+    <section
+      v-if="isPhone"
+      v-loading="loading"
+      class="ar-verification-mobile"
+      :aria-label="t('arModule.tabs.verification')"
+    >
+      <ul class="card-list">
+        <li v-for="row in verifications" :key="row.id" class="card-item">
+          <dl class="card-fields">
+            <div class="field-emphasis">
+              <dt>ID</dt>
+              <dd>{{ row.id }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('arModule.verification.invoiceNo') }}</dt>
+              <dd>{{ row.invoice_no }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('arModule.verification.paymentNo') }}</dt>
+              <dd>{{ row.payment_no }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('arModule.verification.date') }}</dt>
+              <dd>{{ row.verification_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('arModule.verification.amount') }}</dt>
+              <dd>{{ formatMoney(row.verification_amount) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('common.status') }}</dt>
+              <dd>
+                <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
+                  {{ row.status }}
+                </el-tag>
+              </dd>
+            </div>
+          </dl>
+          <div class="card-actions">
+            <el-button @click="showDetail(row)">
+              {{ t('common.detail') }}
+            </el-button>
+            <el-button
+              v-if="row.status === 'active'"
+              type="danger"
+              @click="cancelVerification(row)"
+            >
+              {{ t('arModule.verification.cancel') }}
+            </el-button>
+          </div>
+        </li>
+      </ul>
+      <ElEmpty
+        v-if="!loading && verifications.length === 0"
+        :description="t('components.v2Table.empty')"
+      />
+    </section>
+
+    <el-table v-else v-loading="loading" :data="verifications" border stripe>
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column
         prop="invoice_no"
@@ -66,8 +124,24 @@
     </el-table>
 
     <!-- 手动核销对话框 -->
-    <el-dialog v-model="manualVisible" :title="t('arModule.verification.manual')" width="560px">
-      <el-form ref="manualFormRef" :model="manualForm" :rules="manualRules" label-width="110px">
+    <el-dialog
+      v-model="manualVisible"
+      :title="t('arModule.verification.manual')"
+      :width="
+        isPhone
+          ? 'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))'
+          : '560px'
+      "
+      class="ar-verification-dialog"
+      :class="{ 'ar-verification-dialog--phone': isPhone }"
+    >
+      <el-form
+        ref="manualFormRef"
+        :model="manualForm"
+        :rules="manualRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('arModule.verification.invoice')" prop="invoice_id">
           <el-select v-model="manualForm.invoice_id" filterable>
             <el-option
@@ -107,9 +181,15 @@
     <el-dialog
       v-model="detailVisible"
       :title="t('arModule.verification.detailTitle')"
-      width="600px"
+      :width="
+        isPhone
+          ? 'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))'
+          : '600px'
+      "
+      class="ar-verification-detail-dialog"
+      :class="{ 'ar-verification-detail-dialog--phone': isPhone }"
     >
-      <el-descriptions v-if="detailRow" :column="2" border>
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="ID">{{ detailRow.id }}</el-descriptions-item>
         <el-descriptions-item :label="t('common.status')">{{
           detailRow.status
@@ -132,13 +212,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, toRef, onMounted } from 'vue';
+import { ref, reactive, toRef, computed, onMounted } from 'vue';
 import { logger } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElEmpty } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
 import { useNumberField } from '@/composables/useNumberField';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   getARVerificationList,
   getARVerification,
@@ -153,6 +234,9 @@ import {
 } from '@/api/ar';
 
 const { t } = useI18n({ useScope: 'global' });
+
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const verifications = ref<ARVerification[]>([]);
 const loading = ref(false);
@@ -314,5 +398,116 @@ onMounted(() => {
   margin-bottom: 12px;
   display: flex;
   gap: 8px;
+}
+
+.ar-verification-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+
+.ar-verification-tab--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ar-verification-tab--phone :deep(.el-input__wrapper),
+.ar-verification-tab--phone :deep(.el-select__wrapper) {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.ar-verification-tab--phone :deep(.el-form-item__content) {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ar-verification-tab :deep(.ar-verification-dialog--phone),
+.ar-verification-tab :deep(.ar-verification-detail-dialog--phone) {
+  display: flex;
+  flex-direction: column;
+  width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)) !important;
+  box-sizing: border-box;
+}
+.ar-verification-tab :deep(.ar-verification-dialog--phone .el-dialog__header),
+.ar-verification-tab :deep(.ar-verification-dialog--phone .el-dialog__footer),
+.ar-verification-tab :deep(.ar-verification-detail-dialog--phone .el-dialog__header),
+.ar-verification-tab :deep(.ar-verification-detail-dialog--phone .el-dialog__footer) {
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
+.ar-verification-tab :deep(.ar-verification-dialog--phone .el-dialog__body),
+.ar-verification-tab :deep(.ar-verification-detail-dialog--phone .el-dialog__body) {
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+.ar-verification-tab :deep(.ar-verification-dialog--phone .el-dialog__footer),
+.ar-verification-tab :deep(.ar-verification-detail-dialog--phone .el-dialog__footer) {
+  justify-content: flex-end;
+}
+.ar-verification-tab :deep(.ar-verification-dialog--phone .el-button),
+.ar-verification-tab :deep(.ar-verification-detail-dialog--phone .el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  white-space: normal;
 }
 </style>
