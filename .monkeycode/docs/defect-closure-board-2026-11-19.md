@@ -51,6 +51,8 @@ DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动
 
 **抽检审计纠正（8.5，2026-11-19）**：DC-008（联动影响矩阵 PR 门禁）原记「已关闭」，经 blob 级复核判定为**假闭环，已重开**（见待开发段 DC-008 标注）。原闭环证据「#1306 入收尾聚合器 needs」不成立：#1306 至审计时仍 open/merged=false，其 `check-e2e-linkage-gate.mjs` 与 `e2e-linkage-gate.yml` 在 main 上 NOT_CARRIED；main 的 ci-cd.yml/e2e-batch.yml/e2e-pairing.yml 对 linkage 引用均为 0；主干仅有 `report-e2e-linkage.mjs`，其源码首部明写「信息工具，不是门禁，不设置非零退出码」。根因：把「信息报告工具」误当成「fail-closed PR 门禁」验收关单，验收标准未要求核对门禁是否真正挂载到 CI。同类防线：今后凡「门禁类」工单关单，必须核对 workflow job 实际挂载与退出码语义，不能只凭脚本存在。DC-010（AP 手机卡片支付方式断言）同样经 blob 级复核判定为**回归失效，已重开**：#1303 修复仍 open/merged=false，主干 `ap-mobile-parity.test.ts` 最后提交停在 #1252、无 `paymentMethodLabel`/`expectedPaymentMethod`、仍全宽度 `toBe('bank_transfer')`，而组件桌面列已走标签映射、手机卡片用原始 token；原闭环证据未入主干。待 #1303 或其 cherry-pick 载体（#1308/#1307/#1297）合并后 blob 回读断言已按宽度分治再关单。
 
+**抽检正向对照（8.5，2026-11-19，main 4b40f6ced）**：DC-009（新增功能配 E2E 配对门）按同一 blob 级方法复核，判定为**真闭环，维持已关闭**。证据：`.github/workflows/e2e-pairing.yml` 在 main 在册且真挂载——`:107` 跑 `--self-test`、`:152`/`:162` 实际调用判定器、`:52`/`:65` 列为 paths 过滤触发条件；判定器 `check-e2e-feature-pairing.mjs` 含 `process.exit` 非零阻断、棘轮基线与 `--baseline-ref` 增量比对。与 DC-008 的 report-only 假闭环构成正负对照，证明抽检判定器能区分「真 fail-closed 门禁」与「改名的信息工具」，而非一律否定已关闭工单。附方法论纠偏：Git Bash 的 MSYS 路径转换会把 `origin/main:<path>` 冒号表达式改写为 `origin\main;<path>`，此时 `git show` 落盘 0 字节属工具假象，不可据此判假交付；须以 `cat-file -s`/blob hash 为准——本例 main 看板 blob `7f5fdf41cd9` 与载体分支一致（21543 字节，六项关键词全命中），#1340/#1342 文档合并真实落地。
+
 ## 二、周报（7.2.3 固定字段）
 
 统计周期：2026-11-19。数据来自本轮 completion audit 与远端 PR 现状。
