@@ -134,7 +134,11 @@ async function seedSentApproval(page: Page): Promise<SentApproval> {
     { sample_length_m: '0.5' }
   );
   expect(sampled.approval_status, '剪样后应进入 sampled').toBe('sampled');
-  expect(sampled.sample_length_m, '剪样米数应回显本例输入').toBe('0.5');
+  expect(sampled.sample_length_m, '剪样米数应回显本例输入').toBeTruthy();
+  expect(
+    Number(sampled.sample_length_m),
+    '剪样米数应回显本例输入（DECIMAL 出参固定两位小数字符串，按数值等价比较）'
+  ).toBe(0.5);
   expect(sampled.sample_piece_id, '剪样应生成真实样布匹 id').toBeGreaterThan(0);
 
   const sent = await apiCallRaw<BcaRow>(
