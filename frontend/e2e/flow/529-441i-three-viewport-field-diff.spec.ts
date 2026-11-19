@@ -252,11 +252,11 @@ test('529 4.41 I 三视口字段级 diff：宽建单、窄回读、删后窄回�
 
     await page.setViewportSize(NARROW_VIEWPORT);
     await enterSalesList(page);
-    const tableMain = page.locator('.el-table-v2__main').first();
-    await expect(tableMain, 'sales list main table must render').toHaveCount(1);
+    const mobileList = page.locator('.sales-order-mobile').first();
+    await expect(mobileList, 'sales list mobile card list must render').toHaveCount(1);
     await expect(
-      tableMain.locator('.el-table-v2__row').filter({ hasText: orderNo }),
-      `deleted order ${orderNo} must have no list row`
+      mobileList.locator('.order-card').filter({ hasText: orderNo }),
+      `deleted order ${orderNo} must have no mobile card`
     ).toHaveCount(0);
     const gone = await apiCallExpectFail(page, 'GET', `/sales/orders/${orderId}`);
     expect(gone.status, `deleted order readback: expected 404, got ${gone.status}`).toBe(404);
