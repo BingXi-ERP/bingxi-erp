@@ -1,0 +1,98 @@
+# ==============================================================================
+# .github/workflows/e2e-linkage-gate.yml
+#
+# 功能：把联动影响矩阵从"信息工具"升格为 PR 门禁的一部分——改动登记在册的业务
+#       模块时，PR 上自动列出受影响链路与应回归的 E2E spec；矩阵结构被破坏
+#       （spec 丢失、链路拆空、引用未定义）则 fail-closed 判红，禁止合并。
+# 调用方：pull_request 命中 backend/src/**、矩阵文件、判定器、本工作流时触发；
+#       workflow_dispatch 可手工在任一 ref 上跑同一判定。
+# 入参：判定器用 --changed-from <base sha> 取本支相对基线的变更文件；三态退出码
+#       0=GREEN、1=RED、2=UNVERIFIED。基线取不到（新建分支首推）时显式跳过。
+# 传给谁：先跑 --self-test 证明判定器检测力（命中数不等即作废本轮），再跑判定；
+#       RED 让 step 失败阻断合并，UNVERIFIED 只打 notice 不判红，报告写 step summary。
+# 存什么：不改仓内任何文件；判定器只读矩阵、只写标准输出与退出码。
+# 存哪里：运行摘要与结论只在 Actions 侧，随 run 销毁。
+#
+# 为什么不并入 ci-cd.yml：该文件是在途改动最密集的 hub，独立成支避免撞冲突，
+#       也不占用收尾清理聚合门的 needs 列表。与 e2e-pairing.yml 同一形态。
+# 为什么默认只对结构 fail-closed：矩阵当前在主干 0 损坏（16 spec 全在），结构红
+#       不会挂住任何存量支；影响面先只报告，避免"改一个模块就要求补用例"把全支
+#       挂红。待报告面跑稳后再用棘轮基线收敛为新增即判红。
+# ==============================================================================
+
+name: 联动影响矩阵门
+
+on:
+  pull_request:
+    paths:
+      - 'backend/src/**'
+      - 'frontend/scripts/e2e-linkage-matrix.json'
+      - 'frontend/scripts/check-e2e-linkage-gate.mjs'
+      - '.github/workflows/e2e-linkage-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linkage-gate:
+    name: 联动影响矩阵判定
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 装配 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 判定器自证（检测力正向对照）
+        run: node frontend/scripts/check-e2e-linkage-gate.mjs --self-test
+
+      - name: 取 PR 基线提交
+        id: base
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          ZERO="0000000000000000000000000000000000000000"
+          if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
+            # workflow_dispatch 没有 PR 基线，退回默认分支顶点，仍跑同一判定。
+            BASE="$(git rev-parse "origin/${{ github.event.repository.default_branch }}")"
+          fi
+          if [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; then
+            echo "available=0" >> "$GITHUB_OUTPUT"
+            echo "::notice::无可用基线（新建分支首推），联动判定跳过；跳过不等于通过"
+          else
+            git fetch --no-tags --depth=1 origin "$BASE"
+            echo "sha=$BASE" >> "$GITHUB_OUTPUT"
+            echo "available=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 联动影响判定
+        if: steps.base.outputs.available == '1'
+        run: |
+          set +e
+          node frontend/scripts/check-e2e-linkage-gate.mjs --changed-from "${{ steps.base.outputs.sha }}" \
+            | tee linkage-report.txt
+          RC=${PIPESTATUS[0]}
+          set -e
+          {
+            echo '### 联动影响矩阵门'
+            echo '```text'
+            cat linkage-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          case "$RC" in
+            0) echo "::notice::联动矩阵结构完整，受影响链路已列入摘要" ;;
+            1)
+              echo "::error::联动矩阵结构损坏，见摘要中的红项"
+              exit 1
+              ;;
+            2) echo "::warning::联动判定未验证（取变更或读矩阵失败），不判红；请核对矩阵文件" ;;
+            *)
+              echo "::error::判定器返回异常码 $RC，本轮结论作废"
+              exit 1
+              ;;
+          esac
