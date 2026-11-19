@@ -9,14 +9,17 @@
 | 编号 | 类型 | 优先级 | 标题 | 准入证据 | 关联用例 / PR | 负责人 |
 |------|------|--------|------|----------|---------------|--------|
 | DC-001 | 功能补齐 | P1 | 小程序接口层客户越权 E2E 用例集 | miniprogram/ 有工程但 6 条独有链路零 E2E，仅 7 道静态门（completion audit 实量） | `frontend/e2e/miniprogram/01-customer-access.spec.ts` / PR #1320 | 测试 |
+| DC-002（第一批） | 功能补齐 | P1 | 写操作参数篡改 IDOR（目标 4.1-P / 3.6） | 现有 data-scope-isolation 仅覆盖读越权；换他人 ID 改金额 0.01、DELETE 他人单据的写越权为真实缺口 | `frontend/e2e/miniprogram/02-write-idor.spec.ts` / PR #1320（head fcff7e120） | 测试 |
 
 验收标准（7.4）：客户角色越权访问 5 个内部单据端点（sales/orders、products、ar-reconciliations、crm/customers、purchase/orders）由后端返回 401/403；CI 全量面绿；不依赖前端按钮隐藏。事实核对已记入 PR #1320 描述（端点在 route-snapshot、权限码在册、不在 AUTH_ONLY、customer 可登录）。
+
+DC-002 第一批验收标准（7.4）：两个不同 user_id 的 self 角色，跨 owner PUT 把他人线索金额改成 0.01、DELETE 他人线索，后端返回 403 固定脱敏信封并带字符串机器码；owner 回读金额仍为原值、记录仍在（实证未篡改）。后端承载体为 `update_lead`/`delete_lead` 的 `ensure_cross_owner_write_allowed` 写门（crm_handler.rs:719/753）。本地静态检查 prettier/eslint/playwright --list 全绿；CI run 44601446625（CI/CD）+ 44601446715（配对门）在新 head 物化 pending，待终态方可关闭。
 
 ### 待开发
 
 | 编号 | 类型 | 优先级 | 标题 | 缺口证据 | 计划 | 负责人 |
 |------|------|--------|------|----------|------|--------|
-| DC-002 | 功能补齐 | P1 | 小程序询样/对账跨端互通与 IDOR 正向用例 | DC-001 只覆盖越权负向；询样提交、客户对账确认、分享卡片越权（4.35/第五章）仍空白 | 待 DC-001 CI 终态后，同专支追加 | 测试 |
+| DC-002（余项） | 功能补齐 | P1 | 询样/对账跨端互通与分享卡片越权正向用例 | 第一批写 IDOR 已进验证中；询样提交、客户对账确认、分享卡片越权（4.35/第五章）仍空白；正向可见性受客户业务账号缺失约束（见 DC-007），须先明账号体系 | 待第一批 CI 终态后同专支追加 | 测试 |
 | DC-003 | 功能补齐 | P1 | 统一测试数据工厂 builder API | 造数逻辑散落 `flow/helpers.ts:266` ensureTestEntities、`global-setup.ts:1440` ensureGlobalBusinessSeed、`helpers.ts:4105` seedColorCardArchive，无统一入口 | 单开测试基建支 | 测试 |
 | DC-004 | 功能补齐 | P2 | 分环境预制脚本与独立库隔离 | `playwright.config.ts:48` baseURL 写死 localhost，CI 45 分片共用同库，仅靠账号前缀+时间戳唯一名隔离 | 与 DC-003 同域 | 测试 / 运维 |
 
@@ -50,12 +53,12 @@ DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动
 
 统计周期：2026-11-19。数据来自本轮 completion audit 与远端 PR 现状。
 
-- 新增清单：DC-001（小程序接口层越权 E2E，PR #1320）、DC-005/DC-006（audit 新识别待评估项）。
+- 新增清单：DC-001（小程序接口层越权 E2E，PR #1320）、DC-002 第一批（写操作参数篡改 IDOR，PR #1320 head fcff7e120）、DC-005/DC-006（audit 新识别待评估项）。
 - 已闭环清单：DC-008/DC-009/DC-010（门禁与共享红，证据见上）。
-- 积压清单：待开发 3（DC-002/003/004），待评估 2（DC-005/006），搁置 1（DC-007）。
+- 积压清单：待开发 3（DC-002 余项/003/004），验证中 2（DC-001/DC-002 第一批），待评估 2（DC-005/006），搁置 1（DC-007）。
 - P0 风险项：DC-006（#1302 脏支阻塞合并）——收口末期处理，不需 force 时走 merge origin/main。
 - P1 积压清单：DC-001/002/003/005；DC-006 为 P0。
-- 本周新增固化 E2E 用例数量：5（DC-001 的 5 端点越权断言，PR #1320）。
+- 本周新增固化 E2E 用例数量：7（DC-001 的 5 端点越权断言 + DC-002 第一批 2 条写越权断言，均 PR #1320）。
 - 逾期工单清单：无（本看板为首期建立，无历史逾期基准）。
 - 来源统计：completion audit 实量 8 条（DC-001~007 中除 DC-010 外），E2E 断言失败 1 条（DC-010）。
 - 遗留风险与计划：DC-005 受限于真机自动化基础设施，待拍板；DC-002/003/004 待存量 PR 消化后开工，避免加剧队列拥塞。
