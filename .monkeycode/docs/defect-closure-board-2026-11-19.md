@@ -86,6 +86,7 @@ DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动
 - 更正后结论：4.37 色差与计量从"部分"上修为**已有专门 spec 但在途**：`542-fabric-gsm-deviation-grade-gate` / `543-quotation-dual-unit-conversion-conservation` / `544-cross-dye-lot-fallback-trace` 三 spec 在开放 PR #1300，main 尚未收录，待 #1300 合并后改判已覆盖。
 - 空白项更正：严格空白仅剩 4.35 微信小程序深度专项（受 DC-005 真机基础设施搁置约束，仅接口层 DC-001/002 覆盖）。
 - 方法教训：审计必须以远端 main 权威树为准，不得用本地工作树——本地 main 滞后会制造假阴。后续每轮 audit 先 `git ls-remote`/trees API 对齐基线再判定。
+- 三次更正（2026-11-19 本轮，均**在途未合并**，不得据此报已覆盖）：4.34 新增 `flow/525-a11y-dark-mode.spec.ts`（点击 `.theme-toggle-btn` 断言 `html.dark` + `data-theme=dark` + localStorage `bx-erp-theme=dark`、刷新恢复、预置深色后加载即应用并可切回亮色），契约逐字段核对 `useTheme.ts` 的 STORAGE_KEY/DARK_CLASS/applyTheme/onMounted 与 `MainLayout.vue:90`；4.11 补 CSRF 负例 `flow/owasp-csrf-negative.spec.ts`（裸 POST `/crm/customers` 缺 X-CSRF-Token 断言 403 + CSRF 机器码，中间件层拒绝不达 handler）。两 spec 均在开放 PR #1332（head `0bbe4578d`），main 尚未收录，待 CI 全绿且合并后按 8.5 抽检改判。4.34 的「150% 字号布局不错乱」经核对主题字号为 px 定值（`styles/theme.css:44-46`），浏览器字号缩放不改变组件尺寸，无法做真值断言，列**不可测观察项**，不以假绿断言充数；读屏语义仍为剩余缺口（523 仅覆盖登录页 aria-label）。
 - 首轮结论存照（已被上方更正）：已覆盖 26 / 部分 13 / 空白 2。
 - 首轮空白存照：4.34 无障碍与可访问性；4.35 微信小程序深度专项。
 - 首轮部分 13 项存照：4.9 性能压力、4.10 浏览器兼容矩阵、4.11 OWASP（仅越权，无 XSS/SQLi/CSRF 负例）、4.12 历史迁移灰度、4.13 Monkey/探索性、4.26 第三方支付回调、4.27 缓存一致性、4.28 MQ 异步、4.30 时区边界、4.36 扫码识别、4.38 备份恢复、4.39 脏数据巡检、4.40 多组织维度。
