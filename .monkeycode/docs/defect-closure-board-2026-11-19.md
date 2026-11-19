@@ -11,6 +11,7 @@
 | DC-001 | 功能补齐 | P1 | 小程序接口层客户越权 E2E 用例集 | miniprogram/ 有工程但 6 条独有链路零 E2E，仅 7 道静态门（completion audit 实量） | `frontend/e2e/miniprogram/01-customer-access.spec.ts` / PR #1320 | 测试 |
 | DC-002（第一批） | 功能补齐 | P1 | 写操作参数篡改 IDOR（目标 4.1-P / 3.6） | 现有 data-scope-isolation 仅覆盖读越权；换他人 ID 改金额 0.01、DELETE 他人单据的写越权为真实缺口 | `frontend/e2e/miniprogram/02-write-idor.spec.ts` / PR #1320（head fcff7e120） | 测试 |
 | DC-010（回归失效） | Bug 缺陷 | P1 | AP 手机卡片支付方式断言共享红——原记已关闭，抽检证实修复未入主干 | blob 级取证：#1303 open/merged=false，主干 `ap-mobile-parity.test.ts` 最后提交是 #1252、仍无 `paymentMethodLabel`/`expectedPaymentMethod`、断言全宽度 `toBe('bank_transfer')`；而主干组件桌面列 `paymentMethodLabel` →「银行转账」/「Bank Transfer」，手机卡片用原始 token | 待 #1303 或其 cherry-pick 载体（#1308/#1307/#1297）合并入主干后，blob 回读测试已按宽度分治再重关 | 测试 |
+| DC-003 | 功能补齐 | P1 | 统一测试数据工厂 builder API | 代码已交付：`frontend/e2e/factory/test-data-factory.ts` 聚合客户/线索/色卡原子造数、自动追踪 id、LIFO 统一回收；`data-factory.spec.ts` 为真实消费者（造数→按 id 回读→cleanup）。字段照抄已验证端点，不自造键 | 载体分支 `test/data-factory-1119`（commit `114e0fb`）已推送保工；本地 prettier/eslint/`playwright --list`、配对门 `PAIRING_GREEN`、api-paths 门均绿；待 CI 队列消化后开 PR、全量绿且合入 main 再关单 | 测试 |
 
 验收标准（7.4）：客户角色越权访问 5 个内部单据端点（sales/orders、products、ar-reconciliations、crm/customers、purchase/orders）由后端返回 401/403；CI 全量面绿；不依赖前端按钮隐藏。事实核对已记入 PR #1320 描述（端点在 route-snapshot、权限码在册、不在 AUTH_ONLY、customer 可登录）。
 
@@ -21,7 +22,6 @@ DC-002 第一批验收标准（7.4）：两个不同 user_id 的 self 角色，�
 | 编号 | 类型 | 优先级 | 标题 | 缺口证据 | 计划 | 负责人 |
 |------|------|--------|------|----------|------|--------|
 | DC-002（余项） | 功能补齐 | P1 | 询样/对账跨端互通与分享卡片越权正向用例 | 第一批写 IDOR 已进验证中；询样提交、客户对账确认、分享卡片越权（4.35/第五章）仍空白；正向可见性受客户业务账号缺失约束（见 DC-007），须先明账号体系 | 待第一批 CI 终态后同专支追加 | 测试 |
-| DC-003 | 功能补齐 | P1 | 统一测试数据工厂 builder API | 造数逻辑散落 `flow/helpers.ts:266` ensureTestEntities、`global-setup.ts:1440` ensureGlobalBusinessSeed、`helpers.ts:4105` seedColorCardArchive，无统一入口 | 单开测试基建支 | 测试 |
 | DC-004 | 功能补齐 | P2 | 分环境预制脚本与独立库隔离 | `playwright.config.ts:48` baseURL 写死 localhost，CI 45 分片共用同库，仅靠账号前缀+时间戳唯一名隔离 | 与 DC-003 同域 | 测试 / 运维 |
 | DC-008（重开） | 功能补齐 | P1 | 联动影响矩阵 PR 门禁（4.41.N）——原误判已关闭，抽检证实未落地 | blob 级取证：#1306 open/merged=false，`check-e2e-linkage-gate.mjs`/`e2e-linkage-gate.yml` 在 main NOT_CARRIED，main 的 ci-cd/e2e-batch/e2e-pairing 对 linkage 引用均为 0，主干仅有「信息工具，不是门禁」的 report 脚本；对应任务 #41/#47 仍 in_progress | 兑现载体已验证：#1306 的 `check-e2e-linkage-gate.mjs` 有 `process.exit(0/2/3)` + `--self-test` 正向对照，ci-cd.yml 新增 `ci-e2e-linkage` job 并挂进 `ci-cleanup-retry` needs，是真 fail-closed；其旁路门「联动影响矩阵静态检查」已 success、全量门 queued。待 #1306 合并后 blob 回读再关单，不再凭脚本存在关单 | 测试 / CI |
 
@@ -55,12 +55,12 @@ DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动
 
 统计周期：2026-11-19。数据来自本轮 completion audit 与远端 PR 现状。
 
-- 新增清单：DC-001（小程序接口层越权 E2E，PR #1320）、DC-002 第一批（写操作参数篡改 IDOR，PR #1320 head fcff7e120）、DC-005/DC-006（audit 新识别待评估项）。
+- 新增清单：DC-001（小程序接口层越权 E2E，PR #1320）、DC-002 第一批（写操作参数篡改 IDOR，PR #1320 head fcff7e120）、DC-005/DC-006（audit 新识别待评估项）、DC-003（数据工厂代码已交付，分支 test/data-factory-1119 commit 114e0fb）。
 - 已闭环清单：DC-009（配对门，self-test 16/16 通过；DC-008/DC-010 经本周抽检判定假闭环/回归失效，已移出，不再计入闭环）。
-- 积压清单：待开发 4（DC-002 余项/003/004/008 重开），验证中 3（DC-001/DC-002 第一批/DC-010 回归失效），待评估 2（DC-005/006），搁置 1（DC-007）。
+- 积压清单：待开发 3（DC-002 余项/004/008 重开），验证中 4（DC-001/DC-002 第一批/DC-010 回归失效/DC-003），待评估 2（DC-005/006），搁置 1（DC-007）。
 - P0 风险项：DC-006（#1302 脏支阻塞合并）——收口末期处理，不需 force 时走 merge origin/main。
 - P1 积压清单：DC-001/002/003/005/010；DC-006 为 P0。
-- 本周新增固化 E2E 用例数量：7（DC-001 的 5 端点越权断言 + DC-002 第一批 2 条写越权断言，均 PR #1320）。
+- 本周新增固化 E2E 用例数量：8（DC-001 的 5 端点越权断言 + DC-002 第一批 2 条写越权断言，均 PR #1320；DC-003 数据工厂消费 spec 1 条，分支 test/data-factory-1119）。
 - 逾期工单清单：无（本看板为首期建立，无历史逾期基准）。
 - 来源统计：completion audit 实量 8 条（DC-001~007 中除 DC-010 外），E2E 断言失败 1 条（DC-010）。
 - 遗留风险与计划：DC-005 受限于真机自动化基础设施，待拍板；DC-002/003/004 待存量 PR 消化后开工，避免加剧队列拥塞。
