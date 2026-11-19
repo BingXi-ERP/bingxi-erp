@@ -53,4 +53,10 @@ const { t } = useI18n({ useScope: 'global' });
 :deep(.text-red) {
   color: #f56c6c;
 }
+
+@media (max-width: 767px) {
+  .fixed-assets-page {
+    padding: 12px;
+  }
+}
 </style>

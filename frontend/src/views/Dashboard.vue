@@ -102,4 +102,10 @@ onMounted(async () => {
 :deep(.el-card__body) {
   padding: 20px;
 }
+
+@media (max-width: 767px) {
+  .dashboard {
+    padding: 12px;
+  }
+}
 </style>

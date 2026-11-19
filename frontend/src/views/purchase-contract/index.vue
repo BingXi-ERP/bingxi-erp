@@ -149,4 +149,10 @@ onMounted(() => {
   display: flex;
   gap: 10px;
 }
+
+@media (max-width: 767px) {
+  .purchase-contract-page {
+    padding: 12px;
+  }
+}
 </style>

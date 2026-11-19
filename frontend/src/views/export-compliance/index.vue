@@ -57,7 +57,7 @@
 
       <!-- 贸易术语 -->
       <el-tab-pane label="贸易术语" name="incoterms">
-        <el-form inline label-width="110px">
+        <el-form inline label-width="110px" :label-position="isPhone ? 'top' : 'right'">
           <el-form-item label="报价单ID"
             ><el-input v-model="quotationIdField.text" @blur="quotationIdField.normalize()"
           /></el-form-item>
@@ -107,7 +107,11 @@
         <pre v-if="declarationResult" class="result-box">{{ declarationResult }}</pre>
 
         <el-dialog v-model="dischargeDialogVisible" title="新增排放记录" width="520">
-          <el-form :model="dischargeForm" label-width="110px">
+          <el-form
+            :model="dischargeForm"
+            label-width="110px"
+            :label-position="isPhone ? 'top' : 'right'"
+          >
             <el-form-item label="排放类型" required>
               <el-select v-model="dischargeForm.discharge_type" class="w-full">
                 <el-option
@@ -165,7 +169,7 @@
     </el-tabs>
 
     <el-dialog v-model="declDialogVisible" title="新建报关单" width="480">
-      <el-form :model="declForm" label-width="110px">
+      <el-form :model="declForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="销售订单ID" required
           ><el-input
             v-model="declSalesOrderField.text"
@@ -194,7 +198,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, toRef } from 'vue';
+import { computed, onMounted, reactive, ref, toRef } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
@@ -216,6 +221,8 @@ import {
   createCustomsDeclaration,
   verifyDocumentsCompleteness,
 } from '@/api/tax-rebate';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const activeTab = ref('inspection');
 const { t } = useI18n();

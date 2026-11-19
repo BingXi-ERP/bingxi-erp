@@ -145,4 +145,10 @@ const onTabChange = async (name: string | number) => {
   font-weight: 600;
   margin-top: 6px;
 }
+
+@media (max-width: 767px) {
+  .api-gateway-page {
+    padding: 12px;
+  }
+}
 </style>

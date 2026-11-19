@@ -109,4 +109,10 @@ onMounted(() => {
   font-size: 20px;
   font-weight: 600;
 }
+
+@media (max-width: 767px) {
+  .logistics {
+    padding: 12px;
+  }
+}
 </style>

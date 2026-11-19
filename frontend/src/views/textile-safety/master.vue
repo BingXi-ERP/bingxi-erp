@@ -213,10 +213,16 @@
     <el-dialog
       v-model="itemDialogVisible"
       :title="itemForm.id ? '编辑检测项目' : '新建检测项目'"
-      width="620px"
+      :width="isPhone ? '95%' : '620px'"
       destroy-on-close
     >
-      <el-form ref="itemFormRef" :model="itemForm" :rules="itemRules" label-width="110px">
+      <el-form
+        ref="itemFormRef"
+        :model="itemForm"
+        :rules="itemRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="项目编码" prop="item_code"
           ><el-input
             v-model="itemForm.item_code"
@@ -280,10 +286,16 @@
     <el-dialog
       v-model="limitDialogVisible"
       :title="limitForm.editId ? '编辑限值行' : '新增限值行'"
-      width="620px"
+      :width="isPhone ? '95%' : '620px'"
       destroy-on-close
     >
-      <el-form ref="limitFormRef" :model="limitForm" :rules="limitRules" label-width="110px">
+      <el-form
+        ref="limitFormRef"
+        :model="limitForm"
+        :rules="limitRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="检测项目" prop="item_code">
           <el-select
             v-model="limitForm.item_code"
@@ -378,10 +390,16 @@
     <el-dialog
       v-model="reqDialogVisible"
       :title="reqForm.id ? '编辑出口要求' : '登记出口要求'"
-      width="620px"
+      :width="isPhone ? '95%' : '620px'"
       destroy-on-close
     >
-      <el-form ref="reqFormRef" :model="reqForm" :rules="reqRules" label-width="110px">
+      <el-form
+        ref="reqFormRef"
+        :model="reqForm"
+        :rules="reqRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="要求编码" prop="requirement_code"
           ><el-input v-model="reqForm.requirement_code" :disabled="!!reqForm.id"
         /></el-form-item>
@@ -437,7 +455,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import {
@@ -470,6 +489,8 @@ import {
   TARGET_MARKET_LABELS,
   optionList,
 } from '@/constants/textile-safety';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const route = useRoute();
 const activeTab = ref((route.query.tab as string) || 'items');

@@ -68,7 +68,7 @@
     </el-card>
 
     <el-dialog v-model="dialogVisible" title="新建参保记录" width="480">
-      <el-form :model="form" label-width="100px">
+      <el-form :model="form" label-width="100px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="员工ID" required
           ><el-input
             v-model="formWorkerField.text"
@@ -107,7 +107,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, toRef } from 'vue';
+import { computed, onMounted, reactive, ref, toRef } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { logAuxLoadFailure } from '@/utils/logger';
 import {
@@ -123,6 +124,8 @@ import {
   INSURANCE_STATUS_LABEL,
   type SocialInsurance,
 } from '@/api/social-insurance';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const records = ref<SocialInsurance[]>([]);
 const loading = ref(false);
