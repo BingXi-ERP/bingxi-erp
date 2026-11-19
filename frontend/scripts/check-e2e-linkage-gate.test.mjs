@@ -34,11 +34,12 @@ test('内置正向对照固定命中 7/7，退出 0', () => {
   assert.ok(r.stdout.includes('SELFTEST_OK 7/7'), r.stdout);
 });
 
-test('仓内真实矩阵当前完整，默认判定为 GREEN', () => {
+test('仓内真实矩阵当前完整，默认判定为 GREEN 且不声称已跑 E2E', () => {
   const r = run(['--json', 'README.md']);
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const j = JSON.parse(r.stdout);
   assert.equal(j.verdict, 'GREEN');
+  assert.equal(j.e2eExecution, 'NOT_RUN');
   assert.equal(j.reds.length, 0);
   assert.equal(j.affected.chains.length, 0);
 });
@@ -56,6 +57,41 @@ test('改 sales 路由命中 sale-to-cash 与 returns-to-report 两条链', () =
     j.affected.specs.includes('frontend/e2e/flow/11-returns.spec.ts'),
     JSON.stringify(j.affected.specs)
   );
+});
+
+test('文本报告必须声明 E2E 未执行', () => {
+  const r = run(['README.md']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.ok(r.stdout.includes('E2E_EXECUTION=NOT_RUN'), r.stdout);
+  assert.ok(r.stdout.includes('VERDICT=GREEN'), r.stdout);
+});
+
+test('多个位置参数全部纳入影响面，首个位置参数不再漏检', () => {
+  const r = run(['--json', 'README.md', 'backend/src/routes/sales.rs']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.changedCount, 2);
+  assert.deepEqual(j.affected.chains, ['sale-to-cash', 'returns-to-report']);
+});
+
+test('--changed-from 与位置参数混用 → UNVERIFIED，退出 2，不判红', () => {
+  const r = run(['--json', '--changed-from', 'HEAD', 'README.md']);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.verdict, 'UNVERIFIED');
+  assert.equal(j.e2eExecution, 'NOT_RUN');
+  assert.ok(
+    j.unverified.some(x => x.includes('不能与位置参数混用')),
+    JSON.stringify(j.unverified)
+  );
+});
+
+test('无效布尔参数仍按 JSON 形式输出 UNVERIFIED', () => {
+  const r = run(['--json=true', 'README.md']);
+  assert.equal(r.status, 2, r.stdout + r.stderr);
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.verdict, 'UNVERIFIED');
+  assert.equal(j.e2eExecution, 'NOT_RUN');
 });
 
 test('矩阵注入不存在的 spec → RED，退出 1，点名该 spec', () => {

@@ -13,6 +13,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '..', '..');
@@ -20,6 +21,8 @@ const MATRIX_FILE = path.join(HERE, 'e2e-linkage-matrix.json');
 const CHAIN_ORDER = ['sale-to-cash', 'purchase-to-pay', 'outsource-to-cost', 'returns-to-report'];
 const SELF_CHECKS = 7;
 const say = line => process.stdout.write(line + '\n');
+const wantsJson = () =>
+  process.argv.slice(2).some(arg => arg === '--json' || arg.startsWith('--json='));
 
 function normalize(raw) {
   return String(raw).replace(/\\/g, '/').replace(/^\.\//, '').trim();
@@ -96,15 +99,21 @@ function impact(changed, matrix) {
 }
 
 function changedFrom(ref) {
-  const out = execFileSync('git', ['diff', '--name-only', `${ref}...HEAD`], {
-    cwd: REPO_ROOT,
-    encoding: 'utf8',
-  });
-  return out.split('\n').filter(Boolean).map(normalize);
+  const out = execFileSync(
+    'git',
+    ['diff', '--name-only', '--no-renames', '-z', `${ref}...HEAD`, '--'],
+    {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }
+  );
+  return out.split('\0').filter(Boolean).map(normalize);
 }
 
 function report(matrix, changed, affected, reds, unverified) {
-  say('联动影响矩阵门禁（结构 fail-closed，变更影响面仅报告）');
+  say('联动影响矩阵静态检查（结构校验与影响面报告）');
+  say('E2E_EXECUTION=NOT_RUN，本检查未执行业务 E2E');
   say(`变更文件：${changed.length} 个`);
   say(
     `命中模块规则：${affected.hitRules.length} 条${affected.hitRules.length ? '：' + affected.hitRules.join('、') : ''}`
@@ -199,44 +208,62 @@ function selfTest() {
   process.exit(0);
 }
 
-function main() {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) return selfTest();
-  const asJson = argv.includes('--json');
-  const fromIdx = argv.indexOf('--changed-from');
-  const matrixIdx = argv.indexOf('--matrix');
-  const matrixFile = matrixIdx !== -1 ? argv[matrixIdx + 1] : MATRIX_FILE;
-  if (matrixIdx !== -1 && !matrixFile) {
-    say('MATRIX_ARG_MISSING --matrix 缺少路径');
-    process.exit(2);
+function unverifiedResult(asJson, message) {
+  if (asJson) {
+    say(
+      JSON.stringify({
+        verdict: 'UNVERIFIED',
+        e2eExecution: 'NOT_RUN',
+        reds: [],
+        unverified: [message],
+      })
+    );
+  } else {
+    say('E2E_EXECUTION=NOT_RUN');
+    say(`VERDICT=UNVERIFIED ${message}`);
   }
-  // 位置参数取非选项、且不是 --changed-from/--matrix 的取值，避免把参数值当成变更文件。
-  const valueIdx = new Set([fromIdx + 1, matrixIdx + 1]);
-  const positional = argv.filter((a, i) => !a.startsWith('--') && !valueIdx.has(i));
-  let changed = [];
+  process.exit(2);
+}
+
+function main() {
+  let args;
+  try {
+    args = parseArgs({
+      allowPositionals: true,
+      options: {
+        json: { type: 'boolean' },
+        'self-test': { type: 'boolean' },
+        'changed-from': { type: 'string' },
+        matrix: { type: 'string' },
+      },
+    });
+  } catch (e) {
+    unverifiedResult(wantsJson(), `参数无效：${e.message}`);
+  }
+  const { values, positionals } = args;
+  if (values['self-test']) return selfTest();
+  const asJson = values.json === true;
+  if (values['changed-from'] !== undefined && positionals.length > 0) {
+    unverifiedResult(asJson, '--changed-from 不能与位置参数混用');
+  }
+  let changed = positionals.map(normalize);
   const unverified = [];
-  if (fromIdx !== -1) {
-    const ref = argv[fromIdx + 1];
-    if (!ref) {
-      say('CHANGED_FROM_MISSING --changed-from 缺少 ref');
-      process.exit(2);
+  if (values['changed-from'] !== undefined) {
+    if (!values['changed-from'].trim()) {
+      unverifiedResult(asJson, '--changed-from 缺少有效 ref');
     }
     try {
-      changed = changedFrom(ref);
+      changed = changedFrom(values['changed-from']);
     } catch (e) {
-      say(`CHANGED_FROM_ERROR 取变更清单失败：${e.message}`);
-      process.exit(2);
+      unverifiedResult(asJson, `取变更清单失败：${e.message}`);
     }
-  } else {
-    changed = positional.map(normalize);
   }
 
   let matrix;
   try {
-    matrix = JSON.parse(readFileSync(matrixFile, 'utf8'));
+    matrix = JSON.parse(readFileSync(values.matrix ?? MATRIX_FILE, 'utf8'));
   } catch (e) {
-    say(`MATRIX_ERROR 读取矩阵失败：${e.message}`);
-    process.exit(2);
+    unverifiedResult(asJson, `读取矩阵失败：${e.message}`);
   }
   const reds = integrity(matrix, REPO_ROOT);
   const affected = reds.length ? { hitRules: [], chains: [], specs: [] } : impact(changed, matrix);
@@ -246,6 +273,7 @@ function main() {
     process.stdout.write(
       JSON.stringify({
         verdict: ['GREEN', 'RED', 'UNVERIFIED'][code],
+        e2eExecution: 'NOT_RUN',
         reds,
         unverified,
         affected,
