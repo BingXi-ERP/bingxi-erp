@@ -28,11 +28,10 @@ test.describe('扫码识别失效码负例（4.36）', () => {
     );
 
     expect(fail.status, '失效条码盘库必须 404，200 即内容校验门失效').toBe(404);
-    expect(failureCode(fail.json), '机器码应为 NOT_FOUND').toBe(APP_ERROR_CODES.NOT_FOUND);
-    expect(
-      fail.json?.message,
-      '失效码提示应为统一脱敏文案「资源未找到」，不得回显内部 SQL/表名'
-    ).toBe(SANITIZED_NOT_FOUND);
+    expect(failureCode(fail), '机器码应为 NOT_FOUND').toBe(APP_ERROR_CODES.NOT_FOUND);
+    expect(fail.message, '失效码提示应为统一脱敏文案「资源未找到」，不得回显内部 SQL/表名').toBe(
+      SANITIZED_NOT_FOUND
+    );
   });
 
   test('用不存在的条码扫码出库被 404 NOT_FOUND 拒绝，不写入出库状态', async ({ page }) => {
@@ -44,8 +43,8 @@ test.describe('扫码识别失效码负例（4.36）', () => {
     });
 
     expect(fail.status, '失效条码出库必须 404，200 即把失效码当成有效布卷').toBe(404);
-    expect(failureCode(fail.json), '机器码应为 NOT_FOUND').toBe(APP_ERROR_CODES.NOT_FOUND);
-    expect(fail.json?.message, '失效码出库提示应为统一脱敏文案').toBe(SANITIZED_NOT_FOUND);
+    expect(failureCode(fail), '机器码应为 NOT_FOUND').toBe(APP_ERROR_CODES.NOT_FOUND);
+    expect(fail.message, '失效码出库提示应为统一脱敏文案').toBe(SANITIZED_NOT_FOUND);
 
     // 回读：同一失效码再次盘库仍 NOT_FOUND，证明前一次失败未凭空写入任何布卷。
     const reread = await apiCallExpectFail(
@@ -54,6 +53,6 @@ test.describe('扫码识别失效码负例（4.36）', () => {
       `/scanner/scan-inventory?barcode=${fakeBarcode}`
     );
     expect(reread.status, '失败请求不得写入任何布卷，回读仍应 404').toBe(404);
-    expect(failureCode(reread.json), '回读机器码仍应为 NOT_FOUND').toBe(APP_ERROR_CODES.NOT_FOUND);
+    expect(failureCode(reread), '回读机器码仍应为 NOT_FOUND').toBe(APP_ERROR_CODES.NOT_FOUND);
   });
 });
