@@ -394,6 +394,17 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
     expect(gmBytes.length, `453-04 gm 下载字节必须非零，实际 ${gmBytes.length}B`).toBeGreaterThan(
       0
     );
+    // 下游持权角色读到的必须是真文件内容，不能只凭"非空"就放行：
+    // 先钉 PDF 魔数（首四字节 %PDF），再与上传时的真实字节逐字节比对，
+    // 服务端若返回占位文件、空壳或被串改的内容，下面的魔数与逐字节比对立即判红。
+    expect(gmBytes[0], `453-04 gm 下载首字节必须为 0x25（%），实际 ${gmBytes[0]}`).toBe(0x25);
+    expect(gmBytes[1], `453-04 gm 下载次字节必须为 0x50（P），实际 ${gmBytes[1]}`).toBe(0x50);
+    expect(gmBytes[2], `453-04 gm 下载第三字节必须为 0x44（D），实际 ${gmBytes[2]}`).toBe(0x44);
+    expect(gmBytes[3], `453-04 gm 下载第四字节必须为 0x46（F），实际 ${gmBytes[3]}`).toBe(0x46);
+    expect(
+      Buffer.from(gmBytes).toString('latin1'),
+      '453-04 gm 下载字节内容必须与上传的 PDF 逐字节一致（跨角色可见同一真实文件）'
+    ).toBe(pdf.toString('latin1'));
 
     // 无 suppliers:read 的角色（质检员仅持近邻键 supplier-qualifications:read）：
     // permission 中间件按 URL 段推 suppliers:read 短路，列表与下载均 403 FORBIDDEN

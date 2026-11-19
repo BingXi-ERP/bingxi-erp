@@ -401,12 +401,22 @@ impl EnergyAllocationRecordService {
             ],
         };
         if let Err(e) = voucher_service.create_and_post(req, user_id).await {
-            tracing::warn!(
+            tracing::error!(
                 allocation_id = model.id,
                 allocation_no = %model.allocation_no,
-                "能耗分摊凭证生成失败（B05-P2-9）：{}",
+                "能耗分摊凭证生成失败（B05-P2-9），已落死信补偿记录等待补生成：{}",
                 e
             );
+            crate::services::event_retry_service::EventRetryService::
+                record_voucher_generation_failure(
+                    self.db.clone(),
+                    "energy_allocation_record",
+                    "energy",
+                    i64::from(model.id),
+                    &model.allocation_no,
+                    &e,
+                )
+                .await;
         }
 
         // 按缸号归集制造费用到成本归集单

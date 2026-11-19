@@ -175,6 +175,7 @@ import {
 import { getAPPaymentRequestList, printAPPaymentDocx, type APPaymentRequest } from '@/api/ap';
 import { getSupplierList, type Supplier } from '@/api/supplier';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
+import { paymentMethodLabel } from '@/composables/usePaymentMethods';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -194,14 +195,8 @@ const formatMoney = (amount: number | string | undefined) => {
 };
 
 const getPaymentMethodLabel = (method: string) => {
-  const keyMap: Record<string, string> = {
-    bank_transfer: 'apModule.payment.methodBankTransfer',
-    cash: 'apModule.payment.methodCash',
-    check: 'apModule.payment.methodCheck',
-    bill: 'apModule.payment.methodBill',
-  };
-  const key = keyMap[method];
-  if (key) return t(key);
+  const label = paymentMethodLabel(method);
+  if (label !== method) return label;
   return getAPPaymentMethodText(method) || method;
 };
 
