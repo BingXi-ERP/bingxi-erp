@@ -24,7 +24,7 @@ const INTERNAL_ENDPOINTS: Array<{ path: string; why: string }> = [
   { path: '/products', why: '客户不得读取含成本的标准价产品主档（3.4a 成本脱敏）' },
   { path: '/ar-reconciliations', why: '客户不得越权访问内部应收对账单（3.4c 对账数据）' },
   { path: '/crm/customers', why: '客户不得访问内部客户档案（3.4c 其他客户数据）' },
-  { path: '/purchases/orders', why: '客户不得访问采购单据（3.4c 内部单据）' },
+  { path: '/purchase/orders', why: '客户不得访问采购单据（3.4c 内部单据）' },
 ];
 
 test.describe('小程序接口层：客户账号越权拦截', () => {
