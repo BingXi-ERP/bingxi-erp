@@ -41,4 +41,10 @@ const { t } = useI18n({ useScope: 'global' });
   color: #606266;
   margin: 20px 0 40px;
 }
+
+@media (max-width: 767px) {
+  .error-page {
+    padding: 12px;
+  }
+}
 </style>
