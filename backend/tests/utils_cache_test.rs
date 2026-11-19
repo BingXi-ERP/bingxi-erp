@@ -129,7 +129,7 @@ fn test_drift_grace_copy_is_still_bound_and_cleared_by_rotation() {
     );
     cache.consume_csrf_token(&token, IP_CELL, Some(42), Some(SESSION_A));
 
-    // 用户索引必须登记宽限副本，否则重新登录/刷新清不掉它
+    // 用户索引必须登记宽限副本，否则吊销场景整集清除时清不掉它
     assert!(
         cache
             .csrf_user_index
@@ -149,7 +149,7 @@ fn test_drift_grace_copy_is_still_bound_and_cleared_by_rotation() {
         "宽限副本不得被同用户的别的会话消费"
     );
 
-    // 强制轮换（登录/刷新链路）把副本一并清除
+    // 整集清除（改角色/停用等吊销场景）把副本一并清除
     assert!(
         cache.clear_old_csrf_token_for_user(42),
         "宽限副本应随强制轮换被清除"

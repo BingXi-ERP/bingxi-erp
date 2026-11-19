@@ -382,6 +382,7 @@ impl MigratorTrait for Migrator {
             Box::new(domain::like_acceleration::Migration),
             // 周期任务执行历史表，链尾独立域（存量复用库上属 pending 必然执行）
             Box::new(domain::scheduler_observability::Migration),
+            Box::new(domain::business::m0098_payment_channel_configs::Migration),
             // 调样单两表建表域（sample_dispatch_orders/sample_dispatch_items），链尾独立域
             // （存量复用库上属 pending 必然执行；并入 business 域会被台账整体跳过、建表永不执行）
             Box::new(domain::sample_dispatch::Migration),

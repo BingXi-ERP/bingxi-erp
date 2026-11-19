@@ -600,6 +600,7 @@ dependencies = [
 name = "bingxi-backend"
 version = "2026.810.1"
 dependencies = [
+ "aes-gcm",
  "arc-swap",
  "argon2",
  "async-trait",
