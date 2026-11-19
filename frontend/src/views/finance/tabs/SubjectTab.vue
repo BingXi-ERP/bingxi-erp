@@ -26,7 +26,89 @@
     </div>
 
     <el-card shadow="hover">
+      <!-- 手机端：科目树改单列卡片，按 level 缩进体现层级 -->
+      <section v-if="isPhone" v-loading="subjectLoading" class="subject-mobile">
+        <ul class="card-list" :aria-label="t('finance.subjectTab.ariaLabel')">
+          <li v-for="(row, index) in flatSubjects" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('finance.subjectTab.columnName') }}</dt>
+                <dd :style="{ 'padding-left': `${(row.level ?? 1) * 8}px` }">{{ row.name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('finance.subjectTab.columnCode') }}</dt>
+                <dd>{{ row.code }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('finance.subjectTab.columnCategory') }}</dt>
+                <dd>
+                  <el-tag size="small">{{ getCategoryLabel(row.category) }}</el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('finance.subjectTab.columnDirection') }}</dt>
+                <dd>
+                  <el-tag
+                    v-if="row.balance_direction"
+                    :type="isDebitDirection(row.balance_direction) ? 'success' : 'danger'"
+                    size="small"
+                  >
+                    {{ getDirectionLabel(row.balance_direction) }}
+                  </el-tag>
+                  <span v-else>-</span>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('finance.subjectTab.columnLevel') }}</dt>
+                <dd>{{ row.level }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('finance.subjectTab.columnIsLeaf') }}</dt>
+                <dd>
+                  <el-tag :type="!row.children?.length ? 'success' : 'info'" size="small">
+                    {{
+                      !row.children?.length
+                        ? t('finance.subjectTab.yes')
+                        : t('finance.subjectTab.no')
+                    }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('common.status') }}</dt>
+                <dd>
+                  <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
+                    {{
+                      row.status === 'active'
+                        ? t('finance.subjectTab.statusActive')
+                        : t('finance.subjectTab.statusInactive')
+                    }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button
+                v-permission="PERMISSIONS.SUBJECT_UPDATE"
+                type="primary"
+                @click="openSubjectDialog(row)"
+              >
+                {{ t('common.edit') }}
+              </el-button>
+              <el-button
+                v-permission="PERMISSIONS.SUBJECT_DELETE"
+                type="danger"
+                @click="deleteSubject(row)"
+              >
+                {{ t('common.delete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="subjectLoading"
         :data="subjects"
         stripe
@@ -123,7 +205,7 @@
           ? t('finance.subjectTab.dialogTitleEdit')
           : t('finance.subjectTab.dialogTitleNew')
       "
-      width="500px"
+      :width="isPhone ? '95%' : '500px'"
       :aria-label="
         subjectForm.id
           ? t('finance.subjectTab.dialogAriaLabelEdit')
@@ -135,6 +217,7 @@
         :model="subjectForm"
         :rules="subjectRules"
         label-width="80px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('finance.subjectTab.formAriaLabel')"
       >
         <el-form-item :label="t('finance.subjectTab.labelCode')" prop="code">
@@ -208,6 +291,7 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Printer, Download } from '@element-plus/icons-vue';
@@ -225,8 +309,16 @@ import { exportFromBackend } from '@/utils/export';
 import { PERMISSIONS } from '@/constants/permissions';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const subjects = ref<AccountSubject[]>([]);
+// 手机卡片无法表达树展开，拉平为列表并保留 level 供缩进
+const flatSubjects = computed<AccountSubject[]>(() => {
+  const flatten = (nodes: AccountSubject[]): AccountSubject[] =>
+    nodes.flatMap(node => [node, ...flatten((node.children as AccountSubject[]) ?? [])]);
+  return flatten(subjects.value);
+});
 const subjectLoading = ref(false);
 const subjectSubmitLoading = ref(false);
 const subjectDialogVisible = ref(false);
@@ -452,3 +544,53 @@ onMounted(() => {
   fetchSubjects();
 });
 </script>
+
+<style scoped>
+.subject-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.subject-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.subject-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.subject-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.subject-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.subject-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.subject-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.subject-mobile .card-actions .el-button {
+  margin: 0;
+}
+</style>
