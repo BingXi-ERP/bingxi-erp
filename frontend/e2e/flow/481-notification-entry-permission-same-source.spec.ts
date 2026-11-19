@@ -81,8 +81,12 @@ async function createScratchUser(
 }
 
 /** 以当前会话（admin）向目标用户发公告以自举通知数据，返回本次投递数 */
-async function seedNotification(page: Page, targetUserIds: number[]): Promise<number> {
-  const tag = genCode('N');
+async function seedNotification(
+  page: Page,
+  targetUserIds: number[],
+  tagOverride?: string
+): Promise<number> {
+  const tag = tagOverride ?? genCode('N');
   const result = await apiCallRaw<{ delivered_count: number }>(
     page,
     'POST',
@@ -220,6 +224,15 @@ test.describe('481 通知中心路由权限键与读面同源', () => {
 
   test('481-04 超管：整页与选择器可用，列表有真实条目', async ({ page }) => {
     await loginViaUI(page);
+    // 库存预警调度器持续向 admin 灌入 SYSTEM 通知，长时分片里 beforeAll 那条公告的
+    // created_at 不再保证落在首屏；临近断言补发一条，才能稳定钉住写面到界面读面的同源。
+    const adminMe = await apiCallRaw<{ id: number }>(page, 'GET', '/auth/me');
+    await apiCallRaw(page, 'PUT', '/user-notification-settings', {
+      internal_enabled: true,
+      system_notification_type: 'internal',
+    });
+    const freshTag = genCode('N');
+    await seedNotification(page, [adminMe.id], freshTag);
     await page.goto(`${BASE_URL}/notification`);
     await page.waitForLoadState('networkidle');
 
@@ -239,11 +252,12 @@ test.describe('481 通知中心路由权限键与读面同源', () => {
     const count = await items.count();
     expect(count, `超管的通知列表应有真实条目（非空），实际 ${count}`).toBeGreaterThan(0);
     // 只断行数非正时，任意一条别人的通知就能把本例点亮；改为逐项比对标题文本，钉住
-    // beforeAll 发给超管的那条自举公告确实渲染进列表，写面与界面读面逐值同源。
+    // 本例临近补发的那条自举公告确实渲染进列表，写面与界面读面逐值同源。用独立 freshTag
+    // 而非 beforeAll 那条，避免库存预警持续灌入把它挤出首屏造成的时序假红。
     const itemTitles = await items.locator('.item-title').allTextContents();
     expect(
-      itemTitles.some(title => title.includes('E2E-481')),
-      `超管通知列表应渲染出自举公告标题，实际标题集=${JSON.stringify(itemTitles)}`
+      itemTitles.some(title => title.includes(freshTag)),
+      `超管通知列表应渲染出本例补发的自举公告(${freshTag})，实际标题集=${JSON.stringify(itemTitles)}`
     ).toBe(true);
   });
 });
