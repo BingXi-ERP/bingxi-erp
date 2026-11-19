@@ -4,7 +4,7 @@
   数据源：/ap/reports/*（api/ap.ts 封装）
 -->
 <template>
-  <div class="ap-report-tab">
+  <div class="ap-report-tab" :class="{ 'ap-report-tab--phone': isPhone }">
     <el-card shadow="never">
       <template #header>
         <div class="report-header">
@@ -22,7 +22,23 @@
         </div>
       </template>
 
-      <el-table v-if="rows.length" :data="rows" border stripe max-height="480">
+      <section v-if="isPhone" class="ap-report-mobile" :aria-label="t('apModule.tabs.report')">
+        <ul class="card-list">
+          <li v-for="(row, index) in rows" :key="index" class="card-item">
+            <dl class="card-fields">
+              <div v-for="col in columns" :key="col">
+                <dt>{{ col }}</dt>
+                <dd>{{ formatCell(row[col]) }}</dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+        <el-empty
+          v-if="!loading && rows.length === 0"
+          :description="t('apModule.report.emptyTip')"
+        />
+      </section>
+      <el-table v-else-if="rows.length" :data="rows" border stripe max-height="480">
         <el-table-column
           v-for="col in columns"
           :key="col"
@@ -32,11 +48,7 @@
           align="right"
         >
           <template #default="{ row }">
-            {{
-              typeof row[col] === 'number'
-                ? row[col].toLocaleString('zh-CN', { maximumFractionDigits: 2 })
-                : (row[col] ?? '-')
-            }}
+            {{ formatCell(row[col]) }}
           </template>
         </el-table-column>
       </el-table>
@@ -49,6 +61,7 @@
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   getAPStatisticsReport,
   getAPDailyReport,
@@ -58,11 +71,21 @@ import {
 
 const { t } = useI18n({ useScope: 'global' });
 
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
+
 const reportType = ref<'statistics' | 'daily' | 'monthly' | 'aging'>('statistics');
 const loading = ref(false);
 const rows = ref<Record<string, unknown>[]>([]);
 
 const columns = computed(() => (rows.value.length ? Object.keys(rows.value[0]) : []));
+
+const formatCell = (value: unknown) => {
+  if (typeof value === 'number') {
+    return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  }
+  return value ?? '-';
+};
 
 const fetchers = {
   statistics: getAPStatisticsReport,
@@ -106,5 +129,62 @@ defineExpose({ refresh: fetchReport });
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.ap-report-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.ap-report-tab--phone .report-header {
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+.ap-report-tab--phone :deep(.el-radio-group) {
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ap-report-tab--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 </style>

@@ -7,8 +7,7 @@
 //!   total_collections=实收 / closing_balance=上期欠款，与
 //! `ar_reconciliation.rs` 一一对应；开单时由调用方写入）。
 //! 表由 `migration/src/domain/sample_dispatch` 域 m0142 建立；
-//! 单号格式 `{前缀}{YYMM}-{3位流水}`（样例 BX-DY2607-1356），取号方
-//! `utils/number_generator.rs::generate_no_ym_with_txn`（下切片接线）。
+//! 单号格式 `{前缀}{YYMM}-{3位流水}`（样例 BX-DY2607-1356），由开单方按该号段写入。
 
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;

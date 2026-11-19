@@ -22,7 +22,26 @@
         </div>
       </template>
 
-      <el-table v-if="rows.length" :data="rows" border stripe max-height="480">
+      <!-- 手机卡片（与 BPM 审批手机卡片同断点同范式） -->
+      <section v-if="isPhone && rows.length" v-loading="loading" class="ar-report-mobile">
+        <ul class="card-list">
+          <li v-for="(row, idx) in rows" :key="idx" class="card-item">
+            <dl class="card-fields">
+              <div v-for="col in columns" :key="col">
+                <dt>{{ col }}</dt>
+                <dd>
+                  {{
+                    typeof row[col] === 'number'
+                      ? row[col].toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+                      : (row[col] ?? '-')
+                  }}
+                </dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+      </section>
+      <el-table v-else-if="rows.length" :data="rows" border stripe max-height="480">
         <el-table-column
           v-for="col in columns"
           :key="col"
@@ -49,6 +68,7 @@
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   getARStatisticsReport,
   getARDailyReport,
@@ -57,6 +77,10 @@ import {
 } from '@/api/ar';
 
 const { t } = useI18n({ useScope: 'global' });
+
+// 手机卡片断点（与 BPM 审批手机卡片同断点）
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const reportType = ref<'statistics' | 'daily' | 'monthly' | 'aging'>('statistics');
 const loading = ref(false);
@@ -96,6 +120,45 @@ defineExpose({ refresh: fetchReport });
 </script>
 
 <style scoped>
+/* 手机卡片（范式与 BPM 审批手机卡片一致） */
+.ar-report-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .report-header {
   display: flex;
   justify-content: space-between;

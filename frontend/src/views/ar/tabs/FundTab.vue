@@ -4,7 +4,7 @@
   拆分日期：2026-06-15 B3-2
 -->
 <template>
-  <div class="fund-tab">
+  <div class="fund-tab" :class="{ 'fund-tab--phone': isPhone }">
     <div class="page-header">
       <h2 class="page-title">{{ $t('arModule.fund.title') }}</h2>
       <el-button type="primary" @click="openFundDialog()">
@@ -49,7 +49,80 @@
     </el-row>
 
     <el-card shadow="hover" class="mt-20">
+      <section
+        v-if="isPhone"
+        v-loading="fundLoading"
+        class="ar-fund-mobile"
+        :aria-label="t('arModule.tabs.fund')"
+      >
+        <ul class="card-list">
+          <li v-for="row in funds" :key="row.id" class="card-item">
+            <dl class="card-fields">
+              <div class="field-emphasis">
+                <dt>{{ $t('arModule.fund.accountCode') }}</dt>
+                <dd>{{ row.account_code }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.fund.accountName') }}</dt>
+                <dd>{{ row.account_name }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.fund.accountType') }}</dt>
+                <dd>{{ getAccountTypeLabel(row.account_type) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.fund.balance') }}</dt>
+                <dd>{{ formatMoney(row.balance) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.fund.frozenBalance') }}</dt>
+                <dd class="text-orange">{{ formatMoney(row.frozen_balance) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.fund.availableBalance') }}</dt>
+                <dd class="text-green">{{ formatMoney(row.available_balance) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.fund.bankName') }}</dt>
+                <dd>{{ row.bank_name }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.fund.bankAccount') }}</dt>
+                <dd>{{ row.bank_account }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('common.status') }}</dt>
+                <dd>
+                  <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
+                    {{
+                      row.status === 'active'
+                        ? $t('arModule.fund.statusActive')
+                        : $t('arModule.fund.statusFrozen')
+                    }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" @click="depositFund(row)">
+                {{ $t('arModule.fund.deposit') }}
+              </el-button>
+              <el-button type="primary" @click="withdrawFund(row)">
+                {{ $t('arModule.fund.withdraw') }}
+              </el-button>
+              <el-button type="warning" @click="freezeFund(row)">
+                {{ $t('arModule.fund.freeze') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <ElEmpty
+          v-if="!fundLoading && funds.length === 0"
+          :description="$t('components.v2Table.empty')"
+        />
+      </section>
       <el-table
+        v-else
         v-loading="fundLoading"
         :data="funds"
         stripe
@@ -113,7 +186,13 @@
     <el-dialog
       v-model="fundDialogVisible"
       :title="$t('arModule.fund.createTitle')"
-      width="500px"
+      :width="
+        isPhone
+          ? 'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))'
+          : '500px'
+      "
+      class="fund-dialog"
+      :class="{ 'fund-dialog--phone': isPhone }"
       :aria-label="$t('arModule.fund.createAria')"
     >
       <el-form
@@ -121,6 +200,7 @@
         :model="fundForm"
         :rules="fundRules"
         label-width="80px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('arModule.fund.formAria')"
       >
         <el-form-item :label="$t('arModule.fund.accountCode')" prop="account_code">
@@ -171,10 +251,20 @@
     <el-dialog
       v-model="fundOperationDialogVisible"
       :title="fundOperationTitle"
-      width="400px"
+      :width="
+        isPhone
+          ? 'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))'
+          : '400px'
+      "
+      class="fund-operation-dialog"
+      :class="{ 'fund-operation-dialog--phone': isPhone }"
       :aria-label="$t('arModule.fund.opAria')"
     >
-      <el-form label-width="80px" :aria-label="$t('arModule.fund.opFormAria')">
+      <el-form
+        label-width="80px"
+        :label-position="isPhone ? 'top' : 'right'"
+        :aria-label="$t('arModule.fund.opFormAria')"
+      >
         <el-form-item :label="$t('arModule.fund.amount')">
           <el-input
             v-model="fundOperationField.text"
@@ -209,9 +299,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElEmpty } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   useNumberField,
   validateNumberValue,
@@ -227,6 +318,9 @@ import {
 } from '@/api/fund';
 
 const { t } = useI18n({ useScope: 'global' });
+
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const funds = ref<FundAccount[]>([]);
 const fundLoading = ref(false);
@@ -271,7 +365,7 @@ const fundRules: FormRules = {
   ],
 };
 
-const formatMoney = (amount: number) => {
+const formatMoney = (amount?: number | null) => {
   return amount?.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) || '0.00';
 };
 
@@ -443,5 +537,130 @@ onMounted(() => {
   font-size: 24px;
   font-weight: 600;
   color: #303133;
+}
+
+.ar-fund-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+
+.fund-tab--phone .page-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+.fund-tab--phone .page-title {
+  overflow-wrap: anywhere;
+}
+.fund-tab--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.fund-tab--phone :deep(.el-input__wrapper),
+.fund-tab--phone :deep(.el-select__wrapper) {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.fund-tab--phone :deep(.el-form-item__content) {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.fund-tab--phone .fund-summary .summary-value {
+  font-size: 20px;
+}
+
+.fund-tab :deep(.fund-dialog--phone),
+.fund-tab :deep(.fund-operation-dialog--phone) {
+  display: flex;
+  flex-direction: column;
+  width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)) !important;
+  box-sizing: border-box;
+}
+.fund-tab :deep(.fund-dialog--phone .el-dialog__header),
+.fund-tab :deep(.fund-dialog--phone .el-dialog__footer),
+.fund-tab :deep(.fund-operation-dialog--phone .el-dialog__header),
+.fund-tab :deep(.fund-operation-dialog--phone .el-dialog__footer) {
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
+.fund-tab :deep(.fund-dialog--phone .el-dialog__body),
+.fund-tab :deep(.fund-operation-dialog--phone .el-dialog__body) {
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+.fund-tab :deep(.fund-dialog--phone .el-dialog__footer),
+.fund-tab :deep(.fund-operation-dialog--phone .el-dialog__footer) {
+  justify-content: flex-end;
+}
+.fund-tab :deep(.fund-dialog--phone .el-button),
+.fund-tab :deep(.fund-operation-dialog--phone .el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
 }
 </style>

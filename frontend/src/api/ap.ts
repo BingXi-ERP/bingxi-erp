@@ -131,7 +131,8 @@ export interface APReconciliation {
   reconciliation_no: string;
   supplier_id: number;
   supplier_name: string;
-  reconciliation_date: string;
+  start_date: string;
+  end_date: string;
   /** 后端对账金额列 rust_decimal（models/ap_reconciliation.rs:41 与 ap_reconciliation_ops/types.rs 侧同名键均 Decimal），出参十进制字符串 */
   total_invoice_amount: string;
   /**

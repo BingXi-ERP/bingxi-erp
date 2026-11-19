@@ -9,8 +9,6 @@ use sea_orm::{
 /// 通用单号生成器
 ///
 /// 标准格式：`{前缀}{YYYYMMDD}{左补零流水号}`（默认 3 位，可指定位数）。
-/// 年月格式变体：`{前缀}{YYMM}-{3位流水}`（`generate_no_ym_with_txn`，
-/// 真实业务样例 `BX-DY2607-1356`——调样单号段）。
 ///
 /// ## 并发与唯一性约定（与调用方共同遵守）
 /// - 取号前先取 `pg_advisory_xact_lock(prefix+date)` 事务咨询锁，
@@ -141,38 +139,6 @@ impl DocumentNumberGenerator {
         Self::lock_prefix(txn, prefix, &today).await?;
 
         Self::allocate_no::<E, C>(txn, column, &date_prefix, width).await
-    }
-
-    /// 在外部事务内生成年月格式单号：`{前缀}{YYMM}-{3位流水}`
-    ///
-    /// 真实业务样例 `BX-DY2607-1356`（前缀 BX-DY + 年月 2607 + 横杠 + 3 位流水，
-    /// 调样单号段）。与既有函数共用 `lock_prefix`/`allocate_no`/UNIQUE 兜底结构，
-    /// 只换日期段拼装与锁粒度：
-    /// - 号段按月：基数 = `max(同前缀同月已有单号横杠后流水) + 1`；月份翻篇后
-    ///   旧月单号不再命中 `starts_with(前缀+YYMM-)`，流水自然按月重置
-    ///   （照既有实现语义，见 `allocate_no` 文档）；
-    /// - 咨询锁 key 取 `prefix+YYMM`：同前缀同月的并发取号串行化；
-    /// - 既有 `{前缀}{YYYYMMDD}{流水}` 格式的各函数行为不变（格式拼装点抽成
-    ///   `full_date_prefix` 纯函数，输出逐字符不变，由单测锁定）。
-    pub async fn generate_no_ym_with_txn<'db, E, C>(
-        txn: &'db DatabaseTransaction,
-        prefix: &str,
-        _entity: E,
-        column: C,
-    ) -> Result<String, AppError>
-    where
-        E: EntityTrait,
-        <<E as EntityTrait>::Column as std::str::FromStr>::Err: std::fmt::Debug,
-        E::Model: Sync + Send + FromQueryResult + 'db,
-        C: ColumnTrait,
-    {
-        let now = Utc::now();
-        let ym = now.format("%y%m").to_string();
-        let date_prefix = Self::ym_date_prefix(prefix, now);
-
-        Self::lock_prefix(txn, prefix, &ym).await?;
-
-        Self::allocate_no::<E, C>(txn, column, &date_prefix, Self::DEFAULT_SEQ_WIDTH).await
     }
 
     /// 在调用方事务内「取号 + 构建 ActiveModel + INSERT」并对唯一约束冲突(23505)
@@ -310,12 +276,6 @@ impl DocumentNumberGenerator {
     /// 的输出不因年月变体的加入而变化）；`generate_no` 族的唯一调用点。
     fn full_date_prefix(prefix: &str, now: DateTime<Utc>) -> String {
         format!("{}{}", prefix, now.format("%Y%m%d"))
-    }
-
-    /// 年月格式变体的日期段拼装点：`{前缀}{YYMM}-`（横杠分隔，
-    /// 真实样例 `BX-DY2607-`）。`generate_no_ym_with_txn` 的唯一调用点。
-    fn ym_date_prefix(prefix: &str, now: DateTime<Utc>) -> String {
-        format!("{}{}-", prefix, now.format("%y%m"))
     }
 
     /// 从单号后缀解析出「基数流水」（`allocate_no` 的基数判据）。
@@ -718,32 +678,6 @@ mod tests {
             DocumentNumberGenerator::full_date_prefix("BX-DY", at(2026, 1, 5)),
             "BX-DY20260105"
         );
-    }
-
-    /// 年月变体格式锁定：`{前缀}{YYMM}-` 与真实样例 `BX-DY2607-1356` 的前缀
-    /// 逐字符一致，且横杠后流水可被基数判据解析（allocate_no 同源通道）。
-    #[test]
-    fn ym_date_prefix_matches_real_sample() {
-        let prefix = DocumentNumberGenerator::ym_date_prefix("BX-DY", at(2026, 7, 15));
-        assert_eq!(prefix, "BX-DY2607-");
-
-        let sample = "BX-DY2607-1356";
-        assert!(sample.starts_with(&prefix));
-        let suffix = sample.strip_prefix(&prefix).unwrap();
-        assert_eq!(
-            DocumentNumberGenerator::base_seq_from_suffix(suffix),
-            Some(1356)
-        );
-    }
-
-    /// 流水按月段重置的拼装前提：月份翻篇后日期段不同，旧月单号不再命中
-    /// 新月 `starts_with(前缀+YYMM-)`，基数自然回到新月首号。
-    #[test]
-    fn ym_date_prefix_resets_across_months() {
-        let july = DocumentNumberGenerator::ym_date_prefix("BX-DY", at(2026, 7, 31));
-        let august = DocumentNumberGenerator::ym_date_prefix("BX-DY", at(2026, 8, 1));
-        assert_ne!(july, august);
-        assert_eq!(august, "BX-DY2608-");
     }
 
     /// 基数判据与横杠分隔形态的相容性：纯数字流水照常解析；横杠混排属于

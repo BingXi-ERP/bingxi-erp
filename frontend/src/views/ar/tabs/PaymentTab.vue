@@ -4,7 +4,7 @@
   数据源：/ar/payments（api/ar.ts 封装）
 -->
 <template>
-  <div class="ar-payment-tab">
+  <div class="ar-payment-tab" :class="{ 'ar-payment-tab--phone': isPhone }">
     <div class="tab-toolbar">
       <el-button type="primary" :icon="Plus" @click="openCreateDialog">
         {{ t('arModule.payment.create') }}
@@ -12,7 +12,75 @@
       <el-button @click="fetchPayments">{{ t('common.refresh') }}</el-button>
     </div>
 
-    <el-table v-loading="loading" :data="payments" border stripe>
+    <section
+      v-if="isPhone"
+      v-loading="loading"
+      class="ar-payment-mobile"
+      :aria-label="t('arModule.tabs.payment')"
+    >
+      <ul class="card-list">
+        <li v-for="row in payments" :key="row.id" class="card-item">
+          <dl class="card-fields">
+            <div class="field-emphasis">
+              <dt>{{ t('arModule.payment.paymentNo') }}</dt>
+              <dd>{{ row.payment_no }}</dd>
+            </div>
+            <div>
+              <dt>ID</dt>
+              <dd>{{ row.id }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('arModule.payment.customer') }}</dt>
+              <dd>{{ row.customer_id }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('arModule.payment.paymentDate') }}</dt>
+              <dd>{{ row.payment_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('arModule.payment.method') }}</dt>
+              <dd>{{ row.payment_method }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('arModule.payment.amount') }}</dt>
+              <dd>{{ formatMoney(row.amount) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('common.status') }}</dt>
+              <dd>
+                <el-tag :type="statusTagType(row.status)" size="small">{{ row.status }}</el-tag>
+              </dd>
+            </div>
+          </dl>
+          <div class="card-actions">
+            <el-button
+              v-if="row.status === 'draft' || row.status === 'pending'"
+              type="primary"
+              @click="openEditDialog(row)"
+            >
+              {{ t('common.edit') }}
+            </el-button>
+            <el-button
+              v-if="
+                row.status === 'draft' || row.status === 'pending' || row.status === 'confirmed'
+              "
+              type="success"
+              @click="confirmPayment(row)"
+            >
+              {{ t('arModule.payment.confirm') }}
+            </el-button>
+            <el-button @click="showDetail(row)">{{ t('common.detail') }}</el-button>
+            <el-button @click="printCollection(row)">{{ t('common.print') }}</el-button>
+          </div>
+        </li>
+      </ul>
+      <ElEmpty
+        v-if="!loading && payments.length === 0"
+        :description="t('components.v2Table.empty')"
+      />
+    </section>
+
+    <el-table v-else v-loading="loading" :data="payments" border stripe>
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="payment_no" :label="t('arModule.payment.paymentNo')" min-width="150" />
       <el-table-column prop="customer_id" :label="t('arModule.payment.customer')" width="90" />
@@ -64,9 +132,21 @@
     <el-dialog
       v-model="dialogVisible"
       :title="editId ? t('arModule.payment.edit') : t('arModule.payment.create')"
-      width="540px"
+      :width="
+        isPhone
+          ? 'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))'
+          : '540px'
+      "
+      class="ar-payment-dialog"
+      :class="{ 'ar-payment-dialog--phone': isPhone }"
     >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('arModule.payment.customer')" prop="customer_id">
           <el-input v-model="customerField.text" @blur="customerField.normalize()" />
         </el-form-item>
@@ -104,8 +184,18 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailVisible" :title="t('arModule.payment.detailTitle')" width="600px">
-      <el-descriptions v-if="detailRow" :column="2" border>
+    <el-dialog
+      v-model="detailVisible"
+      :title="t('arModule.payment.detailTitle')"
+      :width="
+        isPhone
+          ? 'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))'
+          : '600px'
+      "
+      class="ar-payment-detail-dialog"
+      :class="{ 'ar-payment-detail-dialog--phone': isPhone }"
+    >
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="ID">{{ detailRow.id }}</el-descriptions-item>
         <el-descriptions-item :label="t('arModule.payment.paymentNo')">
           {{ detailRow.payment_no }}
@@ -128,14 +218,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, toRef, onMounted } from 'vue';
+import { ref, reactive, toRef, computed, onMounted } from 'vue';
 import { logger } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElEmpty } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import { isDialogDismissal } from '@/utils/monitor';
 import { useNumberField } from '@/composables/useNumberField';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   getARPaymentList,
   getARPayment,
@@ -147,6 +238,9 @@ import {
 } from '@/api/ar';
 
 const { t } = useI18n({ useScope: 'global' });
+
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const payments = ref<ARPayment[]>([]);
 const loading = ref(false);
@@ -348,5 +442,116 @@ onMounted(() => {
   margin-bottom: 12px;
   display: flex;
   gap: 8px;
+}
+
+.ar-payment-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+
+.ar-payment-tab--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ar-payment-tab--phone :deep(.el-input__wrapper),
+.ar-payment-tab--phone :deep(.el-select__wrapper) {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.ar-payment-tab--phone :deep(.el-form-item__content) {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ar-payment-tab :deep(.ar-payment-dialog--phone),
+.ar-payment-tab :deep(.ar-payment-detail-dialog--phone) {
+  display: flex;
+  flex-direction: column;
+  width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)) !important;
+  box-sizing: border-box;
+}
+.ar-payment-tab :deep(.ar-payment-dialog--phone .el-dialog__header),
+.ar-payment-tab :deep(.ar-payment-dialog--phone .el-dialog__footer),
+.ar-payment-tab :deep(.ar-payment-detail-dialog--phone .el-dialog__header),
+.ar-payment-tab :deep(.ar-payment-detail-dialog--phone .el-dialog__footer) {
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
+.ar-payment-tab :deep(.ar-payment-dialog--phone .el-dialog__body),
+.ar-payment-tab :deep(.ar-payment-detail-dialog--phone .el-dialog__body) {
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+.ar-payment-tab :deep(.ar-payment-dialog--phone .el-dialog__footer),
+.ar-payment-tab :deep(.ar-payment-detail-dialog--phone .el-dialog__footer) {
+  justify-content: flex-end;
+}
+.ar-payment-tab :deep(.ar-payment-dialog--phone .el-button),
+.ar-payment-tab :deep(.ar-payment-detail-dialog--phone .el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  white-space: normal;
 }
 </style>

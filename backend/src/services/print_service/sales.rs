@@ -997,8 +997,9 @@ impl super::PrintService {
 ///
 /// 为什么不直接产 XlsxTable：用户真实单据（细码单/调样单/销售单）是 WPS 表格版式，
 /// 缸号块合并等富版式待 xlsx 引擎增强车道（feat/xlsx-engine-merge）落地后升级；
-/// 本结构把主表 KV、明细表头/行、汇总 KV、总金额与金额大写占位分字段保存，
-/// 届时只需替换 [`SalesXlsxPrintDoc::to_xlsx_table`] 的铺排逻辑，取数构建器零改动。
+/// 本结构把主表 KV、明细表头/行、汇总 KV 与总金额分字段保存，总金额同时是
+/// 「金额大写」格的唯一取值源；届时只需替换 [`SalesXlsxPrintDoc::to_xlsx_table`]
+/// 的铺排逻辑，取数构建器零改动。
 /// 当前版式 = 单一规整表格（沿用 utils/xlsx_export.rs，只调用不改）：
 /// 首行为明细表头（冻结行），数据区顶部为主表 KV 行（label/value 两列，其余列空串），
 /// 空行分隔后接明细行，再空行接汇总 KV 行。
@@ -1016,10 +1017,8 @@ pub(crate) struct SalesXlsxPrintDoc {
     pub rows: Vec<Vec<String>>,
     /// 汇总 KV 栏次（label, value）
     pub summary_kv: Vec<(String, String)>,
-    /// 单据总金额原始值（A 车道 feat/amount-in-words 注入大写的取值源）
+    /// 单据总金额原始值（金额大写格的取值源）
     pub total_amount: rust_decimal::Decimal,
-    /// 金额大写（A 车道产出后注入；本切片恒 None，转表时省略该行）
-    pub total_amount_words: Option<String>,
 }
 
 impl SalesXlsxPrintDoc {
@@ -1049,9 +1048,8 @@ impl SalesXlsxPrintDoc {
             for (label, value) in &self.summary_kv {
                 rows.push(Self::kv_row(label, value, width));
             }
-            if let Some(words) = &self.total_amount_words {
-                rows.push(Self::kv_row("金额大写", words, width));
-            }
+            let words = crate::utils::amount_in_words::amount_in_words(self.total_amount);
+            rows.push(Self::kv_row("金额大写", &words, width));
         }
         crate::utils::xlsx_export::XlsxTable {
             sheet_name: self.sheet_name.clone(),
@@ -1064,7 +1062,7 @@ impl SalesXlsxPrintDoc {
 impl super::PrintService {
     /// 销售订单 xlsx 打印取数：行级归属门（与 docx 打印同一判定器）后取关联并构建中间版式。
     /// 明细行缺失或产品档案缺席按 fail-closed 报错，不产空表假绿。
-    pub async fn get_sales_order_xlsx_print_data(
+    pub(crate) async fn get_sales_order_xlsx_print_data(
         &self,
         ctx: &crate::utils::data_scope::DataScopeContext,
         id: i32,
@@ -1077,7 +1075,7 @@ impl super::PrintService {
 
     /// 销售发货单 xlsx 打印取数：行级归属门（与 docx 打印同一判定器）后取关联并构建中间版式。
     /// 明细行缺失按 fail-closed 报错，不产空表假绿。
-    pub async fn get_sales_delivery_xlsx_print_data(
+    pub(crate) async fn get_sales_delivery_xlsx_print_data(
         &self,
         ctx: &crate::utils::data_scope::DataScopeContext,
         id: i32,
@@ -1093,8 +1091,7 @@ impl super::PrintService {
     /// 明细列 = 序号/品名/编号/色号/匹号(条件)/数量/单价/金额。sales_order_item 模型只有
     /// `piece_no` 列、没有缸号 `dye_lot_no` 列（仅 `dye_lot_requirement` 要求文本，不是
     /// 已分配事实，不得造列填充），故缸号列不产出、匹号列在任一行有值时才输出。
-    /// 金额大写本切片不产出（A 车道 feat/amount-in-words 在 utils 开发中，产出后由
-    /// handler 注入 `total_amount_words`）。
+    /// 金额大写由转表时按单据总金额生成，取数构建器只保存权威金额值。
     fn build_sales_order_xlsx(
         order: &crate::models::sales_order::Model,
         customer: Option<&crate::models::customer::Model>,
@@ -1191,7 +1188,6 @@ impl super::PrintService {
             rows,
             summary_kv,
             total_amount: order.total_amount,
-            total_amount_words: None,
         })
     }
 
@@ -1305,7 +1301,6 @@ impl super::PrintService {
             rows,
             summary_kv,
             total_amount: record.total_amount,
-            total_amount_words: None,
         })
     }
 }
@@ -1770,9 +1765,12 @@ mod xlsx_print_tests {
             order.shipping_address.clone().expect("fixture")
         );
         assert_eq!(kv("总金额(元)"), order.total_amount.to_string());
-        // A 车道 feat/amount-in-words 注入点：本切片占位为空
         assert_eq!(doc.total_amount, order.total_amount);
-        assert!(doc.total_amount_words.is_none());
+        let words = crate::utils::amount_in_words::amount_in_words(order.total_amount);
+        let table = doc.to_xlsx_table();
+        assert!(table.rows.iter().any(|row| {
+            row.first().map(String::as_str) == Some("金额大写") && row.get(1) == Some(&words)
+        }));
     }
 
     // ---------------- 销售发货单 xlsx 构建 ----------------
@@ -1908,8 +1906,8 @@ mod xlsx_print_tests {
             .expect("构建应成功");
         let table = doc.to_xlsx_table();
         let width = doc.headers.len();
-        // 布局：主表 KV 行 + 空行 + 明细行 + 空行 + 汇总 KV 行
-        let expected_len = doc.main_kv.len() + 1 + doc.rows.len() + 1 + doc.summary_kv.len();
+        // 布局：主表 KV 行 + 空行 + 明细行 + 空行 + 汇总 KV 行 + 金额大写行
+        let expected_len = doc.main_kv.len() + 1 + doc.rows.len() + 1 + doc.summary_kv.len() + 1;
         assert_eq!(table.rows.len(), expected_len);
         assert!(table.rows.iter().all(|row| row.len() == width));
         assert_eq!(table.headers, doc.headers);
