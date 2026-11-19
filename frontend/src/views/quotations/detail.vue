@@ -40,7 +40,7 @@
       </template>
 
       <!-- 基本信息 -->
-      <el-descriptions :column="3" border>
+      <el-descriptions :column="isPhone ? 1 : 3" border>
         <el-descriptions-item :label="t('quotations.detail.labelCustomer')">
           {{ quotation.customer_name }}
         </el-descriptions-item>
@@ -118,7 +118,50 @@
       <h3 class="section-title">
         {{ t('quotations.detail.itemsTitle', { count: quotation.items?.length || 0 }) }}
       </h3>
+      <!-- 手机端：明细单列卡片，字段与动作与桌面表格等价 -->
+      <section v-if="isPhone" class="quot-items-mobile">
+        <ul class="card-list" :aria-label="t('quotations.detail.itemsTableAriaLabel')">
+          <li v-for="(row, index) in quotation.items" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('quotations.detail.colProduct') }}</dt>
+                <dd>{{ row.product_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.detail.colColor') }}</dt>
+                <dd>{{ row.color_code || '-' }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.detail.colSpec') }}</dt>
+                <dd>{{ row.specification || '-' }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.detail.colUnit') }}</dt>
+                <dd>{{ row.unit }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.detail.colQuantity') }}</dt>
+                <dd>{{ row.quantity }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.detail.colUnitPrice') }}</dt>
+                <dd>{{ formatAmount(row.unit_price) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.detail.colUnitPriceWithTax') }}</dt>
+                <dd>{{ formatAmount(row.unit_price_with_tax) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.detail.colAmount') }}</dt>
+                <dd>{{ formatAmount(row.amount) }}</dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         :data="quotation.items"
         border
         :empty-text="t('quotations.detail.emptyItems')"
@@ -207,6 +250,7 @@ import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
 import { promptApprovalReason, promptRejectReason } from '@/composables/useActionPrompts';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { formatDecimalAmount } from '@/utils/money';
 import { useUserStore } from '@/store/user';
 import { hasRoutePermission } from '@/router';
@@ -232,6 +276,8 @@ import {
 type TagType = '' | 'success' | 'warning' | 'info' | 'danger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const route = useRoute();
 const router = useRouter();
@@ -469,5 +515,40 @@ onMounted(loadData);
   color: #909399;
   display: flex;
   gap: 24px;
+}
+
+.quot-items-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.quot-items-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.quot-items-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.quot-items-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.quot-items-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.quot-items-mobile .field-emphasis dd {
+  font-weight: 500;
 }
 </style>
