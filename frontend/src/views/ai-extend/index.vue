@@ -1,11 +1,9 @@
 <script setup lang="ts">
-/**
- * P2-4 AI 分析深化 - 概览看板
- */
 import { onMounted, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { DataAnalysis, Document, MagicStick } from '@element-plus/icons-vue';
 import {
   getAiSummary,
@@ -16,9 +14,9 @@ import {
   SOURCE_LABELS,
 } from '@/api/ai-extend';
 import type { AiSummary } from '@/api/ai-extend';
-
-// 批次 34 v9 P1：接入 i18n，替换硬编码中文 ElMessage
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const router = useRouter();
 const summary = ref<AiSummary | null>(null);
@@ -54,7 +52,7 @@ const applyRateColor = computed(() => {
 </script>
 
 <template>
-  <div class="ai-overview">
+  <div class="ai-overview" :class="{ 'ai-overview--phone': isPhone }">
     <div class="page-header">
       <h2>{{ $t('aiExtend.overview.title') }}</h2>
       <div class="header-right">
@@ -75,8 +73,8 @@ const applyRateColor = computed(() => {
       </div>
     </div>
 
-    <el-row v-if="summary" :gutter="16" class="kpi-row">
-      <el-col :span="6">
+    <el-row v-if="summary" :gutter="isPhone ? 8 : 16" class="kpi-row">
+      <el-col :span="isPhone ? 12 : 6">
         <el-card shadow="hover" class="kpi-card">
           <div class="kpi-label">{{ $t('aiExtend.overview.kpiProcessHistory') }}</div>
           <div class="kpi-value">{{ summary.process_optimization?.total ?? 0 }}</div>
@@ -89,7 +87,7 @@ const applyRateColor = computed(() => {
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="isPhone ? 12 : 6">
         <el-card shadow="hover" class="kpi-card">
           <div class="kpi-label">{{ $t('aiExtend.overview.kpiApplyRate') }}</div>
           <div class="kpi-value" :style="{ color: applyRateColor }">{{ applyRateText }}</div>
@@ -100,7 +98,7 @@ const applyRateColor = computed(() => {
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="isPhone ? 12 : 6">
         <el-card shadow="hover" class="kpi-card">
           <div class="kpi-label">{{ $t('aiExtend.overview.kpiQualityHistory') }}</div>
           <div class="kpi-value">{{ summary.quality_prediction?.total ?? 0 }}</div>
@@ -111,7 +109,7 @@ const applyRateColor = computed(() => {
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="isPhone ? 12 : 6">
         <el-card shadow="hover" class="kpi-card">
           <div class="kpi-label">{{ $t('aiExtend.overview.kpiUnack') }}</div>
           <div
@@ -127,8 +125,8 @@ const applyRateColor = computed(() => {
       </el-col>
     </el-row>
 
-    <el-row :gutter="16" class="actions-row">
-      <el-col :span="8">
+    <el-row :gutter="isPhone ? 8 : 16" class="actions-row">
+      <el-col :span="isPhone ? 24 : 8">
         <el-card
           shadow="hover"
           class="action-card"
@@ -143,7 +141,7 @@ const applyRateColor = computed(() => {
           </div>
         </el-card>
       </el-col>
-      <el-col :span="8">
+      <el-col :span="isPhone ? 24 : 8">
         <el-card
           shadow="hover"
           class="action-card"
@@ -158,7 +156,7 @@ const applyRateColor = computed(() => {
           </div>
         </el-card>
       </el-col>
-      <el-col :span="8">
+      <el-col :span="isPhone ? 24 : 8">
         <el-card
           shadow="hover"
           class="action-card"
@@ -175,13 +173,66 @@ const applyRateColor = computed(() => {
       </el-col>
     </el-row>
 
-    <el-row v-if="summary" :gutter="16" class="latest-row">
-      <el-col :span="12">
-        <el-card shadow="hover">
+    <el-row v-if="summary" :gutter="isPhone ? 0 : 16" class="latest-row">
+      <el-col :span="isPhone ? 24 : 12">
+        <el-card shadow="hover" class="overview-process-card">
           <template #header>
             <div class="card-header">{{ $t('aiExtend.overview.latestProcess') }}</div>
           </template>
+          <section
+            v-if="isPhone"
+            class="ai-mobile overview-process-mobile"
+            :aria-label="t('aiExtend.overview.ariaLatestProcess')"
+          >
+            <ul class="card-list">
+              <li
+                v-for="row in summary.latest_process_optimizations"
+                :key="row.id"
+                class="card-item"
+              >
+                <dl class="card-fields">
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colColorNo') }}</dt>
+                    <dd>{{ row.color_no }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colFabricType') }}</dt>
+                    <dd>{{ row.fabric_type }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colSource') }}</dt>
+                    <dd>{{ SOURCE_LABELS[row.source] || row.source }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colConfidence') }}</dt>
+                    <dd>{{ Number(row.confidence).toFixed(2) }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colApplied') }}</dt>
+                    <dd>
+                      <el-tag :type="row.is_applied ? 'success' : 'info'" size="small">
+                        {{
+                          row.is_applied
+                            ? $t('aiExtend.overview.applied')
+                            : $t('aiExtend.overview.notApplied')
+                        }}
+                      </el-tag>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colTime') }}</dt>
+                    <dd>{{ row.created_at }}</dd>
+                  </div>
+                </dl>
+              </li>
+            </ul>
+            <el-empty
+              v-if="summary.latest_process_optimizations.length === 0"
+              :description="t('components.v2Table.empty')"
+            />
+          </section>
           <el-table
+            v-else
             :data="summary.latest_process_optimizations"
             size="small"
             max-height="300"
@@ -230,12 +281,72 @@ const applyRateColor = computed(() => {
           </el-table>
         </el-card>
       </el-col>
-      <el-col :span="12">
-        <el-card shadow="hover">
+      <el-col :span="isPhone ? 24 : 12">
+        <el-card shadow="hover" class="overview-quality-card">
           <template #header>
             <div class="card-header">{{ $t('aiExtend.overview.latestQuality') }}</div>
           </template>
+          <section
+            v-if="isPhone"
+            class="ai-mobile overview-quality-mobile"
+            :aria-label="t('aiExtend.overview.ariaLatestQuality')"
+          >
+            <ul class="card-list">
+              <li v-for="row in summary.latest_quality_predictions" :key="row.id" class="card-item">
+                <dl class="card-fields">
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colProductId') }}</dt>
+                    <dd>{{ row.product_id }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colRisk') }}</dt>
+                    <dd>
+                      <el-tag
+                        :style="{
+                          background: RISK_LEVEL_COLORS[row.risk_level],
+                          color: '#fff',
+                          border: 'none',
+                        }"
+                        size="small"
+                      >
+                        {{ RISK_LEVEL_LABELS[row.risk_level] }}
+                      </el-tag>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colRiskScore') }}</dt>
+                    <dd>{{ row.risk_score }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colTrend') }}</dt>
+                    <dd>{{ TREND_LABELS[row.trend] || row.trend }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colAck') }}</dt>
+                    <dd>
+                      <el-tag :type="row.is_acknowledged ? 'success' : 'warning'" size="small">
+                        {{
+                          row.is_acknowledged
+                            ? $t('aiExtend.overview.acknowledged')
+                            : $t('aiExtend.overview.unacknowledged')
+                        }}
+                      </el-tag>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.overview.colTime') }}</dt>
+                    <dd>{{ row.created_at }}</dd>
+                  </div>
+                </dl>
+              </li>
+            </ul>
+            <el-empty
+              v-if="summary.latest_quality_predictions.length === 0"
+              :description="t('components.v2Table.empty')"
+            />
+          </section>
           <el-table
+            v-else
             :data="summary.latest_quality_predictions"
             size="small"
             max-height="300"
@@ -300,6 +411,49 @@ const applyRateColor = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
+}
+.ai-overview--phone .page-header {
+  flex-wrap: wrap;
+}
+.ai-overview--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+}
+.card-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .page-header {
   display: flex;
