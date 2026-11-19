@@ -5,6 +5,7 @@ import PaymentRequestTab from '@/views/ap/tabs/PaymentRequestTab.vue';
 import PaymentTab from '@/views/ap/tabs/PaymentTab.vue';
 import ReconciliationTab from '@/views/ap/tabs/ReconciliationTab.vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
+import { paymentMethodLabel } from '@/composables/usePaymentMethods';
 import { getSupplierList } from '@/api/supplier';
 import zhCN from '@/locales/zh-CN';
 
@@ -163,7 +164,13 @@ for (const width of [320, 767, 768, 1280]) {
       for (const [index, row] of list.entries()) {
         expect(row.text()).toContain(requests[index].request_no);
         expect(field(row, width, labels.paymentRequest.requestDate, 3).text()).toBe('2026-11-15');
-        expect(field(row, width, labels.payment.paymentMethod, 5).text()).toBe('bank_transfer');
+        const expectedPaymentMethod =
+          width < 768
+            ? requests[index].payment_method
+            : paymentMethodLabel(requests[index].payment_method);
+        expect(field(row, width, labels.payment.paymentMethod, 5).text()).toBe(
+          expectedPaymentMethod
+        );
         expect(field(row, width, labels.paymentRequest.requestAmount, 6).text()).toBe('1,234.56');
         expect(field(row, width, labels.paymentRequest.currencyLabel, 7).text()).toBe('USD');
       }
