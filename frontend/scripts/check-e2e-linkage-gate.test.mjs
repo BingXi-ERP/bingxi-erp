@@ -137,6 +137,20 @@ test('无效布尔参数仍按 JSON 形式输出 UNVERIFIED', () => {
   assert.equal(j.e2eExecution, 'NOT_RUN');
 });
 
+test('模块规则 match 拼错被判 RED 并点名（命中真实性有检测力）', () => {
+  const { file } = tempMatrix(m => {
+    m.modules.push({ match: 'frontend/src/views/不存在-自证拼错目录/', chains: ['sale-to-cash'] });
+  });
+  const r = run(['--json', '--matrix', file, 'README.md']);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  const j = JSON.parse(r.stdout);
+  assert.equal(j.verdict, 'RED');
+  assert.ok(
+    j.reds.some(x => x.includes('不存在-自证拼错目录') && x.includes('零命中')),
+    JSON.stringify(j.reds)
+  );
+});
+
 test('矩阵注入不存在的 spec → RED，退出 1，点名该 spec', () => {
   const { dir, file } = tempMatrix(m => {
     m.chains['sale-to-cash'].specs.push('frontend/e2e/flow/不存在自证.spec.ts');

@@ -9,7 +9,7 @@
 //       CI 按退出码判负，报告正文供 step summary 采信，不回调任何服务。
 // 存什么：默认不写仓内文件；仅 --specs-out 明确指定时写清单，正向对照夹具只在内存构造。
 // 存哪里：无持久化；唯一读源是 frontend/scripts/e2e-linkage-matrix.json。
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +34,39 @@ function orderChains(ids) {
     return i === -1 ? CHAIN_ORDER.length : i;
   };
   return [...ids].sort((a, b) => rank(a) - rank(b));
+}
+
+// 规则命中真实性：modules[].match 拼错时矩阵结构照样合法、却永不触发，是静默假绿。
+// 只扫判定相关的四棵源树并剪掉依赖产物，避免 CI 安装 node_modules 后遍历爆炸。
+function repoFileList(diskRoot) {
+  const out = [];
+  const skip = new Set([
+    'node_modules',
+    '.git',
+    'dist',
+    'coverage',
+    'test-results',
+    'playwright-report',
+  ]);
+  const walk = dir => {
+    let ents;
+    try {
+      ents = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of ents) {
+      if (e.isDirectory()) {
+        if (!skip.has(e.name)) walk(path.join(dir, e.name));
+      } else {
+        out.push(path.relative(diskRoot, path.join(dir, e.name)).split(path.sep).join('/'));
+      }
+    }
+  };
+  for (const sub of ['backend/src', 'frontend/src', 'frontend/e2e', 'frontend/scripts']) {
+    walk(path.join(diskRoot, sub));
+  }
+  return out;
 }
 
 // 完整性判定：矩阵结构损坏意味着"该跑的联动用例"无从谈起，必须 fail-closed。
@@ -75,6 +108,14 @@ function integrity(matrix, diskRoot) {
       if (!Object.prototype.hasOwnProperty.call(matrix.chains, id)) {
         reds.push(`模块规则 ${rule.match} 引用未定义链路：${id}`);
       }
+    }
+  }
+  // 规则命中真实性：match 拼错时矩阵结构照样合法、却永不触发，属静默假绿，fail-closed 判红。
+  const repoFiles = repoFileList(diskRoot);
+  for (const rule of matrix.modules) {
+    if (!rule || typeof rule.match !== 'string') continue;
+    if (!repoFiles.some(f => f.includes(rule.match))) {
+      reds.push(`模块规则 ${rule.match} 在当前仓库零命中（路径拼错或模块已下线），须修正矩阵`);
     }
   }
   return reds;
