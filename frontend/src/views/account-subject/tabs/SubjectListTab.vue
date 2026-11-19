@@ -4,10 +4,10 @@
   拆分日期：2026-06-15 B3-2
 -->
 <template>
-  <div class="subject-list-tab">
+  <div class="subject-list-tab" :class="{ 'subject-list-tab--phone': isPhone }">
     <div class="page-header">
       <h2 class="page-title">{{ $t('accountSubject.title') }}</h2>
-      <div>
+      <div class="subject-header-actions">
         <el-button type="primary" @click="openDialog()">
           <el-icon><Plus /></el-icon>{{ $t('accountSubject.create') }}
         </el-button>
@@ -19,7 +19,8 @@
     </div>
     <el-card shadow="hover" class="filter-card">
       <el-form
-        :inline="true"
+        :inline="!isPhone"
+        :label-position="isPhone ? 'top' : 'right'"
         :model="queryForm"
         :aria-label="$t('accountSubject.filter.ariaLabel')"
       >
@@ -54,6 +55,9 @@
         row-key="id"
         default-expand-all
         :tree-props="{ children: 'children' }"
+        :role="isPhone ? 'region' : undefined"
+        :scrollbar-tabindex="isPhone ? 0 : undefined"
+        :scrollbar-always-on="isPhone"
         :aria-label="$t('accountSubject.table.ariaLabel')"
       >
         <el-table-column prop="code" :label="$t('accountSubject.table.code')" width="120" />
@@ -100,7 +104,12 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('accountSubject.table.operation')" width="160" fixed="right">
+        <el-table-column
+          :label="$t('accountSubject.table.operation')"
+          width="160"
+          :fixed="isPhone ? false : 'right'"
+          class-name="subject-actions"
+        >
           <template #default="{ row }">
             <!-- 编辑/删除面的权限键按 PUT 与 DELETE /subjects/{id} 的路径段派生为 subjects 资源 -->
             <el-button
@@ -129,7 +138,9 @@
       :title="
         form.id ? $t('accountSubject.dialog.editTitle') : $t('accountSubject.dialog.createTitle')
       "
-      width="500px"
+      :width="isPhone ? 'calc(100vw - 24px)' : '500px'"
+      class="subject-dialog"
+      :class="{ 'subject-dialog--phone': isPhone }"
       :aria-label="
         form.id
           ? $t('accountSubject.dialog.editAriaLabel')
@@ -141,6 +152,7 @@
         :model="form"
         :rules="rules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('accountSubject.dialog.ariaLabel')"
       >
         <el-form-item :label="$t('accountSubject.filter.code')" prop="code">
@@ -154,6 +166,7 @@
             v-model="form.parent_id"
             :data="parentSubjectOptions"
             :props="{ label: 'name', value: 'id' }"
+            :popper-class="isPhone ? 'subject-parent-popper--phone' : undefined"
             :placeholder="$t('accountSubject.dialog.parentPlaceholder')"
             clearable
             check-strictly
@@ -218,8 +231,11 @@ import {
 import { logger } from '@/utils/logger';
 import { exportFromBackend } from '@/utils/export';
 import { PERMISSIONS } from '@/constants/permissions';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const loading = ref(false);
 const submitLoading = ref(false);
@@ -445,3 +461,144 @@ onMounted(() => {
   fetchSubjects();
 });
 </script>
+
+<style scoped>
+.subject-list-tab--phone {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.subject-list-tab--phone .page-header,
+.subject-list-tab--phone .subject-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.subject-list-tab--phone .page-header {
+  align-items: flex-start;
+}
+
+.subject-list-tab--phone .subject-header-actions {
+  width: 100%;
+}
+
+.subject-list-tab--phone .page-title {
+  overflow-wrap: anywhere;
+}
+
+.subject-list-tab--phone :deep(.filter-card .el-form-item),
+.subject-list-tab--phone :deep(.filter-card .el-input),
+.subject-list-tab :deep(.subject-dialog--phone .el-select) {
+  width: 100%;
+  margin-right: 0;
+}
+
+.subject-list-tab--phone :deep(.el-button),
+.subject-list-tab :deep(.subject-dialog--phone .el-button),
+.subject-list-tab :deep(.subject-dialog--phone .el-dialog__headerbtn),
+.subject-list-tab :deep(.subject-dialog--phone .el-radio),
+.subject-list-tab :deep(.subject-dialog--phone .el-switch) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.subject-list-tab--phone :deep(.el-input__wrapper),
+.subject-list-tab :deep(.subject-dialog--phone .el-input__wrapper),
+.subject-list-tab :deep(.subject-dialog--phone .el-select__wrapper) {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.subject-list-tab--phone :deep(.el-form-item__content),
+.subject-list-tab--phone :deep(.subject-actions .cell),
+.subject-list-tab :deep(.subject-dialog--phone .el-radio-group),
+.subject-list-tab :deep(.subject-dialog--phone .el-dialog__footer) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.subject-list-tab--phone :deep(.el-table .cell) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.subject-list-tab--phone :deep(.el-table__expand-icon) {
+  width: 44px;
+  height: 44px;
+  vertical-align: middle;
+}
+
+.subject-list-tab--phone :deep(.el-scrollbar__wrap:focus-visible) {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: -2px;
+}
+
+.subject-list-tab :deep(.subject-dialog) {
+  width: 500px !important;
+}
+
+.subject-list-tab :deep(.subject-dialog--phone) {
+  display: flex;
+  flex-direction: column;
+  width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)) !important;
+  box-sizing: border-box;
+}
+
+.subject-list-tab :deep(.subject-dialog--phone .el-dialog__header),
+.subject-list-tab :deep(.subject-dialog--phone .el-dialog__footer) {
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
+
+.subject-list-tab :deep(.subject-dialog--phone .el-dialog__body) {
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.subject-list-tab :deep(.subject-dialog--phone .el-dialog__footer) {
+  justify-content: flex-end;
+}
+
+.subject-list-tab :deep(.subject-dialog--phone .el-radio) {
+  margin-right: 0;
+}
+
+.subject-list-tab :deep(.subject-dialog--phone .el-radio__label) {
+  white-space: normal;
+}
+
+:global(.subject-parent-popper--phone) {
+  max-width: calc(100vw - 48px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+}
+
+:global(.subject-parent-popper--phone .el-tree-node__content),
+:global(.subject-parent-popper--phone .el-select-dropdown__item) {
+  min-height: 44px;
+  height: auto;
+}
+
+:global(.subject-parent-popper--phone .el-select-dropdown__item) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+}
+</style>

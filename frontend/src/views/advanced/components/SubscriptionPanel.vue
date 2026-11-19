@@ -1,12 +1,78 @@
 <template>
-  <div class="subscription-panel">
+  <div class="subscription-panel" :class="{ 'subscription-panel--phone': isPhone }">
     <el-tabs v-model="innerTab">
       <el-tab-pane label="报表订阅" name="subscriptions">
         <div class="toolbar">
           <el-button type="primary" @click="openCreate">新建订阅</el-button>
           <el-button plain @click="loadSubscriptions">刷新</el-button>
         </div>
-        <el-table v-loading="subLoading" :data="subscriptions" border>
+        <section
+          v-if="isPhone"
+          v-loading="subLoading"
+          class="subscription-mobile subscriptions-mobile"
+        >
+          <ul class="card-list" aria-label="报表订阅列表">
+            <li v-for="row in subscriptions" :key="row.id" class="card-item">
+              <dl class="card-fields">
+                <div>
+                  <dt>ID</dt>
+                  <dd>{{ row.id }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('advancedModule.subscription.name') }}</dt>
+                  <dd>{{ row.name }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('advancedModule.subscription.templateId') }}</dt>
+                  <dd>{{ row.template_id }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('advancedModule.subscription.frequency') }}</dt>
+                  <dd>
+                    <el-tag>{{ scheduleLabel(row.frequency) }}</el-tag>
+                  </dd>
+                </div>
+                <div>
+                  <dt>收件人</dt>
+                  <dd>{{ row.recipients.join('；') || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('advancedModule.subscription.exportFormat') }}</dt>
+                  <dd>{{ row.export_format }}</dd>
+                </div>
+                <div>
+                  <dt>状态</dt>
+                  <dd>
+                    <el-tag :type="row.is_enabled ? 'success' : 'info'">
+                      {{
+                        row.is_enabled
+                          ? t('common.enable')
+                          : t('advancedModule.subscription.inactive')
+                      }}
+                    </el-tag>
+                  </dd>
+                </div>
+                <div>
+                  <dt>{{ t('advancedModule.subscription.lastRunAt') }}</dt>
+                  <dd>{{ row.last_run_at || '-' }}</dd>
+                </div>
+              </dl>
+              <div class="card-actions">
+                <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+                <el-button link @click="handleToggle(row)">{{
+                  row.is_enabled ? t('advancedModule.subscription.inactive') : t('common.enable')
+                }}</el-button>
+                <el-button link type="success" @click="handleSendNow(row)">立即发送</el-button>
+                <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+              </div>
+            </li>
+          </ul>
+          <el-empty
+            v-if="!subLoading && subscriptions.length === 0"
+            :description="t('components.v2Table.empty')"
+          />
+        </section>
+        <el-table v-else v-loading="subLoading" :data="subscriptions" border>
           <el-table-column prop="id" label="ID" width="70" />
           <el-table-column
             prop="name"
@@ -82,14 +148,40 @@
               查询字段
             </el-button>
           </div>
-          <el-table v-if="fields.length" :data="fields" border size="small">
-            <el-table-column prop="key" label="字段键" min-width="140" />
-            <el-table-column prop="label" label="名称" min-width="140" />
-            <el-table-column prop="type" label="类型" width="100" />
-            <el-table-column label="可排序" width="90">
-              <template #default="{ row }">{{ row.sortable ? '是' : '否' }}</template>
-            </el-table-column>
-          </el-table>
+          <template v-if="fields.length">
+            <section v-if="isPhone" class="subscription-mobile fields-mobile">
+              <ul class="card-list" aria-label="可用字段列表">
+                <li v-for="(row, index) in fields" :key="row.key + '-' + index" class="card-item">
+                  <dl class="card-fields">
+                    <div>
+                      <dt>字段键</dt>
+                      <dd>{{ row.key }}</dd>
+                    </div>
+                    <div>
+                      <dt>名称</dt>
+                      <dd>{{ row.label }}</dd>
+                    </div>
+                    <div>
+                      <dt>类型</dt>
+                      <dd>{{ row.type }}</dd>
+                    </div>
+                    <div>
+                      <dt>可排序</dt>
+                      <dd>{{ row.sortable ? '是' : '否' }}</dd>
+                    </div>
+                  </dl>
+                </li>
+              </ul>
+            </section>
+            <el-table v-else :data="fields" border size="small">
+              <el-table-column prop="key" label="字段键" min-width="140" />
+              <el-table-column prop="label" label="名称" min-width="140" />
+              <el-table-column prop="type" label="类型" width="100" />
+              <el-table-column label="可排序" width="90">
+                <template #default="{ row }">{{ row.sortable ? '是' : '否' }}</template>
+              </el-table-column>
+            </el-table>
+          </template>
         </div>
 
         <div class="section-block">
@@ -101,7 +193,23 @@
             </el-button>
           </div>
           <template v-if="previewResult">
-            <el-table :data="previewRows" border size="small" max-height="360">
+            <section v-if="isPhone" class="subscription-mobile preview-mobile">
+              <ul class="card-list" aria-label="增强报表预览">
+                <li v-for="(row, rowIndex) in previewRows" :key="rowIndex" class="card-item">
+                  <dl class="card-fields">
+                    <div v-for="(col, colIndex) in previewColumns" :key="col">
+                      <dt>{{ col }}</dt>
+                      <dd>{{ row[colIndex] }}</dd>
+                    </div>
+                  </dl>
+                </li>
+              </ul>
+              <el-empty
+                v-if="previewRows.length === 0"
+                :description="t('components.v2Table.empty')"
+              />
+            </section>
+            <el-table v-else :data="previewRows" border size="small" max-height="360">
               <!-- data 每行是按列序的字符串数组，非以列名为键的对象，故按位置索引渲染 -->
               <el-table-column
                 v-for="(col, idx) in previewColumns"
@@ -119,8 +227,12 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="subDialogVisible" :title="editingId ? '编辑订阅' : '新建订阅'" width="520">
-      <el-form :model="subForm" label-width="100px">
+    <el-dialog
+      v-model="subDialogVisible"
+      :title="editingId ? '编辑订阅' : '新建订阅'"
+      :width="isPhone ? 'calc(100vw - 24px)' : '520'"
+    >
+      <el-form :model="subForm" label-width="100px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item :label="t('advancedModule.subscription.name')" required>
           <el-input
             v-model="subForm.name"
@@ -174,6 +286,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, onMounted } from 'vue';
 import NumericInput from '@/components/NumericInput.vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
@@ -193,6 +306,8 @@ import {
 } from '@/api/report-enhanced';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const innerTab = ref('subscriptions');
 
 // ===== 订阅管理 =====
@@ -402,6 +517,66 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.subscription-panel {
+  min-width: 0;
+  max-width: 100%;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+.subscription-panel--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  white-space: normal;
+}
+.subscription-panel--phone :deep(.el-select__wrapper),
+.subscription-panel--phone :deep(.el-input__wrapper) {
+  min-height: 44px;
+}
 .toolbar {
   display: flex;
   gap: 8px;

@@ -508,8 +508,8 @@ test.describe.serial('P0 数据持久性：全字段填写→创建→回读→�
     expect(detail?.items?.length ?? 0, '详情应有 1 条明细').toBe(1);
     // 明细字段比对
     const item = detail?.items?.[0] as Record<string, unknown>;
-    expect(item?.quantity, '明细 quantity 应为 10').toBeTruthy();
-    expect(item?.unit_price, '明细 unit_price 应为 5').toBeTruthy();
+    expect(Number(item?.quantity), '明细 quantity 应为 10').toBe(10);
+    expect(Number(item?.unit_price), '明细 unit_price 应为 5').toBe(5);
     expect(item?.color_no, '明细 color_no 应为 P0-COLOR').toBe('P0-COLOR');
     console.log('[P0-销售订单] ✅ 全字段创建→详情二次访问+明细字段比对全通过');
   });
@@ -738,7 +738,7 @@ test.describe.serial('P0 数据持久性：全字段填写→创建→回读→�
     expect(detail?.items?.length ?? 0, '报价单应有 1 条明细').toBe(1);
     const item = detail?.items?.[0] as Record<string, unknown>;
     expect(item?.unit, '明细 unit 应为 米').toBe('米');
-    expect(item?.quantity, '明细 quantity 应为 100').toBeTruthy();
+    expect(Number(item?.quantity), '明细 quantity 应为 100').toBe(100);
     console.log('[P0-报价单] ✅ 全字段创建→详情二次访问+明细字段比对全通过');
   });
 });

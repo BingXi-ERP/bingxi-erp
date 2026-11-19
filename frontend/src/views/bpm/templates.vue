@@ -1,5 +1,5 @@
 <template>
-  <div class="bpm-templates-page">
+  <div class="bpm-templates-page" :class="{ 'bpm-templates-page--phone': isPhone }">
     <div class="page-header">
       <div class="header-left">
         <h1 class="page-title">{{ $t('bpm.templates.title') }}</h1>
@@ -17,7 +17,7 @@
          无 category（模板业务分类与 usage_count 统计为后端缺口，已登记串行清单；
          且模板行 category 恒为后端内部哨兵值 __TEMPLATE__，按其过滤/展示均无业务意义） -->
 
-    <el-row v-loading="loading" :gutter="20">
+    <el-row v-if="!isPhone" v-loading="loading" :gutter="20">
       <el-col
         v-for="template in templates"
         :key="template.id"
@@ -71,15 +71,63 @@
       </el-col>
     </el-row>
 
+    <section v-else v-loading="loading" class="bpm-templates-mobile">
+      <ul
+        v-if="templates.length"
+        class="card-list"
+        :aria-label="$t('bpm.templates.detailDialog.descriptionsAriaLabel')"
+      >
+        <li v-for="template in templates" :key="template.id" class="card-item">
+          <dl class="card-fields">
+            <div class="field-emphasis">
+              <dt>{{ $t('bpm.templates.detailDialog.templateName') }}</dt>
+              <dd>{{ template.process_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ $t('bpm.templates.detailDialog.templateKey') }}</dt>
+              <dd>{{ template.code }}</dd>
+            </div>
+            <div>
+              <dt>{{ $t('bpm.definitions.table.version') }}</dt>
+              <dd>v{{ template.version || '1' }}</dd>
+            </div>
+            <div>
+              <dt>{{ $t('bpm.templates.detailDialog.createdAt') }}</dt>
+              <dd>{{ template.created_at }}</dd>
+            </div>
+            <div class="field-emphasis">
+              <dt>{{ $t('bpm.templates.detailDialog.description') }}</dt>
+              <dd>{{ template.description || $t('bpm.templates.card.noDescription') }}</dd>
+            </div>
+          </dl>
+          <div class="card-actions">
+            <el-button size="small" @click="handleViewDetail(template)">{{
+              $t('bpm.templates.card.viewDetail')
+            }}</el-button>
+            <el-button type="primary" size="small" @click="handleCreateFromTemplate(template)">{{
+              $t('bpm.templates.card.createFromTemplate')
+            }}</el-button>
+            <el-button type="danger" size="small" @click="handleDeleteTemplate(template)">{{
+              $t('bpm.templates.card.deleteTemplate')
+            }}</el-button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
     <el-empty v-if="!loading && templates.length === 0" :description="$t('bpm.templates.empty')" />
 
-    <div v-if="total > 0" class="pagination-wrapper">
+    <div
+      v-if="total > 0"
+      class="pagination-wrapper"
+      :class="{ 'pagination-wrapper--phone': isPhone }"
+    >
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
         :total="total"
         :page-sizes="[8, 16, 32]"
-        layout="total, sizes, prev, pager, next"
+        :layout="isPhone ? 'total, sizes, prev, next' : 'total, sizes, prev, pager, next'"
         :aria-label="$t('bpm.templates.paginationAriaLabel')"
         @size-change="handleSizeChange"
         @current-change="handlePageChange"
@@ -89,15 +137,17 @@
     <el-dialog
       v-model="detailDialogVisible"
       :title="$t('bpm.templates.detailDialog.title')"
-      width="700px"
+      :width="isPhone ? phoneDialogWidth : '700px'"
       destroy-on-close
+      class="bpm-template-detail-dialog"
+      :class="{ 'bpm-template-detail-dialog--phone': isPhone }"
       :aria-label="$t('bpm.templates.detailDialog.ariaLabel')"
     >
       <div v-if="currentTemplate" class="template-detail">
         <!-- 模板行= bpm_process_definition（process_name/code/version/description/nodes），
              后端不返回 template_name/template_key/usage_count（恒 undefined，已按真实键改写） -->
         <el-descriptions
-          :column="2"
+          :column="isPhone ? 1 : 2"
           border
           :aria-label="$t('bpm.templates.detailDialog.descriptionsAriaLabel')"
         >
@@ -116,42 +166,44 @@
         </el-descriptions>
         <div v-if="currentTemplate.nodes && currentTemplate.nodes.length" class="process-preview">
           <h4>{{ $t('bpm.templates.detailDialog.nodePreview') }}</h4>
-          <el-table
-            :data="currentTemplate.nodes"
-            size="small"
-            style="margin-top: 12px"
-            :aria-label="$t('bpm.templates.detailDialog.nodePreviewAriaLabel')"
-          >
-            <el-table-column
-              prop="type"
-              :label="$t('bpm.templates.detailDialog.nodeType')"
-              width="120"
+          <div class="node-preview-scroll">
+            <el-table
+              :data="currentTemplate.nodes"
+              size="small"
+              style="margin-top: 12px"
+              :aria-label="$t('bpm.templates.detailDialog.nodePreviewAriaLabel')"
             >
-              <template #default="{ row }">
-                <el-tag size="small">{{ getNodeTypeName(row.type) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="name"
-              :label="$t('bpm.templates.detailDialog.nodeName')"
-              min-width="150"
-            />
-            <el-table-column
-              prop="assignee_type"
-              :label="$t('bpm.templates.detailDialog.assigneeType')"
-              width="120"
-            >
-              <template #default="{ row }">
-                <span v-if="row.assignee_type">{{ getAssigneeTypeText(row.assignee_type) }}</span>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="assignee_value"
-              :label="$t('bpm.templates.detailDialog.assigneeValue')"
-              min-width="120"
-            />
-          </el-table>
+              <el-table-column
+                prop="type"
+                :label="$t('bpm.templates.detailDialog.nodeType')"
+                width="120"
+              >
+                <template #default="{ row }">
+                  <el-tag size="small">{{ getNodeTypeName(row.type) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column
+                prop="name"
+                :label="$t('bpm.templates.detailDialog.nodeName')"
+                min-width="150"
+              />
+              <el-table-column
+                prop="assignee_type"
+                :label="$t('bpm.templates.detailDialog.assigneeType')"
+                width="120"
+              >
+                <template #default="{ row }">
+                  <span v-if="row.assignee_type">{{ getAssigneeTypeText(row.assignee_type) }}</span>
+                  <span v-else>-</span>
+                </template>
+              </el-table-column>
+              <el-table-column
+                prop="assignee_value"
+                :label="$t('bpm.templates.detailDialog.assigneeValue')"
+                min-width="120"
+              />
+            </el-table>
+          </div>
         </div>
       </div>
       <template #footer>
@@ -167,13 +219,16 @@
     <el-dialog
       v-model="createDialogVisible"
       :title="$t('bpm.templates.createDialog.title')"
-      width="500px"
+      :width="isPhone ? phoneDialogWidth : '500px'"
       destroy-on-close
+      class="bpm-template-create-dialog"
+      :class="{ 'bpm-template-create-dialog--phone': isPhone }"
       :aria-label="$t('bpm.templates.createDialog.ariaLabel')"
     >
       <el-form
         :model="createForm"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('bpm.templates.createDialog.formAriaLabel')"
       >
         <el-form-item :label="$t('bpm.templates.createDialog.templateName')">
@@ -208,7 +263,7 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { MoreFilled, Document } from '@element-plus/icons-vue';
@@ -217,8 +272,14 @@ import { createBpmFromTemplate, deleteBpmTemplate, getBpmTemplateById } from '@/
 import type { ProcessTemplate, CreateProcessDefinitionPayload } from '@/api/bpm-enhanced';
 import { logger, logAuxLoadFailure } from '@/utils/logger';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
+
+const phoneDialogWidth =
+  'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const submitLoading = ref(false);
 const currentTemplate = ref<ProcessTemplate | null>(null);
@@ -359,6 +420,9 @@ const handleDeleteTemplate = async (row: ProcessTemplate) => {
   background-color: #f5f7fa;
   min-height: 100%;
 }
+.bpm-templates-page--phone {
+  padding: 12px;
+}
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -470,6 +534,64 @@ const handleDeleteTemplate = async (row: ProcessTemplate) => {
   justify-content: flex-end;
   margin-top: 20px;
 }
+.pagination-wrapper--phone :deep(.el-pagination button) {
+  min-height: 44px;
+  min-width: 44px;
+}
+.card-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.field-emphasis {
+  grid-column: 1 / -1;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
 .template-detail {
   padding: 8px 0;
 }
@@ -481,5 +603,34 @@ const handleDeleteTemplate = async (row: ProcessTemplate) => {
   font-weight: 600;
   color: #303133;
   margin: 0 0 8px 0;
+}
+.node-preview-scroll {
+  overflow-x: auto;
+}
+.bpm-templates-page :deep(.bpm-template-detail-dialog--phone),
+.bpm-templates-page :deep(.bpm-template-create-dialog--phone) {
+  display: flex;
+  flex-direction: column;
+  width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)) !important;
+  box-sizing: border-box;
+}
+.bpm-templates-page :deep(.bpm-template-detail-dialog--phone .el-dialog__body),
+.bpm-templates-page :deep(.bpm-template-create-dialog--phone .el-dialog__body) {
+  min-height: 0;
+  overflow-y: auto;
+}
+.bpm-templates-page :deep(.bpm-template-detail-dialog--phone .el-descriptions__label) {
+  display: block;
+  text-align: left;
 }
 </style>
