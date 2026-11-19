@@ -11,7 +11,7 @@
   <el-dialog
     :model-value="visible"
     :title="t('sales.convert.title')"
-    width="960px"
+    :width="isPhone ? '95%' : '960px'"
     :close-on-click-modal="false"
     :aria-label="t('sales.convert.title')"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
@@ -38,6 +38,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('sales.convert.ariaForm')"
       >
         <el-row :gutter="20">
@@ -219,6 +220,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
@@ -241,6 +243,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const router = useRouter();
 
 const loading = ref(false);
