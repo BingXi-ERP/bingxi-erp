@@ -181,6 +181,7 @@ test.describe('517 客户信用评分模型', () => {
         decimalNumber(before.credit_limit, '评估前信用额度')
       );
       expect(after.status, '[517] 评估后状态不变').toBe(before.status);
+      expect(after, '[517] 评估不得写入信用行').toEqual(before);
     } finally {
       if (creditCreated) {
         await tryCleanup(
