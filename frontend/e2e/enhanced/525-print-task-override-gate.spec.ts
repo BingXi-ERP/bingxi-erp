@@ -72,7 +72,7 @@ async function createOrder(page: Page): Promise<number> {
   const ctx = getCtx();
   expect(
     typeof ctx.customerId === 'number' && ctx.productIds.length > 0,
-    '[524] 夹具须有客户与产品主键，无法自建销售订单'
+    '[525] 夹具须有客户与产品主键，无法自建销售订单'
   ).toBe(true);
   const created = await apiCallRaw<{ id?: number }>(page, 'POST', '/sales/orders', {
     customer_id: ctx.customerId,
@@ -82,13 +82,13 @@ async function createOrder(page: Page): Promise<number> {
   const id = Number(created?.id);
   expect(
     Number.isInteger(id) && id > 0,
-    `[524] 销售订单须回真实主键，实际 ${JSON.stringify(created)}`
+    `[525] 销售订单须回真实主键，实际 ${JSON.stringify(created)}`
   ).toBe(true);
   return id;
 }
 
 async function createTargetAndTemplate(page: Page, tag: string): Promise<string> {
-  const targetCode = genCode(`E524PRN${tag}`);
+  const targetCode = genCode(`E525PRN${tag}`);
   const target = await apiCallRaw<{ id?: number }>(page, 'POST', '/print-targets', {
     target_code: targetCode,
     display_name: `e2e打印目标${targetCode}`,
@@ -98,9 +98,9 @@ async function createTargetAndTemplate(page: Page, tag: string): Promise<string>
     enabled: true,
   });
   targetId = Number(target?.id);
-  expect(Number.isInteger(targetId) && targetId > 0, '[524] 打印目标须回真实主键').toBe(true);
+  expect(Number.isInteger(targetId) && targetId > 0, '[525] 打印目标须回真实主键').toBe(true);
 
-  const templateCode = genCode(`E524TPL${tag}`);
+  const templateCode = genCode(`E525TPL${tag}`);
   const template = await apiCallRaw<{ id?: number; default_target_name?: string }>(
     page,
     'POST',
@@ -119,8 +119,8 @@ async function createTargetAndTemplate(page: Page, tag: string): Promise<string>
     }
   );
   templateId = Number(template?.id);
-  expect(Number.isInteger(templateId) && templateId > 0, '[524] 打印模板须回真实主键').toBe(true);
-  expect(String(template?.default_target_name), '[524] 模板须回显本例专属缺省目标').toBe(
+  expect(Number.isInteger(templateId) && templateId > 0, '[525] 打印模板须回真实主键').toBe(true);
+  expect(String(template?.default_target_name), '[525] 模板须回显本例专属缺省目标').toBe(
     targetCode
   );
   return targetCode;
@@ -135,11 +135,11 @@ async function submitTask(
   const id = Number(created?.id);
   expect(
     Number.isInteger(id) && id > 0,
-    `[524] ${reason} 须受理并回主键，实际 ${JSON.stringify(created)}`
+    `[525] ${reason} 须受理并回主键，实际 ${JSON.stringify(created)}`
   ).toBe(true);
   expect(
     typeof created?.job_code === 'string' && created.job_code.length > 0,
-    `[524] ${reason} 须回非空任务号，实际 ${JSON.stringify(created)}`
+    `[525] ${reason} 须回非空任务号，实际 ${JSON.stringify(created)}`
   ).toBe(true);
   return id;
 }
@@ -151,22 +151,22 @@ async function readTask(
   reason: string
 ): Promise<PrintTaskRecord> {
   const row = await apiCallRaw<PrintTaskRecord>(page, 'GET', `${PATH}/${id}`);
-  expect(Number(row?.id), `[524] ${reason} 详情 id 应为 ${id}`).toBe(id);
-  expect(Number(row?.doc_id), `[524] ${reason} 详情须指向自建订单`).toBe(orderId);
-  expect(Number(row?.template_id), `[524] ${reason} 详情须指向自建模板`).toBe(templateId);
-  expect(String(row?.target_name), `[524] ${reason} 详情须指向自建目标`).toBe(targetCode);
+  expect(Number(row?.id), `[525] ${reason} 详情 id 应为 ${id}`).toBe(id);
+  expect(Number(row?.doc_id), `[525] ${reason} 详情须指向自建订单`).toBe(orderId);
+  expect(Number(row?.template_id), `[525] ${reason} 详情须指向自建模板`).toBe(templateId);
+  expect(String(row?.target_name), `[525] ${reason} 详情须指向自建目标`).toBe(targetCode);
   return row;
 }
 
 function expectOverrides(row: PrintTaskRecord, want: OverrideValues, reason: string): void {
-  expect(String(row.orientation), `[524] ${reason} orientation 须原样落库`).toBe(want.orientation);
-  expect(Number(row.copies), `[524] ${reason} copies 须原样落库`).toBe(want.copies);
-  expect(Number(row.margin_top_mm), `[524] ${reason} 上边距须原样落库`).toBe(want.margin_top_mm);
-  expect(Number(row.margin_bottom_mm), `[524] ${reason} 下边距须原样落库`).toBe(
+  expect(String(row.orientation), `[525] ${reason} orientation 须原样落库`).toBe(want.orientation);
+  expect(Number(row.copies), `[525] ${reason} copies 须原样落库`).toBe(want.copies);
+  expect(Number(row.margin_top_mm), `[525] ${reason} 上边距须原样落库`).toBe(want.margin_top_mm);
+  expect(Number(row.margin_bottom_mm), `[525] ${reason} 下边距须原样落库`).toBe(
     want.margin_bottom_mm
   );
-  expect(Number(row.margin_left_mm), `[524] ${reason} 左边距须原样落库`).toBe(want.margin_left_mm);
-  expect(Number(row.margin_right_mm), `[524] ${reason} 右边距须原样落库`).toBe(
+  expect(Number(row.margin_left_mm), `[525] ${reason} 左边距须原样落库`).toBe(want.margin_left_mm);
+  expect(Number(row.margin_right_mm), `[525] ${reason} 右边距须原样落库`).toBe(
     want.margin_right_mm
   );
 }
@@ -178,24 +178,24 @@ async function expectRejected(
   reason: string
 ): Promise<void> {
   const rejected = await apiCallExpectFail(page, 'POST', PATH, { ...baseline, ...overrides });
-  expect(rejected.status, `[524] ${reason} 须 400，实际 ${rejected.status}`).toBe(400);
+  expect(rejected.status, `[525] ${reason} 须 400，实际 ${rejected.status}`).toBe(400);
   expect(
     failureCode(rejected),
-    `[524] ${reason} 机器码须 BAD_REQUEST，实际 ${String(failureCode(rejected))}`
+    `[525] ${reason} 机器码须 BAD_REQUEST，实际 ${String(failureCode(rejected))}`
   ).toBe(APP_ERROR_CODES.BAD_REQUEST);
-  expect(String(rejected.message), `[524] ${reason} 须脱敏，实际 ${String(rejected.message)}`).toBe(
+  expect(String(rejected.message), `[525] ${reason} 须脱敏，实际 ${String(rejected.message)}`).toBe(
     MASKED_BAD_REQUEST
   );
 }
 
-test.describe('524 打印任务覆盖参数门', () => {
+test.describe('525 打印任务覆盖参数门', () => {
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
   });
 
-  test('524-01 方向与份数四边距边界内逐字段回读，越界全部前置拒绝', async ({ page }) => {
+  test('525-01 方向与份数四边距边界内逐字段回读，越界全部前置拒绝', async ({ page }) => {
     orderId = await createOrder(page);
-    const targetCode = await createTargetAndTemplate(page, genCode('E524'));
+    const targetCode = await createTargetAndTemplate(page, genCode('E525'));
     const baseline = {
       doc_type: 'sales_order',
       doc_id: orderId,
