@@ -14,6 +14,7 @@
 // 检测力：上限写成 201 则 201 字被误放即红；写成 199 则 200 字被误拒即红；
 //   200 字入库被截断则回读 length 不足即红。
 import { test, expect, type Page } from '../diagnose-fixture';
+import { PRODUCT_TYPE } from '../../src/constants/product-type';
 import {
   loginViaUI,
   apiCall,
@@ -29,8 +30,6 @@ interface ProductRow {
   name?: string;
   code?: string;
 }
-
-const PRODUCT_TYPE_AUXILIARY = 'auxiliary';
 
 function pad(prefix: string, ch: string, len: number): string {
   const head = `${prefix}`;
@@ -60,7 +59,7 @@ test('449-01 产品名 200 字放行并逐字回读，201 字被拒且零落库'
     name: okName,
     category_id: categoryId,
     unit: '米',
-    product_type: PRODUCT_TYPE_AUXILIARY,
+    product_type: PRODUCT_TYPE.auxiliary,
   });
   const id = Number(ok.data?.id);
   expect(id, '[449] 产品名恰好 200 字须放行建档').toBeGreaterThan(0);
@@ -79,7 +78,7 @@ test('449-01 产品名 200 字放行并逐字回读，201 字被拒且零落库'
     name: overName,
     category_id: categoryId,
     unit: '米',
-    product_type: PRODUCT_TYPE_AUXILIARY,
+    product_type: PRODUCT_TYPE.auxiliary,
   });
   expectStateGateRejection(rejected, '产品名 201 字建档');
   expect(
