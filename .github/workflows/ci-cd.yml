@@ -3417,7 +3417,7 @@ jobs:
               36) SPEC_TARGETS="e2e/enhanced/ e2e/production/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               37) SPEC_TARGETS="e2e/bpm/ e2e/fabric/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               38) SPEC_TARGETS="e2e/ai/ e2e/quotations/ e2e/system/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
-              39) SPEC_TARGETS="e2e/dashboard/ e2e/color-card.spec.ts e2e/color-price.spec.ts e2e/custom-order.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
+              39) SPEC_TARGETS="e2e/dashboard/ e2e/factory/ e2e/miniprogram/ e2e/color-card.spec.ts e2e/color-price.spec.ts e2e/custom-order.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               # fullflow（96 条契约链用例，此前从未被任何分片传入，任务 #306 静默丢覆盖）。
               # 原 2 片 hash 分片实测一片只跑 6 个轻文件共 1.3 分钟，另一片挤进 10 个
               # 重链路文件共 28.5 分钟。hash 按文件散列分配，无法保证时长配平，改为按
