@@ -215,7 +215,7 @@ test.describe.serial('117 报表增强模板生命周期真值链', () => {
       sort_order: 'desc',
       refresh_strategy: 'DAILY',
       cache_ttl_seconds: 3600,
-      supported_formats: ['pdf', 'xlsx'],
+      supported_formats: ['docx', 'xlsx'],
     });
     const templateId = num(created.id);
     expect(
@@ -257,7 +257,7 @@ test.describe.serial('117 报表增强模板生命周期真值链', () => {
     expect(
       (detail.supported_formats as string[]).slice().sort().join(','),
       'supported_formats 必须回读提交的两枚格式'
-    ).toBe('pdf,xlsx');
+    ).toBe('docx,xlsx');
 
     // 主键不存在：详情 404 + NOT_FOUND 机器码
     const missing = await apiCallExpectFail(page, 'GET', '/reports/enhanced/templates/99999999');

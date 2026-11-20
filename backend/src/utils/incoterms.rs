@@ -143,7 +143,7 @@ impl Incoterms2020 {
         }
     }
 
-    /// 风险转移点描述（用于报价单 PDF 显示，明确买卖双方风险划分点）
+    /// 风险转移点描述（用于报价单文档显示，明确买卖双方风险划分点）
     pub fn risk_transfer_point(&self) -> &'static str {
         match self {
             Incoterms2020::Exw => "卖方工厂（买方提货后风险归买方）",

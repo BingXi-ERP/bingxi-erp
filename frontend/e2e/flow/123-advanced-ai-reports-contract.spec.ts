@@ -16,7 +16,7 @@ import { APP_ERROR_CODES, apiCallRaw, apiCall, apiCallExpectFail } from './helpe
  *   get_template 的 not_found（services/report/tpl 附近）→ 404 + NOT_FOUND；
  *   已知 sales_summary 返回 columns（{key,label} 数组）、data 行数组与 total_count。
  * - POST /advanced/reports/export：format 经白名单校验
- *   （csv/excel/xlsx/pdf/json，非法值在取数之前即被拒 → 400 VALIDATION_ERROR，
+ *   （xlsx/docx，非法值在取数之前即被拒 → 400 VALIDATION_ERROR，
  *   白名单外的值不再静默回落成 json）；
  *   csv 出参 data.status/format/size_bytes/record_count（format 回显请求值）。
  * - POST /advanced/ai/recommendations（rec，OptionalJson）：缺体回落

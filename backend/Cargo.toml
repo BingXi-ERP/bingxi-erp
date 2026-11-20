@@ -86,9 +86,6 @@ zip = "2.2"
 # 时间类型（axum-extra Cookie::max_age 需要 time::Duration，axum-extra 不 re-export）
 time = { version = "0.3", features = ["macros"] }
 
-# PDF 生成
-printpdf = "0.7"
-
 # 监控
 prometheus = "0.13"
 # 系统信息（健康检查的内存/磁盘/uptime 真实数据）

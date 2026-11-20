@@ -257,10 +257,10 @@
           <ElInput v-model="createForm.estimatedRowsText" clearable />
         </ElFormItem>
         <ElFormItem :label="$t('exportApprovals.fileFormatLabel')">
-          <!-- 后端 create 校验 file_format 仅接受 xlsx/pdf（export_approval_service） -->
+          <!-- 后端 create 校验 file_format 仅接受 xlsx/docx（export_approval_service） -->
           <ElSelect v-model="createForm.file_format" style="width: 100%">
             <ElOption label="xlsx" value="xlsx" />
-            <ElOption label="pdf" value="pdf" />
+            <ElOption label="docx" value="docx" />
           </ElSelect>
         </ElFormItem>
       </ElForm>

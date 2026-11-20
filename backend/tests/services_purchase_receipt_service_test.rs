@@ -51,7 +51,7 @@ fn sample_request() -> CreatePurchaseReceiptRequest {
         department_id: Some(1),
         inspector_id: Some(10),
         notes: Some("测试入库单".to_string()),
-        attachment_urls: Some(vec!["file://test.pdf".to_string()]),
+        attachment_urls: Some(vec!["file://test.png".to_string()]),
         items: vec![sample_item()],
     }
 }

@@ -123,7 +123,7 @@ test.describe.serial('104 出口商检建单与结论登记读回', () => {
       `/export-inspections/${created.id}/result`,
       {
         result: 'pass',
-        report_url: `/reports/e2e-${tag}.pdf`,
+        report_url: `/reports/e2e-${tag}.xlsx`,
         certificate_no: `CERT-${tag}`,
         certificate_expiry: '2027-03-31',
       }
@@ -140,7 +140,7 @@ test.describe.serial('104 出口商检建单与结论登记读回', () => {
       readBack.certificate_expiry,
       `证书到期日应读回提交值，实际：${String(readBack.certificate_expiry)}`
     ).toBe('2027-03-31');
-    expect(readBack.report_url).toBe(`/reports/e2e-${tag}.pdf`);
+    expect(readBack.report_url).toBe(`/reports/e2e-${tag}.xlsx`);
 
     // 改判为 fail 且只提交 result：整行覆盖语义下未提交的可选列应被落 NULL，不是保留旧值。
     await apiCall(page, 'PUT', `/export-inspections/${created.id}/result`, { result: 'fail' });

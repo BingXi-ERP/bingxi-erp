@@ -1,4 +1,4 @@
-# layers=8 endpoints=1823
+# layers=8 endpoints=1831
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -160,6 +160,7 @@ GET	/api/v1/erp/alerts	login_security_handler::get_security_alerts	analytics
 GET	/api/v1/erp/ap/invoices	ap_invoice_handler::list_ap_invoices	finance
 GET	/api/v1/erp/ap/invoices/*	ap_invoice_handler::get_ap_invoice	finance
 GET	/api/v1/erp/ap/invoices/*/print	print_handler::ap_invoice_print_docx	finance
+GET	/api/v1/erp/ap/invoices/*/print-xlsx	print_xlsx_finance_handler::ap_invoice_print_xlsx	finance
 GET	/api/v1/erp/ap/invoices/*/relations	ap_reconciliation_handler::get_invoice_relations	finance
 GET	/api/v1/erp/ap/invoices/aging	ap_invoice_handler::get_aging_analysis	finance
 GET	/api/v1/erp/ap/invoices/balance	ap_invoice_handler::get_balance_summary	finance
@@ -168,14 +169,17 @@ GET	/api/v1/erp/ap/invoices/statistics	ap_invoice_handler::get_statistics	financ
 GET	/api/v1/erp/ap/payment-requests	ap_payment_request_handler::list_requests	finance
 GET	/api/v1/erp/ap/payment-requests/*	ap_payment_request_handler::get_request	finance
 GET	/api/v1/erp/ap/payment-requests/*/print	print_handler::ap_payment_request_print_docx	finance
+GET	/api/v1/erp/ap/payment-requests/*/print-xlsx	print_xlsx_finance_handler::ap_payment_request_print_xlsx	finance
 GET	/api/v1/erp/ap/payment-requests/payment-methods	crate::handlers::payment_channel_handler::list_payment_channel_options	finance
 GET	/api/v1/erp/ap/payments	ap_payment_handler::list_payments	finance
 GET	/api/v1/erp/ap/payments/*	ap_payment_handler::get_payment	finance
 GET	/api/v1/erp/ap/payments/*/print	print_handler::ap_payment_print_docx	finance
+GET	/api/v1/erp/ap/payments/*/print-xlsx	print_xlsx_finance_handler::ap_payment_print_xlsx	finance
 GET	/api/v1/erp/ap/payments/schedule	ap_payment_handler::get_payment_schedule	finance
 GET	/api/v1/erp/ap/reconciliations	ap_reconciliation_handler::list_reconciliations	finance
 GET	/api/v1/erp/ap/reconciliations/*	ap_reconciliation_handler::get_reconciliation	finance
 GET	/api/v1/erp/ap/reconciliations/*/print	print_handler::ap_reconciliation_print_docx	finance
+GET	/api/v1/erp/ap/reconciliations/*/print-xlsx	print_xlsx_finance_handler::ap_reconciliation_print_xlsx	finance
 GET	/api/v1/erp/ap/reconciliations/summary	ap_reconciliation_handler::get_supplier_summary	finance
 GET	/api/v1/erp/ap/reports/aging	ap_report_handler::get_aging_report	finance
 GET	/api/v1/erp/ap/reports/daily	ap_report_handler::get_daily_report	finance
@@ -190,7 +194,7 @@ GET	/api/v1/erp/api-gateway/endpoints/*	api_gateway_handler::get_api_endpoint	an
 GET	/api/v1/erp/api-gateway/stats	api_gateway_handler::get_api_stats	analytics
 GET	/api/v1/erp/ar-reconciliations	ar_reconciliation_handler::list_reconciliations	finance
 GET	/api/v1/erp/ar-reconciliations-enhanced/*/details	ar_reconciliation_enhanced_handler::get_reconciliation_details	finance
-GET	/api/v1/erp/ar-reconciliations-enhanced/*/pdf	ar_reconciliation_enhanced_handler::export_reconciliation_pdf	finance
+GET	/api/v1/erp/ar-reconciliations-enhanced/*/docx	ar_reconciliation_enhanced_handler::export_reconciliation_docx	finance
 GET	/api/v1/erp/ar-reconciliations-enhanced/aging-report	ar_reconciliation_enhanced_handler::aging_report	finance
 GET	/api/v1/erp/ar-reconciliations-enhanced/auto-reconcile/results	ar_reconciliation_enhanced_handler::list_results	finance
 GET	/api/v1/erp/ar-reconciliations-enhanced/confirmations	ar_reconciliation_enhanced_handler::list_confirmations	finance
@@ -200,6 +204,7 @@ GET	/api/v1/erp/ar-reconciliations/*	ar_reconciliation_handler::get_reconciliati
 GET	/api/v1/erp/ar-reconciliations/*/print	print_handler::ar_reconciliation_print_docx	finance
 GET	/api/v1/erp/ar-reconciliations/*/print-xlsx	print_xlsx_finance_handler::ar_reconciliation_print_xlsx	finance
 GET	/api/v1/erp/ar/collections/*/print	print_handler::ar_collection_print_docx	finance
+GET	/api/v1/erp/ar/collections/*/print-xlsx	print_xlsx_finance_handler::ar_collection_print_xlsx	finance
 GET	/api/v1/erp/ar/invoices	ar_invoice_handler::list_ar_invoices	finance
 GET	/api/v1/erp/ar/invoices/*	ar_invoice_handler::get_ar_invoice	finance
 GET	/api/v1/erp/ar/invoices/export	ar_invoice_handler::export_ar_invoices	finance
@@ -236,6 +241,7 @@ GET	/api/v1/erp/bad-debts/*	bad_debt_handler::get_provision	bad_debt
 GET	/api/v1/erp/bad-debts/writeoffs	bad_debt_handler::list_writeoffs	bad_debt
 GET	/api/v1/erp/bad-debts/writeoffs/*	bad_debt_handler::get_writeoff	bad_debt
 GET	/api/v1/erp/bad-debts/writeoffs/*/print	crate::handlers::print_handler::bad_debt_writeoff_print_docx	bad_debt
+GET	/api/v1/erp/bad-debts/writeoffs/*/print-xlsx	crate::handlers::print_xlsx_finance_handler::bad_debt_writeoff_print_xlsx	bad_debt
 GET	/api/v1/erp/bi/sales/by-category	crate::handlers::bi_handler::sales_by_category	analytics
 GET	/api/v1/erp/bi/sales/by-customer	crate::handlers::bi_handler::sales_by_customer	analytics
 GET	/api/v1/erp/bi/sales/by-product	crate::handlers::bi_handler::sales_by_product	analytics
@@ -472,6 +478,7 @@ GET	/api/v1/erp/environmental-tax/tax-declarations	environmental_tax_handler::ge
 GET	/api/v1/erp/excel/*	import_export_handler::export_excel_type	analytics
 GET	/api/v1/erp/exchange-rates	currency_handler::list_exchange_rates	finance
 GET	/api/v1/erp/exchange-rates/*/print	print_handler::foreign_exchange_verification_print_docx	finance
+GET	/api/v1/erp/exchange-rates/*/print-xlsx	print_xlsx_finance_handler::foreign_exchange_verification_print_xlsx	finance
 GET	/api/v1/erp/exchange-rates/query	currency_handler::get_exchange_rate	finance
 GET	/api/v1/erp/execute	report_engine_handler::execute_report	analytics
 GET	/api/v1/erp/export	report_engine_handler::export_report	analytics
@@ -488,6 +495,7 @@ GET	/api/v1/erp/export-inspections/*/print	print_handler::export_inspection_prin
 GET	/api/v1/erp/export-inspections/certificates/*	certificate_of_origin_handler::get_certificate	export_inspection_routes
 GET	/api/v1/erp/export-inspections/certificates/*/print	print_handler::certificate_of_origin_print_docx	export_inspection_routes
 GET	/api/v1/erp/export-refunds/*/print	print_handler::export_refund_declaration_print_docx	export_refund
+GET	/api/v1/erp/export-refunds/*/print-xlsx	crate::handlers::print_xlsx_finance_handler::export_refund_declaration_print_xlsx	export_refund
 GET	/api/v1/erp/export-refunds/refund-declarations	export_refund_handler::list_refund_declarations	export_refund
 GET	/api/v1/erp/export-refunds/sales-orders/*/documents-verification	export_refund_handler::verify_documents_completeness	export_refund
 GET	/api/v1/erp/field-permissions	field_permission_handler::list_field_permissions	iam
@@ -974,6 +982,7 @@ GET	/api/v1/erp/users/me	user_handler::get_user_me	iam
 GET	/api/v1/erp/vouchers	voucher_handler::list_vouchers	finance
 GET	/api/v1/erp/vouchers/*	voucher_handler::get_voucher	finance
 GET	/api/v1/erp/vouchers/*/print	crate::handlers::print_handler::voucher_print_docx	finance
+GET	/api/v1/erp/vouchers/*/print-xlsx	print_xlsx_finance_handler::voucher_print_xlsx	finance
 GET	/api/v1/erp/vouchers/export	voucher_handler::export_vouchers	finance
 GET	/api/v1/erp/vouchers/generate-no	voucher_handler::generate_voucher_no	finance
 GET	/api/v1/erp/vouchers/types	voucher_handler::get_voucher_types	finance
@@ -1557,7 +1566,6 @@ POST	/api/v1/erp/quotations/calculate-price	quotation_handler::calculate_price	q
 POST	/api/v1/erp/quotations/color-prices/*	quotation_handler::set_color_price	quotations
 POST	/api/v1/erp/report-templates	report_engine_handler::create_custom_template	analytics
 POST	/api/v1/erp/reports/enhanced/export/excel	report_enhanced_handler::export_excel	analytics
-POST	/api/v1/erp/reports/enhanced/export/pdf	report_enhanced_handler::export_pdf	analytics
 POST	/api/v1/erp/reports/enhanced/subscriptions	report_enhanced_handler::subscriptions::create	analytics
 POST	/api/v1/erp/reports/enhanced/subscriptions/*/send	report_enhanced_handler::send_subscription_now	analytics
 POST	/api/v1/erp/reports/enhanced/subscriptions/*/toggle	report_enhanced_handler::toggle_subscription	analytics

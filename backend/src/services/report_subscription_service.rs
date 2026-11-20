@@ -134,7 +134,7 @@ impl ReportSubscriptionService {
             frequency: Set(req.frequency),
             parameters: Set(req.parameters),
             recipients: Set(recipients_json),
-            export_format: Set(req.export_format.unwrap_or_else(|| "pdf".to_string())),
+            export_format: Set(req.export_format.unwrap_or_else(|| "xlsx".to_string())),
             is_enabled: Set(req.is_enabled.unwrap_or(true)),
             status: Set("ACTIVE".to_string()),
             next_run_at: Set(next_run),

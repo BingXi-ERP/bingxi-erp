@@ -125,7 +125,7 @@ impl ReportEngineService {
                 options: None,
                 required: true,
             }],
-            supported_formats: vec!["excel".to_string(), "pdf".to_string(), "csv".to_string()],
+            supported_formats: vec!["xlsx".to_string(), "docx".to_string()],
             parameters: vec![Rp {
                 name: "group_by".to_string(),
                 param_type: "string".to_string(),
@@ -149,12 +149,7 @@ impl ReportEngineService {
             report_type: "sales".to_string(),
             columns,
             filters: Self::sales_detail_filters(),
-            supported_formats: vec![
-                "excel".to_string(),
-                "pdf".to_string(),
-                "csv".to_string(),
-                "json".to_string(),
-            ],
+            supported_formats: vec!["xlsx".to_string(), "docx".to_string()],
             parameters: vec![],
         }
     }
@@ -275,7 +270,7 @@ impl ReportEngineService {
             report_type: "inventory".to_string(),
             columns,
             filters: Self::inventory_status_filters(),
-            supported_formats: vec!["excel".to_string(), "pdf".to_string()],
+            supported_formats: vec!["xlsx".to_string(), "docx".to_string()],
             parameters: vec![],
         }
     }
@@ -429,7 +424,7 @@ impl ReportEngineService {
                 options: None,
                 required: true,
             }],
-            supported_formats: vec!["excel".to_string(), "pdf".to_string()],
+            supported_formats: vec!["xlsx".to_string(), "docx".to_string()],
             parameters: vec![],
         }
     }
@@ -507,7 +502,7 @@ impl ReportEngineService {
                 },
             ],
             filters: vec![],
-            supported_formats: vec!["excel".to_string(), "pdf".to_string()],
+            supported_formats: vec!["xlsx".to_string(), "docx".to_string()],
             parameters: vec![],
         }
     }
@@ -583,7 +578,7 @@ impl ReportEngineService {
                 options: None,
                 required: true,
             }],
-            supported_formats: vec!["excel".to_string(), "pdf".to_string()],
+            supported_formats: vec!["xlsx".to_string(), "docx".to_string()],
             parameters: vec![Rp {
                 name: "top_n".to_string(),
                 param_type: "integer".to_string(),
@@ -665,7 +660,7 @@ impl ReportEngineService {
                 options: None,
                 required: true,
             }],
-            supported_formats: vec!["excel".to_string(), "pdf".to_string()],
+            supported_formats: vec!["xlsx".to_string(), "docx".to_string()],
             parameters: vec![],
         }
     }
@@ -683,7 +678,7 @@ impl ReportEngineService {
             report_type: "sales".to_string(),
             columns,
             filters: Self::profit_analysis_filters(),
-            supported_formats: vec!["excel".to_string(), "pdf".to_string()],
+            supported_formats: vec!["xlsx".to_string(), "docx".to_string()],
             parameters: vec![],
         }
     }
@@ -849,7 +844,7 @@ impl ReportEngineService {
                 options: None,
                 required: true,
             }],
-            supported_formats: vec!["excel".to_string(), "pdf".to_string()],
+            supported_formats: vec!["xlsx".to_string(), "docx".to_string()],
             parameters: vec![],
         }
     }

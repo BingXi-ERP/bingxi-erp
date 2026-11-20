@@ -17,7 +17,7 @@
 //!
 //! 协作子模块：
 //! - `vfy` 自动对账算法、自动生成、客户确认/争议
-//! - `inv` PDF 导出
+//! - `inv` Word 导出
 //!
 //! 拆分自原 `ar_reconciliation_service.rs`。
 //! 结构体定义与构造函数 `ArReconciliationService::new` 位于 `super`（`ar/mod.rs`）。

@@ -1733,7 +1733,7 @@ async fn live_receipt_update_null_clears_nullable_and_absent_keeps() {
         total_quantity_alt: Set(Decimal::ZERO),
         total_amount: Set(Decimal::ZERO),
         notes: Set(Some("待清空的备注".to_string())),
-        attachment_urls: Set(Some(vec!["a.pdf".to_string()])),
+        attachment_urls: Set(Some(vec!["a.docx".to_string()])),
         created_by: Set(9101),
         created_at: Set(Utc::now()),
         updated_at: Set(Utc::now()),

@@ -17,8 +17,9 @@
 //! 业务级路径（`/payments`、`/invoices`、`/vouchers` 等），path 不冲突。
 
 use axum::{
-    Router, middleware,
+    middleware,
     routing::{delete, get, post, put},
+    Router,
 };
 
 use crate::container::AppState;
@@ -236,6 +237,11 @@ pub fn gl() -> Router<AppState> {
         .route(
             "/vouchers/{id}/print",
             get(crate::handlers::print_handler::voucher_print_docx),
+        )
+        // 会计凭证 xlsx 打印腿（镜像 docx 鉴权与参数，版式走 XlsxRichTable 富表格）
+        .route(
+            "/vouchers/{id}/print-xlsx",
+            get(print_xlsx_finance_handler::voucher_print_xlsx),
         )
         // V15 P0 5-1 修复：凭证导出
         .route("/vouchers/export", get(voucher_handler::export_vouchers))
@@ -682,6 +688,10 @@ fn ap_invoice_routes() -> Router<AppState> {
             "/ap/invoices/{id}/print",
             get(print_handler::ap_invoice_print_docx),
         )
+        .route(
+            "/ap/invoices/{id}/print-xlsx",
+            get(print_xlsx_finance_handler::ap_invoice_print_xlsx),
+        )
 }
 
 /// AP 付款路由（path 前缀 /ap/payments）
@@ -698,6 +708,10 @@ fn ap_payment_routes() -> Router<AppState> {
         .route(
             "/ap/payments/{id}/print",
             get(print_handler::ap_payment_print_docx),
+        )
+        .route(
+            "/ap/payments/{id}/print-xlsx",
+            get(print_xlsx_finance_handler::ap_payment_print_xlsx),
         )
         .route(
             "/ap/payments/schedule",
@@ -747,6 +761,10 @@ fn ap_payment_request_routes() -> Router<AppState> {
         .route(
             "/ap/payment-requests/{id}/print",
             get(print_handler::ap_payment_request_print_docx),
+        )
+        .route(
+            "/ap/payment-requests/{id}/print-xlsx",
+            get(print_xlsx_finance_handler::ap_payment_request_print_xlsx),
         )
 }
 
@@ -822,6 +840,10 @@ fn ap_reconciliation_routes() -> Router<AppState> {
             "/ap/reconciliations/{id}/print",
             get(print_handler::ap_reconciliation_print_docx),
         )
+        .route(
+            "/ap/reconciliations/{id}/print-xlsx",
+            get(print_xlsx_finance_handler::ap_reconciliation_print_xlsx),
+        )
 }
 
 /// AP 报表路由（path 前缀 /ap/reports）
@@ -896,6 +918,10 @@ fn ar_payment_routes() -> Router<AppState> {
         .route(
             "/ar/collections/{id}/print",
             get(print_handler::ar_collection_print_docx),
+        )
+        .route(
+            "/ar/collections/{id}/print-xlsx",
+            get(print_xlsx_finance_handler::ar_collection_print_xlsx),
         )
 }
 
@@ -990,8 +1016,8 @@ pub fn ar_reconciliations_enhanced() -> Router<AppState> {
             post(ar_reconciliation_enhanced_handler::dispute_reconciliation),
         )
         .route(
-            "/ar-reconciliations-enhanced/{id}/pdf",
-            get(ar_reconciliation_enhanced_handler::export_reconciliation_pdf),
+            "/ar-reconciliations-enhanced/{id}/docx",
+            get(ar_reconciliation_enhanced_handler::export_reconciliation_docx),
         )
         .route(
             "/ar-reconciliations-enhanced/generate",
@@ -1115,6 +1141,10 @@ pub fn exchange_rates() -> Router<AppState> {
         .route(
             "/exchange-rates/{id}/print",
             get(print_handler::foreign_exchange_verification_print_docx),
+        )
+        .route(
+            "/exchange-rates/{id}/print-xlsx",
+            get(print_xlsx_finance_handler::foreign_exchange_verification_print_xlsx),
         )
 }
 

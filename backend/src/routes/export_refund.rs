@@ -4,8 +4,8 @@ use crate::container::AppState;
 use crate::handlers::export_refund_handler;
 use crate::handlers::print_handler;
 use axum::{
-    Router,
     routing::{get, post},
+    Router,
 };
 
 /// 出口退税路由（path 前缀 /export-refunds）
@@ -35,6 +35,11 @@ pub fn export_refunds() -> Router<AppState> {
         .route(
             "/export-refunds/{id}/print",
             get(print_handler::export_refund_declaration_print_docx),
+        )
+        // 出口退税申报单 xlsx 打印腿（与 docx 版同路径族，版式走 XlsxRichTable 富表格）
+        .route(
+            "/export-refunds/{id}/print-xlsx",
+            get(crate::handlers::print_xlsx_finance_handler::export_refund_declaration_print_xlsx),
         )
 }
 
