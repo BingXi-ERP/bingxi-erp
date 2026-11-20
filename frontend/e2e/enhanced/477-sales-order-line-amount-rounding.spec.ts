@@ -41,7 +41,7 @@ function cents(raw: string | number | undefined, label: string): bigint {
 
 async function seedCustomer(page: Page): Promise<number> {
   const code = genCode('E477C');
-  const res = await apiCall<{ data?: { id?: number } }>(page, 'POST', '/crm/customers', {
+  const res = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
     customer_code: code,
     customer_name: `477舍入客户_${code}`,
   });
@@ -61,7 +61,7 @@ test.describe('4.16 销售订单行金额舍入', () => {
     // 行1：3 × 7.777 = 23.331→23.33；折扣15%→3.4995→3.50；折后 19.83；
     //   税13%→2.5779→2.58；合计 22.41。
     // 行2：2 × 5.555 = 11.11；无折扣无税→合计 11.11。
-    const created = await apiCall<{ data?: { id?: number } }>(page, 'POST', '/sales/orders', {
+    const created = await apiCall<{ id?: number }>(page, 'POST', '/sales/orders', {
       customer_id: customerId,
       items: [
         {
