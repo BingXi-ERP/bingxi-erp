@@ -104,8 +104,9 @@ async function parseSheetRows(body: Buffer): Promise<SheetRows> {
     if (!cellXmls) continue;
     for (const cellXml of cellXmls) {
       const attrs = /<c\b([^>]*?)(?:\/>|>)/.exec(cellXml)?.[1];
+      if (!attrs) throw new Error(`xlsx 单元格属性解析失败：${cellXml.slice(0, 120)}`);
       const ref = /\br="([A-Z]+\d+)"/.exec(attrs)?.[1];
-      if (!attrs || !ref) throw new Error(`xlsx 单元格坐标解析失败：${cellXml.slice(0, 120)}`);
+      if (!ref) throw new Error(`xlsx 单元格坐标解析失败：${cellXml.slice(0, 120)}`);
       if (/<c\b[^>]*\/>$/.test(cellXml)) {
         cells[columnIndex(ref)] = '';
         continue;
