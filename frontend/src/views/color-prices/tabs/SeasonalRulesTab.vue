@@ -10,7 +10,69 @@
         }}</el-button>
       </div>
 
-      <el-table v-loading="loading" :data="rules" border stripe>
+      <!-- 手机端：季节规则单列卡片 -->
+      <section v-if="isPhone" class="srule-mobile">
+        <ul class="card-list" :aria-label="$t('colorPrices.seasonalRules.table.season')">
+          <li v-for="(row, index) in rules" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ $t('colorPrices.seasonalRules.table.ruleName') }}</dt>
+                <dd>{{ row.rule_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.seasonalRules.table.season') }}</dt>
+                <dd>
+                  <el-tag>{{ getSeasonLabel(row.season) }}</el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.seasonalRules.table.categoryId') }}</dt>
+                <dd>{{ row.product_category_id }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.seasonalRules.table.adjustType') }}</dt>
+                <dd>
+                  {{
+                    row.adjustment_type === 'percentage'
+                      ? $t('colorPrices.seasonalRules.dialog.percentage')
+                      : $t('colorPrices.seasonalRules.dialog.fixed')
+                  }}
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.seasonalRules.table.adjustValue') }}</dt>
+                <dd>{{ row.adjustment_value }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.seasonalRules.table.validFrom') }}</dt>
+                <dd>{{ row.valid_from }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.seasonalRules.table.validUntil') }}</dt>
+                <dd>{{ row.valid_until }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.seasonalRules.table.isActive') }}</dt>
+                <dd>
+                  <el-tag :type="row.is_active ? 'success' : 'info'">
+                    {{
+                      row.is_active
+                        ? $t('colorPrices.common.enable')
+                        : $t('colorPrices.common.disable')
+                    }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.seasonalRules.table.description') }}</dt>
+                <dd>{{ row.description }}</dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+      </section>
+
+      <el-table v-if="!isPhone" v-loading="loading" :data="rules" border stripe>
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column
           prop="rule_name"
@@ -103,7 +165,7 @@
           ? $t('colorPrices.seasonalRules.dialog.editTitle')
           : $t('colorPrices.seasonalRules.dialog.createTitle')
       "
-      width="520"
+      :width="isPhone ? '95%' : '520px'"
     >
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="110px">
         <el-form-item :label="$t('colorPrices.seasonalRules.dialog.ruleName')" required>
@@ -162,6 +224,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
@@ -176,6 +239,8 @@ import {
 import { numberInputRules, numericView } from '@/utils/number-input';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const getSeasonLabel = (season: string | null | undefined) =>
   t(`colorPrices.season.${season || 'default'}`);
@@ -351,5 +416,46 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+.cspecial-mobile .card-list,
+.srule-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cspecial-mobile .card-item,
+.srule-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.cspecial-mobile .card-fields > div,
+.srule-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.cspecial-mobile .card-fields dt,
+.srule-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.cspecial-mobile .card-fields dd,
+.srule-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.cspecial-mobile .field-emphasis dd,
+.srule-mobile .field-emphasis dd {
+  font-weight: 500;
 }
 </style>

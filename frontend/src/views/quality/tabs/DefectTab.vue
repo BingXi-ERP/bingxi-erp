@@ -11,7 +11,63 @@
     </div>
 
     <el-card shadow="hover">
+      <!-- 手机端：单列卡片，字段与动作与桌面表格等价 -->
+      <section v-if="isPhone" v-loading="loading" class="defect-mobile">
+        <ul class="card-list" :aria-label="t('quality.defectTab.tableAriaLabel')">
+          <li v-for="(row, index) in defects" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('quality.recordTab.colRecordNo') }}</dt>
+                <dd>{{ row.unqualified_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.recordTab.colBatchNo') }}</dt>
+                <dd>{{ row.batch_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.defectTab.colQuantity') }}</dt>
+                <dd>{{ row.unqualified_qty }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.defectTab.dialogUnqualifiedReason') }}</dt>
+                <dd>{{ row.unqualified_reason }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventory.stockTab.colGrade') }}</dt>
+                <dd>
+                  <el-tag v-if="row.grade" :type="gradeTagType(row.grade)" size="small">
+                    {{ gradeLabel(row.grade) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.defectTab.dialogHandlingMethod') }}</dt>
+                <dd>{{ handlingMethodLabel(row.handling_method) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.defectTab.colHandlingReason') }}</dt>
+                <dd>{{ row.handling_reason }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.defectTab.colProcessed') }}</dt>
+                <dd>
+                  <el-tag :type="handlingStatusTagType(row.handling_status)" size="small">
+                    {{ handlingStatusLabel(row.handling_status) }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button v-if="canProcess(row)" type="primary" @click="openProcessDialog(row)">
+                {{ t('quality.defectTab.buttonProcess') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="defects"
         stripe
@@ -94,7 +150,7 @@
     <el-dialog
       v-model="processDialogVisible"
       :title="t('quality.defectTab.messageProcessTitle')"
-      width="520px"
+      :width="isPhone ? '95%' : '520px'"
       :aria-label="t('quality.defectTab.dialogAriaLabel')"
     >
       <el-form label-width="100px">
@@ -135,6 +191,7 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import {
@@ -158,6 +215,8 @@ import {
 import { logAuxLoadFailure } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const defects = ref<UnqualifiedProductRecord[]>([]);
 const loading = ref(false);
@@ -277,3 +336,53 @@ onMounted(() => {
 
 defineExpose({ fetchDefects });
 </script>
+
+<style scoped>
+.defect-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.defect-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.defect-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.defect-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.defect-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.defect-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.defect-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.defect-mobile .card-actions .el-button {
+  margin: 0;
+}
+</style>

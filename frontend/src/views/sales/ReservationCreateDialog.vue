@@ -7,11 +7,16 @@
   <el-dialog
     :model-value="visible"
     :title="t('sales.reservation.title')"
-    width="480px"
+    :width="isPhone ? '95%' : '480px'"
     :aria-label="t('sales.reservation.dialogAriaLabel')"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
-    <el-form :model="form" :aria-label="t('sales.reservation.formAriaLabel')" label-width="110px">
+    <el-form
+      :model="form"
+      :aria-label="t('sales.reservation.formAriaLabel')"
+      label-width="110px"
+      :label-position="isPhone ? 'top' : 'right'"
+    >
       <el-form-item :label="t('sales.reservation.sourceOrder')">
         <el-input :model-value="orderNo" readonly />
       </el-form-item>
@@ -77,11 +82,14 @@
 <script setup lang="ts">
 import { reactive, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import type { SalesOrderItem } from '@/api/sales';
 import NumericInput from '@/components/NumericInput.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 预留产品候选：按 product_id 聚合订单明细行。

@@ -14,7 +14,52 @@
       </el-button>
     </div>
 
-    <el-table v-loading="loading" :data="rows" border stripe>
+    <section v-if="isPhone" v-loading="loading" class="fabric-mobile">
+      <ul class="card-list">
+        <li v-for="(row, index) in rows" :key="(row.id as number) ?? index" class="card-item">
+          <dl class="card-fields">
+            <div class="field">
+              <dt>ID</dt>
+              <dd>{{ row.id }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.reservation.product') }}</dt>
+              <dd>{{ row.product_id }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.stockTab.colWarehouse') }}</dt>
+              <dd>{{ row.warehouse_id }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.stockTab.colBatchNo') }}</dt>
+              <dd>{{ row.batch_no }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.fabricStock.colorNo') }}</dt>
+              <dd>{{ row.color_no }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.fabricStock.grade') }}</dt>
+              <dd>{{ row.grade }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.fabricStock.meters') }}</dt>
+              <dd>{{ row.quantity_meters }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.fabricStock.kg') }}</dt>
+              <dd>{{ row.quantity_kg }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('common.createTime') }}</dt>
+              <dd>{{ row.created_at }}</dd>
+            </div>
+          </dl>
+        </li>
+      </ul>
+    </section>
+
+    <el-table v-if="!isPhone" v-loading="loading" :data="rows" border stripe>
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="product_id" :label="t('inventory.reservation.product')" width="100" />
       <el-table-column
@@ -46,8 +91,18 @@
       <el-table-column prop="created_at" :label="t('common.createTime')" width="170" />
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="t('inventory.fabricStock.create')" width="500px">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
+    <el-dialog
+      v-model="dialogVisible"
+      :title="t('inventory.fabricStock.create')"
+      :width="isPhone ? '95%' : '500px'"
+    >
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('inventory.reservation.product')" prop="product_id">
           <NumericInput v-model="form.product_id" :min="1" />
         </el-form-item>
@@ -92,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
@@ -100,8 +155,11 @@ import type { FormInstance, FormRules } from 'element-plus';
 import { getStockFabricList, createStockFabric } from '@/api/inventory';
 import { getWarehouseList, type Warehouse } from '@/api/warehouse';
 import NumericInput from '@/components/NumericInput.vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const rows = ref<Record<string, unknown>[]>([]);
 const warehouses = ref<Warehouse[]>([]);
@@ -201,5 +259,36 @@ onMounted(() => {
   margin-bottom: 12px;
   display: flex;
   gap: 8px;
+}
+
+.fabric-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fabric-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.fabric-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.fabric-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.fabric-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
 }
 </style>

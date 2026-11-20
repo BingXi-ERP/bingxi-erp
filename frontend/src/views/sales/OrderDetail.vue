@@ -18,7 +18,7 @@
     </div>
 
     <el-card v-loading="loading">
-      <el-descriptions :column="3" border>
+      <el-descriptions :column="isPhone ? 1 : 3" border>
         <el-descriptions-item :label="t('sales.orderDetail.orderNo')">
           {{ order?.order_no }}
         </el-descriptions-item>
@@ -65,7 +65,48 @@
         </el-descriptions-item>
       </el-descriptions>
 
-      <el-table :data="order?.items || []" border class="items-table">
+      <section v-if="isPhone" class="items-mobile">
+        <ul class="card-list" :aria-label="t('sales.orderDetail.title')">
+          <li v-for="(row, index) in order?.items || []" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field">
+                <dt>{{ t('sales.orderDetail.productCode') }}</dt>
+                <dd>{{ row.product_code }}</dd>
+              </div>
+              <div class="field field-emphasis">
+                <dt>{{ t('sales.orderDetail.product') }}</dt>
+                <dd>{{ row.product_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('sales.orderDetail.colorNo') }}</dt>
+                <dd>{{ row.color_no || t('sales.orderDetail.greige') }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('sales.orderDetail.dyeLotNo') }}</dt>
+                <dd>{{ row.dye_lot_requirement }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('sales.orderDetail.quantity') }}</dt>
+                <dd>{{ row.quantity }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('sales.orderDetail.unitPrice') }}</dt>
+                <dd>{{ row.unit_price }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('sales.orderDetail.subtotal') }}</dt>
+                <dd>{{ row.subtotal }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('sales.orderDetail.tolerance') }}</dt>
+                <dd>{{ row.quantity_tolerance_pct }}</dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+      </section>
+
+      <el-table v-if="!isPhone" :data="order?.items || []" border class="items-table">
         <el-table-column
           prop="product_code"
           :label="t('sales.orderDetail.productCode')"
@@ -141,7 +182,11 @@ import { logAuxLoadFailure } from '@/utils/logger';
 import { useUserStore } from '@/store/user';
 import { hasRoutePermission } from '@/router';
 import { PERMISSIONS } from '@/constants/permissions';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import ConvertToContractDialog from './ConvertToContractDialog.vue';
+
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const route = useRoute();
 const router = useRouter();
@@ -216,5 +261,44 @@ onMounted(async () => {
 .items-table {
   margin-top: 16px;
   width: 100%;
+}
+
+.items-mobile {
+  margin-top: 16px;
+}
+
+.items-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.items-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.items-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.items-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.items-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.items-mobile .field-emphasis dd {
+  font-weight: 500;
 }
 </style>

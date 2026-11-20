@@ -29,4 +29,10 @@ const { t } = useI18n({ useScope: 'global' });
   background-color: #f5f7fa;
   min-height: 100%;
 }
+
+@media (max-width: 767px) {
+  .sales-page {
+    padding: 12px;
+  }
+}
 </style>

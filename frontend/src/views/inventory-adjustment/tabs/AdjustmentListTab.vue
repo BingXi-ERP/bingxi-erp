@@ -64,7 +64,7 @@
 
     <el-card shadow="hover" class="filter-card">
       <el-form
-        :inline="true"
+        :inline="!isPhone"
         :model="queryParams"
         class="filter-form"
         :aria-label="t('inventoryAdjustment.listTab.ariaLabelFilter')"
@@ -109,7 +109,78 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
+      <section v-if="isPhone" v-loading="loading" class="adjustment-mobile">
+        <ul class="card-list" :aria-label="t('inventoryAdjustment.listTab.ariaLabelTable')">
+          <li v-for="(row, index) in adjustments" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('inventoryAdjustment.listTab.colAdjustNo') }}</dt>
+                <dd>{{ row.adjustment_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryAdjustment.listTab.colAdjustDate') }}</dt>
+                <dd>{{ row.adjustment_date }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryAdjustment.listTab.colWarehouse') }}</dt>
+                <dd>{{ row.warehouse_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryAdjustment.listTab.colReason') }}</dt>
+                <dd>{{ row.reason_type }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryAdjustment.listTab.colTotalQuantity') }}</dt>
+                <dd>{{ row.total_quantity }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryAdjustment.listTab.colStatus') }}</dt>
+                <dd>
+                  <el-tag :type="inventoryAdjustmentStatusTagType(row.status)" size="small">
+                    {{ t(inventoryAdjustmentStatusLabelKey(row.status)) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryAdjustment.listTab.colCreatedBy') }}</dt>
+                <dd>{{ row.created_by_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryAdjustment.listTab.colCreatedAt') }}</dt>
+                <dd>{{ row.created_at }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="emit('openForm', 'view', row)">
+                {{ t('inventoryAdjustment.listTab.buttonDetail') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_ADJUSTMENT_STATUS.PENDING"
+                @click="emit('openForm', 'edit', row)"
+              >
+                {{ t('inventoryAdjustment.listTab.buttonEdit') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_ADJUSTMENT_STATUS.PENDING"
+                type="success"
+                @click="emit('openApprove', row)"
+              >
+                {{ t('inventoryAdjustment.listTab.buttonApprove') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_ADJUSTMENT_STATUS.PENDING"
+                type="danger"
+                @click="emit('delete', row)"
+              >
+                {{ t('inventoryAdjustment.listTab.buttonDelete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="adjustments"
         stripe
@@ -217,7 +288,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue';
+import { reactive, watch, computed } from 'vue';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
@@ -231,8 +302,11 @@ import {
   inventoryAdjustmentStatusLabelKey,
   inventoryAdjustmentStatusTagType,
 } from '@/utils/inventory-adjustment-status';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const emit = defineEmits<{
   openForm: [mode: 'create' | 'edit' | 'view', row: InventoryAdjustmentEntity | null];
@@ -383,5 +457,53 @@ defineExpose({ fetchAdjustments });
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+.adjustment-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.adjustment-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.adjustment-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.adjustment-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.adjustment-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.adjustment-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.adjustment-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.adjustment-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>
