@@ -12,7 +12,7 @@
   <el-dialog
     :model-value="visible"
     :title="t('inventory.adjustmentDialog.title')"
-    width="500px"
+    :width="isPhone ? '95%' : '500px'"
     :close-on-click-modal="false"
     :aria-label="t('inventory.adjustmentDialog.ariaLabel')"
     @update:model-value="onClose"
@@ -20,6 +20,7 @@
     <el-form
       :model="localForm"
       label-width="100px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('inventory.adjustmentDialog.formAria')"
     >
       <!-- 产品：行内入口（有预置 name）→ 只读回显；工具栏入口 → 可选 el-select -->
@@ -92,14 +93,17 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { deepClone } from '@/utils';
-import { reactive, watch } from 'vue';
+import { computed, reactive, watch } from 'vue';
 import type { Warehouse } from '@/api/warehouse';
 import type { Product } from '@/api/product';
 import NumericInput from '@/components/NumericInput.vue';
 
 // 接入 i18n，替换硬编码中文文案
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 库存调整表单数据结构（字段与 inventory 父组件 initialForm 保持一致）
 export interface AdjustmentForm {

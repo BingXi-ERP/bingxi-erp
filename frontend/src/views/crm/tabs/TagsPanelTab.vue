@@ -50,13 +50,14 @@
     <el-dialog
       v-model="dialogVisible"
       :title="t('crmTagsPanel.dialog.title')"
-      width="400px"
+      :width="isPhone ? '95%' : '400px'"
       :aria-label="t('crmTagsPanel.dialog.ariaLabel')"
     >
       <el-form
         ref="formRef"
         :model="form"
         label-width="80px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('crmTagsPanel.dialog.formAriaLabel')"
       >
         <el-form-item :label="t('crmTagsPanel.dialog.nameLabel')" prop="name">
@@ -83,8 +84,12 @@
     </el-dialog>
 
     <!-- 新建全局标签对话框 -->
-    <el-dialog v-model="createTagVisible" title="新建全局标签" width="440px">
-      <el-form :model="globalTagForm" label-width="90px">
+    <el-dialog v-model="createTagVisible" title="新建全局标签" :width="isPhone ? '95%' : '440px'">
+      <el-form
+        :model="globalTagForm"
+        label-width="90px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="标签名称">
           <el-input v-model="globalTagForm.name" />
         </el-form-item>
@@ -107,8 +112,9 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive, onMounted } from 'vue';
+import { computed, ref, reactive, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
@@ -124,6 +130,8 @@ import {
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   customerId: number;

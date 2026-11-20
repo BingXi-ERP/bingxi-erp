@@ -288,7 +288,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="form.id ? t('printTargets.dialog.editTitle') : t('printTargets.dialog.createTitle')"
-      width="640px"
+      :width="isPhone ? '95%' : '640px'"
       :aria-label="t('printTargets.dialog.ariaLabel')"
     >
       <el-form
@@ -296,6 +296,7 @@
         :model="form"
         :rules="rules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('printTargets.dialog.formAriaLabel')"
       >
         <el-form-item :label="t('printTargets.dialog.targetCode')" prop="target_code">
@@ -423,6 +424,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus, Refresh, Setting } from '@element-plus/icons-vue';
@@ -472,6 +474,8 @@ import {
 } from '@/api/print-targets';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 表单模型：连接字段用空串占位供输入框绑定，提交时按当前 kind/池配置只带有效字段（空串一律不提交）
 interface TargetForm {
@@ -1096,5 +1100,11 @@ onMounted(() => {
 }
 .bluetooth-card :deep(.el-alert) {
   margin-bottom: 12px;
+}
+
+@media (max-width: 767px) {
+  .print-targets-page {
+    padding: 12px;
+  }
 }
 </style>

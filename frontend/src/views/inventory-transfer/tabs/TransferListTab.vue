@@ -64,7 +64,7 @@
 
     <el-card shadow="hover" class="filter-card">
       <el-form
-        :inline="true"
+        :inline="!isPhone"
         :model="queryParams"
         class="filter-form"
         :aria-label="t('inventoryTransfer.transferList.filter.ariaLabel')"
@@ -113,7 +113,85 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
+      <section v-if="isPhone" v-loading="loading" class="transfer-mobile">
+        <ul class="card-list" :aria-label="t('inventoryTransfer.transferList.table.ariaLabel')">
+          <li v-for="(row, index) in transfers" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('inventoryTransfer.transferList.table.transferNo') }}</dt>
+                <dd>{{ row.transfer_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryTransfer.transferList.table.transferDate') }}</dt>
+                <dd>{{ row.transfer_date }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryTransfer.transferList.table.fromWarehouse') }}</dt>
+                <dd>{{ row.from_warehouse_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryTransfer.transferList.table.toWarehouse') }}</dt>
+                <dd>{{ row.to_warehouse_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryTransfer.transferList.table.amount') }}</dt>
+                <dd>{{ formatCurrency(row.total_amount) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryTransfer.transferList.table.status') }}</dt>
+                <dd>
+                  <el-tag :type="inventoryTransferStatusTagType(row.status)" size="small">
+                    {{ t(inventoryTransferStatusLabelKey(row.status)) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryTransfer.transferList.table.createdBy') }}</dt>
+                <dd>{{ row.created_by_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryTransfer.transferList.table.createdAt') }}</dt>
+                <dd>{{ row.created_at }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="emit('openForm', 'view', row)">
+                {{ t('inventoryTransfer.transferList.button.detail') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_TRANSFER_STATUS.PENDING"
+                @click="emit('openForm', 'edit', row)"
+              >
+                {{ t('inventoryTransfer.transferList.button.edit') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_TRANSFER_STATUS.PENDING"
+                type="success"
+                @click="emit('openApprove', row)"
+              >
+                {{ t('inventoryTransfer.transferList.button.approve') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_TRANSFER_STATUS.APPROVED"
+                type="warning"
+                @click="handleShip(row)"
+              >
+                {{ t('inventoryTransfer.transferList.button.ship') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_TRANSFER_STATUS.PENDING"
+                type="danger"
+                @click="emit('delete', row)"
+              >
+                {{ t('inventoryTransfer.transferList.button.delete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="transfers"
         stripe
@@ -231,7 +309,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue';
+import { reactive, watch, computed } from 'vue';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -251,9 +329,12 @@ import {
   inventoryTransferStatusLabelKey,
   inventoryTransferStatusTagType,
 } from '@/utils/inventory-transfer-status';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 // 批次 34 v9 P1：接入 i18n，替换硬编码中文 ElMessage
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const emit = defineEmits<{
   openForm: [mode: 'create' | 'edit' | 'view', row: InventoryTransferEntity | null];
@@ -454,5 +535,53 @@ const handleGenerateNo = async () => {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+.transfer-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.transfer-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.transfer-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.transfer-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.transfer-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.transfer-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.transfer-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.transfer-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

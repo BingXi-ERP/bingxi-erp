@@ -93,9 +93,9 @@
     <el-dialog
       v-model="stockDialogVisible"
       :title="stockEditingId ? t('inventory.stockTab.edit') : t('inventory.stockTab.create')"
-      width="520px"
+      :width="isPhone ? '95%' : '520px'"
     >
-      <el-form :model="stockForm" label-width="110px">
+      <el-form :model="stockForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <!-- 编辑走 PUT /inventory/stock/{id}：该端点只接收数量纠偏与库位，
              产品/仓库/批次/色号提交也不会被后端读取——置灰并在表单内如实说明，
              不做"改了会被静默丢弃"的假可编辑。四维/归属变更走库存调整/出入库流程 -->
@@ -162,7 +162,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
@@ -174,11 +174,14 @@ import { loadIfNot, createLazyLoader } from '@/utils/lazy-loader';
 
 // 接入 i18n，替换硬编码中文文案
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 import { exportFromBackend } from '@/utils/export';
 import type { InventoryStock, StockAlert } from '@/api/inventory';
 import type { Warehouse } from '@/api/warehouse';
 import type { Product } from '@/api/product';
 import InventoryStockTab, { type StockQuery } from './tabs/InventoryStockTab.vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import InventoryAlertTab from './tabs/InventoryAlertTab.vue';
 import InventoryTransactionTab from './tabs/InventoryTransactionTab.vue';
 import InventoryReservationTab from './tabs/InventoryReservationTab.vue';
@@ -637,5 +640,16 @@ onMounted(() => {
 .header-actions {
   display: flex;
   gap: 12px;
+}
+
+@media (max-width: 767px) {
+  .inventory-page {
+    padding: 12px;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
 }
 </style>

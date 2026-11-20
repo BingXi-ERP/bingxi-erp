@@ -626,4 +626,10 @@ function resizeCharts() {
   white-space: pre-wrap;
   margin: 0;
 }
+
+@media (max-width: 767px) {
+  .bi-sales-analysis {
+    padding: 12px;
+  }
+}
 </style>

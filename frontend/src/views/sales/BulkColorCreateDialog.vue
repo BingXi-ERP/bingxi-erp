@@ -7,11 +7,16 @@
   <el-dialog
     :model-value="visible"
     :title="t('sales.bulkColor.title')"
-    width="480px"
+    :width="isPhone ? '95%' : '480px'"
     :aria-label="t('sales.bulkColor.dialogAriaLabel')"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
-    <el-form :model="form" :aria-label="t('sales.bulkColor.formAriaLabel')" label-width="110px">
+    <el-form
+      :model="form"
+      :aria-label="t('sales.bulkColor.formAriaLabel')"
+      label-width="110px"
+      :label-position="isPhone ? 'top' : 'right'"
+    >
       <el-form-item :label="t('sales.bulkColor.sourceOrder')">
         <el-input :model-value="orderNo" readonly />
       </el-form-item>
@@ -65,12 +70,15 @@
 <script setup lang="ts">
 import { reactive, ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import { logAuxLoadFailure } from '@/utils/logger';
 import type { SalesOrderItem } from '@/api/sales';
 import { getDyeBatchList, type DyeBatch } from '@/api/dye-batch';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 提交体：sales_order_id / customer_id 由来源订单上下文带入（父组件经 GET /sales/orders/{id}

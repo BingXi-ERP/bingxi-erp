@@ -45,7 +45,7 @@
       :title="editingId ? '编辑/续签合同' : '新建合同'"
       width="560"
     >
-      <el-form :model="form" label-width="110px">
+      <el-form :model="form" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="员工ID" required
           ><NumericInput v-model="form.worker_id" :disabled="!!editingId" class="w-full" :min="1"
         /></el-form-item>
@@ -124,7 +124,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -140,6 +141,8 @@ import {
 } from '@/api/labor-contract';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 词表事实来源为后端 labor_contract_service 的 validate_contract_type 与
 // validate_working_hours_system，取值逐字符一致，前端不得自造或扩充。

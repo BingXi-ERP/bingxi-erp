@@ -153,4 +153,10 @@ const handleRemoveNode = (index: number) => {
   font-size: 20px;
   font-weight: 600;
 }
+
+@media (max-width: 767px) {
+  .bpm-definitions {
+    padding: 12px;
+  }
+}
 </style>

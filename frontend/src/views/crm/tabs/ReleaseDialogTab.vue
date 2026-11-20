@@ -6,13 +6,18 @@
   <el-dialog
     v-model="visible"
     :title="t('crmReleaseDialog.title')"
-    width="500px"
+    :width="isPhone ? '95%' : '500px'"
     :aria-label="t('crmReleaseDialog.ariaLabel')"
   >
     <p>
       {{ t('crmReleaseDialog.description', { name: customerName }) }}
     </p>
-    <el-form :model="form" label-width="80px" :aria-label="t('crmReleaseDialog.formAriaLabel')">
+    <el-form
+      :model="form"
+      label-width="80px"
+      :label-position="isPhone ? 'top' : 'right'"
+      :aria-label="t('crmReleaseDialog.formAriaLabel')"
+    >
       <el-form-item :label="t('crmReleaseDialog.reason')">
         <el-input v-model="form.reason" type="textarea" :rows="3" />
       </el-form-item>
@@ -27,14 +32,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import { logger } from '@/utils/logger';
 // D14 Batch 5b：原 crmEnhancedApi 对象已转风格 B 函数
 import { recycleCustomerToPool } from '@/api/crm-enhanced';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

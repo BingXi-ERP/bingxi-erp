@@ -55,13 +55,14 @@
       v-model="dialogVisible"
       :aria-label="t('crmFollowUp.dialog.ariaLabel')"
       :title="t('crmFollowUp.dialog.title')"
-      width="500px"
+      :width="isPhone ? '95%' : '500px'"
       :close-on-click-modal="false"
     >
       <el-form
         ref="formRef"
         :model="form"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('crmFollowUp.dialog.formAriaLabel')"
       >
         <el-form-item :label="t('crmFollowUp.form.type')" prop="type">
@@ -105,8 +106,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { computed, ref, reactive } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import type { FormInstance } from 'element-plus';
 import { Plus, Clock } from '@element-plus/icons-vue';
@@ -115,6 +117,8 @@ import { getFollowUpList, createFollowUp, type FollowUpRecord } from '@/api/crm-
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 接收父组件传入的客户 ID
 interface Props {

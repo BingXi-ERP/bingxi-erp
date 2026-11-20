@@ -11,7 +11,7 @@
         ? t('inventoryBatch.batchFormDialog.titleEdit')
         : t('inventoryBatch.batchFormDialog.titleCreate')
     "
-    width="600px"
+    :width="isPhone ? '95%' : '600px'"
     :aria-label="
       formData.id
         ? t('inventoryBatch.batchFormDialog.ariaLabelEdit')
@@ -24,6 +24,7 @@
       :model="formData"
       :rules="formRules"
       label-width="100px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('inventoryBatch.batchFormDialog.ariaLabelForm')"
     >
       <el-form-item :label="t('inventoryBatch.batchFormDialog.labelBatchNo')" prop="batch_no">
@@ -113,6 +114,7 @@
 import { ref, reactive, watch, computed } from 'vue';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import {
@@ -128,6 +130,8 @@ import { logAuxLoadFailure, logger } from '@/utils/logger';
 import { STOCK_GRADE } from '@/constants/stock-grade';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

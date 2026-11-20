@@ -143,4 +143,10 @@ onMounted(() => {
 .ranking-row {
   margin-bottom: 20px;
 }
+
+@media (max-width: 767px) {
+  .sales-analysis-page {
+    padding: 12px;
+  }
+}
 </style>

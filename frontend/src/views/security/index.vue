@@ -106,4 +106,10 @@ onMounted(() => {
 .table-card {
   margin-bottom: 20px;
 }
+
+@media (max-width: 767px) {
+  .security-page {
+    padding: 12px;
+  }
+}
 </style>

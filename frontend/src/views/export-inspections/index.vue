@@ -72,8 +72,8 @@
       />
     </el-card>
 
-    <el-dialog v-model="detailVisible" title="商检单详情" width="640px">
-      <el-descriptions v-if="detailRow" :column="2" border>
+    <el-dialog v-model="detailVisible" title="商检单详情" :width="isPhone ? '95%' : '640px'">
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="商检单号">{{ detailRow.inspection_no }}</el-descriptions-item>
         <el-descriptions-item label="结果">
           <el-tag :type="inspectionResultTagMap[detailRow.result] ?? 'info'">
@@ -121,7 +121,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import {
   getExportInspectionList,
@@ -129,6 +130,8 @@ import {
   inspectionResultTagMap,
   type ExportInspection,
 } from '@/api/export-inspection';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const resultTextMap: Record<string, string> = {
   pending: '待检',
@@ -211,5 +214,11 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+@media (max-width: 767px) {
+  .export-inspections-page {
+    padding: 12px;
+  }
 }
 </style>

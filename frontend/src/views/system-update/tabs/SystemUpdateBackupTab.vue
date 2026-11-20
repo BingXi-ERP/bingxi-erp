@@ -6,7 +6,55 @@
 -->
 <template>
   <el-card shadow="hover">
+    <!-- 手机端：备份记录单列卡片 -->
+    <section v-if="isPhone" v-loading="loading" class="sys-table-mobile">
+      <ul class="card-list" :aria-label="t('systemUpdate.backupTab.tableAriaLabel')">
+        <li v-for="(row, index) in backups" :key="row.id ?? index" class="card-item">
+          <dl class="card-fields">
+            <div class="field field-emphasis">
+              <dt>{{ t('systemUpdate.backupTab.columnBackupCode') }}</dt>
+              <dd>{{ row.backup_code }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('systemUpdate.backupTab.columnBackupType') }}</dt>
+              <dd>{{ getBackupTypeLabel(row.backup_type) }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('systemUpdate.backupTab.columnDescription') }}</dt>
+              <dd>{{ row.description }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('systemUpdate.backupTab.columnFileSize') }}</dt>
+              <dd>{{ row.file_size }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('systemUpdate.backupTab.columnStatus') }}</dt>
+              <dd>
+                <el-tag :type="backupStatusTypeMap[row.status]" size="small">
+                  {{ getBackupStatusLabel(row.status) }}
+                </el-tag>
+              </dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('systemUpdate.backupTab.columnCreatedBy') }}</dt>
+              <dd>{{ row.created_by_name }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('systemUpdate.backupTab.columnCreatedAt') }}</dt>
+              <dd>{{ row.created_at }}</dd>
+            </div>
+          </dl>
+          <div class="card-actions">
+            <el-button type="info" @click="emit('view-detail', row)">
+              {{ t('systemUpdate.backupTab.buttonDetail') }}
+            </el-button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
     <el-table
+      v-if="!isPhone"
       v-loading="loading"
       :data="backups"
       stripe
@@ -122,10 +170,14 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type { SystemBackup } from '@/api/system-update';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 defineProps<{
   backups: SystemBackup[];
@@ -179,5 +231,53 @@ const getBackupStatusLabel = (status: string): string => {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+
+.sys-table-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sys-table-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.sys-table-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.sys-table-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.sys-table-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.sys-table-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.sys-table-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.sys-table-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

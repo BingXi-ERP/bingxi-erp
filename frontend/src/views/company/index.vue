@@ -14,6 +14,7 @@
         :model="companyForm"
         :rules="companyRules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
         style="max-width: 800px"
         :aria-label="t('system.company.aria.form')"
       >
@@ -102,6 +103,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
@@ -120,6 +122,8 @@ import {
 } from '@/utils/logo-file';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const { refresh } = useCompanyProfile();
 
 // PNG 上传本地校验上限：512KB（与后端 ≤512KB 约束一致）

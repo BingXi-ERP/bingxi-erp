@@ -12,7 +12,7 @@
 
     <div class="rfm-section">
       <el-row :gutter="20" class="mb-20">
-        <el-col v-for="(count, level) in rfmDistribution" :key="level" :span="4">
+        <el-col v-for="(count, level) in rfmDistribution" :key="level" :span="isPhone ? 12 : 4">
           <el-card shadow="hover" class="rfm-card">
             <div class="rfm-card-content">
               <span class="rfm-card-level">{{ level }}</span>
@@ -22,7 +22,37 @@
         </el-col>
       </el-row>
 
+      <section v-if="isPhone" v-loading="rfmLoading" class="rfm-mobile">
+        <ul class="card-list" :aria-label="t('crmRfm.table.ariaLabel')">
+          <li v-for="(row, index) in rfmCustomers" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field">
+                <dt>{{ t('crmRfm.table.customerCode') }}</dt>
+                <dd>{{ row.customer_code }}</dd>
+              </div>
+              <div class="field field-emphasis">
+                <dt>{{ t('crmRfm.table.customerName') }}</dt>
+                <dd>
+                  <el-button type="primary" link @click="viewDetail(row.id)">
+                    {{ row.customer_name }}
+                  </el-button>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmRfm.table.owner') }}</dt>
+                <dd>{{ row.owner_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmRfm.table.segment') }}</dt>
+                <dd>{{ segmentText(row.converted_customer_id) }}</dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="rfmLoading"
         :data="rfmCustomers"
         stripe
@@ -61,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -74,8 +104,11 @@ import {
   type RfmSegmentItem,
 } from '@/api/crm-enhanced';
 import { loadIfNot, createLazyLoader } from '@/utils/lazy-loader';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const hasLoaded = createLazyLoader();
 
@@ -157,3 +190,40 @@ onMounted(() => {
   loadIfNot('fetchRfmCustomers', fetchRfmCustomers, hasLoaded);
 });
 </script>
+
+<style scoped>
+.rfm-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rfm-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.rfm-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.rfm-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.rfm-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.rfm-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+</style>

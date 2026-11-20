@@ -20,6 +20,7 @@
         :model="form"
         :rules="rules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('customOrders.create.formAriaLabel')"
       >
         <el-form-item :label="t('customOrders.create.labelCustomer')" prop="customer_id">
@@ -147,7 +148,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
@@ -156,6 +158,8 @@ import { numberInputRules } from '@/utils/number-input';
 
 const router = useRouter();
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const formRef = ref();
 const submitting = ref(false);
 const customReqText = ref('');

@@ -62,7 +62,7 @@
 
     <el-card shadow="hover" class="filter-card">
       <el-form
-        :inline="true"
+        :inline="!isPhone"
         :model="filterForm"
         class="filter-form"
         :aria-label="t('inventoryCount.listTab.ariaLabelFilter')"
@@ -106,7 +106,95 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
+      <section v-if="isPhone" v-loading="loading" class="count-mobile">
+        <ul class="card-list" :aria-label="t('inventoryCount.listTab.ariaLabelTable')">
+          <li v-for="(row, index) in counts" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('inventoryCount.listTab.colCountNo') }}</dt>
+                <dd>{{ row.count_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryCount.listTab.colCountDate') }}</dt>
+                <dd>{{ row.count_date }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryCount.listTab.colWarehouse') }}</dt>
+                <dd>{{ row.warehouse_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryCount.listTab.colStatus') }}</dt>
+                <dd>
+                  <el-tag :type="inventoryCountStatusTagType(row.status)" size="small">
+                    {{ t(inventoryCountStatusLabelKey(row.status)) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryCount.listTab.colCreatedBy') }}</dt>
+                <dd>{{ row.created_by_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryCount.listTab.colCreatedAt') }}</dt>
+                <dd>{{ row.created_at }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryCount.listTab.colCompletedAt') }}</dt>
+                <dd>{{ row.completed_at }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="emit('openDetail', row)">
+                {{ t('inventoryCount.listTab.buttonDetail') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_COUNT_STATUS.PENDING"
+                @click="emit('openForm', 'edit', row)"
+              >
+                {{ t('inventoryCount.listTab.buttonEdit') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_COUNT_STATUS.PENDING"
+                type="success"
+                :loading="rowActing(row, 'submit')"
+                :disabled="actingKey !== null"
+                @click="handleSubmit(row)"
+              >
+                {{ t('inventoryCount.listTab.buttonComplete') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_COUNT_STATUS.IN_REVIEW"
+                type="success"
+                :loading="rowActing(row, 'approve')"
+                :disabled="actingKey !== null"
+                @click="handleApprove(row)"
+              >
+                {{ t('inventoryCount.listTab.buttonApprove') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_COUNT_STATUS.IN_REVIEW"
+                type="warning"
+                :loading="rowActing(row, 'reject')"
+                :disabled="actingKey !== null"
+                @click="handleReject(row)"
+              >
+                {{ t('inventoryCount.listTab.buttonReject') }}
+              </el-button>
+              <el-button
+                v-if="row.status === INVENTORY_COUNT_STATUS.PENDING"
+                type="danger"
+                :disabled="actingKey !== null"
+                @click="handleDelete(row)"
+              >
+                {{ t('inventoryCount.listTab.buttonDelete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="counts"
         stripe
@@ -229,7 +317,7 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { PERMISSIONS } from '@/constants/permissions';
-import { reactive, ref, watch, defineEmits } from 'vue';
+import { reactive, ref, watch, computed, defineEmits } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Document, Clock, CircleCheck, DataAnalysis, Plus } from '@element-plus/icons-vue';
@@ -249,8 +337,11 @@ import {
   inventoryCountStatusLabelKey,
   inventoryCountStatusTagType,
 } from '@/utils/inventory-count-status';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const emit = defineEmits<{
   openForm: [mode: 'create' | 'edit' | 'view', row: InventoryCountEntity | null];
@@ -502,5 +593,53 @@ defineExpose({ fetchCounts });
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+.count-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.count-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.count-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.count-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.count-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.count-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.count-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.count-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

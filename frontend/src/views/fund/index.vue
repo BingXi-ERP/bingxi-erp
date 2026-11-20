@@ -83,4 +83,10 @@ const activeTab = ref('account');
   font-size: 12px;
   color: #909399;
 }
+
+@media (max-width: 767px) {
+  .fund-page {
+    padding: 12px;
+  }
+}
 </style>

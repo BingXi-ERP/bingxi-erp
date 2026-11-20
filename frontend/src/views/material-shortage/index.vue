@@ -95,4 +95,10 @@ onMounted(() => {
   color: #303133;
   margin: 0;
 }
+
+@media (max-width: 767px) {
+  .material-shortage-page {
+    padding: 12px;
+  }
+}
 </style>

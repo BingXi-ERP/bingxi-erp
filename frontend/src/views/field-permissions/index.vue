@@ -151,10 +151,16 @@
           ? t('system.fieldPermission.dialog.editTitle')
           : t('system.fieldPermission.dialog.createTitle')
       "
-      width="560px"
+      :width="isPhone ? '95%' : '560px'"
       :aria-label="t('system.fieldPermission.dialog.aria')"
     >
-      <el-form ref="formRef" :model="form" :rules="formRules" label-width="120px">
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="formRules"
+        label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('system.fieldPermission.dialog.labelRole')" prop="role_id">
           <el-select
             v-model="form.role_id"
@@ -242,7 +248,8 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue';
+import { computed, reactive, ref, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
@@ -265,6 +272,8 @@ import {
 } from '@/constants/data-permission-resource';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const fieldPermissionList = ref<FieldPermissionRow[]>([]);
 const fieldPermLoading = ref(false);

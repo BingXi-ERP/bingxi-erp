@@ -169,7 +169,7 @@
           ? t('financialAnalysis.analysisListTab.dialogTitleEdit')
           : t('financialAnalysis.analysisListTab.dialogTitleCreate')
       "
-      width="500px"
+      :width="isPhone ? '95%' : '500px'"
       :aria-label="
         form.id
           ? t('financialAnalysis.analysisListTab.ariaLabelDialogEdit')
@@ -181,6 +181,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('financialAnalysis.analysisListTab.ariaLabelForm')"
       >
         <el-form-item :label="t('financialAnalysis.analysisListTab.labelReportName')" prop="name">
@@ -238,7 +239,7 @@
 
     <!-- 带参执行对话框（executeReportWithParams） -->
     <el-dialog v-model="paramExecVisible" title="带参数执行报表" width="480">
-      <el-form label-width="90px">
+      <el-form label-width="90px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="报表">
           <el-input :model-value="paramExecRow?.name || ''" disabled />
         </el-form-item>
@@ -263,7 +264,11 @@
 
     <!-- 新增财务指标（createFinancialIndicator） -->
     <el-dialog v-model="indicatorVisible" title="新增财务指标" width="520">
-      <el-form :model="indicatorForm" label-width="100px">
+      <el-form
+        :model="indicatorForm"
+        label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="指标名称" required>
           <el-input v-model="indicatorForm.name" />
         </el-form-item>
@@ -311,7 +316,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive, onMounted } from 'vue';
+import { computed, ref, reactive, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
@@ -333,6 +339,8 @@ import { logAuxLoadFailure } from '@/utils/logger';
 import { PERMISSIONS } from '@/constants/permissions';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const loading = ref(false);
 const submitLoading = ref(false);

@@ -173,4 +173,10 @@ onUnmounted(() => {
 .event-card {
   margin-bottom: 20px;
 }
+
+@media (max-width: 767px) {
+  .failover-monitor {
+    padding: 12px;
+  }
+}
 </style>
