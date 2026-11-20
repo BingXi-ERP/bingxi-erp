@@ -1929,7 +1929,7 @@ pub async fn copy_print_template(
 /// /api/v1/erp/sales/orders）；明细取数按 id 升序逐匹成行，产品名称走 LoaderTrait
 /// `load_one` 单次查询范式（禁止逐行再查），缸号聚合与版式全部收敛在
 /// [`crate::services::print_service::codex_sheet`]，本 handler 只装配入参。
-/// 货款总计大写金额由发货单总金额经金额大写工具生成后注入版式。
+/// 货款总计大写金额由本 handler 计算注入，结余类金额取该客户最近一期应收对账单。
 pub async fn sales_delivery_codex_sheet_xlsx(
     // 路由为 /orders/{id}/deliveries/{delivery_id}/codex-sheet（两段参数），
     // axum Path 单值提取多段路径会 500，必须用 tuple 提取并取第二段
@@ -1937,7 +1937,9 @@ pub async fn sales_delivery_codex_sheet_xlsx(
     State(state): State<AppState>,
     auth: AuthContext,
 ) -> Result<Response, AppError> {
-    use crate::models::{customer, product, sales_delivery, sales_delivery_item, user};
+    use crate::models::{
+        ar_reconciliation, customer, product, sales_delivery, sales_delivery_item, user,
+    };
     use crate::services::print_service::codex_sheet::{
         self, CodexSheetCompanyInfo, CodexSheetInput, DEFAULT_BRANCH_OFFICE_ADDRESS,
         DEFAULT_BRANCH_OFFICE_NAME, DEFAULT_COMPANY_NAME, DEFAULT_DEPARTMENT, DEFAULT_DOC_NAME,
@@ -1991,6 +1993,24 @@ pub async fn sales_delivery_codex_sheet_xlsx(
         .collect::<Result<Vec<_>, AppError>>()?;
 
     let rows = codex_sheet::group_items_by_dye_lot(&items, &product_names)?;
+    // 结余类金额取该客户最近一期应收对账单四字段（上单结余=opening_balance、应收=total_invoices、
+    // 实收=total_collections、上期欠款=closing_balance）；客户尚无对账历史时为零往来，属真实业务态
+    let latest_reconciliation = ar_reconciliation::Entity::find()
+        .filter(ar_reconciliation::Column::CustomerId.eq(delivery.customer_id))
+        .order_by_desc(ar_reconciliation::Column::ReconciliationDate)
+        .one(db)
+        .await?;
+    let (previous_balance, receivable_amount, received_amount, previous_debt) =
+        latest_reconciliation
+            .map(|recon| {
+                (
+                    recon.opening_balance,
+                    recon.total_invoices,
+                    recon.total_collections,
+                    recon.closing_balance,
+                )
+            })
+            .unwrap_or((Decimal::ZERO, Decimal::ZERO, Decimal::ZERO, Decimal::ZERO));
     let input = CodexSheetInput {
         // 单号占位参数：本切片直接用发货单号，不接单据号生成器
         sheet_no: delivery.delivery_no.clone(),
@@ -1999,11 +2019,10 @@ pub async fn sales_delivery_codex_sheet_xlsx(
         department: DEFAULT_DEPARTMENT.to_string(),
         sheet_date: delivery.delivery_date.to_string(),
         rows,
-        // 结余类金额本端点无对账数据源，仍按零占位；货款总计大写另由总金额生成
-        previous_balance: Decimal::ZERO,
-        received_amount: Decimal::ZERO,
-        receivable_amount: Decimal::ZERO,
-        previous_debt: Decimal::ZERO,
+        previous_balance,
+        received_amount,
+        receivable_amount,
+        previous_debt,
         prepared_by: creator.username.clone(),
         remark: delivery.remarks.clone().unwrap_or_default(),
         company: CodexSheetCompanyInfo {
@@ -2015,8 +2034,18 @@ pub async fn sales_delivery_codex_sheet_xlsx(
             phone: DEFAULT_PHONE.to_string(),
         },
     };
-    let total_amount_words = crate::utils::amount_in_words::amount_in_words(delivery.total_amount);
-    let bytes = codex_sheet::build_codex_sheet_xlsx(&input, Some(&total_amount_words))?;
+    let mut total_amount = rust_decimal::Decimal::ZERO;
+    for row in &input.rows {
+        let amount = row.unit_price.checked_mul(row.quantity).ok_or_else(|| {
+            AppError::validation(format!(
+                "细码单构建失败: 缸号 {} 金额计算溢出（单价 {} × 数量 {}）",
+                row.dye_lot_no, row.unit_price, row.quantity
+            ))
+        })?;
+        total_amount += amount;
+    }
+    let amount_words = crate::utils::amount_in_words::amount_in_words(total_amount);
+    let bytes = codex_sheet::build_codex_sheet_xlsx(&input, Some(&amount_words))?;
     record_codex_sheet_audit(&state, &auth, delivery_id);
     Ok(crate::utils::xlsx_export::xlsx_response(
         bytes,
