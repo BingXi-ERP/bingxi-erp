@@ -14,6 +14,7 @@ use crate::search::SearchClient;
 use crate::services::event_bus::{
     BusinessEvent, EVENT_BUS, MAIN_LISTENER_HANDLE, lock_event_bus_state,
 };
+use crate::services::event_retry_service::EventRetryService;
 use crate::utils::error::AppError;
 use futures::FutureExt;
 use sea_orm::DatabaseConnection;
@@ -768,11 +769,35 @@ fn spawn_dye_vat_occupy(db: Arc<DatabaseConnection>, batch_id: i32, batch_no: St
                 return;
             }
         };
-        let service = crate::services::dye_vat_occupation_service::DyeVatOccupationService::new(db);
+        let service =
+            crate::services::dye_vat_occupation_service::DyeVatOccupationService::new(db.clone());
         if let Err(e) = service
             .occupy(vat_id, batch_id, Some(batch_no.clone()))
             .await
         {
+            // 死信兜底：染缸占用腿失败，落 event_dead_letters 供人工/后台补偿（warn 保留，
+            // 不阻断状态流转），payload 带 vat_id/batch_id/batch_no/操作方向。
+            if let Err(dl_err) = EventRetryService::new(db)
+                .record_dead_letter(
+                    "dye_vat_occupy_failed",
+                    serde_json::json!({
+                        "vat_id": vat_id,
+                        "batch_id": batch_id,
+                        "batch_no": batch_no.clone(),
+                        "direction": "occupy",
+                    }),
+                    "染缸占用失败",
+                    &e.to_string(),
+                )
+                .await
+            {
+                tracing::error!(
+                    batch_id,
+                    vat_id,
+                    error = %dl_err,
+                    "染缸占用失败死信落库失败，仅剩日志可查"
+                );
+            }
             tracing::warn!(
                 batch_id,
                 batch_no = %batch_no,
@@ -787,8 +812,30 @@ fn spawn_dye_vat_occupy(db: Arc<DatabaseConnection>, batch_id: i32, batch_no: St
 /// V15 P2 B05-P2-6：异步释放染缸（按 batch_id 释放，幂等，失败仅 warn）。
 fn spawn_dye_vat_release(db: Arc<DatabaseConnection>, batch_id: i32, batch_no: String) {
     tokio::spawn(async move {
-        let service = crate::services::dye_vat_occupation_service::DyeVatOccupationService::new(db);
+        let service =
+            crate::services::dye_vat_occupation_service::DyeVatOccupationService::new(db.clone());
         if let Err(e) = service.release(batch_id).await {
+            // 死信兜底：染缸释放腿失败，落 event_dead_letters 供人工/后台补偿（warn 保留，
+            // 不阻断状态流转），payload 带 batch_id/batch_no/操作方向。
+            if let Err(dl_err) = EventRetryService::new(db)
+                .record_dead_letter(
+                    "dye_vat_release_failed",
+                    serde_json::json!({
+                        "batch_id": batch_id,
+                        "batch_no": batch_no.clone(),
+                        "direction": "release",
+                    }),
+                    "染缸释放失败",
+                    &e.to_string(),
+                )
+                .await
+            {
+                tracing::error!(
+                    batch_id,
+                    error = %dl_err,
+                    "染缸释放失败死信落库失败，仅剩日志可查"
+                );
+            }
             tracing::warn!(
                 batch_id,
                 batch_no = %batch_no,
@@ -1219,17 +1266,59 @@ async fn handle_purchase_receipt_completed(
                         receipt_id,
                         inv.id
                     ),
-                    Err(e) => tracing::warn!(
-                        "⚠ 入库单 {} 已入库成功，但补偿生成应付账单失败，需人工补生成应付单：{}",
+                    Err(e) => {
+                        // 死信兜底：补偿生成应付腿失败，落 event_dead_letters 供人工/后台补偿（warn 保留）
+                        if let Err(dl_err) = EventRetryService::new(db.clone())
+                            .record_dead_letter(
+                                "purchase_receipt_ap_compensate_failed",
+                                serde_json::json!({
+                                    "receipt_id": receipt_id,
+                                    "order_id": order_id,
+                                }),
+                                "入库单事件侧补偿生成应付账单失败",
+                                &e.to_string(),
+                            )
+                            .await
+                        {
+                            tracing::error!(
+                                receipt_id,
+                                error = %dl_err,
+                                "应付补偿失败死信落库失败，仅剩日志可查"
+                            );
+                        }
+                        tracing::warn!(
+                            "⚠ 入库单 {} 已入库成功，但补偿生成应付账单失败，需人工补生成应付单：{}",
+                            receipt_id,
+                            e
+                        );
+                    }
+                },
+                Err(e) => {
+                    // 死信兜底：存在性查询失败导致无法判定是否补偿，落 event_dead_letters（error 保留）
+                    if let Err(dl_err) = EventRetryService::new(db.clone())
+                        .record_dead_letter(
+                            "purchase_receipt_ap_exists_query_failed",
+                            serde_json::json!({
+                                "receipt_id": receipt_id,
+                                "order_id": order_id,
+                            }),
+                            "查询入库单应付单存在性失败，无法判定是否补偿",
+                            &e.to_string(),
+                        )
+                        .await
+                    {
+                        tracing::error!(
+                            receipt_id,
+                            error = %dl_err,
+                            "应付存在性查询失败死信落库失败，仅剩日志可查"
+                        );
+                    }
+                    tracing::error!(
+                        "⚠ 查询入库单 {} 的应付单是否已生成失败，无法判定是否补偿：{}",
                         receipt_id,
                         e
-                    ),
-                },
-                Err(e) => tracing::error!(
-                    "⚠ 查询入库单 {} 的应付单是否已生成失败，无法判定是否补偿：{}",
-                    receipt_id,
-                    e
-                ),
+                    );
+                }
             }
         }
         Ok(None) => tracing::error!(
