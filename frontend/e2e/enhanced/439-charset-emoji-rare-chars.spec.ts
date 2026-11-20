@@ -37,7 +37,7 @@ test('439-01 emoji 生僻字全角半角混排入库逐字回读不乱码不截�
     unit: '米',
     product_type: PRODUCT_TYPE.auxiliary,
   });
-  const id = Number(created?.id);
+  const id = Number(created.data?.id);
   expect(id, '[439] 建品须返回正整数主键').toBeGreaterThan(0);
 
   try {

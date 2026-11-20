@@ -65,7 +65,7 @@ interface ExpectedPricing {
 
 type CustomerLevel = 'VIP' | 'NORMAL';
 
-interface PricingBody {
+type PricingBody = {
   customer_id: number;
   customer_level: CustomerLevel;
   product_id: number;
@@ -74,7 +74,7 @@ interface PricingBody {
   currency: string;
   quotation_date: string;
   tax_rate: string;
-}
+};
 
 function ymd(daysFromToday: number): string {
   return new Date(Date.now() + daysFromToday * 86_400_000).toISOString().slice(0, 10);

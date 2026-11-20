@@ -11,7 +11,8 @@
 //   但未测「恰好 5242880 B 成功 / +1KB 拒」的精确阈值边界。本例专钉该残隙。
 // 检测力：上限判定写成 >= 则恰好 5MB 被误拒即红；写成 6MB 则 +1KB 被误放即红；
 //   拒后落库则预览 200 即红。magic 检测以 %PDF 头构造，不因填充字节误判。
-import { test, expect, type Page, type APIResponse } from '../diagnose-fixture';
+import { test, expect, type Page } from '../diagnose-fixture';
+import type { APIResponse } from '@playwright/test';
 import {
   API_BASE,
   API_PREFIX,
@@ -49,9 +50,10 @@ async function csrfTokenOf(page: Page): Promise<string> {
 function exactSizePdf(size: number, marker: string): Buffer {
   const head = Buffer.from(`%PDF-1.4\n${marker}\n`, 'utf-8');
   const tail = Buffer.from('\n%%EOF', 'utf-8');
-  const buf = Buffer.alloc(size, 0x20);
-  head.copy(buf, 0);
-  tail.copy(buf, size - tail.length);
+  const buf = Buffer.alloc(size);
+  buf.fill(0x20);
+  buf.set(head, 0);
+  buf.set(tail, size - tail.length);
   return buf;
 }
 

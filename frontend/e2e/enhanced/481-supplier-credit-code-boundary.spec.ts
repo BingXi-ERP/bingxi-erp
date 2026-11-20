@@ -44,7 +44,7 @@ async function reject(page: Page, creditCode: string, tag: string) {
 
 async function create(page: Page, creditCode: string, tag: string) {
   const name = `481信用码${tag}_${genCode('E481')}`;
-  const created = await apiCall<{ data?: { id?: number } }>(page, 'POST', '/purchase/suppliers', {
+  const created = await apiCall<{ id?: number }>(page, 'POST', '/purchase/suppliers', {
     supplier_name: name,
     credit_code: creditCode,
   });
