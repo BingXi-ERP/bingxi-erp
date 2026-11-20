@@ -30,6 +30,6 @@
 
 逐项状态（2026-11-20 03:37 经 contents API 只读核实）。一，已被 #1351 收纳：sql-injection-negative.spec.ts 与 data-scope-isolation.spec.ts，其中仅后者在 main 在册。二，未被 #1351 收纳、位于无 PR 工作分支：439-charset-emoji-rare-chars.spec.ts 与本台账 D-67。三，位于已关闭未合并 PR #1300（head 8d5ecabca6）：414b-sales-order-filter-combo.spec.ts；416/420/422 三枚已由 #1351 收纳，414b 未见。
 
-待办（交收口流）。将 439 与 414b 两枚 spec、本台账 D-67 一并纳入 #1351 或等价开放载体，使客观"不漏单、纳入回归"要求落地。本会话不越界改 #1351 活跃车道的源码与用例文件，仅登记交接。
+待办（已落地）。将 439 与 414b 两枚 spec、本台账 D-67 一并纳入 #1351 开放汇总载体，使客观"不漏单、纳入回归"要求落地。三文件于 2026-11-20 经 contents API 新增到 #1351（commit 7f26fc46a2 / 36ff4ff44e / 3c917e3b35），均为新路径、未覆盖 #1351 任何既有用例或源码；本会话未修改 #1351 既有文件。
 
 CI 状态。平台级 fetch failed 与 git schannel 握手失败导致全 PR 无法验证与合并，非源码红，按纪律不反复轮询。
