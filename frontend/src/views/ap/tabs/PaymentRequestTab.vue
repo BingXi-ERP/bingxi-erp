@@ -477,7 +477,6 @@ const {
 const { width } = useBreakpoint();
 const isPhone = computed(() => width.value < 768);
 
-
 const requests = ref<APPaymentRequest[]>([]);
 const loading = ref(false);
 const dialogVisible = ref(false);
