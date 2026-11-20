@@ -74,6 +74,8 @@ interface CleanupTarget {
   label: string;
 }
 
+// 只登记清理尝试：posted 凭证与已被分录引用的科目会被后端拒绝，
+// tryCleanup 如实记录失败，不假设删除成功。
 const CLEANUP: CleanupTarget[] = [];
 
 function dateStr(daysFromToday: number): string {
@@ -162,7 +164,10 @@ async function createSubject(
   const id = requireInteger(row.id, `科目 ${code} 主键`, 1);
   expect(requireString(row.code, `科目 ${id} 回读编码`)).toBe(code);
   const name = requireString(row.name, `科目 ${id} 回读名称`);
-  CLEANUP.push({ path: `/subjects/${id}`, label: `516科目 ${code}` });
+  CLEANUP.push({
+    path: `/subjects/${id}`,
+    label: `516科目删除尝试 ${code}（被分录引用可拒）`,
+  });
   return { id, code, name };
 }
 
@@ -204,7 +209,10 @@ async function createVoucher(
   );
   const id = requireInteger(row.id, '凭证主键', 1);
   const voucherNo = requireString(row.voucher_no, '凭证号');
-  CLEANUP.push({ path: `/vouchers/${id}`, label: `516凭证 ${voucherNo}` });
+  CLEANUP.push({
+    path: `/vouchers/${id}`,
+    label: `516凭证删除尝试 ${voucherNo}（非 draft 必拒）`,
+  });
   return { id, voucherNo, voucherDate, sourceBillNo, summary };
 }
 
