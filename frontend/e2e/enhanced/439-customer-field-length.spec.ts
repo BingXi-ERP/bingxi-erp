@@ -74,8 +74,8 @@ test('439-03 客户主档超长字段被 validator 拒绝，上限值放行并�
     customer_type: 'retail',
     status: 'active',
   });
-  const id = Number(ok?.id);
+  const id = Number(ok.data?.id);
   expect(id, '上限值：各字段取 validator 上限须放行建档').toBeGreaterThan(0);
-  expect(ok?.customer_name?.length, '回读客户名须为 200 字，不得被截断').toBe(200);
+  expect(ok.data?.customer_name?.length, '回读客户名须为 200 字，不得被截断').toBe(200);
   CLEANUP.push({ path: `/crm/customers/${id}`, label: `439 客户 ${id}` });
 });
