@@ -14,8 +14,8 @@ use crate::middleware::rate_limit::rate_limit_ai_endpoint;
 // V15 P2 20.7-B：deprecation 响应头中间件
 use crate::middleware::deprecation;
 use axum::{
-    Router,
     routing::{delete, get, post, put},
+    Router,
 };
 
 use crate::handlers::{
@@ -161,7 +161,6 @@ pub fn reports_enhanced() -> Router<AppState> {
             "/templates/{id}/preview",
             get(report_enhanced_handler::preview_template),
         )
-        .route("/export/pdf", post(report_enhanced_handler::export_pdf))
         .route("/export/excel", post(report_enhanced_handler::export_excel))
         .route(
             "/subscriptions",

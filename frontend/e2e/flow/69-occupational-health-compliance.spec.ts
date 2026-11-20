@@ -214,7 +214,7 @@ test.describe.serial('69 职业健康合规：危害监测 + 体检档案 + PPE 
       limit_value: '6',
       monitoring_date: ymd(0),
       monitoring_organization: 'E2E69检测机构',
-      report_url: '/reports/e2e-69-hazard.pdf',
+      report_url: '/reports/e2e-69-hazard.png',
     });
     const id = Number(created.data?.id);
     expect(id, `危害监测创建应返回 id：${JSON.stringify(created)}`).toBeGreaterThan(0);
@@ -250,7 +250,7 @@ test.describe.serial('69 职业健康合规：危害监测 + 体检档案 + PPE 
     expect(rec.unit, '单位应落库 mg/m³').toBe('mg/m³');
     expect(rec.monitoring_date, '监测日期应逐字落库').toBe(ymd(0));
     expect(rec.monitoring_organization, '检测机构应落库').toBe('E2E69检测机构');
-    expect(rec.report_url, '报告地址应落库').toBe('/reports/e2e-69-hazard.pdf');
+    expect(rec.report_url, '报告地址应落库').toBe('/reports/e2e-69-hazard.png');
     expect(rec.created_by, 'created_by 应由后端从会话注入 = 当前登录用户（handler :22-23）').toBe(
       Number(me.data?.id)
     );

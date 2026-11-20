@@ -112,7 +112,7 @@ async function createApInvoice(
     exchange_rate: 7.15,
     tax_amount: 631.05,
     notes: 'E2E-AP-全字段',
-    attachment_urls: ['https://example.com/a.pdf', 'https://example.com/b.pdf'],
+    attachment_urls: ['https://example.com/a.png', 'https://example.com/b.png'],
     ...overrides,
   });
   CLEANUP.push({ path: `/ap/invoices/${requireId(inv, '建应付单')}`, label: 'ap_invoice' });
@@ -162,7 +162,7 @@ test.describe('10 AP 应付全流程契约链', () => {
     expectKeyValue(
       detail,
       'attachment_urls',
-      ['https://example.com/a.pdf', 'https://example.com/b.pdf'],
+      ['https://example.com/a.png', 'https://example.com/b.png'],
       'AP详情'
     );
     expectDecimal(detail, 'paid_amount', 0, 'AP详情');
@@ -220,7 +220,7 @@ test.describe('10 AP 应付全流程契约链', () => {
     expectKeyValue(
       detail,
       'attachment_urls',
-      ['https://example.com/a.pdf', 'https://example.com/b.pdf'],
+      ['https://example.com/a.png', 'https://example.com/b.png'],
       'AP改后(attachment 应未被 null 静默清空)'
     );
     // ③不碰的字段保持

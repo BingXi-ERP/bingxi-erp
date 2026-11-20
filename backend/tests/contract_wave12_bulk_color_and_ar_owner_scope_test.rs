@@ -31,13 +31,13 @@
 mod test_common;
 
 use axum::{
-    Router,
     body::Body,
     extract::State,
     http::{Method, Request, StatusCode},
-    middleware::{Next, from_fn_with_state},
+    middleware::{from_fn_with_state, Next},
     response::Response,
     routing::{get, post, put},
+    Router,
 };
 use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::{ar_reconciliation_handler, bulk_color_approval_handler};
@@ -52,7 +52,7 @@ use rust_decimal::Decimal;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::sync::Arc;
 use tower::ServiceExt;
 
@@ -453,8 +453,8 @@ fn build_app(auth: AuthContext, db: Arc<sea_orm::DatabaseConnection>) -> Router 
             get(ar_reconciliation_handler::get_reconciliation_details),
         )
         .route(
-            "/ar-reconciliations/{id}/pdf",
-            get(ar_reconciliation_handler::export_reconciliation_pdf),
+            "/ar-reconciliations/{id}/docx",
+            get(ar_reconciliation_handler::export_reconciliation_docx),
         )
         .route(
             "/ar-reconciliations/confirmations/{id}/status",
@@ -1521,19 +1521,19 @@ async fn ar_get_details_cross_owner_is_forbidden() {
     assert_eq!(v["code"], "FORBIDDEN");
 }
 
-// ============ 对账单：export_pdf（读门 + 零文件产出） ============
+// ============ 对账单：export_docx（读门 + 零文件产出） ============
 
 #[tokio::test]
-async fn ar_export_pdf_cross_owner_is_forbidden() {
+async fn ar_export_docx_cross_owner_is_forbidden() {
     let (app, _db) = seeded_app(make_self_auth(OWNER_A)).await;
     let (status, v) = call(
         &app,
         Method::GET,
-        &format!("/ar-reconciliations/{AR_CROSS}/pdf"),
+        &format!("/ar-reconciliations/{AR_CROSS}/docx"),
         None,
     )
     .await;
-    assert_eq!(status, StatusCode::FORBIDDEN, "跨主导出PDF必须 403: {v}");
+    assert_eq!(status, StatusCode::FORBIDDEN, "跨主导出Word必须 403: {v}");
     assert_eq!(v["code"], "FORBIDDEN");
 }
 

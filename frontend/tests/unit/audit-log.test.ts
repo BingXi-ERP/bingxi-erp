@@ -401,7 +401,7 @@ describe('AuditLogView（P13 批 1 P3-2）', () => {
     expect(mockRequestPost).toHaveBeenCalledTimes(1);
     const [url, body] = mockRequestPost.mock.calls[0];
     expect(url).toBe('/export-approvals');
-    // 申请载荷：资源类型钉死 audit_log，成品格式 xlsx（后端仅接受 xlsx/pdf），
+    // 申请载荷：资源类型钉死 audit_log，成品格式 xlsx（后端仅接受 xlsx/docx），
     // export_params 为注册表白名单收敛后的筛选对象
     expect(body).toMatchObject({
       resource_type: 'audit_log',

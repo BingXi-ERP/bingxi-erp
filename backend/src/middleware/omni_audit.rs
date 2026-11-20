@@ -1,8 +1,8 @@
 use axum::extract::ConnectInfo;
 use axum::{
-    body::{Body, Bytes, to_bytes},
+    body::{to_bytes, Body, Bytes},
     extract::State,
-    http::{Request, StatusCode, header},
+    http::{header, Request, StatusCode},
     middleware::Next,
     response::Response,
 };
@@ -404,7 +404,7 @@ fn build_audit_message(
     }
 }
 
-/// V15 P1-7-1：按 method+path+query 分类操作类型；分类规则（优先级从高到低）： 0. 路径末段含 approve / 路径末段为 reject 或 submit → APPROVE 1. 路径末段为 print / 路径含 /print/ → PRINT 2. 路径末段为 export / 路径含 /export/ / 路径以 /pdf 结尾 → EXPORT 3. 查询参数 action=download / 路径末段为 download → DOWNLOAD
+/// V15 P1-7-1：按 method+path+query 分类操作类型；分类规则（优先级从高到低）： 0. 路径末段含 approve / 路径末段为 reject 或 submit → APPROVE 1. 路径末段为 print / 路径含 /print/ → PRINT 2. 路径末段为 export / 路径含 /export/ → EXPORT 3. 查询参数 action=download / 路径末段为 download → DOWNLOAD
 /// 4. HTTP 方法映射：GET→READ、POST→CREATE、PUT/PATCH→UPDATE、DELETE→DELETE 5. 其他 → OTHER；用途：omni_audit_logs.event_type 字段从硬编码 "API_CALL" 升级为分类标签， 支持 SQL `WHERE event_type = 'EXPORT'` 筛选导出操作，满足合规审计报表分类需求。
 pub fn classify_operation(method: &str, uri: &str, query_string: &str) -> String {
     // 路径末段（剥离 query string）
@@ -421,12 +421,8 @@ pub fn classify_operation(method: &str, uri: &str, query_string: &str) -> String
         return "PRINT".to_string();
     }
 
-    // 2. EXPORT：路径末段为 export，或路径含 /export/，或路径以 /pdf 结尾
-    if last_segment == "export"
-        || path.contains("/export/")
-        || last_segment == "pdf"
-        || path.ends_with("/pdf")
-    {
+    // 2. EXPORT：路径末段为 export，或路径含 /export/
+    if last_segment == "export" || path.contains("/export/") {
         return "EXPORT".to_string();
     }
 

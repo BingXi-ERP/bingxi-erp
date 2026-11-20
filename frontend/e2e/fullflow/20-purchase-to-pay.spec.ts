@@ -148,7 +148,7 @@ async function seedPo(
     payment_terms: 'NET30 电汇',
     shipping_terms: 'FOB',
     notes: `E2E-F20-${marker}`,
-    attachment_urls: ['https://example.com/po-a.pdf'],
+    attachment_urls: ['https://example.com/po-a.png'],
     items: [
       {
         line_no: 1,
@@ -717,7 +717,7 @@ test.describe('20 采购到付款全流程契约链', () => {
       payment_terms: 'NET60',
       shipping_terms: 'CIF',
       notes: `E2E-F20-UPD-${marker}`,
-      attachment_urls: ['https://example.com/po-updated.pdf'],
+      attachment_urls: ['https://example.com/po-updated.png'],
     });
     const detail = await apiCallRaw<Record<string, unknown>>(
       page,
@@ -744,7 +744,7 @@ test.describe('20 采购到付款全流程契约链', () => {
     expectKeyValue(
       detail,
       'attachment_urls',
-      ['https://example.com/po-updated.pdf'],
+      ['https://example.com/po-updated.png'],
       'PO 改后附件'
     );
     // 改头不动行：明细仍在（防止 PUT 全量替换语义误伤行的历史回归）

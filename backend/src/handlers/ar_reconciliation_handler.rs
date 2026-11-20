@@ -1,6 +1,6 @@
 use axum::{
-    Json,
     extract::{Path, Query, State},
+    Json,
 };
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
@@ -362,7 +362,7 @@ pub async fn close_reconciliation(
 
 // ============================================================================
 // 增强版合并自 ar_reconciliation_enhanced_handler.rs
-// 包含自动对账、账龄分析、对账明细、客户确认/争议、PDF 导出等高级能力
+// 包含自动对账、账龄分析、对账明细、客户确认/争议、Word 导出等高级能力
 // ============================================================================
 
 /// 自动对账请求参数
@@ -647,8 +647,8 @@ pub async fn generate_reconciliation(
     )))
 }
 
-/// 导出对账单PDF（base64 编码）
-pub async fn export_reconciliation_pdf(
+/// 导出对账单 Word 文档（base64 编码）
+pub async fn export_reconciliation_docx(
     State(state): State<AppState>,
     auth: AuthContext,
     Path(id): Path<i32>,
@@ -660,13 +660,13 @@ pub async fn export_reconciliation_pdf(
         .ok_or_else(|| AppError::not_found("对账单不存在".to_string()))?;
     ensure_reconciliation_customer_access(&state.db, &data_scope_ctx, row.customer_id).await?;
 
-    info!("用户 {} 导出对账单PDF，ID: {}", auth.username, id);
+    info!("用户 {} 导出对账单 Word，ID: {}", auth.username, id);
 
     let service = ArReconciliationService::new(state.db.clone());
-    let pdf_content = service.export_pdf(id).await?;
+    let docx_content = service.export_docx(id).await?;
 
     use base64::Engine;
-    let encoded = base64::engine::general_purpose::STANDARD.encode(&pdf_content);
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&docx_content);
 
     // V15 P0-S11：导出审计日志写入（best-effort，异步不阻塞响应）
     let event = AuditEvent {
@@ -676,20 +676,23 @@ pub async fn export_reconciliation_pdf(
         severity: Severity::Info,
         resource_type: Some("ar_reconciliation".to_string()),
         resource_id: Some(id.to_string()),
-        resource_name: Some(format!("reconciliation_{}.pdf", id)),
+        resource_name: Some(format!("reconciliation_{}.docx", id)),
         description: Some(format!(
-            "用户 {} 导出对账单 PDF（ID: {}，大小：{} 字节）",
+            "用户 {} 导出对账单 Word（ID: {}，大小：{} 字节）",
             auth.username,
             id,
-            pdf_content.len()
+            docx_content.len()
         )),
         request_method: Some("GET".to_string()),
-        request_path: Some(format!("/api/v1/erp/ar-reconciliations/{}/export-pdf", id)),
+        request_path: Some(format!(
+            "/api/v1/erp/ar-reconciliations-enhanced/{}/docx",
+            id
+        )),
         before_snapshot: None,
         after_snapshot: Some(serde_json::json!({
             "id": id,
-            "content_type": "application/pdf",
-            "size": pdf_content.len(),
+            "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "size": docx_content.len(),
         })),
     };
     let svc = Arc::new(AuditLogService::new(state.db.clone()));
@@ -698,11 +701,11 @@ pub async fn export_reconciliation_pdf(
     Ok(Json(ApiResponse::success_with_message(
         serde_json::json!({
             "id": id,
-            "content_type": "application/pdf",
-            "size": pdf_content.len(),
+            "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "size": docx_content.len(),
             "base64_content": encoded,
         }),
-        "PDF导出成功",
+        "Word导出成功",
     )))
 }
 

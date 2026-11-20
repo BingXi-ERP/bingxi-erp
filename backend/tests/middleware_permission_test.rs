@@ -632,7 +632,7 @@ fn test_extract_action_from_query_wcxzfcfh_none() {
 
 #[test]
 fn test_extract_action_from_query_dcssb_action() {
-    let uri: axum::http::Uri = "/api/v1/erp/sales/orders?page=1&action=print&format=pdf"
+    let uri: axum::http::Uri = "/api/v1/erp/sales/orders?page=1&action=print&format=docx"
         .parse()
         .unwrap();
     assert_eq!(extract_action_from_query(&uri), Some("print".to_string()));

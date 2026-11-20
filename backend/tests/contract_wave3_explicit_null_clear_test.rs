@@ -44,12 +44,12 @@ mod test_common;
 use test_common::setup_test_db;
 
 use axum::{
-    Router,
     body::Body,
     extract::State,
     http::{Method, Request, StatusCode},
-    middleware::{Next, from_fn_with_state},
+    middleware::{from_fn_with_state, Next},
     response::Response,
+    Router,
 };
 use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::{
@@ -94,7 +94,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait,
     Order, QueryFilter, QueryOrder, Set, Statement,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -1733,7 +1733,7 @@ async fn live_receipt_update_null_clears_nullable_and_absent_keeps() {
         total_quantity_alt: Set(Decimal::ZERO),
         total_amount: Set(Decimal::ZERO),
         notes: Set(Some("待清空的备注".to_string())),
-        attachment_urls: Set(Some(vec!["a.pdf".to_string()])),
+        attachment_urls: Set(Some(vec!["a.docx".to_string()])),
         created_by: Set(9101),
         created_at: Set(Utc::now()),
         updated_at: Set(Utc::now()),

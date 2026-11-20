@@ -7,7 +7,7 @@
  * 资质四条腿（create_supplier_qualification / upload_supplier_qualification_attachment /
  * list_supplier_qualifications / get_supplier_qualification_attachment / delete_supplier_qualification）。
  * 入参：档位区间与单价由本用例自建（min_quantity/max_quantity/tier_price 取 CreatePriceTierDto 的
- * 字段名与可空性，customer_level 一律写 null 表通用档）；附件字节由本用例在内存生成的真实 PDF
+ * 字段名与可空性，customer_level 一律写 null 表通用档）；附件字节由本用例在内存生成的真实 PNG
  *  magic 头构成；会话账号只取 ./helpers 的 testPassword() / testUsername() 与 loginAsRole 的岗位名，
  * 源码内不出现任何口令字面量。
  * 传给谁：档位命中判定交 backend/src/utils/price_calculator.rs 的 find_tier_price
@@ -48,7 +48,7 @@
  * - create_tier 无行级归属门，只吃 permission 中间件由 URL 段推导的 color-prices 权限键
  *   （middleware/permission.rs 取 /api/v1/erp/{seg3}/{seg4}），写权限缺失岗位一律 403 FORBIDDEN。
  * - 附件门：上传必须是合法 multipart（缺 boundary → 400 VALIDATION_ERROR）；扩展名白名单
- *   pdf/jpg/jpeg/png（supplier_handler.rs），非白名单 → 拒绝；声明扩展名与实际 magic 不符
+ *   jpg/jpeg/png（supplier_handler.rs），非白名单 → 拒绝；声明扩展名与实际 magic 不符
  *   → 400 VALIDATION_ERROR；未上传前读取 → 404 NOT_FOUND（attachment_path 为 NULL）；
  *   删除资质行后该双键路径整体不存在 → 404。
  * - 脱敏分面（utils/field_mask.rs + handlers/product_handler.rs 与 :435-445）：
@@ -589,15 +589,15 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
     );
     expect(badExt.status, `非白名单扩展名必须被拒，实际 ${badExt.status}`).toBe(400);
 
-    const fakePdf = await uploadQualificationAttachment(
+    const fakePng = await uploadQualificationAttachment(
       page,
       supplierId,
       qid,
-      '伪装.pdf',
-      'application/pdf',
-      Buffer.from('this is not a pdf at all', 'utf-8')
+      '伪装.png',
+      'image/png',
+      Buffer.from('this is not a png at all', 'utf-8')
     );
-    expect(fakePdf.status, `声明 .pdf 但 magic 不符必须被拒，实际 ${fakePdf.status}`).toBe(400);
+    expect(fakePng.status, `声明 .png 但 magic 不符必须被拒，实际 ${fakePng.status}`).toBe(400);
 
     const stillEmpty = await apiCallExpectFail(
       page,
@@ -606,21 +606,21 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
     );
     expect(stillEmpty.status, '两笔被拒上传后仍不得有附件可读').toBe(404);
 
-    const pdfBytes = Buffer.from(
-      '%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n',
-      'utf-8'
-    );
+    const pngBytes = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from('\n真实 PNG 扫描件\n', 'utf-8'),
+    ]);
     const uploaded = await uploadQualificationAttachment(
       page,
       supplierId,
       qid,
-      '质检报告（2026 年度）.pdf',
-      'application/pdf',
-      pdfBytes
+      '质检报告（2026 年度）.png',
+      'image/png',
+      pngBytes
     );
-    expect(uploaded.status, `真实 PDF 附件应上传成功，实际 ${uploaded.status}`).toBe(200);
+    expect(uploaded.status, `真实 PNG 附件应上传成功，实际 ${uploaded.status}`).toBe(200);
     const uploadedRow = requireRow(uploaded.body.data, '上传成功信封 data');
-    const expectedPath = `/uploads/qualifications/${supplierId}_${qid}.pdf`;
+    const expectedPath = `/uploads/qualifications/${supplierId}_${qid}.png`;
     expect(
       str(uploadedRow.attachment_path),
       `附件路径必须是服务端生成的受控单点号形态 ${expectedPath}，实际 ${str(
@@ -652,11 +652,11 @@ test.describe.serial('451 阶梯价命中与资质附件流转', () => {
     );
     expect(download.status(), '附件下载必须 200，不得把 404 当健康').toBe(200);
     const got = await download.body();
-    expect(got.length, `下载字节数必须与上传字节数相等，实际 ${got.length}`).toBe(pdfBytes.length);
+    expect(got.length, `下载字节数必须与上传字节数相等，实际 ${got.length}`).toBe(pngBytes.length);
     expect(
-      got.subarray(0, 5).toString('utf-8'),
-      `下载内容必须是真实 PDF 字节而非空壳，实际前 5 字节 ${got.subarray(0, 5).toString('utf-8')}`
-    ).toBe('%PDF-');
+      got.subarray(0, 8).toString('hex'),
+      `下载内容必须是真实 PNG 字节而非空壳，实际前 8 字节 ${got.subarray(0, 8).toString('hex')}`
+    ).toBe('89504e470d0a1a0a');
 
     await apiCallRaw<unknown>(
       page,

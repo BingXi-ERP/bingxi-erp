@@ -84,8 +84,8 @@ const closeReportResult = () => emit('update:report-result-visible', false);
               <el-button type="success" @click="exportReport(row, 'excel')">{{
                 t('advancedModule.report.exportExcel')
               }}</el-button>
-              <el-button type="warning" @click="exportReport(row, 'pdf')">{{
-                t('advancedModule.report.exportPdf')
+              <el-button type="warning" @click="exportReport(row, 'docx')">{{
+                t('advancedModule.report.exportWord')
               }}</el-button>
             </div>
           </li>
@@ -139,8 +139,8 @@ const closeReportResult = () => emit('update:report-result-visible', false);
             <el-button type="success" link size="small" @click="exportReport(row, 'excel')">{{
               t('advancedModule.report.exportExcel')
             }}</el-button>
-            <el-button type="warning" link size="small" @click="exportReport(row, 'pdf')">{{
-              t('advancedModule.report.exportPdf')
+            <el-button type="warning" link size="small" @click="exportReport(row, 'docx')">{{
+              t('advancedModule.report.exportWord')
             }}</el-button>
           </template>
         </el-table-column>

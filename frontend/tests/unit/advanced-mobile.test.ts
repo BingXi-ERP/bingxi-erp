@@ -98,7 +98,7 @@ function subscription(enabled: boolean, id = 1): ReportSubscription {
     frequency: enabled ? 'DAILY' : 'WEEKLY',
     recipients: ['a@example.com', 'b@example.com'],
     parameters: null,
-    export_format: enabled ? 'pdf' : 'excel',
+    export_format: enabled ? 'xlsx' : 'excel',
     is_enabled: enabled,
     status: 'ACTIVE',
     next_run_at: null,
@@ -586,7 +586,7 @@ describe('Advanced report panel mobile cards', () => {
       expect(actions.map(button => button.text().trim())).toEqual([
         labels.report.execute,
         labels.report.exportExcel,
-        labels.report.exportPdf,
+        labels.report.exportWord,
       ]);
     } else {
       expect(wrapper.findAllComponents(ElTableColumn).map(col => col.props('prop'))).toEqual([
@@ -601,7 +601,7 @@ describe('Advanced report panel mobile cards', () => {
       expect(row.findAll('button').map(button => button.text().trim())).toEqual([
         labels.report.execute,
         labels.report.exportExcel,
-        labels.report.exportPdf,
+        labels.report.exportWord,
       ]);
     }
 
@@ -614,7 +614,7 @@ describe('Advanced report panel mobile cards', () => {
     expect(props.executeReport).toHaveBeenCalledExactlyOnceWith(templates[0]);
     expect(props.exportReport).toHaveBeenCalledTimes(2);
     expect(props.exportReport).toHaveBeenNthCalledWith(1, templates[0], 'excel');
-    expect(props.exportReport).toHaveBeenNthCalledWith(2, templates[0], 'pdf');
+    expect(props.exportReport).toHaveBeenNthCalledWith(2, templates[0], 'docx');
   });
 
   it('keeps result rows and empty templates aligned across breakpoints', async () => {
@@ -679,7 +679,7 @@ describe('Subscription panel mobile cards', () => {
         { label: labels.subscription.templateId, value: '9' },
         { label: labels.subscription.frequency, value: labels.subscription.daily },
         { label: '收件人', value: 'a@example.com；b@example.com' },
-        { label: labels.subscription.exportFormat, value: 'pdf' },
+        { label: labels.subscription.exportFormat, value: 'xlsx' },
         { label: '状态', value: '启用' },
         { label: labels.subscription.lastRunAt, value: '2026-11-16T09:00:00Z' },
       ]);

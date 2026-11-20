@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use sea_orm::FromJsonQueryResult;
 use sea_orm::entity::prelude::*;
+use sea_orm::FromJsonQueryResult;
 use serde::{Deserialize, Serialize};
 
 /// 导出参数 JSON（过滤条件/字段选择等）
@@ -136,7 +136,7 @@ pub struct Model {
     pub export_params: Option<ExportParams>,
     /// 预估导出行数
     pub estimated_rows: Option<i64>,
-    /// 文件格式：xlsx/pdf/csv
+    /// 文件格式：xlsx/docx
     pub file_format: String,
     /// 审批状态：pending/approved/rejected/expired/cancelled
     pub status: String,

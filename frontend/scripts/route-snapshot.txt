@@ -1,4 +1,4 @@
-# layers=8 endpoints=1820
+# layers=8 endpoints=1819
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -190,7 +190,7 @@ GET	/api/v1/erp/api-gateway/endpoints/*	api_gateway_handler::get_api_endpoint	an
 GET	/api/v1/erp/api-gateway/stats	api_gateway_handler::get_api_stats	analytics
 GET	/api/v1/erp/ar-reconciliations	ar_reconciliation_handler::list_reconciliations	finance
 GET	/api/v1/erp/ar-reconciliations-enhanced/*/details	ar_reconciliation_enhanced_handler::get_reconciliation_details	finance
-GET	/api/v1/erp/ar-reconciliations-enhanced/*/pdf	ar_reconciliation_enhanced_handler::export_reconciliation_pdf	finance
+GET	/api/v1/erp/ar-reconciliations-enhanced/*/docx	ar_reconciliation_enhanced_handler::export_reconciliation_docx	finance
 GET	/api/v1/erp/ar-reconciliations-enhanced/aging-report	ar_reconciliation_enhanced_handler::aging_report	finance
 GET	/api/v1/erp/ar-reconciliations-enhanced/auto-reconcile/results	ar_reconciliation_enhanced_handler::list_results	finance
 GET	/api/v1/erp/ar-reconciliations-enhanced/confirmations	ar_reconciliation_enhanced_handler::list_confirmations	finance
@@ -1554,7 +1554,6 @@ POST	/api/v1/erp/quotations/calculate-price	quotation_handler::calculate_price	q
 POST	/api/v1/erp/quotations/color-prices/*	quotation_handler::set_color_price	quotations
 POST	/api/v1/erp/report-templates	report_engine_handler::create_custom_template	analytics
 POST	/api/v1/erp/reports/enhanced/export/excel	report_enhanced_handler::export_excel	analytics
-POST	/api/v1/erp/reports/enhanced/export/pdf	report_enhanced_handler::export_pdf	analytics
 POST	/api/v1/erp/reports/enhanced/subscriptions	report_enhanced_handler::subscriptions::create	analytics
 POST	/api/v1/erp/reports/enhanced/subscriptions/*/send	report_enhanced_handler::send_subscription_now	analytics
 POST	/api/v1/erp/reports/enhanced/subscriptions/*/toggle	report_enhanced_handler::toggle_subscription	analytics

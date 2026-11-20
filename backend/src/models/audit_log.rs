@@ -1,6 +1,6 @@
 #![allow(dead_code)]
-use sea_orm::FromJsonQueryResult;
 use sea_orm::entity::prelude::*;
+use sea_orm::FromJsonQueryResult;
 use serde::{Deserialize, Serialize};
 
 /// 审计日志差异快照 JSON 值（与 before/after_snapshot 字段对应）
@@ -132,7 +132,7 @@ pub struct Model {
     /// 导出时的筛选条件 JSON，用于追溯导出数据范围
     #[sea_orm(column_type = "Text", nullable)]
     pub export_query_filter: Option<String>,
-    /// 导出文件格式（xlsx/csv/pdf），格式合规审计
+    /// 导出文件格式（xlsx/docx），格式合规审计
     pub export_file_format: Option<String>,
     /// 二级审批 token（敏感数据导出），10 分钟有效期
     pub export_approval_token: Option<String>,

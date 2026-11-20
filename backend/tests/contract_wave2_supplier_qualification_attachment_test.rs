@@ -6,9 +6,9 @@
 //!   1. 父资源归属门控 + data_scope（与四个资质端点同源：get_supplier(supplier_id, Some(&ctx))）；
 //!   2. (supplier_id, qualification_id) 双键归属校验，错配返回**用户可见** business_displayable
 //!      文案（BUSINESS_ERROR + 真实 message，不是脱敏的「业务处理失败」）；
-//!   3. 扩展名白名单 pdf/jpg/jpeg/png（非白名单后缀被拒，即使内容合法）；
-//!   4. magic bytes 校验：伪造 Content-Type / 合法后缀但内容非 PDF/JPEG/PNG 被拒；
-//!      后缀与内容不同族（.png 实为 %PDF）同样被拒；
+//!   3. 扩展名白名单 jpg/jpeg/png（非白名单后缀被拒，即使内容合法）；
+//!   4. magic bytes 校验：伪造 Content-Type / 合法后缀但内容非 JPEG/PNG 被拒；
+//!      后缀与内容不同族（.png 实为 JPEG）同样被拒；
 //!   5. 大小上限（5MB）显式拒绝，不落裸 500；
 //!   6. 文件名服务端生成 `{supplier_id}_{qualification_id}.{ext}`，客户端原名不参与落盘名，
 //!      上传后 attachment_path 回读 = 服务端受控 URL `/uploads/qualifications/...`；
@@ -30,13 +30,13 @@
 //!   （business_displayable）。本文件按各自正确族断言，不再笼统写 BUSINESS_ERROR。
 
 use axum::{
-    Router,
     body::Body,
     extract::State,
     http::{Request, StatusCode},
-    middleware::{Next, from_fn_with_state},
+    middleware::{from_fn_with_state, Next},
     response::Response,
     routing::get,
+    Router,
 };
 use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::supplier_handler;
@@ -54,6 +54,20 @@ mod test_common;
 
 fn dec(s: &str) -> Decimal {
     Decimal::from_str(s).unwrap()
+}
+
+/// 合法 PNG 字节（magic + 占位内容）：资质附件只收图片，作为合法附件内容
+fn png_bytes() -> Vec<u8> {
+    let mut data = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    data.extend_from_slice(b"fake-license-image");
+    data
+}
+
+/// 合法 JPEG 字节（magic + 占位内容）：用于构造后缀/内容不同族的伪造用例
+fn jpeg_bytes() -> Vec<u8> {
+    let mut data = vec![0xFF, 0xD8, 0xFF];
+    data.extend_from_slice(b"fake-license-jpeg");
+    data
 }
 
 fn make_auth(user_id: i32) -> AuthContext {
@@ -278,18 +292,18 @@ async fn attachment_path_of(db: &sea_orm::DatabaseConnection, qid: i32) -> Optio
 // 1) 拒绝路径（不产生落盘与 DB 写入）
 // =========================================================
 
-/// 非白名单后缀被拒（内容本身是合法 PDF 也不放行——白名单是场景约束，不只防攻击）
+/// 非白名单后缀被拒（内容本身是合法 PNG 也不放行——白名单是场景约束，不只防攻击）
 #[tokio::test]
 async fn upload_rejects_non_whitelisted_extension() {
     let (app, db, ids) = seeded_app().await;
-    let mut data = b"%PDF-1.7 fake".to_vec();
+    let mut data = png_bytes();
     data.extend_from_slice(&[0u8; 64]);
     let (status, v) = post_attachment(
         &app,
         ids.supplier_a,
         ids.qual_a1,
-        "invoice.pdf.exe",
-        "application/pdf",
+        "invoice.png.exe",
+        "image/png",
         &data,
     )
     .await;
@@ -300,7 +314,7 @@ async fn upload_rejects_non_whitelisted_extension() {
         v["message"]
             .as_str()
             .unwrap_or_default()
-            .contains("仅支持 pdf/jpg/jpeg/png"),
+            .contains("仅支持 jpg/jpeg/png"),
         "拒绝文案必须可见且指向白名单，实际: {v}"
     );
     assert_eq!(
@@ -310,7 +324,7 @@ async fn upload_rejects_non_whitelisted_extension() {
     );
 }
 
-/// 伪造 Content-Type application/pdf + 合法 .pdf 后缀，但文件内容非 PDF/JPEG/PNG → 拒绝
+/// 伪造 Content-Type image/png + 合法 .png 后缀，但文件内容非 JPEG/PNG → 拒绝
 #[tokio::test]
 async fn upload_rejects_forged_content_type_with_bad_magic() {
     let (app, db, ids) = seeded_app().await;
@@ -318,9 +332,9 @@ async fn upload_rejects_forged_content_type_with_bad_magic() {
         &app,
         ids.supplier_a,
         ids.qual_a1,
-        "license.pdf",
-        "application/pdf",
-        b"#!/bin/sh\necho not-a-pdf",
+        "license.png",
+        "image/png",
+        b"#!/bin/sh\necho not-a-png",
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "实际体: {v}");
@@ -331,7 +345,7 @@ async fn upload_rejects_forged_content_type_with_bad_magic() {
         v["message"]
             .as_str()
             .unwrap_or_default()
-            .contains("附件内容不是有效的证照文件"),
+            .contains("附件内容不是有效图片"),
         "拒绝必须指向内容格式校验，实际: {v}"
     );
     assert_eq!(
@@ -341,7 +355,7 @@ async fn upload_rejects_forged_content_type_with_bad_magic() {
     );
 }
 
-/// 合法后缀 + 合法 magic，但后缀与内容不同族（.png 实为 %PDF）→ 伪造拒绝
+/// 合法后缀 + 合法 magic，但后缀与内容不同族（.png 实为 JPEG）→ 伪造拒绝
 #[tokio::test]
 async fn upload_rejects_extension_magic_family_mismatch() {
     let (app, _db, ids) = seeded_app().await;
@@ -351,7 +365,7 @@ async fn upload_rejects_extension_magic_family_mismatch() {
         ids.qual_a1,
         "scan.png",
         "image/png",
-        b"%PDF-1.7 disguised-as-png",
+        &jpeg_bytes(),
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "实际体: {v}");
@@ -369,14 +383,14 @@ async fn upload_rejects_extension_magic_family_mismatch() {
 #[tokio::test]
 async fn upload_rejects_oversize_with_visible_message_not_bare_500() {
     let (app, _db, ids) = seeded_app().await;
-    let mut data = b"%PDF-1.7 ".to_vec();
+    let mut data = png_bytes();
     data.resize(5 * 1024 * 1024 + 1, 0x20);
     let (status, v) = post_attachment(
         &app,
         ids.supplier_a,
         ids.qual_a2,
-        "big.pdf",
-        "application/pdf",
+        "big.png",
+        "image/png",
         &data,
     )
     .await;
@@ -404,9 +418,9 @@ async fn upload_rejects_mismatched_supplier_qualification_pair_with_visible_mess
         &app,
         ids.supplier_b,
         ids.qual_a1,
-        "license.pdf",
-        "application/pdf",
-        b"%PDF-1.7 someone-else's-license",
+        "license.png",
+        "image/png",
+        &png_bytes(),
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "实际体: {v}");
@@ -458,21 +472,21 @@ async fn download_rejects_mismatched_pair_with_visible_message() {
 #[tokio::test]
 async fn upload_success_persists_server_generated_url_and_download_serves_bytes() {
     let (app, db, ids) = seeded_app().await;
-    let content = b"%PDF-1.4 real-license-content-bytes";
+    let content = png_bytes();
     let (status, v) = post_attachment(
         &app,
         ids.supplier_a,
         ids.qual_a1,
-        "营业执照 扫描件 final.pdf",
-        "application/pdf",
-        content,
+        "营业执照 扫描件 final.png",
+        "image/png",
+        &content,
     )
     .await;
     assert_eq!(status, StatusCode::OK, "上传必须 200，实际体: {v}");
     assert_eq!(v["message"], "资质附件上传成功");
     // 出参 attachment_path == 服务端生成受控 URL（客户端原名不参与落盘名与 URL）
     let expected_url = format!(
-        "/uploads/qualifications/{}_{}.pdf",
+        "/uploads/qualifications/{}_{}.png",
         ids.supplier_a, ids.qual_a1
     );
     assert_eq!(
@@ -489,12 +503,12 @@ async fn upload_success_persists_server_generated_url_and_download_serves_bytes(
     // 磁盘 + 读回：GET 端点（同一鉴权链）返回字节与上传内容一致
     let (status, got, content_type) = get_attachment(&app, ids.supplier_a, ids.qual_a1).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(content_type.as_deref(), Some("application/pdf"));
+    assert_eq!(content_type.as_deref(), Some("image/png"));
     assert_eq!(got, content.as_slice(), "读回字节必须与上传内容一致");
 
     // 清理本用例生成的受控文件（失败仅打印，不影响断言结论）
     let p = std::path::Path::new("uploads/qualifications")
-        .join(format!("{}_{}.pdf", ids.supplier_a, ids.qual_a1));
+        .join(format!("{}_{}.png", ids.supplier_a, ids.qual_a1));
     if let Err(e) = std::fs::remove_file(&p) {
         eprintln!("测试清理失败（不影响断言）: {e}");
     }
@@ -544,7 +558,7 @@ async fn upload_body_over_global_max_http_bytes_fails_as_business_stream_error_n
 {
     let (app, db, ids) = seeded_app().await;
     // 体积 = 全局上限 + 1MB 余量，确保总请求体（含 multipart 框架开销）严格超过 12MB
-    let mut data = b"%PDF-1.7 ".to_vec();
+    let mut data = png_bytes();
     data.resize(
         bingxi_backend::constants::MAX_HTTP_BODY_BYTES + 1024 * 1024,
         0x20,
@@ -553,8 +567,8 @@ async fn upload_body_over_global_max_http_bytes_fails_as_business_stream_error_n
         &app,
         ids.supplier_a,
         ids.qual_a2,
-        "over-global-limit.pdf",
-        "application/pdf",
+        "over-global-limit.png",
+        "image/png",
         &data,
     )
     .await;

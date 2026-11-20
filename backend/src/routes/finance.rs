@@ -17,8 +17,9 @@
 //! 业务级路径（`/payments`、`/invoices`、`/vouchers` 等），path 不冲突。
 
 use axum::{
-    Router, middleware,
+    middleware,
     routing::{delete, get, post, put},
+    Router,
 };
 
 use crate::container::AppState;
@@ -990,8 +991,8 @@ pub fn ar_reconciliations_enhanced() -> Router<AppState> {
             post(ar_reconciliation_enhanced_handler::dispute_reconciliation),
         )
         .route(
-            "/ar-reconciliations-enhanced/{id}/pdf",
-            get(ar_reconciliation_enhanced_handler::export_reconciliation_pdf),
+            "/ar-reconciliations-enhanced/{id}/docx",
+            get(ar_reconciliation_enhanced_handler::export_reconciliation_docx),
         )
         .route(
             "/ar-reconciliations-enhanced/generate",

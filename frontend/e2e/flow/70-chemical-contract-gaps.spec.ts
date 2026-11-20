@@ -493,7 +493,7 @@ test.describe.serial('70 染化料契约缺口：分类/状态机/检验闭包/�
       color_index: 'C.I. Reactive Blue 19',
       ghs_classification: 'Eye Irrit. 2',
       signal_word: 'warning',
-      msds_url: '/msds/e2e-70.pdf',
+      msds_url: '/msds/e2e-70.png',
       safety_stock: '5',
       reorder_point: '8',
     });
@@ -619,11 +619,11 @@ test.describe.serial('70 染化料契约缺口：分类/状态机/检验闭包/�
       unit_cost: '1.00',
     });
     await apiCall(page, 'POST', `/chemical-lots/${failLot.id}/fail-inspection`, {
-      inspection_report_url: '/reports/e2e-70-fail.pdf',
+      inspection_report_url: '/reports/e2e-70-fail.png',
     });
     const failed = await apiCallRaw<Row>(page, 'GET', `/chemical-lots/${failLot.id}`);
     expect(failed.inspection_status, 'fail-inspection 应落库 failed').toBe('failed');
-    expect(failed.inspection_report_url, '不合格报告地址应落库').toBe('/reports/e2e-70-fail.pdf');
+    expect(failed.inspection_report_url, '不合格报告地址应落库').toBe('/reports/e2e-70-fail.png');
     const revivePass = await apiCallExpectFail(
       page,
       'POST',
