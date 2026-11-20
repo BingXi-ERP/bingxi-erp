@@ -66,15 +66,15 @@ fn rust_vocabulary_covers_all_seven_lowercase_states() {
 #[test]
 fn approval_service_has_no_bare_status_literals() {
     let svc = read_rel("src/services/quotation_approval_service.rs");
-    for lit in [
-        r#""draft""#,
-        r#""pending_approval""#,
-        r#""approved""#,
-        r#""rejected""#,
-    ] {
+    for word in ["draft", "pending_approval", "approved", "rejected"] {
+        let quoted = format!("\"{word}\"");
+        let bare_value = svc.match_indices(&quoted).any(|(idx, _)| {
+            let after = &svc[idx + quoted.len()..];
+            !after.trim_start().starts_with(':')
+        });
         assert!(
-            !svc.contains(lit),
-            "quotation_approval_service 不得残留状态裸字面量 {lit}"
+            !bare_value,
+            "quotation_approval_service 不得残留状态裸字面量 {quoted}（后随冒号者视为 JSON 键名豁免）"
         );
     }
     assert!(
