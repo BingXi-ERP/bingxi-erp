@@ -41,7 +41,7 @@ function expectMoney(actual: number, expected: number, label: string): void {
 }
 
 async function seedCustomer(page: Page): Promise<number> {
-  const res = await apiCall<{ data?: { id?: number } }>(page, 'POST', '/crm/customers', {
+  const res = await apiCall<{ id?: number }>(page, 'POST', '/crm/customers', {
     customer_name: `E2E多单核销${genCode('AR')}`,
   });
   const id = Number(res.data?.id);
