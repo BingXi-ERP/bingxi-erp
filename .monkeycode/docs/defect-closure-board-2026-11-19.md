@@ -32,7 +32,7 @@ DC-002 第一批验收标准（7.4）：两个不同 user_id 的 self 角色，�
 
 | 编号 | 类型 | 优先级 | 标题 | 判定要点 | 卡点 |
 |------|------|--------|------|----------|------|
-| DC-006 | Bug 缺陷 | P0 | #1302 合并阻塞（mergeable=false / state=dirty） | 23 支开放 PR 中唯一脏支，46 文件与已合并移动端支冲突，CI 绿也无法 squash 合并 | 收口末期处理：fetch --unshallow → merge origin/main 解冲突 → 普通 push；force push 属另一档需单独授权 |
+| DC-006 | Bug 缺陷 | P0 | #1302 合并阻塞（mergeable=false / state=dirty） | 逐支 GET 确认真 dirty（列表端点 mergeable_state=null 是假象）；46 是 PR 全部改动数非冲突数，git 试合并后真实冲突仅 frontend/src/views/ap/tabs/PaymentRequestTab.vue 1 文件：1 行 import（main 侧 DC-010 支付方式标签映射，HEAD 侧缺，取空会 reference error 故取 main）+ 1 个机械重复断点块（HEAD/main 各加一次 identical useBreakpoint）。车道原是 shallow clone、merge-base 为空致无法并基，fetch --unshallow 因大 pack 传输失败（invalid index-pack output + 150s 超时），改用 fetch --deepen=200 拿到 merge-base 02ed55843。 | 本地并基已解：merge commit 145088b8d + 修复 commit e5e65fac1（eslint 单文件 0 error、无残留冲突标记、工作区干净），未推送——push 需用户明确授权且 CI 停摆期推送会让在途 run 变 stale。后续待授权 push → CI 全量绿 → 合并后 blob 回读确认 mergeable_state=clean 方可关单。 |
 
 DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动联网查询，结合行业标准给出最优拍板方案"），结论为**不可行，转入搁置**：
 - 硬约束：全仓 CI job 均为 `runs-on: ubuntu-latest`（.github/workflows/ci-cd.yml:97 等、miniprogram-checks.yml:65）；微信开发者工具仅 Windows/macOS 版，Linux 无法安装。
