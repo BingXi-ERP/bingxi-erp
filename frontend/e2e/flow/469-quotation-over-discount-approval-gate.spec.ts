@@ -38,6 +38,7 @@ import {
   loginViaUI,
 } from './helpers';
 import { createRelay } from '../fixtures/relay';
+import { PRODUCT_TYPE } from '../../src/constants/product-type';
 
 type Row = Record<string, unknown>;
 
@@ -123,7 +124,7 @@ test.describe.serial('超折扣审批门：阈值配置、权限拒绝、超阈�
               code,
               name: `E2E超折扣门产品${code}`,
               unit: '米',
-              product_type: '辅料',
+              product_type: PRODUCT_TYPE.auxiliary,
             });
             const productId = Number(created?.id);
             expect(productId, '建产品应返回有效 id').toBeGreaterThan(0);
