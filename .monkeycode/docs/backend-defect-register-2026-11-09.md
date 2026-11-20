@@ -141,6 +141,7 @@
 3. **零新增端点**：四页复用 packageA/services 既有 service 方法，不新写 URL 字面量；端点门只判 `/api/v1/erp/*` 调用点命中仓内快照，取档源码里 375 条 `/app-api/*` 记 legacy 不判红，契约文档 v3 已裁定未映射旧路径直通 404 不做回退/模拟，本批不扩面。
 4. **死链清零 + 基线棘轮终态**：11 处 ROUTE_DEAD → dead=0（exactOk 268→279）；10 条基线有效键全部注释归档。判定器修正：有效键清零是合法终态，不再报 TOOL_BUG，任何新死链一律按 MP_ROUTE_NEW_DEAD 判红（比原分类更严）；缺基线文件仍走 TOOL_BUG。
 5. **验证**：主门禁 `bash scripts/ci/miniprogram-checks.sh` rc=0 七道全过（MP_CHECK_GREEN、STEP_END routes rc=0、dead=0）；`--self-test` rc=0 且 caught=7/7 missed:0、MP_DETECTOR_OK、红向夹具正确打 MP_ROUTE_NEW_DEAD 2 处；`bash -n` rc=0；四页 js 逐文件 node --check 过；另造「基线塞真实非死链键」正向对照 rc=0，通过集合未缩小。本地验证齐过，未推送（用户「先不推」裁定仍生效，仅解除「不许修」）。
+6. **2026-11-21 主干回读补证**：以 `origin/main` `968f868da3` 为基准，修复载体 `3fab9e5b2` 已是主干祖先；`offer-info` 四件套在主干逐文件存在；`git grep offer-onfo` 在 miniprogram 源码零命中，仅 `scripts/ci/miniprogram-route-baseline.txt` 保留历史死链注释。原“未进主干未开 PR”是结案当日状态，后续已由合并载体进入主干。
 
 ## 附：功能缺失登记项处置全景核对（2026-11-15）
 
@@ -148,5 +149,5 @@
 
 - **已修（源码面补齐 + 用例钉面）**：E8 超折扣审批门（#1183，折扣阈值配置 + evaluate 判档 + 469 号用例）；订单编辑并发冲突（#1212，更新时刻令牌 + 473）；产品编码重复拒因 + 色号唯一性（#1214，服务层查重 + 505）；HTTP 幂等重放防护（#1216，middleware/idempotency.rs + 474，11-12 登记的"无实现落点"已收口）；交货允差超收拦截（purchase_receipt_ops/crud.rs 的 plan_order_item_links 已按行解析 resolve_tolerance_pct + tolerance_bounds 整单拒超收，含上下界提示，11-03 登记的三腿缺口已由收货腿消费）。
 - **设计裁定（非漏修）**：预警扫描触发人——调度器只落预警行，站内信由 finance_alert_service 的 attach_notification 按规则角色集投递（454 号用例钉）；生产完工扣料 fail-open 空转——BOM 整族移除裁定（11-06）后该域随 BOM 下线。
-- **仍开口（待裁/待排期）**：D-62 微信订阅消息发送腿（P1，feat/wechat-subscribe-send-leg 车道仅保工并基无实现提交，HTTP 侧无出站触发入口，属凭证环境 + 出站渠道建设）。D-66 已于 2026-11-15 用户授权后结案（见「附二」），四缺失页、11 处死链、offer-onfo 拼写全修，本地七道门禁与反向自检全绿；仅「先不推」仍生效，未进主干未开 PR。
+- **仍开口（待裁/待排期）**：D-62 微信订阅消息发送腿（P1，feat/wechat-subscribe-send-leg 车道仅保工并基无实现提交，HTTP 侧无出站触发入口，属凭证环境 + 出站渠道建设）。D-66 已于 2026-11-15 用户授权后结案（见「附二」），四缺失页、11 处死链、offer-onfo 拼写全修，本地七道门禁与反向自检全绿；结案当日“未进主干未开 PR”是历史状态，2026-11-21 主干回读确认修复载体已入主干（见附二第 6 条）。
 - 结论：测试暴露的功能缺失绝大多数已闭环或按裁定处置；D-66 已授权修完（见「附二」），剩余 D-62 属微信域出站渠道建设，与小程序车道一起被用户「先不推」裁定覆盖，非遗漏。
