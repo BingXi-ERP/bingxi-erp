@@ -98,4 +98,48 @@ test.describe('4.22 坯布引用删除守卫', () => {
     const again = await apiCallExpectFail(page, 'DELETE', `/production/greige-fabrics/${fabricId}`);
     expect(again.status, '引用未解除前重复删除仍应被拒，不得静默成功').toBe(400);
   });
+
+  test('4.22-02 有在架库存的坯布删除被拒且拒因点名库存事实', async ({ page }) => {
+    const tag = genCode('E2E-422B');
+    const fabricNo = `E2E-GFG-${tag}`;
+
+    // 有在架库存、无任何下游引用：只撞库存门（greige_fabric_handler.rs:786-788）。
+    // 拒因文案 remaining_stock_rejection（:737-753）走 business_displayable 外显（error.rs:851）。
+    const fabric = await apiCall<{ id?: number }>(page, 'POST', '/production/greige-fabrics', {
+      fabric_no: fabricNo,
+      fabric_name: `E2E 库存守卫坯布 ${tag}`,
+      fabric_type: '梭织',
+      product_id: 1,
+      supplier_id: 1,
+      warehouse_id: 1,
+      weight_kg: 12.5,
+      length_m: 0,
+      quantity_meters: 0,
+      quantity_kg: 12.5,
+      status: '在库',
+      remarks: 'E2E 4.22 库存守卫前置',
+    });
+    const fabricId = fabric.data?.id;
+    expect(fabricId, `库存守卫坯布建档失败：${JSON.stringify(fabric)}`).toBeTruthy();
+    CLEANUP.push({ path: `/production/greige-fabrics/${fabricId}`, label: 'greige_fabric' });
+
+    const rejected = await apiCallExpectFail(
+      page,
+      'DELETE',
+      `/production/greige-fabrics/${fabricId}`
+    );
+    expect(rejected.status, '有在架库存坯布删除应 400').toBe(400);
+    expect(String(rejected.code ?? ''), '机器码应为业务错误').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+    const msg = String(rejected.message ?? '');
+    expect(msg, '拒因须外显「仍有在架库存」而非脱敏常量').toContain('仍有在架库存');
+    expect(msg, '拒因须点名坯布号，便于用户定位').toContain(fabricNo);
+    expect(msg, '只登记重量的坯布，拒因须带重量单位公斤').toContain('公斤');
+    console.log(`[4.22] DELETE 有库存坯布 → 400 msg=${msg}`);
+
+    // 删除被拒不应产生副作用：详情回读仍 200
+    const stillThere = await page.request.get(
+      `${process.env.API_BASE || 'http://localhost:8082'}/api/v1/erp/production/greige-fabrics/${fabricId}`
+    );
+    expect(stillThere.status(), '删除被拒后坯布记录不应消失').toBe(200);
+  });
 });
