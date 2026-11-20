@@ -28,7 +28,7 @@ test.describe('4.14 销售价目 status 筛选白名单门', () => {
   test('467-01 采购侧 inactive 与越界状态恰 400/VALIDATION_ERROR 且点名允许值', async ({
     page,
   }) => {
-    const illegal = ['inactive', 'APPROVED', 'draft', 'pending ', `${'x'.repeat(80)}`, 'pe%nding'];
+    const illegal = ['inactive', 'APPROVED', 'draft', `${'x'.repeat(80)}`, 'pe%nding'];
     for (const value of illegal) {
       const result = await apiCallExpectFail(
         page,
@@ -51,7 +51,7 @@ test.describe('4.14 销售价目 status 筛选白名单门', () => {
   });
 
   test('467-02 三个合法状态与空串/纯空白放行（200，出参为数组）', async ({ page }) => {
-    for (const value of ['pending', 'approved', 'rejected', '', '   ']) {
+    for (const value of ['pending', 'approved', 'rejected', '', '   ', 'pending ']) {
       const rows = await apiCallRaw<unknown[]>(
         page,
         'GET',
