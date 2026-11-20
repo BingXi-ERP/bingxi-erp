@@ -155,4 +155,15 @@ onMounted(() => {
   color: #303133;
   margin: 0 0 12px 0;
 }
+
+@media (max-width: 767px) {
+  .product-page {
+    padding: 12px;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
 </style>

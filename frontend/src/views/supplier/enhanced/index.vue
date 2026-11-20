@@ -29,7 +29,7 @@
         </div>
       </div>
 
-      <el-descriptions v-if="supplier" :column="4" border class="block-gap">
+      <el-descriptions v-if="supplier" :column="isPhone ? 1 : 4" border class="block-gap">
         <el-descriptions-item :label="t('supplier.enhanced.descriptions.id')">
           {{ supplier.id }}
         </el-descriptions-item>
@@ -221,7 +221,7 @@
             :description="t('supplier.enhanced.history.balanceEmpty')"
             :image-size="60"
           />
-          <el-descriptions v-else :column="4" border>
+          <el-descriptions v-else :column="isPhone ? 1 : 4" border>
             <el-descriptions-item :label="t('supplier.enhanced.history.totalAmount')">
               {{ fmtAmount(balance.total_amount) }}
             </el-descriptions-item>
@@ -527,6 +527,7 @@
 
 <script setup lang="ts">
 import { computed, ref, reactive } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -560,6 +561,8 @@ import { getEvaluationIndicatorList, type EvaluationIndicator } from '@/api/supp
 import { useSupplierPicker } from '@/composables/useSupplierPicker';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 供应商入口的候选数据源：关键字远程搜索、加载中标志与竞态序号都在组合式里单点持有，
 // 本页只消费它的返回状态；已选供应商的主键仍由本页 supplierId 持有并供各取数函数使用。

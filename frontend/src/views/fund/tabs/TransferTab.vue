@@ -15,7 +15,57 @@
         </div>
       </template>
 
+      <!-- 手机端：转账记录单列卡片 -->
+      <section v-if="isPhone" v-loading="transferLoading" class="fund-transfer-mobile">
+        <ul class="card-list" :aria-label="t('fund.transferTab.tableAriaLabel')">
+          <li v-for="(row, index) in transferList" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('fund.transferTab.columnTransferNo') }}</dt>
+                <dd>{{ row.transfer_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.transferTab.columnFromAccount') }}</dt>
+                <dd>{{ row.from_account_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.transferTab.columnToAccount') }}</dt>
+                <dd>{{ row.to_account_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.transferTab.columnAmount') }}</dt>
+                <dd>
+                  <span class="balance-positive">¥{{ Number(row.amount ?? 0).toFixed(2) }}</span>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.transferTab.columnStatus') }}</dt>
+                <dd>
+                  <el-tag :type="getTransferStatusType(row.status)">
+                    {{ getTransferStatusLabel(row.status) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.transferTab.columnRemark') }}</dt>
+                <dd>{{ row.remark }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.transferTab.columnCreatedAt') }}</dt>
+                <dd>{{ row.created_at }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="viewTransferDetail(row)">
+                {{ t('fund.transferTab.buttonDetail') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="transferLoading"
         :data="transferList"
         stripe
@@ -84,7 +134,7 @@
     <el-dialog
       v-model="transferVisible"
       :title="t('fund.transferTab.dialogTitle')"
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('fund.transferTab.dialogAriaLabel')"
     >
       <el-form
@@ -92,6 +142,7 @@
         :model="transferForm"
         :rules="transferRules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('fund.transferTab.formAriaLabel')"
       >
         <el-form-item :label="t('fund.transferTab.fieldFromAccount')" prop="from_account_id">
@@ -166,6 +217,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Money } from '@element-plus/icons-vue';
@@ -182,6 +234,8 @@ import { isDialogDismissal } from '@/utils/monitor';
 import { useTableApi } from '@/composables/useTableApi';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const transferSubmitLoading = ref(false);
 const transferVisible = ref(false);
@@ -408,3 +462,59 @@ onMounted(() => {
   fetchAccounts();
 });
 </script>
+
+<style scoped>
+.fund-account-mobile .card-list,
+.fund-transfer-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fund-account-mobile .card-item,
+.fund-transfer-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.fund-account-mobile .card-fields > div,
+.fund-transfer-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.fund-account-mobile .card-fields dt,
+.fund-transfer-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.fund-account-mobile .card-fields dd,
+.fund-transfer-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.fund-account-mobile .field-emphasis dd,
+.fund-transfer-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.fund-account-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.fund-account-mobile .card-actions .el-button {
+  margin: 0;
+}
+</style>
