@@ -61,7 +61,7 @@ test('454-01 三行小数数量逐行舍入后行额合计与表头小计守恒'
   if (!unit) throw new Error('[454] 前置缺失：ctx.quotationProductUnit 未就绪');
 
   const lineQty = ['0.333', '0.333', '0.334'];
-  const created = await apiCall<{ data?: { id?: number } }>(page, 'POST', '/quotations', {
+  const created = await apiCall<{ id?: number }>(page, 'POST', '/quotations', {
     customer_id: ctx.customerId,
     sales_user_id: ctx.userIds[0],
     quotation_date: new Date().toISOString().slice(0, 10),
