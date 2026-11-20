@@ -1,81 +1,122 @@
-/**
- * 530 导入模板元数据契约。
- *
- * 功能：钉住 GET /templates/meta/{import_type} 的模板列清单与未知类型拒绝，防止前端复制列定义后与后端解析表漂移。
- * 调用方：数据导入中心的列说明面板；本用例仅作为 CI 回归，不点击 UI。
- * 入参：路径参数 customers 与 no-such-type，无 query、无 body、无造数。
- * 传给谁：apiCallRaw/apiCallExpectFail 发出相对 baseURL /api/v1/erp 的请求；auth 由 loginViaUI 提供。
- * 存什么：成功 data 的四个模板键与四列逐字段断言；失败只断 HTTP、机器码与外显原因。
- * 存哪里：后端 ImportExportService 的模板登记表（services/import_export_service.rs:116-128,163-199），不写库。
- *
- * 判据出处：路由在 frontend/scripts/route-snapshot.txt:957；handler 在 handlers/import_export_handler.rs:178-190；
- * 未知类型经 AppError::validation_displayable 落 400/VALIDATION_ERROR，中文原因用于导入面板提示，故可断言。
- */
-import { test, expect } from '../diagnose-fixture';
+// 530 导入模板元数据契约：客户模板固定列清单 + 未知类型统一拒绝。
+// 后端判据：routes/analytics.rs:199-202 注册 GET /templates/meta/{import_type}，
+//   handlers/import_export_handler.rs:178-189 从 ImportExportService::get_import_template 取登记表，
+//   原样回 {import_type,name,description,columns}；services/import_export_service.rs:115-127 的
+//   match 只为 products/customers/inventory/sku_mapping/crm_leads 放行，
+//   未知类型走 AppError::validation_displayable → HTTP 400 / VALIDATION_ERROR（error.rs:220-221/823）。
+//   客户列清单同源定义在同文件 :163-199；ImportColumnDef 固定五键 field/title/data_type/required/example。
+// 路径说明：服务层旧注释写 /import/templates/meta/...，但 route-snapshot.txt:957 与前端
+//   src/api/import-template.ts:34 的真实注册路径均为 /templates/meta/...，故本例钉真实端点，
+//   不对不存在的 /import 前缀做假绿断言。
+// 纯 GET：不建数据、不清理；唯一 unknown type 由 genCode 派生，避免与后端登记类型相撞。
+import { expect, test } from '../diagnose-fixture';
 import {
   APP_ERROR_CODES,
   apiCallExpectFail,
   apiCallRaw,
   failureCode,
+  genCode,
   loginViaUI,
 } from '../flow/helpers';
 
-interface ImportColumn {
+interface ImportColumnDef {
   field: string;
   title: string;
   data_type: string;
   required: boolean;
-  example: string;
+  example: string | null;
 }
 
 interface ImportTemplateMeta {
   import_type: string;
   name: string;
   description: string;
-  columns: ImportColumn[];
+  columns: ImportColumnDef[];
 }
 
-const CUSTOMERS_TEMPLATE: ImportTemplateMeta = {
-  import_type: 'customers',
-  name: '客户导入模板',
-  description: '用于批量导入客户信息',
-  columns: [
-    { field: 'code', title: '客户编码', data_type: 'string', required: true, example: 'C001' },
-    { field: 'name', title: '客户名称', data_type: 'string', required: true, example: 'ABC公司' },
-    { field: 'contact', title: '联系人', data_type: 'string', required: false, example: '张三' },
-    {
-      field: 'phone',
-      title: '电话',
-      data_type: 'string',
-      required: false,
-      example: '13800138000',
-    },
-  ],
-};
+const EXPECTED_TOP_KEYS = ['columns', 'description', 'import_type', 'name'];
+const EXPECTED_COLUMN_KEYS = ['data_type', 'example', 'field', 'required', 'title'];
+const EXPECTED_COLUMNS = [
+  { field: 'code', title: '客户编码', data_type: 'string', required: true },
+  { field: 'name', title: '客户名称', data_type: 'string', required: true },
+  { field: 'contact', title: '联系人', data_type: 'string', required: false },
+  { field: 'phone', title: '电话', data_type: 'string', required: false },
+];
 
-test('530-01 客户导入模板元数据四列逐字段回读不漂移', async ({ page }) => {
-  await loginViaUI(page);
-  const meta = await apiCallRaw<ImportTemplateMeta>(page, 'GET', '/templates/meta/customers');
-  expect(meta, '客户模板出参须逐字段等于后端模板登记表').toEqual(CUSTOMERS_TEMPLATE);
-  for (const column of meta.columns) {
+test.describe('530 导入模板元数据契约', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginViaUI(page);
+  });
+
+  test('530-01 customers 模板列清单逐字段固定且未知类型 400/VALIDATION_ERROR', async ({ page }) => {
+    const meta = await apiCallRaw<ImportTemplateMeta>(page, 'GET', '/templates/meta/customers');
+
     expect(
-      Object.keys(column).sort(),
-      `${column.field} 列只允许 field/title/data_type/required/example 五键`
-    ).toEqual(['data_type', 'example', 'field', 'required', 'title']);
-  }
-});
+      meta !== null && typeof meta === 'object',
+      `[530] customers 元数据 data 须为对象，实际=${JSON.stringify(meta)}`
+    ).toBe(true);
+    expect(
+      Object.keys(meta).sort(),
+      `[530] customers 元数据只含四键，实际=${JSON.stringify(Object.keys(meta).sort())}`
+    ).toEqual(EXPECTED_TOP_KEYS);
+    expect(meta.import_type, `[530] import_type 须为 customers，实际=${meta.import_type}`).toBe(
+      'customers'
+    );
+    expect(meta.name, `[530] name 须逐字符等于后端登记表，实际=${JSON.stringify(meta.name)}`).toBe(
+      '客户导入模板'
+    );
+    expect(
+      meta.description,
+      `[530] description 须逐字符等于后端登记表，实际=${JSON.stringify(meta.description)}`
+    ).toBe('用于批量导入客户信息');
+    expect(
+      Array.isArray(meta.columns),
+      `[530] columns 须为数组，实际=${JSON.stringify(meta.columns)}`
+    ).toBe(true);
+    expect(meta.columns.length, `[530] customers 固定四列，实际列数=${meta.columns.length}`).toBe(
+      4
+    );
 
-test('530-02 未知导入类型返回 400 机器码并提示具体类型', async ({ page }) => {
-  await loginViaUI(page);
-  const invalidType = 'no-such-type';
-  const failure = await apiCallExpectFail(page, 'GET', `/templates/meta/${invalidType}`);
+    const shape = meta.columns.map(column => ({
+      field: column.field,
+      title: column.title,
+      data_type: column.data_type,
+      required: column.required,
+    }));
+    expect(
+      shape,
+      `[530] customers 四列须逐字段等于权威列清单，实际=${JSON.stringify(shape)}`
+    ).toEqual(EXPECTED_COLUMNS);
 
-  expect(failure.status, `未知导入类型须 400，实际 ${failure.status}`).toBe(400);
-  expect(
-    failureCode(failure),
-    `未知导入类型机器码，实际 ${String(failure.code)} message=${String(failure.message)}`
-  ).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
-  expect(failure.message, '外显原因须点名未知类型，不能退化成通用失败').toContain(
-    `不支持的导入类型: ${invalidType}`
-  );
+    for (const [index, column] of meta.columns.entries()) {
+      expect(
+        Object.keys(column).sort(),
+        `[530] 第 ${index + 1} 列只含五键，实际=${JSON.stringify(Object.keys(column).sort())}`
+      ).toEqual(EXPECTED_COLUMN_KEYS);
+      expect(
+        typeof column.required === 'boolean',
+        `[530] 第 ${index + 1} 列 required 须严格布尔，实际=${JSON.stringify(column.required)}`
+      ).toBe(true);
+      expect(
+        typeof column.example === 'string' && column.example.length > 0,
+        `[530] 第 ${index + 1} 列 example 须非空字符串，实际=${JSON.stringify(column.example)}`
+      ).toBe(true);
+    }
+
+    const unknownType = genCode('E530UNKNOWN');
+    const failure = await apiCallExpectFail(page, 'GET', `/templates/meta/${unknownType}`);
+    expect(failure.status, `[530] 未知类型 ${unknownType} 须 400，实际=${failure.status}`).toBe(
+      400
+    );
+    expect(
+      failureCode(failure),
+      `[530] 未知类型 ${unknownType} 机器码须 VALIDATION_ERROR，实际=${failureCode(failure)}`
+    ).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+    expect(
+      failure.message ?? '',
+      `[530] 未知类型 ${unknownType} 文案须点名不支持的导入类型，实际=${JSON.stringify(
+        failure.message
+      )}`
+    ).toContain('不支持的导入类型');
+  });
 });
