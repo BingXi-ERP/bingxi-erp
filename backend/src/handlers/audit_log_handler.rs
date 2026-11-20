@@ -8,7 +8,8 @@
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::HeaderMap,
+    http::{HeaderMap, HeaderName, HeaderValue},
+    response::Response,
 };
 use chrono::{DateTime, Utc};
 use sea_orm::{
@@ -20,7 +21,7 @@ use sha2::{Digest, Sha256};
 
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
-use crate::models::{audit_log, audit_log_export_log};
+use crate::models::{audit_log, audit_log_export_log, event_dead_letter};
 use crate::services::export_approval_service::ExportApprovalService;
 use crate::utils::admin_checker::can_access_audit_logs;
 use crate::utils::error::AppError;
@@ -515,7 +516,7 @@ pub async fn export_audit_logs(
         )
         .await?;
 
-    let (xlsx_bytes, filename) = approval_svc
+    let (xlsx_bytes, filename, tamper_proof_error) = approval_svc
         .run_export_leg(approval.id, async {
             const EXPORT_LIMIT: u64 = 10000;
             let cond = build_audit_log_condition(&query);
@@ -550,21 +551,26 @@ pub async fn export_audit_logs(
             let file_size = xlsx_bytes.len() as i64;
 
             // 写入防篡改表（独立于 audit_logs，审计员无法改与删）
-            record_audit_log_export_tamper_proof(
+            // 写失败已在函数内重试并落死信；此处把最终错误带出 closure，供响应头附加警告
+            let tamper_proof_error = record_audit_log_export_tamper_proof(
                 &state, &auth, &query, logs_count, &file_hash, file_size, &headers,
             )
-            .await;
+            .await
+            .err();
 
             // 敏感导出 fail-closed：记录令牌消费（用真实 file_hash 与 file_size）
             approval_svc
                 .record_download(approval.id, filename.clone(), file_size, file_hash)
                 .await?;
 
-            Ok((xlsx_bytes, filename))
+            Ok((xlsx_bytes, filename, tamper_proof_error))
         })
         .await?;
 
-    Ok(xlsx_response(xlsx_bytes, &filename))
+    Ok(attach_export_warning_header(
+        xlsx_response(xlsx_bytes, &filename),
+        tamper_proof_error.as_deref(),
+    ))
 }
 
 /// 计算 SHA256 指纹并返回小写十六进制字符串
@@ -584,7 +590,9 @@ pub fn header_str(headers: &HeaderMap, name: &str) -> Option<String> {
 
 /// V15 缺陷 10-4：写入防篡改表 audit_log_export_log（独立于 audit_logs）。
 /// 该表通过 BEFORE UPDATE / DELETE 触发器禁止修改，审计员无法篡改自身导出记录。
-/// best-effort：写入失败仅记录日志，不阻塞导出响应（导出本身已成功）。
+/// 写失败先重试 1 次；仍失败则落 event_dead_letters（status=DEAD）供人工补录，
+/// 并返回 Err(last_error) 由调用方在响应头附加可观测警告（不阻断导出，文件已生成）。
+/// 入参为调用方 handler 的 state/auth/查询与已生成的导出指纹；成功返回 Ok(())。
 async fn record_audit_log_export_tamper_proof(
     state: &AppState,
     auth: &AuthContext,
@@ -593,7 +601,7 @@ async fn record_audit_log_export_tamper_proof(
     file_hash: &str,
     file_size: i64,
     headers: &HeaderMap,
-) {
+) -> Result<(), String> {
     let query_filter = serde_json::to_string(query).ok();
     let ip = header_str(headers, "x-forwarded-for")
         .or_else(|| header_str(headers, "x-real-ip"))
@@ -601,29 +609,158 @@ async fn record_audit_log_export_tamper_proof(
     let user_agent = header_str(headers, "user-agent");
     let request_id = header_str(headers, "x-request-id");
 
-    let export_log = audit_log_export_log::ActiveModel {
+    let build_export_log = || audit_log_export_log::ActiveModel {
         exporter_user_id: Set(auth.user_id),
         exporter_username: Set(auth.username.clone()),
-        export_query_filter: Set(query_filter),
+        export_query_filter: Set(query_filter.clone()),
         export_record_count: Set(record_count as i32),
         export_file_format: Set("xlsx".to_string()),
         export_file_hash_sha256: Set(Some(file_hash.to_string())),
         export_file_size_bytes: Set(Some(file_size)),
-        export_ip_address: Set(ip),
-        export_user_agent: Set(user_agent),
-        export_request_id: Set(request_id),
+        export_ip_address: Set(ip.clone()),
+        export_user_agent: Set(user_agent.clone()),
+        export_request_id: Set(request_id.clone()),
         exported_at: Set(chrono::Utc::now()),
         ..Default::default()
     };
 
-    if let Err(e) = export_log.insert(state.db.as_ref()).await {
+    match build_export_log().insert(state.db.as_ref()).await {
+        Ok(_) => return Ok(()),
+        Err(e) => {
+            tracing::error!(
+                target: "security_audit",
+                error = %e,
+                user_id = auth.user_id,
+                "[SECURITY] 写入 audit_log_export_log 防篡改表失败，准备重试 1 次"
+            );
+        }
+    }
+
+    let last_error = match build_export_log().insert(state.db.as_ref()).await {
+        Ok(_) => {
+            tracing::info!(
+                target: "security_audit",
+                user_id = auth.user_id,
+                "[SECURITY] audit_log_export_log 防篡改行重试写入成功"
+            );
+            return Ok(());
+        }
+        Err(e) => {
+            let err = e.to_string();
+            tracing::error!(
+                target: "security_audit",
+                error = %err,
+                user_id = auth.user_id,
+                "[SECURITY] audit_log_export_log 防篡改行重试仍失败，落 event_dead_letters 补偿（导出响应附加警告头）"
+            );
+            err
+        }
+    };
+
+    let dead_letter = build_export_dead_letter_model(
+        auth.user_id,
+        &auth.username,
+        query_filter.as_deref(),
+        record_count,
+        file_hash,
+        file_size,
+        ip.as_deref(),
+        user_agent.as_deref(),
+        request_id.as_deref(),
+        &last_error,
+    );
+    if let Err(dl_err) = event_dead_letter::Entity::insert(dead_letter)
+        .exec(state.db.as_ref())
+        .await
+    {
         tracing::error!(
             target: "security_audit",
-            error = %e,
+            error = %dl_err,
             user_id = auth.user_id,
-            "[SECURITY] 写入 audit_log_export_log 防篡改表失败（导出已成功，但二次审计记录缺失）"
+            "[SECURITY] 导出防篡改死信写入 event_dead_letters 失败，仅剩日志可追溯"
         );
     }
+
+    Err(last_error)
+}
+
+/// 导出防篡改行写失败死信的事件类型标识（写入方：audit_log_handler；消费方：死信人工处理）
+pub const EXPORT_TAMPER_PROOF_DEAD_LETTER_EVENT: &str =
+    "AUDIT_LOG_EXPORT_TAMPER_PROOF_WRITE_FAILED";
+
+/// 导出响应附加防篡改警告的响应头名（调用方：audit-logs 导出 handler）
+pub const AUDIT_EXPORT_LOG_WARNING_HEADER_NAME: &str = "x-audit-export-log-warning";
+/// 上述警告头的固定取值（错误详情在日志与死信表，头值保持可校验的固定 token）
+pub const AUDIT_EXPORT_LOG_WARNING_VALUE: &str = "tamper-proof-record-missing";
+
+/// 构建导出防篡改写失败死信 ActiveModel（纯函数，供单测断言结构）。
+/// 落 event_dead_letters 表，event_payload 携带补录防篡改行所需字段
+/// （导出人/条数/文件指纹/筛选条件/请求标识/最终错误），retry_count=max_retries=1（重试 1 次）。
+#[allow(clippy::too_many_arguments)]
+fn build_export_dead_letter_model(
+    exporter_user_id: i32,
+    exporter_username: &str,
+    query_filter: Option<&str>,
+    record_count: usize,
+    file_hash: &str,
+    file_size: i64,
+    ip: Option<&str>,
+    user_agent: Option<&str>,
+    request_id: Option<&str>,
+    last_error: &str,
+) -> event_dead_letter::ActiveModel {
+    let now = chrono::Utc::now();
+    let payload = serde_json::json!({
+        "exporter_user_id": exporter_user_id,
+        "exporter_username": exporter_username,
+        "export_query_filter": query_filter,
+        "export_record_count": record_count,
+        "export_file_hash_sha256": file_hash,
+        "export_file_size_bytes": file_size,
+        "export_ip_address": ip,
+        "export_user_agent": user_agent,
+        "export_request_id": request_id,
+        "export_file_format": "xlsx",
+        "last_error": last_error,
+    });
+    event_dead_letter::ActiveModel {
+        event_type: Set(EXPORT_TAMPER_PROOF_DEAD_LETTER_EVENT.to_string()),
+        event_payload: Set(payload),
+        failure_reason: Set(
+            "audit_log_export_log 防篡改行写入重试 1 次后仍失败，导出二次审计记录缺失（待人工补录）"
+                .to_string(),
+        ),
+        last_error: Set(Some(last_error.to_string())),
+        retry_count: Set(1),
+        max_retries: Set(1),
+        status: Set(event_dead_letter::status::DEAD.to_string()),
+        first_failed_at: Set(now),
+        last_retry_at: Set(Some(now)),
+        resolved_at: Set(None),
+        resolved_by: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+        ..Default::default()
+    }
+}
+
+/// 导出成功但防篡改审计行缺失时，在 xlsx 响应上附加固定警告头，
+/// 让调用方在不破坏二进制文件的前提下观测到审计断档（纯函数，供单测断言）。
+/// 入参 response 为已构造的下载响应；error 为 None 时不修改响应原样返回。
+fn attach_export_warning_header(mut response: Response, error: Option<&str>) -> Response {
+    if let Some(err) = error {
+        tracing::error!(
+            target: "security_audit",
+            error = %err,
+            "[SECURITY] 导出响应附加防篡改记录缺失警告头 {}={}",
+            AUDIT_EXPORT_LOG_WARNING_HEADER_NAME,
+            AUDIT_EXPORT_LOG_WARNING_VALUE
+        );
+        let name = HeaderName::from_static(AUDIT_EXPORT_LOG_WARNING_HEADER_NAME);
+        let value = HeaderValue::from_static(AUDIT_EXPORT_LOG_WARNING_VALUE);
+        response.headers_mut().insert(name, value);
+    }
+    response
 }
 
 /// V15 缺陷 10-4：查询审计日志导出二次审计记录（仅 admin/auditor）。
@@ -827,4 +964,94 @@ pub async fn get_audit_log_summary(
     });
 
     Ok(Json(ApiResponse::success(summary)))
+}
+
+#[cfg(test)]
+mod export_warning_tests {
+    use super::*;
+    use sea_orm::ActiveValue;
+
+    /// 防篡改行写失败时，导出响应必须携带固定警告头；
+    /// xlsx 是二进制体，警告只能走响应头通道，缺头 = 审计断档对调用方不可见。
+    #[test]
+    fn attaches_warning_header_when_tamper_proof_write_failed() {
+        let response = Response::builder()
+            .body(axum::body::Body::empty())
+            .expect("构造空响应失败");
+        let response = attach_export_warning_header(response, Some("connection refused"));
+        let name = HeaderName::from_static(AUDIT_EXPORT_LOG_WARNING_HEADER_NAME);
+        let got = response
+            .headers()
+            .get(&name)
+            .map(|v| v.to_str().expect("警告头值必须可见 ASCII").to_string())
+            .expect("防篡改写失败时警告头必须存在");
+        assert_eq!(got, AUDIT_EXPORT_LOG_WARNING_VALUE);
+    }
+
+    /// 写入成功（error=None）时响应不得携带警告头，避免下游把正常导出误判为审计断档。
+    #[test]
+    fn omits_warning_header_when_tamper_proof_write_succeeded() {
+        let response = Response::builder()
+            .body(axum::body::Body::empty())
+            .expect("构造空响应失败");
+        let response = attach_export_warning_header(response, None);
+        let name = HeaderName::from_static(AUDIT_EXPORT_LOG_WARNING_HEADER_NAME);
+        assert!(
+            response.headers().get(&name).is_none(),
+            "防篡改写入成功时不应出现警告头"
+        );
+    }
+
+    /// 导出防篡改死信行必须落 status=DEAD、event_type 固定为写入方常量，
+    /// 且 payload 携带补录防篡改行所需的全部字段（缺键 = 死信无法还原导出上下文）。
+    #[test]
+    fn export_dead_letter_model_keeps_audit_fields_and_dead_status() {
+        let model = build_export_dead_letter_model(
+            7,
+            "alice",
+            Some("{\"page\":1}"),
+            25,
+            "abc123",
+            4096,
+            Some("10.0.0.8"),
+            Some("ua"),
+            Some("req-1"),
+            "connection refused",
+        );
+        assert_eq!(
+            model.status,
+            ActiveValue::Set(event_dead_letter::status::DEAD.to_string())
+        );
+        assert_eq!(
+            model.event_type,
+            ActiveValue::Set(EXPORT_TAMPER_PROOF_DEAD_LETTER_EVENT.to_string())
+        );
+        assert_eq!(model.retry_count, ActiveValue::Set(1));
+        assert_eq!(model.max_retries, ActiveValue::Set(1));
+
+        let payload = match model.event_payload {
+            ActiveValue::Set(v) => v,
+            other => panic!("event_payload 必须为 Set，实际 {:?}", other),
+        };
+        let obj = payload.as_object().expect("死信 payload 必须是 JSON 对象");
+        for key in [
+            "exporter_user_id",
+            "exporter_username",
+            "export_query_filter",
+            "export_record_count",
+            "export_file_hash_sha256",
+            "export_file_size_bytes",
+            "export_ip_address",
+            "export_user_agent",
+            "export_request_id",
+            "export_file_format",
+            "last_error",
+        ] {
+            assert!(obj.contains_key(key), "导出死信 payload 缺少键: {}", key);
+        }
+        assert_eq!(obj["exporter_user_id"], 7);
+        assert_eq!(obj["export_record_count"], 25);
+        assert_eq!(obj["export_file_hash_sha256"], "abc123");
+        assert_eq!(obj["last_error"], "connection refused");
+    }
 }

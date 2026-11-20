@@ -17,13 +17,7 @@
 use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::{
-    // 批次 357 v13 复审 baseline 清零：移除 unused import ActiveModelTrait
-    ColumnTrait,
-    DatabaseConnection,
-    EntityTrait,
-    QueryFilter,
-    QuerySelect,
-    Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QuerySelect, Set,
     TransactionTrait,
 };
 use std::sync::Arc;
@@ -31,6 +25,7 @@ use std::sync::Arc;
 use crate::container::AppState;
 use crate::models::bpm_task;
 use crate::models::dto::bpm_dto::StartProcessRequest;
+use crate::models::event_dead_letter;
 use crate::models::sales_quotation::{
     self, ActiveModel as QuotationActive, Entity as QuotationEntity,
 };
@@ -46,6 +41,53 @@ use crate::utils::error::AppError;
 /// 金额阶梯常量
 const AMOUNT_THRESHOLD_SELF: i64 = 100_000; // 10 万
 const AMOUNT_THRESHOLD_MANAGER: i64 = 500_000; // 50 万
+
+/// BPM 回写失败死信的事件类型（is_err 审计条目 16）。
+/// 复用 event_dead_letters 表承载"业务状态已推进、BPM 待办未闭环"的补偿信号，
+/// event_type 采用 BizEvent 命名式（非 BusinessEvent 变体，同步腿独立标注）。
+const BPM_WRITEBACK_DEAD_LETTER_EVENT_TYPE: &str = "QuotationApprovalBpmWritebackFailed";
+
+/// 构建报价单 BPM 回写失败死信行（纯函数，供 [`QuotationApprovalService::write_bpm_dead_letter`]
+/// 与契约测试共用）。payload 契约键：quotation_id / approved / approver_id / reject_reason /
+/// task_id / action——人工按 payload 中的 task_id 直达 PENDING 的 bpm_task 补闭环。
+/// 状态直接落 DEAD（本信号无重试链，`retry_count=0` 记录"一次即入死信"）。
+pub fn build_bpm_dead_letter_active(
+    quotation_id: i64,
+    approved: bool,
+    approver_id: i32,
+    reject_reason: Option<&str>,
+    task_id: i32,
+    action: &str,
+    full_error: &str,
+) -> event_dead_letter::ActiveModel {
+    let now = Utc::now();
+    event_dead_letter::ActiveModel {
+        event_type: Set(BPM_WRITEBACK_DEAD_LETTER_EVENT_TYPE.to_string()),
+        event_payload: Set(serde_json::json!({
+            "quotation_id": quotation_id,
+            "approved": approved,
+            "approver_id": approver_id,
+            "reject_reason": reject_reason,
+            "task_id": task_id,
+            "action": action,
+        })),
+        failure_reason: Set(format!(
+            "报价单 {} 业务状态已推进但 BPM approve_task（task_id={}，action={}）失败，任务永久 PENDING",
+            quotation_id, task_id, action
+        )),
+        last_error: Set(Some(full_error.to_string())),
+        retry_count: Set(0),
+        max_retries: Set(0),
+        status: Set(event_dead_letter::status::DEAD.to_string()),
+        first_failed_at: Set(now),
+        last_retry_at: Set(Some(now)),
+        resolved_at: Set(None),
+        resolved_by: Set(None),
+        created_at: Set(now),
+        updated_at: Set(now),
+        ..Default::default()
+    }
+}
 
 /// 审批角色枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -102,6 +144,51 @@ impl QuotationApprovalService {
     pub fn from_state(state: &AppState) -> Self {
         Self {
             db: state.db.clone(),
+        }
+    }
+
+    /// BPM 回写失败补偿信号落死信（is_err 审计条目 16，参照
+    /// services/event_retry_service.rs::write_to_dead_letter 的写行范式）。
+    /// 业务状态已在调用方事务内提交、不回改；死信写失败只以 error 级日志点名，
+    /// 不向上抛（避免把"补偿信号写失败"伪装成业务失败二次改写已提交状态）。
+    async fn write_bpm_dead_letter(
+        &self,
+        quotation_id: i64,
+        approved: bool,
+        approver_id: i32,
+        reject_reason: Option<&str>,
+        task_id: i32,
+        action: &str,
+        full_error: &str,
+    ) {
+        let active = build_bpm_dead_letter_active(
+            quotation_id,
+            approved,
+            approver_id,
+            reject_reason,
+            task_id,
+            action,
+            full_error,
+        );
+        match active.insert(&*self.db).await {
+            Ok(_) => {
+                tracing::warn!(
+                    business_type = "quotation",
+                    business_id = quotation_id,
+                    task_id,
+                    event_type = BPM_WRITEBACK_DEAD_LETTER_EVENT_TYPE,
+                    "BPM 回写失败已落 event_dead_letters 死信，待人工按 payload 补闭环"
+                );
+            }
+            Err(dl_err) => {
+                tracing::error!(
+                    business_type = "quotation",
+                    business_id = quotation_id,
+                    task_id,
+                    error = %dl_err,
+                    "BPM 回写失败且死信写入失败：补偿信号未持久化，需人工核对 bpm_task PENDING 残留"
+                );
+            }
         }
     }
 
@@ -460,6 +547,18 @@ impl QuotationApprovalService {
                     business_id = quotation_id,
                     "BPM 报价单审批通过任务失败（不阻断已提交的业务状态）"
                 );
+                // is_err 审计条目 16：业务状态已推进、BPM 任务将永久 PENDING，
+                // 落死信持久化补偿信号（payload 带 quotation_id/approved/approver_id 等）。
+                self.write_bpm_dead_letter(
+                    quotation_id,
+                    true,
+                    approver_id,
+                    None,
+                    task.id,
+                    APPROVE_ACTION,
+                    &e.to_string(),
+                )
+                .await;
             } else {
                 tracing::info!(
                     task_id = task.id,
@@ -660,6 +759,17 @@ impl QuotationApprovalService {
                     business_id = updated.id,
                     "BPM 报价单审批拒绝任务失败（不阻断已提交的业务状态）"
                 );
+                // is_err 审计条目 16：拒绝腿同款死信接入（payload 带拒绝理由）。
+                self.write_bpm_dead_letter(
+                    updated.id,
+                    false,
+                    approver_id,
+                    Some(reason),
+                    task.id,
+                    REJECT_ACTION,
+                    &e.to_string(),
+                )
+                .await;
             } else {
                 tracing::info!(
                     task_id = task.id,
