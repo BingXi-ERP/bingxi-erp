@@ -354,4 +354,10 @@ const handlePrint = () => {
   display: flex;
   justify-content: flex-end;
 }
+
+@media (max-width: 767px) {
+  .supplier-page {
+    padding: 12px;
+  }
+}
 </style>

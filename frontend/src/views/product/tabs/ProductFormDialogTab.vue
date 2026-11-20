@@ -8,7 +8,7 @@
   <el-dialog
     :model-value="visible"
     :title="title"
-    width="700px"
+    :width="isPhone ? '95%' : '700px'"
     :close-on-click-modal="false"
     :aria-label="title"
     @update:model-value="(val: boolean) => emit('update:modelValue', val)"
@@ -18,6 +18,7 @@
       :model="formData"
       :rules="formRules"
       label-width="100px"
+      :label-position="isPhone ? 'top' : 'right'"
       :disabled="mode === 'view'"
       :aria-label="t('product.productFormDialogTab.formAriaLabel')"
     >
@@ -508,6 +509,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { QuestionFilled } from '@element-plus/icons-vue';
@@ -532,6 +534,8 @@ import { computeMetersPerKg, buildFabricSpecification } from '@/utils/fabric-yar
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 安全类别下拉：value 用字母落库真相（A/B/C），label 走 i18n；词表与后端 product_safety_category 同源
 const safetyCategoryOptions = computed(() =>

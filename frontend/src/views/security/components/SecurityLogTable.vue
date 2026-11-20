@@ -47,7 +47,50 @@
       </div>
     </template>
 
+    <!-- 手机端：登录日志单列卡片 -->
+    <section v-if="isPhone" v-loading="loading" class="security-table-mobile">
+      <ul class="card-list" :aria-label="t('security.logTable.ariaLabel.table')">
+        <li v-for="(row, index) in data" :key="index" class="card-item">
+          <dl class="card-fields">
+            <div class="field field-emphasis">
+              <dt>{{ t('security.logTable.column.username') }}</dt>
+              <dd>{{ row.username }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('security.logTable.column.loginType') }}</dt>
+              <dd>
+                <el-tag>{{ getTypeLabel(row.login_type) }}</el-tag>
+              </dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('security.logTable.column.ipAddress') }}</dt>
+              <dd>{{ row.ip_address }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('security.logTable.column.userAgent') }}</dt>
+              <dd>{{ row.user_agent }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('security.logTable.column.status') }}</dt>
+              <dd>
+                <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+              </dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('security.logTable.column.failReason') }}</dt>
+              <dd>{{ row.fail_reason }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('security.logTable.column.loginTime') }}</dt>
+              <dd>{{ row.login_time }}</dd>
+            </div>
+          </dl>
+        </li>
+      </ul>
+    </section>
+
     <el-table
+      v-if="!isPhone"
       v-loading="loading"
       :data="data"
       border
@@ -128,13 +171,16 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue';
+import { reactive, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { Search } from '@element-plus/icons-vue';
 import type { LoginLog } from '@/api/security';
 import { getStatusType } from '../composables/secFmts';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 批次 282：queryParams 类型放宽为 Record<string, unknown>（兼容 useTableApi）
 const props = defineProps<{
@@ -190,5 +236,53 @@ const handleSearch = () => {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+.security-table-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.security-table-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.security-table-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.security-table-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.security-table-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.security-table-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.security-table-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.security-table-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

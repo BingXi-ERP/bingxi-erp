@@ -30,6 +30,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         class="change-pwd-form"
         :aria-label="t('security.changePassword.ariaLabel')"
       >
@@ -96,13 +97,16 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { reactive, ref, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { changePassword } from '@/api/user';
 import PasswordStrengthMeter from '@/components/PasswordStrengthMeter.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface ChangePwdForm {
   old_password: string;

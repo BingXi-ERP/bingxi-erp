@@ -15,7 +15,7 @@
     :model-value="visible"
     :title="title"
     :aria-label="title"
-    width="800px"
+    :width="isPhone ? '95%' : '800px'"
     :close-on-click-modal="false"
     @update:model-value="onVisibleChange"
     @close="emit('close')"
@@ -25,6 +25,7 @@
       :model="localFormData"
       :rules="formRules"
       label-width="120px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('supplier.dialog.formAriaLabel')"
     >
       <el-divider content-position="left">{{ t('supplier.dialog.section.basic') }}</el-divider>
@@ -240,6 +241,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
 import type { FormInstance, FormRules } from 'element-plus';
@@ -247,6 +249,8 @@ import type { FormInstance, FormRules } from 'element-plus';
 import type { SupplierFormData } from './supplier-form';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const props = defineProps<{
   // 对话框可见性

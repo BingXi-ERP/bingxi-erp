@@ -32,7 +32,74 @@
         </div>
       </template>
 
+      <!-- 手机端：资金账户单列卡片 -->
+      <section v-if="isPhone" v-loading="loading" class="fund-account-mobile">
+        <ul class="card-list" :aria-label="t('fund.accountTab.tableAriaLabel')">
+          <li v-for="(row, index) in accountList" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('fund.accountTab.columnAccountNo') }}</dt>
+                <dd>{{ row.account_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.accountTab.columnAccountName') }}</dt>
+                <dd>{{ row.account_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.accountTab.columnBankName') }}</dt>
+                <dd>{{ row.bank_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.accountTab.columnCurrentBalance') }}</dt>
+                <dd>
+                  <span class="balance-positive">¥{{ Number(row.balance ?? 0).toFixed(2) }}</span>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.accountTab.columnFrozenBalance') }}</dt>
+                <dd>
+                  <span v-if="row.frozen_balance" class="balance-frozen"
+                    >¥{{ Number(row.frozen_balance ?? 0).toFixed(2) }}</span
+                  >
+                  <span v-else>-</span>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('fund.accountTab.columnStatus') }}</dt>
+                <dd>
+                  <el-tag
+                    :type="
+                      FUND_ACCOUNT_STATUS[row.status as keyof typeof FUND_ACCOUNT_STATUS]?.type
+                    "
+                  >
+                    {{ getAccountStatusLabel(row.status) }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="viewDetail(row)">
+                {{ t('fund.accountTab.buttonView') }}
+              </el-button>
+              <el-button v-if="row.status === 'active'" @click="handleDeposit(row)">
+                {{ t('fund.accountTab.buttonDeposit') }}
+              </el-button>
+              <el-button v-if="row.status === 'active'" @click="handleWithdraw(row)">
+                {{ t('fund.accountTab.buttonWithdraw') }}
+              </el-button>
+              <el-button v-if="row.status === 'active'" @click="openTransferDialog(row)">
+                {{ t('fund.accountTab.buttonTransferAction') }}
+              </el-button>
+              <el-button v-if="row.status === 'inactive'" type="danger" @click="handleDelete(row)">
+                {{ t('fund.accountTab.buttonDelete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="accountList"
         stripe
@@ -146,7 +213,7 @@
           ? t('fund.accountTab.dialogTitleCreate')
           : t('fund.accountTab.dialogTitleEdit')
       "
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('fund.accountTab.dialogAriaLabel')"
       @close="resetForm"
     >
@@ -155,6 +222,7 @@
         :model="accountForm"
         :rules="accountRules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('fund.accountTab.formAriaLabel')"
       >
         <el-form-item :label="t('fund.accountTab.fieldAccountNo')" prop="account_no">
@@ -230,7 +298,7 @@
     <el-dialog
       v-model="detailVisible"
       :title="t('fund.accountTab.detailDialogTitle')"
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('fund.accountTab.detailDialogAriaLabel')"
     >
       <el-descriptions :column="2" border :aria-label="t('fund.accountTab.detailAriaLabel')">
@@ -285,7 +353,7 @@
       :title="
         operationType === 'deposit' ? t('fund.accountTab.deposit') : t('fund.accountTab.withdraw')
       "
-      width="500px"
+      :width="isPhone ? '95%' : '500px'"
       :aria-label="t('fund.accountTab.operationDialogAriaLabel')"
     >
       <el-form
@@ -293,6 +361,7 @@
         :model="operationForm"
         :rules="operationRules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('fund.accountTab.operationFormAriaLabel')"
       >
         <el-form-item :label="t('fund.accountTab.fieldOperationAccount')">
@@ -330,7 +399,8 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { PERMISSIONS } from '@/constants/permissions';
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { numberInputRules } from '@/utils/number-input';
@@ -347,6 +417,8 @@ import {
 import { useTableApi } from '@/composables/useTableApi';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const submitLoading = ref(false);
 const dialogVisible = ref(false);
@@ -577,3 +649,59 @@ const handleDelete = async (row: FundAccount) => {
   }
 };
 </script>
+
+<style scoped>
+.fund-account-mobile .card-list,
+.fund-transfer-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fund-account-mobile .card-item,
+.fund-transfer-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.fund-account-mobile .card-fields > div,
+.fund-transfer-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.fund-account-mobile .card-fields dt,
+.fund-transfer-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.fund-account-mobile .card-fields dd,
+.fund-transfer-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.fund-account-mobile .field-emphasis dd,
+.fund-transfer-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.fund-account-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.fund-account-mobile .card-actions .el-button {
+  margin: 0;
+}
+</style>
