@@ -423,6 +423,8 @@ async fn seed(db: &sea_orm::DatabaseConnection) {
             customer_feedback: Set(None),
             delta_e_value: Set(None),
             reject_reason: Set(None),
+            stock_grade_sync_pending: Set(false),
+            stock_scrap_sync_pending: Set(false),
             delivery_blocking: Set(true),
             attachment_url: Set(None),
             remark: Set(None),
