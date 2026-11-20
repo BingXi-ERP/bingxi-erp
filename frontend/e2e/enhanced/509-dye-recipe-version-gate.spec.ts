@@ -1,4 +1,4 @@
-// Wave4 样品/色卡/配方域：染色配方版本门（仅已审核可建新版本）与版本树逐字段回读。
+// 染色配方版本门：仅已审核配方可建新版本，版本树逐字段回读。
 // 后端判据：routes/production.rs:126-137 挂 POST /production/dye-recipes/{id}/version
 //   与 GET /production/dye-recipes/{id}/versions；handlers/dye_recipe_handler.rs:202-220
 //   用 OptionalJson<CreateVersionRequest> 只收 remarks，建版人取 AuthContext.user_id，
