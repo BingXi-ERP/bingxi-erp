@@ -1,6 +1,6 @@
 /**
  * 多域简单页手机端适配批量契约锁。
- * 功能：pin 住本批次 84 个简单页至少具备一类 isPhone 响应式改造
+ * 功能：pin 住本批适配的 84 个简单页至少具备一类 isPhone 响应式改造
  *       （dialog 宽度 / form label / descriptions 单列 / 容器 padding）。
  * 调用方：vitest（tests/unit，CI vitest job）。
  * 入参：仅 fs 读取仓库内前端源码文本，不执行组件、不发网络请求。
