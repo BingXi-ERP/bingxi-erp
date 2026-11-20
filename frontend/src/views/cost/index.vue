@@ -56,4 +56,10 @@ const { t } = useI18n({ useScope: 'global' });
 :deep(.text-bold) {
   font-weight: 600;
 }
+
+@media (max-width: 767px) {
+  .cost-page {
+    padding: 12px;
+  }
+}
 </style>

@@ -236,7 +236,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="800px"
+      :width="isPhone ? '95%' : '800px'"
       :close-on-click-modal="false"
       :aria-label="t('dyeRecipe.index.ariaEditDialog')"
     >
@@ -246,6 +246,7 @@
         :rules="formRules"
         :disabled="isView"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('dyeRecipe.index.ariaForm')"
       >
         <el-row :gutter="20">
@@ -323,7 +324,7 @@
     <el-dialog
       v-model="versionVisible"
       :title="t('dyeRecipe.index.titleVersionHistory')"
-      width="800px"
+      :width="isPhone ? '95%' : '800px'"
       :aria-label="t('dyeRecipe.index.ariaVersionHistory')"
     >
       <el-table
@@ -377,7 +378,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { computed, ref, reactive } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Download, Search, Refresh } from '@element-plus/icons-vue';
@@ -399,6 +401,8 @@ import { useExportApproval } from '@/composables/useExportApproval';
 import { useTableApi } from '@/composables/useTableApi';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 查询参数（仅保留后端 DyeRecipeListQuery 真实读取的筛选：配方编号、色号 color_code、状态；分页由 useTableApi 管理）
 const queryParams = reactive({
@@ -758,5 +762,11 @@ const canReject = (status: DyeRecipeStatus) => status === DYE_RECIPE_STATUS.PEND
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+@media (max-width: 767px) {
+  .dye-recipe-page {
+    padding: 12px;
+  }
 }
 </style>

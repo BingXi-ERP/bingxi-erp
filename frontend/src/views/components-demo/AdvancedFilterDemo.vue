@@ -135,4 +135,10 @@ const handleLogicChange = (_groupIndex: number, _logic: 'AND' | 'OR', filters: F
   font-size: 13px;
   line-height: 1.6;
 }
+
+@media (max-width: 767px) {
+  .advanced-filter-demo {
+    padding: 12px;
+  }
+}
 </style>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import {
   ElTable,
@@ -29,6 +30,8 @@ import { logAuxLoadFailure } from '@/utils/logger';
 import BarcodeScannerDialog from '@/components/BarcodeScannerDialog.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const activeTab = ref('scan');
 const barcodeInput = ref('');
@@ -185,7 +188,7 @@ const handleScanToShip = async () => {
           <div v-if="scanResult" class="scan-detail">
             <ElDivider />
             <h4>{{ $t('barcodeScanner.scan.pieceInfo') }}</h4>
-            <ElDescriptions :column="3" border>
+            <ElDescriptions :column="isPhone ? 1 : 3" border>
               <ElDescriptionsItem :label="$t('barcodeScanner.detail.barcode')">{{
                 scanResult.barcode
               }}</ElDescriptionsItem>
@@ -410,5 +413,11 @@ const handleScanToShip = async () => {
 
 .w-full {
   width: 100%;
+}
+
+@media (max-width: 767px) {
+  .app-container {
+    padding: 12px;
+  }
 }
 </style>

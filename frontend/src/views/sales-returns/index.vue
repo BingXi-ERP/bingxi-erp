@@ -154,4 +154,10 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
 }
+
+@media (max-width: 767px) {
+  .sales-returns-page {
+    padding: 12px;
+  }
+}
 </style>

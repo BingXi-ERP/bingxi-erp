@@ -136,8 +136,19 @@
       />
     </el-card>
 
-    <el-dialog v-model="createVisible" title="新建预算" width="560px" @close="resetForm">
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="100px">
+    <el-dialog
+      v-model="createVisible"
+      title="新建预算"
+      :width="isPhone ? '95%' : '560px'"
+      @close="resetForm"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('budgets.form.planId')" prop="plan_id">
           <el-select
             v-model="formData.plan_id"
@@ -185,8 +196,8 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailVisible" title="预算详情" width="640px">
-      <el-descriptions v-if="detailRow" :column="2" border>
+    <el-dialog v-model="detailVisible" title="预算详情" :width="isPhone ? '95%' : '640px'">
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="预算编码">{{
           detailRow.item_code || '-'
         }}</el-descriptions-item>
@@ -218,7 +229,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { numberInputRules } from '@/utils/number-input';
@@ -241,6 +253,8 @@ import {
 import { logAuxLoadFailure } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const statusTextMap: Record<BudgetItemStatus, string> = {
   draft: '草稿',
@@ -560,5 +574,11 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 8px;
   font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .budgets-page {
+    padding: 12px;
+  }
 }
 </style>

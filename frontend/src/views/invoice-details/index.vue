@@ -51,7 +51,7 @@
     </el-card>
 
     <el-drawer v-model="detailVisible" title="发票详情" size="480px">
-      <el-descriptions v-if="detailRow" :column="1" border>
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 1" border>
         <el-descriptions-item label="发票号">{{ detailRow.invoice_no }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="statusTagMap[detailRow.status] ?? 'info'">
@@ -83,8 +83,19 @@
       </el-descriptions>
     </el-drawer>
 
-    <el-dialog v-model="createVisible" title="新建发票" width="520px" @close="resetForm">
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="100px">
+    <el-dialog
+      v-model="createVisible"
+      title="新建发票"
+      :width="isPhone ? '95%' : '520px'"
+      @close="resetForm"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="发票号" prop="invoice_no">
           <el-input v-model="formData.invoice_no" readonly />
         </el-form-item>
@@ -129,7 +140,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { numberInputRules } from '@/utils/number-input';
@@ -144,6 +156,8 @@ import {
   type FinanceInvoice,
   type FinanceInvoiceStatus,
 } from '@/api/invoice-detail';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const statusTextMap: Record<FinanceInvoiceStatus, string> = {
   pending: '待审批',
@@ -365,5 +379,11 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+@media (max-width: 767px) {
+  .invoice-details-page {
+    padding: 12px;
+  }
 }
 </style>

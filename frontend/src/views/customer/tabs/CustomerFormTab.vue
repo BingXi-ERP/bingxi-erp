@@ -7,7 +7,7 @@
   <el-dialog
     v-model="visible"
     :title="title"
-    width="700px"
+    :width="isPhone ? '95%' : '700px'"
     :close-on-click-modal="false"
     :aria-label="t('customer.form.ariaLabel')"
     @close="handleClose"
@@ -17,6 +17,7 @@
       :model="formData"
       :rules="formRules"
       label-width="120px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('customer.form.formAriaLabel')"
     >
       <el-divider content-position="left">{{ t('customer.form.section.basic') }}</el-divider>
@@ -249,7 +250,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
@@ -259,6 +261,8 @@ import { createCustomer, updateCustomer } from '@/api/customer';
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

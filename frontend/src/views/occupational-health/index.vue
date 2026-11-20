@@ -68,7 +68,7 @@
     </el-tabs>
 
     <el-dialog v-model="examDialogVisible" title="新建体检记录" width="520">
-      <el-form :model="examForm" label-width="100px">
+      <el-form :model="examForm" label-width="100px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="员工ID" required
           ><el-input
             v-model="examWorkerField.text"
@@ -123,7 +123,7 @@
     </el-dialog>
 
     <el-dialog v-model="hazardDialogVisible" title="新建监测记录" width="520">
-      <el-form :model="hazardForm" label-width="110px">
+      <el-form :model="hazardForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="危害类型" required>
           <el-select v-model="hazardForm.hazard_type" class="w-full">
             <el-option
@@ -177,7 +177,7 @@
     </el-dialog>
 
     <el-dialog v-model="ppeDialogVisible" title="新建发放记录" width="520">
-      <el-form :model="ppeForm" label-width="110px">
+      <el-form :model="ppeForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="员工ID" required
           ><el-input
             v-model="ppeWorkerField.text"
@@ -238,7 +238,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, toRef } from 'vue';
+import { computed, onMounted, reactive, ref, toRef } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   useNumberField,
   validateNumberValue,
@@ -257,6 +258,8 @@ import {
   scanPpeExpired,
   type HealthExam,
 } from '@/api/occupational-health';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const { t } = useI18n();
 
