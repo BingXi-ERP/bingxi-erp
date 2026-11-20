@@ -3518,11 +3518,26 @@ export async function assertPageHealthy(
     );
   }
 
-  // 4. 主容器非白屏（innerText 长度阈值）
-  const mainContent = await page.evaluate(() => {
-    const main = document.querySelector('.app-container, .el-main, main, #app');
-    return main ? (main.textContent?.trim().length ?? 0) : 0;
-  });
+  // 4. 主容器非白屏（innerText 长度阈值）。
+  // 仪表盘统计卡等异步渲染存在"首帧尚未挂载即采样"的瞬时 0 字符窗口，单点采样会把
+  // 渲染竞态误报成白屏（失败时页面快照实际已整页渲染完毕）；故在宽限窗内重采样，
+  // 窗口耗尽仍空白才判白屏，不放松对真白屏的拒绝。
+  const readMainContentLength = (): Promise<number> =>
+    page.evaluate(() => {
+      const main = document.querySelector('.app-container, .el-main, main, #app');
+      return main ? (main.textContent?.trim().length ?? 0) : 0;
+    });
+  let mainContent = await readMainContentLength();
+  const MAIN_CONTENT_GRACE_MS = 5000;
+  const MAIN_CONTENT_POLL_MS = 500;
+  for (
+    let waited = 0;
+    mainContent < 10 && waited < MAIN_CONTENT_GRACE_MS;
+    waited += MAIN_CONTENT_POLL_MS
+  ) {
+    await page.waitForTimeout(MAIN_CONTENT_POLL_MS);
+    mainContent = await readMainContentLength();
+  }
   if (mainContent < 10) {
     throw new Error(`${tag}页面主容器内容过少（${mainContent} 字符），疑似白屏`);
   }

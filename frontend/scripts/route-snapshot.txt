@@ -1,4 +1,4 @@
-# layers=8 endpoints=1809
+# layers=8 endpoints=1820
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -168,6 +168,7 @@ GET	/api/v1/erp/ap/invoices/statistics	ap_invoice_handler::get_statistics	financ
 GET	/api/v1/erp/ap/payment-requests	ap_payment_request_handler::list_requests	finance
 GET	/api/v1/erp/ap/payment-requests/*	ap_payment_request_handler::get_request	finance
 GET	/api/v1/erp/ap/payment-requests/*/print	print_handler::ap_payment_request_print_docx	finance
+GET	/api/v1/erp/ap/payment-requests/payment-methods	crate::handlers::payment_channel_handler::list_payment_channel_options	finance
 GET	/api/v1/erp/ap/payments	ap_payment_handler::list_payments	finance
 GET	/api/v1/erp/ap/payments/*	ap_payment_handler::get_payment	finance
 GET	/api/v1/erp/ap/payments/*/print	print_handler::ap_payment_print_docx	finance
@@ -197,6 +198,7 @@ GET	/api/v1/erp/ar-reconciliations-enhanced/disputes	ar_reconciliation_enhanced_
 GET	/api/v1/erp/ar-reconciliations-enhanced/disputes/*	ar_reconciliation_enhanced_handler::get_dispute	finance
 GET	/api/v1/erp/ar-reconciliations/*	ar_reconciliation_handler::get_reconciliation	finance
 GET	/api/v1/erp/ar-reconciliations/*/print	print_handler::ar_reconciliation_print_docx	finance
+GET	/api/v1/erp/ar-reconciliations/*/print-xlsx	print_xlsx_finance_handler::ar_reconciliation_print_xlsx	finance
 GET	/api/v1/erp/ar/collections/*/print	print_handler::ar_collection_print_docx	finance
 GET	/api/v1/erp/ar/invoices	ar_invoice_handler::list_ar_invoices	finance
 GET	/api/v1/erp/ar/invoices/*	ar_invoice_handler::get_ar_invoice	finance
@@ -615,6 +617,8 @@ GET	/api/v1/erp/occupational-health/ppe-distributions/*/print	crate::handlers::p
 GET	/api/v1/erp/optimize-inventory	ai_analysis_handler::optimize_inventory	analytics
 GET	/api/v1/erp/page-view/stats	tracking_handler::get_page_view_stats	analytics
 GET	/api/v1/erp/page-view/stats/by-day	tracking_handler::get_page_view_stats_by_day	analytics
+GET	/api/v1/erp/payment-channels	crate::handlers::payment_channel_handler::list_payment_channels	system
+GET	/api/v1/erp/payment-channels/*	crate::handlers::payment_channel_handler::get_payment_channel	system
 GET	/api/v1/erp/period-adjustments	period_adjustment_handler::list_adjustments	period_adjustment
 GET	/api/v1/erp/period-adjustments/*	period_adjustment_handler::get_adjustment	period_adjustment
 GET	/api/v1/erp/period-report-snapshots	crate::handlers::period_report_snapshot_handler::list_snapshots	finance
@@ -742,6 +746,7 @@ GET	/api/v1/erp/production/outsourcing-orders/report	outsourcing_handler::get_ou
 GET	/api/v1/erp/production/outsourcing-receipts	outsourcing_handler::list_outsourcing_receipts	production
 GET	/api/v1/erp/production/outsourcing-receipts/*	outsourcing_handler::get_outsourcing_receipt	production
 GET	/api/v1/erp/production/outsourcing-receipts/*/print	print_handler::outsourcing_receipt_print_docx	production
+GET	/api/v1/erp/production/outsourcing-receipts/*/print-xlsx	print_xlsx_purchase_handler::outsourcing_receipt_print_xlsx	production
 GET	/api/v1/erp/production/outsourcing-receipts/by-no/*	outsourcing_handler::get_outsourcing_receipt_by_no	production
 GET	/api/v1/erp/production/outsourcing-vouchers	outsourcing_handler::list_outsourcing_vouchers	production
 GET	/api/v1/erp/production/outsourcing-vouchers/by-no/*	outsourcing_handler::get_outsourcing_voucher_by_no	production
@@ -793,6 +798,7 @@ GET	/api/v1/erp/purchase/orders	purchase_order_handler::list_orders	purchase
 GET	/api/v1/erp/purchase/orders/*	purchase_order_handler::get_order	purchase
 GET	/api/v1/erp/purchase/orders/*/items	purchase_order_handler::list_order_items	purchase
 GET	/api/v1/erp/purchase/orders/*/print	print_handler::purchase_order_print_docx	purchase
+GET	/api/v1/erp/purchase/orders/*/print-xlsx	print_xlsx_purchase_handler::purchase_order_print_xlsx	purchase
 GET	/api/v1/erp/purchase/orders/export	purchase_order_handler::export_orders	purchase
 GET	/api/v1/erp/purchase/orders/generate-no	purchase_order_handler::generate_order_no	purchase
 GET	/api/v1/erp/purchase/purchase-contracts	purchase_contract_handler::list_contracts	purchase
@@ -809,6 +815,7 @@ GET	/api/v1/erp/purchase/receipts	purchase_receipt_handler::list_receipts	purcha
 GET	/api/v1/erp/purchase/receipts/*	purchase_receipt_handler::get_receipt	purchase
 GET	/api/v1/erp/purchase/receipts/*/items	purchase_receipt_handler::list_receipt_items	purchase
 GET	/api/v1/erp/purchase/receipts/*/print	print_handler::purchase_receipt_print_docx	purchase
+GET	/api/v1/erp/purchase/receipts/*/print-xlsx	print_xlsx_purchase_handler::purchase_receipt_print_xlsx	purchase
 GET	/api/v1/erp/purchase/receipts/generate-no	purchase_receipt_handler::generate_no	purchase
 GET	/api/v1/erp/purchase/returns	purchase_return_handler::list_purchase_returns	purchase
 GET	/api/v1/erp/purchase/returns/*	purchase_return_handler::get_purchase_return	purchase
@@ -882,9 +889,12 @@ GET	/api/v1/erp/sales/fabric-orders/*	sales_fabric_order_handler::get_fabric_ord
 GET	/api/v1/erp/sales/orders	sales_order_handler::list_orders	sales
 GET	/api/v1/erp/sales/orders/*	sales_order_handler::get_order	sales
 GET	/api/v1/erp/sales/orders/*/deliveries	sales_order_handler::get_order_deliveries	sales
+GET	/api/v1/erp/sales/orders/*/deliveries/*/codex-sheet	print_handler::sales_delivery_codex_sheet_xlsx	sales
 GET	/api/v1/erp/sales/orders/*/deliveries/*/print	print_handler::sales_delivery_print_docx	sales
+GET	/api/v1/erp/sales/orders/*/deliveries/*/print-xlsx	print_handler::sales_delivery_print_xlsx	sales
 GET	/api/v1/erp/sales/orders/*/history	sales_order_handler::get_order_history	sales
 GET	/api/v1/erp/sales/orders/*/print	print_handler::sales_order_print_docx	sales
+GET	/api/v1/erp/sales/orders/*/print-xlsx	print_handler::sales_order_print_xlsx	sales
 GET	/api/v1/erp/sales/orders/export	sales_order_handler::export_orders	sales
 GET	/api/v1/erp/sales/orders/generate-no	sales_order_handler::generate_order_no	sales
 GET	/api/v1/erp/sales/orders/statistics	sales_order_handler::get_order_statistics	sales
@@ -1715,6 +1725,7 @@ PUT	/api/v1/erp/labor-contracts/*	labor_contract_handler::update	labor_contract
 PUT	/api/v1/erp/material-shortage/*/status	material_shortage_handler::update_shortage_status	mod
 PUT	/api/v1/erp/notifications/settings	notification_handler::update_setting	analytics
 PUT	/api/v1/erp/oa-announcements/*	oa_announcement_handler::update	oa_announcement
+PUT	/api/v1/erp/payment-channels/*	crate::handlers::payment_channel_handler::update_payment_channel	system
 PUT	/api/v1/erp/pollution-monitoring/solid-waste-disposals/*/status	pollution_monitoring_handler::update_waste_status	pollution_monitoring
 PUT	/api/v1/erp/print-targets/*	print_target_handler::update_print_target	mod
 PUT	/api/v1/erp/print-templates/*	print_handler::update_print_template	mod

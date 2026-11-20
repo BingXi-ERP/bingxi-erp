@@ -1497,6 +1497,10 @@ impl InitService {
                 ],
             ),
             (
+                "admin",
+                &[("payment-channels", "read"), ("payment-channels", "update")],
+            ),
+            (
                 "system_admin",
                 &[
                     // 超折扣审批阈值配置面：系统管理岗负责政策参数的落地维护，读写两枚键

@@ -44,8 +44,8 @@ use test_common::setup_test_db;
 const GROUP: &[(&str, usize, usize, &str)] = &[
     (
         "src/utils/xlsx_export.rs",
-        13,
-        13,
+        1,
+        1,
         include_str!("../src/utils/xlsx_export.rs"),
     ),
     (

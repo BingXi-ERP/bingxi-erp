@@ -20,8 +20,8 @@ use crate::handlers::{
     business_mode_handler, capacity_handler, cost_collection_handler, dye_batch_handler,
     dye_batch_state_machine_handler, dye_recipe_handler, energy_handler, fabric_inspection_handler,
     flow_card_handler, flow_card_material_handler, greige_fabric_handler, lab_dip_handler,
-    outsourcing_handler, print_handler, production_order_handler, production_recipe_handler,
-    quality_inspection_handler, wage_handler,
+    outsourcing_handler, print_handler, print_xlsx_purchase_handler, production_order_handler,
+    production_recipe_handler, quality_inspection_handler, wage_handler,
 };
 
 /// 缸号管理路由（path 前缀 /dye-batches）
@@ -456,6 +456,10 @@ pub fn outsourcing() -> Router<AppState> {
         // ===== 委外打印路由 =====
         .route("/outsourcing-orders/{id}/print", get(print_handler::outsourcing_order_print_docx))
         .route("/outsourcing-receipts/{id}/print", get(print_handler::outsourcing_receipt_print_docx))
+        .route(
+            "/outsourcing-receipts/{id}/print-xlsx",
+            get(print_xlsx_purchase_handler::outsourcing_receipt_print_xlsx),
+        )
         // ===== batch-13 P3: 委外加工报表 =====
         .route("/outsourcing-orders/report", get(outsourcing_handler::get_outsourcing_report))
 }

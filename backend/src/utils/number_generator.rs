@@ -1,5 +1,5 @@
 use crate::utils::error::AppError;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelBehavior, ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseBackend,
     DatabaseTransaction, EntityTrait, FromQueryResult, IntoActiveModel, QueryFilter, QuerySelect,
@@ -68,8 +68,9 @@ impl DocumentNumberGenerator {
         E::Model: Sync + Send + FromQueryResult + 'db,
         C: ColumnTrait,
     {
-        let today = Utc::now().format("%Y%m%d").to_string();
-        let date_prefix = format!("{}{}", prefix, today);
+        let now = Utc::now();
+        let today = now.format("%Y%m%d").to_string();
+        let date_prefix = Self::full_date_prefix(prefix, now);
 
         // 事务/保存点生命周期失败是真正的 DbErr：按语义归口 AppError::database
         // （分类与日志口径同 utils/error.rs 的 From<DbErr> 映射），不再降级成 internal；
@@ -131,8 +132,9 @@ impl DocumentNumberGenerator {
         E::Model: Sync + Send + FromQueryResult + 'db,
         C: ColumnTrait,
     {
-        let today = Utc::now().format("%Y%m%d").to_string();
-        let date_prefix = format!("{}{}", prefix, today);
+        let now = Utc::now();
+        let today = now.format("%Y%m%d").to_string();
+        let date_prefix = Self::full_date_prefix(prefix, now);
 
         Self::lock_prefix(txn, prefix, &today).await?;
 
@@ -267,6 +269,13 @@ impl DocumentNumberGenerator {
         ))
         .await?;
         Ok(())
+    }
+
+    /// 既有标准格式的日期段拼装点：`{前缀}{YYYYMMDD}`。
+    /// 抽成纯函数只为让单测能锁定既有格式逐字符不变（SO/PO/QT/LD/DN 等前缀族
+    /// 的输出不因年月变体的加入而变化）；`generate_no` 族的唯一调用点。
+    fn full_date_prefix(prefix: &str, now: DateTime<Utc>) -> String {
+        format!("{}{}", prefix, now.format("%Y%m%d"))
     }
 
     /// 从单号后缀解析出「基数流水」（`allocate_no` 的基数判据）。
@@ -646,4 +655,44 @@ fn compute_advisory_lock_key(prefix: &str, date: &str) -> i64 {
     prefix.hash(&mut hasher);
     date.hash(&mut hasher);
     hasher.finish() as i64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    fn at(y: i32, m: u32, d: u32) -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(y, m, d, 8, 0, 0).unwrap()
+    }
+
+    /// 既有标准格式锁定：`{前缀}{YYYYMMDD}`（无横杠、月日各两位）。既有前缀族
+    /// SO/PO/QT/LD/DN 等的输出不因年月变体的加入而变化。
+    #[test]
+    fn full_date_prefix_keeps_legacy_format() {
+        assert_eq!(
+            DocumentNumberGenerator::full_date_prefix("SO", at(2026, 7, 15)),
+            "SO20260715"
+        );
+        assert_eq!(
+            DocumentNumberGenerator::full_date_prefix("BX-DY", at(2026, 1, 5)),
+            "BX-DY20260105"
+        );
+    }
+
+    /// 基数判据与横杠分隔形态的相容性：纯数字流水照常解析；横杠混排属于
+    /// 旁路形态，不参与基数（逐条 warn 的既有语义）。
+    #[test]
+    fn base_seq_parses_plain_digits_only() {
+        assert_eq!(
+            DocumentNumberGenerator::base_seq_from_suffix("1356"),
+            Some(1356)
+        );
+        assert_eq!(
+            DocumentNumberGenerator::base_seq_from_suffix("001"),
+            Some(1)
+        );
+        assert_eq!(DocumentNumberGenerator::base_seq_from_suffix("13-56"), None);
+        assert_eq!(DocumentNumberGenerator::base_seq_from_suffix("A7"), None);
+    }
 }
