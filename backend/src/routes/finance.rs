@@ -17,9 +17,8 @@
 //! 业务级路径（`/payments`、`/invoices`、`/vouchers` 等），path 不冲突。
 
 use axum::{
-    middleware,
+    Router, middleware,
     routing::{delete, get, post, put},
-    Router,
 };
 
 use crate::container::AppState;

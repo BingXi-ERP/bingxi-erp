@@ -30,13 +30,13 @@
 //!   （business_displayable）。本文件按各自正确族断言，不再笼统写 BUSINESS_ERROR。
 
 use axum::{
+    Router,
     body::Body,
     extract::State,
     http::{Request, StatusCode},
-    middleware::{from_fn_with_state, Next},
+    middleware::{Next, from_fn_with_state},
     response::Response,
     routing::get,
-    Router,
 };
 use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::supplier_handler;

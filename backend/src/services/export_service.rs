@@ -4,9 +4,9 @@
 //! v11 批次 161 CI2：移除 CSV 导出，规则 3 要求 xlsx 交付
 //! V15 P1 batch-08 缺陷 8：新增 docx 导出，规则 3 要求合同/发票/报表支持 .docx
 
-use crate::utils::docx_export::{build_docx_with_kv_and_image, DocxKeyValue, DocxPageLayout};
+use crate::utils::docx_export::{DocxKeyValue, DocxPageLayout, build_docx_with_kv_and_image};
 use crate::utils::error::AppError;
-use crate::utils::xlsx_export::{build_xlsx, XlsxTable};
+use crate::utils::xlsx_export::{XlsxTable, build_xlsx};
 use serde::{Deserialize, Serialize};
 
 /// 导出数据
