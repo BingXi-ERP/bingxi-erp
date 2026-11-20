@@ -1,5 +1,6 @@
 //! purchase 域打印取数（自 print_service.rs 拆分，方法签名零改动）
 
+use crate::utils::amount_in_words::amount_in_words;
 use crate::utils::error::AppError;
 use crate::utils::xlsx_export::XlsxTable;
 use rust_decimal::Decimal;
@@ -838,8 +839,11 @@ pub(crate) fn build_purchase_receipt_xlsx(print_data: &PrintData) -> Result<Xlsx
         ("质检状态", xlsx_string_cell(data, "inspection_status")?),
         ("收货状态", xlsx_string_cell(data, "receipt_status")?),
         ("总数量", xlsx_string_cell(data, "total_quantity")?),
-        // 大写金额待 A 车道（feat/amount-in-words）utils 接入后在此追加"大写金额"行
         ("总金额", xlsx_string_cell(data, "total_amount")?),
+        (
+            "大写金额",
+            amount_in_words(xlsx_decimal_cell(data, "total_amount")?),
+        ),
         ("备注", xlsx_string_cell(data, "notes")?),
     ];
     let mut rows = Vec::with_capacity(print_data.items.len());
@@ -947,8 +951,11 @@ pub(crate) fn build_purchase_order_xlsx(print_data: &PrintData) -> Result<XlsxTa
         ),
         ("仓库", xlsx_string_cell(data, "warehouse_name")?),
         ("币种", xlsx_string_cell(data, "currency")?),
-        // 大写金额待 A 车道（feat/amount-in-words）utils 接入后在此追加"大写金额"行
         ("总金额", xlsx_string_cell(data, "total_amount")?),
+        (
+            "大写金额",
+            amount_in_words(xlsx_decimal_cell(data, "total_amount")?),
+        ),
         ("总数量", xlsx_string_cell(data, "total_quantity")?),
         ("备注", xlsx_string_cell(data, "notes")?),
     ];
