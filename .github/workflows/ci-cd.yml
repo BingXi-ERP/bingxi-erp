@@ -2471,6 +2471,8 @@ jobs:
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      app_version: ${{ steps.version.outputs.app_version }}
+      cargo_version: ${{ steps.version.outputs.cargo_version }}
     steps:
       - name: 检出代码
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -2508,15 +2510,24 @@ jobs:
             VERSION=${GITHUB_REF#refs/tags/v}
           else
             YEAR=$(date +'%Y')
-            MONTH=$(date +'%-m')
-            DAY=$(date +'%-d')
-            HOUR=$(date +'%-H')
-            MIN=$(date +'%-M')
-            TIME=$((HOUR * 100 + MIN))
+            MONTH=$(date +'%m')
+            DAY=$(date +'%d')
+            HOUR=$(date +'%H')
+            MIN=$(date +'%M')
+            TIME=$(printf '%02d%02d' "$HOUR" "$MIN")
             VERSION="${YEAR}.${MONTH}.${DAY}.${TIME}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "构建版本: $VERSION"
+          IFS="." read -r VY VM VD VT <<< "$VERSION"
+          CARGO_VERSION="${VY}.$((10#$VM * 100 + 10#$VD)).$((10#$VT))"
+          echo "app_version=$VERSION" >> $GITHUB_OUTPUT
+          echo "cargo_version=$CARGO_VERSION" >> $GITHUB_OUTPUT
+          # 对外 4 段：tauri.conf.json 与小程序 package.json；Cargo 3 段：semver 硬约束
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" mobile-app/src-tauri/tauri.conf.json
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" miniprogram/package.json
+          sed -i "s/^version = \".*\"/version = \"$CARGO_VERSION\"/" mobile-app/src-tauri/Cargo.toml
+          echo "对外版本 $VERSION / Cargo 版本 $CARGO_VERSION"
 
       - name: 更新 Cargo.toml 版本号
         run: |
@@ -2793,7 +2804,7 @@ jobs:
   # ==============================================================================
   ci-android-apk:
     name: 📱 安卓客户端 APK
-    needs: ci-info
+    needs: [ci-info, ci-build-rust]
     # PR 也放行，为的是安卓链（workflow_call 接线、权限与插件注入、产物可达性）在合并前就曝光问题；
     # PR 轮 build_release 仍为 true，但发布事件才是要附进 Release 的那份签名产物。
     # 主干 push 已不是本 workflow 的触发事件（合并 PR 不自动跑主线），故条件里不再列 main 分支。
@@ -2804,6 +2815,8 @@ jobs:
       # 写成表达式形式是因为静态检查把裸的 'false' 字面量推成布尔型，与 string 型输入不符；
       # 运行期取值仍是字符串 false，判据不变。
       run_e2e: ${{ 'false' }}
+      app_version: ${{ needs.ci-build-rust.outputs.app_version }}
+      cargo_version: ${{ needs.ci-build-rust.outputs.cargo_version }}
     secrets: inherit
     uses: ./.github/workflows/android.yml
 
@@ -2889,6 +2902,9 @@ jobs:
 
           cp -r deploy/* release/bingxi-erp/deploy/
 
+          # 小程序源码随成品包交付（同版本）
+          cp -r miniprogram release/bingxi-erp/miniprogram
+
           if [ -d "backend/database" ]; then
             cp -r backend/database release/bingxi-erp/ 2>/dev/null || true
           fi
@@ -2926,9 +2942,8 @@ jobs:
     needs: [package-release, ci-android-apk]
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    # 与打包发布同一对发布事件（v* tag 与未跳过发布的手动运行）；两处条件必须同文，
-    # 否则一方跑另一方 skip，Release 会停在只有半成品资产的形态。
-    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_release != 'true')
+    # 唯一对外发布关口：仅手动运行 main 且未跳过发布才建 Release；构建/打包验证照旧。
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.skip_release != 'true'
     permissions:
       contents: write
       pull-requests: read
