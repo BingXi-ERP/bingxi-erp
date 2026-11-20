@@ -59,7 +59,7 @@ function ymd(daysFromToday: number): string {
 }
 
 async function seedSupplier(page: Page): Promise<number> {
-  const created = await apiCall<{ data?: { id?: number } }>(page, 'POST', '/purchase/suppliers', {
+  const created = await apiCall<{ id?: number }>(page, 'POST', '/purchase/suppliers', {
     supplier_name: `486自动核销供方_${genCode('E486')}`,
   });
   const id = Number(created.data?.id);
