@@ -90,7 +90,6 @@ test.describe('511 质检自动判级边界', () => {
 
     for (const item of cases) {
       const inspectionNo = `${tag}-${item.suffix}`;
-      console.log(`[511] 建记录 ${inspectionNo} rate=${item.rate} 期望 grade=${item.grade}`);
       const created = await createRecord(page, productId, inspectionNo, item.rate);
       expect(created.grade, `[511] ${item.rate}% 建单响应自动判级`).toBe(item.grade);
 
