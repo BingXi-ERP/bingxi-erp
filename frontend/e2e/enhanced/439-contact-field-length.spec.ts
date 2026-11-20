@@ -38,7 +38,7 @@ async function seedCustomer(page: Page): Promise<number> {
     customer_type: 'retail',
     status: 'active',
   });
-  const id = Number(created?.id);
+  const id = Number(created.data?.id);
   expect(id, '前置：建客户须返回正整数主键').toBeGreaterThan(0);
   CLEANUP.push({ path: `/crm/customers/${id}`, label: `439 客户 ${id}` });
   return id;
@@ -68,7 +68,7 @@ test('439-02 联系人超长字段被 validator 拒绝，正常联系人仍可�
     title: 'T'.repeat(100),
     remarks: '备'.repeat(500),
   });
-  const contactId = Number(ok?.id);
+  const contactId = Number(ok.data?.id);
   expect(contactId, '边界值：name/title=100/remarks=500 须放行').toBeGreaterThan(0);
   CLEANUP.push({
     path: `/crm/customers/${customerId}/contacts/${contactId}`,
