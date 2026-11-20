@@ -477,9 +477,6 @@ const {
 const { width } = useBreakpoint();
 const isPhone = computed(() => width.value < 768);
 
-// 手机卡片断点（与 BPM 审批手机卡片同断点）
-const { width } = useBreakpoint();
-const isPhone = computed(() => width.value < 768);
 
 const requests = ref<APPaymentRequest[]>([]);
 const loading = ref(false);
