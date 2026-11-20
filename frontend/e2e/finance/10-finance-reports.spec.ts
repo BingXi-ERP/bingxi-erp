@@ -34,6 +34,7 @@ import {
   failureCode,
   tryCleanup,
   genCode,
+  ensureTestEntities,
   getCtx,
 } from '../flow/helpers';
 
@@ -566,6 +567,9 @@ test.describe('10 财务报表与导出', () => {
     // 第四条路径 /exchange-rates/*/print-xlsx 的打印数据源是 foreign_exchange_verification 表，
     // 后端没有创建该表行的任何 API（route-snapshot 无 POST、migration 无种子），
     // 无法确定性造出真实 200；改为对不存在的 id 断真实 404 NOT_FOUND 标准信封，不静默跳过。
+    // ctx 的客户/销售订单由共享造数工厂按分片独立创建；本 spec 其它用例各自局部造数，
+    // 只有本用例依赖 ctx 的客户 + 销售订单（收款单与退税报关单前置），故在此显式确保。
+    await ensureTestEntities(page);
     const ctx = getCtx();
     const { date } = utcTodayAndPeriod();
 
