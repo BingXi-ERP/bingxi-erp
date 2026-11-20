@@ -31,9 +31,9 @@
 // 销售订单、发货仓库、客户全部来自本 worker 前置实体与真实列表读回，不硬编码任何实体 ID，
 // 发货仓库编码从仓库列表按仓库 ID 反查真实 warehouse_code，取不到直接抛错不回落默认值。
 //
-// 已知真实行为声明。发货单头 total_amount 由写入方落固定零值且全链路无任何回填，
-// 属未修复缺陷，已另行登记跟进。本用例对发货单只断数量维与状态维，
-// 金额同源断言走应收发票与订单头 total_amount 这条链路，不拿缺陷列凑断言。
+// 发货金额口径。发货单头 total_amount 在发货事务内按本次实际明细金额加税额回写，
+// 全额发货与订单头含税总额同源，部分发货只算本次发出的量，不继承订单全额。
+// 金额回归同时断发货单头读回值与应收发票同源链路，两处任一漂移即判红。
 import { test, expect } from '../diagnose-fixture';
 import JSZip from 'jszip';
 import {
@@ -72,9 +72,10 @@ function expectQuantity(actual: number, expected: number, label: string): void {
 
 /** 状态逐字符断言，先把读回值 String 化再 toBe，绝不做大小写归一。 */
 function expectStatusChar(actual: unknown, expected: string, label: string): void {
-  expect(String(actual), `${label}应逐字符等于写入方词表值 ${expected}，实际 ${String(actual)}`).toBe(
-    expected
-  );
+  expect(
+    String(actual),
+    `${label}应逐字符等于写入方词表值 ${expected}，实际 ${String(actual)}`
+  ).toBe(expected);
 }
 
 /** 白坯库存播种的唯一批次取值生成，配合回读定位本用例专属库存行。 */
@@ -111,7 +112,11 @@ async function resolveWarehouseCode(
   page: import('@playwright/test').Page,
   warehouseId: number
 ): Promise<string> {
-  const res = await apiCallRaw<Record<string, unknown>>(page, 'GET', '/warehouses?page=1&page_size=200');
+  const res = await apiCallRaw<Record<string, unknown>>(
+    page,
+    'GET',
+    '/warehouses?page=1&page_size=200'
+  );
   const rows = pickListArray<Record<string, unknown>>(res, 'items', '仓库列表反查发货编码');
   const hit = rows.find(w => Number(w.id) === warehouseId);
   if (!hit) {
@@ -186,7 +191,9 @@ async function findDraftInvoiceByOrderNo(
     }
   }
   if (collected < total) {
-    throw new Error(`${label} 应收草稿扫描未覆盖全量，total=${total} 已扫=${collected}，拒绝给出缺判结论`);
+    throw new Error(
+      `${label} 应收草稿扫描未覆盖全量，total=${total} 已扫=${collected}，拒绝给出缺判结论`
+    );
   }
   if (hits.length > 1) {
     throw new Error(
@@ -364,11 +371,7 @@ test.describe('销售发货到收款深度链路', () => {
     const detail = await readOrderDetail(page, chain.orderId);
     expectStatusChar(detail.status, 'shipped', '全额发货后订单状态');
     const line = pickOrderItem(detail, chain.productId, '全额发货后订单详情');
-    expectQuantity(
-      readNumber(line, 'quantity', '订单行数量'),
-      40,
-      '订单行 quantity 应保持建单值'
-    );
+    expectQuantity(readNumber(line, 'quantity', '订单行数量'), 40, '订单行 quantity 应保持建单值');
     expectQuantity(
       readNumber(line, 'shipped_quantity', '订单行已发量'),
       40,
@@ -403,20 +406,17 @@ test.describe('销售发货到收款深度链路', () => {
     ).toBe(chain.warehouseId);
 
     // 库存侧，可用量精确减、已发量精确增、在库量不动，三点同时成立才算账实一致
-    const stockAfter = await rereadGreigeRow(page, chain.productId, chain.warehouseId, chain.batchNo);
+    const stockAfter = await rereadGreigeRow(
+      page,
+      chain.productId,
+      chain.warehouseId,
+      chain.batchNo
+    );
     const availableAfter = readNumber(stockAfter, 'quantity_available', '发货后可用量');
     const shippedAfter = readNumber(stockAfter, 'quantity_shipped', '发货后已发量');
     const onHandAfter = readNumber(stockAfter, 'quantity_on_hand', '发货后在库量');
-    expectQuantity(
-      chain.availableBefore - availableAfter,
-      40,
-      '发货后可用量减少量应恰为发货量 40'
-    );
-    expectQuantity(
-      shippedAfter - chain.shippedBefore,
-      40,
-      '发货后已发量增加量应恰为发货量 40'
-    );
+    expectQuantity(chain.availableBefore - availableAfter, 40, '发货后可用量减少量应恰为发货量 40');
+    expectQuantity(shippedAfter - chain.shippedBefore, 40, '发货后已发量增加量应恰为发货量 40');
     expectQuantity(
       onHandAfter,
       chain.onHandBefore,
@@ -504,6 +504,13 @@ test.describe('销售发货到收款深度链路', () => {
       25,
       '动作发货单 total_quantity 应等于本次发货量 25'
     );
+    const unitPrice = readNumber(line, 'unit_price', '订单行单价');
+    const taxPercent = readNumber(line, 'tax_percent', '订单行税率');
+    expectQuantity(
+      readNumber(deliveries[0]!, 'total_amount', '部分发货单头含税金额'),
+      unitPrice * 25 * (1 + taxPercent / 100),
+      '部分发货单头金额只含本次明细金额与税额，不得照抄订单全额'
+    );
 
     // 手动建单口是同一词表的另一个写入方，落 pending 而不是动作发货的 shipped
     const manual = await apiCallRaw<Record<string, unknown>>(
@@ -526,15 +533,16 @@ test.describe('销售发货到收款深度链路', () => {
       .map(d => String(d.status))
       .sort()
       .join(',');
-    expect(
-      statuses,
-      '两张发货单的状态集合应恰好是 shipped 与 pending 两个小写词表值'
-    ).toBe('pending,shipped');
+    expect(statuses, '两张发货单的状态集合应恰好是 shipped 与 pending 两个小写词表值').toBe(
+      'pending,shipped'
+    );
     const manualRow = allDeliveries.find(d => Number(d.id) === manualId);
     if (!manualRow) {
-      throw new Error(`手动发货单 ${manualId} 建后在列表里读不回，实际 id=${allDeliveries
-        .map(d => String(d.id))
-        .join(',')}`);
+      throw new Error(
+        `手动发货单 ${manualId} 建后在列表里读不回，实际 id=${allDeliveries
+          .map(d => String(d.id))
+          .join(',')}`
+      );
     }
 
     // 库存只按真实出库的 25 变化，手动空壳单不得动库存
@@ -584,17 +592,34 @@ test.describe('销售发货到收款深度链路', () => {
     });
     const orderDetail = await readOrderDetail(page, chain.orderId);
     const orderTotal = readNumber(orderDetail, 'total_amount', '订单头总额读回');
+    const fullDeliveries = await readDeliveries(page, chain.orderId);
+    expect(
+      fullDeliveries.length,
+      `全额发货后本订单应恰好一张发货单，实际 ${fullDeliveries.length} 张`
+    ).toBe(1);
+    expectQuantity(
+      readNumber(fullDeliveries[0]!, 'total_amount', '发货单头含税金额'),
+      orderTotal,
+      '全额发货时发货单头含税金额应等于订单头含税总额，零值未回填即判红'
+    );
 
-    const found = await findDraftInvoiceByOrderNo(page, customerId!, chain.orderNo, '全额发货应收圈定');
+    const found = await findDraftInvoiceByOrderNo(
+      page,
+      customerId!,
+      chain.orderNo,
+      '全额发货应收圈定'
+    );
     if (!found) {
-      throw new Error(
-        `订单 ${chain.orderNo} 全额发货后应收草稿扫描零命中，生成链断裂，见后端日志`
-      );
+      throw new Error(`订单 ${chain.orderNo} 全额发货后应收草稿扫描零命中，生成链断裂，见后端日志`);
     }
     const invoiceId = readNumber(found, 'id', '应收单列表命中行');
 
     // 详情读回逐字段断言，列表行与详情行必须同源同值，防止两个出参面各写各的
-    const invoice = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/ar/invoices/${invoiceId}`);
+    const invoice = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/ar/invoices/${invoiceId}`
+    );
     expect(readNumber(invoice, 'id', '应收单详情'), '详情与列表应命中同一张发票').toBe(invoiceId);
     expectQuantity(
       readNumber(invoice, 'invoice_amount', '应收单金额'),
@@ -619,14 +644,12 @@ test.describe('销售发货到收款深度链路', () => {
     expectStatusChar(invoice.status, 'DRAFT', '应收单初始状态');
     expectStatusChar(invoice.approval_status, 'PENDING', '应收单初始审批状态');
     expect(String(invoice.source_type), `来源类型应逐字符等于 SALES_ORDER`).toBe('SALES_ORDER');
-    expect(
-      String(invoice.source_bill_no),
-      `来源单号应逐字符等于销售订单号 ${chain.orderNo}`
-    ).toBe(chain.orderNo);
-    expect(
-      String(invoice.sales_order_no),
-      `销售订单号冗余键应逐字符等于 ${chain.orderNo}`
-    ).toBe(chain.orderNo);
+    expect(String(invoice.source_bill_no), `来源单号应逐字符等于销售订单号 ${chain.orderNo}`).toBe(
+      chain.orderNo
+    );
+    expect(String(invoice.sales_order_no), `销售订单号冗余键应逐字符等于 ${chain.orderNo}`).toBe(
+      chain.orderNo
+    );
     expect(
       readNumber(invoice, 'customer_id', '应收单客户'),
       `应收单客户应等于订单客户 ${chain.customerId}`
@@ -656,7 +679,12 @@ test.describe('销售发货到收款深度链路', () => {
       shipQty: 50,
       unitPrice: 12.75,
     });
-    const found = await findDraftInvoiceByOrderNo(page, customerId!, chain.orderNo, '收款前应收圈定');
+    const found = await findDraftInvoiceByOrderNo(
+      page,
+      customerId!,
+      chain.orderNo,
+      '收款前应收圈定'
+    );
     if (!found) {
       throw new Error(`订单 ${chain.orderNo} 全额发货后应收草稿零命中，收款环节无从挂账`);
     }
@@ -679,7 +707,8 @@ test.describe('销售发货到收款深度链路', () => {
     const collectionId = readNumber(paymentData, 'id', '收款创建回读');
     expectStatusChar(paymentData.status, 'pending', '收款创建后状态');
     expect(
-      String(paymentData.payment_no).trim() !== '' && String(paymentData.payment_no) !== 'undefined',
+      String(paymentData.payment_no).trim() !== '' &&
+        String(paymentData.payment_no) !== 'undefined',
       `收款单号应为写入方生成的非空串，实际 ${String(paymentData.payment_no)}`
     ).toBe(true);
     expectQuantity(
@@ -712,7 +741,11 @@ test.describe('销售发货到收款深度链路', () => {
       'GET',
       `/ar/verifications?invoice_id=${invoiceId}&page=1&page_size=10`
     );
-    const recRows = pickListArray<Record<string, unknown>>(listByInvoice, 'list', '按发票反查核销列表');
+    const recRows = pickListArray<Record<string, unknown>>(
+      listByInvoice,
+      'list',
+      '按发票反查核销列表'
+    );
     expect(
       readNumber(listByInvoice, 'total', '按发票反查核销总数'),
       `本发票应恰好一张核销单，实际 ${recRows.length} 行`
@@ -847,7 +880,11 @@ test.describe('销售发货到收款深度链路', () => {
       'GET',
       `/crm/customers/${customerId}`
     );
-    const product = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/products/${productId}`);
+    const product = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/products/${productId}`
+    );
     const customerName = readText(customer, 'customer_name', '客户档案');
     const productName = readText(product, 'name', '产品档案');
     const productCode = readText(product, 'code', '产品档案编号');
@@ -926,10 +963,7 @@ test.describe('销售发货到收款深度链路', () => {
     ];
     for (const key of bareKeys) {
       const leaked = firstText.includes(key);
-      expect(
-        leaked,
-        `打印正文不应出现裸字段名 ${key}，栏名应取档案名称口径出栏`
-      ).toBe(false);
+      expect(leaked, `打印正文不应出现裸字段名 ${key}，栏名应取档案名称口径出栏`).toBe(false);
     }
 
     const identical = secondText === firstText;
@@ -964,7 +998,9 @@ async function fetchDeliveryPrintText(
   const url = `${API_BASE}${API_PREFIX}/sales/orders/${orderId}/deliveries/${deliveryId}/print`;
   const resp = await page.request.get(url);
   const status = resp.status();
-  console.log(`[108-print] GET /sales/orders/${orderId}/deliveries/${deliveryId}/print → ${status}`);
+  console.log(
+    `[108-print] GET /sales/orders/${orderId}/deliveries/${deliveryId}/print → ${status}`
+  );
   expect(status, `有效发货单 ${deliveryId} 打印应 200，实际 ${status}`).toBe(200);
   const body = await resp.body();
   expect(body.length, `打印 docx 应为非空二进制容器（>1KB），实际 ${body.length}B`).toBeGreaterThan(
