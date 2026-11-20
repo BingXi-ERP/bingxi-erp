@@ -106,14 +106,23 @@ async function parseSheetRows(body: Buffer): Promise<SheetRows> {
       const attrs = /<c\b([^>]*?)(?:\/>|>)/.exec(cellXml)?.[1];
       const ref = /\br="([A-Z]+\d+)"/.exec(attrs)?.[1];
       if (!attrs || !ref) throw new Error(`xlsx 单元格坐标解析失败：${cellXml.slice(0, 120)}`);
-      const inner = /<c\b[^>]*>([\s\S]*?)<\/c>/.exec(cellXml)?.[1] ?? '';
-      cells[columnIndex(ref)] = cellText(inner, attrs, shared);
+      if (/<c\b[^>]*\/>$/.test(cellXml)) {
+        cells[columnIndex(ref)] = '';
+        continue;
+      }
+      const innerMatch = /<c\b[^>]*>([\s\S]*?)<\/c>/.exec(cellXml);
+      if (!innerMatch) throw new Error(`xlsx 单元格体解析失败：${cellXml.slice(0, 120)}`);
+      cells[columnIndex(ref)] = cellText(innerMatch[1], attrs, shared);
     }
     byNumber.set(rowNo, cells);
   }
   const maxRow = Math.max(...byNumber.keys());
   const rows: SheetRows = [];
-  for (let i = 1; i <= maxRow; i += 1) rows.push(byNumber.get(i) ?? []);
+  for (let i = 1; i <= maxRow; i += 1) {
+    const row = byNumber.get(i);
+    if (row) rows.push(row);
+    else rows.push([]);
+  }
   return rows;
 }
 
