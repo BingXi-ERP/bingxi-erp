@@ -30,8 +30,12 @@ import {
   loginViaUI,
   apiCall,
   apiCallRaw,
+  apiCallExpectFail,
+  failureCode,
   tryCleanup,
   genCode,
+  ensureTestEntities,
+  getCtx,
 } from '../flow/helpers';
 
 const CLEANUP: Array<{ path: string; label: string }> = [];
@@ -553,5 +557,107 @@ test.describe('10 财务报表与导出', () => {
       typeof body.trace_id === 'string' && body.trace_id.length > 0,
       `失败信封应携带非空 trace_id，实际=${JSON.stringify(body).slice(0, 200)}`
     ).toBe(true);
+  });
+
+  test('10-06 新增 print-xlsx 打印腿：凭证/应收收款/退税申报真 xlsx 字节 + 外汇核销 fail-closed', async ({
+    page,
+  }) => {
+    // 覆盖本支新增的 4 条 GET print-xlsx。全部走真实后端与真实库，无 mock、无网络拦截。
+    // 前三条用仓库既有造数链造出真实单据后断 200 + OOXML Content-Type + PK(zip) 魔数 + xl/workbook.xml。
+    // 第四条路径 /exchange-rates/*/print-xlsx 的打印数据源是 foreign_exchange_verification 表，
+    // 后端没有创建该表行的任何 API（route-snapshot 无 POST、migration 无种子），
+    // 无法确定性造出真实 200；改为对不存在的 id 断真实 404 NOT_FOUND 标准信封，不静默跳过。
+    // ctx 的客户/销售订单由共享造数工厂按分片独立创建；本 spec 其它用例各自局部造数，
+    // 只有本用例依赖 ctx 的客户 + 销售订单（收款单与退税报关单前置），故在此显式确保。
+    await ensureTestEntities(page);
+    const ctx = getCtx();
+    const { date } = utcTodayAndPeriod();
+
+    // 1) 会计凭证：复用本套件 posted 平衡凭证造数链。
+    const debitCode = genCode('E2E-PXD');
+    const creditCode = genCode('E2E-PXC');
+    const debitId = await seedSubject(page, debitCode, `E2E xlsx 借${debitCode}`, 'debit');
+    const creditId = await seedSubject(page, creditCode, `E2E xlsx 贷${creditCode}`, 'credit');
+    const voucherId = await seedPostedVoucher(page, date, 1000, debitId, creditId);
+    await assertRealXlsxBlob(
+      await fetchExportRaw(page, `/vouchers/${voucherId}/print-xlsx`),
+      `vouchers/${voucherId}/print-xlsx`,
+      /voucher_\d+\.xlsx/
+    );
+    // 凭证打印 fail-closed：不存在的凭证断真实 404，不能 200 吐空壳 xlsx。
+    const missingVoucherId = 999999999;
+    const voucherFail = await apiCallExpectFail(
+      page,
+      'GET',
+      `/vouchers/${missingVoucherId}/print-xlsx`
+    );
+    expect(voucherFail.status, '不存在的凭证打印应真实 404').toBe(404);
+    expect(failureCode(voucherFail), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
+
+    // 2) 应收收款单：/ar/payments 建单落 ar_collections 行（print 取数表）。
+    const customerId = ctx.customerId;
+    expect(customerId, '收款单前置：ensureTestEntities 应提供真实客户').toBeTruthy();
+    const pay = await apiCall<{ id?: number }>(page, 'POST', '/ar/payments', {
+      customer_id: customerId,
+      amount: 2500.75,
+      payment_method: '银行汇款',
+      payment_date: date,
+    });
+    const collectionId = pay.data?.id;
+    expect(
+      collectionId,
+      `收款单建单应返回 id（实际=${JSON.stringify(pay).slice(0, 200)}）`
+    ).toBeGreaterThan(0);
+    await assertRealXlsxBlob(
+      await fetchExportRaw(page, `/ar/collections/${collectionId}/print-xlsx`),
+      `ar/collections/${collectionId}/print-xlsx`,
+      /ar_collection_\d+\.xlsx/
+    );
+
+    // 3) 出口退税申报单：真实报关单 + 申报表生成链（与 61 套件同口径）。
+    await apiCall(page, 'POST', '/export-refunds/customs-declarations', {
+      declaration_no: genCode('E2E-PXRF'),
+      sales_order_id: ctx.salesOrderId,
+      export_date: '2099-01-15',
+      total_amount: '1000',
+      exchange_rate: '2',
+    });
+    const gen = await apiCall<{ id?: number }>(
+      page,
+      'POST',
+      '/export-refunds/refund-declarations',
+      {
+        period_year: 2099,
+        period_month: 1,
+        refund_rate: '0.13',
+        input_vat_amount: '600',
+        carryforward_from_prev: '0',
+      }
+    );
+    const declId = gen.data?.id;
+    expect(
+      declId,
+      `退税申报表生成应返回 id（实际=${JSON.stringify(gen).slice(0, 200)}）`
+    ).toBeGreaterThan(0);
+    await assertRealXlsxBlob(
+      await fetchExportRaw(page, `/export-refunds/${declId}/print-xlsx`),
+      `export-refunds/${declId}/print-xlsx`,
+      /export_refund_declaration_\d+\.xlsx/
+    );
+    // 退税申报打印 fail-closed：不存在的申报断真实 404，不能 200 吐空壳 xlsx。
+    const missingDeclId = 999999999;
+    const declFail = await apiCallExpectFail(
+      page,
+      'GET',
+      `/export-refunds/${missingDeclId}/print-xlsx`
+    );
+    expect(declFail.status, '不存在的退税申报打印应真实 404').toBe(404);
+    expect(failureCode(declFail), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
+
+    // 4) 外汇核销单打印：见上，后端无建单 API，断真实 404 标准信封。
+    const missingFxId = 999999999;
+    const fail = await apiCallExpectFail(page, 'GET', `/exchange-rates/${missingFxId}/print-xlsx`);
+    expect(fail.status, '不存在的核销单打印应真实 404，不能 200 假绿').toBe(404);
+    expect(failureCode(fail), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
   });
 });
