@@ -93,7 +93,6 @@ test.describe('545 采购 xlsx 打印大写金额', () => {
       expect(product.code, '产品应能读回 code 作为收货 material_code').toBeTruthy();
       const materialCode = String(product.code);
       const receipt = await apiCall<{ id?: number }>(page, 'POST', '/purchase/receipts', {
-        order_id: orderId,
         supplier_id: ctx.supplierId,
         warehouse_id: ctx.warehouseIds[0],
         receipt_date: new Date().toISOString().slice(0, 10),
