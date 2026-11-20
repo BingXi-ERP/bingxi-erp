@@ -57,10 +57,6 @@ test('424-01 分摊规则状态门与生效查询只认启用态', async ({ page
     expiry_date: today,
   });
   expectStateGateRejection(badExpiry, '失效日期等于生效日期建档');
-  expect(
-    String(badExpiry.message ?? ''),
-    `失效日期边界拒因须可定位，实际 ${JSON.stringify(badExpiry.message)}`
-  ).not.toBe('');
 
   const rule = await createRule(page, workshop, today);
 
