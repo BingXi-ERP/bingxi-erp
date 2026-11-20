@@ -64,6 +64,12 @@ pub struct Model {
     pub delivery_blocking: bool,
     /// 附件 URL（样布照片/批色单扫描件）
     pub attachment_url: Option<String>,
+    /// 库存等级降级待补标记（downgraded 联动 inventory_stocks.grade 失败时置 true，
+    /// 补降成功后清回 false；写入方 bulk_color_approval_service，读取方为人工对账）
+    pub stock_grade_sync_pending: bool,
+    /// 库存报废标记待补标记（scrapped 联动 inventory_stocks.stock_status/quality_status
+    /// 失败时置 true，补执行成功后清回 false；写入方同上，读取方为人工对账）
+    pub stock_scrap_sync_pending: bool,
     /// 备注
     pub remark: Option<String>,
     pub created_at: DateTime<Utc>,

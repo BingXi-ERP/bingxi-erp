@@ -65,6 +65,10 @@ pub fn router() -> Router<AppState> {
             "/sales-returns/{id}/print",
             get(crate::handlers::print_handler::sales_return_print_docx),
         )
+        .route(
+            "/sales-returns/{id}/print-xlsx",
+            get(crate::handlers::print_handler::sales_return_print_xlsx),
+        )
 }
 
 /// 获取销售退货单列表

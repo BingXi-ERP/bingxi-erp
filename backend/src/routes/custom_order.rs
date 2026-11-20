@@ -84,6 +84,10 @@ pub fn routes() -> Router<AppState> {
             get(print_handler::custom_order_print_docx),
         )
         .route(
+            "/{id}/print-xlsx",
+            get(print_handler::custom_order_print_xlsx),
+        )
+        .route(
             "/{id}/after-sales/print",
             get(print_handler::after_sales_print_docx),
         )

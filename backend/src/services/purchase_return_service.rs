@@ -825,6 +825,28 @@ impl PurchaseReturnService {
             .auto_generate_from_return(return_id, user_id)
             .await
         {
+            // 死信兜底：退货库存已扣减但应付红字/冲销凭证未生成，落 event_dead_letters
+            // 供人工/后台补偿，不改库存扣减语义（error 保留，落库失败仅显式报错）。
+            if let Err(dl_err) =
+                crate::services::event_retry_service::EventRetryService::new(self.db.clone())
+                    .record_dead_letter(
+                        "purchase_return_ap_redflush_failed",
+                        serde_json::json!({
+                            "return_id": return_id,
+                            "return_no": return_no,
+                            "user_id": user_id,
+                        }),
+                        "采购退货自动生成应付红字账单/冲销凭证失败",
+                        &e.to_string(),
+                    )
+                    .await
+            {
+                tracing::error!(
+                    return_id,
+                    error = %dl_err,
+                    "采购退货应付红字失败死信落库失败，仅剩日志可查"
+                );
+            }
             tracing::error!(
                 "自动生成应付红字账单/冲销凭证失败 (退货单 {}): {}",
                 return_no,
