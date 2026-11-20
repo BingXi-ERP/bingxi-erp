@@ -23,7 +23,7 @@
 #   PR 自动跑，是测试面唯一的自动执行位（Rust 测试、前端测试、E2E 全量分片、审计与真实性门禁）。
 #   主干 push 不触发。合并 PR 属自动动作，主线一律人工发起，见 on.push 与 ci-info 的
 #   plan-scope 步骤（手动运行默认 full_suite=true，即整条流水线连同发布链一起核一遍）。
-#   v* tag 推送仍自动跑，但属显式发版动作，按基本检查面加发布链执行，不带测试面。
+#   v* tag 推送仅触发验证，不打包不发布；成品包只在手动运行 main 时产出。
 #   漏洞检测在 PR 与 v 前缀标签两轮跑（前者拦合并、后者拦正式版本发布）；关掉测试面的手动
 #   发布轮不扫，那一轮前置的 skipped 由打包发布的 job 级 if 显式放行，发布链不因此断。
 #   所有 job timeout 统一 360 分钟（6 小时），E2E 45 分片并行加速。
@@ -241,6 +241,9 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           components: rustfmt
+          # cargo fmt --check 不编译任何 crate，关掉 sccache 与目标缓存，省 GB 级往返并消除争写
+          sccache: 'false'
+          target-cache: 'false'
 
       - name: 运行 cargo fmt 检查（失败时自动修正）
         working-directory: backend
@@ -1133,7 +1136,7 @@ jobs:
           exit 0
 
       - name: 评估 clippy 严格模式就绪度（复用主步骤 TSV，不重跑 clippy）
-        # 信息性 job：不阻塞 CI（continue-on-error: true）
+        # 严格模式就绪度监控：主 clippy 门禁在独立步骤阻塞，本步仅采集信息。
         # 目的：监控 baseline 缩减进度，当 baseline = 0 时自动切换主 clippy 步骤为严格模式
         # 2026-07-31 优化：原步骤重跑 `cargo clippy -- -D warnings`（约 60-120s）仅为统计 error 数，
         # 现复用主步骤已生成的 clippy-structured.tsv：-D warnings 会把所有 warning 升为 error，
@@ -1553,9 +1556,7 @@ jobs:
           mem_per_unit_gb: '7'
 
       - name: 安装 cargo-nextest
-        uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2
-        with:
-          tool: nextest
+        uses: ./.github/actions/setup-nextest
 
       - name: 编译所有测试并打包为 archive
         # 条件与测试面开关同源：ci-test-rust 的 10 个分片靠这份 archive 取二进制，
@@ -1688,9 +1689,7 @@ jobs:
           target-cache: 'false'
 
       - name: 安装 cargo-nextest
-        uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2
-        with:
-          tool: nextest
+        uses: ./.github/actions/setup-nextest
 
       - name: 下载预编译测试 archive
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -2032,9 +2031,7 @@ jobs:
           target-cache: 'false'
 
       - name: 安装 cargo-nextest
-        uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2
-        with:
-          tool: nextest
+        uses: ./.github/actions/setup-nextest
 
       - name: 下载预编译测试 archive（与分片同一产物）
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -2354,11 +2351,10 @@ jobs:
     timeout-minutes: 30
     needs: ci-info
     # informational job，continue-on-error 避免性能波动阻塞主 CI
-    # 性能回归 > 10% 会写入报告并标注，但不阻塞合并（避免硬件差异导致误报）
+    # 性能基准执行失败即判红（编译错/崩溃/基准缺失）；趋势写报告离线跟踪。
     # 性能基准属测试面，按现行分工一律在 PR 与手动全量轮验证（口径见 ci-info 的 full_suite），
     # 主线不自动触发，避免一次主线运行占住单机 runner 数小时。
     if: needs.ci-info.outputs.full_suite == 'true'
-    continue-on-error: true
     steps:
       - name: 检出代码
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
@@ -2388,18 +2384,18 @@ jobs:
           # 运行 4 项关键 service 性能基准（库存核算 / 凭证生成 / 染整成本归集 / 产量工资）
           # criterion 自动建立基线并对比；首次运行无基线时只采集数据
           BENCHES=(
-            "inventory_calculation"
-            "voucher_generation"
-            "dye_cost_collection"
-            "wage_calculation"
+            "inventory_calculation_bench"
+            "voucher_generation_bench"
+            "dye_cost_collection_bench"
+            "wage_calculation_bench"
           )
           EXIT_CODE=0
           for bench in "${BENCHES[@]}"; do
             echo "运行基准：$bench"
-            if cargo bench --bench "$bench" -- --save-baseline "main" > "reports/bench-${bench}.log" 2>&1; then
+            if cargo bench --features bench --bench "$bench" -- --save-baseline "main" > "reports/bench-${bench}.log" 2>&1; then
               echo "✅ $bench 完成"
             else
-              echo "⚠️ $bench 失败（不影响主 CI）"
+              echo "❌ $bench 基准执行失败，将判红"
               EXIT_CODE=1
             fi
           done
@@ -2437,11 +2433,18 @@ jobs:
             echo "## 回归阈值"
             echo ""
             echo "- 回归 > 10% 时 criterion 自动在日志中标记 `Performance has regressed`"
-            echo "- 本 job 不阻塞主 CI（continue-on-error: true），仅作为监控告警"
+            echo "- 检测到性能回归即判红（本 job 是门禁，不是信息项）"
             echo "- 详细日志见 artifacts: \`perf-bench-report\`"
           } > reports/perf-bench-report.md
 
-          exit 0
+          # cargo bench 自身失败（编译错/崩溃）也必须判红，不能只看回归 grep
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "::error::cargo bench 执行失败（EXIT_CODE=$EXIT_CODE），本 job 判红"
+            exit "$EXIT_CODE"
+          fi
+          # 性能回归跨 run 比较需要持久基线，CI runner 每次干净、--save-baseline
+          # 只保存当轮数据，无法在此判回归；本 job 的真实门禁是上面的 cargo bench
+          # 执行失败（编译错/崩溃/基准缺失）即判红，回归趋势由报告产物离线跟踪。
 
       - name: 写入 Step Summary
         if: always()
@@ -2537,7 +2540,8 @@ jobs:
           IFS='.' read -r YEAR MONTH DAY TIME <<< "$VERSION"
           # 拼接月日为 3 位数（如 8 月 3 日 → 803）
           MD=$(printf "%d%02d" "$MONTH" "$DAY")
-          CARGO_VERSION="${YEAR}.${MD}.${TIME}"
+          # TIME 已补零为 HHMM（如 0703），Cargo semver 不接受前导零，必须转十进制再拼
+          CARGO_VERSION="${YEAR}.${MD}.$((10#$TIME))"
           sed -i "s/^version = \".*\"/version = \"$CARGO_VERSION\"/" backend/Cargo.toml
           echo "更新后版本: $(grep '^version' backend/Cargo.toml)"
 
@@ -2806,18 +2810,27 @@ jobs:
     name: 📱 安卓客户端 APK
     needs: [ci-info, ci-build-rust]
     # PR 也放行，为的是安卓链（workflow_call 接线、权限与插件注入、产物可达性）在合并前就曝光问题；
-    # PR 轮 build_release 仍为 true，但发布事件才是要附进 Release 的那份签名产物。
+    # PR 轮 build_release 为 false（不签名），仅发布事件才用签名证书出包。
     # 主干 push 已不是本 workflow 的触发事件（合并 PR 不自动跑主线），故条件里不再列 main 分支。
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_release != 'true')
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.skip_release != 'true' && needs.ci-info.outputs.full_suite == 'true')
     with:
-      build_release: true
+      # PR 轮只做 debug 构建与 E2E，不接触签名 secret；签名仅限发布轮。
+      build_release: ${{ github.event_name != 'pull_request' }}
       # run_e2e 为字符串输入（false 字符串即跳过模拟器，直接触发判空不等于 false 恒跑）。
       # 写成表达式形式是因为静态检查把裸的 'false' 字面量推成布尔型，与 string 型输入不符；
       # 运行期取值仍是字符串 false，判据不变。
       run_e2e: ${{ 'false' }}
       app_version: ${{ needs.ci-build-rust.outputs.app_version }}
       cargo_version: ${{ needs.ci-build-rust.outputs.cargo_version }}
-    secrets: inherit
+    secrets:
+      CI_E2E_JWT_SECRET: ${{ secrets.CI_E2E_JWT_SECRET }}
+      CI_E2E_COOKIE_SECRET: ${{ secrets.CI_E2E_COOKIE_SECRET }}
+      CI_E2E_WEBHOOK_SECRET: ${{ secrets.CI_E2E_WEBHOOK_SECRET }}
+      AUDIT_SECRET_KEY: ${{ secrets.AUDIT_SECRET_KEY }}
+      ANDROID_KEYSTORE_BASE64: ${{ github.event_name != 'pull_request' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+      ANDROID_KEYSTORE_ALIAS: ${{ github.event_name != 'pull_request' && secrets.ANDROID_KEYSTORE_ALIAS || '' }}
+      ANDROID_KEY_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.ANDROID_KEY_PASSWORD || '' }}
     uses: ./.github/workflows/android.yml
 
 # ==============================================================================
@@ -2848,7 +2861,7 @@ jobs:
     # 显式 if 取代默认的"全部前置成功"语义，所以 failure 与 cancelled 一律拦住，只放行 skipped。
     # 会被 skip 的前置只有全面漏洞检测（按检查范围跳过），其余前置（格式与静态与 lint 与类型与
     # 前后端构建）红时本 job 仍不触发。
-    if: ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_release != 'true')) && !(contains(needs.*.result, 'failure')) && !(contains(needs.*.result, 'cancelled'))
+    if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.skip_release != 'true' && needs.ci-info.outputs.full_suite == 'true') && !(contains(needs.*.result, 'failure')) && !(contains(needs.*.result, 'cancelled'))
     permissions:
       contents: write
     outputs:
@@ -2939,11 +2952,11 @@ jobs:
     # 必须等 APK job：本 job 末尾要把已签名 APK 附到同一个 Release，不等就会出现
     # "Release 先建好、APK 还没产"的竞态。代价是安卓构建失败会连带把整条发布挡住
     # （宁可不发，也不发一个少资产的 Release）。
-    needs: [package-release, ci-android-apk]
+    needs: [ci-info, package-release, ci-android-apk, ci-android-apk-probe]
     runs-on: ubuntu-latest
     timeout-minutes: 360
     # 唯一对外发布关口：仅手动运行 main 且未跳过发布才建 Release；构建/打包验证照旧。
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.skip_release != 'true'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.skip_release != 'true' && needs.ci-info.outputs.full_suite == 'true'
     permissions:
       contents: write
       pull-requests: read
@@ -3179,7 +3192,7 @@ jobs:
     if: needs.ci-info.outputs.full_suite == 'true'
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 12
       # 45 分片：0-19 flow（20 片）/ 20-24 smoke（5 片）/ 25-29 traversal（5 片）
       #            / 30-44 extras（15 片，按目录域重排，见下方 extras 分支说明。
       #            原 6 片在 run #4671 把 1800s 窗口撞穿、13 条用例根本没跑；
@@ -5112,15 +5125,15 @@ jobs:
       # 前三步语义原样保留。判定逻辑集中在
       # scripts/ci/check-e2e-shard-red-forensics.mjs，本 job 只做取数与三态转接，
       # 退出码 0 为 PASS，1 为 FAIL（脚本已逐条点名，转接步骤只退 1 不降级成警告），
-      # 2 为数据缺失的 SKIP（脚本已点名缺失原因，转接步骤只出点名告警不静默放行）。
+      # 2 为数据缺失：本步骤按 fail-closed 直接判红，不降级为 SKIP（恒绿修复）。
       # ==========================================================================
       - name: 下载 E2E 分片报告产物
         # ci-e2e 的分片 job 每轮都按 if always 上传轻量报告制品，制品名以
         # e2e-report-shard 开头并带分片号与本轮标识，内容含分片的 playwright-output
         # 文本输出与退出码文件（上传路径公共祖先被剥离，文件平铺在各制品目录根部）。
         # ci-e2e 结论非 success 的轮次（tag push 与手动 dispatch）没有分片产物可取，
-        # 本步按 needs 结论跳过，随后两个报告对账步骤以数据缺失记 SKIP 并点名，
-        # 不会假装通过；ci-e2e 结论为 success 而下载步报错时本步直接红，属真异常。
+        # 本步按 needs 结论跳过；但取证三步骤在 full_suite 轮必跑，数据缺失直接判红，
+        # 不降级为 SKIP；ci-e2e 结论为 success 而下载步报错时本步直接红，属真异常。
         if: ${{ !cancelled() && needs.ci-e2e.result == 'success' }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -5129,12 +5142,9 @@ jobs:
           merge-multiple: false
 
       - name: 安装对账用 Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: ./.github/actions/setup-node-no-cache
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # 本 job 只跑 node 脚本对账，全程没有 npm ci 与 npm install（实测该 job 体内
-          # 零包管理命令），setup-node 的内置依赖缓存没有消费者，一律关掉而不是留位豁免。
-          package-manager-cache: false
 
       - name: 空片与用例总数对账
         # 判据一，每片实际执行用例数必须大于 0，各片执行数之和不得低于分片数乘以
@@ -5150,9 +5160,8 @@ jobs:
         run: |
           rc=0
           node scripts/ci/check-e2e-shard-red-forensics.mjs --mode shard-stats --artifacts e2e-forensics-artifacts || rc=$?
-          if [ "$rc" -eq 2 ]; then
-            echo "::warning::空片与用例总数对账记 SKIP（数据缺失，原因见上方脚本输出点名）"
-          elif [ "$rc" -ne 0 ]; then
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::取证数据缺失或脚本失败（rc=$rc），不降级为 SKIP"
             exit 1
           fi
 
@@ -5160,16 +5169,15 @@ jobs:
         # 判据二，报告里每个实际执行且通过的用例必须至少含一个断言节点。断言数取
         # Playwright JSON 报告 steps 树中 category 为 assert 的节点数，Playwright 把
         # expect 系列断言登记为 assert 类目节点，所以该计数能代表断言数。
-        # 本判据不向文本降级，因为文本输出没有逐用例步骤树；当前分片跑测未产出
-        # JSON 报告时本步按数据缺失记 SKIP 并点名缺口，分片跑测补出 json reporter
-        # 后本判据自动生效，把每个零断言用例逐条判红并点名文件与标题。
+        # 本判据不向文本降级，因为文本输出没有逐用例步骤树；分片未产出 JSON
+        # 报告时本步按数据缺失直接判红并点名缺口（恒绿修复），补出 json reporter
+        # 后转为把每个零断言用例逐条判红并点名文件与标题。
         if: ${{ !cancelled() }}
         run: |
           rc=0
           node scripts/ci/check-e2e-shard-red-forensics.mjs --mode zero-assertion --artifacts e2e-forensics-artifacts || rc=$?
-          if [ "$rc" -eq 2 ]; then
-            echo "::warning::零断言用例点名记 SKIP（数据缺失，原因见上方脚本输出点名）"
-          elif [ "$rc" -ne 0 ]; then
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::取证数据缺失或脚本失败（rc=$rc），不降级为 SKIP"
             exit 1
           fi
 
@@ -5187,9 +5195,8 @@ jobs:
         run: |
           rc=0
           node scripts/ci/check-e2e-shard-red-forensics.mjs --mode skip-only --baseline scripts/ci/e2e-skip-only-baseline.json --artifacts e2e-forensics-artifacts || rc=$?
-          if [ "$rc" -eq 2 ]; then
-            echo "::warning::skip 与 only 对账记 SKIP（数据缺失，原因见上方脚本输出点名）"
-          elif [ "$rc" -ne 0 ]; then
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::取证数据缺失或脚本失败（rc=$rc），不降级为 SKIP"
             exit 1
           fi
 
@@ -5286,12 +5293,9 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: 安装 Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: ./.github/actions/setup-node-no-cache
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # 本 job 只跑 node 脚本对账，全程没有 npm ci 与 npm install（实测该 job 体内
-          # 零包管理命令），setup-node 的内置依赖缓存没有消费者，一律关掉而不是留位豁免。
-          package-manager-cache: false
 
       - name: E2E 显式日志合规扫描
         run: |
@@ -5379,17 +5383,57 @@ jobs:
       - name: 汇总各 job 结果（动态遍历 needs，避免手工清单漏项）
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}
+          FULL_SUITE: ${{ needs.ci-info.outputs.full_suite }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
+          SKIP_RELEASE: ${{ github.event.inputs.skip_release }}
         run: |
           python3 - <<'PYEOF'
           import json, os, sys
           needs = json.loads(os.environ['NEEDS_JSON'])
-          allow = {'success', 'skipped'}
-          bad = sorted((j, v.get('result')) for j, v in needs.items() if v.get('result') not in allow)
+          full_suite = os.environ.get('FULL_SUITE', 'true') == 'true'
+          event = os.environ.get('GITHUB_EVENT_NAME', '')
+          ref = os.environ.get('GITHUB_REF', '')
+          # 恒绿修复：按事件推导"应跑集合"，集合内必须真实 success，skipped 不再放行。
+          # 发布链只在 manual-main 且未跳过发布时算应跑；PR 与 tag 轮它们本就 skip，不强制。
+          publish = (event == 'workflow_dispatch' and ref == 'refs/heads/main'
+                     and os.environ.get('SKIP_RELEASE', 'false') != 'true')
+          # 每个 job 的应跑条件严格对应其 job 级 if，避免把本就 skipped 的
+          # job 误判为恒红（尤其 tag 轮 full_suite=false 与手动 basic 轮）。
+          must_run = {
+              'ci-info','ci-fmt-rust','ci-static-checks','ci-lint-rust','ci-lint-fe',
+              'ci-type-check','ci-build-test-artifacts','ci-build-rust','ci-build-fe',
+          }
+          # security-vulnerability-scan if: full_suite || tag
+          if full_suite or event == 'push':
+              must_run |= {'security-vulnerability-scan'}
+          # 三个 check if: full_suite
+          if full_suite:
+              must_run |= {
+                  'comment-convention-check','feature-completeness-check',
+                  'sensitive-audit-coverage',
+                  'ci-test-rust','ci-test-rust-ignored','ci-test-fe','ci-perf-bench',
+                  'ci-e2e','role-permission-matrix','ci-dead-code-audit',
+                  'ci-e2e-setup-wizard','e2e-authenticity-guard','e2e-error-detection',
+              }
+          # ci-android-apk: PR 轮或发布轮（两者都带 full_suite，发布还需 publish）
+          if event == 'pull_request' or (publish and full_suite):
+              must_run |= {'ci-android-apk'}
+          # 发布专属三件：仅 manual-main + full_suite + 未跳过发布
+          if publish and full_suite:
+              must_run |= {'ci-android-apk-probe','package-release','github-release'}
+          bad=[]
+          for job,v in needs.items():
+              res=v.get('result')
+              if job in must_run:
+                  if res!='success': bad.append((job,res))
+              elif res not in {'success','skipped'}:
+                  bad.append((job,res))
           print(f"依赖 job 共 {len(needs)} 个：{', '.join(sorted(needs))}")
-          for job, res in bad:
-              print(f"::error::job {job} 结论={res}")
+          for job,res in sorted(bad):
+              print(f"::error::job {job} 结论={res}（应跑集合内必须为 success）")
           if bad:
-              print(f"❌ {len(bad)} 个 job 未通过，请排查后重跑（不自动重试）")
+              print(f"❌ {len(bad)} 个 job 未真实通过，请排查后重跑（不自动重试）")
               sys.exit(1)
-          print("✅ 所有 job 通过（success/skipped）")
+          print(f"✅ 应跑集合全部 success（full_suite={full_suite}），其余 success/skipped")
           PYEOF
