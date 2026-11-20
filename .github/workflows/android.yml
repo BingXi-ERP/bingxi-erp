@@ -20,6 +20,14 @@ on:
         description: '是否跑 Android 模拟器端到端（发布轮传字符串 false，避免把发布卡在模拟器上；布尔 false 会被类型检查拒绝）'
         type: string
         default: 'false'
+      app_version:
+        description: '对外版本号 YYYY.MM.DD.HHMM，由 ci-cd 统一生成传入，三端同源'
+        type: string
+        default: ''
+      cargo_version:
+        description: 'Cargo 三段版本号，由 ci-cd 统一派生传入（semver 硬约束）'
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       build_release:
@@ -83,6 +91,15 @@ jobs:
       apk_version: ${{ steps.ver.outputs.android_client_version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: 同步三端版本号
+        if: inputs.app_version != ''
+        run: |
+          set -euo pipefail
+          # ci-cd 统一算好的版本，三端同源：对外 4 段写 tauri.conf，Cargo 3 段
+          sed -i "s/\"version\": \".*\"/\"version\": \"${{ inputs.app_version }}\"/" mobile-app/src-tauri/tauri.conf.json
+          sed -i "s/^version = \".*\"/version = \"${{ inputs.cargo_version }}\"/" mobile-app/src-tauri/Cargo.toml
+          echo "安卓端版本同步为 ${{ inputs.app_version }}"
 
       - name: 记录安卓端版本
         id: ver
