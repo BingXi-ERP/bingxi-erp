@@ -37,10 +37,16 @@ interface ImportTemplateMeta {
 const EXPECTED_TOP_KEYS = ['columns', 'description', 'import_type', 'name'];
 const EXPECTED_COLUMN_KEYS = ['data_type', 'example', 'field', 'required', 'title'];
 const EXPECTED_COLUMNS = [
-  { field: 'code', title: '客户编码', data_type: 'string', required: true },
-  { field: 'name', title: '客户名称', data_type: 'string', required: true },
-  { field: 'contact', title: '联系人', data_type: 'string', required: false },
-  { field: 'phone', title: '电话', data_type: 'string', required: false },
+  { field: 'code', title: '客户编码', data_type: 'string', required: true, example: 'C001' },
+  { field: 'name', title: '客户名称', data_type: 'string', required: true, example: 'ABC公司' },
+  { field: 'contact', title: '联系人', data_type: 'string', required: false, example: '张三' },
+  {
+    field: 'phone',
+    title: '电话',
+    data_type: 'string',
+    required: false,
+    example: '13800138000',
+  },
 ];
 
 test.describe('530 导入模板元数据契约', () => {
@@ -82,6 +88,7 @@ test.describe('530 导入模板元数据契约', () => {
       title: column.title,
       data_type: column.data_type,
       required: column.required,
+      example: column.example,
     }));
     expect(
       shape,
@@ -117,6 +124,6 @@ test.describe('530 导入模板元数据契约', () => {
       `[530] 未知类型 ${unknownType} 文案须点名不支持的导入类型，实际=${JSON.stringify(
         failure.message
       )}`
-    ).toContain('不支持的导入类型');
+    ).toBe(`不支持的导入类型: ${unknownType}`);
   });
 });
