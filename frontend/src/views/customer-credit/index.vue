@@ -123,7 +123,7 @@
               </el-button>
               <el-button
                 v-if="row.status === 'active'"
-                v-permission="PERMISSIONS.CUSTOMER_CREDIT_UPDATE"
+                v-permission="PERMISSIONS.CUSTOMER_CREDIT_CREATE"
                 type="warning"
                 @click="handleDeactivate(row)"
               >
