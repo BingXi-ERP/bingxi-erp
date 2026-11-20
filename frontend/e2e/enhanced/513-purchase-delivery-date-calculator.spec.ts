@@ -1,8 +1,8 @@
 // 采购交期计算：零历史供应商的默认交期与生产天数、工作日推进。
 // 后端判据：handlers/purchase_order_handler.rs:500-558 定义请求/出参并调 service；
 // services/purchase_delivery_calculator.rs:54-87 组装结果，:99-137 统计已完成/部分收货历史，
-// :140-169 按数量分档（>500→3，>100→2，其余 1），多行取最大后乘 1.2 并下取整，
-// :171-183 从起始日次日起跳过周末。零历史时均值 7、历史 0，basis 文案逐字符来自 :71-78。
+// :140-164 按数量分档（<=50→1，<=100→2，<=500→3，>500→ceil(q/50)），多行取最大后乘 1.2 并下取整，
+// :166-183 从起始日次日起跳过周末。零历史时均值 7、历史 0，basis 文案逐字符来自 :71-78。
 import type { Page } from '@playwright/test';
 import { expect, test } from '../diagnose-fixture';
 import { apiCallRaw, loginViaUI } from '../flow/helpers';
@@ -42,6 +42,9 @@ async function calculate(
   expect(result.calculation_basis, '[513] 零历史交期依据须逐字符一致').toBe(BASIS);
   expect(int(result.historical_orders, 'historical_orders'), '[513] 零历史供应商样本数').toBe(0);
   expect(int(result.avg_lead_time_days, 'avg_lead_time_days'), '[513] 默认交货周期').toBe(7);
+  console.warn(
+    `[513] 交期计算 items=${JSON.stringify(items)} basis=${result.calculation_basis} suggested=${result.suggested_date}`
+  );
   return result;
 }
 
@@ -57,7 +60,7 @@ test.describe('513 采购交期计算', () => {
 
     const multi = await calculate(page, [
       { product_id: 1, quantity: '60' },
-      { product_id: 2, quantity: '501' },
+      { product_id: 2, quantity: '101' },
     ]);
     expect(
       int(multi.max_production_days, '多腿生产天数'),
