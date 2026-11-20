@@ -417,58 +417,62 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     }
   }
 
-  // ---- 3. 产品色号（仍用 API，因为色号在详情页创建且依赖 product_id）----
-  // ---- 3. 产品色号（自建专属产品承载，不复用共享行）----
-  // 共享产品（readEntityIds 读到的列表行，如 seed id=2）可能在本 worker 建色时
+  // ---- 3. 产品色号（建色宿主产品自建自持，色号真实创建）----
+  // 共享产品（readEntityIds 读到的列表行，如 seed id=20）可能在本 worker 建色时
   // 已被并行 worker 的收尾清理，POST /products/{id}/colors 会撞
-  // fk_product_colors_product 外键违例回 500 DATABASE_ERROR（三 run 同文红实证）。
-  // 故建色一律打本 worker 刚自建的产品（补齐段末位必存在且归属本 worker），
-  // 与供应商段"自建自持不复用共享行"同范式。
-  try {
-    const ownProductId = ctx.productIds[ctx.productIds.length - 1];
-    if (!ownProductId) {
-      throw new Error('自建产品不存在：补齐段应保证至少一支本 worker 专属产品');
+  // fk_product_colors_product 外键违例回 500 DATABASE_ERROR（既往 CI run 实证
+  // POST /products/20/colors）。且上面的补齐段只在基数不足 3 时才建产品：库中
+  // 已有 ≥3 支共享行时一支都不建，末位并不归属本 worker。故建色宿主一律现建
+  // 一支本 worker 专属产品（新建行不会进任何分片的收尾清理名单），与供应商/客户段
+  // "自建自持不复用共享行"同范式；新建产品天然无色号，色号走真实创建
+  // （CreateProductColorRequest），非占位兜底。
+  const hostCatId = ctx.productCategoryIds[0];
+  expect(hostCatId, '[ensureTestEntities] 建色宿主产品需产品分类 id').toBeTruthy();
+  // 字段口径与上面补齐段建产品一致（CreateProductRequest 必填 code/name/category_id；
+  // 克重/幅宽供米↔公斤换算、面料必录门要求面料成分），编码/名称带唯一后缀防重名。
+  const hostSuffix = `${Date.now().toString().slice(-6)}${ctx.productIds.length}`;
+  const hostProduct = await apiCall<{ id?: number }>(page, 'POST', '/products', {
+    code: `E2E-P${hostSuffix}`,
+    name: `E2E产品${hostSuffix}`,
+    unit: '米',
+    category_id: hostCatId,
+    product_type: PRODUCT_TYPE.finished,
+    fabric_composition: '100%涤纶',
+    gram_weight: 180,
+    width: 150,
+    meters_per_piece: 50,
+  });
+  const hostProductId = Number(hostProduct.data?.id);
+  expect(
+    hostProductId,
+    `建色宿主产品创建失败：${JSON.stringify(hostProduct.data)}`
+  ).toBeGreaterThan(0);
+  // color_no 只算一次：创建载荷与 ctx.colorNos 必须是同一字符串，两处各自取
+  // Date.now() 会在毫秒跳变时记下与落库不一致的色号。
+  const colorNo = `E2E-C${Date.now().toString().slice(-6)}`;
+  const created = await apiCall<{ id?: number }>(
+    page,
+    'POST',
+    `/products/${hostProductId}/colors`,
+    {
+      color_no: colorNo,
+      color_name: 'E2E色号',
+      // CreateProductColorRequest 必填：color_type/extra_cost
+      color_type: '纯色',
+      extra_cost: 0,
     }
-    // 真实端点：GET /products/{id}/colors（返回数组，非分页包装）
-    const colors = await apiCallRaw<Array<{ id: number; color_no: string }>>(
-      page,
-      'GET',
-      `/products/${ownProductId}/colors`
-    );
-    ctx.productColorIds = colors?.map(c => c.id) || [];
-    ctx.colorNos = colors?.map(c => c.color_no) || [];
-    if (ctx.colorNos.length > 0) {
-      // 与建色段同一契约锚点：colorNos 挂在本专属产品上，把该产品提到
-      // productIds[0]，保住「productIds[0] 拥有 colorNos[0]」配对假设。
-      ctx.productIds = [ownProductId, ...ctx.productIds.filter(id => id !== ownProductId)];
-    }
-  } catch (e) {
-    throw new Error(`[ensureTestEntities] 色号查询失败: ${(e as Error).message}`);
+  );
+  if (!created.data?.id) {
+    throw new Error(`[ensureTestEntities] 色号创建失败: ${JSON.stringify(created)}`);
   }
-  if (ctx.colorNos.length === 0) {
-    // 新建产品天然无色号——真实创建一个（CreateProductColorRequest），非占位兜底
-    const ownProductId = ctx.productIds[ctx.productIds.length - 1];
-    const created = await apiCall<{ id?: number }>(
-      page,
-      'POST',
-      `/products/${ownProductId}/colors`,
-      {
-        color_no: `E2E-C${Date.now().toString().slice(-6)}`,
-        color_name: 'E2E色号',
-        // CreateProductColorRequest 必填：color_type/extra_cost
-        color_type: '纯色',
-        extra_cost: 0,
-      }
-    );
-    if (!created.data?.id) {
-      throw new Error(`[ensureTestEntities] 色号创建失败: ${JSON.stringify(created)}`);
-    }
-    ctx.productColorIds = [created.data.id];
-    ctx.colorNos = [`E2E-C${Date.now().toString().slice(-6)}`];
-    // 契约锚点恢复：既有用例（21a 等）以「productIds[0] 拥有 colorNos[0]」取配对，
-    // 自建色号挂在末位产品上，把该专属产品提到首位保住这条配对假设。
-    ctx.productIds = [ownProductId, ...ctx.productIds.filter(id => id !== ownProductId)];
-  }
+  ctx.productColorIds = [created.data.id];
+  ctx.colorNos = [colorNo];
+  console.log(
+    `[ensureTestEntities] 建色宿主产品已建 id=${hostProductId}，专属色号 ${colorNo} 已创建`
+  );
+  // 契约锚点：既有用例（21a 等）以「productIds[0] 拥有 colorNos[0]」取配对，
+  // 自建色号挂在宿主产品上，把该产品提到首位保住这条配对假设。
+  ctx.productIds = [hostProductId, ...ctx.productIds];
 
   // ---- 4. 供应商（本 worker 自建自持，不复用库里的共享行）----
   // 委外建单与各应付链按 supplier_id 引用供应商，而后端 suppliers 的删除守门只在被应付发票或

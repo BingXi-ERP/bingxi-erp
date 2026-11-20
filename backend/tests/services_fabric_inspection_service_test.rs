@@ -5,6 +5,7 @@ use bingxi_backend::services::fabric_inspection_service::calculate_ten_point_poi
 use bingxi_backend::services::fabric_inspection_service::determine_grade_by_four_point;
 use bingxi_backend::services::fabric_inspection_service::determine_grade_by_ten_point;
 use bingxi_backend::services::fabric_inspection_service::sum_four_point_points_capped_per_yard;
+use bingxi_backend::utils::error::AppError;
 use rust_decimal::Decimal;
 
 // ===== 四分制扣分计算测试 =====
@@ -169,10 +170,18 @@ fn test_calculate_points_per_100_sq_yards_invalid_input() {
     // 受检码数为0
     let result = calculate_points_per_100_sq_yards(10, Decimal::ZERO, Decimal::new(55, 0));
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::BusinessError(ref m) if m == "受检码数必须 > 0"),
+        "零受检码数必须被除数校验拒绝（fabric_inspection_service.rs:155）"
+    );
 
     // 幅宽为0
     let result = calculate_points_per_100_sq_yards(10, Decimal::new(100, 0), Decimal::ZERO);
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::BusinessError(ref m) if m == "幅宽必须 > 0"),
+        "零幅宽必须被除数校验拒绝（fabric_inspection_service.rs:158）"
+    );
 }
 
 // ===== 等级判定测试 =====

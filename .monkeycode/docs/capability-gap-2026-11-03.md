@@ -55,3 +55,16 @@ models/audit_log.rs 现有列直读结论：
 - 列表筛选/排序/分页不入 URL：useTableApi.ts 仍无路由（全文无 router/route 引用），被 109 个视图消费，改 URL 态波及面同样属产品口径，待拍板。
 - 面料字段前端零面（余码/打样逐版/缸号补录）：parent_piece_id 仅在 inventory-transfer.ts 类型声明出现，views 层无任何余码显示与 version_label 引用，仍「后端有列前端缺半边」。建新页面属功能补齐立项，待拍板。
 - 移动端专项清单（第二节）：useBreakpoint 现量 4 个视图（较登记时 3 个 +1），其余项（灯箱/手势放大/压缩上传/云打印/弱网缓存/审批卡片）现态未变，整体属移动端体验批次，待排期拍板。
+
+## 六、缸差管理审批缺口（2026-11-19 实量）
+
+需求原文见总体目标 4.37：「缸差管理，同色多缸标注缸差等级，客户指定缸号，跨缸替代需审批」。
+
+现态取证：
+
+- `backend/src/services/so/delivery.rs:82` 的 `validate_dye_lot_consistency` 对同产品多缸只记录 `tracing::warn`，不阻断、不生成审批单。
+- `backend/src/services/inventory_deduction.rs:83` 的 `plan_deduction` 先精确命中指定缸，不足时按 `dye_lot_no` 字典序确定性回退到其他缸号；这条写路径真实存在。
+- `backend/src/services/inv/batch.rs:457` 与 `backend/src/services/so/delivery_ops/ship.rs:417`、`:469` 已把指定缸、实扣缸、`is_cross_dye_lot` 与“跨缸回退：指定缸号 … 数量不足，本笔实扣缸号 …”写入库存流水/outbound 备注；这是留痕，不是审批。
+- 全链路未发现跨缸替代的审批状态、审批端点、审批人字段或审批通过凭据；也没有缸差等级字段。按客户指定缸号发货后改扣其他缸，当前缺少业务闸门。
+
+定性：功能补齐，P1 候选（客户指定缸被绕过且存在色差质量风险，但业务可绕行，需产品确认审批角色与阈值）。不能用 E2E 断言伪造审批已存在；`frontend/e2e/flow/544-cross-dye-lot-fallback-trace.spec.ts` 只固化已实现的跨缸回退留痕与两缸库存守恒。审批门补齐需单独实现工单，并在实现同支补配套 E2E 后纳入门禁。
