@@ -140,6 +140,28 @@ impl PurchaseReceiptService {
             .auto_generate_from_receipt(receipt.id, user_id)
             .await
         {
+            // 死信兜底：入库已确认但应付未生成，落 event_dead_letters 供人工/后台补偿，
+            // 不改状态流转语义（warn 保留，落库失败仅显式报错不回滚已确认入库）。
+            if let Err(dl_err) =
+                crate::services::event_retry_service::EventRetryService::new(self.db.clone())
+                    .record_dead_letter(
+                        "purchase_receipt_ap_generate_failed",
+                        serde_json::json!({
+                            "receipt_id": receipt.id,
+                            "receipt_no": receipt.receipt_no,
+                            "user_id": user_id,
+                        }),
+                        "入库单确认后自动生成应付账单失败",
+                        &e.to_string(),
+                    )
+                    .await
+            {
+                tracing::error!(
+                    receipt_id = receipt.id,
+                    error = %dl_err,
+                    "应付生成失败死信落库失败，仅剩日志可查"
+                );
+            }
             tracing::warn!(
                 "⚠ 入库单 {} 已确认成功，但自动生成应付账单失败，需人工补生成应付单：{}",
                 receipt.receipt_no,
