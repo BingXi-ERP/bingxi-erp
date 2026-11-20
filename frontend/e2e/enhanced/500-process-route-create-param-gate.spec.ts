@@ -35,12 +35,12 @@ interface ProcessRoute {
   created_by?: number;
 }
 
-interface CreateBody {
+type CreateBody = {
   route_code: string;
   route_name: string;
   seq: number;
   process_type: string;
-}
+};
 
 const createdIds: number[] = [];
 const softDeletedIds = new Set<number>();
