@@ -1,7 +1,7 @@
-// 功能：钉销售发货单 xlsx 打印的缸号、匹号、批次与米数合计不丢列不串值；调用方 CI e2e flow 分片；
+// 功能：钉销售发货单 xlsx 打印的缸号、匹号、批次、米数合计与含税金额不丢列不串值；调用方 CI e2e flow 分片；
 // 入参仅真实登录会话与 HTTP 建单、发货、打印响应；传给 xlsx 解包断言，比较对象为同链订单号、发货单号与库存四维；
 // 存什么为一次性订单、发货单与染色匹，靠唯一缸号隔离，存哪里为业务库；不写本地文件、不做删除清理。
-// 检测力自证：任一目标列被删、被换位或汇总米数错算，逐行解析出的对应单元格断言即红。
+// 检测力自证：任一目标列被删、被换位或汇总米数与含税金额错算，逐行解析出的对应单元格断言即红。
 import JSZip from 'jszip';
 import { test, expect, type Page } from '../diagnose-fixture';
 import {
@@ -144,7 +144,7 @@ function findKvRow(rows: SheetRows, label: string): string[] {
 async function readDelivery(
   page: Page,
   orderId: number
-): Promise<{ id: number; deliveryNo: string }> {
+): Promise<{ id: number; deliveryNo: string; totalAmount: number }> {
   const res = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${orderId}/deliveries`);
   if (!Array.isArray(res.list))
     throw new Error(`发货单列表缺 list 数组：${JSON.stringify(res).slice(0, 200)}`);
@@ -162,6 +162,10 @@ async function readDelivery(
   return {
     id: readPositiveNumber(delivery.id, '发货单 id'),
     deliveryNo: readNonEmptyString(delivery.delivery_no, '发货单号'),
+    totalAmount: readPositiveNumber(
+      delivery.total_amount,
+      '发货单头含税金额（建单零值未回填即判红）'
+    ),
   };
 }
 
@@ -171,7 +175,7 @@ test.describe('548 销售发货单 xlsx 打印字段级回归', () => {
     await ensureTestEntities(page);
   });
 
-  test('真实发货后打印 xlsx，缸号匹号批次与米数合计逐格同源于库存四维', async ({ page }) => {
+  test('真实发货后打印 xlsx，缸号匹号批次、米数与含税金额逐格同源', async ({ page }) => {
     test.setTimeout(300_000);
     const ctx = getCtx();
     if (!ctx.quotationProductId || !ctx.customerId) {
@@ -217,6 +221,9 @@ test.describe('548 销售发货单 xlsx 打印字段级回归', () => {
       ],
     });
     const delivery = await readDelivery(page, orderId);
+    expect(delivery.totalAmount, '全额发货后发货单头含税金额应与订单头同源，退回零值即判红').toBe(
+      readPositiveNumber(approved.total_amount, '订单头含税总额')
+    );
 
     const print = await page.request.get(
       `${API_BASE}${API_PREFIX}/sales/orders/${orderId}/deliveries/${delivery.id}/print-xlsx`,
@@ -252,6 +259,10 @@ test.describe('548 销售发货单 xlsx 打印字段级回归', () => {
       delivery.deliveryNo
     );
     expect(findKvRow(rows, '来源销售订单号')[1], '主表来源订单号应与真实建单号一致').toBe(orderNo);
+    expect(
+      readPositiveNumber(findKvRow(rows, '总金额(元)')[1], '打印汇总含税金额'),
+      '打印汇总含税金额应与发货单头回填值逐分一致'
+    ).toBe(delivery.totalAmount);
     expect(findKvRow(rows, '总匹数')[1], '汇总总匹数应与实际发货匹数一致').toBe('1');
     expect(
       readPositiveNumber(findKvRow(rows, '总米数')[1], '汇总总米数'),
