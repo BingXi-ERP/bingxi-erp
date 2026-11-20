@@ -25,6 +25,9 @@ DC-002 第一批验收标准（7.4）：两个不同 user_id 的 self 角色，�
 | DC-004 | 功能补齐 | P2 | 分环境预制脚本与独立库隔离 | `playwright.config.ts:48` baseURL 写死 localhost，CI 45 分片共用同库，仅靠账号前缀+时间戳唯一名隔离 | 与 DC-003 同域 | 测试 / 运维 |
 | DC-008（重开） | 功能补齐 | P1 | 联动影响矩阵 PR 门禁（4.41.N）——原误判已关闭，抽检证实未落地 | blob 级取证：#1306 open/merged=false，`check-e2e-linkage-gate.mjs`/`e2e-linkage-gate.yml` 在 main NOT_CARRIED，main 的 ci-cd/e2e-batch/e2e-pairing 对 linkage 引用均为 0，主干仅有「信息工具，不是门禁」的 report 脚本；对应任务 #41/#47 仍 in_progress | 兑现载体已验证：#1306 的 `check-e2e-linkage-gate.mjs` 有 `process.exit(0/2/3)` + `--self-test` 正向对照，ci-cd.yml 新增 `ci-e2e-linkage` job 并挂进 `ci-cleanup-retry` needs，是真 fail-closed；其旁路门「联动影响矩阵静态检查」已 success、全量门 queued。待 #1306 合并后 blob 回读再关单，不再凭脚本存在关单 | 测试 / CI |
 
+| DC-011 | 功能补齐 | P1 | 审批引擎多人协作动作（会签/或签/超时自动转交，4.21） | blob 级取证：services/bpm_ops/task.rs:39-49 审批动作取值域仅 approve/reject 两常量，validate_approve_action 对 transfer/delegate 一律拒；全仓 cosign/counter_sign/或签/超时转交在审批引擎零命中；monitor.rs:64 仅 overdue_tasks 统计、bulk_color_approval_service.rs:1388 仅超时提醒非转交。详见第五节十次更正。 | 产品立项多人会签/或签审批模式与超时自动转交引擎改造；实现后按 4.21 补字段级 E2E（会签逐人审批、或签一人即流转、超时后待办归属转移）并 CI 全量绿 | 产品 / 开发 / 测试 |
+| DC-012 | 功能补齐 | P1 | 会话安全能力（扫码登录/会话超时自动登出/多端互踢或并存策略/异地提醒/记住登录/单点登录切换组织/停用账号强制下线，4.20） | handlers/auth*、services/auth、models 逐项取证零命中；已覆盖账号锁定解锁（495）、token 轮换与 logout 黑名单+JTI 吊销（19）、改密吊销旧会话（system/03）；锁定阈值 9 次(per-IP)/18 次(全局)与目标文档「5 次」口径差异待产品确认，非生产跳过锁定检查属防 CI 污染设计。详见第五节十一次更正。 | 产品立项会话安全能力建设；实现后按 4.20 补字段级 E2E（静置超时边界、互踢后旧会话 401、异地提醒触发、停用强制下线）并 CI 全量绿 | 产品 / 开发 / 测试 |
+
 ### 待评估
 
 | 编号 | 类型 | 优先级 | 标题 | 判定要点 | 卡点 |
@@ -59,9 +62,9 @@ DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动
 
 - 新增清单：DC-001（小程序接口层越权 E2E，PR #1320）、DC-002 第一批（写操作参数篡改 IDOR，PR #1320 head fcff7e120）、DC-005/DC-006（audit 新识别待评估项）、DC-003（数据工厂代码已交付，分支 test/data-factory-1119 commit 114e0fb）。
 - 已闭环清单：DC-009（配对门，self-test 16/16 通过；DC-008/DC-010 经本周抽检判定假闭环/回归失效，已移出，不再计入闭环）。
-- 积压清单：待开发 3（DC-002 余项/004/008 重开），验证中 4（DC-001/DC-002 第一批/DC-010 回归失效/DC-003），待评估 2（DC-005/006），搁置 1（DC-007）。
+- 积压清单：待开发 5（DC-002 余项/004/008 重开/011/012），验证中 4（DC-001/DC-002 第一批/DC-010 回归失效/DC-003），待评估 2（DC-005/006），搁置 1（DC-007）。
 - P0 风险项：CI 平台级停摆（GitHub Actions 全仓 0 in_progress / 0 success，31 支开放 PR 全部 queued，最老 run 排队数小时）——仓库侧成因（漏合、真红、审批门、叠层、脏支、concurrency 死锁）已全部排除，属平台调度故障，本地无可修项；合并循环 PID 732 守候，CI 一恢复即自动逐支收口。次生风险：#1302 脏支（收口末期解冲突，force 需单独授权）。
-- P1 积压清单：DC-001/002/003/005/010；CI 停摆为 P0 环境阻塞（非工单）。
+- P1 积压清单：DC-001/002/003/005/010/011/012；CI 停摆为 P0 环境阻塞（非工单）。
 - 本周新增固化 E2E 用例数量：9（上一周期 8 条 + 本周期 4.19「导出按筛选一致」断言 1 条：39d spec `frontend/e2e/traversal/39d-export-filter-consistency.spec.ts`，PR #1341，本地六项静态门全绿、await CI）。
 - 逾期工单清单：无（本看板无历史逾期基准）。
 - 来源统计：completion audit 实量 8 条（DC-001~007 中除 DC-010 外），E2E 断言失败 1 条（DC-010）；本周期新增 8.5 抽检 1 次（门禁脚本与专项 spec 的 main 落地核对，无假闭环）、专项覆盖复核 6 项（4.16/4.17/4.25/4.28/4.31 已密集覆盖不重复建设，4.33 日志脱敏为 E2E 盲区归后端单测面）。
