@@ -33,6 +33,7 @@ DC-002 第一批验收标准（7.4）：两个不同 user_id 的 self 角色，�
 | 编号 | 类型 | 优先级 | 标题 | 判定要点 | 卡点 |
 |------|------|--------|------|----------|------|
 | DC-006 | Bug 缺陷 | P0 | #1302 合并阻塞（mergeable=false / state=dirty） | 逐支 GET 确认真 dirty（列表端点 mergeable_state=null 是假象）；46 是 PR 全部改动数非冲突数，git 试合并后真实冲突仅 frontend/src/views/ap/tabs/PaymentRequestTab.vue 1 文件：1 行 import（main 侧 DC-010 支付方式标签映射，HEAD 侧缺，取空会 reference error 故取 main）+ 1 个机械重复断点块（HEAD/main 各加一次 identical useBreakpoint）。车道原是 shallow clone、merge-base 为空致无法并基，fetch --unshallow 因大 pack 传输失败（invalid index-pack output + 150s 超时），改用 fetch --deepen=200 拿到 merge-base 02ed55843。 | 本地并基已解：merge commit 145088b8d + 修复 commit e5e65fac1（eslint 单文件 0 error、无残留冲突标记、工作区干净），2026-11-20 用户授权后推送成功：credential manager/Bearer 认证均超时（RC=124），改用 -c credential.helper= -c http.sslBackend=openssl -c http.extraHeader='Authorization: basic <x-access-token>' 一次推上（15776cc21→e5e65fac1）。逐支 GET 复核 PR#1302 已从 mergeable=false/dirty 转 mergeable=true/unstable；新 head 自动触发两条 pull_request run（44648048736 配对门、44648049030 CI/CD 全量）均 queued，无需重发 dispatch。待 CI 全量绿 → 合并后 blob 回读确认状态方可关单。 |
+| DC-013 | Bug 缺陷 | P2 | 后端时区口径不一致（4.30 时间与时区边界） | 2026-11-20 代码级复核：backend/src/utils/date_utils.rs:4-14 固定 UTC+0 为统一口径，但全仓 16 处 service 用 chrono::Local::now() 取「今天」（fund_management_service.rs:437 转账日期、occupational_health_service.rs:399 体检到期扫描等），UTC 与本地时区口径并存；CI runner 为 UTC、开发机 CST(+8)，零点/跨日边界同一单据归属日期可能差 1 日。已有 E2E 勿重复建：finance/08-accounting-period-lock、flow/509 年结拒绝、flow/460 纯日期折 00:00 UTC、492-07 未来出具日拒绝、37 跨年 month=12 上界。 | 需产品确认统一口径（业务日期 UTC 还是本地时区）后再修；确认后按 4.30 补字段级 E2E（零点 23:59:59/00:00:00 归属、跨月跨年、UTC/CST 展示一致、倒计时不受 DST）。「不允许未来日期」需区分场景——14-asset-tax.spec.ts:207 的 2099-01 是资产折旧预测期间、非业务单据补录，不据此判缺陷。 |
 
 DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动联网查询，结合行业标准给出最优拍板方案"），结论为**不可行，转入搁置**：
 - 硬约束：全仓 CI job 均为 `runs-on: ubuntu-latest`（.github/workflows/ci-cd.yml:97 等、miniprogram-checks.yml:65）；微信开发者工具仅 Windows/macOS 版，Linux 无法安装。
@@ -62,7 +63,7 @@ DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动
 
 - 新增清单：DC-001（小程序接口层越权 E2E，PR #1320）、DC-002 第一批（写操作参数篡改 IDOR，PR #1320 head fcff7e120）、DC-005/DC-006（audit 新识别待评估项）、DC-003（数据工厂代码已交付，分支 test/data-factory-1119 commit 114e0fb）。
 - 已闭环清单：DC-009（配对门，self-test 16/16 通过；DC-008/DC-010 经本周抽检判定假闭环/回归失效，已移出，不再计入闭环）。
-- 积压清单：待开发 5（DC-002 余项/004/008 重开/011/012），验证中 4（DC-001/DC-002 第一批/DC-010 回归失效/DC-003），待评估 2（DC-005/006），搁置 1（DC-007）。
+- 积压清单：待开发 5（DC-002 余项/004/008 重开/011/012），验证中 4（DC-001/DC-002 第一批/DC-010 回归失效/DC-003），待评估 3（DC-005/006/013），搁置 1（DC-007）。
 - P0 风险项：CI 平台级停摆（GitHub Actions 全仓 0 in_progress / 0 success，31 支开放 PR 全部 queued，最老 run 排队数小时）——仓库侧成因（漏合、真红、审批门、叠层、脏支、concurrency 死锁）已全部排除，属平台调度故障，本地无可修项；合并循环 PID 732 守候，CI 一恢复即自动逐支收口。次生风险：#1302 脏支（收口末期解冲突，force 需单独授权）。
 - P1 积压清单：DC-001/002/003/005/010/011/012；CI 停摆为 P0 环境阻塞（非工单）。
 - 本周新增固化 E2E 用例数量：9（上一周期 8 条 + 本周期 4.19「导出按筛选一致」断言 1 条：39d spec `frontend/e2e/traversal/39d-export-filter-consistency.spec.ts`，PR #1341，本地六项静态门全绿、await CI）。
