@@ -118,7 +118,7 @@
     <el-dialog
       v-model="userDialogVisible"
       :title="userForm.id ? t('system.user.dialog.editTitle') : t('system.user.dialog.createTitle')"
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('system.user.dialog.ariaLabel')"
     >
       <el-form
@@ -126,6 +126,7 @@
         :model="userForm"
         :rules="userRules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('system.user.dialog.formAriaLabel')"
       >
         <el-form-item :label="t('system.user.dialog.username')" prop="username">
@@ -167,7 +168,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive } from 'vue';
+import { computed, ref, reactive } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -182,6 +184,8 @@ import { PERMISSIONS } from '@/constants/permissions';
 
 // 提示文案走 i18n 键，不写硬编码中文
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const userQuery = reactive({
   keyword: '',

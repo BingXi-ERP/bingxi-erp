@@ -227,7 +227,13 @@
       "
       width="560"
     >
-      <el-form ref="orderFormRef" :model="form" :rules="orderRules" label-width="110px">
+      <el-form
+        ref="orderFormRef"
+        :model="form"
+        :rules="orderRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item v-if="!editingId" :label="$t('outsourcing.columns.orderNo')" required>
           <el-input v-model="form.order_no" readonly />
         </el-form-item>
@@ -328,7 +334,7 @@
     </el-dialog>
 
     <el-dialog v-model="detailVisible" :title="$t('outsourcing.dialog.orderDetail')" width="820">
-      <el-descriptions v-if="detailOrder" :column="2" border>
+      <el-descriptions v-if="detailOrder" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item :label="$t('outsourcing.columns.orderNo')">{{
           detailOrder.order_no
         }}</el-descriptions-item>
@@ -429,7 +435,13 @@
       :title="$t('outsourcing.dialog.addItemTitle')"
       width="520"
     >
-      <el-form ref="itemFormRef" :model="itemForm" :rules="itemRules" label-width="110px">
+      <el-form
+        ref="itemFormRef"
+        :model="itemForm"
+        :rules="itemRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="$t('outsourcing.columns.productId')" prop="product_id" required>
           <el-input v-model="itemForm.product_id" inputmode="numeric" class="w-full" />
         </el-form-item>
@@ -489,7 +501,13 @@
       :title="$t('outsourcing.actions.createReceipt')"
       width="560"
     >
-      <el-form ref="receiptFormRef" :model="receiptForm" :rules="receiptRules" label-width="110px">
+      <el-form
+        ref="receiptFormRef"
+        :model="receiptForm"
+        :rules="receiptRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="$t('outsourcing.columns.receiptNo')" required>
           <el-input v-model="receiptForm.receipt_no" readonly />
         </el-form-item>
@@ -595,6 +613,7 @@
         :model="measuredForm"
         :rules="measuredRules"
         label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
       >
         <el-form-item :label="$t('outsourcing.receipt.measured.weight')" prop="weight">
           <el-input
@@ -634,6 +653,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { generateUniqueDocNo } from '@/utils/document-no';
@@ -682,6 +702,8 @@ import {
   type InventoryPieceRow,
 } from '@/api/inventory-transfer';
 import { getSupplierList, type Supplier } from '@/api/supplier';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const { t } = useI18n();
 

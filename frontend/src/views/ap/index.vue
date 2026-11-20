@@ -123,4 +123,10 @@ const activeTab = ref<string>(visibleTabNames.value[0] ?? '');
   background-color: #f5f7fa;
   min-height: 100%;
 }
+
+@media (max-width: 767px) {
+  .ap-page {
+    padding: 12px;
+  }
+}
 </style>

@@ -63,7 +63,7 @@
           ? t('departments.index.titleCreate')
           : t('departments.index.titleEdit')
       "
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="
         dialogMode === 'create'
           ? t('departments.index.ariaCreateDialog')
@@ -76,6 +76,7 @@
         :model="formData"
         :rules="formRules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('departments.index.ariaForm')"
       >
         <el-form-item :label="t('departments.index.colName')" prop="name">
@@ -131,6 +132,7 @@ import { isDialogDismissal } from '@/utils/monitor';
 import { numberInputRules } from '@/utils/number-input';
 import { PERMISSIONS } from '@/constants/permissions';
 import { ref, onMounted, reactive, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
@@ -147,6 +149,8 @@ import {
 } from '@/api/department';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const loading = ref(false);
 const submitLoading = ref(false);
@@ -365,5 +369,11 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+
+@media (max-width: 767px) {
+  .departments-page {
+    padding: 12px;
+  }
 }
 </style>

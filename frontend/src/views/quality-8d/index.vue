@@ -40,7 +40,7 @@
     </el-card>
 
     <el-dialog v-model="dialogVisible" title="启动 8D 报告" width="480">
-      <el-form :model="form" label-width="110px">
+      <el-form :model="form" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="质量问题ID" required>
           <NumericInput v-model="form.quality_issue_id" class="w-full" :min="1" />
         </el-form-item>
@@ -62,7 +62,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { logAuxLoadFailure, logger } from '@/utils/logger';
@@ -74,6 +75,8 @@ import {
   startQuality8d,
   type Quality8dReport,
 } from '@/api/quality-8d';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const list = ref<Quality8dReport[]>([]);
 const loading = ref(false);

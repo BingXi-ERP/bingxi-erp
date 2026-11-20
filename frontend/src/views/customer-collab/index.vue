@@ -98,7 +98,13 @@
     </el-tabs>
 
     <el-dialog v-model="signVisible" title="签署合同" width="480">
-      <el-form ref="signFormRef" :model="signForm" :rules="signRules" label-width="110px">
+      <el-form
+        ref="signFormRef"
+        :model="signForm"
+        :rules="signRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="合同类型" required>
           <el-select v-model="signForm.contract_type" class="w-full">
             <el-option
@@ -129,7 +135,13 @@
     </el-dialog>
 
     <el-dialog v-model="shareVisible" title="共享客户" width="480">
-      <el-form ref="shareFormRef" :model="shareForm" :rules="shareRules" label-width="110px">
+      <el-form
+        ref="shareFormRef"
+        :model="shareForm"
+        :rules="shareRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="客户ID" prop="customer_id" required
           ><el-input v-model="shareForm.customer_id" inputmode="numeric" class="w-full"
         /></el-form-item>
@@ -156,7 +168,13 @@
     </el-dialog>
 
     <el-dialog v-model="teamVisible" title="添加团队成员" width="460">
-      <el-form ref="teamFormRef" :model="teamForm" :rules="teamFormRules" label-width="110px">
+      <el-form
+        ref="teamFormRef"
+        :model="teamForm"
+        :rules="teamFormRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="客户ID" prop="customer_id" required
           ><el-input v-model="teamForm.customer_id" inputmode="numeric" class="w-full"
         /></el-form-item>
@@ -178,6 +196,7 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
@@ -202,6 +221,8 @@ import {
 } from '@/api/customer-share';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const activeTab = ref('signature');
 const unwrapList = <T,>(p: unknown): T[] => (p as { data: T[] }).data;

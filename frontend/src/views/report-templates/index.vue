@@ -135,7 +135,7 @@
       :title="
         form.id ? $t('reportTemplates.dialog.editTitle') : $t('reportTemplates.dialog.createTitle')
       "
-      width="800px"
+      :width="isPhone ? '95%' : '800px'"
       :aria-label="$t('reportTemplates.dialog.ariaLabel')"
     >
       <el-form
@@ -143,6 +143,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('reportTemplates.dialog.formAriaLabel')"
       >
         <el-row :gutter="20">
@@ -211,7 +212,7 @@
     <el-dialog
       v-model="previewVisible"
       :title="$t('reportTemplates.previewDialog.title')"
-      width="900px"
+      :width="isPhone ? '95%' : '900px'"
       :aria-label="$t('reportTemplates.previewDialog.ariaLabel')"
     >
       <div v-loading="previewLoading" class="preview-container">
@@ -232,6 +233,7 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { ref, reactive, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus, Search } from '@element-plus/icons-vue';
@@ -252,6 +254,8 @@ import {
 import { useTableApi } from '@/composables/useTableApi';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const queryParams = reactive({
   keyword: '',
@@ -566,5 +570,11 @@ const handleSizeChange = (s: number) => {
   text-align: center;
   color: #909399;
   padding: 40px;
+}
+
+@media (max-width: 767px) {
+  .report-templates-page {
+    padding: 12px;
+  }
 }
 </style>

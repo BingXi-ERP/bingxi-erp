@@ -151,7 +151,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="form.id ? $t('fixedAssets.dialog.editTitle') : $t('fixedAssets.dialog.createTitle')"
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="$t('fixedAssets.dialog.ariaLabel')"
     >
       <el-form
@@ -159,6 +159,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('fixedAssets.dialog.formAriaLabel')"
       >
         <el-row :gutter="20">
@@ -261,7 +262,7 @@
     <el-dialog
       v-model="disposalDialogVisible"
       :title="$t('fixedAssets.disposal.title')"
-      width="520px"
+      :width="isPhone ? '95%' : '520px'"
       :aria-label="$t('fixedAssets.disposal.ariaLabel')"
     >
       <el-form
@@ -269,6 +270,7 @@
         :model="disposalForm"
         :rules="disposalRules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('fixedAssets.disposal.formAriaLabel')"
       >
         <el-form-item :label="$t('fixedAssets.disposal.type')" prop="disposal_type">
@@ -320,7 +322,7 @@
     </el-dialog>
     <!-- 资产详情（getAsset 回源） -->
     <el-dialog v-model="detailVisible" :title="$t('fixedAssets.table.detailTitle')" width="560">
-      <el-descriptions v-if="detailAsset" :column="2" border>
+      <el-descriptions v-if="detailAsset" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="资产编码">{{ detailAsset.asset_code }}</el-descriptions-item>
         <el-descriptions-item label="资产名称">{{ detailAsset.asset_name }}</el-descriptions-item>
         <el-descriptions-item label="类别">{{ detailAsset.category || '-' }}</el-descriptions-item>
@@ -361,7 +363,8 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { PERMISSIONS } from '@/constants/permissions';
-import { ref, reactive } from 'vue';
+import { computed, ref, reactive } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { numberInputRules } from '@/utils/number-input';
@@ -389,6 +392,8 @@ const fmtNum = (v: unknown): string => Number(v ?? 0).toFixed(2);
 import { useTableApi } from '@/composables/useTableApi';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const submitLoading = ref(false);
 const dialogVisible = ref(false);

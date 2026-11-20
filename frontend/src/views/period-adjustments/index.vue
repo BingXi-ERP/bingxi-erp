@@ -99,8 +99,19 @@
       />
     </el-card>
 
-    <el-dialog v-model="createVisible" title="新建期末调整" width="600px" @close="resetForm">
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="100px">
+    <el-dialog
+      v-model="createVisible"
+      title="新建期末调整"
+      :width="isPhone ? '95%' : '600px'"
+      @close="resetForm"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="调整类型" prop="adjustment_type">
           <el-select
             v-model="formData.adjustment_type"
@@ -147,8 +158,8 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailVisible" title="期末调整详情" width="680px">
-      <el-descriptions v-if="detailRow" :column="2" border>
+    <el-dialog v-model="detailVisible" title="期末调整详情" :width="isPhone ? '95%' : '680px'">
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="调整单号">{{ detailRow.adjustment_no }}</el-descriptions-item>
         <el-descriptions-item label="类型">
           {{ typeTextMap[detailRow.adjustment_type] ?? detailRow.adjustment_type }}
@@ -199,7 +210,8 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import NumericInput from '@/components/NumericInput.vue';
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
@@ -215,6 +227,8 @@ import {
 } from '@/api/period-adjustment';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const typeTextMap: Record<PeriodAdjustmentType, string> = {
   estimate: '暂估',
@@ -459,5 +473,11 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   width: 100%;
+}
+
+@media (max-width: 767px) {
+  .period-adjustments-page {
+    padding: 12px;
+  }
 }
 </style>

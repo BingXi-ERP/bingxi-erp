@@ -232,9 +232,13 @@
     <el-dialog
       v-model="relationDialogVisible"
       :title="t('systemGovernance.dialog.newRelation')"
-      width="460px"
+      :width="isPhone ? '95%' : '460px'"
     >
-      <el-form :model="relationForm" label-width="110px">
+      <el-form
+        :model="relationForm"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <!-- 键集逐字对齐后端 CreateRoleRelationRequest：parent_role_code/child_role_code/
              relation_type 必填、description 可选（原 role_a/role_b 后端无此键，serde 缺必填即 422） -->
         <el-form-item :label="t('systemGovernance.form.parentRoleCode')" required>
@@ -272,9 +276,9 @@
     <el-dialog
       v-model="versionDialogVisible"
       :title="t('systemGovernance.dialog.newModelVersion')"
-      width="480px"
+      :width="isPhone ? '95%' : '480px'"
     >
-      <el-form :model="versionForm" label-width="110px">
+      <el-form :model="versionForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <!-- 键集对齐后端 CreateModelVersionRequest：model_name/version/algorithm 必填、
              change_reason 可选（原 description 后端无此键，算法漏填即 422） -->
         <el-form-item :label="t('systemGovernance.form.modelName')" required>
@@ -303,9 +307,9 @@
     <el-dialog
       v-model="deviceDialogVisible"
       :title="t('systemGovernance.dialog.registerDevice')"
-      width="460px"
+      :width="isPhone ? '95%' : '460px'"
     >
-      <el-form :model="deviceForm" label-width="110px">
+      <el-form :model="deviceForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <!-- 键集对齐后端 RegisterDeviceRequest：device_id 必填（原 device_code 后端无此键）、
              device_type 必填（默认 other）、device_name 可选 -->
         <el-form-item :label="t('systemGovernance.form.deviceId')" required>
@@ -339,9 +343,13 @@
     <el-dialog
       v-model="delegationDialogVisible"
       :title="t('systemGovernance.dialog.newDelegation')"
-      width="480px"
+      :width="isPhone ? '95%' : '480px'"
     >
-      <el-form :model="delegationForm" label-width="110px">
+      <el-form
+        :model="delegationForm"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <!-- 后端 CreateDelegationRequest：delegator 取当前登录用户（谁委托自己的权限），
              一条委托仅一个 permission_code（String 列），时间必填 RFC3339 -->
         <el-form-item :label="t('systemGovernance.form.delegator')">
@@ -390,9 +398,13 @@
     <el-dialog
       v-model="roleChangeDialogVisible"
       :title="t('systemGovernance.dialog.newRoleChange')"
-      width="500px"
+      :width="isPhone ? '95%' : '500px'"
     >
-      <el-form :model="roleChangeForm" label-width="120px">
+      <el-form
+        :model="roleChangeForm"
+        label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <!-- change_type 取值域=后端服务层白名单（越界 422）；target_role_code 为非 Option 必填；
              后端 DTO/审批表均无 reason 字段，变更原因输入被丢弃（缺失已登记串行清单），故移除 -->
         <el-form-item :label="t('systemGovernance.form.changeType')" required>
@@ -434,7 +446,7 @@
     <el-dialog
       v-model="detailDialogVisible"
       :title="t('systemGovernance.dialog.detail')"
-      width="560px"
+      :width="isPhone ? '95%' : '560px'"
     >
       <pre class="detail-json">{{ detailJson }}</pre>
     </el-dialog>
@@ -443,6 +455,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logger, logAuxLoadFailure } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -487,6 +500,8 @@ import {
 } from '@/api/system-governance';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 // 权限委托委托人=当前登录用户（后端 delegator_id 必填，真实取值不手填）
 const userStore = useUserStore();
 

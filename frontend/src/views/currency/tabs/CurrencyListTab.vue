@@ -79,7 +79,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="t('currency.dialog.createTitle')"
-      width="500px"
+      :width="isPhone ? '95%' : '500px'"
       :aria-label="t('currency.dialog.createAriaLabel')"
     >
       <el-form
@@ -87,6 +87,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('currency.dialog.formAriaLabel')"
       >
         <el-form-item :label="t('currency.dialog.code')" prop="code">
@@ -116,7 +117,7 @@
     <el-dialog
       v-model="rateDialogVisible"
       :title="t('currency.rateDialog.createTitle')"
-      width="500px"
+      :width="isPhone ? '95%' : '500px'"
       :aria-label="t('currency.rateDialog.createAriaLabel')"
     >
       <el-form
@@ -124,6 +125,7 @@
         :model="rateForm"
         :rules="rateRules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('currency.rateDialog.formAriaLabel')"
       >
         <el-form-item :label="t('currency.rateDialog.fromCurrency')" prop="from_currency">
@@ -181,7 +183,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive, onMounted } from 'vue';
+import { computed, ref, reactive, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { numberInputRules } from '@/utils/number-input';
 import { Plus } from '@element-plus/icons-vue';
@@ -197,6 +200,8 @@ import {
 } from '@/api/currency';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const loading = ref(false);
 const submitLoading = ref(false);

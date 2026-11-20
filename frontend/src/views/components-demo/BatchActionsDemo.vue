@@ -97,4 +97,10 @@ const handleComplete = (_key: string, success: boolean) => {
 .batch-actions-demo {
   padding: 10px;
 }
+
+@media (max-width: 767px) {
+  .batch-actions-demo {
+    padding: 12px;
+  }
+}
 </style>
