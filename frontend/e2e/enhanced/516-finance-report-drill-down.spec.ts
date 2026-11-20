@@ -74,8 +74,6 @@ interface CleanupTarget {
   label: string;
 }
 
-// 只登记清理尝试：posted 凭证与已被分录引用的科目会被后端拒绝，
-// tryCleanup 如实记录失败，不假设删除成功。
 const CLEANUP: CleanupTarget[] = [];
 
 function dateStr(daysFromToday: number): string {
