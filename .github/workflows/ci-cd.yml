@@ -2789,15 +2789,15 @@ jobs:
 
   # ==============================================================================
   # 安卓客户端 APK：以可复用工作流方式调用 android.yml（脚本只有一份，不复制第二套）
-  # 只在发布事件（v* tag 与未跳过发布的手动运行）与 PR 上跑。
+  # 成品包只在手动运行 main 且未跳过发布时构建：PR 不产签名包，tag push 也不再发版。
   # ==============================================================================
   ci-android-apk:
     name: 📱 安卓客户端 APK
     needs: ci-info
-    # PR 也放行，为的是安卓链（workflow_call 接线、权限与插件注入、产物可达性）在合并前就曝光问题；
-    # PR 轮 build_release 仍为 true，但发布事件才是要附进 Release 的那份签名产物。
-    # 主干 push 已不是本 workflow 的触发事件（合并 PR 不自动跑主线），故条件里不再列 main 分支。
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_release != 'true')
+    # 签名 APK 属成品包，只在手动运行 main 且未跳过发布时构建；PR 与 tag push 不发。
+    # 安卓链的合并前验证由 android.yml 自身的 pull_request 触发（debug 构建 + 模拟器 E2E）承担，
+    # 不依赖本发布 job。
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.skip_release != 'true'
     with:
       build_release: true
       # run_e2e 为字符串输入（false 字符串即跳过模拟器，直接触发判空不等于 false 恒跑）。
@@ -2831,11 +2831,11 @@ jobs:
     ]
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    # 发布事件两枚：显式发版的 v* tag，与人工发起且未跳过发布的手动运行。合并 PR 不再自动发布。
+    # 成品包只在人工发起、目标为 main、且未勾选跳过发布的运行轮产出；tag push 只验证不发版。
     # 显式 if 取代默认的"全部前置成功"语义，所以 failure 与 cancelled 一律拦住，只放行 skipped。
     # 会被 skip 的前置只有全面漏洞检测（按检查范围跳过），其余前置（格式与静态与 lint 与类型与
     # 前后端构建）红时本 job 仍不触发。
-    if: ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_release != 'true')) && !(contains(needs.*.result, 'failure')) && !(contains(needs.*.result, 'cancelled'))
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.skip_release != 'true' && !(contains(needs.*.result, 'failure')) && !(contains(needs.*.result, 'cancelled'))
     permissions:
       contents: write
     outputs:
@@ -2889,6 +2889,9 @@ jobs:
 
           cp -r deploy/* release/bingxi-erp/deploy/
 
+          # 小程序源码随成品包发布：与后端/前端同版本交付
+          cp -r miniprogram release/bingxi-erp/miniprogram
+
           if [ -d "backend/database" ]; then
             cp -r backend/database release/bingxi-erp/ 2>/dev/null || true
           fi
@@ -2926,9 +2929,9 @@ jobs:
     needs: [package-release, ci-android-apk]
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    # 与打包发布同一对发布事件（v* tag 与未跳过发布的手动运行）；两处条件必须同文，
+    # 与打包发布同一发布事件（手动运行 main 且未跳过发布）；两处条件必须同文，
     # 否则一方跑另一方 skip，Release 会停在只有半成品资产的形态。
-    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.event.inputs.skip_release != 'true')
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.event.inputs.skip_release != 'true'
     permissions:
       contents: write
       pull-requests: read

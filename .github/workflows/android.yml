@@ -84,6 +84,44 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: 递增移动端版本号
+        run: |
+          set -euo pipefail
+          export TZ="Asia/Shanghai"
+          # 版本口径与 ci-cd.yml 的 ci-build-rust 生成版本号同文：tag 轮取 tag，
+          # 其余（手动发布轮/独立 dispatch/PR）按当前时间递增，避免固定 0.1.0 永不前进。
+          if [[ "${GITHUB_REF}" == refs/tags/android-v* ]]; then
+            MOBILE_VERSION="${GITHUB_REF#refs/tags/android-v}"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            MOBILE_VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            YEAR=$(date +"%Y")
+            MONTH=$(date +"%-m")
+            DAY=$(date +"%-d")
+            HOUR=$(date +"%-H")
+            MIN=$(date +"%-M")
+            TIME=$((HOUR * 100 + MIN))
+            MOBILE_VERSION="${YEAR}.${MONTH}.${DAY}.${TIME}"
+          fi
+          # Tauri/Cargo 要求三段语义版本，按 ci-cd 的 CARGO_VERSION 口径折叠为 YEAR.MDHHMM
+          IFS="." read -r VY VM VD VT <<< "$MOBILE_VERSION"
+          SEMVER="${VY}.$((10#$VM * 100 + 10#$VD)).$((10#$VT))"
+          python3 - "$SEMVER" <<'PY'
+          import json, sys, pathlib
+          ver = sys.argv[1]
+          p = pathlib.Path("mobile-app/src-tauri/tauri.conf.json")
+          conf = json.loads(p.read_text(encoding="utf-8"))
+          conf["version"] = ver
+          p.write_text(json.dumps(conf, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          c = pathlib.Path("mobile-app/src-tauri/Cargo.toml")
+          lines = c.read_text(encoding="utf-8").splitlines()
+          for i, line in enumerate(lines):
+              if line.startswith("version = "):
+                  lines[i] = f'version = "{ver}"'
+                  break
+          c.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          print(f"移动端版本已递增为 {ver}")
+          PY
       - name: 记录安卓端版本
         id: ver
         run: |
