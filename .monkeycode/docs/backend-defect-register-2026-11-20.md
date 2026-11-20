@@ -23,3 +23,13 @@
 待补 E2E（修复后随功能同批入库，当前不先写会红的断言）。在 flow/19 该用例内，登出后新增独立 bare context 重放旧 access_token 请求 /auth/me 断言 401，范式照搬同文件 :165-175 的 refresh 重放段，并补机器码与 420 系列一致的 UNAUTHORIZED 校验。修复未落地前不提交该断言，以免制造 CI 假红。
 
 关联标签。会话安全；退出失效；JTI 吊销；Cookie-only；假闭环重开；E2E 发现。关联 E2E 用例 ID：flow/19-token-connection.spec.ts::登出后 Cookie 被清除且会话失效（当前假闭环，待补强）。
+
+## QA 交接（2026-11-20 03:37）本轮补测成果的收纳状态
+
+背景。开放 PR 由 31 收敛到 12，`#1351`（test/e2e-all-reorg-1119，标题「全部 E2E 补测汇总为一支」）正在统一收纳散落补测，03:28 仍在更新。本工作分支 test/e2e-search-scope-414 当前查无开放 PR，存在补测成果悬空风险。
+
+逐项状态（2026-11-20 03:37 经 contents API 只读核实）。一，已被 #1351 收纳：sql-injection-negative.spec.ts 与 data-scope-isolation.spec.ts，其中仅后者在 main 在册。二，未被 #1351 收纳、位于无 PR 工作分支：439-charset-emoji-rare-chars.spec.ts 与本台账 D-67。三，位于已关闭未合并 PR #1300（head 8d5ecabca6）：414b-sales-order-filter-combo.spec.ts；416/420/422 三枚已由 #1351 收纳，414b 未见。
+
+待办（交收口流）。将 439 与 414b 两枚 spec、本台账 D-67 一并纳入 #1351 或等价开放载体，使客观"不漏单、纳入回归"要求落地。本会话不越界改 #1351 活跃车道的源码与用例文件，仅登记交接。
+
+CI 状态。平台级 fetch failed 与 git schannel 握手失败导致全 PR 无法验证与合并，非源码红，按纪律不反复轮询。
