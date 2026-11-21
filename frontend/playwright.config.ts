@@ -39,7 +39,10 @@ export default defineConfig({
   // 本配置不再静态指定任何一份会话态文件（静态值在主进程求值一次，全 run 只有一份）。
   globalSetup: './e2e/global-setup.ts',
   // 同时生成 HTML 报告（可下载的 artifact）和命令行输出
-  reporter: [['html'], ['line']],
+  // json reporter 落盘逐用例报告（含 steps 树），供 CI 端 E2E 真实性门禁的
+  // 零断言对账（check-e2e-shard-red-forensics.mjs zero-assertion）读取；
+  // 该门禁对 JSON 缺失判红，缺 reporter 即门禁必红。
+  reporter: [['html'], ['line'], ['json', { outputFile: 'reports/e2e-report.json' }]],
   // 单测试 420s：ensureTestEntities 需 UI 创建 10+ 实体（仓库/产品/供应商/dye-batch/
   // dye-recipe/BOM/定制订单/色卡等），CI 慢环境下单个页面加载/登录可达 120s，
   // 300s 在后段实体（色卡 140s 实测）处耗尽导致 page closed 连锁失败
