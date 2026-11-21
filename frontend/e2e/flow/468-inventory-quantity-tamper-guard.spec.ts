@@ -12,21 +12,7 @@ import {
   type ApiFailureResult,
 } from './helpers';
 
-/**
- * 库存数量篡改守卫：调整数量必须严格为正且不能造成负库存；盘点实盘允许零、拒绝负数。
- *
- * 真值来源：inventory_adjustment_handler.rs 的 DTO 仅 Deserialize，quantity 仅解析 Decimal；
- * inventory_adjustment_service.rs::create_adjustment / create_adjustment_items 未校验数量范围，
- * quantity_after 直接按 increase 加、其他类型减，审批再写入库存。这是 P0 源码缺陷，判责为
- * 后端补校验；调整负例要求 HTTP 400 + VALIDATION_ERROR/BUSINESS_ERROR，不把当前放行钉成预期。
- * inventory_count_service.rs::record_count_items / update_count_item 则已有非负校验，
- * 返回可外显的 VALIDATION_ERROR「实盘数量不能为负」，零值合法。
- *
- * 各 test 独立造库存、不串行依赖，调整缺陷判红不会跳过盘点对照腿。数量与流水只读本用例
- * 唯一批次；调整列表按 handler 的真实键 adjustments 读取（不是通用分页的 items），遍历
- * 所有分页后按唯一 reason_description 定位，避免用全库总数变化误判并发写入。
- * 负例先读副作用再断拒绝；软断言仅用于完整执行各数量攻击面，每条仍严格判红，不接受 5xx。
- */
+// 按唯一批次与整单快照比较副作用，避免全库并发写入干扰拒绝判据。
 type Row = Record<string, unknown>;
 type Decimal = string | number;
 interface StockFixture {
@@ -53,6 +39,20 @@ interface AdjustmentSummary {
   id: number;
   reason_description: string | null;
 }
+interface AdjustmentDetail {
+  id: number;
+  status: string;
+  total_quantity: Decimal;
+  items: Array<{
+    id: number;
+    stock_id: number;
+    quantity: Decimal;
+    quantity_before: Decimal;
+    quantity_after: Decimal;
+    unit_cost: Decimal | null;
+    amount: Decimal | null;
+  }>;
+}
 
 const cleanup: Array<{ path: string; label: string }> = [];
 
@@ -66,10 +66,10 @@ function numeric(value: unknown, label: string): number {
   return Number(value);
 }
 
-async function seedStock(page: Page, label: string): Promise<StockFixture> {
+async function seedStock(page: Page, label: string, warehouseIndex = 0): Promise<StockFixture> {
   const ctx = getCtx();
   const productId = ctx.productIds[0];
-  const warehouseId = ctx.warehouseIds[0];
+  const warehouseId = ctx.warehouseIds[warehouseIndex];
   expect(Number.isInteger(productId) && productId > 0, '产品前置必须真实存在').toBe(true);
   expect(Number.isInteger(warehouseId) && warehouseId > 0, '仓库前置必须真实存在').toBe(true);
   const batchNo = genCode(label);
@@ -84,6 +84,45 @@ async function seedStock(page: Page, label: string): Promise<StockFixture> {
   expect(numeric(row.quantity_on_hand, '库存 quantity_on_hand')).toBe(100);
   cleanup.push({ path: `/inventory/stock/${stockId}`, label: `${label} 库存` });
   return { stockId, productId, warehouseId, batchNo };
+}
+
+async function seedReservedStock(page: Page, label: string): Promise<StockFixture> {
+  const ctx = getCtx();
+  const productId = ctx.productIds[0];
+  const warehouseId = ctx.warehouseIds[0];
+  const batchNo = genCode(label);
+  const created = await apiCallRaw<Row>(page, 'POST', '/inventory/stock/fabric', {
+    warehouse_id: warehouseId,
+    product_id: productId,
+    batch_no: batchNo,
+    color_no: '',
+    grade: '一等品',
+    quantity_meters: '100',
+    quantity_kg: '20',
+  });
+  const fixture = {
+    stockId: numeric(created.id, '双计量库存主键'),
+    productId,
+    warehouseId,
+    batchNo,
+  };
+  expect(Number.isSafeInteger(fixture.stockId) && fixture.stockId > 0).toBe(true);
+  cleanup.push({ path: `/inventory/stock/${fixture.stockId}`, label });
+  const stock = await readStock(page, fixture);
+  expect(numeric(stock.quantity_on_hand, '双计量期初米数')).toBe(100);
+  expect(numeric(stock.quantity_kg, '双计量期初公斤')).toBe(20);
+  // 直接编辑预留字段构造库存快照，不冒称已跑通订单锁库或预留单联动。
+  await apiCallRaw(page, 'PUT', `/inventory/stock/${fixture.stockId}`, {
+    version: numeric(stock.version, '库存版本'),
+    quantity_reserved: '30',
+    quantity_available: '70',
+  });
+  const reserved = await readStock(page, fixture);
+  expect(numeric(reserved.quantity_reserved, '期初预留')).toBe(30);
+  expect(numeric(reserved.quantity_available, '期初可用')).toBe(70);
+  expect(numeric(reserved.quantity_on_hand, '预留后实物数量')).toBe(100);
+  expect(numeric(reserved.quantity_kg, '预留后公斤')).toBe(20);
+  return fixture;
 }
 
 async function readStock(page: Page, fixture: StockFixture): Promise<Row> {
@@ -164,6 +203,30 @@ async function rejectAdjustment(
   expectQuantityRejection(result, marker);
 }
 
+async function createAdjustment(
+  page: Page,
+  fixture: StockFixture,
+  quantity: string
+): Promise<AdjustmentDetail> {
+  const draft = await apiCallRaw<AdjustmentDetail>(page, 'POST', '/inventory/adjustments', {
+    warehouse_id: fixture.warehouseId,
+    adjustment_date: new Date().toISOString(),
+    adjustment_type: 'decrease',
+    reason_type: 'other',
+    reason_description: genCode('468-valid'),
+    items: [{ stock_id: fixture.stockId, quantity, unit_cost: '1' }],
+  });
+  expect(Number.isSafeInteger(draft.id) && draft.id > 0, '合法调整单必须返回有效主键').toBe(true);
+  cleanup.push({ path: `/inventory/adjustments/${draft.id}`, label: '468 合法调整单' });
+  expect(draft.status, '合法调整单初始状态必须待审核').toBe('pending');
+  expect(draft.items, '合法调整单必须恰有一行明细').toHaveLength(1);
+  expect(draft.items[0].stock_id, '明细必须引用本用例库存').toBe(fixture.stockId);
+  expect(numeric(draft.items[0].quantity, '调整数量')).toBe(Number(quantity));
+  expect(numeric(draft.items[0].quantity_before, '调整前数量')).toBe(100);
+  expect(numeric(draft.items[0].quantity_after, '调整后数量')).toBe(100 - Number(quantity));
+  return draft;
+}
+
 async function createCount(page: Page, fixture: StockFixture): Promise<CountDetail> {
   const created = await apiCallRaw<CountDetail>(page, 'POST', '/inventory/counts', {
     warehouse_id: fixture.warehouseId,
@@ -220,6 +283,346 @@ test.describe('468 库存数量篡改守卫', () => {
     const fixture = await seedStock(page, '468-02');
     await rejectAdjustment(page, fixture, 'increase', '0');
     await rejectAdjustment(page, fixture, 'decrease', '0');
+  });
+
+  test('468-05 合法草稿不能通过新增或更新明细绕过数量校验', async ({ page }) => {
+    const fixture = await seedStock(page, '468-05');
+    const draft = await createAdjustment(page, fixture, '10');
+    const path = `/inventory/adjustments/${draft.id}`;
+    const before = await apiCallRaw<AdjustmentDetail>(page, 'GET', path);
+    const beforeStock = await readStock(page, fixture);
+    const beforeLedger = await readLedger(page, fixture);
+    expect(numeric(beforeStock.quantity_on_hand, '建单后库存'), '待审核不能提前扣库存').toBe(100);
+
+    for (const quantity of ['-5', '0', '105']) {
+      for (const attempt of [
+        { method: 'POST' as const, path: `${path}/items` },
+        { method: 'PUT' as const, path: `/inventory/adjustments/items/${draft.items[0].id}` },
+      ]) {
+        const fail = await apiCallExpectFail(page, attempt.method, attempt.path, {
+          stock_id: fixture.stockId,
+          quantity,
+          unit_cost: '1',
+        });
+        expectQuantityRejection(fail, `${attempt.method} ${attempt.path} quantity=${quantity}`);
+        expect(
+          await apiCallRaw<AdjustmentDetail>(page, 'GET', path),
+          '拒绝后主单及明细零漂移'
+        ).toEqual(before);
+        expect(await readStock(page, fixture), '拒绝后库存不能变化').toEqual(beforeStock);
+        expect(await readLedger(page, fixture), '拒绝后不能新增库存流水').toEqual(beforeLedger);
+      }
+    }
+  });
+
+  test('468-06 库存已被另一合法调整更新时审核旧草稿必须拒绝覆盖', async ({ page }) => {
+    const fixture = await seedStock(page, '468-06');
+    const stale = await createAdjustment(page, fixture, '10');
+    const current = await createAdjustment(page, fixture, '20');
+    const approved = await apiCallRaw<AdjustmentDetail>(
+      page,
+      'POST',
+      `/inventory/adjustments/${current.id}/approve`
+    );
+    expect(approved.status, '正向对照必须真正审核成功，排除接口或权限错误').toBe('approved');
+    const afterCurrent = await readStock(page, fixture);
+    expect(numeric(afterCurrent.quantity_on_hand, '正向审核后账面库存')).toBe(80);
+    expect(numeric(afterCurrent.quantity_meters, '正向审核后米数')).toBe(80);
+    cleanup.splice(
+      cleanup.findIndex(entry => entry.path === `/inventory/adjustments/${current.id}`),
+      1
+    );
+    process.stdout.write(`[468-06] 已审核调整单 ${current.id} 按业务规则保留，不尝试硬删\n`);
+
+    const path = `/inventory/adjustments/${stale.id}`;
+    const before = await apiCallRaw<AdjustmentDetail>(page, 'GET', path);
+    expect(before.status, '旧草稿仍应处于待审核态').toBe('pending');
+    const beforeLedger = await readLedger(page, fixture);
+    const fail = await apiCallExpectFail(page, 'POST', `${path}/approve`);
+    expect(fail.status, '陈旧草稿审核必须业务拒绝').toBe(400);
+    expect(fail.code, '陈旧快照拒绝必须是业务错误，不是数据库崩溃').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
+    expect(await readStock(page, fixture), '不能把80库存按旧草稿覆写成90').toEqual(afterCurrent);
+    expect(await readLedger(page, fixture), '陈旧草稿拒绝后不能新增流水').toEqual(beforeLedger);
+    expect(
+      await apiCallRaw<AdjustmentDetail>(page, 'GET', path),
+      '拒绝审核须回滚状态及明细'
+    ).toEqual(before);
+  });
+
+  test('468-07 合法明细新增修改删除后合计与金额同步回读，未审核不动库存', async ({ page }) => {
+    const first = await seedStock(page, '468-07-first');
+    const second = await seedStock(page, '468-07-second');
+    const draft = await createAdjustment(page, first, '10');
+    const path = `/inventory/adjustments/${draft.id}`;
+    const beforeStocks = await Promise.all([readStock(page, first), readStock(page, second)]);
+    const beforeLedgers = await Promise.all([readLedger(page, first), readLedger(page, second)]);
+    expect(numeric(draft.total_quantity, '初始调整合计')).toBe(10);
+
+    await apiCallRaw(page, 'POST', `${path}/items`, {
+      stock_id: second.stockId,
+      quantity: '2',
+      unit_cost: '1.234',
+    });
+    const added = await apiCallRaw<AdjustmentDetail>(page, 'GET', path);
+    expect(added.items).toHaveLength(2);
+    expect(numeric(added.total_quantity, '新增明细后合计')).toBe(12);
+    const addedItem = added.items.find(item => item.stock_id === second.stockId);
+    expect(addedItem, '新增行必须能由库存主键唯一定位').toBeDefined();
+    if (!addedItem) throw new Error('[468-07] 新增明细缺失');
+    expect(numeric(addedItem.amount, '新增行金额')).toBe(2.47);
+
+    await apiCallRaw(page, 'PUT', `/inventory/adjustments/items/${draft.items[0].id}`, {
+      stock_id: first.stockId,
+      quantity: '7',
+      unit_cost: '1.234',
+    });
+    const updated = await apiCallRaw<AdjustmentDetail>(page, 'GET', path);
+    expect(updated.items).toHaveLength(2);
+    expect(numeric(updated.total_quantity, '修改明细后合计')).toBe(9);
+    const updatedItem = updated.items.find(item => item.id === draft.items[0].id);
+    expect(updatedItem, '修改行必须仍然存在').toBeDefined();
+    if (!updatedItem) throw new Error('[468-07] 修改明细缺失');
+    expect(numeric(updatedItem.quantity, '修改行数量')).toBe(7);
+    expect(numeric(updatedItem.quantity_after, '修改行调整后数量')).toBe(93);
+    expect(numeric(updatedItem.amount, '修改行金额')).toBe(8.64);
+
+    await apiCallRaw(page, 'DELETE', `/inventory/adjustments/items/${addedItem.id}`);
+    const deleted = await apiCallRaw<AdjustmentDetail>(page, 'GET', path);
+    expect(deleted.status).toBe('pending');
+    expect(deleted.items).toHaveLength(1);
+    expect(deleted.items[0]).toEqual(updatedItem);
+    expect(numeric(deleted.total_quantity, '删除明细后合计')).toBe(7);
+    expect(await Promise.all([readStock(page, first), readStock(page, second)])).toEqual(
+      beforeStocks
+    );
+    expect(await Promise.all([readLedger(page, first), readLedger(page, second)])).toEqual(
+      beforeLedgers
+    );
+  });
+
+  for (const entry of ['create', 'add', 'update'] as const) {
+    test(`468-08-${entry} 成本乘法溢出必须业务拒绝且整单库存流水零漂移`, async ({ page }) => {
+      const fixture = await seedStock(page, `468-08-${entry}`);
+      const beforeStock = await readStock(page, fixture);
+      const beforeLedger = await readLedger(page, fixture);
+      const overflowItem = {
+        stock_id: fixture.stockId,
+        quantity: '2',
+        unit_cost: '79228162514264337593543950335',
+      };
+      let fail: ApiFailureResult;
+      if (entry === 'create') {
+        const first = await seedStock(page, '468-08-valid-first');
+        const firstStock = await readStock(page, first);
+        const firstLedger = await readLedger(page, first);
+        const marker = genCode('468-08-overflow');
+        expect(await findAdjustments(page, marker)).toEqual([]);
+        fail = await apiCallExpectFail(page, 'POST', '/inventory/adjustments', {
+          warehouse_id: fixture.warehouseId,
+          adjustment_date: new Date().toISOString(),
+          adjustment_type: 'decrease',
+          reason_type: 'other',
+          reason_description: marker,
+          items: [{ stock_id: first.stockId, quantity: '1', unit_cost: '1' }, overflowItem],
+        });
+        const persisted = await findAdjustments(page, marker);
+        for (const row of persisted)
+          cleanup.push({ path: `/inventory/adjustments/${row.id}`, label: marker });
+        expect(persisted, '第二行溢出须回滚主单与已插入的合法首行').toEqual([]);
+        expect(await readStock(page, first)).toEqual(firstStock);
+        expect(await readLedger(page, first)).toEqual(firstLedger);
+      } else {
+        const draft = await createAdjustment(page, fixture, '10');
+        const path = `/inventory/adjustments/${draft.id}`;
+        const before = await apiCallRaw<AdjustmentDetail>(page, 'GET', path);
+        fail = await apiCallExpectFail(
+          page,
+          entry === 'add' ? 'POST' : 'PUT',
+          entry === 'add' ? `${path}/items` : `/inventory/adjustments/items/${draft.items[0].id}`,
+          overflowItem
+        );
+        expect(
+          await apiCallRaw<AdjustmentDetail>(page, 'GET', path),
+          '金额溢出不得改写主单或明细'
+        ).toEqual(before);
+      }
+      expect(fail.status, '溢出应由数量金额规则拒绝，不能返回数据库异常').toBe(400);
+      expect(fail.code).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+      expect(fail.message).toBe('调整金额超出范围，请核对数量与单位成本后重试');
+      expect(await readStock(page, fixture)).toEqual(beforeStock);
+      expect(await readLedger(page, fixture)).toEqual(beforeLedger);
+    });
+  }
+
+  test('468-09 多行合计超出Decimal范围必须拒绝且不落单', async ({ page }) => {
+    const fixture = await seedStock(page, '468-09');
+    const marker = genCode('468-09-total');
+    const beforeStock = await readStock(page, fixture);
+    const beforeLedger = await readLedger(page, fixture);
+    expect(await findAdjustments(page, marker)).toEqual([]);
+    const fail = await apiCallExpectFail(page, 'POST', '/inventory/adjustments', {
+      warehouse_id: fixture.warehouseId,
+      adjustment_date: new Date().toISOString(),
+      adjustment_type: 'increase',
+      reason_type: 'other',
+      reason_description: marker,
+      items: ['79228162514264337593543950335', '1'].map(quantity => ({
+        stock_id: fixture.stockId,
+        quantity,
+      })),
+    });
+    const persisted = await findAdjustments(page, marker);
+    for (const row of persisted)
+      cleanup.push({ path: `/inventory/adjustments/${row.id}`, label: marker });
+    expect(persisted).toEqual([]);
+    expect(await readStock(page, fixture)).toEqual(beforeStock);
+    expect(await readLedger(page, fixture)).toEqual(beforeLedger);
+    expect(fail.status).toBe(400);
+    expect(fail.code).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+    expect(fail.message).toBe('调整合计数量超出范围，请减少明细数量后重试');
+  });
+
+  for (const entry of ['create', 'add', 'update'] as const) {
+    test(`468-10-${entry} 调整单不得引用其他仓库库存且两仓零副作用`, async ({ page }) => {
+      const local = await seedStock(page, `468-10-${entry}-local`);
+      const foreign = await seedStock(page, `468-10-${entry}-foreign`, 1);
+      expect(foreign.warehouseId, '跨仓负例必须使用两个不同真实仓库').not.toBe(local.warehouseId);
+      const beforeStocks = await Promise.all([readStock(page, local), readStock(page, foreign)]);
+      const beforeLedgers = await Promise.all([readLedger(page, local), readLedger(page, foreign)]);
+      const wrongWarehouseLedger = { ...foreign, warehouseId: local.warehouseId };
+      const beforeWrongLedger = await readLedger(page, wrongWarehouseLedger);
+      const item = { stock_id: foreign.stockId, quantity: '2', unit_cost: '1' };
+      let fail: ApiFailureResult;
+      if (entry === 'create') {
+        const marker = genCode('468-10-cross-warehouse');
+        expect(await findAdjustments(page, marker)).toEqual([]);
+        fail = await apiCallExpectFail(page, 'POST', '/inventory/adjustments', {
+          warehouse_id: local.warehouseId,
+          adjustment_date: new Date().toISOString(),
+          adjustment_type: 'decrease',
+          reason_type: 'other',
+          reason_description: marker,
+          items: [{ stock_id: local.stockId, quantity: '1', unit_cost: '1' }, item],
+        });
+        const persisted = await findAdjustments(page, marker);
+        for (const row of persisted)
+          cleanup.push({ path: `/inventory/adjustments/${row.id}`, label: marker });
+        expect(persisted, '第二行跨仓必须回滚主单及合法首行').toEqual([]);
+      } else {
+        const draft = await createAdjustment(page, local, '10');
+        const path = `/inventory/adjustments/${draft.id}`;
+        const before = await apiCallRaw<AdjustmentDetail>(page, 'GET', path);
+        fail = await apiCallExpectFail(
+          page,
+          entry === 'add' ? 'POST' : 'PUT',
+          entry === 'add' ? `${path}/items` : `/inventory/adjustments/items/${draft.items[0].id}`,
+          item
+        );
+        expect(await apiCallRaw<AdjustmentDetail>(page, 'GET', path), '跨仓拒绝后整单不变').toEqual(
+          before
+        );
+      }
+      expect(fail.status).toBe(400);
+      expect(fail.code).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+      expect(fail.message).toBe('库存所属仓库与调整单仓库不一致，请重新选择库存');
+      expect(await Promise.all([readStock(page, local), readStock(page, foreign)])).toEqual(
+        beforeStocks
+      );
+      expect(await Promise.all([readLedger(page, local), readLedger(page, foreign)])).toEqual(
+        beforeLedgers
+      );
+      expect(await readLedger(page, wrongWarehouseLedger), '不得把他仓批次流水记入本仓').toEqual(
+        beforeWrongLedger
+      );
+    });
+  }
+
+  test('468-11 非默认仓库同仓调整可正常建单并修改，不能将仓库限制写死', async ({ page }) => {
+    const fixture = await seedStock(page, '468-11', 1);
+    expect(fixture.warehouseId).not.toBe(getCtx().warehouseIds[0]);
+    const beforeStock = await readStock(page, fixture);
+    const beforeLedger = await readLedger(page, fixture);
+    const draft = await createAdjustment(page, fixture, '10');
+    await apiCallRaw(page, 'PUT', `/inventory/adjustments/items/${draft.items[0].id}`, {
+      stock_id: fixture.stockId,
+      quantity: '7',
+      unit_cost: '1',
+    });
+    const updated = await apiCallRaw<AdjustmentDetail>(
+      page,
+      'GET',
+      `/inventory/adjustments/${draft.id}`
+    );
+    expect(updated.status).toBe('pending');
+    expect(updated.items).toHaveLength(1);
+    expect(updated.items[0].stock_id).toBe(fixture.stockId);
+    expect(numeric(updated.total_quantity, '非默认仓库合计')).toBe(7);
+    expect(numeric(updated.items[0].quantity_after, '非默认仓库调整后数量')).toBe(93);
+    expect(await readStock(page, fixture)).toEqual(beforeStock);
+    expect(await readLedger(page, fixture)).toEqual(beforeLedger);
+  });
+
+  for (const scenario of [
+    { direction: 'increase', quantity: '10', onHand: 110, available: 80, kg: 22 },
+    { direction: 'decrease', quantity: '20', onHand: 80, available: 50, kg: 16 },
+  ] as const) {
+    test(`468-12-${scenario.direction} 审核保留预留量且可用量按差额变化，米公斤同步`, async ({
+      page,
+    }) => {
+      const fixture = await seedReservedStock(page, `468-12-${scenario.direction}`);
+      const draft = await apiCallRaw<AdjustmentDetail>(page, 'POST', '/inventory/adjustments', {
+        warehouse_id: fixture.warehouseId,
+        adjustment_date: new Date().toISOString(),
+        adjustment_type: scenario.direction,
+        reason_type: 'other',
+        reason_description: genCode('468-12-valid'),
+        items: [{ stock_id: fixture.stockId, quantity: scenario.quantity, unit_cost: '1' }],
+      });
+      expect(Number.isSafeInteger(draft.id) && draft.id > 0).toBe(true);
+      const cleanupEntry = {
+        path: `/inventory/adjustments/${draft.id}`,
+        label: '468-12 合法调整单',
+      };
+      cleanup.push(cleanupEntry);
+      expect(draft.status).toBe('pending');
+      const path = `/inventory/adjustments/${draft.id}`;
+      const approved = await apiCallRaw<AdjustmentDetail>(page, 'POST', `${path}/approve`);
+      expect(approved.status).toBe('approved');
+      cleanup.splice(cleanup.indexOf(cleanupEntry), 1);
+      process.stdout.write(`[468-12] 已审核调整单 ${draft.id} 按业务规则保留\n`);
+      const after = await readStock(page, fixture);
+      expect(numeric(after.quantity_on_hand, '审核后实物米数')).toBe(scenario.onHand);
+      expect(numeric(after.quantity_meters, '审核后面料米数')).toBe(scenario.onHand);
+      expect(numeric(after.quantity_available, '审核后可用量')).toBe(scenario.available);
+      expect(numeric(after.quantity_reserved, '审核后预留量')).toBe(30);
+      expect(numeric(after.quantity_kg, '审核后公斤')).toBe(scenario.kg);
+      const detail = await apiCallRaw<AdjustmentDetail>(page, 'GET', path);
+      const ledger = await readLedger(page, fixture);
+      const repeat = await apiCallExpectFail(page, 'POST', `${path}/approve`);
+      expect(repeat.status).toBe(400);
+      expect(repeat.code).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+      expect(await readStock(page, fixture), '重复审核不得再次改变数量或预留').toEqual(after);
+      expect(await apiCallRaw<AdjustmentDetail>(page, 'GET', path)).toEqual(detail);
+      expect(await readLedger(page, fixture), '重复审核不得新增流水').toEqual(ledger);
+    });
+  }
+
+  test('468-13 调减超过可用量时审核必须整体回滚，不能侵占预留', async ({ page }) => {
+    const fixture = await seedReservedStock(page, '468-13');
+    const draft = await createAdjustment(page, fixture, '80');
+    const path = `/inventory/adjustments/${draft.id}`;
+    const before = await apiCallRaw<AdjustmentDetail>(page, 'GET', path);
+    const beforeStock = await readStock(page, fixture);
+    const beforeLedger = await readLedger(page, fixture);
+    const fail = await apiCallExpectFail(page, 'POST', `${path}/approve`);
+    expect(fail.status).toBe(400);
+    expect(fail.code).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+    expect(fail.message).toBe('调整后可用库存不能为负数，请先核对预留数量');
+    expect(await apiCallRaw<AdjustmentDetail>(page, 'GET', path)).toEqual(before);
+    expect(await readStock(page, fixture)).toEqual(beforeStock);
+    expect(await readLedger(page, fixture)).toEqual(beforeLedger);
   });
 
   test('468-03 盘点批量录入与明细更新均拒绝负数且整单、库存、流水不变', async ({ page }) => {

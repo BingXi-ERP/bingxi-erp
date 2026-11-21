@@ -132,8 +132,8 @@ async function createActor(
   expect(ownQuotation.status).toBe('draft');
   expect(ownQuotation.quotation_no).toEqual(expect.any(String));
   expect(ownQuotation.quotation_no.length).toBeGreaterThan(0);
-  console.info(
-    `[469] ${label} 前置就绪 user=${id} customer=${customer.id} quotation=${quotation.id}`
+  process.stdout.write(
+    `[469] ${label} 前置就绪 user=${id} customer=${customer.id} quotation=${quotation.id}\n`
   );
   return { id, session, customer: ownCustomer, quotation: ownQuotation };
 }
@@ -216,7 +216,7 @@ test.describe.serial('469 跨业务员报价与客户隔离', () => {
         status: 'inactive',
       });
       expect(user.is_active, '专用账号保留外键身份但必须停用').toBe(false);
-      console.info(`[469] 专用业务员 ${userId} 已停用`);
+      process.stdout.write(`[469] 专用业务员 ${userId} 已停用\n`);
     }
   });
 
