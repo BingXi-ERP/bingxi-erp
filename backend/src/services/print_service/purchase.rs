@@ -1072,7 +1072,8 @@ mod xlsx_builder_tests {
         let table = build_purchase_receipt_xlsx(&print_data).unwrap();
         assert_eq!(table.sheet_name, "采购收货单");
         assert_eq!(table.headers.len(), 10);
-        assert_eq!(table.rows.len(), 9 + 1 + 3 + 1);
+        // KV 10 行（总金额后多出"大写金额"行）+ 空行 + 3 明细 + 合计
+        assert_eq!(table.rows.len(), 10 + 1 + 3 + 1);
     }
 
     /// 缸号逐行对：lot_no 独立列（第 6 列）与输入逐行一致
@@ -1086,7 +1087,8 @@ mod xlsx_builder_tests {
                 .collect(),
         );
         let table = build_purchase_receipt_xlsx(&print_data).unwrap();
-        let detail_start = 9 + 1;
+        // KV 10 行（单号起，"大写金额"插在总金额后）+ 空行 = 明细自第 11 行起
+        let detail_start = 10 + 1;
         for (i, lot) in lots.iter().enumerate() {
             assert_eq!(table.rows[detail_start + i][5], *lot);
         }
@@ -1219,11 +1221,11 @@ mod xlsx_builder_tests {
         let table = build_purchase_order_xlsx(&print_data).unwrap();
         assert_eq!(table.sheet_name, "采购订单");
         assert_eq!(table.headers.len(), 8);
-        // KV 10 行 + 空行 + 2 明细 + 合计
-        assert_eq!(table.rows.len(), 10 + 1 + 2 + 1);
-        assert_eq!(table.rows[11][1], "P001");
-        assert_eq!(table.rows[11][6], "1050");
+        // KV 11 行（总金额后多出"大写金额"行）+ 空行 + 2 明细 + 合计
+        assert_eq!(table.rows.len(), 11 + 1 + 2 + 1);
+        assert_eq!(table.rows[12][1], "P001");
         assert_eq!(table.rows[12][6], "1050");
+        assert_eq!(table.rows[13][6], "1050");
         let total = &table.rows[table.rows.len() - 1];
         assert_eq!(total[3].parse::<Decimal>().unwrap(), dec!(200));
         assert_eq!(total[6].parse::<Decimal>().unwrap(), dec!(2100));
