@@ -30,4 +30,10 @@ const activeTab = ref('charts');
 .component-demo-page {
   padding: 20px;
 }
+
+@media (max-width: 767px) {
+  .component-demo-page {
+    padding: 12px;
+  }
+}
 </style>

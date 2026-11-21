@@ -8,7 +8,7 @@
   <el-dialog
     :model-value="modelValue"
     :title="t('product.categoryDialogTab.title')"
-    width="600px"
+    :width="isPhone ? '95%' : '600px'"
     :aria-label="t('product.categoryDialogTab.ariaLabel')"
     @update:model-value="(val: boolean) => emit('update:modelValue', val)"
   >
@@ -24,7 +24,38 @@
           {{ t('product.categoryDialogTab.buttonAddCategory') }}
         </el-button>
       </div>
+      <!-- 手机端：分类单列卡片 -->
+      <section v-if="isPhone" class="category-mobile">
+        <ul class="card-list" :aria-label="t('product.categoryDialogTab.tableAriaLabel')">
+          <li v-for="(row, index) in categories" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('product.categoryDialogTab.colId') }}</dt>
+                <dd>{{ row.id }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('product.categoryDialogTab.colName') }}</dt>
+                <dd>{{ row.name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('product.categoryDialogTab.colDescription') }}</dt>
+                <dd>{{ row.description }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" @click="handleRename(row as ProductCategory)">
+                {{ t('common.edit') }}
+              </el-button>
+              <el-button type="danger" @click="handleDelete(row as ProductCategory)">
+                {{ t('common.delete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="categories"
         stripe
@@ -64,7 +95,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
@@ -78,6 +110,8 @@ import {
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;
@@ -185,5 +219,53 @@ watch(
 .category-add-form {
   display: flex;
   align-items: center;
+}
+
+.category-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.category-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.category-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.category-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.category-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.category-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.category-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.category-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

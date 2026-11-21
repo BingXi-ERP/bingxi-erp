@@ -8,13 +8,14 @@
   <el-dialog
     :model-value="visible"
     :title="t('systemUpdate.backupForm.dialogTitle')"
-    width="500px"
+    :width="isPhone ? '95%' : '500px'"
     :aria-label="t('systemUpdate.backupForm.dialogAriaLabel')"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
     <el-form
       :model="localForm"
       label-width="100px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('systemUpdate.backupForm.formAriaLabel')"
     >
       <el-form-item :label="t('systemUpdate.backupForm.labelBackupType')" prop="backup_type">
@@ -46,10 +47,14 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ref, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface BackupForm {
   backup_type: 'full' | 'incremental' | 'database' | 'files';

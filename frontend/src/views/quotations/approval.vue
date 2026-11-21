@@ -25,7 +25,7 @@
         :converted-order-id="quotation.converted_sales_order_id"
       />
 
-      <el-descriptions :column="2" border style="margin-top: 24px">
+      <el-descriptions :column="isPhone ? 1 : 2" border style="margin-top: 24px">
         <el-descriptions-item :label="t('quotations.approval.labelCustomer')">
           {{ quotation.customer_name }}
         </el-descriptions-item>
@@ -101,6 +101,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -121,6 +122,8 @@ import {
 import ApprovalProgress from './components/ApprovalProgress.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const route = useRoute();
 const router = useRouter();

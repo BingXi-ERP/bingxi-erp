@@ -71,7 +71,7 @@
     </el-card>
 
     <el-dialog v-model="permitDialogVisible" title="新建排污许可证" width="560">
-      <el-form :model="permitForm" label-width="110px">
+      <el-form :model="permitForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="许可证编号" required>
           <el-input v-model="permitForm.permit_no" />
         </el-form-item>
@@ -112,7 +112,7 @@
     </el-dialog>
 
     <el-dialog v-model="recordDialogVisible" title="新建监测记录" width="560">
-      <el-form :model="recordForm" label-width="110px">
+      <el-form :model="recordForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="监测类型" required>
           <el-select v-model="recordForm.monitoring_type" class="w-full">
             <el-option label="废水" value="wastewater" />
@@ -158,7 +158,8 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, toRef, onMounted } from 'vue';
+import { computed, reactive, ref, toRef, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
@@ -172,6 +173,8 @@ import {
   scanExceedanceAlerts,
   type PollutantMonitoringRecord,
 } from '@/api/compliance';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const activeTab = ref('permits');
 

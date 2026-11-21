@@ -89,7 +89,85 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
+      <!-- 手机端：单列卡片，字段与动作与桌面表格等价 -->
+      <section v-if="isPhone" v-loading="loading" class="pool-mobile">
+        <ul class="card-list" :aria-label="t('crmPool.table.ariaLabel')">
+          <li v-for="(row, index) in poolList" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('crmPool.table.customerName') }}</dt>
+                <dd>{{ row.customer_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmPool.table.contactPerson') }}</dt>
+                <dd>{{ row.contact_person }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmPool.table.phone') }}</dt>
+                <dd>{{ row.phone }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmPool.table.type') }}</dt>
+                <dd>
+                  <el-tag :type="getCustomerTypeTag(row.customer_type)" size="small">
+                    {{ getCustomerTypeLabel(row.customer_type) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmPool.table.releasedAt') }}</dt>
+                <dd>{{ row.released_at }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmPool.table.releasedBy') }}</dt>
+                <dd>{{ row.released_by_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmPool.table.daysInPool') }}</dt>
+                <dd>
+                  <el-tag :type="getDaysTag(row.days_in_pool)" size="small">
+                    {{ row.days_in_pool }} {{ t('crmPool.table.daysUnit') }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('crmPool.table.releaseReason') }}</dt>
+                <dd>{{ row.release_reason }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="openClaimDialog(row)">
+                {{ t('crmPool.table.claim') }}
+              </el-button>
+              <el-button @click="openTransferDialog(row)">
+                {{ t('crmPool.table.transfer') }}
+              </el-button>
+              <el-button
+                v-if="row.previous_owner_id"
+                type="warning"
+                @click="openReleaseDialog(row)"
+              >
+                {{ t('crmPool.table.release') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="total"
+            layout="total, sizes, prev, next"
+            :aria-label="t('crmPool.table.paginationAriaLabel')"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
+        </div>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="poolList"
         border
@@ -223,7 +301,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -235,11 +313,23 @@ import { logger, logAuxLoadFailure } from '@/utils/logger';
 import { type PoolCustomer } from '@/api/crm-enhanced';
 import { batchClaimCustomersFromPool } from '@/api/crm-enhanced';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import ClaimDialogTab from './tabs/ClaimDialogTab.vue';
 import TransferDialogTab from './tabs/TransferDialogTab.vue';
 import ReleaseDialogTab from './tabs/ReleaseDialogTab.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
+
+// 后端 list_pool 出参在 PoolCustomer 之外还带回收上下文列，桌面表格早已消费，
+// 手机卡片需直接绑定这些字段，故显式扩展类型（与 crm/leads 的 LeadRow 同范式）
+interface PoolRow extends PoolCustomer {
+  released_at?: string;
+  released_by_name?: string;
+  release_reason?: string;
+  previous_owner_id?: number;
+}
 
 const hasLoaded = createLazyLoader();
 
@@ -259,7 +349,7 @@ const {
   total,
   refresh: getList,
   setQueryParam,
-} = useTableApi<PoolCustomer>({
+} = useTableApi<PoolRow>({
   url: '/crm/pool',
   // 后端 crm_pool_handler::list_pool 返回 json!{items,total,page,page_size}，
   // 承载列表的键为 items，显式钉住 listKey。
@@ -444,5 +534,58 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+.pool-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pool-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.pool-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.pool-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.pool-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.pool-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.pool-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.pool-mobile .card-actions .el-button {
+  margin: 0;
+}
+
+.pool-mobile .pagination-container {
+  justify-content: center;
+  flex-wrap: wrap;
 }
 </style>

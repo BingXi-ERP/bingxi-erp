@@ -74,4 +74,10 @@ const handleSubmitted = () => {
   color: #303133;
   margin: 0 0 12px 0;
 }
+
+@media (max-width: 767px) {
+  .inventory-batch-page {
+    padding: 12px;
+  }
+}
 </style>

@@ -185,7 +185,7 @@
           ? $t('qualityStandards.dialog.editTitle')
           : $t('qualityStandards.dialog.createTitle')
       "
-      width="700px"
+      :width="isPhone ? '95%' : '700px'"
       :aria-label="
         form.id
           ? $t('qualityStandards.dialog.editAriaLabel')
@@ -197,6 +197,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('qualityStandards.dialog.formAriaLabel')"
       >
         <el-form-item :label="$t('qualityStandards.dialog.standardCode')" prop="standard_code">
@@ -257,7 +258,8 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { PERMISSIONS } from '@/constants/permissions';
-import { ref, reactive } from 'vue';
+import { computed, ref, reactive } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus, Download, Search } from '@element-plus/icons-vue';
@@ -276,6 +278,8 @@ import { exportFromBackend } from '@/utils/export';
 import { useTableApi } from '@/composables/useTableApi';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 批次 277：listQuery 仅保留筛选字段，page/page_size 交给 useTableApi 管理
 const listQuery = reactive({
@@ -599,5 +603,11 @@ const handleExport = async () => {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+@media (max-width: 767px) {
+  .quality-standards-page {
+    padding: 12px;
+  }
 }
 </style>

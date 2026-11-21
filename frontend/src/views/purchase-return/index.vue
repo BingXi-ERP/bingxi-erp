@@ -250,4 +250,10 @@ onMounted(async () => {
 .text-danger {
   color: #f56c6c;
 }
+
+@media (max-width: 767px) {
+  .purchase-return {
+    padding: 12px;
+  }
+}
 </style>

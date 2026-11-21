@@ -91,7 +91,7 @@
     </el-card>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑验布单' : '新建验布单'" width="480">
-      <el-form :model="form" label-width="100px">
+      <el-form :model="form" label-width="100px" :label-position="isPhone ? 'top' : 'right'">
         <!-- 字段与后端 CreateInspectionRequest 对齐：验布日期必填（缺它后端直接 422）；
              缸号/色号/日期在编辑态不可改（UpdateInspectionRequest 不含这三项） -->
         <el-form-item label="验布日期" required>
@@ -141,7 +141,7 @@
     </el-dialog>
 
     <el-dialog v-model="detailVisible" title="验布单详情" width="600">
-      <el-descriptions v-if="detailRow" :column="2" border>
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="验布单号">{{ detailRow.inspection_no }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ detailRow.status }}</el-descriptions-item>
         <el-descriptions-item label="缸号">{{ detailRow.dye_lot_no || '-' }}</el-descriptions-item>
@@ -214,7 +214,13 @@
     </el-dialog>
 
     <el-dialog v-model="rollVisible" title="验布打卷入库" width="500">
-      <el-form ref="rollFormRef" :model="rollForm" :rules="rollRules" label-width="130px">
+      <el-form
+        ref="rollFormRef"
+        :model="rollForm"
+        :rules="rollRules"
+        label-width="130px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="仓库 ID" prop="warehouse_id" required>
           <NumericInput v-model="rollForm.warehouse_id" :min="1" class="w-full" />
         </el-form-item>
@@ -310,7 +316,7 @@
     </el-dialog>
 
     <el-dialog v-model="defectVisible" title="疵点登记" width="500">
-      <el-form :model="defectForm" label-width="130px">
+      <el-form :model="defectForm" label-width="130px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="疵点类型" required>
           <el-select v-model="defectForm.defect_type" class="w-full">
             <el-option label="断经" value="broken_end" />
@@ -361,7 +367,7 @@
     </el-dialog>
 
     <el-dialog v-model="gradeVisible" title="验布定级" width="440">
-      <el-form :model="gradeForm" label-width="120px">
+      <el-form :model="gradeForm" label-width="120px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="检验码数" required>
           <NumericInput
             v-model="gradeForm.inspected_yards"
@@ -393,6 +399,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   FABRIC_SCORING,
   FABRIC_SCORING_LABEL,
@@ -442,6 +449,8 @@ import {
 } from '@/api/fabric-inspection';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const inspections = ref<FabricInspection[]>([]);
 const loading = ref(false);
 const saving = ref(false);

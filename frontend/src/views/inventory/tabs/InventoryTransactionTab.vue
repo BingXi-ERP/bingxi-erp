@@ -10,7 +10,59 @@
       </el-button>
     </div>
 
-    <el-table v-loading="loading" :data="transactions" border stripe max-height="520">
+    <section v-if="isPhone" v-loading="loading" class="transaction-mobile">
+      <ul class="card-list">
+        <li
+          v-for="(row, index) in transactions"
+          :key="(row.id as number) ?? index"
+          class="card-item"
+        >
+          <dl class="card-fields">
+            <div class="field field-emphasis">
+              <dt>{{ t('inventory.transaction.colNo') }}</dt>
+              <dd>{{ row.transaction_no }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.transaction.colType') }}</dt>
+              <dd>
+                <el-tag size="small" :type="row.transaction_type === 'in' ? 'success' : 'warning'">
+                  {{ row.transaction_type }}
+                </el-tag>
+              </dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.stockTab.colProductName') }}</dt>
+              <dd>{{ row.product_name }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.stockTab.colBatchNo') }}</dt>
+              <dd>{{ row.batch_no }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.stockTab.colQuantity') }}</dt>
+              <dd>{{ Number(row.quantity ?? 0).toLocaleString() }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('inventory.stockTab.colWarehouse') }}</dt>
+              <dd>{{ row.warehouse_name }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('common.createTime') }}</dt>
+              <dd>{{ row.created_at }}</dd>
+            </div>
+          </dl>
+        </li>
+      </ul>
+    </section>
+
+    <el-table
+      v-if="!isPhone"
+      v-loading="loading"
+      :data="transactions"
+      border
+      stripe
+      max-height="520"
+    >
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column
         prop="transaction_no"
@@ -53,12 +105,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { getTransactionList, type TransactionQueryParams } from '@/api/inventory';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const transactions = ref<Record<string, unknown>[]>([]);
 const loading = ref(false);
@@ -93,5 +148,40 @@ onMounted(() => {
   margin-bottom: 12px;
   display: flex;
   gap: 8px;
+}
+
+.transaction-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.transaction-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.transaction-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.transaction-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.transaction-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.transaction-mobile .field-emphasis dd {
+  font-weight: 500;
 }
 </style>

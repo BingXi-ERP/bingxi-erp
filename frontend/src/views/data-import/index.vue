@@ -118,4 +118,10 @@ const diProc = useDiProc({
   display: flex;
   align-items: center;
 }
+
+@media (max-width: 767px) {
+  .data-import-page {
+    padding: 12px;
+  }
+}
 </style>

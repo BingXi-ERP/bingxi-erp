@@ -7,7 +7,7 @@
   <el-dialog
     :model-value="visible"
     :title="title"
-    width="900px"
+    :width="isPhone ? '95%' : '900px'"
     destroy-on-close
     :aria-label="title"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
@@ -17,6 +17,7 @@
       :model="localData"
       :rules="formRules"
       label-width="100px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('sales.orderForm.formAriaLabel')"
     >
       <el-divider content-position="left">{{ t('sales.orderForm.basicInfo') }}</el-divider>
@@ -227,6 +228,7 @@
 import { deepClone, toLocalDateString } from '@/utils';
 import { ref, reactive, watch, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
@@ -237,6 +239,8 @@ import { logger } from '@/utils/logger';
 import NumericInput from '@/components/NumericInput.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface OrderItemForm {
   id: number;

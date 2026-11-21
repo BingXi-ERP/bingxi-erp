@@ -73,7 +73,7 @@
     <el-dialog
       v-model="backupDetailVisible"
       :title="t('systemUpdate.backupTab.buttonDetail')"
-      width="520"
+      :width="isPhone ? '95%' : '520px'"
     >
       <el-descriptions v-if="upd.currentBackupDetail" :column="2" border>
         <el-descriptions-item label="ID">{{ upd.currentBackupDetail.id }}</el-descriptions-item>
@@ -96,7 +96,7 @@
     <el-dialog
       v-model="taskDetailVisible"
       :title="t('systemUpdate.taskTab.buttonDetail')"
-      width="520"
+      :width="isPhone ? '95%' : '520px'"
     >
       <el-descriptions v-if="upd.currentTaskDetail" :column="2" border>
         <el-descriptions-item label="ID">{{ upd.currentTaskDetail.id }}</el-descriptions-item>
@@ -121,7 +121,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { Refresh, FolderAdd } from '@element-plus/icons-vue';
 import { PERMISSIONS } from '@/constants/permissions';
@@ -134,6 +135,8 @@ import SystemUpdateInfoCards from './components/SystemUpdateInfoCards.vue';
 import SystemUpdateBackupForm from './components/SystemUpdateBackupForm.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const activeTab = ref('tasks');
 

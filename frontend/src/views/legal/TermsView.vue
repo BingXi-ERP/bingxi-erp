@@ -695,4 +695,10 @@
   margin-top: 24px;
   color: var(--el-color-primary);
 }
+
+@media (max-width: 767px) {
+  .legal-page {
+    padding: 12px;
+  }
+}
 </style>

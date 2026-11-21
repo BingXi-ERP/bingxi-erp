@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   ElTable,
   ElTableColumn,
@@ -31,6 +32,8 @@ import { useTableApi } from '@/composables/useTableApi';
 import { logAuxLoadFailure } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const activeTab = ref('records');
 const dimensions = ref<AssistDimensionResponse[]>([]);
@@ -177,7 +180,7 @@ loadDimensions();
   <div class="app-container">
     <div class="filter-container">
       <ElRow :gutter="20">
-        <ElCol :span="6">
+        <ElCol :span="isPhone ? 24 : 6">
           <ElDatePicker
             v-model="searchForm.accounting_period"
             type="month"
@@ -185,7 +188,7 @@ loadDimensions();
             class="filter-item"
           />
         </ElCol>
-        <ElCol :span="6">
+        <ElCol :span="isPhone ? 24 : 6">
           <ElSelect
             v-model="searchForm.dimension_code"
             :placeholder="$t('assistAccounting.filter.dimension')"
@@ -200,7 +203,7 @@ loadDimensions();
             />
           </ElSelect>
         </ElCol>
-        <ElCol :span="6">
+        <ElCol :span="isPhone ? 24 : 6">
           <ElSelect
             v-model="searchForm.business_type"
             :placeholder="$t('assistAccounting.filter.businessType')"
@@ -214,7 +217,7 @@ loadDimensions();
             />
           </ElSelect>
         </ElCol>
-        <ElCol :span="6">
+        <ElCol :span="isPhone ? 24 : 6">
           <ElInput
             v-model="searchForm.warehouse_id"
             :placeholder="$t('assistAccounting.filter.warehouseId')"
@@ -236,7 +239,67 @@ loadDimensions();
 
     <ElTabs v-model="activeTab" @tab-change="handleTabChange">
       <ElTabPane :label="$t('assistAccounting.tabs.records')" name="records">
+        <!-- 手机端：核算记录单列卡片，字段与动作与桌面表格等价 -->
+        <section v-if="isPhone" class="records-mobile">
+          <ul class="card-list" :aria-label="$t('assistAccounting.recordsTable.ariaLabel')">
+            <li v-for="(row, index) in tableData" :key="row.id ?? index" class="card-item">
+              <dl class="card-fields">
+                <div class="field field-emphasis">
+                  <dt>{{ $t('assistAccounting.recordsTable.businessNo') }}</dt>
+                  <dd>{{ row.business_no }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.recordsTable.businessType') }}</dt>
+                  <dd>{{ getBusinessTypeLabel(row.business_type) }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.recordsTable.batchNo') }}</dt>
+                  <dd>{{ row.batch_no }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.recordsTable.colorNo') }}</dt>
+                  <dd>{{ row.color_no }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.recordsTable.grade') }}</dt>
+                  <dd>{{ row.grade }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.recordsTable.warehouseId') }}</dt>
+                  <dd>{{ row.warehouse_id }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.recordsTable.quantityMeters') }}</dt>
+                  <dd>{{ row.quantity_meters }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.recordsTable.quantityKg') }}</dt>
+                  <dd>{{ row.quantity_kg }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.recordsTable.debitAmount') }}</dt>
+                  <dd>{{ row.debit_amount }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.recordsTable.creditAmount') }}</dt>
+                  <dd>{{ row.credit_amount }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.recordsTable.createdAt') }}</dt>
+                  <dd>{{ row.created_at }}</dd>
+                </div>
+              </dl>
+              <div class="card-actions">
+                <ElButton size="small" @click="openViewDialog(row as AssistRecordResponse)">
+                  <View />
+                </ElButton>
+              </div>
+            </li>
+          </ul>
+        </section>
+
         <ElTable
+          v-if="!isPhone"
           :data="tableData"
           :loading="recordsLoading"
           border
@@ -336,7 +399,50 @@ loadDimensions();
       </ElTabPane>
 
       <ElTabPane :label="$t('assistAccounting.tabs.summary')" name="summary">
+        <!-- 手机端：汇总单列卡片 -->
+        <section v-if="isPhone" class="summary-mobile">
+          <ul class="card-list" :aria-label="$t('assistAccounting.summaryTable.ariaLabel')">
+            <li v-for="(row, index) in summaryData" :key="row.id ?? index" class="card-item">
+              <dl class="card-fields">
+                <div class="field field-emphasis">
+                  <dt>{{ $t('assistAccounting.summaryTable.accountingPeriod') }}</dt>
+                  <dd>{{ row.accounting_period }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.summaryTable.dimensionCode') }}</dt>
+                  <dd>{{ row.dimension_code }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.summaryTable.dimensionValue') }}</dt>
+                  <dd>{{ row.dimension_value_name }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.summaryTable.totalDebit') }}</dt>
+                  <dd>{{ row.total_debit }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.summaryTable.totalCredit') }}</dt>
+                  <dd>{{ row.total_credit }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.summaryTable.totalQuantityMeters') }}</dt>
+                  <dd>{{ row.total_quantity_meters }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.summaryTable.totalQuantityKg') }}</dt>
+                  <dd>{{ row.total_quantity_kg }}</dd>
+                </div>
+                <div class="field">
+                  <dt>{{ $t('assistAccounting.summaryTable.recordCount') }}</dt>
+                  <dd>{{ row.record_count }}</dd>
+                </div>
+              </dl>
+            </li>
+          </ul>
+        </section>
+
         <ElTable
+          v-if="!isPhone"
           :data="summaryData"
           :loading="summaryLoading"
           border
@@ -398,12 +504,12 @@ loadDimensions();
     <ElDialog
       :title="$t('assistAccounting.detailDialog.title')"
       v-model="viewDialogVisible"
-      width="800px"
+      :width="isPhone ? '95%' : '800px'"
       :aria-label="$t('assistAccounting.detailDialog.ariaLabel')"
       @close="viewDialogVisible = false"
     >
       <div v-if="viewData">
-        <ElDescriptions :column="3" border>
+        <ElDescriptions :column="isPhone ? 1 : 3" border>
           <ElDescriptionsItem :label="$t('assistAccounting.detailDialog.id')">{{
             viewData.id
           }}</ElDescriptionsItem>
@@ -488,5 +594,59 @@ loadDimensions();
 
 .filter-actions {
   margin-top: 10px;
+}
+
+.records-mobile .card-list,
+.summary-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.records-mobile .card-item,
+.summary-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.records-mobile .card-fields > div,
+.summary-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.records-mobile .card-fields dt,
+.summary-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.records-mobile .card-fields dd,
+.summary-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.records-mobile .field-emphasis dd,
+.summary-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.records-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.records-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

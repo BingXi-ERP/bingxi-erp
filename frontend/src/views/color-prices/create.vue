@@ -16,6 +16,7 @@
         :model="form"
         :rules="rules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
         style="max-width: 800px"
         :aria-label="$t('colorPrices.create.formAriaLabel')"
       >
@@ -139,9 +140,12 @@ import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { createColorPrice, type CreateColorPriceDto } from '@/api/color-price';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { numberInputRules } from '@/utils/number-input';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const router = useRouter();
 const formRef = ref<FormInstance>();
 const submitting = ref(false);
