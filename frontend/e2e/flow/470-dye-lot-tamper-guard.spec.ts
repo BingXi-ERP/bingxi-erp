@@ -23,7 +23,7 @@ import {
  *   同请求夹带的合法货位修改也不得半写；显式 null 同样不能绕过。
  * - inv::stock 建单预检与 inv::batch 发运 CAS 要求真实可用匹的缸/批/仓匹配；
  *   inv::batch 明确允许记录实际缸的跨缸回退，故不把一切缸号差异断为非法；
- *   batch.rs:1325 仅在已发货/已完成锁明细编辑：审批态编辑的事务状态门仍需独立修复，
+ *   inv::batch 发运服务在已发货/已完成态锁明细编辑：审批态编辑的事务状态门仍需独立修复，
  *   本文件不以条件断言把该缺口蒙绿。
  * - piece_split_handler::build_new_piece 继承缸/色/批，收货按同一追溯组合落库。
  *
@@ -173,7 +173,7 @@ async function assertRejectedCreate(
   }
   expect.soft(afterStocks, '拒绝前后库存行必须相同').toEqual(beforeStocks);
   expect.soft(await readLedger(page, fixture), '被拒直建不得产生流水').toEqual(beforeLedger);
-  reject(result, APP_ERROR_CODES.VALIDATION_ERROR);
+  reject(result, APP_ERROR_CODES.BUSINESS_ERROR);
   expect.soft(result.message).toMatch(message);
 }
 

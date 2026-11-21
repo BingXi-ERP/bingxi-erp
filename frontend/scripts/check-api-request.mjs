@@ -18,8 +18,9 @@
  *       · 后端必填（非 Option、无 #[serde(default)]）而前端不传  -> 失配（反序列化失败/校验 422）
  *       · 前端传了后端没有的字段                                -> 失配（serde 忽略=参数被静默丢弃）
  *   - 查询参数（GET/DELETE 的 `{ params }`）：同一套判据比对后端 `Query<T>`。
- *   - 任一侧解析不出（`Record<string, unknown>`、`any`、`#[serde(flatten)]`、泛型、跨文件多定义）
- *     -> 盲区，逐条计数并列出，不判负也不谎称已覆盖。
+ *   - 任一侧解析不出（`Record<string, unknown>`、`any`、泛型、跨文件多定义）
+ *     -> 盲区，逐条计数并列出，不判负也不谎称已覆盖；字段级 `serde(flatten)` 解析为可选键，
+ *     不再把整个 DTO 打成盲区。
  *   - serde 命名换算：仅按结构体级 `#[serde(rename_all = "...")]` 换算；比对时同时接受
  *     「原样字段名」与「换算后键名」两种集合之一（整表一致即可），混用才算失配——
  *     避免把大小写约定当成漂移，同时仍能抓出真正多/少的字段。
@@ -215,18 +216,20 @@ function rustFieldsOf(typeName, structIndex) {
   const out = [];
   for (const f of entry.allFields) {
     const t = (f.type || '').replace(/\s+/g, '');
-    if (/^#\[?serde\(flatten/.test(t)) return null;
+    const fieldAttrs = (f.attrs || '').replace(/\s+/g, ' ');
+    const flattened = /#\[\s*serde\s*\([^)]*\bflatten\b[^)]*\)\s*\]/.test(fieldAttrs);
     const optional = /^Option</.test(t);
-    const hasDefault = /#[a-z_]*serde[^]*default/.test(entry.attrs || '');
+    const hasDefault =
+      /#[a-z_]*serde[^]*default/.test(entry.attrs || '') ||
+      /#\[\s*serde\s*\([^)]*\bdefault\b[^)]*\)\s*\]/.test(fieldAttrs);
     out.push({
       name: f.name,
-      optional: optional || hasDefault,
+      optional: flattened || optional || hasDefault,
       renamed: applyCase(f.name, rule),
       type: t, // 保留类型文本供叶子判定(d)；旧实现直接丢弃，Value 字段无声漂过
     });
     if (out[out.length - 1].renamed === null) return null;
   }
-  if (/flatten/.test(entry.attrs || '')) return null;
   return out;
 }
 
