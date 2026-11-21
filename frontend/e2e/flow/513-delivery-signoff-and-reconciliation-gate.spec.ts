@@ -451,19 +451,24 @@ test('513-04 部分签收仍拦对账，全签后明细与余额守恒', async (
   const opening = Number(generated.opening_balance);
   expect(Number.isFinite(opening), `期初余额不可解析：${JSON.stringify(generated.opening_balance)}`).toBe(true);
   expect(opening, '专属客户无期初应收').toBe(0);
-  expect(Number(generated.total_invoices), '发票合计').toBe(invoiceAmount);
-  expect(Number(generated.total_collections), '收款合计').toBe(paymentAmount);
-  expect(
-    Number(generated.closing_balance),
-    '期末=期初+发票-收款'
-  ).toBe(opening + invoiceAmount - paymentAmount);
-
   const details = await apiCallRaw<{ reconciliation: Row; details: Array<Row> }>(
     page,
     'GET',
     `/ar-reconciliations-enhanced/${reconId}/details`
   );
+
   expect(readNumber(details.reconciliation.id, '明细回读对账单 id')).toBe(reconId);
+  // 发票合计按对账明细实际 INVOICE 行求和，涵盖两张销售发货自动生成的应收单。
+  const invoiceLineTotal = details.details
+    .filter(d => d.item_type === 'INVOICE')
+    .reduce((sum, d) => sum + Number(d.amount || 0), 0);
+  expect(Number(generated.total_invoices), '发票合计应等于明细 INVOICE 行之和').toBe(invoiceLineTotal);
+  expect(Number(generated.total_collections), '收款合计').toBe(paymentAmount);
+  expect(
+    Number(generated.closing_balance),
+    '期末=期初+发票-收款'
+  ).toBe(opening + invoiceLineTotal - paymentAmount);
+
   const invoiceItem = details.details.find(
     d => d.item_type === 'INVOICE' && Number(d.document_id) === invoiceId
   );

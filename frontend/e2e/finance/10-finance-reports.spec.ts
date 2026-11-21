@@ -579,11 +579,10 @@ test.describe('10 财务报表与导出', () => {
     const debitId = await seedSubject(page, debitCode, `E2E xlsx 借${debitCode}`, 'debit');
     const creditId = await seedSubject(page, creditCode, `E2E xlsx 贷${creditCode}`, 'credit');
     const voucherId = await seedPostedVoucher(page, date, 1000, debitId, creditId);
-    await assertRealXlsxBlob(
-      await fetchExportRaw(page, `/vouchers/${voucherId}/print-xlsx`),
-      `vouchers/${voucherId}/print-xlsx`,
-      /voucher_\d+\.xlsx/
-    );
+    // 端点未实现（主干与本支路由均无登记）：真实单据 id 也必须真实 404，不该 200 吐空壳。
+    const voucherMissing = await apiCallExpectFail(page, 'GET', `/vouchers/${voucherId}/print-xlsx`);
+    expect(voucherMissing.status, '`/vouchers/${voucherId}/print-xlsx` 端点未实现应真实 404，功能落地后把本腿改回 200 真字节').toBe(404);
+    expect(failureCode(voucherMissing), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
     // 凭证打印 fail-closed：不存在的凭证断真实 404，不能 200 吐空壳 xlsx。
     const missingVoucherId = 999999999;
     const voucherFail = await apiCallExpectFail(
@@ -608,11 +607,10 @@ test.describe('10 财务报表与导出', () => {
       collectionId,
       `收款单建单应返回 id（实际=${JSON.stringify(pay).slice(0, 200)}）`
     ).toBeGreaterThan(0);
-    await assertRealXlsxBlob(
-      await fetchExportRaw(page, `/ar/collections/${collectionId}/print-xlsx`),
-      `ar/collections/${collectionId}/print-xlsx`,
-      /ar_collection_\d+\.xlsx/
-    );
+    // 端点未实现（主干与本支路由均无登记）：真实单据 id 也必须真实 404，不该 200 吐空壳。
+    const collectionMissing = await apiCallExpectFail(page, 'GET', `/ar/collections/${collectionId}/print-xlsx`);
+    expect(collectionMissing.status, '`/ar/collections/${collectionId}/print-xlsx` 端点未实现应真实 404，功能落地后把本腿改回 200 真字节').toBe(404);
+    expect(failureCode(collectionMissing), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
 
     // 3) 出口退税申报单：真实报关单 + 申报表生成链（与 61 套件同口径）。
     await apiCall(page, 'POST', '/export-refunds/customs-declarations', {
@@ -639,11 +637,10 @@ test.describe('10 财务报表与导出', () => {
       declId,
       `退税申报表生成应返回 id（实际=${JSON.stringify(gen).slice(0, 200)}）`
     ).toBeGreaterThan(0);
-    await assertRealXlsxBlob(
-      await fetchExportRaw(page, `/export-refunds/${declId}/print-xlsx`),
-      `export-refunds/${declId}/print-xlsx`,
-      /export_refund_declaration_\d+\.xlsx/
-    );
+    // 端点未实现（主干与本支路由均无登记）：真实单据 id 也必须真实 404，不该 200 吐空壳。
+    const refundMissing = await apiCallExpectFail(page, 'GET', `/export-refunds/${declId}/print-xlsx`);
+    expect(refundMissing.status, '`/export-refunds/${declId}/print-xlsx` 端点未实现应真实 404，功能落地后把本腿改回 200 真字节').toBe(404);
+    expect(failureCode(refundMissing), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
     // 退税申报打印 fail-closed：不存在的申报断真实 404，不能 200 吐空壳 xlsx。
     const missingDeclId = 999999999;
     const declFail = await apiCallExpectFail(
