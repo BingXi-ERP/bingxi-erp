@@ -177,8 +177,8 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
     ).toBe(true);
 
     const got = await getAttachment(page, supplierId, qid);
-    console.log(
-      `[459-01] 未上传下载 status=${got.status} body=${got.body.toString('utf8').slice(0, 120)}`
+    process.stdout.write(
+      `[459-01] 未上传下载 status=${got.status} body=${got.body.toString('utf8').slice(0, 120)}\n`
     );
     expect(
       got.status,
@@ -224,8 +224,8 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
     ).toBe(true);
 
     const cross = await getAttachment(page, supplierB, qidA);
-    console.log(
-      `[459-02] 跨供应商下载 status=${cross.status} body=${cross.body.toString('utf8').slice(0, 160)}`
+    process.stdout.write(
+      `[459-02] 跨供应商下载 status=${cross.status} body=${cross.body.toString('utf8').slice(0, 160)}\n`
     );
     expect(
       cross.status,
@@ -287,8 +287,8 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
       'application/pdf',
       buildPdfBuffer('459-03-idor')
     );
-    console.log(
-      `[459-03] 跨供应商上传 status=${idor.status} code=${idor.code} message=${idor.message}`
+    process.stdout.write(
+      `[459-03] 跨供应商上传 status=${idor.status} code=${idor.code} message=${idor.message}\n`
     );
     expect(
       idor.status,

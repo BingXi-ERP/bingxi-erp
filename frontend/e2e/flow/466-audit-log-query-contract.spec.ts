@@ -1,6 +1,6 @@
 import { test, expect } from '../diagnose-fixture';
 import type { Page } from '@playwright/test';
-import { loginViaUI, loginAsRole, apiCall, apiCallRaw, apiCallExpectFail } from './helpers';
+import { loginViaUI, loginAsRole, apiCall, apiCallExpectFail } from './helpers';
 
 /**
  * 466 审计日志查询契约与 admin 门控（目标 3.3 操作审计留痕 / 4.11 审计不可篡改 / 4.33 审计合规）
@@ -71,15 +71,15 @@ test.describe.serial('466 审计日志查询契约与 admin 门控', () => {
         ).toBe(true);
       }
     }
-    console.log(
-      `[466-01] clamp 后 page=${list.page} page_size=${list.page_size} total=${list.total}`
+    process.stdout.write(
+      `[466-01] clamp 后 page=${list.page} page_size=${list.page_size} total=${list.total}\n`
     );
   });
 
   test('466-02 非 admin 角色查询审计日志被 admin 门控拒绝', async ({ page }) => {
     await loginAsRole(page, 'gm');
     const denied = await apiCallExpectFail(page, 'GET', '/audit-logs?page=1&page_size=20');
-    console.log(`[466-02] 非 admin 查询 status=${denied.status} code=${denied.code}`);
+    process.stdout.write(`[466-02] 非 admin 查询 status=${denied.status} code=${denied.code}\n`);
     expect(
       denied.status,
       `466-02 非 admin 查审计必须被拒（403），实际 status=${denied.status}`
@@ -122,6 +122,8 @@ test.describe.serial('466 审计日志查询契约与 admin 门控', () => {
         `466-03 resource_id=${seedId} 的结果里不得出现不同值（后端注释 :74-76 要求精确命中），实际 ${String(row.resource_id)}`
       ).toBe(seedId);
     }
-    console.log(`[466-03] 种子 resource_id=${seedId} 反查命中 ${exact.items.length} 条且全精确`);
+    process.stdout.write(
+      `[466-03] 种子 resource_id=${seedId} 反查命中 ${exact.items.length} 条且全精确\n`
+    );
   });
 });

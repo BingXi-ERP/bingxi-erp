@@ -179,7 +179,7 @@ async function ensureSupplier(page: Page): Promise<number> {
     );
   }
   cachedSupplierId = sid;
-  console.log(`[458] 本 worker 专属供应商已建 id=${sid}`);
+  process.stdout.write(`[458] 本 worker 专属供应商已建 id=${sid}\n`);
   return sid;
 }
 
@@ -203,7 +203,9 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
       'application/pdf',
       pdf
     );
-    console.log(`[458-01] 上传响应 status=${up.status} code=${up.code} message=${up.message}`);
+    process.stdout.write(
+      `[458-01] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`
+    );
     expect(
       up.status,
       `458-01 刚好等于上限必须可传（2xx），实际 status=${up.status} message=${up.message}`
@@ -232,7 +234,9 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
     const pdf = buildPdfOfExactSize(MAX_BYTES + 1);
     expect(pdf.length, '458-02 构造体必须为上限+1 字节').toBe(MAX_BYTES + 1);
     const up = await uploadAttachment(page, supplierId, qid, 'overby1.pdf', 'application/pdf', pdf);
-    console.log(`[458-02] 上传响应 status=${up.status} code=${up.code} message=${up.message}`);
+    process.stdout.write(
+      `[458-02] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`
+    );
     expect(
       up.status,
       `458-02 超上限 1 字节必须被拒（4xx），实际 status=${up.status} message=${up.message}`
@@ -290,7 +294,9 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
     for (const c of cases) {
       const qid = await createQualification(page, supplierId, c.label);
       const up = await uploadAttachment(page, supplierId, qid, c.file, c.mime, c.buf);
-      console.log(`[458-${c.label}] status=${up.status} code=${up.code} message=${up.message}`);
+      process.stdout.write(
+        `[458-${c.label}] status=${up.status} code=${up.code} message=${up.message}\n`
+      );
       expect(
         up.status,
         `458-${c.label} ${c.desc} 必须可传（2xx），实际 status=${up.status} message=${up.message}`
@@ -323,7 +329,9 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
       'image/jpeg',
       pngBytes
     );
-    console.log(`[458-04] 上传响应 status=${up.status} code=${up.code} message=${up.message}`);
+    process.stdout.write(
+      `[458-04] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`
+    );
     expect(
       up.status,
       `458-04 .jpg 后缀实为 PNG magic 必须被拒（4xx），实际 status=${up.status} message=${up.message}`
