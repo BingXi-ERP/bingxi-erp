@@ -48,7 +48,7 @@ use crate::models::status::purchase_inventory::inventory_stock_grade;
 use crate::models::status::purchase_inventory::inventory_stock_quality_status as quality_status;
 use crate::models::status::quality_dyeing::dye_batch_lifecycle_status as batch_status;
 use crate::models::user;
-use crate::utils::data_scope::{DataScopeContext, apply_department_scope};
+use crate::utils::data_scope::{apply_department_scope, DataScopeContext};
 
 /// 业务错误
 #[derive(Debug, Error)]
@@ -442,6 +442,8 @@ impl BulkColorApprovalService {
             sent_to_customer_at: Set(None),
             customer_feedback: Set(None),
             delta_e_value: Set(None),
+            high_light_sensitive: Set(false),
+            delta_e_result: Set(None),
             reject_reason: Set(None),
             delivery_blocking: Set(true),
             attachment_url: Set(None),
