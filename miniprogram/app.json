@@ -42,10 +42,6 @@
     {
       "root": "packageA/",
       "pages": [
-        "pages/customer-portal/index",
-        "pages/customer-portal/orders",
-        "pages/customer-portal/reconciliations",
-        "pages/customer-portal/color-cards",
         "pages/demand/my-demand/my-demand",
         "pages/demand/my-demand/my-post-result/my-post-result",
         "pages/demand/my-demand/address-manage/address-manage",
@@ -207,6 +203,10 @@
   },
   "pages": [
     "pages/index/index",
+    "pages/customer-portal/index",
+    "pages/customer-portal/orders",
+    "pages/customer-portal/reconciliations",
+    "pages/customer-portal/color-cards",
     "pages/search/search",
     "pages/search-img/search-img",
     "pages/search-img/search/search",
