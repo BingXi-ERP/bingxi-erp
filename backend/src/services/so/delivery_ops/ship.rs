@@ -48,7 +48,7 @@ impl SalesService {
         delivery_active.total_amount =
             Set(items_result.delivery_total_amount + items_result.delivery_total_tax);
         delivery_active.updated_at = Set(chrono::Utc::now());
-        let delivery = delivery_active.update(txn).await?;
+        let delivery = delivery_active.update(&txn).await?;
         let post_ctx = self
             .update_order_after_shipment(&request, ctx, user_id, &txn)
             .await?;
