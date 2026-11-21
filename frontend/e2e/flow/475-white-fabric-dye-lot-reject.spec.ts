@@ -105,11 +105,12 @@ test.describe('475 白坯布缸号准入守卫', () => {
       expect(beforeStocks, '负例必须使用尚未存在的批次').toEqual([]);
 
       // 形态一：色号空串 + 非空缸号；形态二：色号键缺省（None）+ 非空缸号
+      const blankColorBatch = genCode('475-B2');
       for (const [index, colorNo] of ['', undefined].entries()) {
         const result = await apiCallExpectFail(page, 'POST', endpoint, {
           warehouse_id: warehouseId,
           product_id: productId,
-          batch_no: index === 0 ? batchNo : genCode('475-B2'),
+          batch_no: index === 0 ? batchNo : blankColorBatch,
           ...(colorNo === undefined ? {} : { color_no: colorNo }),
           dye_lot_no: genCode('475-FORBIDDEN-LOT'),
           grade: '一等品',
@@ -124,6 +125,11 @@ test.describe('475 白坯布缸号准入守卫', () => {
       expect
         .soft(await readLedger(page, productId, warehouseId, batchNo), '被拒直建不得产生流水')
         .toEqual(beforeLedger);
+      // 形态二用了独立批号，零漂移同样要回读，不能只盯形态一的批次
+      expect(
+        await readStocks(page, productId, warehouseId, blankColorBatch),
+        '色号缺省形态必须零落库'
+      ).toEqual([]);
 
       // 白坯合法对照：色号空 + 不带缸号必须成功，证明拒绝是口径生效而非端点坏
       const created = await apiCallRaw<Row>(page, 'POST', endpoint, {
