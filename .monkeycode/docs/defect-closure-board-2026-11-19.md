@@ -10,7 +10,6 @@
 |------|------|--------|------|----------|---------------|--------|
 | DC-001 | 功能补齐 | P1 | 小程序接口层客户越权 E2E 用例集 | miniprogram/ 有工程但 6 条独有链路零 E2E，仅 7 道静态门（completion audit 实量） | `frontend/e2e/miniprogram/01-customer-access.spec.ts` / PR #1320 | 测试 |
 | DC-002（第一批） | 功能补齐 | P1 | 写操作参数篡改 IDOR（目标 4.1-P / 3.6） | 现有 data-scope-isolation 仅覆盖读越权；换他人 ID 改金额 0.01、DELETE 他人单据的写越权为真实缺口 | `frontend/e2e/miniprogram/02-write-idor.spec.ts` / PR #1320（head fcff7e120） | 测试 |
-| DC-010（回归失效） | Bug 缺陷 | P1 | AP 手机卡片支付方式断言共享红——原记已关闭，抽检证实修复未入主干 | blob 级取证：#1303 open/merged=false，主干 `ap-mobile-parity.test.ts` 最后提交是 #1252、仍无 `paymentMethodLabel`/`expectedPaymentMethod`、断言全宽度 `toBe('bank_transfer')`；而主干组件桌面列 `paymentMethodLabel` →「银行转账」/「Bank Transfer」，手机卡片用原始 token | 待 #1303 或其 cherry-pick 载体（#1308/#1307/#1297）合并入主干后，blob 回读测试已按宽度分治再重关 | 测试 |
 | DC-003 | 功能补齐 | P1 | 统一测试数据工厂 builder API | 代码已交付：`frontend/e2e/factory/test-data-factory.ts` 聚合客户/线索/色卡原子造数、自动追踪 id、LIFO 统一回收；`data-factory.spec.ts` 为真实消费者（造数→按 id 回读→cleanup）。字段照抄已验证端点，不自造键 | 载体分支 `test/data-factory-1119`（commit `114e0fb`）已推送保工；本地 prettier/eslint/`playwright --list`、配对门 `PAIRING_GREEN`、api-paths 门均绿；待 CI 队列消化后开 PR、全量绿且合入 main 再关单 | 测试 |
 
 验收标准（7.4）：客户角色越权访问 5 个内部单据端点（sales/orders、products、ar-reconciliations、crm/customers、purchase/orders）由后端返回 401/403；CI 全量面绿；不依赖前端按钮隐藏。事实核对已记入 PR #1320 描述（端点在 route-snapshot、权限码在册、不在 AUTH_ONLY、customer 可登录）。
@@ -23,13 +22,12 @@ DC-002 第一批验收标准（7.4）：两个不同 user_id 的 self 角色，�
 |------|------|--------|------|----------|------|--------|
 | DC-002（余项） | 功能补齐 | P1 | 询样/对账跨端互通与分享卡片可见性正向用例 | 第一批写 IDOR 已进验证中；远端树复核纠正假阴：`flow/431-customer-team-share-and-signature.spec.ts` 已覆盖 customer-shares 的 403+FORBIDDEN 统一机器码、by-user 通道只回读本人行且交叉互查不可见，在途 #1300 还有 531/532 小程序共享契约——"分享卡片越权负例空白"不成立，勿重复建设。真实余项收敛为询样提交/客户对账确认的**正向可见性**，受 DC-007 客户业务账号缺失约束 | 负例不重复建；正向待第一批 CI 终态且 DC-007 账号体系明确后同专支追加 | 测试 |
 | DC-004 | 功能补齐 | P2 | 分环境预制脚本与独立库隔离 | `playwright.config.ts:48` baseURL 写死 localhost，CI 45 分片共用同库，仅靠账号前缀+时间戳唯一名隔离 | 与 DC-003 同域 | 测试 / 运维 |
-| DC-008（重开） | 功能补齐 | P1 | 联动影响矩阵 PR 门禁（4.41.N）——原误判已关闭，抽检证实未落地 | blob 级取证：#1306 open/merged=false，`check-e2e-linkage-gate.mjs`/`e2e-linkage-gate.yml` 在 main NOT_CARRIED，main 的 ci-cd/e2e-batch/e2e-pairing 对 linkage 引用均为 0，主干仅有「信息工具，不是门禁」的 report 脚本；对应任务 #41/#47 仍 in_progress | 兑现载体已验证：#1306 的 `check-e2e-linkage-gate.mjs` 有 `process.exit(0/2/3)` + `--self-test` 正向对照，ci-cd.yml 新增 `ci-e2e-linkage` job 并挂进 `ci-cleanup-retry` needs，是真 fail-closed；其旁路门「联动影响矩阵静态检查」已 success、全量门 queued。待 #1306 合并后 blob 回读再关单，不再凭脚本存在关单 | 测试 / CI |
+| DC-008（重开） | 功能补齐 | P1 | 联动影响矩阵 PR 门禁（4.41.N）——原误判已关闭，抽检证实未落地 | 2026-11-20 复核：#1306 与 #1352 均 closed/merged=false，但当前 #1351 head `5b86db36` 逐文件承载 `e2e-linkage-gate.yml`、`check-e2e-linkage-gate.mjs`、`check-e2e-linkage-gate.test.mjs`、`frontend/scripts/e2e-linkage-matrix.json`；ci-cd.yml 原文仍有 `ci-e2e-linkage` job、`check-e2e-linkage-gate.mjs --json --specs-out` 调用与收尾聚合器引用；main 尚未合入，对应任务 #41/#47 仍 in_progress | 兑现载体已验证为 fail-closed，不再以 report-only 工具关单；待 #1351 当前 head 全量 CI success 并合并后，blob 回读 main 再关单 | 测试 / CI |
 
 ### 待评估
 
 | 编号 | 类型 | 优先级 | 标题 | 判定要点 | 卡点 |
 |------|------|--------|------|----------|------|
-| DC-006 | Bug 缺陷 | P0 | #1302 合并阻塞（mergeable=false / state=dirty） | 23 支开放 PR 中唯一脏支，46 文件与已合并移动端支冲突，CI 绿也无法 squash 合并 | 收口末期处理：fetch --unshallow → merge origin/main 解冲突 → 普通 push；force push 属另一档需单独授权 |
 
 DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动联网查询，结合行业标准给出最优拍板方案"），结论为**不可行，转入搁置**：
 - 硬约束：全仓 CI job 均为 `runs-on: ubuntu-latest`（.github/workflows/ci-cd.yml:97 等、miniprogram-checks.yml:65）；微信开发者工具仅 Windows/macOS 版，Linux 无法安装。
@@ -48,8 +46,10 @@ DC-005 已于 2026-11-19 联网取证拍板（目标"项目决策支持，自动
 | 编号 | 类型 | 优先级 | 标题 | 闭环证据 |
 |------|------|--------|------|----------|
 | DC-009 | 功能补齐 | P1 | 新增功能配 E2E 配对门 | `.github/workflows/e2e-pairing.yml` 九道 self-test + 增量零引用判负 + 棘轮基线，真 fail-closed |
+| DC-006 | Bug 缺陷 | P0 | #1302 合并阻塞（mergeable=false / state=dirty） | 2026-11-20 关单：#1302 已 closed/merged=false、远端分支已删，关闭评论明确由 w4-mobile 重组支承载。逐文件 blob 复核：#1302 的 7 个文件与 #1348 head `f6102c444` 逐字节一致；第 8 个 `PaymentRequestTab.vue` 在 #1348 与 main 均为 `77c2acc5`（去掉多余空行后的正确版本），无内容丢失。本工单对象「#1302 合并阻塞」随分支关闭与承载确认解除；#1348 自身 CI/合并仍按 PR 流程跟进 |
+| DC-010（回归失效） | Bug 缺陷 | P1 | AP 手机卡片支付方式断言共享红 | 2026-11-20 关单：#1303 已 closed/merged=true。主干 `frontend/tests/unit/ap-mobile-parity.test.ts` 在 320/767/768/1280 四档宽度循环内，`rows()` 按 `width < 768` 分别取卡片/表格，`expectedPaymentMethod` 在 `width < 768` 用原始 token、桌面用 `paymentMethodLabel(...)`；主干组件桌面列亦使用 `paymentMethodLabel`。 blob 回读证明宽度分治断言已入主干，原全宽度 token 断言不再存在 |
 
-**抽检审计纠正（8.5，2026-11-19）**：DC-008（联动影响矩阵 PR 门禁）原记「已关闭」，经 blob 级复核判定为**假闭环，已重开**（见待开发段 DC-008 标注）。原闭环证据「#1306 入收尾聚合器 needs」不成立：#1306 至审计时仍 open/merged=false，其 `check-e2e-linkage-gate.mjs` 与 `e2e-linkage-gate.yml` 在 main 上 NOT_CARRIED；main 的 ci-cd.yml/e2e-batch.yml/e2e-pairing.yml 对 linkage 引用均为 0；主干仅有 `report-e2e-linkage.mjs`，其源码首部明写「信息工具，不是门禁，不设置非零退出码」。根因：把「信息报告工具」误当成「fail-closed PR 门禁」验收关单，验收标准未要求核对门禁是否真正挂载到 CI。同类防线：今后凡「门禁类」工单关单，必须核对 workflow job 实际挂载与退出码语义，不能只凭脚本存在。DC-010（AP 手机卡片支付方式断言）同样经 blob 级复核判定为**回归失效，已重开**：#1303 修复仍 open/merged=false，主干 `ap-mobile-parity.test.ts` 最后提交停在 #1252、无 `paymentMethodLabel`/`expectedPaymentMethod`、仍全宽度 `toBe('bank_transfer')`，而组件桌面列已走标签映射、手机卡片用原始 token；原闭环证据未入主干。待 #1303 或其 cherry-pick 载体（#1308/#1307/#1297）合并后 blob 回读断言已按宽度分治再关单。
+**抽检审计纠正（8.5，2026-11-19）**：DC-008（联动影响矩阵 PR 门禁）原记「已关闭」，经 blob 级复核判定为**假闭环，已重开**（见待开发段 DC-008 标注）。原闭环证据「#1306 入收尾聚合器 needs」不成立：#1306 至审计时仍 open/merged=false，其 `check-e2e-linkage-gate.mjs` 与 `e2e-linkage-gate.yml` 在 main 上 NOT_CARRIED；main 的 ci-cd.yml/e2e-batch.yml/e2e-pairing.yml 对 linkage 引用均为 0；主干仅有 `report-e2e-linkage.mjs`，其源码首部明写「信息工具，不是门禁，不设置非零退出码」。根因：把「信息报告工具」误当成「fail-closed PR 门禁」验收关单，验收标准未要求核对门禁是否真正挂载到 CI。同类防线：今后凡「门禁类」工单关单，必须核对 workflow job 实际挂载与退出码语义，不能只凭脚本存在。DC-010（AP 手机卡片支付方式断言）2026-11-20 复核为**真闭环**：#1303 已 merged=true，主干 `ap-mobile-parity.test.ts` 全宽度 token 断言已被 `width < 768` 分治替代，手机端保留原始 token、桌面端用 `paymentMethodLabel(...)`；主干组件桌面列同步走标签映射，原回归失效证据已失效并转入已关闭表。DC-006（#1302 合并阻塞）同日复核关单：#1302 已关闭且内容由 #1348 承载，逐文件 blob 无丢失；不再等待解冲突。
 
 **抽检正向对照（8.5，2026-11-19，main 4b40f6ced）**：DC-009（新增功能配 E2E 配对门）按同一 blob 级方法复核，判定为**真闭环，维持已关闭**。证据：`.github/workflows/e2e-pairing.yml` 在 main 在册且真挂载——`:107` 跑 `--self-test`、`:152`/`:162` 实际调用判定器、`:52`/`:65` 列为 paths 过滤触发条件；判定器 `check-e2e-feature-pairing.mjs` 含 `process.exit` 非零阻断、棘轮基线与 `--baseline-ref` 增量比对。与 DC-008 的 report-only 假闭环构成正负对照，证明抽检判定器能区分「真 fail-closed 门禁」与「改名的信息工具」，而非一律否定已关闭工单。附方法论纠偏：Git Bash 的 MSYS 路径转换会把 `origin/main:<path>` 冒号表达式改写为 `origin\main;<path>`，此时 `git show` 落盘 0 字节属工具假象，不可据此判假交付；须以 `cat-file -s`/blob hash 为准——本例 main 看板 blob `7f5fdf41cd9` 与载体分支一致（21543 字节，六项关键词全命中），#1340/#1342 文档合并真实落地。
 
