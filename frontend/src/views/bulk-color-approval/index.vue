@@ -100,9 +100,9 @@
     <el-dialog
       v-model="dialogVisible"
       :title="t('bulkColorApproval.index.titleCreate')"
-      width="520px"
+      :width="isPhone ? '95%' : '520px'"
     >
-      <el-form :model="form" label-width="90px">
+      <el-form :model="form" label-width="90px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item :label="t('bulkColorApproval.index.labelSalesOrder')" required>
           <el-select
             v-model="form.sales_order_id"
@@ -192,7 +192,7 @@
       :title="t('bulkColorApproval.index.titleDetail')"
       width="720"
     >
-      <el-descriptions v-if="detailRow" :column="2" border>
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="ID">{{ detailRow.id }}</el-descriptions-item>
         <el-descriptions-item :label="t('bulkColorApproval.index.colOrderNo')">{{
           detailRow.order_no
@@ -275,6 +275,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logger, logAuxLoadFailure } from '@/utils/logger';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { useI18n } from 'vue-i18n';
@@ -303,6 +304,8 @@ import {
 import { getDyeBatchList, type DyeBatch } from '@/api/dye-batch';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const loading = ref(false);
 const submitting = ref(false);
 const dialogVisible = ref(false);
@@ -653,5 +656,11 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+@media (max-width: 767px) {
+  .bulk-color-page {
+    padding: 12px;
+  }
 }
 </style>

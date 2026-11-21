@@ -12,7 +12,7 @@
     :aria-label="
       isEdit ? t('bpm.definitions.form.editAriaLabel') : t('bpm.definitions.form.createAriaLabel')
     "
-    width="900px"
+    :width="isPhone ? '95%' : '900px'"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
     <el-form
@@ -229,7 +229,8 @@
 
 <script setup lang="ts">
 import { deepClone } from '@/utils';
-import { ref, watch, nextTick } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import { useI18n } from 'vue-i18n';
@@ -239,6 +240,8 @@ import { fetchUserCandidates } from '../composables/useAssigneeSearch';
 import { logAuxLoadFailure } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 表单数据类型
 interface BpmDefinitionFormData {

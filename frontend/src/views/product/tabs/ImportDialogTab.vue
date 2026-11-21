@@ -8,7 +8,7 @@
   <el-dialog
     :model-value="modelValue"
     :title="t('product.importDialogTab.title')"
-    width="500px"
+    :width="isPhone ? '95%' : '500px'"
     :close-on-click-modal="false"
     :aria-label="t('product.importDialogTab.ariaLabel')"
     @update:model-value="(val: boolean) => emit('update:modelValue', val)"
@@ -53,7 +53,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { Download, Upload } from '@element-plus/icons-vue';
@@ -61,6 +62,8 @@ import { getProductImportTemplate, importProducts } from '@/api/product';
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

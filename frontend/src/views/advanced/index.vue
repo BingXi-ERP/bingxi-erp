@@ -179,4 +179,10 @@ onMounted(() => {
 .rec-list li {
   margin-bottom: 8px;
 }
+
+@media (max-width: 767px) {
+  .advanced-page {
+    padding: 12px;
+  }
+}
 </style>

@@ -113,4 +113,5 @@ type Buffer = NodeBufferLike;
 declare const Buffer: {
   from(data: string | Uint8Array | ArrayBuffer | readonly number[], encoding?: string): Buffer;
   alloc(size: number): Buffer;
+  concat(list: readonly Uint8Array[]): Buffer;
 };

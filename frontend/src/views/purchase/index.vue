@@ -207,4 +207,10 @@ list.initPage();
   justify-content: flex-end;
   gap: 8px;
 }
+
+@media (max-width: 767px) {
+  .app-container {
+    padding: 12px;
+  }
+}
 </style>

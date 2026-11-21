@@ -128,7 +128,7 @@
     </el-tabs>
 
     <el-dialog v-model="dialogVisible" title="新建工资单" width="480">
-      <el-form :model="form" label-width="100px">
+      <el-form :model="form" label-width="100px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="期间起" required>
           <el-date-picker
             v-model="form.period_start"
@@ -184,7 +184,11 @@
 
     <!-- 编辑工资单（updateWageRecord：draft 态修改车间/备注） -->
     <el-dialog v-model="recordEditVisible" title="编辑工资单" width="480">
-      <el-form :model="recordEditForm" label-width="90px">
+      <el-form
+        :model="recordEditForm"
+        label-width="90px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="车间">
           <el-input v-model="recordEditForm.workshop" />
         </el-form-item>
@@ -216,7 +220,7 @@
 
     <!-- 工资费率新建/编辑（createWageRate/updateWageRate） -->
     <el-dialog v-model="rateDialogVisible" title="工资费率" width="440">
-      <el-form :model="rateForm" label-width="90px">
+      <el-form :model="rateForm" label-width="90px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="工序路线" required>
           <el-input
             v-model="rateRouteField.text"
@@ -248,7 +252,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, toRef } from 'vue';
+import { computed, onMounted, reactive, ref, toRef } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
   useNumberField,
@@ -281,6 +286,8 @@ import {
   type WageRecord,
   type CreateWageRatePayload,
 } from '@/api/wage';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const records = ref<WageRecord[]>([]);
 const details = ref<Array<Record<string, unknown>>>([]);

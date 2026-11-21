@@ -36,7 +36,7 @@ use bingxi_backend::utils::error::AppError;
 ///   导入任务创建后按 ID 反查不到（不可能态）1 处。
 /// - auth_service.rs=3：`From<AuthError> for AppError` 的 TokenGenerationError/
 ///   HashingError/JwtError 族映射（JWT 编码 / Argon2 哈希 / 令牌结构异常，系统侧）。
-/// - export_service.rs=2：printpdf 内建字体加载失败 / PDF save 写缓冲 IO 失败。
+/// - export_service.rs：xlsx/docx 构造期的外部库错误映射。
 /// - bi_handler.rs=2：`tokio::time::timeout` Elapsed（服务自身 AppError 已由
 ///   第二个 `?` 原样透传，此处仅超时保护）。
 /// - data_permission_handler.rs=1：对已校验为 object/null 的 Value 再次

@@ -519,4 +519,10 @@ onMounted(() => {
   justify-content: flex-end;
   margin-top: 16px;
 }
+
+@media (max-width: 767px) {
+  .greige-fabrics-page {
+    padding: 12px;
+  }
+}
 </style>

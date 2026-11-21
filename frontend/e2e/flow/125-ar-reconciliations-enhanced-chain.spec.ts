@@ -2,7 +2,7 @@ import { test, expect } from '../diagnose-fixture';
 import { APP_ERROR_CODES, loginViaUI, apiCall, apiCallRaw, apiCallExpectFail } from './helpers';
 
 /**
- * 125 ar-reconciliations-enhanced 面全链真实契约（生成、明细、发送、确认、争议、解决、账龄、PDF、结果列表、自动对账）
+ * 125 ar-reconciliations-enhanced 面全链真实契约（生成、明细、发送、确认、争议、解决、账龄、xlsx、结果列表、自动对账）
  *
  * 守的是什么：enhanced 前缀（routes/finance 起 16 条在册端点）不是 base 面的空镜像——
  * handler 层 ar_reconciliation_enhanced_handler 仅 `pub use` 转发到
@@ -40,8 +40,8 @@ import { APP_ERROR_CODES, loginViaUI, apiCall, apiCallRaw, apiCallExpectFail } f
  *   customer_id 过滤下自建三单必全部入选。
  * - GET /aging-report：AgingReport{analysis_date,total_receivable(DECIMAL 出参字符串),
  *   customer_summaries,overall_buckets} 结构真实成立。
- * - GET /{id}/pdf：出参 content_type=application/pdf、size>0、
- *   base64_content 非空且以 JVBERi0（"%PDF-" 的 base64 前缀）开头——文件魔数级证据，
+ * - GET /{id}/xlsx：出参 content_type=application/vnd.openxmlformats-officedocument.wordprocessingml.document、size>0、
+ *   base64_content 非空且以 UEsDBA（xlsx zip 魔数的 base64 前缀）开头——文件魔数级证据，
  *   不是「有响应即通过」。
  *
  * 金额列为 DECIMAL 线格式（出参字符串），断言用字符串数字形态，不做数值再造。
@@ -84,7 +84,7 @@ type AgingBody = {
   overall_buckets: unknown[];
 };
 
-type PdfBody = {
+type DocxBody = {
   id: number;
   content_type: string;
   size: number;
@@ -381,7 +381,7 @@ test.describe.serial('125 ar-reconciliations-enhanced 全链契约回读', () =>
     expect(created.dispute_reason).toBe(`e2c-desc-${tag}`);
   });
 
-  test('auto-match 与结果分页、账龄、PDF 字段级判据', async ({ page }) => {
+  test('auto-match 与结果分页、账龄、xlsx 字段级判据', async ({ page }) => {
     const matched = await apiCall<unknown[]>(
       page,
       'POST',
@@ -393,7 +393,10 @@ test.describe.serial('125 ar-reconciliations-enhanced 全链契约回读', () =>
       }
     );
     expect(matched.code).toBe(200);
-    expect(Array.isArray(matched.data), `auto-match 出参应为数组，实际 ${JSON.stringify(matched).slice(0, 200)}`).toBe(true);
+    expect(
+      Array.isArray(matched.data),
+      `auto-match 出参应为数组，实际 ${JSON.stringify(matched).slice(0, 200)}`
+    ).toBe(true);
     expect(
       /^自动对账完成，共处理 \d+ 个客户$/.test(matched.message),
       `auto-match 文案应钉成「自动对账完成，共处理 N 个客户」，实际 ${JSON.stringify(matched.message)}`
@@ -422,16 +425,18 @@ test.describe.serial('125 ar-reconciliations-enhanced 全链契约回读', () =>
     expect(Array.isArray(aging.customer_summaries)).toBe(true);
     expect(Array.isArray(aging.overall_buckets)).toBe(true);
 
-    const pdf = await apiCallRaw<PdfBody>(
+    const docx = await apiCallRaw<DocxBody>(
       page,
       'GET',
-      `/ar-reconciliations-enhanced/${recMain}/pdf`
+      `/ar-reconciliations-enhanced/${recMain}/docx`
     );
-    expect(pdf.id).toBe(recMain);
-    expect(pdf.content_type).toBe('application/pdf');
-    expect(pdf.size).toBeGreaterThan(0);
-    // "%PDF-" 的 base64 前缀固定为 JVBERi0：文件魔数级证据
-    expect(pdf.base64_content.startsWith('JVBERi0')).toBe(true);
+    expect(docx.id).toBe(recMain);
+    expect(docx.content_type).toBe(
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    );
+    expect(docx.size).toBeGreaterThan(0);
+    // docx 是 zip 容器，"PK\x03\x04" 的 base64 前缀固定为 UEsDBA：文件魔数级证据
+    expect(docx.base64_content.startsWith('UEsDBA')).toBe(true);
   });
 
   test('清理：删除自建客户（对账单行无删除端点，best-effort 记录残量）', async ({ page }) => {

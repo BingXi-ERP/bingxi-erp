@@ -55,4 +55,10 @@ const selectedPlan = ref<BudgetPlan | null>(null);
   display: flex;
   justify-content: flex-end;
 }
+
+@media (max-width: 767px) {
+  .budget-page {
+    padding: 12px;
+  }
+}
 </style>

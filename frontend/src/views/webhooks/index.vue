@@ -70,13 +70,14 @@
           ? t('system.webhook.dialog.editTitle')
           : t('system.webhook.dialog.createTitle')
       "
-      width="500px"
+      :width="isPhone ? '95%' : '500px'"
       :aria-label="t('system.webhook.dialog.aria')"
     >
       <el-form
         ref="webhookFormRef"
         :model="webhookForm"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('system.webhook.form.aria')"
       >
         <el-form-item :label="t('system.webhook.form.label.name')" prop="name">
@@ -114,7 +115,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { reactive, ref, onMounted } from 'vue';
+import { computed, reactive, ref, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -124,6 +126,8 @@ import { request } from '@/api/request';
 import type { ApiResponse } from '@/types/api';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 状态标签映射（响应式）
 const getStatusLabel = (active: boolean): string =>

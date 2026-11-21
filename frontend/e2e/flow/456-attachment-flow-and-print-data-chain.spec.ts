@@ -29,7 +29,7 @@ import {
  *   出参 ApiResponse<Vec<Model>>，data 为裸数组；
  * - POST `/purchase/suppliers/{sid}/qualifications/{qid}/attachment`（upload_supplier_qualification_attachment）
  *   multipart 文件字段名 `file`，成功回写 attachment_path 为服务端生成受控路径；
- *   校验清单：扩展名白名单 pdf/jpg/jpeg/png、魔数与后缀同族、大小<=5MB、非空；
+ *   校验清单：扩展名白名单 jpg/jpeg/png、魔数与后缀同族、大小<=5MB、非空；
  *   客户端原名仅用于提取扩展名，不落盘不落库（服务端生成 {sid}_{qid}.{ext}），
  *   原名长度不构成拒绝条件，attachment_path 列宽 VARCHAR(500) 约束的是生成 URL；
  * - GET `/purchase/suppliers/{sid}/qualifications/{qid}/attachment`（get_supplier_qualification_attachment）
@@ -52,15 +52,18 @@ import {
  * - `/purchase/orders/*` 段推 orders 权限键；quality_inspector 无 purchase orders 读 → 403。
  *
  * 隔离与自清：每个用例自建资质行或订单，用例尾删除或 flushDeferredCleanups 清理。
- * 不遗留跨用例数据；上传的 PDF 字节用 %PDF 魔数构造最小合法体。
+ * 不遗留跨用例数据；上传的 PNG 字节用 PNG 签名构造最小合法体。
  * 断言不恒真、不用 ?? [] 掩盖缺键、不把 404/403 当健康。
  */
 
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
-function buildPdfBuffer(marker: string, padBytes = 0): Buffer {
-  const pad = padBytes > 0 ? `\n${' '.repeat(padBytes)}\n%%EOF` : '';
-  return Buffer.from(`%PDF-1.4\n${marker}${pad}`, 'utf-8');
+function buildPngBuffer(marker: string, padBytes = 0): Buffer {
+  const pad = padBytes > 0 ? `\n${' '.repeat(padBytes)}` : '';
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from(`\n${marker}${pad}`, 'utf-8'),
+  ]);
 }
 
 function fullUrl(path: string): string {
@@ -344,13 +347,13 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     const sid = await ensureSupplier(page);
     const qid = await createQualification(page, sid, '01');
 
-    const pdf = buildPdfBuffer('456-01 craft-doc scan');
-    const up = await uploadAttachment(page, sid, qid, 'craft01.pdf', 'application/pdf', pdf);
+    const png = buildPngBuffer('456-01 craft-doc scan');
+    const up = await uploadAttachment(page, sid, qid, 'craft01.png', 'image/png', png);
     console.log(`[456-01] upload status=${up.status} code=${up.code} msg=${up.message}`);
     expect(up.status, `456-01 upload must 200, actual ${up.status} msg=${up.message}`).toBe(200);
     expect(up.code, `456-01 success envelope code must 200, actual ${up.code}`).toBe(200);
 
-    const expectedPath = `/uploads/qualifications/${sid}_${qid}.pdf`;
+    const expectedPath = `/uploads/qualifications/${sid}_${qid}.png`;
     expect(up.data, '456-01 upload response data must be present').not.toBeNull();
     expect(
       String(up.data!.attachment_path),
@@ -374,19 +377,19 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     const dlHeaders = dl.headers();
     expect(
       dlHeaders['content-type'],
-      `456-01 download content-type must application/pdf, actual ${dlHeaders['content-type']}`
-    ).toContain('application/pdf');
+      `456-01 download content-type must application/png, actual ${dlHeaders['content-type']}`
+    ).toContain('image/png');
     const dlBytes = new Uint8Array(await dl.body());
     expect(
       dlBytes.length,
       `456-01 download bytes must be non-zero, actual ${dlBytes.length}`
     ).toBeGreaterThan(0);
-    expect(dlBytes[0], `456-01 first byte %PDF 0x25`).toBe(0x25);
-    expect(dlBytes[1], `456-01 second byte %PDF 0x50`).toBe(0x50);
-    expect(dlBytes[2], `456-01 third byte %PDF 0x44`).toBe(0x44);
-    expect(dlBytes[3], `456-01 fourth byte %PDF 0x46`).toBe(0x46);
-    expect(dlBytes.length, `456-01 download byte count must equal upload ${pdf.length}`).toBe(
-      pdf.length
+    expect(dlBytes[0], `456-01 first byte PNG 0x89`).toBe(0x89);
+    expect(dlBytes[1], `456-01 second byte PNG 0x50`).toBe(0x50);
+    expect(dlBytes[2], `456-01 third byte PNG 0x4e`).toBe(0x4e);
+    expect(dlBytes[3], `456-01 fourth byte PNG 0x47`).toBe(0x47);
+    expect(dlBytes.length, `456-01 download byte count must equal upload ${png.length}`).toBe(
+      png.length
     );
 
     // 删除确认消失
@@ -425,11 +428,11 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     const qid1 = await createQualification(page, sid, '02a');
     const qid2 = await createQualification(page, sid, '02b');
 
-    const pdf1 = buildPdfBuffer('456-02 attachment-A');
-    const pdf2 = buildPdfBuffer('456-02 attachment-B');
-    const up1 = await uploadAttachment(page, sid, qid1, 'attA.pdf', 'application/pdf', pdf1);
+    const png1 = buildPngBuffer('456-02 attachment-A');
+    const png2 = buildPngBuffer('456-02 attachment-B');
+    const up1 = await uploadAttachment(page, sid, qid1, 'attA.png', 'image/png', png1);
     expect(up1.status, `456-02 upload A must 200, actual ${up1.status}`).toBe(200);
-    const up2 = await uploadAttachment(page, sid, qid2, 'attB.pdf', 'application/pdf', pdf2);
+    const up2 = await uploadAttachment(page, sid, qid2, 'attB.png', 'image/png', png2);
     expect(up2.status, `456-02 upload B must 200, actual ${up2.status}`).toBe(200);
 
     // 两条都在列表中且 attachment_path 各自独立
@@ -447,10 +450,10 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     expect(row1, '456-02 qualification A must exist in list').toBeTruthy();
     expect(row2, '456-02 qualification B must exist in list').toBeTruthy();
     expect(String(row1!.attachment_path), `456-02 A path`).toBe(
-      `/uploads/qualifications/${sid}_${qid1}.pdf`
+      `/uploads/qualifications/${sid}_${qid1}.png`
     );
     expect(String(row2!.attachment_path), `456-02 B path`).toBe(
-      `/uploads/qualifications/${sid}_${qid2}.pdf`
+      `/uploads/qualifications/${sid}_${qid2}.png`
     );
 
     // 删除 A → B 不丢
@@ -471,7 +474,7 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     expect(
       String(kept2!.attachment_path),
       `456-02 B attachment_path preserved after A delete`
-    ).toBe(`/uploads/qualifications/${sid}_${qid2}.pdf`);
+    ).toBe(`/uploads/qualifications/${sid}_${qid2}.png`);
 
     // 清理 B
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qid2}`);
@@ -545,8 +548,8 @@ test.describe.serial('456 attachment flow and print data chain', () => {
 
     // 准备附件数据
     const qid = await createQualification(page, sid, '04');
-    const pdf = buildPdfBuffer('456-04 permission test');
-    const up = await uploadAttachment(page, sid, qid, 'perm.pdf', 'application/pdf', pdf);
+    const png = buildPngBuffer('456-04 permission test');
+    const up = await uploadAttachment(page, sid, qid, 'perm.png', 'image/png', png);
     expect(up.status, `456-04 upload must 200 for admin, actual ${up.status}`).toBe(200);
 
     // 准备打印订单数据
@@ -614,8 +617,8 @@ test.describe.serial('456 attachment flow and print data chain', () => {
       page,
       sid,
       qidEmpty,
-      'empty.pdf',
-      'application/pdf',
+      'empty.png',
+      'image/png',
       Buffer.alloc(0)
     );
     console.log(
@@ -632,9 +635,9 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     // 原名不参与路径拼接也不落库，长度不是拒绝条件。断言真实契约：上传 200、attachment_path
     // 为受控形态且不泄漏原名（等值断言同时覆盖 VARCHAR(500) 列宽）、回读一致、下载字节完整、删除后无残留。
     const qidLong = await createQualification(page, sid, '05b');
-    const longName = 'a'.repeat(250) + '.pdf';
-    const pdfLong = buildPdfBuffer('456-05b');
-    const longUp = await uploadAttachment(page, sid, qidLong, longName, 'application/pdf', pdfLong);
+    const longName = 'a'.repeat(250) + '.png';
+    const pngLong = buildPngBuffer('456-05b');
+    const longUp = await uploadAttachment(page, sid, qidLong, longName, 'image/png', pngLong);
     console.log(
       `[456-05b] long name upload status=${longUp.status} code=${longUp.code} msg=${longUp.message}`
     );
@@ -643,7 +646,7 @@ test.describe.serial('456 attachment flow and print data chain', () => {
       `456-05b long client name is discarded server-side, upload must 200, actual ${longUp.status} msg=${longUp.message}`
     ).toBe(200);
     expect(longUp.code, `456-05b success envelope code must 200, actual ${longUp.code}`).toBe(200);
-    const controlledPath = `/uploads/qualifications/${sid}_${qidLong}.pdf`;
+    const controlledPath = `/uploads/qualifications/${sid}_${qidLong}.png`;
     expect(longUp.data, '456-05b upload response data must be present').not.toBeNull();
     expect(
       String(longUp.data!.attachment_path),
@@ -661,13 +664,13 @@ test.describe.serial('456 attachment flow and print data chain', () => {
     const dlLongBytes = Buffer.from(await dlLong.body());
     expect(
       dlLongBytes.length,
-      `456-05b download byte count must equal upload ${pdfLong.length}, actual ${dlLongBytes.length}`
-    ).toBe(pdfLong.length);
+      `456-05b download byte count must equal upload ${pngLong.length}, actual ${dlLongBytes.length}`
+    ).toBe(pngLong.length);
     // latin1 逐字节一一映射为码点，字符串相等即字节内容相等（Buffer 窄类型面无 equals）
     expect(
       dlLongBytes.toString('latin1'),
-      '456-05b download bytes must equal uploaded PDF content'
-    ).toBe(pdfLong.toString('latin1'));
+      '456-05b download bytes must equal uploaded PNG content'
+    ).toBe(pngLong.toString('latin1'));
     await apiCall(page, 'DELETE', `/purchase/suppliers/${sid}/qualifications/${qidLong}`);
     const goneLong = await apiCallExpectFail(
       page,
@@ -686,8 +689,8 @@ test.describe.serial('456 attachment flow and print data chain', () => {
       sid,
       qidExe,
       'trojan.exe',
-      'application/pdf',
-      buildPdfBuffer('456-05c')
+      'image/png',
+      buildPngBuffer('456-05c')
     );
     console.log(
       `[456-05c] exe upload status=${exeUp.status} code=${exeUp.code} msg=${exeUp.message}`

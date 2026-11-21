@@ -70,8 +70,8 @@
       />
     </el-card>
 
-    <el-dialog v-model="detailVisible" title="产地证详情" width="640px">
-      <el-descriptions v-if="detailRow" :column="2" border>
+    <el-dialog v-model="detailVisible" title="产地证详情" :width="isPhone ? '95%' : '640px'">
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="证书编号">{{ detailRow.certificate_no }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="certificateStatusTagMap[detailRow.status] ?? 'info'">
@@ -115,7 +115,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import {
   getCertificateOfOriginList,
@@ -123,6 +124,8 @@ import {
   certificateStatusTagMap,
   type CertificateOfOrigin,
 } from '@/api/certificate-of-origin';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const statusTextMap: Record<string, string> = {
   active: '有效',
@@ -206,5 +209,11 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+@media (max-width: 767px) {
+  .certificates-page {
+    padding: 12px;
+  }
 }
 </style>

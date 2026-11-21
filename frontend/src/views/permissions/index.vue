@@ -19,7 +19,46 @@
           class="permission-filter"
         />
       </div>
+      <!-- 手机端：权限单列卡片 -->
+      <section v-if="isPhone" v-loading="permissionListLoading" class="perm-mobile">
+        <ul class="card-list" :aria-label="t('system.permission.aria.list')">
+          <li
+            v-for="(row, index) in pagedPermissionList"
+            :key="`${row.resource_type}-${row.action}-${index}`"
+            class="card-item"
+          >
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('system.permission.column.resourceType') }}</dt>
+                <dd>{{ resourceTypeLabel(row.resource_type) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.permission.column.action') }}</dt>
+                <dd>{{ actionLabel(row.action) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.permission.column.status') }}</dt>
+                <dd>
+                  <el-tag :type="row.allowed ? 'success' : 'danger'" size="small">
+                    {{
+                      row.allowed
+                        ? t('system.permission.status.allowed')
+                        : t('system.permission.status.denied')
+                    }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.permission.column.resourceId') }}</dt>
+                <dd>{{ row.resource_id }}</dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="permissionListLoading"
         :data="pagedPermissionList"
         stripe
@@ -72,6 +111,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { logger, logAuxLoadFailure } from '@/utils/logger';
 import { getPermissionList, type Permission } from '@/api/role';
@@ -80,6 +120,8 @@ import { dataPermissionResourceTypeLabelKey } from '@/constants/data-permission-
 import { permissionActionLabelKey } from '@/constants/permission-action';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 行类型直接复用 api/role.ts 里对齐后端 PermissionResponse 的声明，页面不再自持一份
 // 本地 interface —— 手抄字段必然与后端漂移。
@@ -234,5 +276,40 @@ onMounted(() => {
 .permission-pagination {
   margin-top: 12px;
   justify-content: flex-end;
+}
+
+.perm-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.perm-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.perm-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.perm-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.perm-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.perm-mobile .field-emphasis dd {
+  font-weight: 500;
 }
 </style>

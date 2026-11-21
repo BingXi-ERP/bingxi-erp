@@ -75,4 +75,10 @@ const activeTab = ref('invoice');
 :deep(.filter-card) {
   margin-bottom: 20px;
 }
+
+@media (max-width: 767px) {
+  .ar-page {
+    padding: 12px;
+  }
+}
 </style>

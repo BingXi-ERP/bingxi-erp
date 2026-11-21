@@ -208,7 +208,7 @@ async fn attachment_path_of(db: &DatabaseConnection, qid: i32) -> Option<String>
 }
 
 fn disk_path_of(sid: i32, qid: i32) -> std::path::PathBuf {
-    std::path::Path::new("uploads/qualifications").join(format!("{sid}_{qid}.pdf"))
+    std::path::Path::new("uploads/qualifications").join(format!("{sid}_{qid}.png"))
 }
 
 /// 503 故障族的统一断言：状态 503、code=SERVICE_UNAVAILABLE、公网脱敏文案，
@@ -283,7 +283,11 @@ async fn scan_dependency_failures_return_503_never_500_and_never_touch_disk() {
     let app = build_supplier_app(&db);
     let crm_db = test_common::connect_empty_schema_db().await;
     let crm_app = build_crm_app(&crm_db);
-    let clean_pdf = b"%PDF-1.7 scan-failure-fixture";
+    let clean_png = {
+        let mut d = vec![0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        d.extend_from_slice(b"scan-failure-fixture");
+        d
+    };
 
     // ---------- ①a 扫描服务不可达 → 503 + 文件未落盘 ----------
     let dead = dead_port();
@@ -296,8 +300,8 @@ async fn scan_dependency_failures_return_503_never_500_and_never_touch_disk() {
         &app,
         &format!("/suppliers/{sid}/qualifications/911/attachment"),
         "file",
-        "license.pdf",
-        clean_pdf,
+        "license.png",
+        &clean_png,
     )
     .await;
     assert_eq!(
@@ -349,8 +353,8 @@ async fn scan_dependency_failures_return_503_never_500_and_never_touch_disk() {
         &app,
         &format!("/suppliers/{sid}/qualifications/912/attachment"),
         "file",
-        "license.pdf",
-        clean_pdf,
+        "license.png",
+        &clean_png,
     )
     .await;
     assert_eq!(
@@ -390,8 +394,8 @@ async fn scan_dependency_failures_return_503_never_500_and_never_touch_disk() {
         &app,
         &format!("/suppliers/{sid}/qualifications/914/attachment"),
         "file",
-        "license.pdf",
-        clean_pdf,
+        "license.png",
+        &clean_png,
     )
     .await;
     assert_eq!(
@@ -410,8 +414,8 @@ async fn scan_dependency_failures_return_503_never_500_and_never_touch_disk() {
         &app,
         &format!("/suppliers/{sid}/qualifications/913/attachment"),
         "file",
-        "license.pdf",
-        clean_pdf,
+        "license.png",
+        &clean_png,
     )
     .await;
     assert!(
@@ -440,14 +444,14 @@ async fn scan_dependency_failures_return_503_never_500_and_never_touch_disk() {
         &app,
         &format!("/suppliers/{sid}/qualifications/915/attachment"),
         "file",
-        "license.pdf",
-        clean_pdf,
+        "license.png",
+        &clean_png,
     )
     .await;
     assert_eq!(status, StatusCode::OK, "扫描通过必须 200，实际体 {v}");
     assert_eq!(
         attachment_path_of(&db, 915).await.as_deref(),
-        Some(format!("/uploads/qualifications/{sid}_915.pdf").as_str()),
+        Some(format!("/uploads/qualifications/{sid}_915.png").as_str()),
         "扫描通过应正常落库"
     );
 

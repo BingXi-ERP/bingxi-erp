@@ -57,7 +57,114 @@
         </ElSelect>
       </div>
 
-      <ElTable v-loading="loading" :data="list" border style="width: 100%">
+      <!-- 手机端：导出审批单列卡片 -->
+      <section v-if="isPhone" v-loading="loading" class="export-approval-mobile">
+        <ul class="card-list" :aria-label="$t('exportApprovals.colResource')">
+          <li v-for="(row, index) in list" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>ID</dt>
+                <dd>{{ row.id }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('exportApprovals.colResource') }}</dt>
+                <dd>
+                  {{
+                    row.resource_type ? $t(exportApprovalResourceLabelKey(row.resource_type)) : ''
+                  }}
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('exportApprovals.colApplicant') }}</dt>
+                <dd>{{ row.applicant_username }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('exportApprovals.colStatus') }}</dt>
+                <dd>
+                  <ElTag v-if="row.status" :type="exportApprovalStatusTagType(row.status)">
+                    {{ $t(exportApprovalStatusLabelKey(row.status)) }}
+                  </ElTag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('exportApprovals.colRows') }}</dt>
+                <dd>{{ row.estimated_rows }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('exportApprovals.colCreatedAt') }}</dt>
+                <dd>{{ row.created_at }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('exportApprovals.colToken') }}</dt>
+                <dd>
+                  <template v-if="row.token_fingerprint">
+                    <span>{{ row.token_fingerprint }}****</span>
+                    <span v-if="row.token_consumed">{{
+                      $t('exportApprovals.tokenConsumedMark')
+                    }}</span>
+                    <span v-else-if="row.token_viewed">{{
+                      $t('exportApprovals.tokenViewedMark')
+                    }}</span>
+                  </template>
+                  <span v-else>-</span>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <ElButton size="small" @click="openDetail(row)">{{ $t('common.detail') }}</ElButton>
+              <template v-if="isMine(row)">
+                <ElButton
+                  v-if="row.status === 'approved' && !row.token_consumed"
+                  size="small"
+                  @click="openTokenOnce(row)"
+                >
+                  {{ $t('exportApprovals.viewTokenAction') }}
+                </ElButton>
+                <ElButton
+                  v-if="row.status === 'approved' && !row.token_consumed"
+                  size="small"
+                  @click="handleRotateToken(row)"
+                >
+                  {{ $t('exportApprovals.rotateTokenAction') }}
+                </ElButton>
+                <ElButton
+                  v-if="row.status === 'approved' && !row.token_consumed"
+                  size="small"
+                  type="primary"
+                  @click="goToExport(row)"
+                >
+                  {{ $t('exportApprovals.goToExport') }}
+                </ElButton>
+                <ElButton
+                  v-if="row.status === 'pending'"
+                  v-permission="EXPORT_APPROVAL_CANCEL_PERMISSION_KEY"
+                  text
+                  size="small"
+                  @click="handleCancel(row)"
+                >
+                  {{ $t('exportApprovals.cancel') }}
+                </ElButton>
+              </template>
+              <ElButton
+                v-if="row.status === 'pending' || row.status === 'pending_l2'"
+                size="small"
+                @click="handleApprove(row)"
+              >
+                {{ $t('exportApprovals.approve') }}
+              </ElButton>
+              <ElButton
+                v-if="row.status === 'pending' || row.status === 'pending_l2'"
+                size="small"
+                @click="handleReject(row)"
+              >
+                {{ $t('exportApprovals.reject') }}
+              </ElButton>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <ElTable v-if="!isPhone" v-loading="loading" :data="list" border style="width: 100%">
         <ElTableColumn prop="id" label="ID" width="60" />
         <ElTableColumn :label="$t('exportApprovals.colResource')" width="120">
           <template #default="{ row }">{{
@@ -166,7 +273,11 @@
     </ElCard>
 
     <!-- 审批详情对话框（getApprovalDetail 回源） -->
-    <ElDialog v-model="detailVisible" :title="$t('exportApprovals.detailTitle')" width="640">
+    <ElDialog
+      v-model="detailVisible"
+      :title="$t('exportApprovals.detailTitle')"
+      :width="isPhone ? '95%' : '640px'"
+    >
       <ElDescriptions v-if="detailRow" :column="2" border>
         <ElDescriptionsItem label="ID">{{ detailRow.id }}</ElDescriptionsItem>
         <ElDescriptionsItem :label="$t('exportApprovals.colResource')">{{
@@ -208,7 +319,11 @@
     </ElDialog>
 
     <!-- 一次性查看令牌（token-once：明文仅此一次） -->
-    <ElDialog v-model="tokenOnceVisible" :title="$t('exportApprovals.tokenOnceTitle')" width="520">
+    <ElDialog
+      v-model="tokenOnceVisible"
+      :title="$t('exportApprovals.tokenOnceTitle')"
+      :width="isPhone ? '95%' : '520px'"
+    >
       <ElAlert
         :title="$t('exportApprovals.tokenOnceWarning')"
         type="warning"
@@ -228,8 +343,17 @@
     </ElDialog>
 
     <!-- 发起审批（createApproval） -->
-    <ElDialog v-model="createVisible" :title="$t('exportApprovals.createTitle')" width="520">
-      <ElForm ref="createFormRef" :model="createForm" label-width="110px">
+    <ElDialog
+      v-model="createVisible"
+      :title="$t('exportApprovals.createTitle')"
+      :width="isPhone ? '95%' : '520px'"
+    >
+      <ElForm
+        ref="createFormRef"
+        :model="createForm"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <ElFormItem :label="$t('exportApprovals.colResource')" required>
           <ElSelect v-model="createForm.resource_type" style="width: 100%">
             <ElOption
@@ -257,10 +381,10 @@
           <ElInput v-model="createForm.estimatedRowsText" clearable />
         </ElFormItem>
         <ElFormItem :label="$t('exportApprovals.fileFormatLabel')">
-          <!-- 后端 create 校验 file_format 仅接受 xlsx/pdf（export_approval_service） -->
+          <!-- 后端 create 校验 file_format 仅接受 xlsx/docx（export_approval_service） -->
           <ElSelect v-model="createForm.file_format" style="width: 100%">
             <ElOption label="xlsx" value="xlsx" />
-            <ElOption label="pdf" value="pdf" />
+            <ElOption label="docx" value="docx" />
           </ElSelect>
         </ElFormItem>
       </ElForm>
@@ -273,7 +397,11 @@
     </ElDialog>
 
     <!-- 下载令牌校验（verifyToken） -->
-    <ElDialog v-model="tokenVisible" :title="$t('exportApprovals.verifyTitle')" width="440">
+    <ElDialog
+      v-model="tokenVisible"
+      :title="$t('exportApprovals.verifyTitle')"
+      :width="isPhone ? '95%' : '440px'"
+    >
       <ElInput v-model="tokenText" :placeholder="$t('exportApprovals.verifyTokenPlaceholder')" />
       <template #footer>
         <ElButton @click="tokenVisible = false">{{ $t('common.cancel') }}</ElButton>
@@ -286,7 +414,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormItemRule } from 'element-plus';
 import { logger, logAuxLoadFailure } from '@/utils/logger';
@@ -325,6 +454,8 @@ import {
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const router = useRouter();
 const userStore = useUserStore();
 
@@ -674,5 +805,53 @@ onMounted(loadList);
 .token-once-actions {
   margin-top: 8px;
   display: flex;
+}
+
+.export-approval-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.export-approval-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.export-approval-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.export-approval-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.export-approval-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.export-approval-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.export-approval-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.export-approval-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

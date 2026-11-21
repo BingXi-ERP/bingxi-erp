@@ -32,7 +32,11 @@
     </div>
 
     <el-card shadow="hover">
-      <el-form class="filter-form" :inline="true" :aria-label="t('quality.recordTab.filterAria')">
+      <el-form
+        class="filter-form"
+        :inline="!isPhone"
+        :aria-label="t('quality.recordTab.filterAria')"
+      >
         <el-form-item :label="t('quality.recordTab.colInspectionType')">
           <el-select v-model="filters.inspection_type" clearable style="width: 150px">
             <el-option
@@ -72,7 +76,64 @@
         </el-form-item>
       </el-form>
 
+      <!-- 手机端：质检记录单列卡片，标签/名称与桌面 columns 同源 -->
+      <section v-if="isPhone" v-loading="loading" class="record-mobile">
+        <ul class="card-list" :aria-label="t('quality.recordTab.filterAria')">
+          <li v-for="(row, index) in data" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('quality.recordTab.colRecordNo') }}</dt>
+                <dd>{{ row.inspection_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.recordTab.colInspectionType') }}</dt>
+                <dd>{{ inspectionTypeLabel(row.inspection_type) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.recordTab.colProduct') }}</dt>
+                <dd>{{ productName(row.product_id) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.recordTab.colBatchNo') }}</dt>
+                <dd>{{ row.batch_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.recordTab.colInspectionDate') }}</dt>
+                <dd>{{ row.inspection_date }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.recordTab.colInspector') }}</dt>
+                <dd>{{ inspectorName(row.inspector_id) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.recordTab.colResult') }}</dt>
+                <dd>
+                  <el-tag :type="resultTagType(row.inspection_result)" size="small">
+                    {{ resultLabel(row.inspection_result) }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="handleView(row)">
+                {{ t('quality.recordTab.buttonView') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <ElPagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, next"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </section>
+
       <V2Table
+        v-if="!isPhone"
         :columns="columns"
         :data="data"
         :loading="loading"
@@ -100,9 +161,10 @@
 import { computed, h, inject, onMounted, reactive } from 'vue';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElTag, ElButton } from 'element-plus';
+import { ElMessage, ElTag, ElButton, ElPagination } from 'element-plus';
 import { Plus, Download, Printer } from '@element-plus/icons-vue';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import V2Table from '@/components/V2Table/index.vue';
 import type { ColumnDef } from '@/components/V2Table/types';
 import { type QualityRecord } from '@/api/quality';
@@ -126,6 +188,8 @@ import { escapeHtml } from '@/utils/print';
 import { exportFromBackend } from '@/utils/export';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 父组件注入：openRecordDialog(row | null)
 const actions = inject<{
@@ -356,5 +420,53 @@ defineExpose({ fetchRecords: refresh });
 .header-actions {
   display: flex;
   gap: 8px;
+}
+
+.record-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.record-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.record-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.record-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.record-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.record-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.record-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.record-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

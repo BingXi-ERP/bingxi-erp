@@ -7,7 +7,49 @@
           <el-button type="primary" @click="openProvision">运行计提</el-button>
         </div>
       </template>
-      <el-table v-loading="loading" :data="debts" border>
+      <!-- 手机端：坏账单列卡片，动态列与桌面同源 -->
+      <section v-if="isPhone" v-loading="loading" class="debt-mobile">
+        <ul class="card-list">
+          <li v-for="(row, index) in debts" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>ID</dt>
+                <dd>{{ row.id }}</dd>
+              </div>
+              <div class="field">
+                <dt>状态</dt>
+                <dd>
+                  <el-tag
+                    :type="
+                      row.status === 'confirmed'
+                        ? 'success'
+                        : row.status === 'reversed'
+                          ? 'info'
+                          : 'warning'
+                    "
+                  >
+                    {{ BAD_DEBT_STATUS_LABEL[row.status] ?? row.status }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div v-for="col in debtExtraCols" :key="col.prop" class="field">
+                <dt>{{ col.label }}</dt>
+                <dd>{{ row[col.prop] }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button v-if="row.status === 'pending'" type="primary" @click="onConfirm(row)">
+                确认
+              </el-button>
+              <el-button v-if="row.status === 'confirmed'" type="warning" @click="onReverse(row)">
+                冲销
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <el-table v-if="!isPhone" v-loading="loading" :data="debts" border>
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
@@ -55,7 +97,57 @@
 
     <el-card shadow="never" class="mt">
       <template #header><span>催收任务</span></template>
-      <el-table v-loading="loadingTasks" :data="tasks" border>
+      <!-- 手机端：催收任务单列卡片，动态列与桌面同源 -->
+      <section v-if="isPhone" v-loading="loadingTasks" class="task-mobile">
+        <ul class="card-list">
+          <li v-for="(row, index) in tasks" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>ID</dt>
+                <dd>{{ row.id }}</dd>
+              </div>
+              <div class="field">
+                <dt>状态</dt>
+                <dd>
+                  <el-tag
+                    :type="
+                      row.status === 'cancelled'
+                        ? 'info'
+                        : row.status === 'completed'
+                          ? 'success'
+                          : 'primary'
+                    "
+                  >
+                    {{ COLLECTION_TASK_STATUS_LABEL[row.status] ?? row.status }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div v-for="col in taskExtraCols" :key="col.prop" class="field">
+                <dt>{{ col.label }}</dt>
+                <dd>{{ row[col.prop] }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button
+                v-if="row.status !== 'cancelled' && row.status !== 'completed'"
+                @click="onReassign(row)"
+              >
+                转派
+              </el-button>
+              <el-button
+                v-if="row.status !== 'cancelled'"
+                type="danger"
+                plain
+                @click="onCancelTask(row)"
+              >
+                取消
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <el-table v-if="!isPhone" v-loading="loadingTasks" :data="tasks" border>
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
@@ -101,7 +193,7 @@
       </el-table>
     </el-card>
 
-    <el-dialog v-model="provisionVisible" title="运行坏账计提" width="460">
+    <el-dialog v-model="provisionVisible" title="运行坏账计提" :width="isPhone ? '95%' : '460px'">
       <el-form
         ref="provisionFormRef"
         :model="provisionForm"
@@ -126,6 +218,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { numberInputRules } from '@/utils/number-input';
@@ -242,6 +335,8 @@ async function onReverse(row: BadDebt) {
 }
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 async function onReassign(row: CollectionTask) {
   // 不加 inputPattern 时留空会以 Number('') === 0 提交，把催收任务派给不存在的用户 ID=0，
@@ -287,5 +382,61 @@ onMounted(load);
 }
 .mt {
   margin-top: 16px;
+}
+
+.debt-mobile .card-list,
+.task-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.debt-mobile .card-item,
+.task-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.debt-mobile .card-fields > div,
+.task-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.debt-mobile .card-fields dt,
+.task-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.debt-mobile .card-fields dd,
+.task-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.debt-mobile .field-emphasis dd,
+.task-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.debt-mobile .card-actions,
+.task-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.debt-mobile .card-actions .el-button,
+.task-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

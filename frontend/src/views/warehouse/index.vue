@@ -187,7 +187,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :close-on-click-modal="false"
       :aria-label="t('warehouse.index.ariaEditDialog')"
       @close="resetForm"
@@ -197,6 +197,7 @@
         :model="formData"
         :rules="formRules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('warehouse.index.ariaForm')"
       >
         <el-row :gutter="20">
@@ -300,7 +301,7 @@
 
     <!-- 仓库详情对话框（getWarehouseById 回源） -->
     <el-dialog v-model="detailVisible" :title="t('warehouse.index.buttonDetail')" width="560">
-      <el-descriptions v-if="detailWarehouse" :column="2" border>
+      <el-descriptions v-if="detailWarehouse" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="ID">{{ detailWarehouse.id }}</el-descriptions-item>
         <el-descriptions-item :label="t('warehouse.index.colName')">{{
           detailWarehouse.warehouse_name
@@ -366,7 +367,7 @@
 
     <!-- 库位表单对话框（createWarehouseLocation / updateWarehouseLocation） -->
     <el-dialog v-model="locFormVisible" :title="editingLocId ? '编辑库位' : '新建库位'" width="480">
-      <el-form :model="locForm" label-width="110px">
+      <el-form :model="locForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="库位编码" required>
           <el-input v-model="locForm.location_code" />
         </el-form-item>
@@ -406,6 +407,7 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { ref, reactive, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
@@ -435,6 +437,8 @@ import { logger } from '@/utils/logger';
 import NumericInput from '@/components/NumericInput.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const submitLoading = ref(false);
 const dialogVisible = ref(false);
@@ -892,5 +896,11 @@ const handleDeleteLocation = async (row: WarehouseLocation) => {
 }
 .w-full {
   width: 100%;
+}
+
+@media (max-width: 767px) {
+  .warehouse-page {
+    padding: 12px;
+  }
 }
 </style>

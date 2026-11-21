@@ -133,13 +133,11 @@ pub async fn export_report(
     // 判定先于任何取数与导出，拒绝路径零副作用。
     // 入参：请求体 format 字面量；传给谁：仅用于本函数后续 export_report 的格式分派。
     let format_str = match payload.format.to_lowercase().as_str() {
-        "csv" => "csv",
         "excel" | "xlsx" => "excel",
-        "pdf" => "pdf",
-        "json" => "json",
+        "docx" | "word" => "docx",
         other => {
             return Err(AppError::validation_displayable(format!(
-                "不支持的导出格式 {other}，可选值：csv、excel、xlsx、pdf、json"
+                "不支持的导出格式 {other}，可选值：xlsx、docx"
             )));
         }
     };

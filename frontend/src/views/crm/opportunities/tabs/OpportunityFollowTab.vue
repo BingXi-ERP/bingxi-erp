@@ -6,12 +6,13 @@
   <el-dialog
     v-model="visible"
     :title="t('crmOpportunityFollow.title')"
-    width="600px"
+    :width="isPhone ? '95%' : '600px'"
     :aria-label="t('crmOpportunityFollow.ariaLabel')"
   >
     <el-form
       :model="formData"
       label-width="80px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('crmOpportunityFollow.formAriaLabel')"
     >
       <el-form-item :label="t('crmFollowUp.form.type')">
@@ -55,14 +56,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import { logger } from '@/utils/logger';
 // D14 Batch 5b：原 crmEnhancedApi 对象已转风格 B 函数
 import { createOpportunityFollowUp } from '@/api/crm-enhanced';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

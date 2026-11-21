@@ -11,7 +11,7 @@
         ? $t('inventoryTransfer.transferForm.editTitle')
         : $t('inventoryTransfer.transferForm.createTitle')
     "
-    width="1000px"
+    :width="isPhone ? '95%' : '1000px'"
     destroy-on-close
     :aria-label="
       mode === 'view'
@@ -26,6 +26,7 @@
       ref="formRef"
       :model="formData"
       label-width="100px"
+      :label-position="isPhone ? 'top' : 'right'"
       :disabled="mode === 'view'"
       :aria-label="$t('inventoryTransfer.transferForm.formAriaLabel')"
     >
@@ -240,6 +241,7 @@
 import { ref, reactive, computed, watch } from 'vue';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
 import type { FormInstance } from 'element-plus';
@@ -269,6 +271,8 @@ import {
 
 // 批次 34 v9 P1：接入 i18n，替换硬编码中文 ElMessage
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

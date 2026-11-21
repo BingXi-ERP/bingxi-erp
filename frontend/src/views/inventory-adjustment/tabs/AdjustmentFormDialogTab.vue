@@ -11,7 +11,7 @@
         ? t('inventoryAdjustment.formDialogTab.titleEdit')
         : t('inventoryAdjustment.formDialogTab.titleCreate')
     "
-    width="800px"
+    :width="isPhone ? '95%' : '800px'"
     :aria-label="
       mode === 'view'
         ? t('inventoryAdjustment.formDialogTab.ariaLabelView')
@@ -25,6 +25,7 @@
       ref="formRef"
       :model="formData"
       label-width="100px"
+      :label-position="isPhone ? 'top' : 'right'"
       :disabled="mode === 'view'"
       :aria-label="t('inventoryAdjustment.formDialogTab.ariaLabelForm')"
     >
@@ -251,6 +252,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
 import type { FormInstance } from 'element-plus';
@@ -274,6 +276,8 @@ import {
 } from '@/utils/inventory-adjustment-status';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

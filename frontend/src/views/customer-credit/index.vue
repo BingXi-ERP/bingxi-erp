@@ -27,7 +27,123 @@
         >
       </div>
 
+      <!-- 手机端：单列卡片，字段与动作与桌面表格等价 -->
+      <section v-if="isPhone" class="credit-mobile">
+        <ul class="card-list" :aria-label="t('customerCredit.index.table.ariaLabel')">
+          <li v-for="(row, index) in creditList" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('customerCredit.index.table.column.customerName') }}</dt>
+                <dd>{{ row.customer_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customerCredit.index.table.column.creditGrade') }}</dt>
+                <dd>
+                  <el-tag v-if="isUnratedCreditLevel(row.credit_level)" type="info">
+                    {{ t('customerCredit.index.creditLevel.none') }}
+                  </el-tag>
+                  <el-tag v-else :type="creditLevelTagType(row.credit_level)">
+                    {{ row.credit_level }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customerCredit.index.table.column.creditLimit') }}</dt>
+                <dd>{{ row.credit_limit }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customerCredit.index.table.column.usedCredit') }}</dt>
+                <dd>{{ row.used_credit }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customerCredit.index.table.column.availableCredit') }}</dt>
+                <dd>
+                  <span
+                    :style="{
+                      color: isAvailableCreditPositive(row.available_credit)
+                        ? '#67c23a'
+                        : '#f56c6c',
+                    }"
+                  >
+                    {{ row.available_credit }}
+                  </span>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customerCredit.index.table.column.status') }}</dt>
+                <dd>
+                  <el-tag v-if="row.status === 'active'" type="success">
+                    {{ t('customerCredit.index.status.active') }}
+                  </el-tag>
+                  <el-tag v-else type="danger">
+                    {{ t('customerCredit.index.status.inactive') }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button
+                v-permission="PERMISSIONS.CUSTOMER_CREDIT_READ"
+                type="primary"
+                plain
+                @click="handleViewDetail(row)"
+              >
+                {{ t('customerCredit.index.button.view') }}
+              </el-button>
+              <el-button
+                v-permission="PERMISSIONS.CUSTOMER_CREDIT_UPDATE"
+                type="warning"
+                @click="handleEdit(row)"
+              >
+                {{ t('customerCredit.index.button.edit') }}
+              </el-button>
+              <el-button
+                v-permission="PERMISSIONS.CUSTOMER_CREDIT_CREATE"
+                @click="openAdjustDialog(row)"
+              >
+                {{ t('customerCredit.index.button.adjust') }}
+              </el-button>
+              <el-button
+                v-permission="PERMISSIONS.CUSTOMER_CREDIT_CREATE"
+                @click="openOccupyDialog(row)"
+              >
+                {{ t('customerCredit.index.button.occupy') }}
+              </el-button>
+              <el-button
+                v-permission="PERMISSIONS.CUSTOMER_CREDIT_RELEASE"
+                @click="openReleaseDialog(row)"
+              >
+                {{ t('customerCredit.index.button.release') }}
+              </el-button>
+              <el-button
+                v-permission="PERMISSIONS.CUSTOMER_CREDIT_CREATE"
+                @click="handleEvaluate(row)"
+              >
+                {{ t('customerCredit.index.button.evaluate') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'active'"
+                v-permission="PERMISSIONS.CUSTOMER_CREDIT_CREATE"
+                type="warning"
+                @click="handleDeactivate(row)"
+              >
+                {{ t('customerCredit.index.button.deactivate') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'inactive'"
+                v-permission="PERMISSIONS.CUSTOMER_CREDIT_DELETE"
+                type="danger"
+                @click="handleDelete(row)"
+              >
+                {{ t('customerCredit.index.button.delete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         :data="creditList"
         border
         stripe
@@ -191,7 +307,7 @@
     <el-dialog
       v-model="detailDialogVisible"
       :title="t('customerCredit.index.detail.title')"
-      width="500px"
+      :width="isPhone ? '95%' : '500px'"
     >
       <!--
         详情项只列得出参载体真有键的字段。valid_from / valid_to / remarks 既不在
@@ -238,7 +354,7 @@
     <el-dialog
       v-model="editDialogVisible"
       :title="t('customerCredit.index.edit.title')"
-      width="480px"
+      :width="isPhone ? '95%' : '480px'"
     >
       <el-form
         ref="editFormRef"
@@ -279,7 +395,7 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
@@ -300,11 +416,14 @@ import { decimalWireToNumber, numberToDecimalWire } from '@/utils/money';
 import { numberInputRules } from '@/utils/number-input';
 import { creditLevelTagType, isUnratedCreditLevel } from '@/constants/credit-level';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import RatingDialogTab from './tabs/RatingDialogTab.vue';
 import AdjustDialogTab from './tabs/AdjustDialogTab.vue';
 import AmountDialogTab from './tabs/AmountDialogTab.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const hasLoaded = createLazyLoader();
 
@@ -609,5 +728,53 @@ onMounted(() => {
 
 .customer-credit .el-table {
   margin-bottom: 16px;
+}
+
+.credit-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.credit-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.credit-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.credit-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.credit-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.credit-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.credit-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.credit-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

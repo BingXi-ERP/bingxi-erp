@@ -69,7 +69,7 @@
     <el-dialog
       v-model="roleDialogVisible"
       :title="roleForm.id ? t('system.role.dialog.editTitle') : t('system.role.dialog.createTitle')"
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('system.role.dialog.aria')"
     >
       <el-form
@@ -77,6 +77,7 @@
         :model="roleForm"
         :rules="roleRules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('system.role.form.aria')"
       >
         <el-form-item :label="t('system.role.form.label.name')" prop="name">
@@ -103,7 +104,7 @@
     <el-dialog
       v-model="permissionDialogVisible"
       :title="t('system.role.permissionDialog.title', { name: currentRoleName })"
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('system.role.permissionDialog.aria')"
     >
       <el-card v-loading="permissionLoading">
@@ -154,6 +155,7 @@
 import { isDialogDismissal } from '@/utils/monitor';
 import { PERMISSIONS } from '@/constants/permissions';
 import { ref, reactive, computed, watch, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
@@ -176,6 +178,8 @@ import {
 } from '@/api/role';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const roles = ref<Role[]>([]);
 const roleLoading = ref(false);

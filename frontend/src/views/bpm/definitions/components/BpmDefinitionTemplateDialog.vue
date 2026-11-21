@@ -9,7 +9,7 @@
     :model-value="visible"
     :title="t('bpm.definitions.templateDialog.title')"
     :aria-label="t('bpm.definitions.templateDialog.ariaLabel')"
-    width="500px"
+    :width="isPhone ? '95%' : '500px'"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
     <el-form
@@ -61,11 +61,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
+import { computed, ref, watch, nextTick } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { type FormInstance, type FormRules } from 'element-plus';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 表单数据类型
 interface TplForm {

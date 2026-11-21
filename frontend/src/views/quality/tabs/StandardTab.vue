@@ -25,7 +25,83 @@
     </div>
 
     <el-card shadow="hover">
+      <!-- 手机端：单列卡片，字段与动作与桌面表格等价 -->
+      <section v-if="isPhone" v-loading="loading" class="standard-mobile">
+        <ul class="card-list" :aria-label="t('quality.standardTab.tableAriaLabel')">
+          <li v-for="(row, index) in standards" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('quality.standardTab.colStandardCode') }}</dt>
+                <dd>{{ row.standard_code }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.standardTab.colStandardName') }}</dt>
+                <dd>{{ row.standard_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.standardTab.colType') }}</dt>
+                <dd>{{ getTypeLabel(row.standard_type) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.standardTab.colVersion') }}</dt>
+                <dd>{{ row.version }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.standardTab.colStatus') }}</dt>
+                <dd>
+                  <el-tag :type="getStatusType(row.status)" size="small">
+                    {{ getStatusLabel(row.status) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.standardTab.colCreatedBy') }}</dt>
+                <dd>{{ row.created_by_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.standardTab.colApprovedBy') }}</dt>
+                <dd>{{ row.approved_by_name || '-' }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quality.standardTab.colApprovedAt') }}</dt>
+                <dd>{{ row.approved_at || '-' }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="handleView(row)">
+                {{ t('quality.standardTab.buttonView') }}
+              </el-button>
+              <el-button v-if="row.status !== 'draft'" @click="emit('openHistory', row)">
+                {{ t('quality.standardTab.buttonVersionHistory') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'draft'"
+                v-permission="PERMISSIONS.QUALITY_STANDARD_UPDATE"
+                @click="openEdit(row)"
+              >
+                {{ t('quality.standardTab.buttonEdit') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'draft'"
+                type="success"
+                @click="emit('openApprove', row)"
+              >
+                {{ t('quality.standardTab.buttonApprove') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'approved'"
+                type="warning"
+                @click="handlePublish(row)"
+              >
+                {{ t('quality.standardTab.buttonPublish') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="standards"
         stripe
@@ -131,7 +207,8 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { PERMISSIONS } from '@/constants/permissions';
-import { ref, onMounted, defineEmits, inject } from 'vue';
+import { ref, computed, onMounted, defineEmits, inject } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Download, Printer } from '@element-plus/icons-vue';
@@ -144,6 +221,8 @@ import { escapeHtml } from '@/utils/print';
 import { exportFromBackend } from '@/utils/export';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const emit = defineEmits<{
   openApprove: [row: QualityStandard];
@@ -292,3 +371,53 @@ onMounted(() => {
 
 defineExpose({ fetchStandards });
 </script>
+
+<style scoped>
+.standard-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.standard-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.standard-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.standard-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.standard-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.standard-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.standard-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.standard-mobile .card-actions .el-button {
+  margin: 0;
+}
+</style>

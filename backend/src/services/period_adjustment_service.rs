@@ -191,8 +191,11 @@ impl PeriodAdjustmentService {
         }
         let now = crate::utils::date_utils::utc_now_fixed();
 
-        // 生成调整凭证（借 debit_subject / 贷 credit_subject）
-        let voucher_id = self.create_adjustment_voucher(&model, user_id, false).await;
+        // 生成调整凭证（借 debit_subject / 贷 credit_subject）。
+        // 失败即上抛：此时状态尚未写入，确认整体失败，重试即可补齐。
+        let voucher_id = self
+            .create_adjustment_voucher(&model, user_id, false)
+            .await?;
 
         let mut active: AdjustmentActiveModel = model.into();
         active.status = Set(period_adjustment_status::CONFIRMED.to_string());
@@ -224,8 +227,11 @@ impl PeriodAdjustmentService {
         }
         let now = crate::utils::date_utils::utc_now_fixed();
 
-        // 生成红字冲销凭证（借贷对调：借 credit_subject / 贷 debit_subject）
-        let reverse_voucher_id = self.create_adjustment_voucher(&model, user_id, true).await;
+        // 生成红字冲销凭证（借贷对调：借 credit_subject / 贷 debit_subject）。
+        // 失败即上抛：此时状态尚未写入，冲销整体失败，重试即可补齐。
+        let reverse_voucher_id = self
+            .create_adjustment_voucher(&model, user_id, true)
+            .await?;
 
         let mut active: AdjustmentActiveModel = model.into();
         active.status = Set(period_adjustment_status::REVERSED.to_string());
@@ -261,18 +267,20 @@ impl PeriodAdjustmentService {
     }
 
     /// 生成调整凭证（is_reverse=true 时借贷对调生成红字冲销凭证）。
-    /// 失败仅 warn 返回 None（不阻断状态流转，与 B05-P2-8/B05-P2-9 语义一致）。
+    /// 凭证生成失败即上抛：期间关闭后重放也无法把凭证计入已关闭期间，
+    /// 死信补偿对本域不可达，唯一正确做法是让确认/冲销整体失败回滚（状态未推进，
+    /// 重试即可补齐），与结账批处理腿的 fail-fast 裁定同源。
     async fn create_adjustment_voucher(
         &self,
         model: &AdjustmentModel,
         user_id: i32,
         is_reverse: bool,
-    ) -> Option<i32> {
+    ) -> Result<Option<i32>, AppError> {
         use crate::services::voucher_service::{CreateVoucherRequest, VoucherItemRequest};
 
         let amount = model.amount;
         if amount <= Decimal::ZERO {
-            return None;
+            return Ok(None);
         }
         // 红字冲销：借贷对调
         let (debit_code, debit_name, credit_code, credit_name) = if is_reverse {
@@ -378,17 +386,19 @@ impl PeriodAdjustmentService {
                     is_reverse,
                     "期末调整凭证生成成功（B05-P2-10）"
                 );
-                Some(voucher.id)
+                Ok(Some(voucher.id))
             }
             Err(e) => {
-                tracing::warn!(
+                // 失败即上抛：确认/冲销状态尚未推进，重试即可补齐；期间一旦关闭
+                // 凭证将无法计入，死信重放对本域不可达，故不落死信。
+                tracing::error!(
                     adjustment_id = model.id,
                     adjustment_no = %model.adjustment_no,
                     is_reverse,
                     error = %e,
-                    "期末调整凭证生成失败（不阻断状态流转，B05-P2-10）"
+                    "期末调整凭证生成失败，中止确认/冲销（B05-P2-10）"
                 );
-                None
+                Err(e)
             }
         }
     }

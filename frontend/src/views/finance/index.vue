@@ -72,4 +72,10 @@ const activeTab = ref('subject');
 :deep(.text-red) {
   color: #f56c6c;
 }
+
+@media (max-width: 767px) {
+  .finance-page {
+    padding: 12px;
+  }
+}
 </style>

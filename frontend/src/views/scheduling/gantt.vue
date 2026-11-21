@@ -107,4 +107,10 @@ onMounted(() => {
   background-color: #f5f7fa;
   min-height: 100%;
 }
+
+@media (max-width: 767px) {
+  .scheduling-gantt {
+    padding: 12px;
+  }
+}
 </style>
