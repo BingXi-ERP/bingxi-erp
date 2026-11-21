@@ -136,11 +136,15 @@ mod tests {
     fn white_fabric_with_dye_lot_rejected() {
         // 白坯带缸号是数据矛盾：显式拒绝而非静默清空或保留（2026-11-22 拍板）；
         // 空白缸号经 trim 过滤后视同缺省，仍合法通过
-        let err = validate_fabric_trace(Some(""), Some("DL-X".to_string()), Some("B1".to_string()))
-            .expect_err("白坯布携带缸号必须报错");
+        let err = validate_fabric_trace(
+            Some("".to_string()),
+            Some("DL-X".to_string()),
+            Some("B1".to_string()),
+        )
+        .expect_err("白坯布携带缸号必须报错");
         assert!(err.to_string().contains("白坯"), "实际: {}", err);
 
-        let blank = v(Some(""), Some("   ".to_string()), Some("B1"));
+        let blank = v(Some(""), Some("   "), Some("B1"));
         assert_eq!(blank.dye_lot_no, None);
     }
 

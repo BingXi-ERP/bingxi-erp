@@ -132,7 +132,7 @@ test.describe('475 白坯布缸号准入守卫', () => {
       ).toEqual([]);
 
       // 白坯合法对照：色号空 + 不带缸号必须成功，证明拒绝是口径生效而非端点坏
-      const created = await apiCallRaw<Row>(page, 'POST', endpoint, {
+      const created = await apiCallRaw<Row & { id: number }>(page, 'POST', endpoint, {
         warehouse_id: warehouseId,
         product_id: productId,
         batch_no: genCode('475-B-OK'),
