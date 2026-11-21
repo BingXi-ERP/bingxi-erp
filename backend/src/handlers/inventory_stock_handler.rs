@@ -197,6 +197,7 @@ pub async fn update_stock(
     Path(id): Path<i32>,
     Json(payload): Json<UpdateStockWithVersionRequest>,
 ) -> Result<Json<ApiResponse<StockResponse>>, AppError> {
+    payload.validate_trace_write()?;
     // NOT NULL 列门控（quantity_on_hand/quantity_available/quantity_reserved/
     // reorder_point/max_stock_point/reorder_quantity，inventory_stocks 模型为非 Option 列）：
     // 显式 null 是调用方错误，不是"保持原值"；在任何 DB 访问之前拒绝，错误外显不脱敏。
