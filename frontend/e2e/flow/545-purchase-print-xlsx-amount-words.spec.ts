@@ -16,6 +16,9 @@ import {
 } from './helpers';
 
 const EXPECTED_WORDS = '壹拾贰元叁角肆分';
+// 收货明细批次号：收货建单四维准入强制批次非空（purchase_receipt_ops/crud.rs 缺批次号
+// 即拒单），取值用本用例自有前缀派生，与相邻用例的批次号互不撞号。
+const RECEIPT_BATCH_NO = `E2E-PAW-${Date.now().toString().slice(-8)}`;
 
 async function extractXlsxText(body: Buffer): Promise<string> {
   const zip = await JSZip.loadAsync(body);
@@ -102,6 +105,7 @@ test.describe('545 采购 xlsx 打印大写金额', () => {
             material_id: ctx.productIds[0],
             material_code: materialCode,
             material_name: 'E2E 采购大写金额',
+            batch_no: RECEIPT_BATCH_NO,
             unit_master: 'm',
             quantity: '1',
             quantity_alt: '0',
