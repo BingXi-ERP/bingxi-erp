@@ -710,6 +710,11 @@ jobs:
 
       - name: Android Emulator 端到端
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        env:
+          # runner 预装 emulator 升级后拒绝无硬件加速启动（-accel off 报 Software CPU
+          # emulation is not supported），官方逃生阀是显式接受 TCG 纯软件模拟；
+          # 缺它则模拟器无法开机，本步恒以 Timeout waiting for emulator to boot 判红。
+          ANDROID_I_WANT_MY_TCG: 'yes'
         with:
           api-level: 34
           arch: x86_64
