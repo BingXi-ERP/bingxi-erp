@@ -2526,8 +2526,9 @@ jobs:
           CARGO_VERSION="${VY}.$((10#$VM * 100 + 10#$VD)).$((10#$VT))"
           echo "app_version=$VERSION" >> $GITHUB_OUTPUT
           echo "cargo_version=$CARGO_VERSION" >> $GITHUB_OUTPUT
-          # 对外 4 段：tauri.conf.json 与小程序 package.json；Cargo 3 段：semver 硬约束
-          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" mobile-app/src-tauri/tauri.conf.json
+          # 对外 4 段只写小程序 package.json；tauri.conf.json 与 Cargo.toml 用 3 段
+          # （Tauri 对 tauri.conf.json version 强制 semver 解析，4 段直接 build 报错）
+          sed -i "s/\"version\": \".*\"/\"version\": \"$CARGO_VERSION\"/" mobile-app/src-tauri/tauri.conf.json
           sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" miniprogram/package.json
           sed -i "s/^version = \".*\"/version = \"$CARGO_VERSION\"/" mobile-app/src-tauri/Cargo.toml
           echo "对外版本 $VERSION / Cargo 版本 $CARGO_VERSION"
@@ -3636,6 +3637,7 @@ jobs:
             frontend/reports/frontend.log
             frontend/reports/playwright-output*.txt
             frontend/reports/seed-failures*.json
+            frontend/reports/e2e-report.json
           retention-days: 30
 
       - name: 打包失败诊断产物（仅失败片，压缩为单归档）

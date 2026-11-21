@@ -126,10 +126,12 @@ jobs:
           CARGO_VERSION_INPUT: ${{ inputs.cargo_version }}
         run: |
           set -euo pipefail
-          # ci-cd 统一算好的版本，三端同源：对外 4 段写 tauri.conf，Cargo 3 段
-          sed -i "s/\"version\": \".*\"/\"version\": \"$APP_VERSION\"/" mobile-app/src-tauri/tauri.conf.json
+          # ci-cd 统一算好的版本，两端同源：Tauri 对 tauri.conf.json version 强制
+          # semver 解析（4 段 YYYY.MM.DD.HHMM 会直接 build 报错），故与 Cargo.toml
+          # 同用 3 段 CARGO_VERSION_INPUT；对外展示 4 段只落在小程序 package.json。
+          sed -i "s/\"version\": \".*\"/\"version\": \"$CARGO_VERSION_INPUT\"/" mobile-app/src-tauri/tauri.conf.json
           sed -i "s/^version = \".*\"/version = \"$CARGO_VERSION_INPUT\"/" mobile-app/src-tauri/Cargo.toml
-          echo "安卓端版本同步为 $APP_VERSION"
+          echo "安卓端 tauri.conf/Cargo 同步为 $CARGO_VERSION_INPUT（对外展示版本 $APP_VERSION）"
 
       - name: 记录安卓端版本
         id: ver
