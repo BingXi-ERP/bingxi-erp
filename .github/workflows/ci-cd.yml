@@ -2540,8 +2540,9 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           # 分割版本号
           IFS='.' read -r YEAR MONTH DAY TIME <<< "$VERSION"
-          # 拼接月日为 3 位数（如 8 月 3 日 → 803）
-          MD=$(printf "%d%02d" "$MONTH" "$DAY")
+          # 月日转 MD 三位数：$((10#$MONTH * 100 + 10#$DAY)) 强制十进制，
+          # printf 会把 "08"/"09" 当八进制无效数直接炸（同 HOUR=09 场景）。
+          MD=$((10#$MONTH * 100 + 10#$DAY))
           # TIME 已补零为 HHMM（如 0703），Cargo semver 不接受前导零，必须转十进制再拼
           CARGO_VERSION="${YEAR}.${MD}.$((10#$TIME))"
           sed -i "s/^version = \".*\"/version = \"$CARGO_VERSION\"/" backend/Cargo.toml
