@@ -13,7 +13,6 @@ use tracing::info;
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 use crate::utils::error::AppError;
-use crate::utils::xlsx_export::{XlsxTable, build_xlsx};
 
 use super::{DocxExportResult, ExcelExportResult, ExportFormat, ReportData, ReportEngineService};
 
