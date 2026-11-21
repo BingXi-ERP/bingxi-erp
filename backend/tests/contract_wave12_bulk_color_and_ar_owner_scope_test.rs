@@ -31,13 +31,13 @@
 mod test_common;
 
 use axum::{
+    Router,
     body::Body,
     extract::State,
     http::{Method, Request, StatusCode},
-    middleware::{from_fn_with_state, Next},
+    middleware::{Next, from_fn_with_state},
     response::Response,
     routing::{get, post, put},
-    Router,
 };
 use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::{ar_reconciliation_handler, bulk_color_approval_handler};
@@ -52,7 +52,7 @@ use rust_decimal::Decimal;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
 use tower::ServiceExt;
 

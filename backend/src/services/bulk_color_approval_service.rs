@@ -881,6 +881,7 @@ impl BulkColorApprovalService {
                     Some("超过 7 天未处理".to_string()),
                     false,
                     None,
+                    None,
                 )
                 .await?;
             rejected_records.push(model);
@@ -958,6 +959,7 @@ impl BulkColorApprovalService {
             None,
             true, // approved → delivery_blocking=false
             delta_e_result,
+            Some(high_light_sensitive),
         )
         .await
     }
@@ -981,6 +983,7 @@ impl BulkColorApprovalService {
             None,
             Some(reject_reason),
             false,
+            None,
             None,
         )
         .await
@@ -1026,6 +1029,7 @@ impl BulkColorApprovalService {
                 None,
                 Some(reject_reason.clone()),
                 false,
+                None,
                 None,
             )
             .await?;
@@ -1107,6 +1111,7 @@ impl BulkColorApprovalService {
                 None,
                 Some(reject_reason),
                 false, // downgraded 仍保持 blocking=true
+                None,
                 None,
             )
             .await?;
@@ -1356,6 +1361,7 @@ impl BulkColorApprovalService {
         reject_reason: Option<String>,
         unblock_delivery: bool,
         delta_e_result: Option<&'static str>,
+        high_light_sensitive: Option<bool>,
     ) -> Result<bulk_color_approval::Model, BulkColorApprovalError> {
         let txn = self.db.begin().await?;
         let model = Entity::find_by_id(id)
@@ -1397,6 +1403,10 @@ impl BulkColorApprovalService {
         active.reject_reason = Set(reject_reason);
         active.delta_e_result = Set(delta_e_result.map(String::from));
         active.delivery_blocking = Set(!unblock_delivery);
+        active.high_light_sensitive = match high_light_sensitive {
+            Some(v) => Set(v),
+            None => ActiveValue::NotSet,
+        };
         active.updated_at = Set(now);
 
         let updated = active.update(&txn).await?;
