@@ -163,6 +163,23 @@ pub struct UpdateStockWithVersionRequest {
     #[serde(default, deserialize_with = "double_option")]
     pub bin_location: Option<Option<String>>,
     pub version: i32,
+    /// 捕获未开放编辑的追溯字段，包括显式 null，避免被 Serde 静默忽略后返回假成功。
+    #[serde(flatten)]
+    pub extra_fields: std::collections::BTreeMap<String, serde_json::Value>,
+}
+
+impl UpdateStockWithVersionRequest {
+    pub fn validate_trace_write(&self) -> Result<(), crate::utils::error::AppError> {
+        for field in ["dye_lot_no", "color_no", "batch_no", "grade"] {
+            if self.extra_fields.contains_key(field) {
+                tracing::warn!(field, "库存编辑拒绝直接修改追溯字段");
+                return Err(crate::utils::error::AppError::validation_displayable(
+                    "库存编辑不允许修改缸号、色号、批次或等级，请通过原入库业务核对追溯信息",
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 #[allow(dead_code, reason = "反序列化输入字段")]
@@ -323,4 +340,55 @@ pub struct InventorySummaryItem {
     pub total_quantity_meters: Decimal,
     pub total_quantity_kg: Decimal,
     pub warehouse_name: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::UpdateStockWithVersionRequest;
+    use crate::utils::error::AppError;
+    use serde_json::{Value, json};
+
+    #[test]
+    fn reject_trace_fields_even_when_null_or_wrong_type() {
+        for field in ["dye_lot_no", "color_no", "batch_no", "grade"] {
+            for value in [Value::Null, json!("FORGED"), json!(42), json!({})] {
+                let mut body = json!({ "version": 1, "bin_location": "A-01" });
+                body[field] = value;
+                let request: UpdateStockWithVersionRequest = serde_json::from_value(body).unwrap();
+                assert!(matches!(
+                    request.validate_trace_write(),
+                    Err(AppError::ValidationErrorDisplayable(_))
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn allow_metadata_update_without_trace_fields() {
+        for body in [
+            json!({ "version": 1, "bin_location": "A-01" }),
+            json!({ "version": 1, "bin_location": null }),
+            json!({ "version": 1 }),
+        ] {
+            let request: UpdateStockWithVersionRequest = serde_json::from_value(body).unwrap();
+            assert!(request.validate_trace_write().is_ok());
+        }
+    }
+
+    #[test]
+    fn flatten_keeps_double_option_three_state_semantics() {
+        let request: UpdateStockWithVersionRequest = serde_json::from_value(json!({
+            "version": 1,
+            "quantity_on_hand": null,
+            "quantity_available": "5",
+            "quantity_reserved": null,
+            "bin_location": null
+        }))
+        .expect("flatten 捕获未知字段后显式 null 仍须按 double_option 语义解析");
+        assert!(matches!(request.quantity_on_hand, Some(None)));
+        assert!(matches!(request.quantity_available, Some(Some(_))));
+        assert!(matches!(request.quantity_reserved, Some(None)));
+        assert!(matches!(request.bin_location, Some(None)));
+        assert!(request.validate_trace_write().is_ok());
+    }
 }
