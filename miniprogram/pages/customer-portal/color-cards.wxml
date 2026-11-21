@@ -9,6 +9,6 @@
     <view class="row-line">类型：{{item.card_type}}　季节：{{item.season}}　颜色数：{{item.total_colors}}</view>
     <view class="row-line" wx:if="{{item.description}}">{{item.description}}</view>
   </view>
-  <view class="portal-empty" wx:if="{{!loading && items.length === 0 && !error}}">暂无色卡</view>
+  <view class="portal-empty" wx:if="{{!loading && finished && items.length === 0 && !error}}">暂无色卡</view>
   <view class="portal-empty" wx:if="{{loading}}">正在加载</view>
 </view>

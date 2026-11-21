@@ -1,5 +1,8 @@
 var servicesCustomerPortal =
-  require("../../../libs/services/ServicesCustomerPortal.js").servicesCustomerPortal;
+    require("../../../libs/services/ServicesCustomerPortal.js").servicesCustomerPortal,
+  perm = require("../../libs/utils/perm.js"),
+  util = require("../../libs/utils/util.js").utils,
+  app = getApp();
 Page({
   data: {
     items: [],
@@ -7,17 +10,16 @@ Page({
     pageSize: 10,
     total: 0,
     loading: false,
+    finished: false,
     error: "",
   },
   onLoad: function () {
+    app.userAuthList = util.getResList(wx.getStorageSync("resCodeList"));
+    if (!perm.requireEntry("customerPortal:view")) return;
     this.loadColorCards();
   },
   loadColorCards: function () {
-    if (
-      this.data.loading ||
-      (this.data.total > 0 && this.data.items.length >= this.data.total)
-    )
-      return;
+    if (this.data.loading || this.data.finished) return;
     var self = this;
     self.setData({ loading: true, error: "" });
     servicesCustomerPortal
@@ -39,11 +41,13 @@ Page({
           resp.data.total,
           resp.data.items.length,
         );
+        var allItems = self.data.items.concat(resp.data.items);
         self.setData({
           loading: false,
-          items: self.data.items.concat(resp.data.items),
+          items: allItems,
           total: resp.data.total,
           page: self.data.page + 1,
+          finished: allItems.length >= resp.data.total,
         });
       })
       .catch(function (err) {
@@ -56,7 +60,7 @@ Page({
     this.loadColorCards();
   },
   onPullDownRefresh: function () {
-    this.setData({ page: 1, items: [], total: 0 });
+    this.setData({ page: 1, items: [], total: 0, finished: false });
     this.loadColorCards();
     wx.stopPullDownRefresh();
   },

@@ -15,6 +15,6 @@
     <view class="row-line" wx:if="{{item.dye_lot_no}}">缸号：{{item.dye_lot_no}}</view>
     <view class="row-line">订单金额：{{item.total_amount}}　未收金额：{{item.balance_amount}}</view>
   </view>
-  <view class="portal-empty" wx:if="{{!loading && items.length === 0 && !error}}">暂无订单</view>
+  <view class="portal-empty" wx:if="{{!loading && finished && items.length === 0 && !error}}">暂无订单</view>
   <view class="portal-empty" wx:if="{{loading}}">正在加载</view>
 </view>

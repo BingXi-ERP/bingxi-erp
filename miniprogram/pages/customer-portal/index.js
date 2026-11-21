@@ -1,20 +1,22 @@
 var servicesCustomerPortal =
-  require("../../../libs/services/ServicesCustomerPortal.js").servicesCustomerPortal;
+    require("../../../libs/services/ServicesCustomerPortal.js").servicesCustomerPortal,
+  perm = require("../../libs/utils/perm.js"),
+  util = require("../../libs/utils/util.js").utils,
+  app = getApp();
 Page({
   data: {
     loading: true,
     error: "",
     summary: null,
     entries: [
-      { title: "我的订单", url: "/packageA/pages/customer-portal/orders" },
-      {
-        title: "我的对账",
-        url: "/packageA/pages/customer-portal/reconciliations",
-      },
-      { title: "我的色卡", url: "/packageA/pages/customer-portal/color-cards" },
+      { title: "我的订单", url: "/pages/customer-portal/orders" },
+      { title: "我的对账", url: "/pages/customer-portal/reconciliations" },
+      { title: "我的色卡", url: "/pages/customer-portal/color-cards" },
     ],
   },
   onLoad: function () {
+    app.userAuthList = util.getResList(wx.getStorageSync("resCodeList"));
+    if (!perm.requireEntry("customerPortal:view")) return;
     this.loadDashboard();
   },
   loadDashboard: function () {
