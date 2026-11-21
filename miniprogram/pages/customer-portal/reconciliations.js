@@ -1,5 +1,5 @@
 var servicesCustomerPortal =
-    require("../../../libs/services/ServicesCustomerPortal.js").servicesCustomerPortal,
+    require("../../libs/services/ServicesCustomerPortal.js").servicesCustomerPortal,
   perm = require("../../libs/utils/perm.js"),
   util = require("../../libs/utils/util.js").utils,
   app = getApp();

@@ -296,7 +296,7 @@ Page({
       switch (app) {
         case "customerPortal":
           wx.navigateTo({
-            url: "/packageA/pages/customer-portal/index",
+            url: "/pages/customer-portal/index",
           });
           break;
         case "teach":
