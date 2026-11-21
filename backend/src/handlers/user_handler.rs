@@ -89,6 +89,18 @@ pub struct CreateUserRequest {
     pub phone: Option<String>,
     pub role_id: Option<i32>,
     pub department_id: Option<i32>,
+    /// 客户门户归属（customers.id）；None=不绑定。指向不存在的客户档案在服务层被拒。
+    pub customer_id: Option<i32>,
+}
+
+/// 客户门户绑定三层语义的反序列化包装：字段缺省=不碰该列、null=显式解绑、数值=改绑。
+/// 与 ar_payment_handler/aging_alert_rule_handler 的本地 double_option 同款实现。
+fn double_option<'de, T, D>(de: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: serde::Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    serde::Deserialize::deserialize(de).map(Some)
 }
 
 #[allow(dead_code, reason = "反序列化输入字段")]
@@ -101,6 +113,9 @@ pub struct UpdateUserRequest {
     pub role_id: Option<i32>,
     pub department_id: Option<i32>,
     pub status: Option<String>,
+    /// 客户门户归属：缺省=不碰、null=显式解绑、数值=改绑（customers.id，服务层校验存在性）
+    #[serde(default, deserialize_with = "double_option")]
+    pub customer_id: Option<Option<i32>>,
 }
 
 #[allow(dead_code, reason = "序列化输出字段")]
@@ -115,6 +130,8 @@ pub struct UserResponse {
     pub role_id: Option<i32>,
     pub department_id: Option<i32>,
     pub is_active: bool,
+    /// 客户门户归属：绑定的 customers.id（null=未绑定，客户门户端点拒访）
+    pub customer_id: Option<i32>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// 部门名称，来自 departments.name（LEFT JOIN department_id）
     pub department_name: Option<String>,
@@ -134,6 +151,7 @@ impl From<user::Model> for UserResponse {
             role_id: user.role_id,
             department_id: user.department_id,
             is_active: user.is_active,
+            customer_id: user.customer_id,
             created_at: user.created_at,
             department_name: None,
             role_names: Vec::new(),
@@ -162,6 +180,7 @@ struct UserListRow {
     pub role_id: Option<i32>,
     pub department_id: Option<i32>,
     pub is_active: bool,
+    pub customer_id: Option<i32>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub department_name: Option<String>,
     pub role_name: Option<String>,
@@ -382,6 +401,7 @@ pub async fn create_user(
             payload.phone.clone(),
             payload.role_id,
             payload.department_id,
+            payload.customer_id,
         )
         .await?;
 
@@ -409,6 +429,7 @@ pub async fn create_user(
             "phone": payload.phone,
             "role_id": payload.role_id,
             "department_id": payload.department_id,
+            "customer_id": payload.customer_id,
         })),
     };
     let svc = Arc::new(AuditLogService::new(state.db.clone()));
@@ -477,6 +498,7 @@ pub async fn list_users(
             role_id: row.role_id,
             department_id: row.department_id,
             is_active: row.is_active,
+            customer_id: row.customer_id,
             created_at: row.created_at,
             department_name: row.department_name,
             role_names: row.role_name.map(|n| vec![n]).unwrap_or_default(),
@@ -551,6 +573,7 @@ pub async fn update_user(
             req.role_id,
             req.department_id,
             req.status,
+            req.customer_id,
             auth.user_id,
         )
         .await?;

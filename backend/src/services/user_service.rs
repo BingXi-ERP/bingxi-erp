@@ -125,6 +125,7 @@ impl UserService {
         phone: Option<String>,
         role_id: Option<i32>,
         department_id: Option<i32>,
+        customer_id: Option<i32>,
     ) -> Result<user::Model, AppError> {
         // 检查用户名是否已存在
         let existing = user::Entity::find()
@@ -145,6 +146,20 @@ impl UserService {
             )));
         }
 
+        // 客户门户绑定必须指向真实存在的客户档案，防止写时就产生悬空绑定
+        // （迁移列无外键，删除客户档案不被绑定行阻塞，悬空由本写口校验兜住）
+        if let Some(cid) = customer_id {
+            crate::models::customer::Entity::find_by_id(cid)
+                .one(self.db.as_ref())
+                .await?
+                .ok_or_else(|| {
+                    AppError::validation_displayable(format!(
+                        "绑定的客户 ID {} 不存在，请先在客户档案中建档",
+                        cid
+                    ))
+                })?;
+        }
+
         let active_user = user::ActiveModel {
             id: Default::default(),
             username: Set(username),
@@ -153,6 +168,7 @@ impl UserService {
             phone: Set(phone),
             role_id: Set(role_id),
             department_id: Set(department_id),
+            customer_id: Set(customer_id),
             is_active: Set(true),
             totp_secret: Set(None),
             is_totp_enabled: Set(false),
@@ -303,6 +319,7 @@ impl UserService {
         role_id: Option<i32>,
         department_id: Option<i32>,
         status: Option<String>,
+        customer_id: Option<Option<i32>>,
         operator_id: i32,
     ) -> Result<user::Model, AppError> {
         // V15 P0-S07：保存旧 role_id，用于角色变更时失效缓存
@@ -329,6 +346,22 @@ impl UserService {
         }
         if let Some(department_id_val) = department_id {
             user.department_id = Set(Some(department_id_val));
+        }
+        // 客户门户绑定三层语义：None=不碰、Some(None)=显式解绑、Some(Some(id))=改绑；
+        // 改绑目标必须真实存在（与创建分支同一校验，悬空绑定在写口被拒）
+        if let Some(customer_binding) = customer_id {
+            if let Some(cid) = customer_binding {
+                crate::models::customer::Entity::find_by_id(cid)
+                    .one(self.db.as_ref())
+                    .await?
+                    .ok_or_else(|| {
+                        AppError::validation_displayable(format!(
+                            "绑定的客户 ID {} 不存在，请先在客户档案中建档",
+                            cid
+                        ))
+                    })?;
+            }
+            user.customer_id = Set(customer_binding);
         }
         if let Some(status_val) = status {
             let becoming_active = status_val == master_data::ACTIVE;

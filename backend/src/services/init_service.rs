@@ -39,6 +39,10 @@ pub const PERMISSION_RESOURCES: &[&str] = &[
     // ===== 产品目录域 =====
     "products",
     "categories",
+    // 小程序客户门户读面（GET /customer-portal/orders|sales-returns|payments|reconciliations，
+    // GET→read ⇒ 运行时键 customer-portal:read）。只授予 customer 角色：员工岗位不授，
+    // 门户与内部 sales:*/ar:* 读面互不越界；行级门 = users.customer_id 绑定（fail-closed）。
+    "customer-portal",
     // 产品分类路由别名段的运行时权限键（`/product-categories*` ⇒ `product-categories:*`，
     // 见 routes/mod.rs:368-391 与 middleware/permission.rs 的资源段取自路径段）。
     // 与 "categories" 是两条不同资源码，`categories:*` 不覆盖它 ⇒ 采购岗读分类树

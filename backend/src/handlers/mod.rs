@@ -37,6 +37,7 @@ pub mod role_handler;
 pub mod role_change_approval_handler;
 pub mod sales_fabric_order_handler;
 pub mod sales_order_handler;
+pub mod customer_portal;
 // 销售报价单 handler（Week 1）
 pub mod quotation_handler;
 pub mod tracking_handler;
