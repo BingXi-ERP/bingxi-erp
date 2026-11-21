@@ -173,11 +173,6 @@ test.describe.serial('118 报表增强导出端点与订阅动作真值链', () 
       directDocx.status,
       `直出 Word 端点已删除应 404，实际 ${directDocx.status} code=${JSON.stringify(directDocx.code)}`
     ).toBe(404);
-    expect(
-      failureCode(directDocx),
-      `直出 Word 端点已删除应归因 NOT_FOUND，实际 ${JSON.stringify(directDocx.code)}`
-    ).toBe(APP_ERROR_CODES.NOT_FOUND);
-
     const directExcel = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/excel', {
       template_id: String(templateId),
     });

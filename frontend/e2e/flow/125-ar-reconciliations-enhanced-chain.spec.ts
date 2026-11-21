@@ -40,8 +40,8 @@ import { APP_ERROR_CODES, loginViaUI, apiCall, apiCallRaw, apiCallExpectFail } f
  *   customer_id 过滤下自建三单必全部入选。
  * - GET /aging-report：AgingReport{analysis_date,total_receivable(DECIMAL 出参字符串),
  *   customer_summaries,overall_buckets} 结构真实成立。
- * - GET /{id}/xlsx：出参 content_type=application/vnd.openxmlformats-officedocument.wordprocessingml.document、size>0、
- *   base64_content 非空且以 UEsDBA（xlsx zip 魔数的 base64 前缀）开头——文件魔数级证据，
+ * - GET /{id}/pdf：出参 content_type=application/pdf、size>0、
+ *   base64_content 非空且以 JVBERi0（"%PDF-" 的 base64 前缀）开头——文件魔数级证据，
  *   不是「有响应即通过」。
  *
  * 金额列为 DECIMAL 线格式（出参字符串），断言用字符串数字形态，不做数值再造。
@@ -84,7 +84,7 @@ type AgingBody = {
   overall_buckets: unknown[];
 };
 
-type DocxBody = {
+type PdfBody = {
   id: number;
   content_type: string;
   size: number;
@@ -425,18 +425,16 @@ test.describe.serial('125 ar-reconciliations-enhanced 全链契约回读', () =>
     expect(Array.isArray(aging.customer_summaries)).toBe(true);
     expect(Array.isArray(aging.overall_buckets)).toBe(true);
 
-    const docx = await apiCallRaw<DocxBody>(
+    const pdf = await apiCallRaw<PdfBody>(
       page,
       'GET',
-      `/ar-reconciliations-enhanced/${recMain}/docx`
+      `/ar-reconciliations-enhanced/${recMain}/pdf`
     );
-    expect(docx.id).toBe(recMain);
-    expect(docx.content_type).toBe(
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    );
-    expect(docx.size).toBeGreaterThan(0);
-    // docx 是 zip 容器，"PK\x03\x04" 的 base64 前缀固定为 UEsDBA：文件魔数级证据
-    expect(docx.base64_content.startsWith('UEsDBA')).toBe(true);
+    expect(pdf.id).toBe(recMain);
+    expect(pdf.content_type).toBe('application/pdf');
+    expect(pdf.size).toBeGreaterThan(0);
+    // "%PDF-" 的 base64 前缀固定为 JVBERi0：文件魔数级证据
+    expect(pdf.base64_content.startsWith('JVBERi0')).toBe(true);
   });
 
   test('清理：删除自建客户（对账单行无删除端点，best-effort 记录残量）', async ({ page }) => {
