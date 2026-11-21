@@ -2348,10 +2348,10 @@ jobs:
   ci-perf-bench:
     name: ⚡ 性能基准回归监控
     runs-on: ubuntu-latest
-    # 90 分钟：基准改为真实执行后（*_bench + --features bench 逐支编译实跑），
-    # 4 项基准串行编译加实跑实测超 30 分钟，30 分钟超时把 job 记成 cancelled
+    # 120 分钟：基准改为真实执行后（*_bench + --features bench 逐支编译实跑），
+    # 4 项基准串行编译加实跑实测超 30 分钟，原 30 分钟超时把 job 记成 cancelled，放宽到 120 分钟
     # 并连锁判红收尾聚合门（GitHub 对超时 job 的 conclusion 是 cancelled）。
-    timeout-minutes: 90
+    timeout-minutes: 120
     needs: ci-info
     # 性能基准执行失败即判红（编译错/崩溃/基准缺失）；趋势写报告离线跟踪。
     # 性能基准属测试面，按现行分工一律在 PR 与手动全量轮验证（口径见 ci-info 的 full_suite），
