@@ -284,8 +284,8 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
     expect(bytes.length, `453-02 下载字节流必须非零长度，实际 ${bytes.length}B`).toBeGreaterThan(0);
     expect(bytes[0], `453-02 首字节必须 0x89，实际 ${bytes[0]}`).toBe(0x89);
     expect(bytes[1], `453-02 次字节必须 0x50（P），实际 ${bytes[1]}`).toBe(0x50);
-    expect(bytes[2], `453-02 第三字节必须 0x44（D），实际 ${bytes[2]}`).toBe(0x44);
-    expect(bytes[3], `453-02 第四字节必须 0x46（F），实际 ${bytes[3]}`).toBe(0x46);
+    expect(bytes[2], `453-02 第三字节必须 0x4e（N），实际 ${bytes[2]}`).toBe(0x4e);
+    expect(bytes[3], `453-02 第四字节必须 0x47（G），实际 ${bytes[3]}`).toBe(0x47);
     // 内容与上传逐字节同：大小一致性
     expect(
       bytes.length,

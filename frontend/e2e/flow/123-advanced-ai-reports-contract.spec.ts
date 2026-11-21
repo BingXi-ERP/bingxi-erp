@@ -202,25 +202,24 @@ test.describe.serial('123-A advanced 报表与推荐族契约（AI 限流桶一�
     expect(missing.code).toBe(APP_ERROR_CODES.NOT_FOUND);
   });
 
-  test('报表导出 csv 返回字节统计，format 白名单拒绝非法值', async ({ page }) => {
-    const body = await apiCallRaw<ExportReportBody>(page, 'POST', '/advanced/reports/export', {
+  test('报表导出格式白名单：csv 被拒绝并点名可选值 xlsx 与 docx', async ({ page }) => {
+    const csv = await apiCallExpectFail(page, 'POST', '/advanced/reports/export', {
       template_code: 'sales_summary',
       format: 'csv',
     });
-    expect(body.status).toBe('success');
-    expect(body.format).toBe('csv');
-    expect(typeof body.size_bytes).toBe('number');
-    expect(body.size_bytes).toBeGreaterThan(0);
-    expect(typeof body.record_count).toBe('number');
-
+    expect(csv.status, `csv 已被移除应 400，实际 ${csv.status}`).toBe(400);
+    expect(csv.code, `csv 应归因 VALIDATION_ERROR，实际 ${JSON.stringify(csv.code)}`).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+    expect(csv.message, `csv 拒绝文案应点名可选值，实际 ${csv.message}`).toContain('xlsx');
+    expect(csv.message, `csv 拒绝文案应点名 docx，实际 ${csv.message}`).toContain('docx');
     const badFormat = await apiCallExpectFail(page, 'POST', '/advanced/reports/export', {
       template_code: 'sales_summary',
       format: 'xml',
     });
-    expect(badFormat.status).toBe(400);
-    // 非法枚举入参走校验族（与下方缺字段与超范围两腿同族同码），
-    // 后端对不在白名单内的 format 报 validation_displayable，出参码 VALIDATION_ERROR。
-    expect(badFormat.code).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+    expect(badFormat.status, `xml 非法格式应 400，实际 ${badFormat.status}`).toBe(400);
+    expect(
+      badFormat.code,
+      `xml 应归因 VALIDATION_ERROR，实际 ${JSON.stringify(badFormat.code)}`
+    ).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
   });
 
   test('智能推荐缺体回落 all+10，limit 入参真实生效', async ({ page }) => {

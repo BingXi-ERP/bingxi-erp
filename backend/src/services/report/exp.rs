@@ -354,17 +354,6 @@ impl ReportEngineService {
     // 公开字节流版本（无元信息，便于 API 直接返回）
     // ==================================================
 
-    /// 导出 Excel 字节流
-    pub async fn export_excel_bytes(
-        &self,
-        data: &ReportData,
-        template_name: &str,
-    ) -> Result<Vec<u8>, AppError> {
-        self.export_excel(data, template_name)
-            .await
-            .map(|r| r.content)
-    }
-
     /// 导出 Word 文档（docx）
     pub async fn export_docx(
         &self,
@@ -427,14 +416,4 @@ impl ReportEngineService {
         })
     }
 
-    /// 导出 Word 字节流
-    pub async fn export_docx_bytes(
-        &self,
-        data: &ReportData,
-        template_name: &str,
-    ) -> Result<Vec<u8>, AppError> {
-        self.export_docx(data, template_name)
-            .await
-            .map(|r| r.content)
-    }
 }

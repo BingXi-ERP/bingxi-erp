@@ -171,12 +171,12 @@ test.describe.serial('118 报表增强导出端点与订阅动作真值链', () 
     });
     expect(
       directDocx.status,
-      `直出 Word 必须被取数门拒为 400，实际 ${directDocx.status} code=${JSON.stringify(directDocx.code)}`
-    ).toBe(400);
+      `直出 Word 端点已删除应 404，实际 ${directDocx.status} code=${JSON.stringify(directDocx.code)}`
+    ).toBe(404);
     expect(
       failureCode(directDocx),
-      `直出 Word 必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(directDocx.code)}`
-    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+      `直出 Word 端点已删除应归因 NOT_FOUND，实际 ${JSON.stringify(directDocx.code)}`
+    ).toBe(APP_ERROR_CODES.NOT_FOUND);
 
     const directExcel = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/excel', {
       template_id: String(templateId),
@@ -191,7 +191,7 @@ test.describe.serial('118 报表增强导出端点与订阅动作真值链', () 
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
 
     // 三 直出端点的入参形门：template_id 是非 Option 字符串键，数字即解码拒
-    const numericShape = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/docx', {
+    const numericShape = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/excel', {
       template_id: templateId,
     });
     expect(
