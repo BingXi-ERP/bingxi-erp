@@ -200,8 +200,13 @@ test.describe('后端连接状态与 Token 管理', () => {
       });
       expect(meBefore.status()).toBe(200);
 
-      // 获取 CSRF token 并执行登出
-      const csrfToken = (await ctx.cookies()).find(c => c.name === 'csrf_token')?.value || '';
+      // 留存登出前的 access_token 原值，供独立 context 重放验证服务端吊销
+      const cookiesBefore = await ctx.cookies();
+      const oldAccessToken = cookiesBefore.find(c => c.name === 'access_token')?.value || '';
+      expect(oldAccessToken).toBeTruthy();
+
+      // 获取 CSRF token 并执行登出（page.request 自动携带 Cookie，不注入 Authorization 头）
+      const csrfToken = cookiesBefore.find(c => c.name === 'csrf_token')?.value || '';
       const logoutResp = await page.request.post(`${API_BASE}${API_PREFIX}/auth/logout`, {
         headers: {
           'X-Requested-With': 'XMLHttpRequest',
@@ -223,11 +228,25 @@ test.describe('后端连接状态与 Token 管理', () => {
           accessCookie.expires <= Date.now() / 1000 + 1
       ).toBe(true);
 
-      // 登出后会话彻底失效：/auth/me → 401
-      const meAfter = await page.request.get(`${API_BASE}${API_PREFIX}/auth/me`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      // 旧凭据在独立 bare context 中重放：断言点为该 bare 请求的状态码 401，
+      // 不复用已清 Cookie 的 page.request，确保验证服务端 JTI 吊销而非本地 Cookie 丢失。
+      const bareReq = await pwRequest.newContext({
+        baseURL: API_BASE,
+        extraHTTPHeaders: { 'X-Requested-With': 'XMLHttpRequest' },
       });
-      expect(meAfter.status()).toBe(401);
+      try {
+        const replayResp = await bareReq.get(`${API_PREFIX}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${oldAccessToken}`,
+            // Cookie 值是 PrivateCookieJar 密文，中间件解密后查 JTI 黑名单；
+            // 未吊销时该请求返回 200，JTI 吊销后返回 401，构成真实吊销闭环。
+            Cookie: 'access_token=' + oldAccessToken,
+          },
+        });
+        expect(replayResp.status()).toBe(401);
+      } finally {
+        await bareReq.dispose();
+      }
     } finally {
       await ctx.close();
     }

@@ -181,7 +181,26 @@ pub async fn logout(
     jar: axum_extra::extract::PrivateCookieJar,
     headers: HeaderMap,
 ) -> Result<axum::response::Response, AppError> {
-    let (logout_user_id, logout_username) = process_logout_token(&state, &headers).await;
+    // 前端请求不再注入 Authorization 头，凭据由 httpOnly Cookie 自动携带；Bearer 未命中时
+    // 从 PrivateCookieJar 解密取出同一个 access_token，走相同的验证与吊销链路。
+    let (mut logout_user_id, mut logout_username) = process_logout_token(&state, &headers).await;
+    let cookie_token = if logout_user_id.is_none() {
+        jar.get("access_token").map(|c| c.value().to_string())
+    } else {
+        None
+    };
+    if let Some(cookie_token) = cookie_token {
+        match AuthService::validate_token_static(&cookie_token, &state.jwt_secret) {
+            Ok(claims) => {
+                logout_user_id = Some(claims.sub);
+                logout_username = Some(claims.username.clone());
+                blacklist_and_revoke_token(&state, &cookie_token, &claims).await;
+            }
+            Err(e) => {
+                tracing::warn!("Logout attempted with invalid access_token cookie: {:?}", e);
+            }
+        }
+    }
     record_logout_audit(
         &state,
         audit_ctx.map(|e| e.0),
