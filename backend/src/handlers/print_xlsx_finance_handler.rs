@@ -23,7 +23,7 @@ use crate::models::audit_log::{OperationType, Severity};
 use crate::services::audit_log_service::{AuditEvent, AuditLogService};
 use crate::services::print_service::PrintService;
 use crate::utils::error::AppError;
-use crate::utils::xlsx_export::{xlsx_response, WatermarkConfig};
+use crate::utils::xlsx_export::{WatermarkConfig, xlsx_response};
 
 /// 应收对账单 xlsx 打印（镜像 ar_reconciliation_print_docx 鉴权与参数）：
 /// 先走 get_print_data 的行级归属门/业务门控（未通过即报错，不产文件），

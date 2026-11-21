@@ -327,10 +327,12 @@ impl super::PrintService {
         );
         data.insert(
             "expected_payment_date".to_string(),
-            serde_json::json!(record
-                .expected_payment_date
-                .map(|d| d.format("%Y-%m-%d").to_string())
-                .unwrap_or_default()),
+            serde_json::json!(
+                record
+                    .expected_payment_date
+                    .map(|d| d.format("%Y-%m-%d").to_string())
+                    .unwrap_or_default()
+            ),
         );
         data.insert(
             "bank_name".to_string(),
