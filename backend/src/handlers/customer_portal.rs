@@ -1,8 +1,8 @@
 //! 小程序客户门户读端点（/customer-portal/*）。
 //!
 //! ## 六要素
-//! - **功能**：客户外部账号（customer 角色）经显式绑定（users.customer_id）读取自己的
-//!   销售订单、销售退货单、收款记录、应收对账单四个列表读面。
+//! - **功能**：客户外部账号（customer 角色）经显式绑定（users.customer_id）以只读方式
+//!   访问自己的订单列表与详情、退货单、收款记录、对账单、商品档案、授权色卡与汇总。
 //! - **调用方**：小程序客户业务页（apiGateway 走 /api/v1/erp 前缀）。
 //! - **入参**：分页与各域安全筛选字段（状态/单号/日期）。**不收 customer_id 入参**——
 //!   归属唯一来源是 require_portal_customer 解析出的绑定，请求侧无任何途径指定他人客户。
@@ -25,11 +25,14 @@
 
 use axum::{
     Json,
-    extract::{Query, State},
+    extract::{Path, Query, State},
 };
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
-use sea_orm::{EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
+use sea_orm::{
+    ColumnTrait, EntityTrait, ExprTrait, JoinType, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, sea_query::Expr,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -37,14 +40,22 @@ use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use crate::models::ar_collection;
 use crate::models::ar_reconciliation;
+use crate::models::color_card;
+use crate::models::color_card_issue;
 use crate::models::dto::PageRequest;
+use crate::models::product;
+use crate::models::sales_order;
+use crate::models::status::sales::sales_order as so_status;
 use crate::services::ar::ArReconciliationService;
+use crate::services::color_card_issue_service::IssueStatus;
 use crate::services::customer_portal_service::require_portal_customer;
+use crate::services::product_service::ProductService;
 use crate::services::sales_return_service::{SalesReturnService, SalesReturnView};
 use crate::services::so::SalesOrderDetail;
 use crate::services::so::order::SalesService;
 use crate::utils::error::AppError;
 use crate::utils::response::{ApiResponse, PaginatedResponse};
+use crate::utils::sql_escape::safe_like_pattern;
 
 /// 分页 clamp 口径与内部列表端点一致（防 DoS）
 fn clamp_page(page: Option<u64>) -> u64 {
@@ -97,7 +108,7 @@ pub struct PortalReconciliationListQuery {
 /// 门户订单白名单：只暴露客户自有单据的单号/状态/日期/金额/缸号批次。
 /// 审批链（approved_by/approval_reason/rejected_reason）、内部人员（created_by/
 /// creator_name/dept_id）、地址与备注均不在此列，内部 DTO 加字段不会波及此面。
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PortalOrderView {
     pub id: i32,
     pub customer_id: i32,
@@ -144,8 +155,33 @@ impl From<SalesOrderDetail> for PortalOrderView {
     }
 }
 
+impl From<sales_order::Model> for PortalOrderView {
+    fn from(order: sales_order::Model) -> Self {
+        Self {
+            id: order.id,
+            customer_id: order.customer_id,
+            order_no: order.order_no,
+            order_date: order.order_date,
+            required_date: order.required_date,
+            ship_date: order.ship_date,
+            status: order.status,
+            subtotal: order.subtotal,
+            tax_amount: order.tax_amount,
+            discount_amount: order.discount_amount,
+            shipping_cost: order.shipping_cost,
+            total_amount: order.total_amount,
+            paid_amount: order.paid_amount,
+            balance_amount: order.balance_amount,
+            batch_no: order.batch_no,
+            color_no: order.color_no,
+            dye_lot_no: order.dye_lot_no,
+            grade: order.grade,
+        }
+    }
+}
+
 /// 门户退货单白名单：单据头业务字段 + 关联客户/来源单名，审批与仓库内部字段不出现。
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PortalReturnView {
     pub id: i32,
     pub customer_id: i32,
@@ -179,7 +215,7 @@ impl From<SalesReturnView> for PortalReturnView {
 }
 
 /// 门户收款白名单：客户自有收款的单号/日期/金额/方式/状态，银行账户与支票号不出门。
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PortalPaymentView {
     pub id: i32,
     pub customer_id: i32,
@@ -207,7 +243,7 @@ impl From<ar_collection::Model> for PortalPaymentView {
 }
 
 /// 门户对账单白名单：期间与收付款余额业务字段，争议说明/备注/内部确认人不出现。
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PortalReconciliationView {
     pub id: i32,
     pub customer_id: i32,
@@ -238,6 +274,116 @@ impl From<ar_reconciliation::Model> for PortalReconciliationView {
             created_at: item.created_at,
         }
     }
+}
+
+/// 门户商品白名单：仅商品化档案字段；成本价/标准价/供应商/工厂信息一律不出现。
+#[derive(Debug, Clone, Serialize)]
+pub struct PortalProductView {
+    pub id: i32,
+    pub code: String,
+    pub name: String,
+    pub specification: Option<String>,
+    pub unit: String,
+    pub product_type: String,
+    pub fabric_composition: Option<String>,
+    pub yarn_count: Option<String>,
+    pub density: Option<String>,
+    pub width: Option<Decimal>,
+    pub gram_weight: Option<Decimal>,
+    pub structure: Option<String>,
+    pub finish: Option<String>,
+    pub usage: Option<String>,
+    pub product_grade: Option<String>,
+    pub status: String,
+    pub description: Option<String>,
+}
+
+impl From<product::Model> for PortalProductView {
+    fn from(item: product::Model) -> Self {
+        Self {
+            id: item.id,
+            code: item.code,
+            name: item.name,
+            specification: item.specification,
+            unit: item.unit,
+            product_type: item.product_type,
+            fabric_composition: item.fabric_composition,
+            yarn_count: item.yarn_count,
+            density: item.density,
+            width: item.width,
+            gram_weight: item.gram_weight,
+            structure: item.structure,
+            finish: item.finish,
+            usage: item.usage,
+            product_grade: item.product_grade,
+            status: item.status,
+            description: item.description,
+        }
+    }
+}
+
+/// 门户色卡白名单：色卡号/名称/图片与工艺展示字段，发放记录的内部字段不出门。
+#[derive(Debug, Clone, Serialize)]
+pub struct PortalColorCardView {
+    pub id: i64,
+    pub card_no: String,
+    pub card_name: String,
+    pub card_type: String,
+    pub season: Option<String>,
+    pub brand: Option<String>,
+    pub total_colors: i32,
+    pub status: String,
+    pub description: Option<String>,
+    pub cover_image_url: Option<String>,
+    pub dyeing_capability: Option<String>,
+    pub printing_capability: Option<String>,
+    pub color_fastness_grade: Option<String>,
+}
+
+impl From<color_card::Model> for PortalColorCardView {
+    fn from(item: color_card::Model) -> Self {
+        Self {
+            id: item.id,
+            card_no: item.card_no,
+            card_name: item.card_name,
+            card_type: item.card_type,
+            season: item.season,
+            brand: item.brand,
+            total_colors: item.total_colors,
+            status: item.status,
+            description: item.description,
+            cover_image_url: item.cover_image_url,
+            dyeing_capability: item.dyeing_capability,
+            printing_capability: item.printing_capability,
+            color_fastness_grade: item.color_fastness_grade,
+        }
+    }
+}
+
+/// 门户汇总白名单：订单总数与在途数直接数绑定客户的销售订单，应收余额取同集合未收金额和。
+/// 不复用内部 dashboard handler（其内部统计含全仓商品数、库存量等非客户视角指标）。
+#[derive(Debug, Clone, Serialize)]
+pub struct PortalDashboardView {
+    pub order_count: u64,
+    pub in_transit_count: u64,
+    pub receivable_balance: Decimal,
+}
+
+/// 门户商品列表查询
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct PortalProductListQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+    pub status: Option<String>,
+    pub search: Option<String>,
+}
+
+/// 门户色卡列表查询
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct PortalColorCardListQuery {
+    pub page: Option<u64>,
+    pub page_size: Option<u64>,
+    pub keyword: Option<String>,
 }
 
 /// GET /api/v1/erp/customer-portal/orders - 我的销售订单列表
@@ -378,4 +524,127 @@ pub async fn list_portal_reconciliations(
     Ok(Json(ApiResponse::success(PaginatedResponse::new(
         items, total, page, page_size,
     ))))
+}
+
+/// GET /api/v1/erp/customer-portal/products - 客户可见的商品化档案
+pub async fn list_portal_products(
+    State(state): State<AppState>,
+    auth: AuthContext,
+    Query(query): Query<PortalProductListQuery>,
+) -> Result<Json<ApiResponse<PaginatedResponse<PortalProductView>>>, AppError> {
+    let db = state.db.clone();
+    let _customer = require_portal_customer(&db, auth.user_id).await?;
+    let page = clamp_page(query.page);
+    let page_size = clamp_page_size(query.page_size);
+
+    let mut select = product::Entity::find();
+    if let Some(status) = query.status {
+        select = select.filter(product::Column::Status.eq(status));
+    }
+    if let Some(keyword) = query.search {
+        let pattern = safe_like_pattern(&keyword);
+        select = select.filter(ProductService::build_product_keyword_condition(&pattern));
+    }
+    let paginator = select
+        .order_by(product::Column::Code, sea_orm::Order::Asc)
+        .paginate(&db, page_size);
+    let total = paginator.num_items().await?;
+    let models = paginator.fetch_page(page.saturating_sub(1)).await?;
+    let items: Vec<PortalProductView> = models.into_iter().map(PortalProductView::from).collect();
+
+    Ok(Json(ApiResponse::success(PaginatedResponse::new(
+        items, total, page, page_size,
+    ))))
+}
+
+/// GET /api/v1/erp/customer-portal/color-cards - 已发放给绑定客户的色卡
+///
+/// 只取发放记录状态为 issued 且未删除的色卡主表行；按色卡主表去重，避免同一客户
+/// 多张发放记录造成重复行与 total 虚高。
+pub async fn list_portal_color_cards(
+    State(state): State<AppState>,
+    auth: AuthContext,
+    Query(query): Query<PortalColorCardListQuery>,
+) -> Result<Json<ApiResponse<PaginatedResponse<PortalColorCardView>>>, AppError> {
+    let db = state.db.clone();
+    let customer = require_portal_customer(&db, auth.user_id).await?;
+    let page = clamp_page(query.page);
+    let page_size = clamp_page_size(query.page_size);
+
+    let mut select = color_card::Entity::find()
+        .distinct()
+        .join(JoinType::InnerJoin, color_card::Relation::Issues.def())
+        .filter(color_card_issue::Column::CustomerId.eq(i64::from(customer.id)))
+        .filter(color_card_issue::Column::Status.eq(IssueStatus::Issued.as_str()))
+        .filter(color_card_issue::Column::IsDeleted.eq(false));
+    if let Some(keyword) = query.keyword {
+        let pattern = safe_like_pattern(&keyword);
+        select = select.filter(color_card::Column::CardName.like(pattern));
+    }
+    let paginator = select
+        .order_by_desc(color_card::Column::CreatedAt)
+        .paginate(&db, page_size);
+    let total = paginator.num_items().await?;
+    let models = paginator.fetch_page(page.saturating_sub(1)).await?;
+    let items: Vec<PortalColorCardView> =
+        models.into_iter().map(PortalColorCardView::from).collect();
+
+    Ok(Json(ApiResponse::success(PaginatedResponse::new(
+        items, total, page, page_size,
+    ))))
+}
+
+/// GET /api/v1/erp/customer-portal/sales-orders/{id} - 我的订单详情
+///
+/// 明细查询同时带 customer_id = 绑定值：非本客户单据（含不存在的 ID）一律 404，
+/// 不暴露"该单存在但不属于你"的事实；出参与列表同白名单口径。
+pub async fn get_portal_order(
+    State(state): State<AppState>,
+    auth: AuthContext,
+    Path(order_id): Path<i32>,
+) -> Result<Json<ApiResponse<PortalOrderView>>, AppError> {
+    let db = state.db.clone();
+    let customer = require_portal_customer(&db, auth.user_id).await?;
+    let model = sales_order::Entity::find_by_id(order_id)
+        .filter(sales_order::Column::CustomerId.eq(customer.id))
+        .one(&db)
+        .await?
+        .ok_or_else(|| AppError::not_found("订单不存在或不属于当前绑定客户"))?;
+
+    Ok(Json(ApiResponse::success(PortalOrderView::from(model))))
+}
+
+/// GET /api/v1/erp/customer-portal/dashboard - 客户视角汇总
+///
+/// 三个指标共用同一行级门（绑定客户）与同一张 sales_orders 集合：
+/// 订单数=该客户全部单据，在途数=状态 partial_shipped/shipped（写入方词表见
+/// models/status/sales.rs::sales_order），应收余额=balance_amount 之和。
+pub async fn get_portal_dashboard(
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Json<ApiResponse<PortalDashboardView>>, AppError> {
+    let db = state.db.clone();
+    let customer = require_portal_customer(&db, auth.user_id).await?;
+    let owned = sales_order::Entity::find().filter(sales_order::Column::CustomerId.eq(customer.id));
+
+    let order_count = owned.clone().count(&db).await?;
+    let in_transit_count = owned
+        .clone()
+        .filter(sales_order::Column::Status.is_in([so_status::PARTIAL_SHIPPED, so_status::SHIPPED]))
+        .count(&db)
+        .await?;
+    let receivable_balance = owned
+        .select_only()
+        .column_as(Expr::col(sales_order::Column::BalanceAmount).sum(), "total")
+        .into_tuple::<Option<Decimal>>()
+        .one(&db)
+        .await?
+        .flatten()
+        .unwrap_or(Decimal::ZERO);
+
+    Ok(Json(ApiResponse::success(PortalDashboardView {
+        order_count,
+        in_transit_count,
+        receivable_balance,
+    })))
 }
