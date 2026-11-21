@@ -1597,6 +1597,7 @@ jobs:
           sccache: 'false'
           # 测试二进制编译峰值高于普通构建：16GB runner 7GB/单元→1路(安全)，
           # 32GB+ runner 自适应→2路+。避免 2 路 OOM(exit 143 实测)
+          mem_per_unit_gb: '7'
           # 跨 run 复用 dev 编译产物（cargo- key 含 backend/target，与 Clippy/死代码同族缓存）：
           # 命中后 nextest archive 只增量编变更 crate，冷编 87m 的主因就是本 job 每轮全量重编
           target-cache: 'true'
