@@ -10,7 +10,7 @@
 use chrono::Utc;
 use std::io::Write;
 use tracing::info;
-use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
+use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 use crate::utils::error::AppError;
 
