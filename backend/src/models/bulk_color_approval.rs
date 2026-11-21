@@ -58,6 +58,11 @@ pub struct Model {
     pub customer_feedback: Option<String>,
     /// CIE D65 色差值 ΔE
     pub delta_e_value: Option<Decimal>,
+    /// 高光敏感色判定标志：客户批色确认 approve 请求写入，true 时 ΔE 通过阈值取 0.8（普通料 1.2）
+    pub high_light_sensitive: bool,
+    /// 客户批色 ΔE 判定等级：pass / conditional_accept；reject 不落 approved 故无该值，
+    /// NULL 表示尚未采集（写入方 bulk_color_approval_service::customer_approve）
+    pub delta_e_result: Option<String>,
     /// 拒绝/返工原因
     pub reject_reason: Option<String>,
     /// 交货门禁标志（true 时阻止发货）

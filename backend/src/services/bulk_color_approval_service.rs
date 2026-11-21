@@ -217,6 +217,8 @@ pub struct BulkColorApprovalListItem {
     pub sent_to_customer_at: Option<chrono::DateTime<Utc>>,
     pub customer_feedback: Option<String>,
     pub delta_e_value: Option<Decimal>,
+    pub high_light_sensitive: bool,
+    pub delta_e_result: Option<String>,
     pub reject_reason: Option<String>,
     pub delivery_blocking: bool,
     pub attachment_url: Option<String>,
@@ -266,6 +268,18 @@ pub enum DeltaEResult {
     ConditionalAccept,
     /// 不合格（ΔE>2.5）
     Reject,
+}
+
+impl DeltaEResult {
+    /// 落库取值（bulk_color_approval.delta_e_result 词表：pass / conditional_accept；
+    /// reject 不落 approved 无需该值，仅用于错误分支比对，不写库）
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DeltaEResult::Pass => "pass",
+            DeltaEResult::ConditionalAccept => "conditional_accept",
+            DeltaEResult::Reject => "reject",
+        }
+    }
 }
 
 /// 色差判定标准（V15 P0-F17 审计报告 11.3）
@@ -331,6 +345,8 @@ pub fn build_history_active(
         "approver_id": model.approver_id,
         "sent_to_customer_at": model.sent_to_customer_at,
         "delta_e_value": model.delta_e_value,
+        "high_light_sensitive": model.high_light_sensitive,
+        "delta_e_result": model.delta_e_result,
         "delivery_blocking": model.delivery_blocking,
         "reject_reason": model.reject_reason,
         "customer_feedback": model.customer_feedback,
@@ -442,6 +458,8 @@ impl BulkColorApprovalService {
             sent_to_customer_at: Set(None),
             customer_feedback: Set(None),
             delta_e_value: Set(None),
+            high_light_sensitive: Set(false),
+            delta_e_result: Set(None),
             reject_reason: Set(None),
             delivery_blocking: Set(true),
             attachment_url: Set(None),
@@ -862,6 +880,7 @@ impl BulkColorApprovalService {
                     None,
                     Some("超过 7 天未处理".to_string()),
                     false,
+                    None,
                 )
                 .await?;
             rejected_records.push(model);
@@ -902,25 +921,31 @@ impl BulkColorApprovalService {
     /// P0-F17：客户批色确认通过（状态转换：sent_to_customer → approved）
     ///
     /// 业务规则（审计报告 11.3）：
-    /// 1. 色差判定标准：ΔE≤1.2 同色通过 / ΔE≤2.5 让步接收 / ΔE>2.5 不合格
+    /// 1. 色差判定标准：ΔE≤1.2 同色通过 / ΔE≤2.5 让步接收 / ΔE>2.5 不合格；
+    ///    高光敏感料（high_light_sensitive=true）通过阈值收紧为 ΔE≤0.8，让步接收阈值不变
     /// 2. 批色结果处理：通过→解除交货门禁
+    /// 3. 判定等级留痕：Pass/ConditionalAccept 均落 approved，判定 token（pass /
+    ///    conditional_accept）写 delta_e_result 列并随历史快照留痕；Reject 不落库
     pub async fn customer_approve(
         &self,
         id: i64,
         approver_id: i32,
         feedback: Option<String>,
         delta_e_value: Option<Decimal>,
+        high_light_sensitive: bool,
     ) -> Result<bulk_color_approval::Model, BulkColorApprovalError> {
+        let mut delta_e_result: Option<&'static str> = None;
         // 业务规则 1：色差判定
         if let Some(de) = delta_e_value {
             let de_f64 = de.to_string().parse::<f64>().unwrap_or(f64::MAX);
-            let result = evaluate_delta_e(de_f64, false);
+            let result = evaluate_delta_e(de_f64, high_light_sensitive);
             if result == DeltaEResult::Reject {
                 return Err(BulkColorApprovalError::Validation(format!(
                     "色差 ΔE={} 超过 2.5，不允许通过",
                     de
                 )));
             }
+            delta_e_result = Some(result.as_str());
         }
 
         // 业务规则 2：批色结果处理（通过→解除交货门禁）
@@ -932,6 +957,7 @@ impl BulkColorApprovalService {
             delta_e_value,
             None,
             true, // approved → delivery_blocking=false
+            delta_e_result,
         )
         .await
     }
@@ -955,6 +981,7 @@ impl BulkColorApprovalService {
             None,
             Some(reject_reason),
             false,
+            None,
         )
         .await
     }
@@ -999,6 +1026,7 @@ impl BulkColorApprovalService {
                 None,
                 Some(reject_reason.clone()),
                 false,
+                None,
             )
             .await?;
 
@@ -1079,6 +1107,7 @@ impl BulkColorApprovalService {
                 None,
                 Some(reject_reason),
                 false, // downgraded 仍保持 blocking=true
+                None,
             )
             .await?;
 
@@ -1326,6 +1355,7 @@ impl BulkColorApprovalService {
         delta_e_value: Option<Decimal>,
         reject_reason: Option<String>,
         unblock_delivery: bool,
+        delta_e_result: Option<&'static str>,
     ) -> Result<bulk_color_approval::Model, BulkColorApprovalError> {
         let txn = self.db.begin().await?;
         let model = Entity::find_by_id(id)
@@ -1365,6 +1395,7 @@ impl BulkColorApprovalService {
             active.delta_e_value = Set(Some(de));
         }
         active.reject_reason = Set(reject_reason);
+        active.delta_e_result = Set(delta_e_result.map(String::from));
         active.delivery_blocking = Set(!unblock_delivery);
         active.updated_at = Set(now);
 

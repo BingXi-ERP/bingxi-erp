@@ -31,13 +31,13 @@
 mod test_common;
 
 use axum::{
-    Router,
     body::Body,
     extract::State,
     http::{Method, Request, StatusCode},
-    middleware::{Next, from_fn_with_state},
+    middleware::{from_fn_with_state, Next},
     response::Response,
     routing::{get, post, put},
+    Router,
 };
 use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::{ar_reconciliation_handler, bulk_color_approval_handler};
@@ -52,7 +52,7 @@ use rust_decimal::Decimal;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::sync::Arc;
 use tower::ServiceExt;
 
@@ -344,6 +344,8 @@ async fn seed(db: &sea_orm::DatabaseConnection) {
             sent_to_customer_at: Set(None),
             customer_feedback: Set(None),
             delta_e_value: Set(None),
+            high_light_sensitive: Set(false),
+            delta_e_result: Set(None),
             reject_reason: Set(None),
             delivery_blocking: Set(true),
             stock_grade_sync_pending: Set(false),
@@ -702,6 +704,8 @@ async fn seed_gate_approval(
         sent_to_customer_at: Set(None),
         customer_feedback: Set(None),
         delta_e_value: Set(None),
+        high_light_sensitive: Set(false),
+        delta_e_result: Set(None),
         reject_reason: Set(None),
         delivery_blocking: Set(status != "approved"),
         stock_grade_sync_pending: Set(false),
