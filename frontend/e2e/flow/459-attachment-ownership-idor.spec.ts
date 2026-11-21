@@ -193,13 +193,9 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
       );
     }
     expect(
-      typeof envelope.code === 'string' ? envelope.code : '<code 缺失>',
-      `459-01 失败信封必须带字符串机器码，实际 ${JSON.stringify(envelope.code)}`
-    ).toBeTruthy();
-    expect(
-      String(envelope.message ?? ''),
-      `459-01 文案应点名「尚未上传附件」，实际 ${String(envelope.message)}`
-    ).toContain('尚未上传附件');
+      envelope.code,
+      `459-01 失败信封机器码必须是 NOT_FOUND（not_found 默认脱敏，真实文案不外显），实际 ${JSON.stringify(envelope.code)}`
+    ).toBe('NOT_FOUND');
 
     await apiCall(page, 'DELETE', `/purchase/suppliers/${supplierId}/qualifications/${qid}`);
   });
