@@ -713,11 +713,10 @@ jobs:
   ci-lint-rust:
     name: 🔍 Rust Clippy
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: ci-build-test-artifacts
-    # 必须等中枢 job：阶段 1 的 clippy-output.json 由 ci-build-test-artifacts 产出并上传。
-    # run 4875（PR #996 首推）实测本 job 与中枢并行起跑，下载步直接报
-    # 「Artifact not found for name: clippy-raw」——拆分输入后这条边漏改了，不是判定阈值问题。
+    timeout-minutes: 90
+    needs: ci-info
+    # clippy 采集（阶段 1）与判定（阶段 2/3）合一：不再 needs 预编译中枢（87m 编译
+    # 独木桥曾是全量 run 关键路径主因），与本 job 并行各自编译，关键路径取两者 max。
     # 启用 contents: write 以便"提交 baseline 文件"步骤能 push 自动建立的基线
     # baseline 机制：首次跑自动建立基线，后续 PR 仅"新增警告"阻塞 CI
     permissions:
@@ -728,11 +727,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 下载中枢 clippy 原始输出
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: clippy-raw
-          path: backend/reports
 
       - name: Setup Rust（clippy + 系统依赖）
         uses: ./.github/actions/setup-rust
@@ -742,8 +736,55 @@ jobs:
           # Clippy 编译 --all-targets 内存峰值高，禁用 sccache + 7GB/单元避免 OOM（exit 143）
           sccache: 'false'
           mem_per_unit_gb: '7'
-          # 本 job 不再编译 crate（阶段 1 已在中枢跑完），恢复多 GB 编译目录纯属白等
-          target-cache: 'false'
+
+      - name: 运行 clippy 阶段 1（采集 JSON，判定由下一步完成）
+        working-directory: backend
+        # 采集与判定合入本 job：这里跑一次 cargo clippy 并把原始 JSON 落盘，
+        # 渲染/多维统计/NEW_COUNT 判定与 baseline 提交由下一步（阶段 2/3）做，
+        # 判据与阻塞语义逐字不变。
+        # 不加 -- -D warnings（避免 JSON 截断），由 NEW_COUNT > 0 判定阻塞
+        # 不加 --all-features（与 build/test 一致用默认 features；--all-features 产生 1773 个误报）
+        # 并行度沿用 setup-rust 探测值（sccache 关断、mem_per_unit_gb 7GB/单元防 OOM）
+        run: |
+          mkdir -p reports
+          set +e
+
+          # ============================================================================
+          # 阶段 1：主 clippy 运行（JSON 格式，带 retry）
+          # ============================================================================
+          # 不加 -- -D warnings（避免 JSON 截断），由 NEW_COUNT > 0 判定阻塞
+          # 不加 --all-features（与 build/test 一致用默认 features；--all-features 产生 1773 个误报）
+          echo "▶ 阶段 1/3：主 clippy 运行（JSON 输出，带 retry）"
+          CLIPPY_MAIN_EXIT=143
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
+          while [ "$ATTEMPT" -le "$MAX_ATTEMPTS" ]; do
+            echo "  尝试 $ATTEMPT/$MAX_ATTEMPTS..."
+            cargo clippy --all-targets --keep-going --message-format=json \
+              --color=always 2>reports/clippy-stderr.txt \
+              | tee reports/clippy-output.json > /dev/null
+            CLIPPY_MAIN_EXIT=${PIPESTATUS[0]}
+            echo "  主 clippy 退出码: $CLIPPY_MAIN_EXIT"
+            # 0 = 成功；101 = 编译错误（真正的代码问题，不重试）；其他（143/137/1）= 基础设施问题，重试
+            if [ "$CLIPPY_MAIN_EXIT" -eq "0" ] || [ "$CLIPPY_MAIN_EXIT" -eq "101" ]; then
+              break
+            fi
+            if [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; then
+              echo "  ⚠️  clippy 异常退出（exit $CLIPPY_MAIN_EXIT，疑似基础设施问题），$((ATTEMPT * 10))s 后重试..."
+              sleep $((ATTEMPT * 10))
+            fi
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+          # 合并 stderr 中可能的警告
+          cat reports/clippy-stderr.txt >> reports/clippy-output.json 2>/dev/null || true
+
+      - name: 上传 clippy 原始输出（取证与本地复跑用）
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: clippy-raw
+          path: backend/reports/
+          retention-days: 7
 
       - name: 运行 clippy（baseline 机制）
         working-directory: backend
@@ -753,15 +794,15 @@ jobs:
           mkdir -p reports
           set +e
 
-          # 阶段 1（真正跑 cargo clippy 的那次 dev profile 编译）已上移到 ci-build-test-artifacts：
-          # 那个 job 为 nextest 已经编过一遍 dev，clippy 再编一遍是第三份重复编译。本 job 只对
-          # 中枢产出的 JSON 做渲染、多维统计与 baseline 判定，自身不编译任何 crate。
+          # 阶段 1（真正跑 cargo clippy 的那次 dev profile 编译）已在本 job 上一步完成：
+          # 采集与判定同 job 后不再等预编译中枢的编译独木桥。本步只做渲染、多维统计
+          # 与 baseline 判定。
           if [ ! -s reports/clippy-output.json ]; then
-            echo "❌ 未取得中枢 job 上传的 reports/clippy-output.json（产物缺失或路径漂移）"
+            echo "❌ 未取得阶段 1 落盘的 reports/clippy-output.json（采集步失败或路径漂移）"
             echo "   采集链断了必须红：这不等于没有警告，绝不静默放行成假绿。"
             exit 1
           fi
-          echo "✅ 已取得中枢 clippy 原始输出：$(wc -l < reports/clippy-output.json) 行 JSON"
+          echo "✅ 已取得阶段 1 clippy 原始输出：$(wc -l < reports/clippy-output.json) 行 JSON"
 
           # ============================================================================
           # 阶段 2：人类可读详细输出（基于 JSON rendered 字段重渲染）+ 短格式定位日志
@@ -1520,9 +1561,9 @@ jobs:
     timeout-minutes: 360
     needs: ci-info
     # 只在 PR 与手动全量轮跑测试（主干不自动触发，PR 阶段已验证）
-    # 本 job 是 dev profile 的编译中枢：nextest archive 与 clippy 阶段 1 共用同一份
-    # warm backend/target，所以它在所有事件上都要跑（clippy 判定链每轮都要有输入）；
-    # 测试面的 archive 两步改由步骤级 if 按 full_suite 开关放行。
+    # 本 job 只负责 dev profile 测试编译产出 nextest archive（clippy 采集已并入
+    # 🔍 Rust Clippy job 并行跑，不再共用本 job 的编译）；测试面的 archive 两步改由
+    # 步骤级 if 按 full_suite 开关放行。
     services:
       postgres:
         image: postgres:16-alpine
@@ -1553,7 +1594,6 @@ jobs:
           sccache: 'false'
           # 测试二进制编译峰值高于普通构建：16GB runner 7GB/单元→1路(安全)，
           # 32GB+ runner 自适应→2路+。避免 2 路 OOM(exit 143 实测)
-          mem_per_unit_gb: '7'
 
       - name: 安装 cargo-nextest
         uses: ./.github/actions/setup-nextest
@@ -1573,55 +1613,6 @@ jobs:
           name: nextest-archive
           path: backend/nextest-archive.tar.zst
           retention-days: 7
-      - name: 运行 clippy 阶段 1（主运行采集 JSON，判定在 🔍 Rust Clippy job）
-        working-directory: backend
-        # 与瘦身后的 ci-lint-rust 分段：这里只负责"跑一次 cargo clippy 并把原始 JSON 落盘"，
-        # 渲染/多维统计/NEW_COUNT 判定与 baseline 提交仍在 🔍 Rust Clippy job 里做，
-        # 判据与阻塞语义逐字不变（见那个 job 的阶段 2/3 原文）。
-        # 不加 -- -D warnings（避免 JSON 截断），由 NEW_COUNT > 0 判定阻塞
-        # 不加 --all-features（与 build/test 一致用默认 features；--all-features 产生 1773 个误报）
-        # 并行度沿用本 job 的 setup-rust 探测值（sccache 关断、mem_per_unit_gb 7GB/单元防 OOM）
-        run: |
-          mkdir -p reports
-          set +e
-
-          # ============================================================================
-          # 阶段 1：主 clippy 运行（JSON 格式，带 retry）
-          # ============================================================================
-          # 不加 -- -D warnings（避免 JSON 截断），由 NEW_COUNT > 0 判定阻塞
-          # 不加 --all-features（与 build/test 一致用默认 features；--all-features 产生 1773 个误报）
-          echo "▶ 阶段 1/3：主 clippy 运行（JSON 输出，带 retry）"
-          CLIPPY_MAIN_EXIT=143
-          MAX_ATTEMPTS=3
-          ATTEMPT=1
-          while [ "$ATTEMPT" -le "$MAX_ATTEMPTS" ]; do
-            echo "  尝试 $ATTEMPT/$MAX_ATTEMPTS..."
-            cargo clippy --all-targets --keep-going --message-format=json \
-              --color=always 2>reports/clippy-stderr.txt \
-              | tee reports/clippy-output.json > /dev/null
-            CLIPPY_MAIN_EXIT=${PIPESTATUS[0]}
-            echo "  主 clippy 退出码: $CLIPPY_MAIN_EXIT"
-            # 0 = 成功；101 = 编译错误（真正的代码问题，不重试）；其他（143/137/1）= 基础设施问题，重试
-            if [ "$CLIPPY_MAIN_EXIT" -eq "0" ] || [ "$CLIPPY_MAIN_EXIT" -eq "101" ]; then
-              break
-            fi
-            if [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; then
-              echo "  ⚠️  clippy 异常退出（exit $CLIPPY_MAIN_EXIT，疑似基础设施问题），$((ATTEMPT * 10))s 后重试..."
-              sleep $((ATTEMPT * 10))
-            fi
-            ATTEMPT=$((ATTEMPT + 1))
-          done
-          # 合并 stderr 中可能的警告
-          cat reports/clippy-stderr.txt >> reports/clippy-output.json 2>/dev/null || true
-
-      - name: 上传 clippy 原始输出（供 🔍 Rust Clippy job 判定）
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: clippy-raw
-          path: backend/reports/
-          retention-days: 7
-
 
 # ==============================================================================
   # Job 8: Rust 单元测试分片（从 archive 运行，不重复编译）
