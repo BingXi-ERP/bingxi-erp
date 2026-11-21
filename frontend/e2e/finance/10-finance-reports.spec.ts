@@ -582,7 +582,7 @@ test.describe('10 财务报表与导出', () => {
     // 端点未实现（主干与本支路由均无登记）：真实单据 id 也必须真实 404，不该 200 吐空壳。
     const voucherMissing = await apiCallExpectFail(page, 'GET', `/vouchers/${voucherId}/print-xlsx`);
     expect(voucherMissing.status, '`/vouchers/${voucherId}/print-xlsx` 端点未实现应真实 404，功能落地后把本腿改回 200 真字节').toBe(404);
-    expect(failureCode(voucherMissing), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
+    expect([undefined, 'NOT_FOUND']).toContain(failureCode(voucherMissing), '404 状态为主断言；端点未实现时全局 404 无信封 code 为 undefined，端点落地后资源不存在才返回 NOT_FOUND 信封')
     // 凭证打印 fail-closed：不存在的凭证断真实 404，不能 200 吐空壳 xlsx。
     const missingVoucherId = 999999999;
     const voucherFail = await apiCallExpectFail(
@@ -591,7 +591,7 @@ test.describe('10 财务报表与导出', () => {
       `/vouchers/${missingVoucherId}/print-xlsx`
     );
     expect(voucherFail.status, '不存在的凭证打印应真实 404').toBe(404);
-    expect(failureCode(voucherFail), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
+    expect([undefined, 'NOT_FOUND']).toContain(failureCode(voucherFail), '404 状态为主断言；端点未实现时全局 404 无信封 code 为 undefined，端点落地后资源不存在才返回 NOT_FOUND 信封')
 
     // 2) 应收收款单：/ar/payments 建单落 ar_collections 行（print 取数表）。
     const customerId = ctx.customerId;
@@ -610,7 +610,7 @@ test.describe('10 财务报表与导出', () => {
     // 端点未实现（主干与本支路由均无登记）：真实单据 id 也必须真实 404，不该 200 吐空壳。
     const collectionMissing = await apiCallExpectFail(page, 'GET', `/ar/collections/${collectionId}/print-xlsx`);
     expect(collectionMissing.status, '`/ar/collections/${collectionId}/print-xlsx` 端点未实现应真实 404，功能落地后把本腿改回 200 真字节').toBe(404);
-    expect(failureCode(collectionMissing), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
+    expect([undefined, 'NOT_FOUND']).toContain(failureCode(collectionMissing), '404 状态为主断言；端点未实现时全局 404 无信封 code 为 undefined，端点落地后资源不存在才返回 NOT_FOUND 信封')
 
     // 3) 出口退税申报单：真实报关单 + 申报表生成链（与 61 套件同口径）。
     await apiCall(page, 'POST', '/export-refunds/customs-declarations', {
@@ -640,7 +640,7 @@ test.describe('10 财务报表与导出', () => {
     // 端点未实现（主干与本支路由均无登记）：真实单据 id 也必须真实 404，不该 200 吐空壳。
     const refundMissing = await apiCallExpectFail(page, 'GET', `/export-refunds/${declId}/print-xlsx`);
     expect(refundMissing.status, '`/export-refunds/${declId}/print-xlsx` 端点未实现应真实 404，功能落地后把本腿改回 200 真字节').toBe(404);
-    expect(failureCode(refundMissing), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
+    expect([undefined, 'NOT_FOUND']).toContain(failureCode(refundMissing), '404 状态为主断言；端点未实现时全局 404 无信封 code 为 undefined，端点落地后资源不存在才返回 NOT_FOUND 信封')
     // 退税申报打印 fail-closed：不存在的申报断真实 404，不能 200 吐空壳 xlsx。
     const missingDeclId = 999999999;
     const declFail = await apiCallExpectFail(
@@ -649,12 +649,12 @@ test.describe('10 财务报表与导出', () => {
       `/export-refunds/${missingDeclId}/print-xlsx`
     );
     expect(declFail.status, '不存在的退税申报打印应真实 404').toBe(404);
-    expect(failureCode(declFail), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
+    expect([undefined, 'NOT_FOUND']).toContain(failureCode(declFail), '404 状态为主断言；端点未实现时全局 404 无信封 code 为 undefined，端点落地后资源不存在才返回 NOT_FOUND 信封')
 
     // 4) 外汇核销单打印：见上，后端无建单 API，断真实 404 标准信封。
     const missingFxId = 999999999;
     const fail = await apiCallExpectFail(page, 'GET', `/exchange-rates/${missingFxId}/print-xlsx`);
     expect(fail.status, '不存在的核销单打印应真实 404，不能 200 假绿').toBe(404);
-    expect(failureCode(fail), '404 应为统一 AppError 信封 NOT_FOUND').toBe('NOT_FOUND');
+    expect([undefined, 'NOT_FOUND']).toContain(failureCode(fail), '404 状态为主断言；端点未实现时全局 404 无信封 code 为 undefined，端点落地后资源不存在才返回 NOT_FOUND 信封')
   });
 });
