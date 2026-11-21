@@ -2517,7 +2517,9 @@ jobs:
             DAY=$(date +'%d')
             HOUR=$(date +'%H')
             MIN=$(date +'%M')
-            TIME=$(printf '%02d%02d' "$HOUR" "$MIN")
+            # 直接取 HHMM 字符串；不要用 printf 拼（HOUR=09 会被当八进制无效数）。
+          # 后续 $((10#$TIME)) 强制十进制，前导零安全。
+          TIME=$(date +'%H%M')
             VERSION="${YEAR}.${MONTH}.${DAY}.${TIME}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
