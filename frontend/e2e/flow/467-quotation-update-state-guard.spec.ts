@@ -2,12 +2,12 @@
  * 467 报价单改单状态守卫：仅 draft/rejected 可改，已提交/已审批态 PUT /quotations/{id} 必被拒
  *
  * 本文件钉死的业务事实（逐条对照后端源码写入方，非推测）：
- * 1. 状态门唯一事实源：backend/src/services/quotation_ops/update.rs:65-72 load_for_update——
+ * 1. 状态门唯一事实源：报价单更新服务在行锁内加载当前状态——
  *    仅 quotation_status::DRAFT/REJECTED（models/status/sales.rs 的 quotation 子模块，小写
  *    draft/rejected）可进更新事务；其他状态在 lock_exclusive 行锁内返回
  *    AppError::business_displayable("当前状态不允许此操作")。
  * 2. 失败信封形状：utils/error.rs BusinessErrorDisplayable → HTTP 400、机器码 BUSINESS_ERROR
- *    （error.rs:825 与 BusinessError 同码），且 message 外显真实文案（error.rs:851
+ *    （业务错误族与 BusinessError 同码），且 message 外显真实文案（可外显变体
  *    display_message 对 Displayable 变体返回原文，单测 business_displayable_exposes_real_message
  *    钉死）——故本文件断言 message 含"当前状态不允许此操作"逐字子串。
  * 3. 提交审批档位：quotation_approval_service.rs ApproverRole::from_amount 以
@@ -53,7 +53,7 @@ import {
 
 type Row = Record<string, unknown>;
 
-/** 状态门外显文案（update.rs:69-70 business_displayable 入参，逐字符） */
+/** 状态门外显文案（报价单更新状态门的业务拒绝入参，逐字符） */
 const STATE_GATE_MESSAGE = '当前状态不允许此操作';
 
 /** DECIMAL 线格式（字符串/数字）折成整数分位；超出标度且非零尾数即判红，不静默截断 */
@@ -190,7 +190,7 @@ function amountCents(quantity: string, unitPrice: string): bigint {
 
 /**
  * 守卫腿公共断言：PUT 必 400 + BUSINESS_ERROR + 外显文案含状态门原句 + trace_id 回填；
- * 再整树 toEqual 证明拒绝零副作用。文案断言依据 error.rs:851 display_message 对
+ * 再整树 toEqual 证明拒绝零副作用。文案断言依据可外显业务错误的 display_message 对
  * BusinessErrorDisplayable 返回原文（与 expectStateGateRejection 不读文案的通用范式不同，
  * 本守卫的文案是"只涉及当前用户自己的业务规则"的安全外显点，单测已钉死）。
  */
