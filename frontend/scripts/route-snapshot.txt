@@ -1,4 +1,4 @@
-# layers=8 endpoints=1817
+# layers=8 endpoints=1819
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -426,12 +426,14 @@ GET	/api/v1/erp/custom-orders/*/nodes	custom_order_handler::get_timeline	custom_
 GET	/api/v1/erp/custom-orders/*/print	print_handler::custom_order_print_docx	custom_order
 GET	/api/v1/erp/custom-orders/*/timeline	custom_order_handler::get_timeline	custom_order
 GET	/api/v1/erp/custom-orders/issues/*/print	print_handler::quality_issue_print_docx	custom_order
+GET	/api/v1/erp/customer-portal/ar-reconciliations	customer_portal::list_portal_reconciliations	customer_portal
 GET	/api/v1/erp/customer-portal/color-cards	customer_portal::list_portal_color_cards	customer_portal
 GET	/api/v1/erp/customer-portal/dashboard	customer_portal::get_portal_dashboard	customer_portal
 GET	/api/v1/erp/customer-portal/orders	customer_portal::list_portal_orders	customer_portal
 GET	/api/v1/erp/customer-portal/payments	customer_portal::list_portal_payments	customer_portal
 GET	/api/v1/erp/customer-portal/products	customer_portal::list_portal_products	customer_portal
 GET	/api/v1/erp/customer-portal/reconciliations	customer_portal::list_portal_reconciliations	customer_portal
+GET	/api/v1/erp/customer-portal/sales-orders	customer_portal::list_portal_orders	customer_portal
 GET	/api/v1/erp/customer-portal/sales-orders/*	customer_portal::get_portal_order	customer_portal
 GET	/api/v1/erp/customer-portal/sales-returns	customer_portal::list_portal_returns	customer_portal
 GET	/api/v1/erp/customer-shares/by-customer	customer_team_share_handler::list_customer_shares	customer_team_share

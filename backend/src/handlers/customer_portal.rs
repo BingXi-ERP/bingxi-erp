@@ -393,7 +393,7 @@ pub async fn list_portal_orders(
     Query(query): Query<PortalOrderListQuery>,
 ) -> Result<Json<ApiResponse<PaginatedResponse<PortalOrderView>>>, AppError> {
     let db = state.db.clone();
-    let customer = require_portal_customer(&db, auth.user_id).await?;
+    let customer = require_portal_customer(&db, auth.user_id, auth.role_id).await?;
     let service = SalesService::new(state.db.clone(), state.search_client.clone());
     let page = clamp_page(query.page);
     let page_size = clamp_page_size(query.page_size);
@@ -436,7 +436,7 @@ pub async fn list_portal_returns(
     Query(query): Query<PortalReturnListQuery>,
 ) -> Result<Json<ApiResponse<PaginatedResponse<PortalReturnView>>>, AppError> {
     let db = state.db.clone();
-    let customer = require_portal_customer(&db, auth.user_id).await?;
+    let customer = require_portal_customer(&db, auth.user_id, auth.role_id).await?;
     let service = SalesReturnService::new(state.db.clone());
     let page = clamp_page(query.page);
     let page_size = clamp_page_size(query.page_size);
@@ -469,7 +469,7 @@ pub async fn list_portal_payments(
     Query(query): Query<PortalPaymentListQuery>,
 ) -> Result<Json<ApiResponse<PaginatedResponse<PortalPaymentView>>>, AppError> {
     let db = state.db.clone();
-    let customer = require_portal_customer(&db, auth.user_id).await?;
+    let customer = require_portal_customer(&db, auth.user_id, auth.role_id).await?;
     let page = clamp_page(query.page);
     let page_size = clamp_page_size(query.page_size);
 
@@ -501,7 +501,7 @@ pub async fn list_portal_reconciliations(
     Query(query): Query<PortalReconciliationListQuery>,
 ) -> Result<Json<ApiResponse<PaginatedResponse<PortalReconciliationView>>>, AppError> {
     let db = state.db.clone();
-    let customer = require_portal_customer(&db, auth.user_id).await?;
+    let customer = require_portal_customer(&db, auth.user_id, auth.role_id).await?;
     let service = ArReconciliationService::new(state.db.clone());
     let page = clamp_page(query.page);
     let page_size = clamp_page_size(query.page_size);
@@ -533,7 +533,7 @@ pub async fn list_portal_products(
     Query(query): Query<PortalProductListQuery>,
 ) -> Result<Json<ApiResponse<PaginatedResponse<PortalProductView>>>, AppError> {
     let db = state.db.clone();
-    let _customer = require_portal_customer(&db, auth.user_id).await?;
+    let _customer = require_portal_customer(&db, auth.user_id, auth.role_id).await?;
     let page = clamp_page(query.page);
     let page_size = clamp_page_size(query.page_size);
 
@@ -567,7 +567,7 @@ pub async fn list_portal_color_cards(
     Query(query): Query<PortalColorCardListQuery>,
 ) -> Result<Json<ApiResponse<PaginatedResponse<PortalColorCardView>>>, AppError> {
     let db = state.db.clone();
-    let customer = require_portal_customer(&db, auth.user_id).await?;
+    let customer = require_portal_customer(&db, auth.user_id, auth.role_id).await?;
     let page = clamp_page(query.page);
     let page_size = clamp_page_size(query.page_size);
 
@@ -604,7 +604,7 @@ pub async fn get_portal_order(
     Path(order_id): Path<i32>,
 ) -> Result<Json<ApiResponse<PortalOrderView>>, AppError> {
     let db = state.db.clone();
-    let customer = require_portal_customer(&db, auth.user_id).await?;
+    let customer = require_portal_customer(&db, auth.user_id, auth.role_id).await?;
     let model = sales_order::Entity::find_by_id(order_id)
         .filter(sales_order::Column::CustomerId.eq(customer.id))
         .one(&db)
@@ -624,7 +624,7 @@ pub async fn get_portal_dashboard(
     auth: AuthContext,
 ) -> Result<Json<ApiResponse<PortalDashboardView>>, AppError> {
     let db = state.db.clone();
-    let customer = require_portal_customer(&db, auth.user_id).await?;
+    let customer = require_portal_customer(&db, auth.user_id, auth.role_id).await?;
     let owned = sales_order::Entity::find().filter(sales_order::Column::CustomerId.eq(customer.id));
 
     let order_count = owned.clone().count(&db).await?;

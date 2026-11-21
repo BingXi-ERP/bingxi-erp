@@ -114,6 +114,39 @@ pub const AUTH_ONLY_PATHS: &[&str] = &[
     "/api/v1/erp/company-profile",
 ];
 
+/// 客户门户只读路径（独立于 [`AUTH_ONLY_PATHS`] 的精确清单）。
+///
+/// 安全边界：只放行 GET，且只覆盖已落地的八个门户读端点与订单详情的数字 ID 形态。
+/// 未来该前缀若新增写端点，不会因本函数被误放行；服务层仍以
+/// `role.code == "customer"` 与 `users.customer_id` 绑定做双重硬门。
+pub fn is_customer_portal_read_path(path: &str, method: &str) -> bool {
+    if !method.eq_ignore_ascii_case("GET") {
+        return false;
+    }
+    let clean_path = path.split(['?', '#']).next().unwrap_or(path);
+    let Some(rest) = clean_path.strip_prefix("/api/v1/erp/customer-portal/") else {
+        return false;
+    };
+    const EXACT_PATHS: &[&str] = &[
+        "orders",
+        "sales-orders",
+        "sales-returns",
+        "payments",
+        "reconciliations",
+        "ar-reconciliations",
+        "products",
+        "color-cards",
+        "dashboard",
+    ];
+    if EXACT_PATHS.contains(&rest) {
+        return true;
+    }
+    match rest.strip_prefix("sales-orders/") {
+        Some(id) => !id.is_empty() && !id.contains('/') && id.bytes().all(|b| b.is_ascii_digit()),
+        None => false,
+    }
+}
+
 /// 路径是否仅需认证（严格精确匹配，语义与 [`is_public_path`] 一致，不做子路径前缀放行）
 pub fn is_auth_only_path(path: &str) -> bool {
     let clean_path = path.split(['?', '#']).next().unwrap_or(path);

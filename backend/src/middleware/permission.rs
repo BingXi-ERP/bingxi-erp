@@ -1,6 +1,8 @@
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
-use crate::middleware::public_routes::{is_auth_only_path, is_public_path};
+use crate::middleware::public_routes::{
+    is_auth_only_path, is_customer_portal_read_path, is_public_path,
+};
 use crate::models::audit_log::{OperationType, Severity};
 use crate::models::role_permission;
 use crate::services::audit_log_service::{AuditEvent, AuditLogService};
@@ -107,7 +109,7 @@ pub async fn permission_middleware(
     // extract_role_id 的固定 403「没有关联角色」拦死（与 /auth/me 曾有的
     // 「刷新即 403 跳登录」同型故障，只是命中的是改密自助面）。
     // 越权面不因此放宽：跳过 RBAC 后各 handler 自身的"只操作 auth.user_id"约束不变。
-    if is_auth_only_path(path) {
+    if is_auth_only_path(path) || is_customer_portal_read_path(path, method.as_str()) {
         tracing::debug!(
             "认证豁免 RBAC 路径放行: path={}, user_id={}",
             path,

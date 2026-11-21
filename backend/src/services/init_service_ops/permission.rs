@@ -1461,6 +1461,16 @@ impl InitService {
     /// 其他域角色权限定义（safety_officer 安全员 / system_admin 系统管理员 / data_analyst 数据分析师 / admin_assistant 行政助理）。
     fn misc_role_resources() -> RoleResourceSlice {
         &[
+            // 客户门户外部账号：门户 GET 已由精确认证豁免放行，服务层按角色码 + 绑定双门；
+            // 此处业务分组只保留黑名单对照码，让 33b 的“持码仍 403”前提不依赖 E2E 临时补授。
+            (
+                "customer",
+                &[
+                    ("customer-portal", "read"),
+                    ("stock", "export"),
+                    ("pieces", "print"),
+                ],
+            ),
             (
                 "safety_officer",
                 &[

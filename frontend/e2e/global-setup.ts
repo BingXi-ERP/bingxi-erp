@@ -661,6 +661,9 @@ const SHELL_PERMISSIONS = ['dashboard:read', 'notifications:read'];
 // 镜像岗位只有 SHELL 两枚键。这类岗位的角色权限矩阵基线证明不了后端授权面（基线文件的
 // provenance 字段已机读标注），不得据以判断"后端已授权"。交集内容由建角日志逐角色点名。
 const SEED_ROLE_EXTRA_PERMISSIONS: Record<string, string[]> = {
+  // customer 已由后端 init 角色矩阵播种，BLACKLIST_TEST_ROLES 不会再建它；
+  // 33b 的"持码仍 403"前提由本映射在存量角色上补授，不能退化成"无码 403"假绿。
+  customer: ['stock:export', 'pieces:print'],
   // purchase_clerk 取后端矩阵同名角色的权限集子面（read、create、update、import，不含 delete）。
   // 覆盖 sku-mapping 用例 A、C、D1、D2b、E1、E3，即产品与供应商只读、目录、对照 CRUD、批量导入。
   // import 是与建单同授本岗的成批建单通路，purchase_clerk 亦有，缺则 E3 批量导入按钮被
