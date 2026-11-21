@@ -136,7 +136,7 @@ async function createUser(
   roleId: number,
   customerId?: number
 ): Promise<number> {
-  const body: Row = { username, password: testPassword, role_id: roleId };
+  const body: Row = { username, password: testPassword(), role_id: roleId };
   if (customerId !== undefined) body.customer_id = customerId;
   const row = await apiCallRaw<Row>(admin, 'POST', '/users', body);
   const id = positiveId(row.id, `用户 ${username} 建档`);
@@ -190,7 +190,7 @@ test.describe.serial('520 小程序客户门户读面', () => {
     await createUser(page, temporaryUsername, temporaryRoleId, customerAId);
 
     for (const username of [boundUsername, unboundUsername, danglingUsername, temporaryUsername]) {
-      sessions.push(await loginInIsolatedContext(browser, username, testPassword));
+      sessions.push(await loginInIsolatedContext(browser, username, testPassword()));
     }
   });
 

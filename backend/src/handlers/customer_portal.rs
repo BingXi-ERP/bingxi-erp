@@ -31,7 +31,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use sea_orm::{
     ColumnTrait, EntityTrait, ExprTrait, JoinType, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, sea_query::Expr,
+    QuerySelect, RelationTrait, sea_query::Expr,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -484,7 +484,7 @@ pub async fn list_portal_payments(
     }
     let paginator = select
         .order_by_desc(ar_collection::Column::CollectionDate)
-        .paginate(&db, page_size);
+        .paginate(db.as_ref(), page_size);
     let total = paginator.num_items().await?;
     let models = paginator.fetch_page(page.saturating_sub(1)).await?;
     let items: Vec<PortalPaymentView> = models.into_iter().map(PortalPaymentView::from).collect();
@@ -547,7 +547,7 @@ pub async fn list_portal_products(
     }
     let paginator = select
         .order_by(product::Column::Code, sea_orm::Order::Asc)
-        .paginate(&db, page_size);
+        .paginate(db.as_ref(), page_size);
     let total = paginator.num_items().await?;
     let models = paginator.fetch_page(page.saturating_sub(1)).await?;
     let items: Vec<PortalProductView> = models.into_iter().map(PortalProductView::from).collect();
@@ -583,7 +583,7 @@ pub async fn list_portal_color_cards(
     }
     let paginator = select
         .order_by_desc(color_card::Column::CreatedAt)
-        .paginate(&db, page_size);
+        .paginate(db.as_ref(), page_size);
     let total = paginator.num_items().await?;
     let models = paginator.fetch_page(page.saturating_sub(1)).await?;
     let items: Vec<PortalColorCardView> =
@@ -607,7 +607,7 @@ pub async fn get_portal_order(
     let customer = require_portal_customer(&db, auth.user_id, auth.role_id).await?;
     let model = sales_order::Entity::find_by_id(order_id)
         .filter(sales_order::Column::CustomerId.eq(customer.id))
-        .one(&db)
+        .one(db.as_ref())
         .await?
         .ok_or_else(|| AppError::not_found("订单不存在或不属于当前绑定客户"))?;
 
@@ -627,17 +627,17 @@ pub async fn get_portal_dashboard(
     let customer = require_portal_customer(&db, auth.user_id, auth.role_id).await?;
     let owned = sales_order::Entity::find().filter(sales_order::Column::CustomerId.eq(customer.id));
 
-    let order_count = owned.clone().count(&db).await?;
+    let order_count = owned.clone().count(db.as_ref()).await?;
     let in_transit_count = owned
         .clone()
         .filter(sales_order::Column::Status.is_in([so_status::PARTIAL_SHIPPED, so_status::SHIPPED]))
-        .count(&db)
+        .count(db.as_ref())
         .await?;
     let receivable_balance = owned
         .select_only()
         .column_as(Expr::col(sales_order::Column::BalanceAmount).sum(), "total")
         .into_tuple::<Option<Decimal>>()
-        .one(&db)
+        .one(db.as_ref())
         .await?
         .flatten()
         .unwrap_or(Decimal::ZERO);
