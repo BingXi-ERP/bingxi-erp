@@ -17,6 +17,12 @@
  * - evidence：入口实际调用的仓内端点或"仓内无端点"的判据出处。
  */
 var ENTRY_PERMS = {
+  // ===== 客户门户只读域（libs/services/ServicesCustomerPortal.js → /api/v1/erp/customer-portal/*）=====
+  "customerPortal:view": {
+    codes: ["customer-portal:read"],
+    evidence: "GET /api/v1/erp/customer-portal/dashboard 及同前缀只读列表",
+  },
+
   // ===== 销售单域（libs/services/ServicesOrder.js → /api/v1/erp/sales/orders*）=====
   "order:saveBilling": {
     codes: ["orders:create"],
@@ -63,7 +69,8 @@ var ENTRY_PERMS = {
   },
   "goods:add": {
     codes: ["products:create"],
-    evidence: "POST /api/v1/erp/products（manager 等持 products:* 角色经通配命中）",
+    evidence:
+      "POST /api/v1/erp/products（manager 等持 products:* 角色经通配命中）",
   },
   "goods:manage": {
     codes: ["products:update"],
@@ -108,7 +115,8 @@ var ENTRY_PERMS = {
   },
   "stat:summary:person": {
     codes: ["dashboard:read"],
-    evidence: "个人/全店切换只是数据范围，后端 new_with_data_scope 收窄，权限键同一枚",
+    evidence:
+      "个人/全店切换只是数据范围，后端 new_with_data_scope 收窄，权限键同一枚",
   },
   "stat:center": {
     codes: ["dashboard:read"],
@@ -121,7 +129,7 @@ var ENTRY_PERMS = {
   },
 
   // ===== 本地能力（后端无受权资源，公共可见）=====
-  "search_record": {
+  search_record: {
     public: true,
     codes: [],
     evidence: "搜索历史仅 wx.storage 本地读写，无网络腿",

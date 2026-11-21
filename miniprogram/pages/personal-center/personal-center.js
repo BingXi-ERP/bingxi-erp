@@ -3,14 +3,18 @@ var e = require("../../@babel/runtime/helpers/interopRequireDefault").default,
   isVisitor = e(require("../../libs/utils/isVisitor")),
   envConfig = e(require("../../envConfig.js")),
   app = getApp(),
-  ServicesCenter = require("../../libs/services/ServicesCenter.js").servicesCenter,
+  ServicesCenter =
+    require("../../libs/services/ServicesCenter.js").servicesCenter,
   login = require("../../libs/utils/login.js").login,
   apiGateway = require("../../libs/utils/apiGateway.js"),
   util = require("../../libs/utils/util.js").utils;
 Page({
   data: {
     comboData: null,
-    iconDebug: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/icon_debug.png"),
+    iconDebug: "".concat(
+      app.config.imgHost,
+      "/img/customer/duibuIcon/icon/icon_debug.png",
+    ),
     isShowDebugBtn: !1,
     openShopStatus: "",
     openShopPopup: !1,
@@ -33,9 +37,18 @@ Page({
     userInfoList: {},
     icon: {
       invite: "".concat(app.config.imgHost, "/img/shareFile/invite.png"),
-      contact: "".concat(app.config.imgHost, "/img/customer/duibuIcon/phone@2x.png"),
-      boss: "".concat(app.config.imgHost, "/img/customer/duibuIcon/门店店长@2x.png"),
-      worker: "".concat(app.config.imgHost, "/img/customer/duibuIcon/worker@2x.png"),
+      contact: "".concat(
+        app.config.imgHost,
+        "/img/customer/duibuIcon/phone@2x.png",
+      ),
+      boss: "".concat(
+        app.config.imgHost,
+        "/img/customer/duibuIcon/门店店长@2x.png",
+      ),
+      worker: "".concat(
+        app.config.imgHost,
+        "/img/customer/duibuIcon/worker@2x.png",
+      ),
     },
   },
   onLoad: function () {
@@ -59,7 +72,9 @@ Page({
     // 判据换成 apiGateway.isLoggedIn()（读的是 auth/me 回读确认后写入的会话快照，是真判据）
     (apiGateway.isLoggedIn()
       ? this.getUserInfo().then(function () {
-          var mta_analysis = util.addDefaultAvatar(app.globalData.userInfo.avatar),
+          var mta_analysis = util.addDefaultAvatar(
+              app.globalData.userInfo.avatar,
+            ),
             isVisitor = app.globalData.userInfo.type;
           (e.setData({
             avatar: mta_analysis,
@@ -145,7 +160,22 @@ Page({
     });
     var ServicesCenter = [
         {
-          img: "".concat(app.config.imgHost, "/img/customer/duibuIcon/equipment@2x.png"),
+          img: "".concat(
+            app.config.imgHost,
+            "/img/customer/duibuIcon/equipment@2x.png",
+          ),
+          title: "客户门户",
+          showBorder: !0,
+          action: "customerPortal",
+          noAuth: !1,
+          perm: "customerPortal:view",
+          bgcolor: "linear-gradient( 180deg, #3E84F8 0%, #78ACFE 100%)",
+        },
+        {
+          img: "".concat(
+            app.config.imgHost,
+            "/img/customer/duibuIcon/equipment@2x.png",
+          ),
           title: "设备连接",
           showBorder: !0,
           action: "link",
@@ -153,7 +183,10 @@ Page({
           bgcolor: "linear-gradient( 180deg, #3E84F8 0%, #78ACFE 100%)",
         },
         {
-          img: "".concat(app.config.imgHost, "/img/customer/duibuIcon/address@2x.png"),
+          img: "".concat(
+            app.config.imgHost,
+            "/img/customer/duibuIcon/address@2x.png",
+          ),
           title: "地址管理",
           showBorder: !0,
           action: "myAddress",
@@ -162,7 +195,10 @@ Page({
         },
         {
           title: "员工管理",
-          img: "".concat(app.config.imgHost, "/img/customer/duibuIcon/account@2x.png"),
+          img: "".concat(
+            app.config.imgHost,
+            "/img/customer/duibuIcon/account@2x.png",
+          ),
           action: "children",
           noAuth: !1,
           perm: "basic:user:subAccount",
@@ -171,21 +207,30 @@ Page({
       ],
       login = [
         {
-          img: "".concat(app.config.imgHost, "/img/customer/duibuIcon/teach@2x.png"),
+          img: "".concat(
+            app.config.imgHost,
+            "/img/customer/duibuIcon/teach@2x.png",
+          ),
           title: "教学视频",
           showBorder: !0,
           action: "teach",
           noAuth: !0,
         },
         {
-          img: "".concat(app.config.imgHost, "/img/customer/duibuIcon/setting@2x.png"),
+          img: "".concat(
+            app.config.imgHost,
+            "/img/customer/duibuIcon/setting@2x.png",
+          ),
           title: "设置",
           showBorder: !0,
           action: "option",
           noAuth: !1,
         },
         {
-          img: "".concat(app.config.imgHost, "/img/customer/duibuIcon/service@2x.png"),
+          img: "".concat(
+            app.config.imgHost,
+            "/img/customer/duibuIcon/service@2x.png",
+          ),
           title: "联系客服",
           showBorder: !0,
           action: "service",
@@ -198,7 +243,7 @@ Page({
     // 映射直接从 resCodeList 现算，不依赖首页 hasPower 先跑（冷启动直达本页同样成立）。
     // 注意：本函数下方有 var util 遮蔽，这里必须走 require 取 getResList。
     var authMap = require("../../libs/utils/util.js").utils.getResList(
-      wx.getStorageSync("resCodeList")
+      wx.getStorageSync("resCodeList"),
     );
     app.userAuthList = authMap;
     e.setData({
@@ -209,7 +254,8 @@ Page({
     });
     var util = wx.getStorageSync("mobile");
     // 演示账号特判，本地缓存手机号等于演示号时隐藏登录入口，演示号取自 envConfig.account.demoMobileNum 单点，改号只改那一枚
-    ((envConfig.default.account.demoMobileNum != util && util) || login.splice(0, 1),
+    ((envConfig.default.account.demoMobileNum != util && util) ||
+      login.splice(0, 1),
       this.setData({
         panel: o,
         panelMuen: login,
@@ -248,6 +294,11 @@ Page({
     // 属假判据，换成会话快照判据，auth 数据属性维持原语义
     if (apiGateway.isLoggedIn() || ServicesCenter)
       switch (app) {
+        case "customerPortal":
+          wx.navigateTo({
+            url: "/packageA/pages/customer-portal/index",
+          });
+          break;
         case "teach":
           wx.navigateTo({
             url: "/packageB/pages/personal-center/teach-video/index",

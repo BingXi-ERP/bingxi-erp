@@ -1,0 +1,14 @@
+<view class="portal-page">
+  <view class="portal-error" wx:if="{{error}}">{{error}}</view>
+  <view class="portal-row" wx:for="{{items}}" wx:key="id">
+    <view class="row-head">
+      <text>{{item.card_no}}</text>
+      <text class="row-status">{{item.status}}</text>
+    </view>
+    <view class="row-line">{{item.card_name}}</view>
+    <view class="row-line">类型：{{item.card_type}}　季节：{{item.season}}　颜色数：{{item.total_colors}}</view>
+    <view class="row-line" wx:if="{{item.description}}">{{item.description}}</view>
+  </view>
+  <view class="portal-empty" wx:if="{{!loading && items.length === 0 && !error}}">暂无色卡</view>
+  <view class="portal-empty" wx:if="{{loading}}">正在加载</view>
+</view>
