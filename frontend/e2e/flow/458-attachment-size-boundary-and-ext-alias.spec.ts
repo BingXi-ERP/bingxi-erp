@@ -6,19 +6,16 @@ import { API_BASE, API_PREFIX, apiCall, apiCallRaw, loginViaUI } from './helpers
  * 458 资质附件大小精确边界与后缀别名/同族真值链（目标 4.18「类型限制/大小限制」）
  *
  * 补齐 451/453/456 未覆盖的边界面：
- * - 大小上限由后端唯一常量 MAX_QUALIFICATION_ATTACHMENT_SIZE = 5*1024*1024（supplier_handler.rs:755），
- *   判定是 data.len() > MAX（:989，严格大于）。故「刚好等于 5MB」必须可传、「5MB+1 字节」必须被
- *   点名拒绝——这是 4.18「精确到阈值的边界刚好等于上限可传，超 1KB 拦截」的真实断言面。
- *   全局请求体上限 MAX_HTTP_BODY_BYTES（12MB）远大于 5MB+1，超限文件能完整读入走到显式校验，
- *   拒绝形态是 validation_displayable（4xx + 可外显文案），不是流读取截断的 BUSINESS_ERROR。
- * - 后缀取扩展名后 to_ascii_lowercase（:1005-1009），故大写别名 .PDF/.JPEG 应按小写白名单放行；
- *   qualification_ext_matches_magic（:783-789）中 jpg/jpeg 同指 JPEG，故 .jpeg + JPEG magic 可传。
- * - magic bytes 真值（:769-779）：PDF %PDF / JPEG FF D8 FF / PNG 89 50 4E 47 0D 0A 1A 0A，
- *   后缀与 magic 不同族（.jpg 实为 PNG）视为伪造拒绝（与 453-05c 的 .png 实为 PDF 对称）。
+ * - 大小上限由供应商资质处理器的唯一常量 MAX_QUALIFICATION_ATTACHMENT_SIZE = 5*1024*1024 决定，
+ *   判定使用严格大于，故刚好等于上限可传、上限加一字节必须被业务拒绝；全局请求体上限远大于该值，
+ *   超出文件能完整读入并走到显式校验，拒绝形态是 validation_displayable（4xx + 可外显文案）。
+ * - 后缀取扩展名后统一转小写，故大写别名按小写白名单放行；JPEG 与 JPG 同族，
+ *   故 .jpeg 配合 JPEG magic 可传。
+ * - magic 真值分别取 PDF、JPEG、PNG 的固定头字节；后缀与 magic 不同族视为伪造拒绝，
+ *   与已有 .png 实为 PDF 的负例对称。
  *
- * 端点在册事实来源 frontend/scripts/route-snapshot.txt：
- * POST /purchase/suppliers/{sid}/qualifications（建行）、GET 同路径裸数组回读、
- * POST /purchase/suppliers/{sid}/qualifications/{qid}/attachment（multipart 字段名 file）。
+ * 端点在册事实来源为 frontend/scripts/route-snapshot.txt：
+ * POST/GET /purchase/suppliers/{sid}/qualifications 与 POST 附件上传端点（multipart 字段名 file）。
  * 失败信封钉 HTTP 码 + 字符串机器码在场 + 成功不假荷；前置不成立显式 throw，不伪装绿灯。
  */
 
@@ -87,29 +84,28 @@ async function uploadAttachment(
   };
 }
 
-/** 构造精确字节数的合法 PDF（头 %PDF 触发 magic，空格填充到指定长度） */
+/** 构造精确字节数的合法 PDF（ASCII 头触发 magic，ASCII 空格填充到指定长度） */
 function buildPdfOfExactSize(totalBytes: number): Buffer {
-  const head = Buffer.from('%PDF-1.4\n', 'utf-8');
+  const head = '%PDF-1.4\n';
   if (totalBytes < head.length) {
     throw new Error(`458 目标字节数 ${totalBytes} 小于 PDF 头长度 ${head.length}`);
   }
-  return Buffer.concat([head, Buffer.alloc(totalBytes - head.length, 0x20)]);
+  return Buffer.from(`${head}${' '.repeat(totalBytes - head.length)}`, 'utf-8');
 }
 
 /** JPEG magic 最小合法体：FF D8 FF + APP0/JFIF，magic 识别只取前三字节 */
 function buildJpegBuffer(marker: string): Buffer {
-  return Buffer.concat([
-    Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]),
-    Buffer.from(`JFIF\0${marker}`, 'utf-8'),
-  ]);
+  const header = [0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10];
+  const jfif = Array.from('JFIF\0', c => c.charCodeAt(0));
+  const tail = Array.from(marker, c => c.charCodeAt(0));
+  return Buffer.from([...header, ...jfif, ...tail]);
 }
 
 /** PNG magic 最小合法体：8 字节签名 + 标记串 */
 function buildPngBuffer(marker: string): Buffer {
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    Buffer.from(marker, 'utf-8'),
-  ]);
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  const tail = Array.from(marker, c => c.charCodeAt(0));
+  return Buffer.from([...signature, ...tail]);
 }
 
 async function createQualification(page: Page, supplierId: number, label: string): Promise<number> {
@@ -179,7 +175,7 @@ async function ensureSupplier(page: Page): Promise<number> {
     );
   }
   cachedSupplierId = sid;
-  process.stdout.write(`[458] 本 worker 专属供应商已建 id=${sid}\n`);
+  console.log(`[458] 本 worker 专属供应商已建 id=${sid}\n`);
   return sid;
 }
 
@@ -203,9 +199,7 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
       'application/pdf',
       pdf
     );
-    process.stdout.write(
-      `[458-01] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`
-    );
+    console.log(`[458-01] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`);
     expect(
       up.status,
       `458-01 刚好等于上限必须可传（2xx），实际 status=${up.status} message=${up.message}`
@@ -234,9 +228,7 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
     const pdf = buildPdfOfExactSize(MAX_BYTES + 1);
     expect(pdf.length, '458-02 构造体必须为上限+1 字节').toBe(MAX_BYTES + 1);
     const up = await uploadAttachment(page, supplierId, qid, 'overby1.pdf', 'application/pdf', pdf);
-    process.stdout.write(
-      `[458-02] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`
-    );
+    console.log(`[458-02] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`);
     expect(
       up.status,
       `458-02 超上限 1 字节必须被拒（4xx），实际 status=${up.status} message=${up.message}`
@@ -294,9 +286,7 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
     for (const c of cases) {
       const qid = await createQualification(page, supplierId, c.label);
       const up = await uploadAttachment(page, supplierId, qid, c.file, c.mime, c.buf);
-      process.stdout.write(
-        `[458-${c.label}] status=${up.status} code=${up.code} message=${up.message}\n`
-      );
+      console.log(`[458-${c.label}] status=${up.status} code=${up.code} message=${up.message}\n`);
       expect(
         up.status,
         `458-${c.label} ${c.desc} 必须可传（2xx），实际 status=${up.status} message=${up.message}`
@@ -329,9 +319,7 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
       'image/jpeg',
       pngBytes
     );
-    process.stdout.write(
-      `[458-04] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`
-    );
+    console.log(`[458-04] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`);
     expect(
       up.status,
       `458-04 .jpg 后缀实为 PNG magic 必须被拒（4xx），实际 status=${up.status} message=${up.message}`

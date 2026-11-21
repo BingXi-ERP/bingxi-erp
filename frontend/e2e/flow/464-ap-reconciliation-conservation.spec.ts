@@ -5,29 +5,24 @@
  * 供应商编码名称富化，未把汇总出口与发票明细列表做「汇总 == 明细逐行累加、差额为 0」
  * 的跨口勾稽；本文件专守该守恒面，且用跨页读回明细，覆盖分页场景下的漏算。
  *
- * 调用面（backend/src/routes/finance.rs 注册，前缀 /api/v1/erp）：
+ * 调用面（财务域路由注册，前缀 /api/v1/erp）：
  * POST /purchase/suppliers 建专属供应商；POST /ap/invoices 建应付单；
  * GET /ap/invoices 发票明细分页列表；GET /ap/invoices/{id} 详情；
  * POST /ap/invoices/{id}/approve 审核；DELETE /ap/invoices/{id} 删除；
  * GET /ap/reconciliations/summary 供应商应付汇总。
  *
- * 契约真相（逐字段对照后端源码，非推测）：
- * - 汇总出参 SupplierApSummary（backend/src/services/ap_reconciliation_ops/types.rs:34-67）：
- *   supplier_id / supplier_code / supplier_name / total_invoice_count / total_invoice_amount /
- *   total_paid_amount / total_unpaid_amount / paid_invoice_count / partial_paid_invoice_count /
- *   overdue_invoice_count / overdue_amount，全部 snake_case。
- * - 汇总口径（backend/src/services/ap_reconciliation_ops/report.rs:24-27,43-79）：从 ap_invoice
- *   按 supplier_id 全量聚合；amount_sum / paid_sum / unpaid_sum 逐行直接累加模型三列；
- *   PAID 与 PARTIAL_PAID 计数逐行判 invoice_status；overdue 判
- *   unpaid_amount > 0 且 due_date < Utc::now().date_naive()，金额取该行未付额。
- * - 明细出参为 ap_invoice::Model 序列化（backend/src/models/ap_invoice.rs:24-90）：
- *   amount / paid_amount / unpaid_amount / invoice_status / due_date（snake_case）；
- *   列表信封 PaginatedResponse（backend/src/utils/response.rs:39-45,59-66）：data.items / data.total。
- * - 建单（backend/src/services/ap_invoice_ops/crud.rs:92-118）：paid_amount 恒 0，
- *   unpaid_amount = amount - paid_amount，invoice_status 初值为 DRAFT
- *   （backend/src/models/status/general.rs:16）。故逐行恒等式 amount = paid + unpaid 成立。
- * - 成功信封机器码 code 固定 200（backend/src/utils/response.rs:88-93）。
- * - Decimal 出参是字符串，按两位小数的整数分比较；差额必须为 0 分，不做四舍五入。
+ * 契约真相（逐字段对照后端类型与写入方）：
+ * - 汇总出参 SupplierApSummary 含 supplier_id / supplier_code / supplier_name /
+ *   total_invoice_count / total_invoice_amount / total_paid_amount / total_unpaid_amount /
+ *   paid_invoice_count / partial_paid_invoice_count / overdue_invoice_count / overdue_amount，
+ *   全部 snake_case。
+ * - 汇总按供应商全量聚合发票行；金额三列逐行直接累加；PAID 与 PARTIAL_PAID 逐行判状态；
+ *   逾期判未付额大于零且到期日早于当天，金额取该行未付额。
+ * - 明细出参由发票模型序列化，amount / paid_amount / unpaid_amount / invoice_status /
+ *   due_date 全为 snake_case；列表信封为 data.items / data.total。
+ * - 建单时 paid_amount 恒 0，unpaid_amount = amount - paid_amount，状态初值为 DRAFT，
+ *   故逐行恒等式 amount = paid + unpaid 成立。
+ * - 成功信封机器码固定 200；Decimal 出参是字符串，按两位小数的整数分比较，差额必须为 0。
  */
 import { test, expect } from '../diagnose-fixture';
 import type { Page } from '@playwright/test';

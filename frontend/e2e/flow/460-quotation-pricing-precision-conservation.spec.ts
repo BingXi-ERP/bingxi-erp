@@ -31,6 +31,16 @@ function str(value: unknown, label: string): string {
   return value;
 }
 
+function canonicalDecimal(value: unknown, label: string): string {
+  const text = str(value, label);
+  if (!/^-?\d+(?:\.\d+)?$/.test(text)) {
+    throw new Error(`${label} 必须是定点小数字符串，实际 ${JSON.stringify(text)}`);
+  }
+  if (!text.includes('.')) return text;
+  const trimmed = text.replace(/0+$/, '').replace(/\.$/, '');
+  return trimmed === '-0' ? '0' : trimmed;
+}
+
 function int(value: unknown, label: string): number {
   if (typeof value !== 'number' || !Number.isInteger(value)) {
     throw new Error(`${label} 必须是整数，实际 ${JSON.stringify(value)}`);
@@ -47,32 +57,28 @@ function ymd(daysFromToday = 0): string {
 /**
  * 460 报价定价自动计算链：定点数精度、量级边界与词表边界
  *
- * 缺口来源。POST /quotations/calculate-price 在 frontend/scripts/route-snapshot.txt:1543 在册，
- * 全仓 E2E 此前零命中；后端写入方是 services/quotation_pricing_service.rs 的
- * QuotationPricingService::calculate（:123-194），税率经 utils/tax.rs:61 的 unit_price_with_tax
- * 统一收敛。现有 451/455 只覆盖色号阶梯价命中与审批档位，未覆盖本端点的舍入链。
+ * 缺口来源：POST /quotations/calculate-price 已在 route-snapshot 在册，全仓 E2E 此前零命中；
+ * 现有 451/455 只覆盖色号阶梯价命中与审批档位，未覆盖本端点的舍入链。
+ * 后端写入方集中在报价定价服务，税率由统一税额工具收敛。
  *
- * 入参逐字段对照 PricingContext（services/quotation_pricing_service.rs:51-65）：
+ * 入参逐字段对照 PricingContext：
  * customer_id/customer_level/product_id/color_id/quantity/currency/quotation_date/tax_rate。
- * customer_level 是枚举 CustomerLevel，serde(rename_all="UPPERCASE")（:23-30），
- * 故合法词只有 VIP 与 NORMAL；小写 vip 在提取器解码层被拒，经
- * middleware/trace_context.rs:279 收口为 HTTP 400 + code=VALIDATION_ERROR（APP_ERROR_CODES）。
- * Decimal 字段一律用字符串提交，金额出参是 DECIMAL 字符串，断言逐位比字符串不重算第二套舍入。
+ * customer_level 是枚举，序列化为大写词；合法词只有 VIP 与 NORMAL，小写词在解码层被拒，
+ * 并由统一错误收口为 HTTP 400 + VALIDATION_ERROR。
+ * Decimal 字段用字符串提交，金额出参是定点数字符串；断言按数值守恒比对，允许固定标度尾部补零，
+ * 不允许提前截断或换一套舍入规则重算。
  *
- * 出参逐字段对照 PricingResult（:77-90）：unit_price/unit_price_with_tax/tier_breakdown/
- * discount_applied/final_amount/price_source；tier_breakdown 元素键取 TierPrice（:69-73）
- * 的 min_quantity/max_quantity/unit_price；price_source 是 snake_case 的 color_price（:95-102）。
+ * 出参逐字段对照 PricingResult：unit_price/unit_price_with_tax/tier_breakdown/
+ * discount_applied/final_amount/price_source；tier_breakdown 元素键取 TierPrice 的
+ * min_quantity/max_quantity/unit_price；price_source 是 snake_case 的 color_price。
  *
- * 前置。ensureTestEntities 自建带色号的报价专用产品，POST /color-prices 落一条
- * base_price=12.3456（product_color_prices.base_price 是 DECIMAL(18,4)）的通用价宿主，
- * customer_level 不写（数据库 NULL，供 VIP/NORMAL 两路都回退到通用价）。
+ * 前置：ensureTestEntities 自建带色号的报价专用产品，POST /color-prices 落一条四位小数通用价，
+ * customer_level 不写，供 VIP/NORMAL 两路都回退到通用价。
  *
- * 数值真值（逐条来自 :171-184 与 utils/tax.rs:61-63）：
- * tier.unit_price=12.3456；VIP 折扣率 0.05（:36）→ discount_applied=(12.3456*0.05).round_dp(2)=0.62，
- * unit_price=(12.3456-0.62).round_dp(2)=11.73；税率 13 为百分数口径 →
- * unit_price_with_tax=(11.73*1.13).round_dp(2)=13.25；final_amount=(unit_price*quantity).round_dp(2)。
- * 数量 3→35.19；数量 0.001→0.01；数量 1000000 且免税→11730000.00、含税单价仍 11.73。
- * NORMAL 折扣率 0（:38）→ discount_applied=0.00、unit_price=12.35、含税 13.96、数量 3 总额 37.05。
+ * 数值真值：tier.unit_price 数值为 12.3456（出参可为固定标度的 12.345600）；
+ * VIP 折扣率 0.05 → discount_applied 收敛到 0.62，unit_price 收敛到 11.73；
+ * 税率 13 为百分数口径 → unit_price_with_tax 收敛到 13.25；final_amount 按数量收敛。
+ * 数量 3、0.001、1000000 与免税分支各有独立守恒断言；NORMAL 折扣率为 0。
  */
 async function seedPrecisionPrice(
   page: Page,
@@ -159,7 +165,10 @@ test.describe.serial('460 报价定价自动计算的定点数精度守恒', () 
       throw new Error(`tier_breakdown 必须恰含一档，实际 ${JSON.stringify(tiers)}`);
     }
     const tier = requireRow(tiers[0], 'tier_breakdown[0]');
-    expect(str(tier.unit_price, 'tier.unit_price'), '四位小数基价不得被提前截断').toBe('12.3456');
+    expect(
+      canonicalDecimal(tier.unit_price, 'tier.unit_price'),
+      '四位小数基价不得被提前截断或改值'
+    ).toBe('12.3456');
     expect(Number(str(tier.min_quantity, 'tier.min_quantity'))).toBe(1);
     expect(tier.max_quantity).toBeNull();
 

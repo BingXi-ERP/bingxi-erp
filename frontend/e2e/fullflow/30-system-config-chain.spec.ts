@@ -58,6 +58,11 @@ function requireNum(v: unknown, label: string): number {
   return n;
 }
 
+/** 时间戳末六位插入字母，避免连续数字触发产品的键盘序列密码规则。 */
+function stampSafe(ts: string): string {
+  return ts.replace(/(\d{2})(\d{2})(\d{2})/, '$1x$2y$3');
+}
+
 /** 部门列表恒 PaginatedResponse{items,...}（define_crud_handlers → service::list，
  *  与 helpers.ts:469 注释同源）；单形状直读，漂移即红 */
 async function listDepartments(page: Page): Promise<Record<string, unknown>[]> {
@@ -208,7 +213,7 @@ test.describe('30 系统配置契约链', () => {
     // 只翻 is_active），守卫按行计数不放行——本钉揭示"删了用户却删不掉部门"是既有契约而非 bug。
     const user = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/users', {
       username: `f30u${Date.now().toString().slice(-6)}`,
-      password: `E30p!${Date.now().toString().slice(-6)}Qz`,
+      password: `E30p!${stampSafe(Date.now().toString().slice(-6))}Qz`,
       department_id: parentId,
     });
     const userId = requireNum(user.id, '建用户');
@@ -235,7 +240,7 @@ test.describe('30 系统配置契约链', () => {
     const username = `f30dup${ts}`;
     const created = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/users', {
       username,
-      password: `E30ok!${ts}Zq`,
+      password: `E30ok!${stampSafe(ts)}Zq`,
       phone: '13800000304',
     });
     const userId = requireNum(created.id, '建用户');

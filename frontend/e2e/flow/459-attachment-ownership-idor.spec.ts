@@ -6,15 +6,14 @@ import { API_BASE, API_PREFIX, apiCall, apiCallRaw, loginViaUI } from './helpers
  * 459 资质附件跨供应商归属校验与未上传下载反假成功链（目标 3.4 数据隔离 + 4.18 权限/下载）
  *
  * 补齐 451/453/456/458 未覆盖的归属面：
- * - 后端 get_supplier_qualification（supplier_service.rs:1122-1137）先 find_by_id(qualification_id)，
- *   再检查 existing.supplier_id != 传入 supplier_id → AppError::business_displayable
- *   「该资质不属于此供应商」。上传腿（supplier_handler.rs:944-946）与下载腿（:1164-1166）
- *   都先过这道双键门，故跨供应商用 A 的资质 id + B 的 supplier_id 必然被拒。
- * - 下载腿（:1167-1175）在 attachment_path 为 None 时 AppError::not_found「该资质尚未上传附件」，
- *   即未上传资质下载必须 404，不能返回空字节流假装成功。
+ * - 供应商资质读取先按资质主键查行，再校验该行 supplier_id 与传入供应商一致；不一致返回
+ *   business_displayable「该资质不属于此供应商」。上传与下载两条腿都先经过这道双键门，
+ *   故跨供应商组合必然被拒。
+ * - 下载腿在 attachment_path 为空时返回 not_found「该资质尚未上传附件」，
+ *   即未上传资质下载必须是 404，不能返回空字节流假装成功。
  *
- * 端点在册事实来源 frontend/scripts/route-snapshot.txt，权限键 suppliers:read 由 URL 段推导。
- * 失败钉 HTTP 码 + 机器码在场；前置不成立显式 throw；不用 ?? 掩盖缺键、不把 404 当健康绿。
+ * 端点在册事实来源为 frontend/scripts/route-snapshot.txt，权限键 suppliers:read 由 URL 段推导。
+ * 失败钉 HTTP 码 + 机器码在场；前置不成立显式 throw；不用兜底掩盖缺键、不把 404 当健康绿。
  */
 
 function fullUrl(path: string): string {
@@ -177,7 +176,7 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
     ).toBe(true);
 
     const got = await getAttachment(page, supplierId, qid);
-    process.stdout.write(
+    console.log(
       `[459-01] 未上传下载 status=${got.status} body=${got.body.toString('utf8').slice(0, 120)}\n`
     );
     expect(
@@ -224,7 +223,7 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
     ).toBe(true);
 
     const cross = await getAttachment(page, supplierB, qidA);
-    process.stdout.write(
+    console.log(
       `[459-02] 跨供应商下载 status=${cross.status} body=${cross.body.toString('utf8').slice(0, 160)}\n`
     );
     expect(
@@ -287,7 +286,7 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
       'application/pdf',
       buildPdfBuffer('459-03-idor')
     );
-    process.stdout.write(
+    console.log(
       `[459-03] 跨供应商上传 status=${idor.status} code=${idor.code} message=${idor.message}\n`
     );
     expect(
