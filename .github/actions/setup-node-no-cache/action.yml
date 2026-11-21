@@ -1,0 +1,17 @@
+# Composite action：Node 工具链（关闭包管理器缓存）
+# 原 2 个纯 node 脚本对账 job 逐字重复；这类 job 全程无 npm ci/install，
+# setup-node 内置依赖缓存没有消费者，一律关掉而不是留位豁免。
+name: Setup Node (no package cache)
+description: 安装指定版本 Node.js 并关闭包管理器缓存，供纯 node 脚本 job 复用
+inputs:
+  node-version:
+    description: Node.js 版本（调用方传 env.NODE_VERSION）
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: 安装 Node.js
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        package-manager-cache: false
