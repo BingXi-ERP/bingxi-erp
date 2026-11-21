@@ -10,7 +10,7 @@
 use chrono::Utc;
 use std::io::Write;
 use tracing::info;
-use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
+use zip::{write::SimpleFileOptions, CompressionMethod, ZipWriter};
 
 use crate::utils::error::AppError;
 
@@ -415,5 +415,4 @@ impl ReportEngineService {
             content: buffer,
         })
     }
-
 }
