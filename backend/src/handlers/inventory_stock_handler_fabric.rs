@@ -139,15 +139,15 @@ pub async fn create_stock_fabric(
 /// 写入前的四维追溯准入。
 ///
 /// 判定本身不在这里重写：唯一权威是 `services::inv::fabric_class::validate_fabric_trace`
-/// （色号为空=白坯免缸号、色号非空=染色布缸号+批次必填、批次任何布种必填、trim 归一、
-/// 禁止按色号文本嗅探布种），本函数只做两点端侧收口：
+/// （色号为空=白坯且禁带缸号、色号非空=染色布缸号+批次必填、批次任何布种必填、trim 归一、
+/// 禁止按色号文本嗅探布种），本函数只做一点端侧收口：
 /// 1. 拒绝文案外显：validate_fabric_trace 产出的校验错误只回显用户自己提交的色号与
 ///    公开业务规则，满足 `business_displayable` 安全边界（见 utils::error 模块文档）；
 ///    若不转则 ValidationError 出参被脱敏成"请求参数验证失败"，用户在界面上看不到原因。
 ///    其余变体原样传播，不强转 500。
-/// 2. 白坯主动把缸号归一为 None：validate_fabric_trace 对白坯仅"免缸号"（不强制为空），
-///    而出库规划 `services::inventory_deduction` 对白坯只接受 `dye_lot_no IS NULL` 的行、
-///    绝不跨缸回退——若放行"白坯带缸号"入库，该行将永久提不出来。此处收口与出库同源。
+/// 2. 白坯带缸号在 validate_fabric_trace 判定层显式拒绝（2026-11-22 拍板）：白坯不具缸号
+///    属性，出库规划对白坯只接受 `dye_lot_no IS NULL` 的行，带缸号入库即成永久提不出的
+///    死库存；本函数不做任何归一改写，判定结果原样透传。
 pub fn admit_stock_fabric_trace(
     color_no: Option<String>,
     dye_lot_no: Option<String>,
@@ -161,13 +161,5 @@ pub fn admit_stock_fabric_trace(
             other => other,
         },
     )?;
-    if trace.color_no.is_empty() {
-        // 白坯布：缸号归一为 None（白坯不具缸号属性，落库 dye_lot_no IS NULL 才能被出库规划命中）
-        Ok(FabricTrace {
-            dye_lot_no: None,
-            ..trace
-        })
-    } else {
-        Ok(trace)
-    }
+    Ok(trace)
 }

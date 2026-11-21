@@ -20,7 +20,7 @@ use crate::utils::error::AppError;
 pub struct FabricTrace {
     /// trim 后的色号；白坯布为空串
     pub color_no: String,
-    /// 染色布为非空缸号；白坯布免填（缺省为 None），给了则如实保留 trim 值（R-1 裁定）
+    /// 染色布为非空缸号；白坯布不具缸号属性，携带缸号入库被判定显式拒绝
     pub dye_lot_no: Option<String>,
     /// trim 后的批次（入库批次，任何布种都必填）
     pub batch_no: String,
@@ -32,10 +32,10 @@ pub struct FabricTrace {
 /// 名字里带"白"的色号（如"本白""白色"）是已染色的白色布，属有颜色产品，必须带缸号追溯，
 /// 按名称嗅探会把染色白色布误判为白坯而豁免缸号，破坏四维追溯。
 ///
-/// 统一规则（用户拍板）：
-/// - `color_no` 为空 → 白坯布：缸号**免填**——即不作必填要求，缺省归一为 None；
-///   若主动提交了非空缸号则如实保留 trim 值（静默丢弃用户入参属本仓既定的"假保存"
-///   缺陷形态，禁止；R-1 裁定）；批次仍必填（批次是入库批次，与是否染色无关）；
+/// 统一规则（2026-11-22 拍板，取代白坯缸号"如实保留"的 R-1 旧口径）：
+/// - `color_no` 为空 → 白坯布：不具缸号属性，携带非空缸号属数据矛盾，显式拒绝——
+///   出库规划对白坯只接受 `dye_lot_no IS NULL` 的行，带缸号入库即成永久提不出的死库存；
+///   拒绝外显原因让用户改对，不做静默清空或保留；批次仍必填（批次是入库批次，与是否染色无关）；
 /// - `color_no` 非空 → 染色布：缸号、批次都必填，缺一即返回明确业务错误；
 /// - 不看色号文本内容，仅以是否为空判定布种。
 ///
@@ -57,6 +57,15 @@ pub fn validate_fabric_trace(
                 "明细缺少批号：出库对染色布按缸号+色号+批次+匹号四维强制追溯（白坯免缸号/匹号），批次不得为空",
             )
         })?;
+    // 白坯布不具缸号属性：带缸号入库的行会被出库规划（白坯只取 dye_lot IS NULL）永久漏掉，
+    // 静默清空属"假保存"，显式拒绝让用户改对（2026-11-22 拍板，见函数文档）
+    if color_no.is_empty() {
+        if let Some(lot) = &dye_lot_no {
+            return Err(AppError::validation_displayable(format!(
+                "白坯布不具缸号属性：色号为空时不得携带缸号（dye_lot_no={lot}），请核对是否漏填色号或删除缸号"
+            )));
+        }
+    }
     // 色号为空 = 白坯布免缸号；色号非空 = 染色布缸号必填（仅以是否为空判定，不看名称）。
     if !color_no.is_empty() && dye_lot_no.is_none() {
         return Err(AppError::validation_displayable(format!(
@@ -112,7 +121,7 @@ mod tests {
 
     #[test]
     fn empty_color_is_white_fabric_exempt_from_dye_lot() {
-        // 空色号 = 白坯布：缸号免填（空值/缺省 → None；主动给值如实保留）；批次仍必填
+        // 空色号 = 白坯布：缸号缺省/空白归一为 None；批次仍必填
         let f = v(Some(""), Some(""), Some("B1"));
         assert_eq!(f.color_no, "");
         assert_eq!(f.dye_lot_no, None);
@@ -121,6 +130,18 @@ mod tests {
         let g = v(None, None, Some("B2"));
         assert_eq!(g.color_no, "");
         assert_eq!(g.dye_lot_no, None);
+    }
+
+    #[test]
+    fn white_fabric_with_dye_lot_rejected() {
+        // 白坯带缸号是数据矛盾：显式拒绝而非静默清空或保留（2026-11-22 拍板）；
+        // 空白缸号经 trim 过滤后视同缺省，仍合法通过
+        let err = validate_fabric_trace(Some(""), Some("DL-X".to_string()), Some("B1".to_string()))
+            .expect_err("白坯布携带缸号必须报错");
+        assert!(err.to_string().contains("白坯"), "实际: {}", err);
+
+        let blank = v(Some(""), Some("   ".to_string()), Some("B1"));
+        assert_eq!(blank.dye_lot_no, None);
     }
 
     #[test]
