@@ -55,6 +55,7 @@ pub async fn list_transactions(
             warehouse_id: txn.warehouse_id,
             batch_no: txn.batch_no,
             color_no: txn.color_no,
+            dye_lot_no: txn.dye_lot_no,
             quantity_meters: txn.quantity_meters,
             quantity_kg: txn.quantity_kg,
             quantity_before_meters: txn.quantity_before_meters.unwrap_or(Decimal::ZERO),

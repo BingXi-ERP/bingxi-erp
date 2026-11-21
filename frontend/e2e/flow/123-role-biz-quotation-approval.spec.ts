@@ -55,6 +55,7 @@ import {
   BASE_URL,
 } from './helpers';
 import { createRelay, expectEndpointDenied } from '../fixtures/relay';
+import { PRODUCT_TYPE } from '../../src/constants/product-type';
 
 type Row = Record<string, unknown>;
 
@@ -308,7 +309,7 @@ test.describe.serial('报价单双人审批链：销售代表提单、销售经�
               unit: '米',
               // 建品门要求显式提交产品类型（validate_product_create_fields 对缺省即拒）；
               // 取辅料档避开面料类的幅宽/克重/成分三列必录门，本用例的靶心是报价审批链
-              product_type: '辅料',
+              product_type: PRODUCT_TYPE.auxiliary,
             });
             const productId = Number(created?.id);
             if (!Number.isFinite(productId) || productId <= 0) {
