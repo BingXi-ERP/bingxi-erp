@@ -1,5 +1,12 @@
 import { test, expect } from '../diagnose-fixture';
-import { APP_ERROR_CODES, loginViaUI, apiCall, apiCallRaw, apiCallExpectFail } from './helpers';
+import {
+  APP_ERROR_CODES,
+  failureCode,
+  loginViaUI,
+  apiCall,
+  apiCallRaw,
+  apiCallExpectFail,
+} from './helpers';
 
 /**
  * 125 ar-reconciliations-enhanced 面全链真实契约（生成、明细、发送、确认、争议、解决、账龄、xlsx、结果列表、自动对账）
@@ -40,9 +47,10 @@ import { APP_ERROR_CODES, loginViaUI, apiCall, apiCallRaw, apiCallExpectFail } f
  *   customer_id 过滤下自建三单必全部入选。
  * - GET /aging-report：AgingReport{analysis_date,total_receivable(DECIMAL 出参字符串),
  *   customer_summaries,overall_buckets} 结构真实成立。
- * - GET /{id}/pdf：出参 content_type=application/pdf、size>0、
- *   base64_content 非空且以 JVBERi0（"%PDF-" 的 base64 前缀）开头——文件魔数级证据，
- *   不是「有响应即通过」。
+ * - GET /{id}/docx：出参 {id,content_type,size,base64_content}；content_type 钉成 Word
+ *   MIME，size 为解码后字节数，base64_content 解出的前两字节必须是 PK（zip 容器魔数），
+ *   不是「有响应即通过」。不存在的 ID → 404 NOT_FOUND。
+ * - GET /{id}/pdf：端点已随导出格式收敛删除，fail-closed 断真实 404。
  *
  * 金额列为 DECIMAL 线格式（出参字符串），断言用字符串数字形态，不做数值再造。
  * 自建客户（POST /crm/customers）隔离本面数据，用例尾部 best-effort 删除客户；
@@ -82,6 +90,13 @@ type AgingBody = {
   total_receivable: string | number;
   customer_summaries: unknown[];
   overall_buckets: unknown[];
+};
+
+type DocxBody = {
+  id: number;
+  content_type: string;
+  size: number;
+  base64_content: string;
 };
 
 const PERIOD_START = '2026-01-01';
@@ -428,6 +443,34 @@ test.describe.serial('125 ar-reconciliations-enhanced 全链契约回读', () =>
     );
     expect(pdfGone.status, `PDF 导出端点已删除应 404，实际 ${pdfGone.status}`).toBe(404);
     expect([undefined, 'NOT_FOUND']).toContain(failureCode(pdfGone));
+  });
+
+  test('docx 导出落真实端点：MIME、字节数与 zip 魔数守恒，未知 ID 404', async ({ page }) => {
+    const docx = await apiCallRaw<DocxBody>(
+      page,
+      'GET',
+      `/ar-reconciliations-enhanced/${recMain}/docx`
+    );
+    expect(docx.id, 'docx 出参 id 必须是被导出的对账单主键').toBe(recMain);
+    expect(
+      docx.content_type,
+      `content_type 必须钉成 Word MIME，实际 ${JSON.stringify(docx.content_type)}`
+    ).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    expect(docx.size, '导出文档字节数必须大于 0').toBeGreaterThan(0);
+    expect(typeof docx.base64_content, 'base64_content 必须是字符串').toBe('string');
+    const bytes = Buffer.from(docx.base64_content, 'base64');
+    expect(bytes.length, 'size 必须是解码后的真实字节数').toBe(docx.size);
+    expect(bytes.subarray(0, 2).toString('ascii'), 'docx 是 zip 容器，前两字节必须是 PK 魔数').toBe(
+      'PK'
+    );
+
+    const ghostDocx = await apiCallExpectFail(
+      page,
+      'GET',
+      '/ar-reconciliations-enhanced/987654/docx'
+    );
+    expect(ghostDocx.status, `不存在的对账单导出应 404，实际 ${ghostDocx.status}`).toBe(404);
+    expect([undefined, 'NOT_FOUND']).toContain(failureCode(ghostDocx));
   });
 
   test('清理：删除自建客户（对账单行无删除端点，best-effort 记录残量）', async ({ page }) => {
