@@ -76,6 +76,13 @@
 
 ## 二、常规规则
 
+- **行尾统一 LF 与本地格式验证标准（IR，2026-11-22）**：仓库根 .gitattributes 已落地
+  `* text=auto eol=lf` 加二进制排除，所有车道/clone 工作区持久 LF，不依赖本机 autocrlf。
+  本地格式验证唯一标准：LF 工作区分批跑 `rustfmt --check --edition 2024 --config-path rustfmt.toml`
+  （100 文件/批绕 Windows 206 限制），Diff 处数归零才算绿；禁用 `--edition 2021`、裸 rustfmt
+  （与 CI 的 2024 排序相反——backend/Cargo.toml 是 2024，被 rustfmt.toml 2021 掩盖）、本地
+  `cargo fmt --all` 直跑（Windows 命令行 206）。修格式按 CI diff 整块重写加逐字比对，本地
+  `cargo check --tests`（CARGO_TARGET_DIR=F:/cs/backend-target）双验证后再推。
 - **每项修复 1 commit**：bug 修复按"每项 1 commit"原则，便于回滚和审计
 - **公开端点收敛**：仅登录/刷新/健康检查可匿名访问，其他所有端点必须认证
 - **多租户已删除**（2026-06-28）：所有 tenant_id 列/字段/过滤/索引/管理表均已移除
