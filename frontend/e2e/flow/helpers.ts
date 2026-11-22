@@ -465,51 +465,9 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
       color_type: '纯色',
       extra_cost: 0,
     }
-    // 真实端点：GET /products/{id}/colors（返回数组，非分页包装）
-    const colors = await apiCallRaw<Array<{ id: number; color_no: string }>>(
-      page,
-      'GET',
-      `/products/${ownProductId}/colors`
-    );
-    ctx.productColorIds = colors?.map(c => c.id) || [];
-    ctx.colorNos = colors?.map(c => c.color_no) || [];
-    if (ctx.colorNos.length > 0) {
-      // 与建色段同一契约锚点：colorNos 挂在本专属产品上，把该产品提到
-      // productIds[0]，保住「productIds[0] 拥有 colorNos[0]」配对假设。
-      ctx.productIds = [ownProductId, ...ctx.productIds.filter(id => id !== ownProductId)];
-    }
-  } catch (e) {
-    throw new Error(`[ensureTestEntities] 色号查询失败: ${(e as Error).message}`);
-  }
-  if (ctx.colorNos.length === 0) {
-    // 新建产品天然无色号——真实创建一个（CreateProductColorRequest），非占位兜底
-    const ownProductId = ctx.productIds[ctx.productIds.length - 1];
-    // 时间戳末6位周期短，重跑/并行 worker 会在同一专属产品下撞色号唯一约束；补随机尾
-    // 并让创建与记录共用一值，杜绝二次 Date.now() 生成不一致色号。与供应商段同范式。
-    const colorSuffix = `${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, '0')}`;
-    const ownColorNo = `E2E-C${colorSuffix}`;
-    const created = await apiCall<{ id?: number }>(
-      page,
-      'POST',
-      `/products/${ownProductId}/colors`,
-      {
-        color_no: ownColorNo,
-        color_name: 'E2E色号',
-        // CreateProductColorRequest 必填：color_type/extra_cost
-        color_type: '纯色',
-        extra_cost: 0,
-      }
-    );
-    if (!created.data?.id) {
-      throw new Error(`[ensureTestEntities] 色号创建失败: ${JSON.stringify(created)}`);
-    }
-    ctx.productColorIds = [created.data.id];
-    ctx.colorNos = [ownColorNo];
-    // 契约锚点恢复：既有用例（21a 等）以「productIds[0] 拥有 colorNos[0]」取配对，
-    // 自建色号挂在末位产品上，把该专属产品提到首位保住这条配对假设。
-    ctx.productIds = [ownProductId, ...ctx.productIds.filter(id => id !== ownProductId)];
+  );
+  if (!created.data?.id) {
+    throw new Error(`[ensureTestEntities] 色号创建失败: ${JSON.stringify(created)}`);
   }
   ctx.productColorIds = [created.data.id];
   ctx.colorNos = [colorNo];
