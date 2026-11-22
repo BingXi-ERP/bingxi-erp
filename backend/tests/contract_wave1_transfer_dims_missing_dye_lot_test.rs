@@ -257,8 +257,7 @@ async fn live_create_transfer_dyed_missing_dye_lot_400_and_rollback() {
     use bingxi_backend::models::{inventory_stock, inventory_transfer, product, warehouse};
     use chrono::Utc;
     use sea_orm::{
-        ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, Order, PaginatorTrait,
-        QueryFilter, QueryOrder,
+        ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter,
     };
     use std::sync::Arc;
     use tower::ServiceExt;
