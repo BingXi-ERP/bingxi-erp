@@ -3795,6 +3795,7 @@ export default {
       nodeStatusBlocked: '阻塞',
       messageLoadFailed: '加载时间线失败',
       notFound: '订单不存在或已被删除',
+      mobileCardAria: '定制单工艺节点手机卡片列表',
     },
   },
   product: {

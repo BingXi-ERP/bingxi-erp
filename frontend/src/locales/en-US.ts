@@ -3824,6 +3824,7 @@ export default {
       nodeStatusBlocked: 'Blocked',
       messageLoadFailed: 'Failed to load timeline',
       notFound: 'Order not found or has been deleted',
+      mobileCardAria: 'Custom order process node mobile card list',
     },
   },
   product: {
