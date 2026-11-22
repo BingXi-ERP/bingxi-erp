@@ -55,17 +55,27 @@ fn req_json(v: serde_json::Value) -> CreateStockFabricRequest {
 // A) 白坯/染色准入收口纯函数矩阵（无 DB）
 // =========================================================
 
-/// 白坯（色号 None / 空串 / 纯空白）携带缸号 → business_displayable 显式拒绝；
-/// 不带缸号则放行且色号归一为空串（白坯合法对照）。
+/// 白坯（色号 None / 空串 / 纯空白）且不带缸号放行；带非空缸号显式拒绝；
+/// 纯空白缸号按未给处理（trim 后视同 None）。
 #[test]
 fn white_fabric_dye_lot_rejected_and_without_lot_passes() {
     for color in [None, Some("".sc_jmqlrx()), Some("   ".sc_jmqlrx())] {
-        let err = admit_stock_fabric_trace(
+        let trace = admit_stock_fabric_trace(color.clone(), None, Some("B1".sc_jmqlrx()))
+            .expect("白坯空色号且无缸号必须放行");
+        assert_eq!(trace.color_no, "", "白坯归一为空串（落 NOT NULL 空串行）");
+        assert_eq!(trace.dye_lot_no, None, "白坯合法行不得带缸号");
+        assert_eq!(trace.batch_no, "B1");
+
+        let blank_lot = admit_stock_fabric_trace(
             color.clone(),
-            Some("D9".sc_jmqlrx()),
+            Some("   ".sc_jmqlrx()),
             Some("B1".sc_jmqlrx()),
         )
-        .expect_err("白坯空色号携带缸号必须拒绝");
+        .expect("白坯纯空白缸号按未给处理，归一为 None");
+        assert_eq!(blank_lot.dye_lot_no, None);
+
+        let err = admit_stock_fabric_trace(color, Some("D9".sc_jmqlrx()), Some("B1".sc_jmqlrx()))
+            .expect_err("白坯空色号携带缸号必须拒绝");
         assert!(
             matches!(err, AppError::BusinessErrorDisplayable(_)),
             "必须是可外显业务错（用户看得见原因），实际: {err:?}"
@@ -78,12 +88,6 @@ fn white_fabric_dye_lot_rejected_and_without_lot_passes() {
             "原因须回显用户提交的缸号，实际: {disp}"
         );
     }
-
-    let trace = admit_stock_fabric_trace(Some("   ".sc_jmqlrx()), None, Some(" B1 ".sc_jmqlrx()))
-        .expect("白坯空色号不带缸号必须放行");
-    assert_eq!(trace.color_no, "", "白坯归一为空串（落 NOT NULL 空串行）");
-    assert_eq!(trace.dye_lot_no, None, "白坯合法行不得带缸号");
-    assert_eq!(trace.batch_no, "B1");
 }
 
 /// 染色布（色号非空）缺缸号 → business_displayable 拒绝：code=BUSINESS_ERROR、
