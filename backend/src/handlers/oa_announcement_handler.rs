@@ -98,13 +98,14 @@ pub async fn publish(
                     .send_system_announcement(user_ids, &announcement.title, &announcement.content)
                     .await
                 {
-                    Ok(()) => {
+                    Ok(delivered) => {
                         tracing::info!(
-                            "OA 公告 {} 已推送通知给 {} 位用户",
+                            "OA 公告 {} 通知推送实际送达 {} 位用户（目标 {} 位）",
                             announcement.id,
+                            delivered,
                             target_count
                         );
-                        target_count
+                        delivered
                     }
                     Err(e) => {
                         tracing::warn!(

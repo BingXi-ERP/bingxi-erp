@@ -128,14 +128,23 @@ test.describe('成本核算完整流程', () => {
     // audit 端点将 draft 置为 approved
     expect(mine!.status.toLowerCase()).toMatch(/approved|audited/);
 
-    // 验证审计日志
-    const auditLogged = await verifyAuditLog(
-      page,
-      'CREATE',
-      'production',
-      '/production/cost-collections'
-    );
-    expect(auditLogged).toBe(true);
+    // 验证审计日志：omni_audit 中间件走进程内异步队列（mpsc + 后台消费者，
+    // omni_audit_service.rs），审计行落库晚于 POST 响应返回；且中间件对全部
+    // 请求（含 GET）都入队，整片 e2e 并发跑时消费积压可达秒级，立即单查会
+    // 把未落库误判成缺审计。改为有界轮询重采样：判定口径不变（两管道均要求
+    // 库里真实存在 action=CREATE 且 resource_type=production、路径含
+    // /production/cost-collections 的行），只等待落库窗口；审计缺失时轮询
+    // 恒返回 false 直至超时判红，不会恒真。
+    await expect
+      .poll(
+        async () => verifyAuditLog(page, 'CREATE', 'production', '/production/cost-collections'),
+        {
+          message: '成本归集创建审计日志（CREATE/production）应在异步写入后可检索',
+          timeout: 20_000,
+          intervals: [500, 1_000, 2_000, 5_000],
+        }
+      )
+      .toBe(true);
   });
 
   test('会计期间控制：关闭期间禁止录入凭证', async ({ page }) => {

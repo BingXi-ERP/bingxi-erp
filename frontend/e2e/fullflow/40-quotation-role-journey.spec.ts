@@ -78,6 +78,7 @@ import {
   expectPageGuardDenied,
   expectPageRendersRow,
 } from '../fixtures/relay';
+import { PRODUCT_TYPE } from '../../src/constants/product-type';
 
 type Row = Record<string, unknown>;
 
@@ -318,26 +319,19 @@ function buildQuotationPayload(
 }
 
 /**
- * 面料产品创建载荷（字段口径与 flow/helpers 建产品先例一致）。
- * 面料必录门要求类型 成分 克重 幅宽 齐备，缺任一键后端 validate_product_create_fields 拒 400；
- * 分类 id 取 ensureTestEntities 就绪的共享种子分类（在库引用而非新建，不动全局夹具）。
+ * 功能：读取面料产品创建所需的共享产品分类主键。
+ * 调用方：40-01 批准主链与 40-02 驳回链的建产品腿。
+ * 入参：无，直接读 ensureTestEntities 就绪的夹具上下文。
+ * 传给谁：POST /products 请求体的 category_id。
+ * 存什么：不落库，只读夹具主键；主键缺失时抛错终止，不用默认值掩盖。
+ * 存哪里：无写入。
  */
-function buildProductPayload(code: string): Row {
+function requireProductCategoryId(): number {
   const catId = Number(getCtx().productCategoryIds[0]);
   if (!Number.isFinite(catId) || catId <= 0) {
     throw new Error('前置缺失：共享产品分类 id 未就绪，无法建面料产品');
   }
-  return {
-    code,
-    name: `E2E报价产品${code}`,
-    unit: '米',
-    category_id: catId,
-    product_type: '成品布',
-    fabric_composition: '100%涤纶',
-    gram_weight: 180,
-    width: 150,
-    meters_per_piece: 50,
-  };
+  return catId;
 }
 
 test.describe('40 报价单多角色审批流转', () => {
@@ -357,12 +351,17 @@ test.describe('40 报价单多角色审批流转', () => {
           label: '建面料产品（products:create 真实持有岗）',
           run: async ({ session, registerCleanup }) => {
             const code = genCode('F40P');
-            const created = await apiCallRaw<Row>(
-              session.page,
-              'POST',
-              '/products',
-              buildProductPayload(code)
-            );
+            const created = await apiCallRaw<Row>(session.page, 'POST', '/products', {
+              code,
+              name: `E2E报价产品${code}`,
+              unit: '米',
+              category_id: requireProductCategoryId(),
+              product_type: PRODUCT_TYPE.finished,
+              fabric_composition: '100%涤纶',
+              gram_weight: 180,
+              width: 150,
+              meters_per_piece: 50,
+            });
             const productId = requireId(created.id, '经理建产品');
             const back = await apiCallRaw<Row>(session.page, 'GET', `/products/${productId}`);
             expect(
@@ -682,12 +681,17 @@ test.describe('40 报价单多角色审批流转', () => {
           label: '建面料产品（驳回链）',
           run: async ({ session, registerCleanup }) => {
             const code = genCode('F40RP');
-            const created = await apiCallRaw<Row>(
-              session.page,
-              'POST',
-              '/products',
-              buildProductPayload(code)
-            );
+            const created = await apiCallRaw<Row>(session.page, 'POST', '/products', {
+              code,
+              name: `E2E报价产品${code}`,
+              unit: '米',
+              category_id: requireProductCategoryId(),
+              product_type: PRODUCT_TYPE.finished,
+              fabric_composition: '100%涤纶',
+              gram_weight: 180,
+              width: 150,
+              meters_per_piece: 50,
+            });
             const productId = requireId(created.id, '经理建产品（驳回链）');
             const back = await apiCallRaw<Row>(session.page, 'GET', `/products/${productId}`);
             expect(

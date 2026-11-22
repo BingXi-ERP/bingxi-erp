@@ -187,6 +187,65 @@ test.describe('数据范围行级隔离（self scope）', () => {
     }
   });
 
+  // 4.14「搜索与权限叠加」：self scope 用户带 keyword 搜索时，结果集仍受 owner/dept 行级隔离
+  // 约束，不能用搜索绕开可见范围。后端 services/crm/lead.rs 的 list_leads 在 :134 应用 keyword
+  // 模糊条件、:152 对同一查询串联 apply_department_scope_with_pool，二者同处一条查询链——keyword
+  // 只收紧结果集、不绕过隔离。self-01/02 只覆盖无 keyword 的列表与按 ID GET，本用例补关键词维度。
+  test('self-05 self 用户带 keyword 搜索仍看不到他人私有行（4.14 搜索×权限叠加）', async ({
+    page,
+    browser,
+  }) => {
+    const prefix = 'E2E-SCOPE-KW';
+    // 两个不同 user_id 的 self 用户各建一条线索，leadNo 均含唯一前缀：
+    // company_name = `隔离测试 ${leadNo}`，keyword=prefix 可同时命中两行。
+    const userA = await createUserAndSeedLead(browser, 'salesperson', prefix);
+    const userB = await createUserAndSeedLead(browser, 'customer_service', prefix);
+
+    try {
+      // 正向对照①：admin(all scope) 带 keyword=prefix 必须同时命中 A、B 两行——证明 keyword
+      // 查询机制工作、两行确实在库、前缀可匹配。缺此对照时"B 搜不到 A"可能只是 keyword
+      // 断裂或行不存在的假绿。
+      const adminList = await apiCallRaw<{ items: Array<{ id: number; lead_no: string }> }>(
+        page,
+        'GET',
+        `/crm/leads?keyword=${encodeURIComponent(prefix)}&page=1&page_size=50`
+      );
+      const adminItems = leadRows(adminList, 'admin keyword 正向对照');
+      const adminA = adminItems.find(l => l.id === userA.leadId);
+      const adminB = adminItems.find(l => l.id === userB.leadId);
+      expect(
+        adminA && adminB,
+        `admin(all scope) 带 keyword=${prefix} 应同时命中 User A(${userA.leadId}) 与 User B(${userB.leadId}) 两行（证明搜索通道与前缀有效）`
+      ).toBeTruthy();
+      expect(
+        adminA!.lead_no === userA.leadNo,
+        `admin 命中 A 行的 lead_no 应等于建单入参，实际=${JSON.stringify(adminA!.lead_no)}`
+      ).toBe(true);
+
+      // 核心负例②：User B(self) 带同一 keyword 搜索，结果必须命中自己的行（证明 B 的搜索
+      // 通道有效、不是空会话假绿），同时不得含 A 的私有行——搜索不能绕开 data_scope 隔离。
+      const bList = await apiCallRaw<{ items: Array<{ id: number }> }>(
+        userB.page,
+        'GET',
+        `/crm/leads?keyword=${encodeURIComponent(prefix)}&page=1&page_size=50`
+      );
+      const itemsB = leadRows(bList, 'User B keyword 隔离');
+      expect(
+        itemsB.find(l => l.id === userB.leadId),
+        `User B(self) 带 keyword=${prefix} 应命中自己建的行 ${userB.leadId}（证明搜索通道有效，负例不是空会话假绿）`
+      ).toBeDefined();
+      expect(
+        itemsB.find(l => l.id === userA.leadId),
+        `User B(self) 带 keyword=${prefix} 不应看到 User A 的私有行 ${userA.leadId}——搜索不得绕开 data_scope 隔离`
+      ).toBeUndefined();
+    } finally {
+      await tryCleanup(userA.page, 'DELETE', `/crm/leads/${userA.leadId}`, 'crm_lead');
+      await tryCleanup(userB.page, 'DELETE', `/crm/leads/${userB.leadId}`, 'crm_lead');
+      await userA.context.close();
+      await userB.context.close();
+    }
+  });
+
   test('self-03 admin(all scope) 可看到任意 self 用户的私有行', async ({ page, browser }) => {
     // User A (self scope) 建线索
     const userA = await createUserAndSeedLead(browser, 'salesperson', 'E2E-ADMIN-VIEW');

@@ -317,6 +317,8 @@ pub struct TransactionResponse {
     pub warehouse_id: i32,
     pub batch_no: String,
     pub color_no: String,
+    /// 染缸批号（inventory_transactions.dye_lot_no，跨缸回退留痕的查询键）
+    pub dye_lot_no: Option<String>,
     pub quantity_meters: Decimal,
     pub quantity_kg: Decimal,
     pub quantity_before_meters: Decimal,
