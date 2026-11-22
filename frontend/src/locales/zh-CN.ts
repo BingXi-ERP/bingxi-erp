@@ -12143,6 +12143,7 @@ export default {
       buttonConfirm: '确认',
       buttonCancel: '取消',
       ariaTable: '坯布列表表格',
+      mobileCardAria: '胚布档案手机卡片列表',
       colFabricCode: '坯布编码',
       colFabricName: '坯布名称',
       colFabricType: '坯布类型',

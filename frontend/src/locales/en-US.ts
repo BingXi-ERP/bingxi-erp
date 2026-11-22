@@ -12221,6 +12221,7 @@ export default {
       buttonConfirm: 'Confirm',
       buttonCancel: 'Cancel',
       ariaTable: 'Greige Fabrics Table',
+      mobileCardAria: 'Greige fabric mobile card list',
       colFabricCode: 'Fabric Code',
       colFabricName: 'Fabric Name',
       colFabricType: 'Fabric Type',
