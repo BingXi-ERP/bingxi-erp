@@ -1,3 +1,4 @@
+use bingxi_backend::utils::error::AppError;
 use bingxi_backend::utils::ssrf_guard::is_blocked_ip;
 use bingxi_backend::utils::ssrf_guard::*;
 use std::net::IpAddr;
@@ -132,39 +133,81 @@ fn test_blocked_hostname_public_allowed() {
 fn test_validate_url_invalid_format() {
     let result = validate_url("not-a-url");
     assert!(result.is_err());
+    // 解析失败的原文携带 url crate 错误详情，只锁错误族与前缀
+    let err = result.unwrap_err();
+    assert_eq!(err.error_code(), "VALIDATION_ERROR");
+    assert!(err.to_string().contains("URL 格式无效"), "实际: {err}");
 }
 
 #[test]
 fn test_validate_url_disallowed_scheme() {
     let result = validate_url("file:///etc/passwd");
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "URL 协议不允许：file（仅允许 http/https）"),
+        "file 协议必须被协议白名单拒绝"
+    );
     let result = validate_url("gopher://example.com");
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "URL 协议不允许：gopher（仅允许 http/https）"),
+        "gopher 协议必须被协议白名单拒绝"
+    );
 }
 
 #[test]
 fn test_validate_url_localhost_blocked() {
     let result = validate_url("http://localhost/webhook");
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationError(ref m) if m == "Webhook URL 主机名被禁止：localhost（可能指向本地或私有网络）"),
+        "localhost 必须被主机名黑名单拒绝"
+    );
 }
 
 #[test]
 fn test_validate_url_loopback_ip_blocked() {
     let result = validate_url("http://127.0.0.1/webhook");
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationError(ref m) if m == "Webhook URL 指向被禁止的 IP 地址：127.0.0.1"),
+        "loopback IP 必须被 IP 黑名单拒绝"
+    );
 }
 
 #[test]
 fn test_validate_url_rfc1918_blocked() {
-    assert!(validate_url("http://10.0.0.1/webhook").is_err());
-    assert!(validate_url("http://172.16.0.1/webhook").is_err());
-    assert!(validate_url("http://192.168.1.1/webhook").is_err());
+    let result = validate_url("http://10.0.0.1/webhook");
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        matches!(err, AppError::ValidationError(ref m) if m == "Webhook URL 指向被禁止的 IP 地址：10.0.0.1"),
+        "实际: {err:?}"
+    );
+    let result = validate_url("http://172.16.0.1/webhook");
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        matches!(err, AppError::ValidationError(ref m) if m == "Webhook URL 指向被禁止的 IP 地址：172.16.0.1"),
+        "实际: {err:?}"
+    );
+    let result = validate_url("http://192.168.1.1/webhook");
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(
+        matches!(err, AppError::ValidationError(ref m) if m == "Webhook URL 指向被禁止的 IP 地址：192.168.1.1"),
+        "实际: {err:?}"
+    );
 }
 
 #[test]
 fn test_validate_url_metadata_service_blocked() {
     let result = validate_url("http://169.254.169.254/latest/meta-data/");
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationError(ref m) if m == "Webhook URL 指向被禁止的 IP 地址：169.254.169.254"),
+        "云元数据 IP 必须被 IP 黑名单拒绝"
+    );
 }
 
 #[test]

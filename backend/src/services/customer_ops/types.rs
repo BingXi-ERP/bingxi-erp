@@ -10,7 +10,7 @@
 use sea_orm::QuerySelect;
 
 use crate::models::customer::{self, Entity as CustomerEntity};
-use crate::utils::data_permission::{CUSTOMER_ALL_FIELDS, DataPermissionFilter};
+use crate::utils::data_permission::{DataPermissionFilter, CUSTOMER_ALL_FIELDS};
 
 /// 将字段名映射到客户实体的列枚举（数据库层面字段选择）
 pub(super) fn select_customer_column(
@@ -36,6 +36,7 @@ pub(super) fn select_customer_column(
         "bank_name" => query.column(Column::BankName),
         "bank_account" => query.column(Column::BankAccount),
         "status" => query.column(Column::Status),
+        "owner_id" => query.column(Column::OwnerId),
         "customer_type" => query.column(Column::CustomerType),
         "notes" => query.column(Column::Notes),
         "created_by" => query.column(Column::CreatedBy),

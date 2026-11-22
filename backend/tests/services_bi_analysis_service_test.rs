@@ -9,6 +9,7 @@ mod test_common;
 use bingxi_backend::database::*;
 use bingxi_backend::handlers::bi_handler::*;
 use bingxi_backend::services::bi_analysis_service::*;
+use bingxi_backend::utils::error::AppError;
 use chrono::NaiveDate;
 use std::sync::Arc;
 
@@ -26,6 +27,10 @@ async fn test_drilldown_invalid_year() {
     let service = make_service().await;
     let result = service.drilldown_year_to_month(1800).await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "年份无效"),
+        "年份 1800 越界必须被年份范围门拒绝（bi_analysis_ops/drilldown.rs:37）"
+    );
 }
 
 #[tokio::test]
@@ -33,6 +38,10 @@ async fn test_slice_invalid_dimension() {
     let service = make_service().await;
     let result = service.slice("invalid_dim", &serde_json::json!({})).await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "不支持的维度: invalid_dim"),
+        "非法切片维度必须被维度白名单拒绝（bi_analysis_ops/olap.rs:37）"
+    );
 }
 
 #[tokio::test]
@@ -46,6 +55,10 @@ async fn test_sales_by_time_invalid_dates() {
         )
         .await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "结束日期不能早于开始日期"),
+        "起止日期倒置必须被日期校验拒绝（bi_analysis_ops/sales.rs:39）"
+    );
 }
 
 #[tokio::test]
@@ -53,6 +66,10 @@ async fn test_drilldown_invalid_month() {
     let service = make_service().await;
     let result = service.drilldown_month_to_day(2026, 13).await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "月份无效"),
+        "月份 13 越界必须被月份范围门拒绝（bi_analysis_ops/drilldown.rs:128）"
+    );
 }
 
 #[tokio::test]
@@ -60,6 +77,10 @@ async fn test_drilldown_customer_invalid_id() {
     let service = make_service().await;
     let result = service.drilldown_customer_to_order(0).await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "客户 ID 无效"),
+        "客户 ID 0 必须被 ID 正数门拒绝（bi_analysis_ops/drilldown.rs:244）"
+    );
 }
 
 #[tokio::test]
@@ -67,6 +88,10 @@ async fn test_drilldown_product_invalid_id() {
     let service = make_service().await;
     let result = service.drilldown_product_to_order(-1).await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "产品 ID 无效"),
+        "产品 ID -1 必须被 ID 正数门拒绝（bi_analysis_ops/drilldown.rs:302）"
+    );
 }
 
 #[tokio::test]
@@ -74,6 +99,10 @@ async fn test_rollup_invalid_level() {
     let service = make_service().await;
     let result = service.rollup("invalid", "month").await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "无效的粒度级别"),
+        "非法上卷粒度必须被粒度白名单拒绝（bi_analysis_ops/olap.rs:98）"
+    );
 }
 
 /// 透视矩阵参数校验测试
@@ -82,6 +111,10 @@ async fn test_pivot_invalid_row_dim() {
     let service = make_service().await;
     let result = service.pivot("invalid", "customer", "total_amount").await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "不支持的行维度: invalid"),
+        "非法行维度必须被行维度白名单拒绝（bi_analysis_ops/olap.rs:120）"
+    );
 }
 
 #[tokio::test]
@@ -89,6 +122,10 @@ async fn test_pivot_invalid_col_dim() {
     let service = make_service().await;
     let result = service.pivot("customer", "invalid", "total_amount").await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "不支持的列维度: invalid"),
+        "非法列维度必须被列维度白名单拒绝（bi_analysis_ops/olap.rs:126）"
+    );
 }
 
 #[tokio::test]
@@ -96,6 +133,10 @@ async fn test_pivot_same_dim() {
     let service = make_service().await;
     let result = service.pivot("customer", "customer", "total_amount").await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "行维度与列维度不能相同"),
+        "行列维度相同必须被去重门拒绝（bi_analysis_ops/olap.rs:132）"
+    );
 }
 
 #[tokio::test]
@@ -105,6 +146,10 @@ async fn test_pivot_invalid_measure() {
         .pivot("customer", "product", "invalid_measure")
         .await;
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::ValidationErrorDisplayable(ref m) if m == "不支持的度量: invalid_measure"),
+        "非法度量必须被度量白名单拒绝（bi_analysis_ops/olap.rs:137）"
+    );
 }
 
 // ==================== dim_to_expr / measure_to_expr 单元测试 ====================

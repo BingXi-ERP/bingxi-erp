@@ -42,6 +42,13 @@ impl SalesService {
         let items_result = self
             .process_shipment_items(&request, &ctx, &delivery, user_id, &txn)
             .await?;
+        // 发货单头含税总额与本次明细同源：明细金额与税额在同一事务内累加后回写，
+        // 建单时的零值不得带到打印与财务取数面。
+        let mut delivery_active: sales_delivery::ActiveModel = delivery.clone().into();
+        delivery_active.total_amount =
+            Set(items_result.delivery_total_amount + items_result.delivery_total_tax);
+        delivery_active.updated_at = Set(chrono::Utc::now());
+        let delivery = delivery_active.update(&txn).await?;
         let post_ctx = self
             .update_order_after_shipment(&request, ctx, user_id, &txn)
             .await?;

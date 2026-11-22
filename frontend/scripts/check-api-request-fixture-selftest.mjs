@@ -115,6 +115,18 @@ const structIndex = {
       { name: 'note', type: 'String' },
     ],
   },
+  FlattenPayload: {
+    attrs: '',
+    allFields: [
+      { name: 'version', type: 'i32' },
+      {
+        name: 'extra_fields',
+        type: 'BTreeMap<String,serde_json::Value>',
+        attrs: '#[serde(flatten)]',
+      },
+      { name: 'periods', type: 'Vec<i32>', attrs: '#[serde(default)]' },
+    ],
+  },
 };
 
 console.log('=== fixture 自测：check-api-request 四类盲区解析器 ===');
@@ -239,6 +251,23 @@ console.log('\n[b] Partial<T>：键集展开 + 可选化，后端漂移仍照判
   );
   const r3 = feKeysOf({ sig: 'data: WidgetPatch' }, 'data', tsIndex); // alias: Partial<WidgetDto>
   ok(r3.kind === 'keys' && r3.keys.length === 3, '(b4) type X = Partial<T> alias 同样展开');
+  const flattenFields = rustFieldsOf('FlattenPayload', structIndex);
+  ok(
+    flattenFields && flattenFields.length === 3,
+    '(b5) 字段级 serde(flatten) 后仍解析完整字段集',
+    JSON.stringify(flattenFields)
+  );
+  const version = flattenFields?.find(f => f.name === 'version');
+  const extraFields = flattenFields?.find(f => f.name === 'extra_fields');
+  const periods = flattenFields?.find(f => f.name === 'periods');
+  ok(version && version.optional === false, '(b6) 展平结构中的真实必填字段仍判必填');
+  ok(extraFields && extraFields.optional === true, '(b7) 字段级 serde(flatten) 按可选处理');
+  ok(
+    extraFields && leafTypeText(extraFields.type) === 'Map<String,...>',
+    '(b8) 展平字段叶子类型仍进未覆盖清单',
+    extraFields?.type
+  );
+  ok(periods && periods.optional === true, '(b9) 字段级 serde(default) 按可选处理');
 }
 
 // ---------- (c) 交叉类型 A & B ----------
