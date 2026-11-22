@@ -12632,6 +12632,7 @@ export default {
     },
     table: {
       ariaLabel: '物料缺料预警列表',
+      mobileCardAria: '物料缺料预警手机卡片列表',
       levelPlaceholder: '缺料级别',
       statusPlaceholder: '预警状态',
       search: '查询',

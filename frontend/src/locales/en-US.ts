@@ -12712,6 +12712,7 @@ export default {
     },
     table: {
       ariaLabel: 'Material Shortage Alert List',
+      mobileCardAria: 'Material shortage mobile card list',
       levelPlaceholder: 'Shortage Level',
       statusPlaceholder: 'Alert Status',
       search: 'Search',
