@@ -9426,6 +9426,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: 'Purchase inspection mobile card list',
       ariaLabel: 'Purchase Inspection List',
       column: {
         inspectionNo: 'Inspection No.',
@@ -9581,6 +9582,7 @@ export default {
     },
     table: {
       ariaLabel: 'Purchase Price List',
+      mobileCardAria: 'Purchase Price Mobile Card List',
       column: {
         index: 'Index',
         productName: 'Product Name',
@@ -9751,6 +9753,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: 'Purchase return mobile card list',
       aria: {
         list: 'Purchase Return List',
         pagination: 'Purchase Return List Pagination',
