@@ -1092,12 +1092,14 @@ impl FabricPhysicalTestService {
         // 允差判定留痕口径：允差值/来源/方法三要素成组出现，来源 token 与质量标准配置共用同一词表
         let tolerance_source = req
             .tolerance_source
-            .map(|value| value.trim())
+            .as_deref()
+            .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(ToString::to_string);
         let detection_method = req
             .detection_method
-            .map(|value| value.trim())
+            .as_deref()
+            .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(ToString::to_string);
         if let Some(tolerance_value) = req.tolerance_value {
