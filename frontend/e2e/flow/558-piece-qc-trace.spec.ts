@@ -37,6 +37,7 @@ interface PieceRow {
   id?: number;
   piece_no?: string;
   inspection_id?: number | null;
+  quality_status?: string;
 }
 
 interface PieceTrace {
