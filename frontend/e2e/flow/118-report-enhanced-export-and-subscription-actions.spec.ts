@@ -228,8 +228,10 @@ test.describe.serial('118 报表增强导出端点与订阅动作真值链', () 
     expect(docxMissing.status, `不存在主键的直出 Word 必须 404，实际 ${docxMissing.status}`).toBe(
       404
     );
-    expect(failureCode(docxMissing), '不存在主键的直出 Word 必须归因 NOT_FOUND').toBe(
-      APP_ERROR_CODES.NOT_FOUND
+    // 直出 Word 端点已随导出格式收敛删除：路由级 404 无 AppError 信封（code 缺席），
+    // 与端点存在但模板不存在时的 NOT_FOUND 信封不同形态，两形态都接受。
+    expect([undefined, APP_ERROR_CODES.NOT_FOUND]).toContain(
+      failureCode(docxMissing)
     );
     const excelMissing = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/excel', {
       template_id: '99999999',

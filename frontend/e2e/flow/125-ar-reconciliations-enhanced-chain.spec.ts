@@ -84,13 +84,6 @@ type AgingBody = {
   overall_buckets: unknown[];
 };
 
-type PdfBody = {
-  id: number;
-  content_type: string;
-  size: number;
-  base64_content: string;
-};
-
 const PERIOD_START = '2026-01-01';
 const PERIOD_END = '2026-12-31';
 
@@ -425,16 +418,16 @@ test.describe.serial('125 ar-reconciliations-enhanced 全链契约回读', () =>
     expect(Array.isArray(aging.customer_summaries)).toBe(true);
     expect(Array.isArray(aging.overall_buckets)).toBe(true);
 
-    const pdf = await apiCallRaw<PdfBody>(
+    // 对账单 PDF 导出端点已随导出格式收敛删除（统一 xlsx/docx 成品格式；
+    // 对账单 xlsx 打印腿由财务报表套件经 /ar-reconciliations/{id}/print-xlsx 覆盖）：
+    // 改为 fail-closed 断真实 404，端点若恢复再固化回内容断言。
+    const pdfGone = await apiCallExpectFail(
       page,
       'GET',
       `/ar-reconciliations-enhanced/${recMain}/pdf`
     );
-    expect(pdf.id).toBe(recMain);
-    expect(pdf.content_type).toBe('application/pdf');
-    expect(pdf.size).toBeGreaterThan(0);
-    // "%PDF-" 的 base64 前缀固定为 JVBERi0：文件魔数级证据
-    expect(pdf.base64_content.startsWith('JVBERi0')).toBe(true);
+    expect(pdfGone.status, `PDF 导出端点已删除应 404，实际 ${pdfGone.status}`).toBe(404);
+    expect([undefined, 'NOT_FOUND']).toContain(failureCode(pdfGone));
   });
 
   test('清理：删除自建客户（对账单行无删除端点，best-effort 记录残量）', async ({ page }) => {
