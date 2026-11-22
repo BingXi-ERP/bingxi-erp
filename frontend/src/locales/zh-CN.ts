@@ -12621,6 +12621,7 @@ export default {
       title: '补货建议',
       refresh: '重新计算',
       ariaLabel: '缺料补货建议列表',
+      mobileCardAria: '补货建议手机卡片列表',
       suggestedQuantity: '建议采购量',
       unit: '单位',
       priority: '优先级',

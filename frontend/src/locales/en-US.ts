@@ -12701,6 +12701,7 @@ export default {
       title: 'Replenishment Suggestions',
       refresh: 'Recalculate',
       ariaLabel: 'Shortage Replenishment Suggestion List',
+      mobileCardAria: 'Replenishment Suggestion Mobile Card List',
       suggestedQuantity: 'Suggested Qty',
       unit: 'Unit',
       priority: 'Priority',
