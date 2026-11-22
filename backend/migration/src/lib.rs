@@ -388,6 +388,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::business::m0098_payment_channel_configs::Migration),
             // 批色库存联动失败持久化待补标记两列，链尾独立域（存量复用库上属 pending 必然执行）
             Box::new(domain::bulk_color_stock_sync_pending::Migration),
+            // 质量标准允差来源/检测方法与三项允差列，链尾独立域（存量复用库上属 pending 必然执行）
+            Box::new(domain::quality_standard_tolerance::Migration),
         ]
     }
 }

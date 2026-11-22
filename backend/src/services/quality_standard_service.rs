@@ -5,6 +5,7 @@ use crate::models::status::quality_dyeing::quality_standard as qs_status;
 use crate::utils::error::AppError;
 use crate::utils::number_generator::DocumentNumberGenerator;
 use chrono::NaiveDate;
+use rust_decimal::Decimal;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, Order, PaginatorTrait,
     QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
@@ -17,6 +18,53 @@ use tracing::info;
 /// migration/src/domain/system/m0005_add_basic_data_and_system_tables.rs:110
 /// `"standard_code" VARCHAR(50) NOT NULL UNIQUE`）
 const STANDARD_CODE_PREFIX: &str = "QS-";
+
+/// 允差来源词表（落库 token）；与 frontend/src/constants/quality-tolerance.ts 保持同一集合
+const TOLERANCE_SOURCES: [&str; 3] = ["product_standard", "order_agreement", "confirmed_sample"];
+
+fn normalize_optional_trimmed(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+}
+
+fn validate_tolerance_config(
+    source: Option<&str>,
+    method: Option<&str>,
+    delta_e_tolerance: Option<Decimal>,
+    weight_tolerance: Option<Decimal>,
+    width_tolerance: Option<Decimal>,
+) -> Result<(), AppError> {
+    let values = [delta_e_tolerance, weight_tolerance, width_tolerance];
+    let has_value = values.iter().any(|v| v.is_some());
+    let source = source.map(str::trim).filter(|s| !s.is_empty());
+    let method = method.map(str::trim).filter(|s| !s.is_empty());
+
+    if has_value && (source.is_none() || method.is_none()) {
+        return Err(AppError::business_displayable(
+            "填写任一允差值时，必须同时选择允差来源并填写检测方法",
+        ));
+    }
+    if !has_value && (source.is_some() || method.is_some()) {
+        return Err(AppError::business_displayable(
+            "选择允差来源或填写检测方法时，必须至少填写一项允差值",
+        ));
+    }
+    if let Some(source) = source {
+        if !TOLERANCE_SOURCES.contains(&source) {
+            return Err(AppError::business_displayable(
+                "允差来源只能是产品标准、订单约定或确认样",
+            ));
+        }
+    }
+    for value in values.into_iter().flatten() {
+        if value.is_sign_negative() {
+            return Err(AppError::business_displayable("允差值不能为负数"));
+        }
+    }
+    Ok(())
+}
 
 /// 质量标准查询参数
 #[derive(Debug, Clone, Default)]
@@ -35,18 +83,30 @@ pub struct CreateQualityStandardRequest {
     pub standard_type: Option<String>,
     pub version: Option<String>,
     pub content: Option<String>,
+    pub tolerance_source: Option<String>,
+    pub detection_method: Option<String>,
+    pub delta_e_tolerance: Option<Decimal>,
+    pub weight_tolerance: Option<Decimal>,
+    pub width_tolerance: Option<Decimal>,
     pub effective_date: Option<NaiveDate>,
     pub expiry_date: Option<NaiveDate>,
     pub remark: Option<String>,
 }
 
 /// 更新质量标准请求
+///
+/// 允差五键走三态：外层 `None` = 不变更，`Some(None)` = 清空，`Some(Some(v))` = 覆盖。
 #[derive(Debug, Clone)]
 pub struct UpdateQualityStandardRequest {
     pub standard_name: Option<String>,
     pub standard_type: Option<String>,
     pub content: Option<String>,
     pub status: Option<String>,
+    pub tolerance_source: Option<Option<String>>,
+    pub detection_method: Option<Option<String>>,
+    pub delta_e_tolerance: Option<Option<Decimal>>,
+    pub weight_tolerance: Option<Option<Decimal>>,
+    pub width_tolerance: Option<Option<Decimal>>,
     pub remark: Option<String>,
 }
 
@@ -116,6 +176,17 @@ impl QualityStandardService {
         let auto_code = req.standard_code.is_none();
         let manual_code = req.standard_code.clone().unwrap_or_default();
 
+        let tolerance_source = normalize_optional_trimmed(req.tolerance_source.as_deref());
+        let detection_method = normalize_optional_trimmed(req.detection_method.as_deref());
+
+        validate_tolerance_config(
+            tolerance_source.as_deref(),
+            detection_method.as_deref(),
+            req.delta_e_tolerance,
+            req.weight_tolerance,
+            req.width_tolerance,
+        )?;
+
         let build_active = |standard_code: String| quality_standard::ActiveModel {
             standard_code: Set(standard_code),
             standard_name: Set(req.standard_name.clone()),
@@ -125,6 +196,11 @@ impl QualityStandardService {
                 .unwrap_or_else(|| "general".to_string())),
             version: Set(req.version.clone().unwrap_or_else(|| "1.0".to_string())),
             content: Set(req.content.clone().unwrap_or_default()),
+            tolerance_source: Set(tolerance_source.clone()),
+            detection_method: Set(detection_method.clone()),
+            delta_e_tolerance: Set(req.delta_e_tolerance),
+            weight_tolerance: Set(req.weight_tolerance),
+            width_tolerance: Set(req.width_tolerance),
             status: Set(qs_status::DRAFT.to_string()),
             effective_date: Set(req
                 .effective_date
@@ -167,7 +243,13 @@ impl QualityStandardService {
     ) -> Result<quality_standard::Model, AppError> {
         info!("用户 {} 正在更新质量标准：{}", user_id, id);
 
-        let mut standard: quality_standard::ActiveModel = self.get_standard_by_id(id).await?.into();
+        let existing = self.get_standard_by_id(id).await?;
+        let mut effective_source = existing.tolerance_source.clone();
+        let mut effective_method = existing.detection_method.clone();
+        let mut effective_delta_e = existing.delta_e_tolerance;
+        let mut effective_weight = existing.weight_tolerance;
+        let mut effective_width = existing.width_tolerance;
+        let mut standard: quality_standard::ActiveModel = existing.into();
 
         if let Some(standard_name) = req.standard_name {
             standard.standard_name = Set(standard_name);
@@ -181,6 +263,36 @@ impl QualityStandardService {
         if let Some(status) = req.status {
             standard.status = Set(status);
         }
+        if let Some(value) = req.tolerance_source {
+            let normalized = normalize_optional_trimmed(value.as_deref());
+            effective_source = normalized.clone();
+            standard.tolerance_source = Set(normalized);
+        }
+        if let Some(value) = req.detection_method {
+            let normalized = normalize_optional_trimmed(value.as_deref());
+            effective_method = normalized.clone();
+            standard.detection_method = Set(normalized);
+        }
+        if let Some(value) = req.delta_e_tolerance {
+            effective_delta_e = value;
+            standard.delta_e_tolerance = Set(value);
+        }
+        if let Some(value) = req.weight_tolerance {
+            effective_weight = value;
+            standard.weight_tolerance = Set(value);
+        }
+        if let Some(value) = req.width_tolerance {
+            effective_width = value;
+            standard.width_tolerance = Set(value);
+        }
+
+        validate_tolerance_config(
+            effective_source.as_deref(),
+            effective_method.as_deref(),
+            effective_delta_e,
+            effective_weight,
+            effective_width,
+        )?;
 
         standard.save(&*self.db).await?;
         let updated = self.get_standard_by_id(id).await?;
