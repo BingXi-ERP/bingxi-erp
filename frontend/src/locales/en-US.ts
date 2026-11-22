@@ -10643,6 +10643,7 @@ export default {
     },
     table: {
       ariaLabel: 'Sales Price List',
+      mobileCardAria: 'Sales price mobile card list',
       columnIndex: 'No.',
       columnProductName: 'Product Name',
       columnCustomer: 'Customer',

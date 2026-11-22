@@ -10575,6 +10575,7 @@ export default {
     },
     table: {
       ariaLabel: '销售价格列表',
+      mobileCardAria: '销售价格手机卡片列表',
       columnIndex: '序号',
       columnProductName: '产品名称',
       columnCustomer: '客户',
