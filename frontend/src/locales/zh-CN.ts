@@ -9950,6 +9950,7 @@ export default {
         sign: '签收',
         delete: '删除',
       },
+      mobileCardAria: '物流运单手机卡片列表',
     },
     stat: {
       label: {

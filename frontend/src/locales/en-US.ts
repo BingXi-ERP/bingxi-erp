@@ -10016,6 +10016,7 @@ export default {
         sign: 'Sign',
         delete: 'Delete',
       },
+      mobileCardAria: 'Logistics waybill mobile card list',
     },
     stat: {
       label: {
