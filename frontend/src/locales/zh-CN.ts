@@ -7952,6 +7952,7 @@ export default {
     },
     ganttChart: {
       title: '排程甘特图',
+      mobileScrollHint: '左右滑动查看完整甘特图',
       legend: {
         pending: '待排程',
         scheduled: '已排程',

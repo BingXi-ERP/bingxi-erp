@@ -8012,6 +8012,7 @@ export default {
     },
     ganttChart: {
       title: 'Schedule Gantt Chart',
+      mobileScrollHint: 'Swipe horizontally to view the full Gantt chart',
       legend: {
         pending: 'Pending',
         scheduled: 'Scheduled',
