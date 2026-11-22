@@ -117,7 +117,7 @@ test.describe('475 白坯布缸号准入守卫', () => {
           quantity_meters: '100',
           quantity_kg: '20',
         });
-        reject(result, APP_ERROR_CODES.VALIDATION_ERROR);
+        reject(result, APP_ERROR_CODES.BUSINESS_ERROR);
       }
 
       const afterStocks = await readStocks(page, productId, warehouseId, batchNo);
