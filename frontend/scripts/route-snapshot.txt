@@ -1,4 +1,4 @@
-# layers=8 endpoints=1823
+# layers=8 endpoints=1825
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -566,6 +566,7 @@ GET	/api/v1/erp/inventory/logistics	logistics_handler::list_waybills	inventory
 GET	/api/v1/erp/inventory/logistics/*	logistics_handler::get_waybill	inventory
 GET	/api/v1/erp/inventory/pieces	crate::handlers::inventory_piece_handler::list_pieces	inventory
 GET	/api/v1/erp/inventory/pieces/*/print	print_handler::inventory_piece_label_print_docx	inventory
+GET	/api/v1/erp/inventory/pieces/*/trace	crate::handlers::inventory_piece_handler::get_piece_trace	inventory
 GET	/api/v1/erp/inventory/reservations	inventory_reservation_handler::list_reservations	inventory
 GET	/api/v1/erp/inventory/stock	inventory_stock_handler::list_stock	inventory
 GET	/api/v1/erp/inventory/stock/*	inventory_stock_handler::get_stock	inventory
@@ -717,6 +718,7 @@ GET	/api/v1/erp/production/fabric-defects/*	fabric_inspection_handler::get_defec
 GET	/api/v1/erp/production/fabric-inspections	fabric_inspection_handler::list_inspections	production
 GET	/api/v1/erp/production/fabric-inspections/*	fabric_inspection_handler::get_inspection	production
 GET	/api/v1/erp/production/fabric-inspections/*/defects	fabric_inspection_handler::list_defects_by_inspection	production
+GET	/api/v1/erp/production/fabric-inspections/*/physical-tests	fabric_inspection_handler::list_physical_tests_by_inspection	production
 GET	/api/v1/erp/production/fabric-inspections/*/print	print_handler::fabric_inspection_print_docx	production
 GET	/api/v1/erp/production/fabric-inspections/by-no/*	fabric_inspection_handler::get_by_no	production
 GET	/api/v1/erp/production/flow-cards	flow_card_handler::list_flow_cards	production

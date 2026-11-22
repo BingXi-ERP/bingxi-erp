@@ -220,3 +220,5 @@ pub mod bulk_color_stock_sync_pending;
 // 调样单实体数据地基域：sample_dispatch_orders/sample_dispatch_items 两表，链尾独立域
 // （并入已应用域会被台账整体跳过，建表永不执行）。
 pub mod sample_dispatch;
+// 验布修边实测列域：fabric_inspection_record 补 edge_trim_length/edge_trim_weight，链尾独立域。
+pub mod fabric_inspection_edge_trim;
