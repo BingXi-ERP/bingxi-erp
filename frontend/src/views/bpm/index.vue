@@ -75,7 +75,75 @@
     <el-tabs v-model="activeTab" @tab-change="handleTabChange">
       <el-tab-pane :label="$t('bpm.tab.pending')" name="pending">
         <el-card shadow="hover" class="table-card">
-          <el-table :data="pendingTasks" stripe :aria-label="$t('bpm.pendingTable.ariaLabel')">
+          <!-- 手机卡片（<768 与流程定义表同断点同范式） -->
+          <section v-if="isPhone" class="bpm-mobile">
+            <ul class="card-list" :aria-label="$t('bpm.pendingTable.mobileCardAria')">
+              <li v-for="task in pendingTasks" :key="task.id" class="card-item">
+                <dl class="card-fields">
+                  <div class="field-emphasis">
+                    <dt>{{ $t('bpm.pendingTable.taskNo') }}</dt>
+                    <dd>{{ task.task_no }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.pendingTable.taskName') }}</dt>
+                    <dd>{{ task.node_name }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.pendingTable.applicant') }}</dt>
+                    <dd>{{ task.actual_handler_name || '-' }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.pendingTable.applyTime') }}</dt>
+                    <dd>{{ task.created_at || '-' }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.pendingTable.dueDate') }}</dt>
+                    <dd :class="{ overdue: task.due_date && isOverdue(task.due_date) }">
+                      {{ task.due_date || '-' }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.pendingTable.priority') }}</dt>
+                    <dd>
+                      <el-tag :type="getPriorityType(task.priority || '')" size="small">
+                        {{ getPriorityText(task.priority || '') }}
+                      </el-tag>
+                    </dd>
+                  </div>
+                </dl>
+                <div class="card-actions">
+                  <el-button
+                    v-permission="PERMISSIONS.BPM_TASK_APPROVE"
+                    type="primary"
+                    size="small"
+                    @click="handleApprove(task)"
+                    >{{ $t('bpm.pendingTable.approve') }}</el-button
+                  >
+                  <el-button size="small" @click="handleDetail(task)">{{
+                    $t('bpm.pendingTable.detail')
+                  }}</el-button>
+                  <el-button
+                    v-permission="PERMISSIONS.BPM_TASK_CREATE"
+                    size="small"
+                    @click="handleTransfer(task)"
+                    >{{ $t('bpm.pendingTable.transfer') }}</el-button
+                  >
+                  <el-button
+                    v-permission="PERMISSIONS.BPM_TASK_CREATE"
+                    size="small"
+                    @click="handleUrge(task)"
+                    >{{ $t('bpm.pendingTable.urge') }}</el-button
+                  >
+                </div>
+              </li>
+            </ul>
+          </section>
+          <el-table
+            v-else
+            :data="pendingTasks"
+            stripe
+            :aria-label="$t('bpm.pendingTable.ariaLabel')"
+          >
             <el-table-column
               prop="task_no"
               :label="$t('bpm.pendingTable.taskNo')"
@@ -151,7 +219,48 @@
 
       <el-tab-pane :label="$t('bpm.tab.processed')" name="processed">
         <el-card shadow="hover" class="table-card">
-          <el-table :data="processedTasks" stripe :aria-label="$t('bpm.processedTable.ariaLabel')">
+          <section v-if="isPhone" class="bpm-mobile">
+            <ul class="card-list" :aria-label="$t('bpm.processedTable.mobileCardAria')">
+              <li v-for="task in processedTasks" :key="task.id" class="card-item">
+                <dl class="card-fields">
+                  <div class="field-emphasis">
+                    <dt>{{ $t('bpm.processedTable.taskNo') }}</dt>
+                    <dd>{{ task.task_no }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.processedTable.taskName') }}</dt>
+                    <dd>{{ task.node_name }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.processedTable.handler') }}</dt>
+                    <dd>{{ task.actual_handler_name || '-' }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.processedTable.completedAt') }}</dt>
+                    <dd>{{ task.handled_at || '-' }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.processedTable.status') }}</dt>
+                    <dd>
+                      <el-tag :type="getTaskStatusType(task.status)" size="small">
+                        {{ getTaskStatusText(task.status) }}
+                      </el-tag>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.processedTable.comment') }}</dt>
+                    <dd>{{ task.approval_opinion || '-' }}</dd>
+                  </div>
+                </dl>
+              </li>
+            </ul>
+          </section>
+          <el-table
+            v-else
+            :data="processedTasks"
+            stripe
+            :aria-label="$t('bpm.processedTable.ariaLabel')"
+          >
             <el-table-column prop="task_no" :label="$t('bpm.processedTable.taskNo')" fixed />
             <el-table-column
               prop="node_name"
@@ -200,7 +309,69 @@
         </div>
         <el-card shadow="hover" class="table-card">
           <template #header>{{ $t('bpm.monitorTable.instancesTitle') }}</template>
-          <el-table :data="processInstances" stripe :aria-label="$t('bpm.monitorTable.ariaLabel')">
+          <section v-if="isPhone" class="bpm-mobile">
+            <ul class="card-list" :aria-label="$t('bpm.monitorTable.mobileCardAria')">
+              <li v-for="instance in processInstances" :key="instance.id" class="card-item">
+                <dl class="card-fields">
+                  <div class="field-emphasis">
+                    <dt>{{ $t('bpm.monitorTable.instanceId') }}</dt>
+                    <dd>{{ instance.instance_no }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.monitorTable.title') }}</dt>
+                    <dd>{{ instance.title }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.monitorTable.businessType') }}</dt>
+                    <dd>{{ instance.business_type || '-' }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.monitorTable.startUser') }}</dt>
+                    <dd>{{ instance.initiator_name || '-' }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.monitorTable.startTime') }}</dt>
+                    <dd>{{ instance.started_at || '-' }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.monitorTable.currentNode') }}</dt>
+                    <dd>{{ instance.current_node_name || '-' }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('bpm.monitorTable.status') }}</dt>
+                    <dd>
+                      <el-tag :type="getProcessStatusType(instance.status || '')" size="small">
+                        {{ getProcessStatusText(instance.status || '') }}
+                      </el-tag>
+                    </dd>
+                  </div>
+                </dl>
+                <div class="card-actions">
+                  <el-button type="primary" size="small" @click="handleViewProcess(instance)">{{
+                    $t('bpm.monitorTable.view')
+                  }}</el-button>
+                  <el-button size="small" @click="handleProcessImage(instance)">{{
+                    $t('bpm.monitorTable.processImage')
+                  }}</el-button>
+                  <el-button size="small" @click="handleTrace(instance)">{{
+                    $t('bpm.initiatedTable.trace')
+                  }}</el-button>
+                  <el-button
+                    v-permission="PERMISSIONS.BPM_INSTANCE_CANCEL"
+                    size="small"
+                    @click="handleCancel(instance)"
+                    >{{ $t('bpm.initiatedTable.cancel') }}</el-button
+                  >
+                </div>
+              </li>
+            </ul>
+          </section>
+          <el-table
+            v-else
+            :data="processInstances"
+            stripe
+            :aria-label="$t('bpm.monitorTable.ariaLabel')"
+          >
             <el-table-column
               prop="instance_no"
               :label="$t('bpm.monitorTable.instanceId')"
@@ -420,6 +591,7 @@ import { isDialogDismissal } from '@/utils/monitor';
 import { computed, ref, reactive, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { Clock, CircleCheck, Warning, Timer } from '@element-plus/icons-vue';
 // D14 Batch 5b：原 bpmApi 对象已转风格 B 函数
 import {
@@ -451,6 +623,8 @@ import { PERMISSIONS } from '@/constants/permissions';
 import NumericInput from '@/components/NumericInput.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const userStore = useUserStore();
 
 // 全局流程监控面（/bpm/monitor/*）未按发起人收窄，只有持 bpm-monitor:read 的角色可读；
@@ -1101,6 +1275,67 @@ onMounted(() => {
 }
 .table-card {
   margin-bottom: 20px;
+}
+/* 手机卡片（三页签共用，与流程定义表同断点同范式） */
+.bpm-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.field-emphasis {
+  grid-column: 1 / -1;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-fields .overdue {
+  color: var(--el-color-danger);
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
 }
 .monitor-toolbar {
   display: flex;

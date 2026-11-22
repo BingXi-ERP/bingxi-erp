@@ -2843,6 +2843,7 @@ export default {
     },
     pendingTable: {
       ariaLabel: '待审批任务列表',
+      mobileCardAria: '待审批任务手机卡片列表',
       taskNo: '任务编号',
       taskName: '任务名称',
 
@@ -2862,6 +2863,7 @@ export default {
     },
     processedTable: {
       ariaLabel: '已处理任务列表',
+      mobileCardAria: '已处理任务手机卡片列表',
       taskNo: '任务编号',
       taskName: '任务名称',
       handler: '处理人',
@@ -2871,6 +2873,7 @@ export default {
     },
     monitorTable: {
       ariaLabel: '流程实例监控列表',
+      mobileCardAria: '流程实例监控手机卡片列表',
       instancesTitle: '流程实例监控',
       instanceId: '实例编号',
       title: '流程标题',

@@ -2869,6 +2869,7 @@ export default {
     },
     pendingTable: {
       ariaLabel: 'Pending Approval Task List',
+      mobileCardAria: 'Pending Approval Task Mobile Card List',
       taskNo: 'Task No.',
       taskName: 'Task Name',
 
@@ -2888,6 +2889,7 @@ export default {
     },
     processedTable: {
       ariaLabel: 'Processed Task List',
+      mobileCardAria: 'Processed Task Mobile Card List',
       taskNo: 'Task No.',
       taskName: 'Task Name',
       handler: 'Handler',
@@ -2897,6 +2899,7 @@ export default {
     },
     monitorTable: {
       ariaLabel: 'Process Instance Monitor List',
+      mobileCardAria: 'Process Instance Monitor Mobile Card List',
       instancesTitle: 'Process Instances',
       instanceId: 'Instance No.',
       title: 'Process Title',
