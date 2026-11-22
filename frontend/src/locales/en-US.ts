@@ -8155,6 +8155,7 @@ export default {
       ariaLabel: {
         table: 'Schedule List',
         pagination: 'Schedule List Pagination',
+        mobileCard: 'Schedule work order mobile card list',
       },
       column: {
         orderNo: 'Work Order No.',

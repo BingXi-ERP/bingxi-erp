@@ -8095,6 +8095,7 @@ export default {
       ariaLabel: {
         table: '排班列表',
         pagination: '排班列表分页',
+        mobileCard: '排程工单手机卡片列表',
       },
       column: {
         orderNo: '工单号',
