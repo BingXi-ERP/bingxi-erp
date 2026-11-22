@@ -115,7 +115,7 @@ fn white_fabric_positive_and_dye_lot_rejected() {
     )
     .expect_err("白坯带缸号必须拒绝");
     assert_eq!(err.error_code(), "VALIDATION_ERROR");
-    let disp = err.sc_jmqlrx();
+    let disp = format!("{}", err);
     assert!(disp.contains("白坯布不具缸号属性"), "实际: {disp}");
     assert!(
         disp.contains("DYE-9"),
@@ -535,8 +535,8 @@ async fn greige_outbound_dims_kept_as_given_readback_live_db() {
     use bingxi_backend::models::warehouse;
     use chrono::Utc;
     use sea_orm::{
-        ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, Order, QueryFilter,
-        QueryOrder,
+        ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, Order, PaginatorTrait,
+        QueryFilter, QueryOrder,
     };
     use std::sync::Arc;
     use tower::ServiceExt;
@@ -774,7 +774,7 @@ async fn greige_outbound_dims_kept_as_given_readback_live_db() {
                 .method(Method::POST)
                 .uri("/inventory/transfers")
                 .header("content-type", "application/json")
-                .body(Body::from(bad_body.sc_jmqlrx()))
+                .body(Body::from(format!("{}", bad_body)))
                 .unwrap(),
         )
         .await
