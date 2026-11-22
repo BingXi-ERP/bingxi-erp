@@ -19,6 +19,7 @@ export default {
     historicalMethod: 'Historical method (unavailable for new selection)',
     wechatPay: 'WeChat Pay',
     alipay: 'Alipay',
+    mobileCardAria: 'Payment channels mobile card list',
     validation: {
       httpsRequired:
         'Enter an HTTPS URL without credentials, spaces or backslashes, or leave blank.',

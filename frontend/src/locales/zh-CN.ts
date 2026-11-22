@@ -18,6 +18,7 @@ export default {
     historicalMethod: '历史方式（不可重新选择）',
     wechatPay: '微信支付',
     alipay: '支付宝',
+    mobileCardAria: '支付通道手机卡片列表',
     validation: {
       httpsRequired: '请输入不含凭据、空白或反斜杠的 HTTPS 地址，或留空。',
       maskedKey: '不能将脱敏占位值作为密钥。',
