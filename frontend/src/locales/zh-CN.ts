@@ -12677,6 +12677,7 @@ export default {
       edit: '编辑',
       delete: '删除',
       paginationAriaLabel: '数据导入模板分页',
+      mobileCardAria: '数据导入模板手机卡片列表',
     },
     taskTable: {
       statusPlaceholder: '状态',
@@ -12701,6 +12702,7 @@ export default {
       cancel: '取消',
       errorLog: '错误日志',
       paginationAriaLabel: '数据导入任务分页',
+      mobileCardAria: '数据导入任务手机卡片列表',
     },
     templateForm: {
       editTitle: '编辑模板',

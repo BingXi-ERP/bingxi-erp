@@ -12757,6 +12757,7 @@ export default {
       edit: 'Edit',
       delete: 'Delete',
       paginationAriaLabel: 'Data Import Template Pagination',
+      mobileCardAria: 'Data import template mobile card list',
     },
     taskTable: {
       statusPlaceholder: 'Status',
@@ -12781,6 +12782,7 @@ export default {
       cancel: 'Cancel',
       errorLog: 'Error Log',
       paginationAriaLabel: 'Data Import Task Pagination',
+      mobileCardAria: 'Data import task mobile card list',
     },
     templateForm: {
       editTitle: 'Edit Template',
