@@ -249,6 +249,18 @@ pub struct CreateBulkColorApprovalParams {
     pub remark: Option<String>,
 }
 
+/// 状态转换参数（封装以避免 clippy::too_many_arguments）
+#[derive(Debug, Clone)]
+struct TransitionParams {
+    approver_id: Option<i32>,
+    feedback: Option<String>,
+    delta_e_value: Option<Decimal>,
+    reject_reason: Option<String>,
+    unblock_delivery: bool,
+    delta_e_result: Option<&'static str>,
+    high_light_sensitive: Option<bool>,
+}
+
 /// 剪大货样参数（P0-F16）
 #[derive(Debug, Clone)]
 pub struct CutSampleParams {
@@ -875,13 +887,15 @@ impl BulkColorApprovalService {
                 .transition_to(
                     record.id,
                     ApprovalStatus::Rejected,
-                    None,
-                    Some("批色超时自动拒绝".to_string()),
-                    None,
-                    Some("超过 7 天未处理".to_string()),
-                    false,
-                    None,
-                    None,
+                    TransitionParams {
+                        approver_id: None,
+                        feedback: Some("批色超时自动拒绝".to_string()),
+                        delta_e_value: None,
+                        reject_reason: Some("超过 7 天未处理".to_string()),
+                        unblock_delivery: false,
+                        delta_e_result: None,
+                        high_light_sensitive: None,
+                    },
                 )
                 .await?;
             rejected_records.push(model);
@@ -953,13 +967,15 @@ impl BulkColorApprovalService {
         self.transition_to(
             id,
             ApprovalStatus::Approved,
-            Some(approver_id),
-            feedback,
-            delta_e_value,
-            None,
-            true, // approved → delivery_blocking=false
-            delta_e_result,
-            Some(high_light_sensitive),
+            TransitionParams {
+                approver_id: Some(approver_id),
+                feedback,
+                delta_e_value,
+                reject_reason: None,
+                unblock_delivery: true, // approved → delivery_blocking=false
+                delta_e_result,
+                high_light_sensitive: Some(high_light_sensitive),
+            },
         )
         .await
     }
@@ -978,13 +994,15 @@ impl BulkColorApprovalService {
         self.transition_to(
             id,
             ApprovalStatus::Rejected,
-            Some(approver_id),
-            feedback,
-            None,
-            Some(reject_reason),
-            false,
-            None,
-            None,
+            TransitionParams {
+                approver_id: Some(approver_id),
+                feedback,
+                delta_e_value: None,
+                reject_reason: Some(reject_reason),
+                unblock_delivery: false,
+                delta_e_result: None,
+                high_light_sensitive: None,
+            },
         )
         .await
     }
@@ -1024,13 +1042,15 @@ impl BulkColorApprovalService {
             .transition_to(
                 id,
                 ApprovalStatus::Rework,
-                Some(approver_id),
-                feedback,
-                None,
-                Some(reject_reason.clone()),
-                false,
-                None,
-                None,
+                TransitionParams {
+                    approver_id: Some(approver_id),
+                    feedback,
+                    delta_e_value: None,
+                    reject_reason: Some(reject_reason.clone()),
+                    unblock_delivery: false,
+                    delta_e_result: None,
+                    high_light_sensitive: None,
+                },
             )
             .await?;
 
@@ -1106,13 +1126,15 @@ impl BulkColorApprovalService {
             .transition_to(
                 id,
                 ApprovalStatus::Downgraded,
-                None,
-                None,
-                None,
-                Some(reject_reason),
-                false, // downgraded 仍保持 blocking=true
-                None,
-                None,
+                TransitionParams {
+                    approver_id: None,
+                    feedback: None,
+                    delta_e_value: None,
+                    reject_reason: Some(reject_reason),
+                    unblock_delivery: false, // downgraded 仍保持 blocking=true
+                    delta_e_result: None,
+                    high_light_sensitive: None,
+                },
             )
             .await?;
 
@@ -1355,14 +1377,17 @@ impl BulkColorApprovalService {
         &self,
         id: i64,
         target: ApprovalStatus,
-        approver_id: Option<i32>,
-        feedback: Option<String>,
-        delta_e_value: Option<Decimal>,
-        reject_reason: Option<String>,
-        unblock_delivery: bool,
-        delta_e_result: Option<&'static str>,
-        high_light_sensitive: Option<bool>,
+        params: TransitionParams,
     ) -> Result<bulk_color_approval::Model, BulkColorApprovalError> {
+        let TransitionParams {
+            approver_id,
+            feedback,
+            delta_e_value,
+            reject_reason,
+            unblock_delivery,
+            delta_e_result,
+            high_light_sensitive,
+        } = params;
         let txn = self.db.begin().await?;
         let model = Entity::find_by_id(id)
             .lock_exclusive()
