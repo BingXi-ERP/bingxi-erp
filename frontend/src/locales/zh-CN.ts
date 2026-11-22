@@ -9805,6 +9805,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: '采购入库单手机卡片列表',
       aria: {
         list: '采购入库单列表',
         pagination: '采购入库单分页',

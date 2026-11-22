@@ -9874,6 +9874,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: 'Purchase Receipt Mobile Card List',
       aria: {
         list: 'Purchase Receipt List',
         pagination: 'Purchase Receipt Pagination',
