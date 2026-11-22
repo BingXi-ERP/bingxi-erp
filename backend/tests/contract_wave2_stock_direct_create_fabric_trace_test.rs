@@ -74,7 +74,8 @@ fn white_fabric_dye_lot_rejected_and_without_lot_passes() {
         .expect("白坯纯空白缸号按未给处理，归一为 None");
         assert_eq!(blank_lot.dye_lot_no, None);
 
-        let err = admit_stock_fabric_trace(color, Some(String::from("D9")), Some(String::from("B1")))
+        let err =
+            admit_stock_fabric_trace(color, Some(String::from("D9")), Some(String::from("B1")))
             .expect_err("白坯空色号携带缸号必须拒绝");
         assert!(
             matches!(err, AppError::BusinessErrorDisplayable(_)),
