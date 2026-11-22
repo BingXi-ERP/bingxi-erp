@@ -225,6 +225,36 @@ test.describe('558 质检与验布匹级追溯读出口', () => {
     expect(trace.quality_records?.length, '未建质检单应为空集合').toBe(0);
   });
 
+  test('质检单绑匹后追溯带出质检判定并按等级联动匹质检状态', async ({ page }) => {
+    const inspectionId = await startInspection(page, 'BIND');
+    await gradeInspection(page, inspectionId);
+    await rollInspection(page, inspectionId);
+
+    const piece = await findPieceByInspection(page, inspectionId);
+    const pieceId = requireId(piece as unknown as Record<string, unknown>, '打卷匹');
+
+    await apiCall(page, 'POST', '/production/quality-inspection/records', {
+      inspection_no: genCode('E2E558'),
+      inspection_type: 'finished',
+      product_id: Number(getCtx().productIds[0]),
+      inspection_date: new Date().toISOString().slice(0, 10),
+      total_qty: '100',
+      inspected_qty: '100',
+      qualified_qty: '100',
+      unqualified_qty: '0',
+      qualification_rate: '100',
+      inspection_result: '合格',
+      grade: 'A',
+      piece_id: pieceId,
+      remark: genCode('558BIND'),
+    });
+
+    const trace = await apiCallRaw<PieceTrace>(page, 'GET', `/inventory/pieces/${pieceId}/trace`);
+    const qualityRecords = Array.isArray(trace.quality_records) ? trace.quality_records : [];
+    expect(qualityRecords.length, '追溯应带出绑匹的质检判定').toBe(1);
+    expect(String(trace.piece?.quality_status), 'A 级判定应把匹质检状态联动为合格').toBe('合格');
+  });
+
   test('按不存在的匹读聚合追溯应 404', async ({ page }) => {
     const failure = await apiCallExpectFail(page, 'GET', '/inventory/pieces/99999999/trace');
     expect(failure.status, '不存在的匹必须 404').toBe(404);
