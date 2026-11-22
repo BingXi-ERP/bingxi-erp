@@ -1,0 +1,96 @@
+# 静态结构通过不代表业务 E2E 已执行；未验证也不能返回成功。
+name: 联动影响矩阵静态检查
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'frontend/scripts/e2e-linkage-matrix.json'
+      - 'frontend/scripts/report-e2e-linkage*.mjs'
+      - 'frontend/scripts/check-e2e-linkage-gate*.mjs'
+      - '.github/workflows/ci-cd.yml'
+      - '.github/workflows/e2e-linkage-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linkage-gate:
+    name: 联动影响矩阵静态判定
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: 装配 Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      - name: 判定器自证
+        run: |
+          node frontend/scripts/check-e2e-linkage-gate.mjs --self-test
+          node --test frontend/scripts/check-e2e-linkage-gate.test.mjs
+
+      - name: 取基线提交
+        id: base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = 'workflow_dispatch' ]; then
+            git fetch --no-tags origin "$DEFAULT_BRANCH"
+            BASE_SHA="$(git rev-parse FETCH_HEAD)"
+          fi
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = '0000000000000000000000000000000000000000' ]; then
+            echo '::error::VERDICT=UNVERIFIED 无可用基线，不能给出通过结论'
+            exit 2
+          fi
+          git cat-file -e "$BASE_SHA^{commit}"
+          echo "sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: 联动影响静态判定
+        env:
+          BASE_SHA: ${{ steps.base.outputs.sha }}
+        run: |
+          set -uo pipefail
+          set +e
+          node frontend/scripts/check-e2e-linkage-gate.mjs --changed-from "$BASE_SHA" | tee linkage-report.txt
+          PIPE_RC=("${PIPESTATUS[@]}")
+          set -e
+          {
+            echo '### 联动影响矩阵静态检查'
+            echo '此检查未执行业务 E2E，不能作为联动回归通过的证据。'
+            echo '```text'
+            cat linkage-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${PIPE_RC[1]}" -ne 0 ]; then
+            echo '::error::VERDICT=UNVERIFIED 无法保存静态报告'
+            exit 2
+          fi
+          case "${PIPE_RC[0]}" in
+            0) echo '::notice::矩阵静态结构通过，业务 E2E 尚未由此检查验证' ;;
+            1)
+              echo '::error::联动矩阵结构损坏，见摘要中的红项'
+              exit 1
+              ;;
+            2)
+              echo '::error::VERDICT=UNVERIFIED 静态判定未完成，不能判绿'
+              exit 2
+              ;;
+            *)
+              echo '::error::VERDICT=UNVERIFIED 判定器异常，本轮结论无效'
+              exit 2
+              ;;
+          esac

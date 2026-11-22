@@ -3447,7 +3447,7 @@ jobs:
               36) SPEC_TARGETS="e2e/enhanced/ e2e/production/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               37) SPEC_TARGETS="e2e/bpm/ e2e/fabric/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               38) SPEC_TARGETS="e2e/ai/ e2e/quotations/ e2e/system/"; SHARD_NO=1; SHARD_TOTAL=1 ;;
-              39) SPEC_TARGETS="e2e/dashboard/ e2e/color-card.spec.ts e2e/color-price.spec.ts e2e/custom-order.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
+              39) SPEC_TARGETS="e2e/dashboard/ e2e/factory/ e2e/miniprogram/ e2e/color-card.spec.ts e2e/color-price.spec.ts e2e/custom-order.spec.ts"; SHARD_NO=1; SHARD_TOTAL=1 ;;
               # fullflow（96 条契约链用例，此前从未被任何分片传入，任务 #306 静默丢覆盖）。
               # 原 2 片 hash 分片实测一片只跑 6 个轻文件共 1.3 分钟，另一片挤进 10 个
               # 重链路文件共 28.5 分钟。hash 按文件散列分配，无法保证时长配平，改为按
@@ -3660,6 +3660,289 @@ jobs:
         with:
           name: e2e-diag-shard-${{ matrix.shard }}-${{ github.run_id }}
           path: frontend/reports/e2e-diag-shard-${{ matrix.shard }}.tar.gz
+          retention-days: 30
+          if-no-files-found: ignore
+
+  # ==========================================================================
+  # Job 15a: 联动影响矩阵真实 E2E（4.41-N）
+  # 与 ci-e2e 并行、复用同一 run 的产物与 PG：先由判定器从 PR 基线算出受影响
+  # spec，再只跑这些 spec。无命中只允许 NOT_APPLICABLE，不得冒充 GREEN；
+  # 矩阵损坏/工具失败必须红，Playwright 失败必须红。
+  # ==========================================================================
+  ci-e2e-linkage:
+    name: "🔗 E2E: 联动影响矩阵"
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    needs: [ci-info, ci-build-fe, ci-build-rust]
+    if: needs.ci-info.outputs.full_suite == 'true'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bingxi
+          POSTGRES_PASSWORD: bingxi_test
+          POSTGRES_DB: bingxi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://bingxi:bingxi_test@localhost:5432/bingxi_test
+      JWT_SECRET: ${{ secrets.CI_E2E_JWT_SECRET != '' && secrets.CI_E2E_JWT_SECRET || 'ci-e2e-jwt-secret-32bytes-do-not-use-in-prod-abc' }}
+      COOKIE_SECRET: ${{ secrets.CI_E2E_COOKIE_SECRET != '' && secrets.CI_E2E_COOKIE_SECRET || 'ci-e2e-cookie-secret-32bytes-do-not-use-in-prod-xyz' }}
+      WEBHOOK_SECRET: ${{ secrets.CI_E2E_WEBHOOK_SECRET != '' && secrets.CI_E2E_WEBHOOK_SECRET || 'ci-e2e-webhook-secret-32bytes-do-not-use-in-prod-q' }}
+      AUDIT_SECRET_KEY: ${{ secrets.CI_E2E_AUDIT_SECRET_KEY != '' && secrets.CI_E2E_AUDIT_SECRET_KEY || 'e2e-only-audit-signing-key-do-not-use-in-prod-32b' }}
+      INIT_TOKEN: ${{ secrets.CI_E2E_INIT_TOKEN != '' && secrets.CI_E2E_INIT_TOKEN || 'ci-e2e-seeding-token-only-32bytes-do-not-use!' }}
+      TEST_USERNAME: e2e_admin
+      TEST_PASSWORD: ${{ secrets.CI_E2E_TEST_PASSWORD != '' && secrets.CI_E2E_TEST_PASSWORD || 'Xk9#mQ2$vL8pW4nR' }}
+      APP_ENV: development
+      ENV: development
+      KAFKA_ENABLED: "false"
+      ELASTICSEARCH_URL: ""
+      CACHE_ENABLED: "false"
+      SERVER__HOST: 127.0.0.1
+      SERVER__PORT: "8082"
+      DATABASE__HOST: localhost
+      DATABASE__PORT: "5432"
+      DATABASE__NAME: bingxi_test
+      DATABASE__USERNAME: bingxi
+      DATABASE__PASSWORD: bingxi_test
+      DATABASE__MAX_CONNECTIONS: "10"
+      LOG__LEVEL: info
+      LOG__DIR: /tmp/e2e-logs
+      SLOW_QUERY__ENABLED: "false"
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+
+      - name: 判定联动影响并导出 spec 清单
+        id: linkage
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          mkdir -p frontend/reports
+          if [ "$EVENT_NAME" = 'pull_request' ]; then
+            BASE_SHA="$PR_BASE_SHA"
+          else
+            git fetch --no-tags origin "$DEFAULT_BRANCH"
+            BASE_SHA="$(git rev-parse FETCH_HEAD)"
+          fi
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = '0000000000000000000000000000000000000000' ]; then
+            git fetch --no-tags origin "$DEFAULT_BRANCH"
+            BASE_SHA="$(git merge-base FETCH_HEAD HEAD)"
+          fi
+          if [ -z "$BASE_SHA" ]; then
+            echo '::error::VERDICT=UNVERIFIED 无可用联动基线'
+            exit 2
+          fi
+          git cat-file -e "$BASE_SHA^{commit}"
+          echo "$BASE_SHA" > frontend/reports/linkage-base.txt
+
+          set +e
+          node frontend/scripts/check-e2e-linkage-gate.mjs --json --changed-from "$BASE_SHA" --specs-out frontend/reports/linkage-specs.txt > frontend/reports/linkage-report.json
+          LINKAGE_RC=$?
+          set -e
+          cat frontend/reports/linkage-report.json
+          if [ "$LINKAGE_RC" -eq 1 ]; then
+            echo '::error::VERDICT=RED 联动矩阵结构损坏，见 summary'
+            exit 1
+          elif [ "$LINKAGE_RC" -ne 0 ]; then
+            echo '::error::VERDICT=UNVERIFIED 联动影响判定未完成，不能判绿'
+            exit 2
+          fi
+
+          SPEC_COUNT=$(awk 'NF {n++} END {print n+0}' frontend/reports/linkage-specs.txt)
+          HAS_SPECS=false
+          if [ "$SPEC_COUNT" -gt 0 ]; then HAS_SPECS=true; fi
+          printf 'base_sha=%s\nspec_count=%s\nhas_specs=%s\n' "$BASE_SHA" "$SPEC_COUNT" "$HAS_SPECS" >> "$GITHUB_OUTPUT"
+
+          {
+            echo '### 联动影响矩阵执行门禁'
+            if [ "$HAS_SPECS" = 'true' ]; then
+              echo 'E2E_EXECUTION=PENDING'
+            else
+              echo 'E2E_EXECUTION=NOT_APPLICABLE 本 PR 未命中已知联动链路，未执行 E2E，不判为已回归'
+            fi
+            echo "BASE_SHA=$BASE_SHA"
+            echo "HEAD_SHA=${{ github.sha }}"
+            echo "SPEC_COUNT=$SPEC_COUNT"
+            echo '```text'
+            cat frontend/reports/linkage-report.json
+            echo '```'
+            if [ "$HAS_SPECS" = 'true' ]; then
+              echo '应回归用例：'
+              sed 's#^#- #' frontend/reports/linkage-specs.txt
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: E2E 运行期装配（后端二进制 + 前端产物 + Node/npm + Playwright 浏览器）
+        if: steps.linkage.outputs.has_specs == 'true'
+        uses: ./.github/actions/e2e-runtime
+
+      - name: 运行数据库迁移
+        if: steps.linkage.outputs.has_specs == 'true'
+        working-directory: backend
+        run: |
+          ./target/release/bingxi migrate run
+
+      - name: 启动后端服务
+        if: steps.linkage.outputs.has_specs == 'true'
+        working-directory: backend
+        run: |
+          mkdir -p /tmp/e2e-logs
+          ./target/release/server > /tmp/e2e-logs/backend.log 2>&1 &
+          BACKEND_PID=$!
+          echo "BACKEND_PID=$BACKEND_PID" > /tmp/e2e-logs/pid.env
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:8082/health > /dev/null 2>&1; then
+              echo "后端就绪（第 ${i} 次尝试）"
+              break
+            fi
+            sleep 0.5
+          done
+          if ! curl -s http://localhost:8082/health > /dev/null 2>&1; then
+            echo "后端启动失败，日志："
+            cat /tmp/e2e-logs/backend.log
+            exit 1
+          fi
+
+      - name: 初始化系统（创建 E2E 测试管理员）
+        if: steps.linkage.outputs.has_specs == 'true'
+        working-directory: backend
+        run: |
+          set +e
+          HTTP_CODE=$(curl -s -w "\n%{http_code}" -X POST http://localhost:8082/api/v1/erp/init/initialize \
+            -H "Content-Type: application/json" \
+            -H "X-Init-Token: ${INIT_TOKEN}" \
+            -H "X-Requested-With: XMLHttpRequest" \
+            -d "{\"admin_username\":\"${TEST_USERNAME}\",\"admin_password\":\"${TEST_PASSWORD}\"}")
+          RESPONSE_BODY=$(echo "$HTTP_CODE" | head -n -1)
+          STATUS_CODE=$(echo "$HTTP_CODE" | tail -n 1)
+          if echo "$RESPONSE_BODY" | grep -q '"code":200'; then exit 0; fi
+          if echo "$RESPONSE_BODY" | grep -q '"code": 200'; then exit 0; fi
+          if [ "$STATUS_CODE" = "400" ] && echo "$RESPONSE_BODY" | grep -q '"code":"BUSINESS_ERROR"'; then exit 0; fi
+          if [ "$STATUS_CODE" = "400" ] && echo "$RESPONSE_BODY" | grep -q '"code": "BUSINESS_ERROR"'; then exit 0; fi
+          echo "初始化失败 HTTP $STATUS_CODE"
+          tail -n 50 /tmp/e2e-logs/backend.log
+          exit 1
+
+      - name: 启动前端 preview（产物来自 ci-build-fe）
+        if: steps.linkage.outputs.has_specs == 'true'
+        working-directory: frontend
+        run: |
+          npx vite preview --port 3000 --strictPort > /tmp/e2e-logs/frontend.log 2>&1 &
+          FRONTEND_PID=$!
+          echo "FRONTEND_PID=$FRONTEND_PID" >> /tmp/e2e-logs/pid.env
+          for i in $(seq 1 60); do
+            if curl -s http://localhost:3000 > /dev/null 2>&1; then
+              echo "前端 preview 就绪（第 ${i} 次尝试）"
+              break
+            fi
+            sleep 1
+          done
+          if ! curl -s http://localhost:3000 > /dev/null 2>&1; then
+            echo "前端 preview 启动失败，日志："
+            tail -20 /tmp/e2e-logs/frontend.log
+            exit 1
+          fi
+
+      - name: 运行联动影响 E2E
+        if: steps.linkage.outputs.has_specs == 'true'
+        working-directory: frontend
+        env:
+          E2E_SHARD_INDEX: '45'
+          TEST_USERNAME: e2e_admin_s45
+          DEBUG: 'pw:api'
+        run: |
+          set -uo pipefail
+          mkdir -p reports
+          mapfile -t SPECS < <(sed -e 's#^frontend/##' -e '/^$/d' reports/linkage-specs.txt)
+          if [ "${#SPECS[@]}" -eq 0 ]; then
+            echo '::error::VERDICT=UNVERIFIED 声明有受影响 spec 但清单为空'
+            exit 2
+          fi
+          echo "E2E_EXECUTION=RUNNING"
+          echo "联动 E2E spec 数=${#SPECS[@]}"
+          printf ' - %s\n' "${SPECS[@]}"
+          set +e
+          timeout 3600 npx playwright test --project=chromium --workers=2 "${SPECS[@]}" 2>&1 | tee reports/linkage-playwright-output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          set -e
+          echo "$EXIT_CODE" > reports/linkage-exit-code.txt
+          if [ "$EXIT_CODE" -ne 0 ]; then
+            echo "::error::VERDICT=RED 联动 E2E 失败，退出码 $EXIT_CODE"
+            exit "$EXIT_CODE"
+          fi
+          echo '::notice::VERDICT=GREEN 联动影响 E2E 真实执行通过'
+
+      - name: 收集后端与前端日志
+        if: always()
+        run: |
+          mkdir -p frontend/reports
+          if [ -f /tmp/e2e-logs/backend.log ]; then
+            cp /tmp/e2e-logs/backend.log frontend/reports/backend.log
+          fi
+          if [ -f /tmp/e2e-logs/frontend.log ]; then
+            cp /tmp/e2e-logs/frontend.log frontend/reports/frontend.log
+          fi
+
+      - name: 汇总联动执行结论
+        if: always()
+        env:
+          HAS_SPECS: ${{ steps.linkage.outputs.has_specs }}
+        run: |
+          set -uo pipefail
+          VERDICT=$(node -e '
+            const fs = require("fs");
+            try {
+              const j = JSON.parse(fs.readFileSync("frontend/reports/linkage-report.json", "utf8"));
+              process.stdout.write(j.verdict || "UNVERIFIED");
+            } catch {
+              process.stdout.write("UNVERIFIED");
+            }
+          ')
+          {
+            echo '### 联动影响矩阵执行结论'
+            if [ -f frontend/reports/linkage-exit-code.txt ]; then
+              RC=$(cat frontend/reports/linkage-exit-code.txt)
+              if [ "$RC" = '0' ]; then
+                echo 'VERDICT=GREEN 受影响用例已由真实后端与真实 PostgreSQL 执行通过'
+              else
+                echo "VERDICT=RED 受影响用例执行失败，退出码=$RC"
+              fi
+            elif [ "$HAS_SPECS" = 'false' ] && [ "$VERDICT" = 'GREEN' ]; then
+              echo 'VERDICT=NOT_APPLICABLE 未命中已知联动链路，未执行 E2E，不得按回归通过处理'
+            elif [ "$VERDICT" = 'RED' ]; then
+              echo 'VERDICT=RED 矩阵结构损坏，未执行 E2E'
+            else
+              echo 'VERDICT=UNVERIFIED 未产出可执行结论，禁止按通过处理'
+            fi
+            if [ -f frontend/reports/linkage-base.txt ]; then
+              echo "BASE_SHA=$(cat frontend/reports/linkage-base.txt)"
+            fi
+            echo "HEAD_SHA=${{ github.sha }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 上传联动 E2E 报告
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: e2e-linkage-report-${{ github.run_id }}
+          path: |
+            frontend/reports/linkage-*.json
+            frontend/reports/linkage-*.txt
+            frontend/reports/backend.log
+            frontend/reports/frontend.log
+            frontend/reports/seed-failures*.json
+            frontend/test-results/
           retention-days: 30
           if-no-files-found: ignore
 
@@ -5029,7 +5312,7 @@ jobs:
     name: 🚨 E2E 真实性门禁
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [ci-info, ci-e2e, ci-e2e-setup-wizard, role-permission-matrix]
+    needs: [ci-info, ci-e2e, ci-e2e-linkage, ci-e2e-setup-wizard, role-permission-matrix]
     # !cancelled()：默认 success() 语义让本 job 在上游 E2E 红的轮次整体 skip，
     # 而"防伪全绿"的门禁恰恰最需要在上游红时执行（run #4671 实证盲区；同型修复
     # 先例 571878e7 给前端静态门禁子步加 !cancelled()）。语义不放宽：动态步对
@@ -5042,18 +5325,19 @@ jobs:
       - name: 动态校验——全部 E2E job 必须真实执行成功
         env:
           CI_E2E_RESULT: ${{ needs.ci-e2e.result }}
+          LINKAGE_E2E_RESULT: ${{ needs.ci-e2e-linkage.result }}
           SETUP_WIZARD_RESULT: ${{ needs.ci-e2e-setup-wizard.result }}
           ROLE_MATRIX_RESULT: ${{ needs.role-permission-matrix.result }}
           GATE_EVENT_NAME: ${{ github.event_name }}
           GATE_REF: ${{ github.ref }}
         run: |
-          for r in "$CI_E2E_RESULT" "$SETUP_WIZARD_RESULT" "$ROLE_MATRIX_RESULT"; do
+          for r in "$CI_E2E_RESULT" "$LINKAGE_E2E_RESULT" "$SETUP_WIZARD_RESULT" "$ROLE_MATRIX_RESULT"; do
             if [[ "$r" != "success" && "$r" != "skipped" ]]; then
               echo "::error::E2E 真实性门禁：上游 E2E job 状态 $r（非 success），E2E 未全部基于真实链路通过"
               exit 1
             fi
           done
-          echo "上游 E2E job（ci-e2e / setup-wizard / role-permission-matrix）本轮结论均为 success 或 skipped"
+          echo "上游 E2E job（ci-e2e / ci-e2e-linkage / setup-wizard / role-permission-matrix）本轮结论均为 success 或 skipped"
           echo "本轮事件=$GATE_EVENT_NAME ref=$GATE_REF，ci-e2e 结论=$CI_E2E_RESULT（分片数不在本步断言，见下一步与 e2e-report-shard-* 产物）"
 
       - name: 放行测试面的轮次 ci-e2e 不得为 skipped
@@ -5371,6 +5655,7 @@ jobs:
       package-release,
       github-release,
       ci-e2e,
+      ci-e2e-linkage,
       role-permission-matrix,
       security-vulnerability-scan,
       ci-dead-code-audit,

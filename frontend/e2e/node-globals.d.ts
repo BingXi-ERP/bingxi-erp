@@ -6,7 +6,8 @@
  * 于是 `process`/`Buffer`/`node:fs` 长期报 TS2580/TS2307，被 `check-e2e-types.mjs`
  * 按 `文件|错误码` 记账成棘轮基线。
  *
- * 本文件的做法：只声明 e2e 代码里**实际用到**的成员（`.env` / `.cwd()` / `.exit()`），
+ * 本文件的做法：只声明 e2e 代码里**实际用到**的成员（`.env` / `.cwd()` / `.exit()` /
+ * `.stdout.write()`），
  * 不伪造 Node 的完整 API 面。用 `node.<member>` 的新代码若不在此声明会直接判红，
  * 由人补声明——即"扩展面必须显式评审"，而不是静默放行。
  *
@@ -27,6 +28,8 @@ declare const process: {
   cwd(): string;
   /** 结束进程（ensure-role-users 脚本的退出路径） */
   exit(code?: number): never;
+  /** 标准输出（长链 E2E 的进度回显，只暴露 write，不引完整 Node 类型） */
+  readonly stdout: { write(chunk: string): boolean };
 };
 
 /**
