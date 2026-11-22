@@ -1,4 +1,4 @@
-//! m0143：bulk_color_approval 补批色 ΔE 判定地基两列（high_light_sensitive 布尔 NOT NULL
+//! m0146：bulk_color_approval 补批色 ΔE 判定地基两列（high_light_sensitive 布尔 NOT NULL
 //! DEFAULT FALSE + delta_e_result 可空字符串）。
 //! 列语义、写入方与回退口径见同目录 mod.rs 头注释。
 use sea_orm_migration::prelude::*;
@@ -7,7 +7,7 @@ pub struct Migration;
 
 impl MigrationName for Migration {
     fn name(&self) -> &'static str {
-        "m0143_add_bulk_color_delta_e_level"
+        "m0146_add_bulk_color_delta_e_level"
     }
 }
 

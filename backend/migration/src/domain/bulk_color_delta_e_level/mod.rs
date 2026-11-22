@@ -21,7 +21,7 @@
 //! 跳过，列永不补上。链尾新域名在复用库上属 pending，必然执行。依赖
 //! `bulk_color_approval` 建表（finance 域），早于本域完成。
 
-mod m0143_add_bulk_color_delta_e_level;
+mod m0146_add_bulk_color_delta_e_level;
 
 use sea_orm_migration::prelude::*;
 
@@ -36,14 +36,14 @@ impl MigrationName for Migration {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        m0143_add_bulk_color_delta_e_level::Migration
+        m0146_add_bulk_color_delta_e_level::Migration
             .up(manager)
             .await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        m0143_add_bulk_color_delta_e_level::Migration
+        m0146_add_bulk_color_delta_e_level::Migration
             .down(manager)
             .await?;
         Ok(())
