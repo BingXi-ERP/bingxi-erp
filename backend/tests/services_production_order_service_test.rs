@@ -270,6 +270,10 @@ fn test_ztzh_cgbnzjdscz() {
         production::PRODUCTION_IN_PROGRESS,
     );
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::BusinessError(ref m) if m == "不允许从 DRAFT 状态转换到 IN_PROGRESS 状态"),
+        "草稿跳级到生产中必须被状态机拒绝（production_order_ops/crud.rs:143）"
+    );
 }
 
 /// test_ztzh_cgbnzjdywc
@@ -280,6 +284,10 @@ fn test_ztzh_cgbnzjdywc() {
         common::STATUS_COMPLETED,
     );
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::BusinessError(ref m) if m == "不允许从 DRAFT 状态转换到 COMPLETED 状态"),
+        "草稿跳级到完成必须被状态机拒绝（production_order_ops/crud.rs:143）"
+    );
 }
 
 /// test_ztzh_ywcwztbkzbg
@@ -290,6 +298,10 @@ fn test_ztzh_ywcwztbkzbg() {
         common::STATUS_CANCELLED,
     );
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::BusinessError(ref m) if m == "不允许从 COMPLETED 状态转换到 CANCELLED 状态"),
+        "终态 COMPLETED 必须无出边（production_order_ops/crud.rs:143）"
+    );
 }
 
 /// test_ztzh_yqxwztbkzbg
@@ -300,6 +312,10 @@ fn test_ztzh_yqxwztbkzbg() {
         common::STATUS_DRAFT,
     );
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::BusinessError(ref m) if m == "不允许从 CANCELLED 状态转换到 DRAFT 状态"),
+        "终态 CANCELLED 必须无出边（production_order_ops/crud.rs:143）"
+    );
 }
 
 /// test_ztzh_wzyztbjj
@@ -308,6 +324,10 @@ fn test_ztzh_wzyztbjj() {
     let result =
         ProductionOrderService::validate_status_transition("UNKNOWN", common::STATUS_DRAFT);
     assert!(result.is_err());
+    assert!(
+        matches!(result.unwrap_err(), AppError::BusinessError(ref m) if m == "未知的状态: UNKNOWN"),
+        "未知当前状态必须被状态表拒识（production_order_ops/crud.rs:149）"
+    );
 }
 
 /// test_ztzh_cwxxbhyhmbzt（验证非法转换的错误消息包含双方状态名，便于排查。）
