@@ -1,4 +1,4 @@
-// 小程序接口层权限 E2E — miniprogram/01-customer-access
+// 小程序接口层权限 E2E — flow/525-mp-customer-access
 // 小程序与 Web 后台共用同一套后端账号权限体系（目标第五章「小程序登录，授权，账号打通，
 // 和 Web 共用一套账号权限体系」）。CI 无微信开发者工具、无 miniprogram-automulator，
 // 无法跑真机 UI 自动化，故本组以小程序客户端真实调用的后端端点为面，验证：
@@ -13,7 +13,7 @@
 // 存什么：不落库，仅断言失败状态码与机器码。存哪里： Actions 侧日志与测试报告。
 import { test, expect } from '../diagnose-fixture';
 import { applyAuthMocks } from '../smoke/_helpers';
-import { getRoleCredential, apiCallRaw, BASE_URL, API_BASE, API_PREFIX } from '../flow/helpers';
+import { getRoleCredential, apiCallRaw, BASE_URL, API_BASE, API_PREFIX } from './helpers';
 
 const CUSTOMER = 'customer';
 

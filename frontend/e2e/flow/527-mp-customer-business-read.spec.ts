@@ -1,4 +1,4 @@
-// 小程序客户业务读接口契约护栏 E2E — miniprogram/03-customer-business-read
+// 小程序客户业务读接口契约护栏 E2E — flow/527-mp-customer-business-read
 // 功能：把"customer 角色对小程序同款业务读端点全部被后端拒绝"的当前权限态钉成契约矩阵
 //   （调研报告 F:/tmp/mp-customer-api-survey-1122.md 结论 B：小程序是真实客户端，
 //   apiGateway.js + 50+ 条 /api/v1/erp 调用，但业务读端点所需权限码 customer 一概不持，
@@ -10,7 +10,7 @@
 // 存什么：不落库，仅断言失败状态码。存哪里：Actions 日志与测试报告。
 import { test, expect } from '../diagnose-fixture';
 import { applyAuthMocks } from '../smoke/_helpers';
-import { getRoleCredential, BASE_URL, API_BASE, API_PREFIX } from '../flow/helpers';
+import { getRoleCredential, BASE_URL, API_BASE, API_PREFIX } from './helpers';
 
 const CUSTOMER = 'customer';
 

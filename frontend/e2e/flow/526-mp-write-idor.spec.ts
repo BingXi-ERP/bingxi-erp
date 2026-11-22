@@ -1,4 +1,4 @@
-// 写操作参数篡改 IDOR E2E — miniprogram/02-write-idor
+// 写操作参数篡改 IDOR E2E — flow/526-mp-write-idor
 // 功能：验证已登录的 self 范围用户把请求参数里的资源 ID 换成他人单据、金额改成 0.01 时，
 //   后端按行级归属拒绝（403 固定脱敏信封），且他人单据金额未被篡改落库（目标 4.1-P / 3.6）。
 // 调用方：Playwright 分片（frontend/playwright.config.ts），与 DC-001 越权用例同一后端与账号池。
@@ -19,7 +19,7 @@ import {
   tryCleanup,
   getRoleCredential,
   BASE_URL,
-} from '../flow/helpers';
+} from './helpers';
 
 const OWNER_ROLE = 'salesperson';
 const INTRUDER_ROLE = 'customer_service';
