@@ -12,8 +12,8 @@ use crate::services::inventory_stock_service::{CreateStockFabricArgs, InventoryS
 use crate::utils::error::AppError;
 use crate::utils::response::ApiResponse;
 use axum::{
-    extract::{Query, State},
     Json,
+    extract::{Query, State},
 };
 use validator::Validate;
 
