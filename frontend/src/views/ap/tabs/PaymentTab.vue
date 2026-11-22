@@ -13,7 +13,76 @@
     </div>
 
     <el-card shadow="hover">
+      <!-- 手机卡片（与 BPM 审批手机卡片同断点同范式） -->
+      <section v-if="isPhone" v-loading="paymentLoading" class="ap-payment-mobile">
+        <ul class="card-list" :aria-label="$t('apModule.payment.listAria')">
+          <li v-for="row in payments" :key="row.id" class="card-item">
+            <dl class="card-fields">
+              <div class="field-emphasis">
+                <dt>{{ $t('apModule.payment.paymentNo') }}</dt>
+                <dd>{{ row.payment_no }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.payment.supplier') }}</dt>
+                <dd>{{ supplierLabel(row.supplier_id) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.payment.paymentDate') }}</dt>
+                <dd>{{ row.payment_date }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.payment.paymentAmount') }}</dt>
+                <dd>{{ formatMoney(row.payment_amount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.payment.paymentMethod') }}</dt>
+                <dd>{{ getPaymentMethodLabel(row.payment_method) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('apModule.payment.bankAccount') }}</dt>
+                <dd>{{ row.bank_account }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('common.createTime') }}</dt>
+                <dd>{{ row.created_at }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('common.status') }}</dt>
+                <dd>
+                  <el-tag
+                    :type="row.payment_status === 'CONFIRMED' ? 'success' : 'warning'"
+                    size="small"
+                  >
+                    {{
+                      row.payment_status === 'CONFIRMED'
+                        ? $t('apModule.payment.statusConfirmed')
+                        : $t('apModule.payment.statusRegistered')
+                    }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button
+                v-if="row.payment_status !== 'CONFIRMED'"
+                type="success"
+                @click="confirmPayment(row as APPayment)"
+              >
+                {{ $t('apModule.payment.confirm') }}
+              </el-button>
+              <el-button type="primary" @click="printPayment(row as APPayment)">
+                {{ $t('common.print') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <ElEmpty
+          v-if="!paymentLoading && payments.length === 0"
+          :description="$t('components.v2Table.empty')"
+        />
+      </section>
       <el-table
+        v-else
         v-loading="paymentLoading"
         :data="payments"
         stripe
@@ -161,9 +230,10 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElEmpty } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   getAPPaymentList,
   createAPPayment,
@@ -175,8 +245,13 @@ import {
 import { getAPPaymentRequestList, printAPPaymentDocx, type APPaymentRequest } from '@/api/ap';
 import { getSupplierList, type Supplier } from '@/api/supplier';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
+import { paymentMethodLabel } from '@/composables/usePaymentMethods';
 
 const { t } = useI18n({ useScope: 'global' });
+
+// 手机卡片断点（与 BPM 审批手机卡片同断点）
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const payments = ref<APPayment[]>([]);
 const paymentLoading = ref(false);
@@ -194,14 +269,8 @@ const formatMoney = (amount: number | string | undefined) => {
 };
 
 const getPaymentMethodLabel = (method: string) => {
-  const keyMap: Record<string, string> = {
-    bank_transfer: 'apModule.payment.methodBankTransfer',
-    cash: 'apModule.payment.methodCash',
-    check: 'apModule.payment.methodCheck',
-    bill: 'apModule.payment.methodBill',
-  };
-  const key = keyMap[method];
-  if (key) return t(key);
+  const label = paymentMethodLabel(method);
+  if (label !== method) return label;
   return getAPPaymentMethodText(method) || method;
 };
 
@@ -377,6 +446,61 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 手机卡片（范式与 BPM 审批手机卡片一致） */
+.ap-payment-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;

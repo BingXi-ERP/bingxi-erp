@@ -15,7 +15,6 @@
 .github/workflows/ci-cd.yml|169:6|SC2086
 .github/workflows/ci-cd.yml|18:20|SC2012
 .github/workflows/ci-cd.yml|18:5|SC2012
-.github/workflows/ci-cd.yml|18:5|SC2034
 .github/workflows/ci-cd.yml|228:8|SC2028
 .github/workflows/ci-cd.yml|22:3|SC2129
 .github/workflows/ci-cd.yml|26:21|SC2012
@@ -34,3 +33,6 @@
 .github/workflows/e2e-batch.yml|1:1|SC2129
 .github/workflows/e2e-batch.yml|1:1|SC2129
 .github/workflows/e2e-batch.yml|42:6|SC2086
+
+.github/workflows/ci-cd.yml|17:32|SC2086
+.github/workflows/ci-cd.yml|18:40|SC2086

@@ -136,6 +136,15 @@ test.describe('13 报价翻译回读', () => {
     const ctx = getCtx();
     const sourceId = await seedRecognizableDraft(page, 'CONV');
     // 本例源单必然被 convert 推进到 converted 终态（该终态就是被断言的结论），无清理腿可用也无需清理。
+    const quotationPath = `/quotations/${sourceId}`;
+    const quotationUrl = `${BASE_URL}${quotationPath}`;
+    const actions = page.locator('.quotation-detail .card-header .actions');
+    const editButton = actions.getByRole('button', { name: '编辑', exact: true });
+    const convertButton = actions.getByRole('button', { name: '转销售订单', exact: true });
+    await page.goto(quotationUrl);
+    await expect(editButton, '草稿报价应显示编辑入口').toBeVisible();
+    await expect(editButton, '草稿报价的编辑入口应可用').toBeEnabled();
+    await expect(convertButton, '审批前不显示转单入口').toHaveCount(0);
 
     // draft → approved（金额 500 < 10 万，submit 自批）
     await apiCall(page, 'POST', `/quotations/${sourceId}/submit`);
@@ -155,16 +164,45 @@ test.describe('13 报价翻译回读', () => {
       '转订单前置：报价单应为 approved'
     ).toBe('approved');
 
-    // 转订单并取回 converted_sales_order_id（02-03 已证 UI「转销售订单」按钮→converted；此处 API 触发同源）
-    await apiCall(page, 'POST', `/quotations/${sourceId}/convert`);
-    const converted = await apiCallRaw<{ status: string; converted_sales_order_id?: number }>(
-      page,
-      'GET',
-      `/quotations/${sourceId}`
-    );
+    await page.reload();
+    await expect(convertButton, '审批通过后同一报价的转单入口应可用').toBeEnabled();
+
+    await apiCall(page, 'POST', `${quotationPath}/convert`);
+    interface ConvertedQuotation {
+      quotation_no: string;
+      status: string;
+      converted_sales_order_id: number | null;
+      converted_at: string | null;
+      notes: string | null;
+      total_amount: number | string;
+      items: QuotationItemLite[];
+    }
+    const converted = await apiCallRaw<ConvertedQuotation>(page, 'GET', quotationPath);
     expect(converted.status, '转订单后报价单状态应为 converted').toBe('converted');
     const soId = converted.converted_sales_order_id;
-    expect(soId, '转订单应回填 converted_sales_order_id').toBeTruthy();
+    expect(soId, '转订单应回填 converted_sales_order_id').toBeGreaterThan(0);
+    expect(converted.notes, '转单不应修改草稿备注').toBe('E2E-13-CONV');
+    expect(converted.items, '转单后报价仍保留原明细').toHaveLength(1);
+    expect(converted.converted_at, '转单应写入转换时间').toBeTruthy();
+
+    await page.reload();
+    const detail = page.locator('.quotation-detail');
+    await expect(detail.locator('.quotation-no')).toHaveText(converted.quotation_no);
+    await expect(detail.getByText(`销售订单 ID：${soId}，转换时间：`)).toBeVisible();
+    await expect(editButton, '已转单报价不显示编辑入口').toHaveCount(0);
+    await expect(convertButton, '已转单报价不显示转单入口').toHaveCount(0);
+
+    const editRejected = await apiCallExpectFail(page, 'PUT', quotationPath, {
+      notes: 'E2E-13-不可改写',
+    });
+    expect(editRejected.status, '编辑已转单报价应被业务状态门拒绝').toBe(400);
+    expect(failureCode(editRejected), '编辑被拒机器码').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+
+    const duplicateRejected = await apiCallExpectFail(page, 'POST', `${quotationPath}/convert`);
+    expect(duplicateRejected.status, '再次转单应被业务状态门拒绝').toBe(400);
+    expect(failureCode(duplicateRejected), '重复转单被拒机器码').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
 
     // 终态复证：converted 是本族唯一在册终止腿（cancel）的拒绝态，走 business_displayable
     // → 400 + BUSINESS_ERROR。撤除清理腿的判据在此钉死，不是口头声明「不用清」。
@@ -176,8 +214,13 @@ test.describe('13 报价翻译回读', () => {
     expect(failureCode(convCancel), 'converted 取消被拒机器码').toBe(
       APP_ERROR_CODES.BUSINESS_ERROR
     );
-    const convAfter = await apiCallRaw<{ status: string }>(page, 'GET', `/quotations/${sourceId}`);
-    expect(convAfter.status, '取消被拒后报价单状态不得从 converted 漂移').toBe('converted');
+    const convAfter = await apiCallRaw<ConvertedQuotation>(page, 'GET', quotationPath);
+    expect(convAfter.status, '写入被拒后报价应保持已转单状态').toBe('converted');
+    expect(convAfter.converted_sales_order_id, '写入被拒后应保留原订单关联').toBe(soId);
+    expect(convAfter.converted_at, '重复转单不得改写原转换时间').toBe(converted.converted_at);
+    expect(convAfter.notes, '编辑被拒后原报价备注不变').toBe(converted.notes);
+    expect(convAfter.items, '写入被拒后报价明细不变').toEqual(converted.items);
+    expect(convAfter.total_amount, '写入被拒后报价总额不变').toBe(converted.total_amount);
 
     // 回读订单明细：非仅断产出 id，逐项验证翻译正确性
     const order = await apiCallRaw<{

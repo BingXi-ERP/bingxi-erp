@@ -197,7 +197,7 @@
       :title="
         form.id ? $t('printTemplates.dialog.editTitle') : $t('printTemplates.dialog.createTitle')
       "
-      width="900px"
+      :width="isPhone ? '95%' : '900px'"
       :aria-label="$t('printTemplates.dialog.ariaLabel')"
     >
       <el-form
@@ -205,6 +205,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('printTemplates.dialog.formAriaLabel')"
       >
         <el-row :gutter="20">
@@ -379,7 +380,7 @@
     <el-dialog
       v-model="previewVisible"
       :title="$t('printTemplates.previewDialog.title')"
-      width="900px"
+      :width="isPhone ? '95%' : '900px'"
       :aria-label="$t('printTemplates.previewDialog.ariaLabel')"
     >
       <div v-loading="previewLoading" class="preview-container">
@@ -401,6 +402,7 @@
 import { isDialogDismissal } from '@/utils/monitor';
 import NumericInput from '@/components/NumericInput.vue';
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus, Search } from '@element-plus/icons-vue';
@@ -424,6 +426,8 @@ import { useTableApi } from '@/composables/useTableApi';
 import { logAuxLoadFailure } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 批次 277：useTableApi 自动管理分页状态、数据加载，自动 watch page/pageSize 变化触发重载
 // getPrintTemplateList 返回 ApiResponse<PrintTemplate[]>（{ data: T[], total: number }），
@@ -859,5 +863,11 @@ const handleSizeChange = (s: number) => {
   text-align: center;
   color: #909399;
   padding: 40px;
+}
+
+@media (max-width: 767px) {
+  .print-templates-page {
+    padding: 12px;
+  }
 }
 </style>

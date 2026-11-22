@@ -53,4 +53,10 @@ const { t } = useI18n({ useScope: 'global' });
   display: flex;
   justify-content: flex-end;
 }
+
+@media (max-width: 767px) {
+  .voucher-page {
+    padding: 12px;
+  }
+}
 </style>

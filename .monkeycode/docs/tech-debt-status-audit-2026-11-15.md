@@ -17,9 +17,9 @@
 
 | 编号 | 事项 | 现态 | 结论 |
 |------|------|------|------|
-| 4.7 | cargo-audit + cargo-deny 扫描 | ci-cd.yml 已有 cargo-audit + gitleaks + semgrep（漏洞扫描 job，每日 cron + PR 面，npm 按 high/critical 卡） | ✅ 闭环（cargo-deny 未上，deny.toml 不存在——cargo-audit 已覆盖 CVE 面） |
+| 4.7 | cargo-audit + cargo-deny 扫描 | 主干已有 `backend/deny.toml`，vuln-scan 步骤组挂载 cargo deny 的 licenses/bans/sources/advisories 检查；但 action 原文为“首轮观察档只报告不阻塞”，命中仅发 warning，只有 cargo-audit 异常退出、npm high/critical 等路径 fail-closed | ⚠️ 部分闭环（cargo-deny 已上但观察档，尚非门禁；不得再写“未上、deny.toml 不存在”） |
 | 4.8 | crate 供应链审计 | 同上 job 群覆盖 | ✅ 闭环 |
-| 4.9 | 弱算法扫描（MD5/DES/RC4） | Cargo.toml 零弱算法依赖，全仓无 md5/des/rc4 使用点 | ✅ 闭环（架构层已证零命中） |
+| 4.9 | 弱算法扫描（MD5/DES/RC4） | 当前主干无 md5/des/rc4 crate，也未发现本地 MD5 计算；系统升级域仅解析官方 `.md5` 资产名作补充记录，SHA-256 才是权威校验；但 Cargo.toml 仍有 sha1 0.10，邮件服务使用 HMAC-SHA1，且无弱算法 fail-closed 扫描门 | ⚠️ 部分闭环（原“全仓零命中”不成立；MD5 元数据口径与 SHA-256 主判据成立，sha1 用途与扫描门仍需评估） |
 | 4.10 | TLS 版本下限 | 未找到显式 TLS 下限配置；reqwest 0.13 默认走 rustls/系统 TLS 现代版本 | ⏳ 低风险遗留（默认配置已达标，显式下限未钉） |
 | 2.9 | 124 个 never-constructed struct 死代码 | `#[allow(dead_code)]` 全仓 881 处（原 103 处 allow 但报告口径为"含 reason 注释"）；#1236 车道已把 13 枚周期任务收编 SchedulerRegistry 接线，死代码量随功能接线减少 | ⏳ 部分推进（结构性减少，未系统清零） |
 | 2.10 | 前端 any 类型 101 文件 | 现 44 文件含 any（下降 57%） | ⏳ 部分推进 |
@@ -53,4 +53,4 @@
 5. **cargo-deny 补位**（4.7 增强，license/源审计维度）。
 6. **BOM DROP 迁移**（用户裁定待拍项）。
 
-> 债务面结论：72 项中批次 1 全闭环，批次 2 安全类全闭环，架构双套迁移/TODO/Clippy/状态词表均已门禁化或裁定落地；余量集中在死代码清点、前端 any、大文件拆分三类"体力型"收尾，无 P0/P1 级未处理项。
+> 债务面结论：72 项中批次 1 全闭环；批次 2 安全类为部分闭环（cargo-deny 已挂载但仍是只报告观察档，弱算法扫描无 fail-closed 门且 sha1 仍在使用）；架构双套迁移/TODO/Clippy/状态词表均已门禁化或裁定落地；余量集中在死代码清点、前端 any、大文件拆分三类"体力型"收尾，无 P0/P1 级未处理项。

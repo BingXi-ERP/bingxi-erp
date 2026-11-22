@@ -1,8 +1,6 @@
 <script setup lang="ts">
-/**
- * P2-4 工艺优化列表 + 创建
- */
 import { reactive, ref, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -16,11 +14,12 @@ import {
   type ProcessOptRequest,
 } from '@/api/ai-extend';
 import { DYE_TYPE_LABEL_KEY, DYE_TYPE_VALUES, isDyeType } from '@/constants/dye-type';
-// 批次 280：接入 useTableApi，消除手写 items/loading/total/page/pageSize/load 重复
 import { useTableApi } from '@/composables/useTableApi';
-
-// 批次 34 v9 P1：接入 i18n，替换硬编码中文 ElMessage
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
+const phoneDialogWidth =
+  'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))';
 
 // 染料类型下拉：提交后端白名单里的稳定码（此前 value 取译文，任何选择都会被 422 拒绝）
 const dyeTypeOptions = computed(() =>
@@ -35,16 +34,12 @@ const dyeTypeText = (value: string | null): string | null =>
   value !== null && isDyeType(value) ? t(DYE_TYPE_LABEL_KEY[value]) : value;
 
 const router = useRouter();
-
-// 批次 280：filter 仅保留筛选字段，分页字段由 useTableApi 管理
 const filter = reactive({
   color_no: '',
   fabric_type: '',
   is_applied: undefined as boolean | undefined,
   source: undefined as string | undefined,
 });
-
-// 批次 280：useTableApi 自动管理分页状态、数据加载，自动 watch page/pageSize 变化触发重载
 // 后端 ai_extend_handler::list_process_optimizations 以 json!({items,total,page,page_size}) 返回，
 // 显式钉 listKey='items'，不依赖 detectList 的顺序探测（否则信封漂移会被静默吞掉）。
 const {
@@ -70,16 +65,12 @@ const form = reactive<ProcessOptRequest>({
   k: 5,
 });
 const submitting = ref(false);
-
-// 批次 280：同步筛选条件到 useTableApi.queryParams 并刷新
 function syncQueryParams() {
   setQueryParam('color_no', filter.color_no || undefined);
   setQueryParam('fabric_type', filter.fabric_type || undefined);
   setQueryParam('is_applied', filter.is_applied);
   setQueryParam('source', filter.source);
 }
-
-// 批次 280：查询时先同步筛选条件再刷新
 function handleSearch() {
   syncQueryParams();
   page.value = 1;
@@ -138,8 +129,7 @@ async function submitCreate() {
   }
   submitting.value = true;
   try {
-    // request 拦截器返回完整 ApiResponse 信封（{code,message,data}），真实载荷在 resp.data。
-    // 直接读 resp.response 会取到 undefined → .toFixed 抛错落入 catch 误弹「创建失败」，
+    // 创建结果从 ApiResponse.data 读取。
     // 尽管 POST 实际 200。必须经 resp.data 解包（与 useTableApi/bpm-enhanced 的信封约定一致）。
     const resp = await createProcessOptimization({ ...form });
     const created = resp.data;
@@ -202,7 +192,7 @@ const appliedOptions = computed(() => [
 </script>
 
 <template>
-  <div class="proc-page">
+  <div class="proc-page" :class="{ 'proc-page--phone': isPhone }">
     <div class="page-header">
       <h2>{{ $t('aiExtend.process.listTitle') }}</h2>
       <div class="header-right">
@@ -214,7 +204,12 @@ const appliedOptions = computed(() => [
     </div>
 
     <el-card class="filter-card">
-      <el-form :inline="true" :model="filter" :aria-label="$t('aiExtend.process.filterAriaLabel')">
+      <el-form
+        :inline="!isPhone"
+        :label-position="isPhone ? 'top' : 'right'"
+        :model="filter"
+        :aria-label="$t('aiExtend.process.filterAriaLabel')"
+      >
         <el-form-item :label="$t('aiExtend.process.colColorNo')">
           <el-input
             v-model="filter.color_no"
@@ -260,8 +255,103 @@ const appliedOptions = computed(() => [
       </el-form>
     </el-card>
 
-    <el-card>
+    <el-card class="process-table-card">
+      <section
+        v-if="isPhone"
+        v-loading="loading"
+        class="ai-mobile process-list-mobile"
+        :aria-label="$t('aiExtend.process.tableAriaLabel')"
+      >
+        <ul v-if="items.length" class="card-list">
+          <li v-for="row in items" :key="row.id" class="card-item">
+            <dl class="card-fields">
+              <div>
+                <dt>ID</dt>
+                <dd>{{ row.id }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colColorNo') }}</dt>
+                <dd>{{ row.color_no }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colColorName') }}</dt>
+                <dd>{{ row.color_name }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colFabricType') }}</dt>
+                <dd>{{ row.fabric_type }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colDyeType') }}</dt>
+                <dd>{{ dyeTypeText(row.dye_type) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colSource') }}</dt>
+                <dd>{{ SOURCE_LABELS[row.source] || row.source }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colSimilar') }}</dt>
+                <dd>{{ row.similar_cases }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colConfidence') }}</dt>
+                <dd>{{ Number(row.confidence).toFixed(2) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colRecParams') }}</dt>
+                <dd class="mono">
+                  {{ row.recommended_temperature }}°C · {{ row.recommended_time_minutes }}min · pH
+                  {{ row.recommended_ph_value }} · 1:{{ row.recommended_liquor_ratio }}
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colApplied') }}</dt>
+                <dd>
+                  <el-tag :type="row.is_applied ? 'success' : 'info'" size="small">
+                    {{
+                      row.is_applied
+                        ? $t('aiExtend.process.applied')
+                        : $t('aiExtend.process.notApplied')
+                    }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colFeedback') }}</dt>
+                <dd>
+                  <el-rate
+                    v-if="row.feedback_score"
+                    :model-value="row.feedback_score"
+                    disabled
+                    :max="5"
+                  />
+                  <span v-else class="muted">—</span>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.process.colCreatedAt') }}</dt>
+                <dd>{{ new Date(row.created_at).toLocaleString('zh-CN') }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" size="small" @click="goDetail(row)">
+                {{ $t('aiExtend.process.detail') }}
+              </el-button>
+              <el-button
+                v-permission="'ai-process-opt:delete'"
+                type="danger"
+                size="small"
+                @click="handleDelete(row)"
+              >
+                {{ $t('aiExtend.process.delete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <el-empty v-else :description="$t('components.v2Table.empty')" />
+      </section>
       <el-table
+        v-else
         v-loading="loading"
         :data="items"
         stripe
@@ -372,10 +462,17 @@ const appliedOptions = computed(() => [
     <el-dialog
       v-model="dialogVisible"
       :title="$t('aiExtend.process.createDialogTitle')"
-      width="540px"
+      class="ai-dialog"
+      :class="{ 'ai-dialog--phone': isPhone }"
+      :width="isPhone ? phoneDialogWidth : '540px'"
       :aria-label="$t('aiExtend.process.createDialogAriaLabel')"
     >
-      <el-form :model="form" label-width="100px" :aria-label="$t('aiExtend.process.formAriaLabel')">
+      <el-form
+        :model="form"
+        label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
+        :aria-label="$t('aiExtend.process.formAriaLabel')"
+      >
         <el-form-item :label="$t('aiExtend.process.colColorNo')" required>
           <el-input
             v-model="form.color_no"
@@ -432,7 +529,13 @@ const appliedOptions = computed(() => [
     </el-dialog>
 
     <!-- 批量创建（batchCreateProcessOptimizations） -->
-    <el-dialog v-model="batchVisible" title="批量工艺优化（JSON 数组）" width="560">
+    <el-dialog
+      v-model="batchVisible"
+      title="批量工艺优化（JSON 数组）"
+      class="ai-dialog"
+      :class="{ 'ai-dialog--phone': isPhone }"
+      :width="isPhone ? phoneDialogWidth : '560px'"
+    >
       <el-input
         v-model="batchText"
         type="textarea"
@@ -480,5 +583,138 @@ const appliedOptions = computed(() => [
   margin-left: 8px;
   font-size: 12px;
   color: #909399;
+}
+.proc-page {
+  min-width: 0;
+  max-width: 100%;
+}
+.card-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.card-actions,
+.proc-page--phone .header-right {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.proc-page--phone .page-header {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 12px;
+}
+.proc-page--phone :deep(.el-button),
+.ai-dialog--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+}
+.proc-page--phone .filter-card :deep(.el-input),
+.proc-page--phone .filter-card :deep(.el-select) {
+  width: 100% !important;
+}
+.proc-page--phone :deep(.el-input__wrapper),
+.proc-page--phone :deep(.el-select__wrapper) {
+  min-height: 44px;
+}
+.proc-page--phone :deep(.el-pagination) {
+  flex-wrap: wrap;
+  row-gap: 12px;
+  justify-content: flex-start !important;
+}
+.ai-dialog--phone {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin-top: calc(12px + env(safe-area-inset-top, 0px));
+  margin-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+.ai-dialog--phone :deep(.el-dialog__body) {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.ai-dialog--phone :deep(.el-dialog__footer) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.proc-page--phone .page-header {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 12px;
+}
+.proc-page--phone .header-right {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.proc-page--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+}
+.proc-page--phone .filter-card :deep(.el-input),
+.proc-page--phone .filter-card :deep(.el-select) {
+  width: 100% !important;
+}
+.proc-page--phone :deep(.el-input__wrapper),
+.proc-page--phone :deep(.el-select__wrapper) {
+  min-height: 44px;
+}
+.proc-page--phone :deep(.el-pagination) {
+  flex-wrap: wrap;
+  row-gap: 12px;
+  justify-content: flex-start !important;
+}
+.proc-page--phone :deep(.el-pagination button),
+.proc-page--phone :deep(.el-pager li) {
+  min-width: 44px;
+  min-height: 44px;
+}
+.proc-page--phone .filter-card :deep(.el-form-item:last-child .el-form-item__content) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ai-dialog--phone :deep(.el-dialog__header),
+.ai-dialog--phone :deep(.el-dialog__footer) {
+  flex-shrink: 0;
 }
 </style>

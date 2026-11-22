@@ -218,7 +218,7 @@
       :title="
         isEditTemplate ? t('email.index.titleEditTemplate') : t('email.index.titleCreateTemplate')
       "
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('email.index.ariaEditDialog')"
     >
       <el-form
@@ -226,6 +226,7 @@
         :model="templateForm"
         :rules="templateRules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('email.index.ariaTemplateForm')"
       >
         <el-form-item :label="t('email.index.colTemplateName')" prop="name">
@@ -289,7 +290,7 @@
     <el-dialog
       v-model="sendDialogVisible"
       :title="t('email.index.titleSendEmail')"
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('email.index.ariaSendDialog')"
     >
       <el-form
@@ -297,6 +298,7 @@
         :model="sendForm"
         :rules="sendRules"
         label-width="80px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('email.index.ariaSendForm')"
       >
         <el-form-item :label="t('email.index.colRecipient')" prop="to">
@@ -334,7 +336,8 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { PERMISSIONS } from '@/constants/permissions';
-import { ref, reactive, h } from 'vue';
+import { computed, ref, reactive, h } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type TabsPaneContext } from 'element-plus';
 import { Plus, Promotion } from '@element-plus/icons-vue';
@@ -356,6 +359,8 @@ import { logger, logAuxLoadFailure } from '@/utils/logger';
 import { useTableApi } from '@/composables/useTableApi';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const activeTab = ref('templates');
 const hasLoaded = createLazyLoader();
@@ -668,5 +673,11 @@ const getStatusText = (status: string) => {
 .el-pagination {
   margin-top: 20px;
   justify-content: flex-end;
+}
+
+@media (max-width: 767px) {
+  .email-management {
+    padding: 12px;
+  }
 }
 </style>

@@ -64,4 +64,10 @@ const { t } = useI18n({ useScope: 'global' });
 :deep(.trend-down) {
   color: #f56c6c;
 }
+
+@media (max-width: 767px) {
+  .financial-analysis-page {
+    padding: 12px;
+  }
+}
 </style>

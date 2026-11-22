@@ -20,6 +20,7 @@ pub mod dto;
 pub mod user_department;
 pub mod finance_invoice;
 pub mod finance_payment;
+pub mod payment_channel_config;
 pub mod inventory_adjustment;
 pub mod inventory_adjustment_item;
 pub mod inventory_count;
@@ -488,3 +489,9 @@ pub mod wechat_mp_binding;
 pub mod wechat_mp_notification_outbox;
 
 pub mod scheduler_job_run;
+
+// 调样单两张表的 Model。sample_dispatch_order 是主表（单据号/客户/账务四列），
+// sample_dispatch_item 是行级明细（缸号/色号/成分/米数/单价/金额）。
+// 表由 migration/src/domain/sample_dispatch 域 m0142 建立。
+pub mod sample_dispatch_order;
+pub mod sample_dispatch_item;

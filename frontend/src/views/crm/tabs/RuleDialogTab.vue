@@ -8,7 +8,7 @@
   <el-dialog
     v-model="visible"
     :title="title"
-    width="560px"
+    :width="isPhone ? '95%' : '560px'"
     :close-on-click-modal="false"
     :aria-label="title"
   >
@@ -17,6 +17,7 @@
       :model="formData"
       :rules="formRules"
       label-width="120px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('crmRuleDialog.ariaLabel')"
     >
       <el-form-item :label="t('crmRuleDialog.form.name')" prop="name">
@@ -46,15 +47,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { createRecycleRule, updateRecycleRule, type RecycleRule } from '@/api/crm-enhanced';
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

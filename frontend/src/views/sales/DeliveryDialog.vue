@@ -14,7 +14,7 @@
   <el-dialog
     :model-value="visible"
     :title="t('sales.delivery.title')"
-    width="800px"
+    :width="isPhone ? '95%' : '800px'"
     :aria-label="t('sales.delivery.dialogAriaLabel')"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
@@ -159,7 +159,9 @@
 <script setup lang="ts">
 // 注：form 由父组件通过 reactive() 创建并通过 prop 传入；
 // 子组件在用户交互时通过 emit('update:form', newForm) 整体覆盖，避免直接修改 prop。
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import type { InventoryStock } from '@/api/inventory';
 import type { InventoryPieceRow } from '@/api/inventory-transfer';
@@ -167,6 +169,8 @@ import { stockRowKey, deliveryPiecesKey, type DeliveryItemForm } from './composa
 import NumericInput from '@/components/NumericInput.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface DeliveryForm {
   order_id: number;

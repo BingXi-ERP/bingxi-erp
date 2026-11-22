@@ -106,8 +106,19 @@
       />
     </el-card>
 
-    <el-dialog v-model="createVisible" title="新建送检单" width="720px" destroy-on-close>
-      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="120px">
+    <el-dialog
+      v-model="createVisible"
+      title="新建送检单"
+      :width="isPhone ? '95%' : '720px'"
+      destroy-on-close
+    >
+      <el-form
+        ref="createFormRef"
+        :model="createForm"
+        :rules="createRules"
+        label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="送检单号" prop="submission_no">
           <el-input v-model="createForm.submission_no" placeholder="例如 SUB-2026-0001" />
         </el-form-item>
@@ -228,7 +239,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import {
   createSubmission,
@@ -251,6 +263,8 @@ import {
   optionList,
 } from '@/constants/textile-safety';
 import SubmissionDetail from './components/SubmissionDetail.vue';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const loading = ref(false);
 const rows = ref<TextileSubmission[]>([]);

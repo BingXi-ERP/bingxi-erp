@@ -19,7 +19,7 @@
       </div>
     </div>
 
-    <el-form :inline="true" class="filter-form">
+    <el-form :inline="!isPhone" class="filter-form">
       <el-form-item :label="t('supplierProduct.filter.supplier')">
         <el-select
           v-model="list.queryParams.supplier_id"
@@ -53,7 +53,60 @@
       </el-form-item>
     </el-form>
 
+    <!-- 手机端：供应商产品单列卡片 -->
+    <section v-if="isPhone" v-loading="list.loading.value" class="supplier-product-mobile">
+      <ul class="card-list" :aria-label="t('supplierProduct.columns.productName')">
+        <li v-for="(row, index) in list.list.value" :key="row.id ?? index" class="card-item">
+          <dl class="card-fields">
+            <div class="field field-emphasis">
+              <dt>{{ t('supplierProduct.columns.productName') }}</dt>
+              <dd>{{ row.product_name }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('supplierProduct.columns.productCode') }}</dt>
+              <dd>{{ row.product_code }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('supplierProduct.columns.unit') }}</dt>
+              <dd>{{ row.unit }}</dd>
+            </div>
+            <div class="field">
+              <dt>{{ t('supplierProduct.columns.isEnabled') }}</dt>
+              <dd>
+                <el-tag v-if="row.is_enabled" type="success" size="small">{{
+                  t('common.yes')
+                }}</el-tag>
+                <el-tag v-else type="danger" size="small">{{ t('common.no') }}</el-tag>
+              </dd>
+            </div>
+          </dl>
+          <div class="card-actions">
+            <el-button
+              v-permission="PERMISSIONS.SUPPLIER_PRODUCT_COLOR_READ"
+              type="primary"
+              @click="color.open(row)"
+            >
+              {{ t('supplierProduct.action.manageColors') }}
+            </el-button>
+            <el-button
+              v-permission="PERMISSIONS.SUPPLIER_PRODUCT_UPDATE"
+              @click="dialog.openEdit(row)"
+            >
+              {{ t('common.edit') }}
+            </el-button>
+            <el-button
+              v-permission="PERMISSIONS.SUPPLIER_PRODUCT_UPDATE"
+              @click="list.toggleEnabled(row)"
+            >
+              {{ row.is_enabled ? t('common.disable') : t('common.enable') }}
+            </el-button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
     <el-table
+      v-if="!isPhone"
       v-loading="list.loading.value"
       :data="list.list.value"
       border
@@ -126,7 +179,8 @@
 </template>
 
 <script setup lang="ts">
-import { provide } from 'vue';
+import { provide, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useSupplierProductList } from './composables/useSupplierProductList';
@@ -136,6 +190,8 @@ import SupplierProductFormDialog from './components/SupplierProductFormDialog.vu
 import SupplierProductColorDialog from './components/SupplierProductColorDialog.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const list = useSupplierProductList();
 const dialog = useSupplierProductDialog(list.loadData);
@@ -170,5 +226,46 @@ provide('supplierProductColorProc', color);
 .pagination {
   margin-top: 16px;
   justify-content: flex-end;
+}
+
+.supplier-product-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.supplier-product-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.supplier-product-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+.supplier-product-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+.supplier-product-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+.supplier-product-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+.supplier-product-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+.supplier-product-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

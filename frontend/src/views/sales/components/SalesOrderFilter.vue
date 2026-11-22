@@ -6,7 +6,12 @@
 -->
 <template>
   <el-card shadow="hover" class="filter-card">
-    <el-form :inline="true" :model="localFilterForm" :aria-label="t('sales.filter.formAriaLabel')">
+    <el-form
+      :inline="!isPhone"
+      :model="localFilterForm"
+      :label-position="isPhone ? 'top' : 'right'"
+      :aria-label="t('sales.filter.formAriaLabel')"
+    >
       <el-form-item :label="t('sales.filter.orderNo')">
         <el-input
           v-model="localFilterForm.order_no"
@@ -39,6 +44,7 @@
         <el-date-picker
           v-model="localFilterForm.dateRange"
           type="daterange"
+          :style="{ width: isPhone ? '100%' : '' }"
           :range-separator="t('sales.filter.dateRangeSeparator')"
           :start-placeholder="t('sales.filter.startDate')"
           :end-placeholder="t('sales.filter.endDate')"
@@ -53,11 +59,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { SALES_ORDER_STATUSES, SALES_STATUS_LABEL_KEYS } from '@/utils/sales-status';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 销售订单过滤表单类型
 interface OlvFilterForm {

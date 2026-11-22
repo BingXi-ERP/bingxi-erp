@@ -249,7 +249,12 @@
             <el-button type="primary" plain @click="handleQueryScore">{{
               t('supplierEvaluation.index.score.button')
             }}</el-button>
-            <el-descriptions v-if="scoreResult" :column="3" border class="score-result">
+            <el-descriptions
+              v-if="scoreResult"
+              :column="isPhone ? 1 : 3"
+              border
+              class="score-result"
+            >
               <el-descriptions-item :label="t('supplierEvaluation.index.score.totalScore')">{{
                 scoreResult.average_score
               }}</el-descriptions-item>
@@ -362,7 +367,7 @@
           ? t('supplierEvaluation.index.dialog.editTitle')
           : t('supplierEvaluation.index.dialog.createTitle')
       "
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('supplierEvaluation.index.dialog.ariaLabel')"
     >
       <el-form
@@ -370,6 +375,7 @@
         :model="recordForm"
         :rules="recordRules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('supplierEvaluation.index.dialog.formAriaLabel')"
       >
         <el-form-item
@@ -431,12 +437,12 @@
     <el-dialog
       v-model="detailDialogVisible"
       :title="t('supplierEvaluation.index.detail.title')"
-      width="700px"
+      :width="isPhone ? '95%' : '700px'"
       :aria-label="t('supplierEvaluation.index.detail.dialogAriaLabel')"
     >
       <el-descriptions
         v-if="currentRecord"
-        :column="2"
+        :column="isPhone ? 1 : 2"
         border
         :aria-label="t('supplierEvaluation.index.detail.ariaLabel')"
       >
@@ -478,9 +484,13 @@
     <el-dialog
       v-model="indicatorDialogVisible"
       :title="t('supplierEvaluation.index.indicators.dialogTitle')"
-      width="520px"
+      :width="isPhone ? '95%' : '520px'"
     >
-      <el-form :model="indicatorForm" label-width="110px">
+      <el-form
+        :model="indicatorForm"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('supplierEvaluation.index.indicators.label.code')" required>
           <el-input v-model="indicatorForm.indicator_code" />
         </el-form-item>
@@ -511,6 +521,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
 import { loadIfNot, createLazyLoader } from '@/utils/lazy-loader';
@@ -539,6 +550,8 @@ import { useSupplierPicker } from '@/composables/useSupplierPicker';
 import { logger, logAuxLoadFailure } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const activeTab = ref('records');
 const rankingList = ref<SupplierScore[]>([]);

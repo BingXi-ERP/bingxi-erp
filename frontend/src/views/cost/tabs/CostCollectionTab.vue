@@ -194,7 +194,7 @@
           ? t('cost.collectionList.dialog.editTitle')
           : t('cost.collectionList.dialog.createTitle')
       "
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('cost.collectionList.dialog.ariaLabel')"
     >
       <el-form
@@ -202,6 +202,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('cost.collectionList.dialog.formAriaLabel')"
       >
         <el-row :gutter="20">
@@ -333,6 +334,7 @@
 import { isDialogDismissal } from '@/utils/monitor';
 import NumericInput from '@/components/NumericInput.vue';
 import { ref, reactive, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus, Download } from '@element-plus/icons-vue';
@@ -352,6 +354,8 @@ import { useTableApi } from '@/composables/useTableApi';
 
 // 批次 34 v9 P1：接入 i18n，替换硬编码中文 ElMessage
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const submitLoading = ref(false);
 const dialogVisible = ref(false);

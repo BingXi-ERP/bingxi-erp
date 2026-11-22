@@ -232,5 +232,12 @@ test.describe('481 通知中心路由权限键与读面同源', () => {
     const items = page.locator('.notification-list .notification-item');
     const count = await items.count();
     expect(count, `超管的通知列表应有真实条目（非空），实际 ${count}`).toBeGreaterThan(0);
+    // 只断行数非正时，任意一条别人的通知就能把本例点亮；改为逐项比对标题文本，钉住
+    // beforeAll 发给超管的那条自举公告确实渲染进列表，写面与界面读面逐值同源。
+    const itemTitles = await items.locator('.item-title').allTextContents();
+    expect(
+      itemTitles.some(title => title.includes('E2E-481')),
+      `超管通知列表应渲染出自举公告标题，实际标题集=${JSON.stringify(itemTitles)}`
+    ).toBe(true);
   });
 });

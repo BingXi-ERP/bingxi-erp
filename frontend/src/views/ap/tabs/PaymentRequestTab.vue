@@ -13,7 +13,96 @@
       <el-button @click="fetchRequests">{{ t('common.refresh') }}</el-button>
     </div>
 
-    <el-table v-loading="loading" :data="requests" border stripe>
+    <!-- 手机卡片（与 BPM 审批手机卡片同断点同范式） -->
+    <section v-if="isPhone" v-loading="loading" class="payment-request-mobile">
+      <ul class="card-list" :aria-label="t('apModule.paymentRequest.listAria')">
+        <li v-for="row in requests" :key="row.id" class="card-item">
+          <dl class="card-fields">
+            <div class="field-emphasis">
+              <dt>{{ t('apModule.paymentRequest.requestNo') }}</dt>
+              <dd>{{ row.request_no }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('apModule.payment.supplier') }}</dt>
+              <dd>{{ row.supplier_id ?? '-' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('apModule.paymentRequest.requestDate') }}</dt>
+              <dd>{{ row.request_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('apModule.paymentRequest.requestAmount') }}</dt>
+              <dd>{{ formatMoney(row.request_amount) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('apModule.paymentRequest.paymentType') }}</dt>
+              <dd>{{ row.payment_type || '-' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('apModule.payment.paymentMethod') }}</dt>
+              <dd>{{ row.payment_method }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('apModule.paymentRequest.currencyLabel') }}</dt>
+              <dd>{{ row.currency }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('common.status') }}</dt>
+              <dd>
+                <el-tag :type="statusTagType(row.approval_status)" size="small">{{
+                  approvalStatusLabel(row.approval_status)
+                }}</el-tag>
+              </dd>
+            </div>
+          </dl>
+          <div class="card-actions">
+            <el-button
+              v-if="row.approval_status === 'DRAFT' || row.approval_status === 'REJECTED'"
+              type="primary"
+              @click="openEditDialog(row)"
+            >
+              {{ t('common.edit') }}
+            </el-button>
+            <el-button
+              v-if="row.approval_status === 'DRAFT' || row.approval_status === 'REJECTED'"
+              type="warning"
+              @click="submitRequest(row)"
+            >
+              {{ t('apModule.paymentRequest.submit') }}
+            </el-button>
+            <el-button
+              v-if="row.approval_status === 'APPROVING'"
+              type="success"
+              @click="approveRequest(row)"
+            >
+              {{ t('apModule.paymentRequest.approve') }}
+            </el-button>
+            <el-button
+              v-if="row.approval_status === 'APPROVING'"
+              type="danger"
+              @click="rejectRequest(row)"
+            >
+              {{ t('apModule.paymentRequest.reject') }}
+            </el-button>
+            <el-button
+              v-if="row.approval_status === 'DRAFT' || row.approval_status === 'REJECTED'"
+              type="danger"
+              @click="removeRequest(row)"
+            >
+              {{ t('common.delete') }}
+            </el-button>
+            <el-button type="primary" @click="showDetail(row)">
+              {{ t('common.detail') }}
+            </el-button>
+          </div>
+        </li>
+      </ul>
+      <ElEmpty
+        v-if="!loading && requests.length === 0"
+        :description="t('components.v2Table.empty')"
+      />
+    </section>
+    <el-table v-else v-loading="loading" :data="requests" border stripe>
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column
         prop="request_no"
@@ -35,7 +124,9 @@
         prop="payment_method"
         :label="t('apModule.payment.paymentMethod')"
         width="110"
-      />
+      >
+        <template #default="{ row }">{{ paymentMethodLabel(row.payment_method) }}</template>
+      </el-table-column>
       <el-table-column
         prop="request_amount"
         :label="t('apModule.paymentRequest.requestAmount')"
@@ -138,12 +229,41 @@
           </el-select>
         </el-form-item>
         <el-form-item :label="t('apModule.payment.paymentMethod')" prop="payment_method">
-          <el-select v-model="form.payment_method">
-            <el-option label="银行转账" value="bank_transfer" />
-            <el-option label="现金" value="cash" />
-            <el-option label="支票" value="check" />
-            <el-option label="承兑" value="bill" />
+          <el-select
+            v-model="form.payment_method"
+            :loading="methodsLoading"
+            :disabled="methodsLoading"
+            data-testid="payment-method"
+          >
+            <el-option
+              v-for="option in methodOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+            <el-option
+              v-if="
+                form.payment_method &&
+                !methodOptions.some(option => option.value === form.payment_method)
+              "
+              :value="form.payment_method"
+              :label="
+                paymentMethodLabel(form.payment_method) +
+                ' · ' +
+                t('paymentChannels.historicalMethod')
+              "
+              disabled
+            />
           </el-select>
+          <el-alert
+            v-if="methodsFailed"
+            :title="t('paymentChannels.optionsFailed')"
+            type="error"
+            :closable="false"
+            data-testid="payment-method-error"
+          >
+            <el-button @click="refreshMethods">{{ t('common.refresh') }}</el-button>
+          </el-alert>
         </el-form-item>
         <el-form-item :label="t('apModule.paymentRequest.requestAmount')" prop="request_amount">
           <el-input v-model="requestAmountField.text" @blur="requestAmountField.normalize()" />
@@ -314,7 +434,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive, toRef, watch, onMounted } from 'vue';
+import { paymentMethodLabel, usePaymentMethods } from '@/composables/usePaymentMethods';
+import { ref, reactive, toRef, watch, onMounted, computed } from 'vue';
 import {
   createNumberFieldPool,
   useNumberField,
@@ -323,8 +444,9 @@ import {
 } from '@/composables/useNumberField';
 import { logger, logAuxLoadFailure } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElEmpty } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type { FormInstance, FormRules } from 'element-plus';
 import { getSupplierList, type Supplier } from '@/api/supplier';
 import {
@@ -344,6 +466,16 @@ import {
 } from '@/api/ap';
 
 const { t } = useI18n({ useScope: 'global' });
+const {
+  options: methodOptions,
+  loading: methodsLoading,
+  failed: methodsFailed,
+  refresh: refreshMethods,
+} = usePaymentMethods();
+
+// 手机卡片断点（与 BPM 审批手机卡片同断点）
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const requests = ref<APPaymentRequest[]>([]);
 const loading = ref(false);
@@ -618,10 +750,11 @@ const resetForm = () => {
   applyAmountField.forget();
 };
 
-const openCreateDialog = () => {
+const openCreateDialog = async () => {
   editId.value = null;
   resetForm();
   dialogVisible.value = true;
+  await refreshMethods();
 };
 
 const openEditDialog = (row: APPaymentRequest) => {
@@ -637,6 +770,7 @@ const openEditDialog = (row: APPaymentRequest) => {
   form.bank_name = row.bank_name || '';
   form.notes = row.notes || '';
   dialogVisible.value = true;
+  void refreshMethods();
 };
 
 const handleSubmit = async () => {
@@ -809,6 +943,61 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 手机卡片（范式与 BPM 审批手机卡片一致） */
+.payment-request-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+
 .tab-toolbar {
   margin-bottom: 12px;
   display: flex;

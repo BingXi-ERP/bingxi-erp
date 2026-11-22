@@ -59,7 +59,7 @@
     <!-- 筛选 + 表格 -->
     <el-card shadow="hover" class="filter-card">
       <el-form
-        :inline="true"
+        :inline="!isPhone"
         :model="filterForm"
         :aria-label="t('system.slowQuery.aria.filterForm')"
         @submit.prevent="handleQuery"
@@ -106,7 +106,59 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
+      <!-- 手机端：慢查询单列卡片，字段与桌面 columns 同源 -->
+      <section v-if="isPhone" v-loading="loading" class="slow-query-mobile">
+        <ul class="card-list" :aria-label="t('system.slowQuery.column.sqlText')">
+          <li v-for="(row, index) in data" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('system.slowQuery.column.id') }}</dt>
+                <dd>{{ row.id }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.slowQuery.column.capturedAt') }}</dt>
+                <dd>{{ formatDateTime(row.captured_at) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.slowQuery.column.avgDuration') }}</dt>
+                <dd>
+                  <el-tag :type="getDurationTag(Number(row.execution_time_ms ?? 0))" size="small">
+                    {{ Number(row.execution_time_ms ?? 0).toFixed(1) }} ms
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.slowQuery.column.calls') }}</dt>
+                <dd>{{ row.calls }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.slowQuery.column.rowsExamined') }}</dt>
+                <dd>{{ row.rows_examined }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.slowQuery.column.sqlText') }}</dt>
+                <dd>{{ truncate(String(row.query_text ?? ''), 100) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.slowQuery.column.database') }}</dt>
+                <dd>{{ row.database_name }}</dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+        <ElPagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, next"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </section>
+
       <V2Table
+        v-if="!isPhone"
         :columns="columns"
         :data="data"
         :loading="loading"
@@ -132,11 +184,12 @@ import { ref, reactive, onMounted, h, computed } from 'vue';
 import NumericInput from '@/components/NumericInput.vue';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElTag } from 'element-plus';
+import { ElMessage, ElTag, ElPagination } from 'element-plus';
 import { Search, Refresh } from '@element-plus/icons-vue';
 import V2Table from '@/components/V2Table/index.vue';
 import type { ColumnDef } from '@/components/V2Table/types';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   getSlowQueryStats,
   refreshSlowQueries,
@@ -145,6 +198,8 @@ import {
 } from '@/api/slow-query';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 慢查询统计响应
 const stats = ref<SlowQueryStatsResponse | null>(null);
@@ -376,5 +431,40 @@ onMounted(() => {
 }
 .table-card {
   margin-bottom: 16px;
+}
+
+.slow-query-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.slow-query-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.slow-query-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.slow-query-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.slow-query-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.slow-query-mobile .field-emphasis dd {
+  font-weight: 500;
 }
 </style>

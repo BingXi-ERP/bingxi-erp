@@ -132,4 +132,10 @@ onMounted(() => {
   padding-top: 20px;
   border-top: 1px solid #ebeef5;
 }
+
+@media (max-width: 767px) {
+  .two-factor-page {
+    padding: 12px;
+  }
+}
 </style>

@@ -4,7 +4,7 @@
   拆分日期：2026-06-15 B3-2
 -->
 <template>
-  <div class="invoice-tab">
+  <div class="invoice-tab" :class="{ 'invoice-tab--phone': isPhone }">
     <div class="page-header">
       <h2 class="page-title">{{ $t('arModule.invoice.title') }}</h2>
       <div class="header-actions">
@@ -26,7 +26,12 @@
     </div>
 
     <el-card shadow="hover" class="filter-card">
-      <el-form :inline="true" :model="invoiceQuery" :aria-label="$t('arModule.invoice.filterAria')">
+      <el-form
+        :inline="!isPhone"
+        :label-position="isPhone ? 'top' : 'right'"
+        :model="invoiceQuery"
+        :aria-label="$t('arModule.invoice.filterAria')"
+      >
         <el-form-item :label="$t('common.status')">
           <el-select
             v-model="invoiceQuery.status"
@@ -48,7 +53,76 @@
     </el-card>
 
     <el-card shadow="hover">
+      <section v-if="isPhone" v-loading="invoiceLoading" class="ar-invoice-mobile">
+        <ul class="card-list" :aria-label="$t('arModule.invoice.listAria')">
+          <li v-for="row in invoices" :key="row.id" class="card-item">
+            <dl class="card-fields">
+              <div class="field-emphasis">
+                <dt>{{ $t('arModule.invoice.invoiceNo') }}</dt>
+                <dd>{{ row.invoice_no }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.invoice.customer') }}</dt>
+                <dd>{{ row.customer_name }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.invoice.invoiceDate') }}</dt>
+                <dd>{{ row.invoice_date }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.invoice.invoiceAmount') }}</dt>
+                <dd>{{ formatMoney(row.invoice_amount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.invoice.taxAmount') }}</dt>
+                <dd>{{ formatMoney(row.tax_amount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.invoice.receivedAmount') }}</dt>
+                <dd>{{ formatMoney(row.received_amount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.invoice.unpaidAmount') }}</dt>
+                <dd :class="{ 'text-red': Number(row.unpaid_amount) > 0 }">
+                  {{ formatMoney(row.unpaid_amount) }}
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('common.status') }}</dt>
+                <dd>
+                  <el-tag :type="getInvoiceStatusType(row.status)" size="small">
+                    {{ getInvoiceStatusLabel(row.status) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('arModule.invoice.dueDate') }}</dt>
+                <dd>{{ row.due_date }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" @click="viewInvoice(row)">{{
+                $t('common.detail')
+              }}</el-button>
+              <el-button
+                v-if="row.status === 'DRAFT'"
+                type="success"
+                @click="approveInvoice(row)"
+                >{{ $t('arModule.invoice.approve') }}</el-button
+              >
+              <el-button v-if="row.status === 'DRAFT'" type="danger" @click="cancelInvoice(row)">{{
+                $t('common.cancel')
+              }}</el-button>
+            </div>
+          </li>
+        </ul>
+        <ElEmpty
+          v-if="!invoiceLoading && invoices.length === 0"
+          :description="$t('components.v2Table.empty')"
+        />
+      </section>
       <el-table
+        v-else
         v-loading="invoiceLoading"
         :data="invoices"
         stripe
@@ -120,13 +194,13 @@
         </el-table-column>
       </el-table>
 
-      <div class="pagination-wrapper">
+      <div class="pagination-wrapper" :class="{ 'pagination-wrapper--phone': isPhone }">
         <el-pagination
           :current-page="invoicePage"
           :page-size="invoicePageSize"
           :page-sizes="[10, 20, 50, 100]"
           :total="invoiceTotal"
-          layout="total, sizes, prev, pager, next, jumper"
+          :layout="isPhone ? 'total, sizes, prev, next' : 'total, sizes, prev, pager, next, jumper'"
           :aria-label="$t('arModule.invoice.paginationAria')"
           @current-change="handlePageChange"
           @size-change="handleSizeChange"
@@ -137,7 +211,13 @@
     <el-dialog
       v-model="invoiceDialogVisible"
       :title="$t('arModule.invoice.createTitle')"
-      width="600px"
+      :width="
+        isPhone
+          ? 'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))'
+          : '600px'
+      "
+      class="invoice-dialog"
+      :class="{ 'invoice-dialog--phone': isPhone }"
       :aria-label="$t('arModule.invoice.createAria')"
     >
       <el-form
@@ -145,10 +225,11 @@
         :model="invoiceForm"
         :rules="invoiceRules"
         label-width="80px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('arModule.invoice.formAria')"
       >
-        <el-row :gutter="20">
-          <el-col :span="12">
+        <el-row :gutter="isPhone ? 0 : 20">
+          <el-col :span="isPhone ? 24 : 12">
             <el-form-item :label="$t('arModule.invoice.customer')" prop="customer_id">
               <el-select
                 v-model="invoiceForm.customer_id"
@@ -164,7 +245,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="isPhone ? 24 : 12">
             <el-form-item :label="$t('arModule.invoice.invoiceDate')" prop="invoice_date">
               <el-date-picker
                 v-model="invoiceForm.invoice_date"
@@ -176,8 +257,8 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
+        <el-row :gutter="isPhone ? 0 : 20">
+          <el-col :span="isPhone ? 24 : 12">
             <el-form-item :label="$t('arModule.invoice.invoiceAmount')" prop="invoice_amount">
               <el-input
                 v-model="invoiceAmountField.text"
@@ -186,7 +267,7 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="isPhone ? 24 : 12">
             <el-form-item :label="$t('arModule.invoice.taxAmount')">
               <el-input
                 v-model="taxAmountField.text"
@@ -196,8 +277,8 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-row :gutter="20">
-          <el-col :span="12">
+        <el-row :gutter="isPhone ? 0 : 20">
+          <el-col :span="isPhone ? 24 : 12">
             <el-form-item :label="$t('arModule.invoice.dueDate')">
               <el-date-picker
                 v-model="invoiceForm.due_date"
@@ -208,7 +289,7 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="isPhone ? 24 : 12">
             <!-- 发票编号后端自生成，新建时只读展示（未创建为空），不入提交请求体 -->
             <el-form-item :label="$t('arModule.invoice.invoiceNo')">
               <el-input :model-value="invoiceNoDisplay()" readonly />
@@ -234,9 +315,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, toRef, onMounted } from 'vue';
+import { ref, reactive, toRef, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox, ElEmpty } from 'element-plus';
 import { Plus, Printer, Download } from '@element-plus/icons-vue';
 import { promptCancelReason } from '@/composables/useActionPrompts';
 import { useNumberField } from '@/composables/useNumberField';
@@ -257,8 +338,12 @@ import { logger, logAuxLoadFailure } from '@/utils/logger';
 import { exportFromBackend } from '@/utils/export';
 import { isDialogDismissal } from '@/utils/monitor';
 import { PERMISSIONS } from '@/constants/permissions';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const invoices = ref<ARInvoice[]>([]);
 const customers = ref<Customer[]>([]);
@@ -563,5 +648,138 @@ onMounted(() => {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+
+.ar-invoice-mobile {
+  min-width: 0;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.field-emphasis dd {
+  font-weight: 600;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.card-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+
+.invoice-tab--phone .page-header,
+.invoice-tab--phone .header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.invoice-tab--phone .page-header {
+  align-items: flex-start;
+}
+.invoice-tab--phone .page-title {
+  overflow-wrap: anywhere;
+}
+.invoice-tab--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.invoice-tab--phone :deep(.el-input__wrapper),
+.invoice-tab--phone :deep(.el-select__wrapper) {
+  min-height: 44px;
+  box-sizing: border-box;
+}
+.invoice-tab--phone :deep(.el-form-item__content) {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.invoice-tab--phone :deep(.filter-card .el-form-item),
+.invoice-tab--phone :deep(.invoice-dialog--phone .el-select) {
+  width: 100%;
+  margin-right: 0;
+}
+.invoice-tab--phone .pagination-wrapper {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.pagination-wrapper--phone :deep(.el-pagination button),
+.pagination-wrapper--phone :deep(.el-pagination .el-select__wrapper) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.invoice-tab :deep(.invoice-dialog--phone) {
+  display: flex;
+  flex-direction: column;
+  width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-width: calc(
+    100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+  ) !important;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin: calc(12px + env(safe-area-inset-top, 0px)) calc(12px + env(safe-area-inset-right, 0px))
+    calc(12px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px)) !important;
+  box-sizing: border-box;
+}
+.invoice-tab :deep(.invoice-dialog--phone .el-dialog__header),
+.invoice-tab :deep(.invoice-dialog--phone .el-dialog__footer) {
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
+}
+.invoice-tab :deep(.invoice-dialog--phone .el-dialog__body) {
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+.invoice-tab :deep(.invoice-dialog--phone .el-dialog__footer) {
+  justify-content: flex-end;
+}
+.invoice-tab :deep(.invoice-dialog--phone .el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
 }
 </style>

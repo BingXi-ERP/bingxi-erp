@@ -19,6 +19,7 @@
             :model="issueForm"
             :rules="issueRules"
             label-width="100px"
+            :label-position="isPhone ? 'top' : 'right'"
             style="max-width: 600px"
             :aria-label="$t('colorCards.issue.form.ariaLabel')"
           >
@@ -90,7 +91,75 @@
           :label="$t('colorCards.issue.tab.active', { count: activeIssues.length })"
           name="active"
         >
+          <!-- 手机端：在发色卡单列卡片 -->
+          <section v-if="isPhone" class="issue-active-mobile">
+            <ul class="card-list" :aria-label="$t('colorCards.issue.activeTable.ariaLabel')">
+              <li v-for="(row, index) in activeIssues" :key="row.id ?? index" class="card-item">
+                <dl class="card-fields">
+                  <div class="field field-emphasis">
+                    <dt>{{ $t('colorCards.issue.activeTable.cardId') }}</dt>
+                    <dd>{{ row.color_card_id }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.activeTable.customerId') }}</dt>
+                    <dd>{{ row.customer_id }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.activeTable.issueQty') }}</dt>
+                    <dd>{{ row.issue_qty }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.activeTable.issuedBy') }}</dt>
+                    <dd>{{ row.issued_by }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.activeTable.issuedAt') }}</dt>
+                    <dd>{{ formatDate(row.issued_at) }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.activeTable.expectedReturn') }}</dt>
+                    <dd>{{ formatDate(row.expected_return_date) }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.activeTable.dyeLotNo') }}</dt>
+                    <dd>{{ row.dye_lot_no }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.activeTable.purpose') }}</dt>
+                    <dd>{{ row.purpose }}</dd>
+                  </div>
+                </dl>
+                <div class="card-actions">
+                  <el-button
+                    v-permission="'color_card_issue:return'"
+                    type="primary"
+                    @click="handleReturn(row)"
+                  >
+                    {{ $t('colorCards.issue.returnDialog.title') }}
+                  </el-button>
+                  <el-button
+                    v-permission="'color_card_issue:damaged'"
+                    @click="handleMarkDamaged(row)"
+                  >
+                    {{ $t('colorCards.issue.damagedDialog.title') }}
+                  </el-button>
+                  <el-button v-permission="'color_card_issue:lost'" @click="handleMarkLost(row)">
+                    {{ $t('colorCards.issue.lostDialog.title') }}
+                  </el-button>
+                  <el-button
+                    v-permission="'color_card_issue:cancel'"
+                    type="danger"
+                    @click="handleCancel(row)"
+                  >
+                    {{ $t('colorCards.issue.cancelDialog.title') }}
+                  </el-button>
+                </div>
+              </li>
+            </ul>
+          </section>
+
           <el-table
+            v-if="!isPhone"
             :data="activeIssues"
             border
             :aria-label="$t('colorCards.issue.activeTable.ariaLabel')"
@@ -173,7 +242,63 @@
 
         <!-- 历史 -->
         <el-tab-pane :label="$t('colorCards.issue.tab.history')" name="history">
+          <!-- 手机端：历史记录单列卡片 -->
+          <section v-if="isPhone" class="issue-history-mobile">
+            <ul class="card-list" :aria-label="$t('colorCards.issue.historyTable.ariaLabel')">
+              <li v-for="(row, index) in historyRecords" :key="row.id ?? index" class="card-item">
+                <dl class="card-fields">
+                  <div class="field field-emphasis">
+                    <dt>{{ $t('colorCards.issue.historyTable.cardId') }}</dt>
+                    <dd>{{ row.color_card_id }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.historyTable.customerId') }}</dt>
+                    <dd>{{ row.customer_id }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.historyTable.issueQty') }}</dt>
+                    <dd>{{ row.issue_qty }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.historyTable.dyeLotNo') }}</dt>
+                    <dd>{{ row.dye_lot_no }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.historyTable.status') }}</dt>
+                    <dd>
+                      <el-tag
+                        :type="
+                          ISSUE_STATUS_COLORS[row.status] as
+                            'success' | 'warning' | 'danger' | 'info'
+                        "
+                      >
+                        {{ getIssueStatusLabel(row.status) || row.status }}
+                      </el-tag>
+                    </dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.historyTable.issuedAt') }}</dt>
+                    <dd>{{ formatDate(row.issued_at) }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.historyTable.actualReturn') }}</dt>
+                    <dd>{{ formatDate(row.actual_return_date) }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.historyTable.compensationAmount') }}</dt>
+                    <dd>{{ row.compensation_amount || '-' }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorCards.issue.historyTable.purpose') }}</dt>
+                    <dd>{{ row.purpose }}</dd>
+                  </div>
+                </dl>
+              </li>
+            </ul>
+          </section>
+
           <el-table
+            v-if="!isPhone"
             :data="historyRecords"
             border
             :aria-label="$t('colorCards.issue.historyTable.ariaLabel')"
@@ -237,9 +362,13 @@
       v-model="showReturnDialog"
       :title="$t('colorCards.issue.returnDialog.title')"
       :aria-label="$t('colorCards.issue.returnDialog.ariaLabel')"
-      width="480px"
+      :width="isPhone ? '95%' : '480px'"
     >
-      <el-form label-width="80px" :aria-label="$t('colorCards.issue.returnDialog.formAriaLabel')">
+      <el-form
+        label-width="80px"
+        :label-position="isPhone ? 'top' : 'right'"
+        :aria-label="$t('colorCards.issue.returnDialog.formAriaLabel')"
+      >
         <el-form-item :label="$t('colorCards.issue.returnDialog.actualReturn')">
           <el-date-picker
             v-model="returnForm.actual_return_date"
@@ -267,12 +396,16 @@
       v-model="showLostDialog"
       :title="$t('colorCards.issue.lostDialog.title')"
       :aria-label="$t('colorCards.issue.lostDialog.ariaLabel')"
-      width="480px"
+      :width="isPhone ? '95%' : '480px'"
     >
       <el-alert type="warning" :closable="false" style="margin-bottom: 16px">
         {{ $t('colorCards.issue.lostDialog.alert') }}
       </el-alert>
-      <el-form label-width="100px" :aria-label="$t('colorCards.issue.lostDialog.formAriaLabel')">
+      <el-form
+        label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
+        :aria-label="$t('colorCards.issue.lostDialog.formAriaLabel')"
+      >
         <el-form-item :label="$t('colorCards.issue.lostDialog.compensationAmount')" required>
           <NumericInput
             v-model="lostForm.compensation_amount"
@@ -300,9 +433,13 @@
       v-model="showDamagedDialog"
       :title="$t('colorCards.issue.damagedDialog.title')"
       :aria-label="$t('colorCards.issue.damagedDialog.ariaLabel')"
-      width="480px"
+      :width="isPhone ? '95%' : '480px'"
     >
-      <el-form label-width="100px" :aria-label="$t('colorCards.issue.damagedDialog.formAriaLabel')">
+      <el-form
+        label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
+        :aria-label="$t('colorCards.issue.damagedDialog.formAriaLabel')"
+      >
         <el-form-item :label="$t('colorCards.issue.damagedDialog.compensationAmount')">
           <NumericInput
             v-model="damagedForm.compensation_amount"
@@ -330,12 +467,16 @@
       v-model="showCancelDialog"
       :title="$t('colorCards.issue.cancelDialog.title')"
       :aria-label="$t('colorCards.issue.cancelDialog.ariaLabel')"
-      width="480px"
+      :width="isPhone ? '95%' : '480px'"
     >
       <el-alert type="info" :closable="false" style="margin-bottom: 16px">
         {{ $t('colorCards.issue.cancelDialog.alert') }}
       </el-alert>
-      <el-form label-width="80px" :aria-label="$t('colorCards.issue.cancelDialog.formAriaLabel')">
+      <el-form
+        label-width="80px"
+        :label-position="isPhone ? 'top' : 'right'"
+        :aria-label="$t('colorCards.issue.cancelDialog.formAriaLabel')"
+      >
         <el-form-item :label="$t('colorCards.issue.cancelDialog.cancelReason')">
           <el-input v-model="cancelForm.remark" type="textarea" :rows="2" />
         </el-form-item>
@@ -354,6 +495,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
@@ -373,6 +515,8 @@ import {
 } from '@/api/color-card';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 状态码 → 本地化标签（响应式：随语言切换自动更新）
 const getIssueStatusLabel = (key: string) => t(`colorCards.issue.issueStatus.${key}`);
@@ -573,5 +717,59 @@ onMounted(() => {
 <style scoped>
 .color-card-issue {
   padding: 16px;
+}
+
+.issue-active-mobile .card-list,
+.issue-history-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.issue-active-mobile .card-item,
+.issue-history-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.issue-active-mobile .card-fields > div,
+.issue-history-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.issue-active-mobile .card-fields dt,
+.issue-history-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.issue-active-mobile .card-fields dd,
+.issue-history-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.issue-active-mobile .field-emphasis dd,
+.issue-history-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.issue-active-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.issue-active-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

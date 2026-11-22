@@ -14,6 +14,7 @@ use crate::search::SearchClient;
 use crate::services::event_bus::{
     BusinessEvent, EVENT_BUS, MAIN_LISTENER_HANDLE, lock_event_bus_state,
 };
+use crate::services::event_retry_service::EventRetryService;
 use crate::utils::error::AppError;
 use futures::FutureExt;
 use sea_orm::DatabaseConnection;
@@ -768,11 +769,35 @@ fn spawn_dye_vat_occupy(db: Arc<DatabaseConnection>, batch_id: i32, batch_no: St
                 return;
             }
         };
-        let service = crate::services::dye_vat_occupation_service::DyeVatOccupationService::new(db);
+        let service =
+            crate::services::dye_vat_occupation_service::DyeVatOccupationService::new(db.clone());
         if let Err(e) = service
             .occupy(vat_id, batch_id, Some(batch_no.clone()))
             .await
         {
+            // 死信兜底：染缸占用腿失败，落 event_dead_letters 供人工/后台补偿（warn 保留，
+            // 不阻断状态流转），payload 带 vat_id/batch_id/batch_no/操作方向。
+            if let Err(dl_err) = EventRetryService::new(db)
+                .record_dead_letter(
+                    "dye_vat_occupy_failed",
+                    serde_json::json!({
+                        "vat_id": vat_id,
+                        "batch_id": batch_id,
+                        "batch_no": batch_no.clone(),
+                        "direction": "occupy",
+                    }),
+                    "染缸占用失败",
+                    &e.to_string(),
+                )
+                .await
+            {
+                tracing::error!(
+                    batch_id,
+                    vat_id,
+                    error = %dl_err,
+                    "染缸占用失败死信落库失败，仅剩日志可查"
+                );
+            }
             tracing::warn!(
                 batch_id,
                 batch_no = %batch_no,
@@ -787,8 +812,30 @@ fn spawn_dye_vat_occupy(db: Arc<DatabaseConnection>, batch_id: i32, batch_no: St
 /// V15 P2 B05-P2-6：异步释放染缸（按 batch_id 释放，幂等，失败仅 warn）。
 fn spawn_dye_vat_release(db: Arc<DatabaseConnection>, batch_id: i32, batch_no: String) {
     tokio::spawn(async move {
-        let service = crate::services::dye_vat_occupation_service::DyeVatOccupationService::new(db);
+        let service =
+            crate::services::dye_vat_occupation_service::DyeVatOccupationService::new(db.clone());
         if let Err(e) = service.release(batch_id).await {
+            // 死信兜底：染缸释放腿失败，落 event_dead_letters 供人工/后台补偿（warn 保留，
+            // 不阻断状态流转），payload 带 batch_id/batch_no/操作方向。
+            if let Err(dl_err) = EventRetryService::new(db)
+                .record_dead_letter(
+                    "dye_vat_release_failed",
+                    serde_json::json!({
+                        "batch_id": batch_id,
+                        "batch_no": batch_no.clone(),
+                        "direction": "release",
+                    }),
+                    "染缸释放失败",
+                    &e.to_string(),
+                )
+                .await
+            {
+                tracing::error!(
+                    batch_id,
+                    error = %dl_err,
+                    "染缸释放失败死信落库失败，仅剩日志可查"
+                );
+            }
             tracing::warn!(
                 batch_id,
                 batch_no = %batch_no,
@@ -1219,17 +1266,59 @@ async fn handle_purchase_receipt_completed(
                         receipt_id,
                         inv.id
                     ),
-                    Err(e) => tracing::warn!(
-                        "⚠ 入库单 {} 已入库成功，但补偿生成应付账单失败，需人工补生成应付单：{}",
+                    Err(e) => {
+                        // 死信兜底：补偿生成应付腿失败，落 event_dead_letters 供人工/后台补偿（warn 保留）
+                        if let Err(dl_err) = EventRetryService::new(db.clone())
+                            .record_dead_letter(
+                                "purchase_receipt_ap_compensate_failed",
+                                serde_json::json!({
+                                    "receipt_id": receipt_id,
+                                    "order_id": order_id,
+                                }),
+                                "入库单事件侧补偿生成应付账单失败",
+                                &e.to_string(),
+                            )
+                            .await
+                        {
+                            tracing::error!(
+                                receipt_id,
+                                error = %dl_err,
+                                "应付补偿失败死信落库失败，仅剩日志可查"
+                            );
+                        }
+                        tracing::warn!(
+                            "⚠ 入库单 {} 已入库成功，但补偿生成应付账单失败，需人工补生成应付单：{}",
+                            receipt_id,
+                            e
+                        );
+                    }
+                },
+                Err(e) => {
+                    // 死信兜底：存在性查询失败导致无法判定是否补偿，落 event_dead_letters（error 保留）
+                    if let Err(dl_err) = EventRetryService::new(db.clone())
+                        .record_dead_letter(
+                            "purchase_receipt_ap_exists_query_failed",
+                            serde_json::json!({
+                                "receipt_id": receipt_id,
+                                "order_id": order_id,
+                            }),
+                            "查询入库单应付单存在性失败，无法判定是否补偿",
+                            &e.to_string(),
+                        )
+                        .await
+                    {
+                        tracing::error!(
+                            receipt_id,
+                            error = %dl_err,
+                            "应付存在性查询失败死信落库失败，仅剩日志可查"
+                        );
+                    }
+                    tracing::error!(
+                        "⚠ 查询入库单 {} 的应付单是否已生成失败，无法判定是否补偿：{}",
                         receipt_id,
                         e
-                    ),
-                },
-                Err(e) => tracing::error!(
-                    "⚠ 查询入库单 {} 的应付单是否已生成失败，无法判定是否补偿：{}",
-                    receipt_id,
-                    e
-                ),
+                    );
+                }
             }
         }
         Ok(None) => tracing::error!(
@@ -1305,7 +1394,7 @@ async fn handle_bpm_export_approval(
     approved: bool,
     approver_id: i32,
 ) {
-    let svc = crate::services::export_approval_service::ExportApprovalService::new(db);
+    let svc = crate::services::export_approval_service::ExportApprovalService::new(db.clone());
     let result = if approved {
         svc.on_bpm_approved(business_id, approver_id).await
     } else {
@@ -1317,17 +1406,28 @@ async fn handle_bpm_export_approval(
             status = %model.status,
             "导出审批 BPM 终审回写完成"
         ),
-        Err(e) => tracing::error!(
-            approval_id = business_id,
-            approved,
-            error = %e,
-            "导出审批 BPM 终审回写失败，令牌未签发或未作废，请人工核查申请行状态"
-        ),
+        Err(e) => {
+            tracing::error!(
+                approval_id = business_id,
+                approved,
+                error = %e,
+                "导出审批 BPM 终审回写失败，令牌未签发或未作废，已落死信补偿记录等待重放"
+            );
+            record_bpm_writeback_failure(
+                &db,
+                "export_approval",
+                business_id,
+                approved,
+                approver_id,
+                &e,
+            )
+            .await;
+        }
     }
 }
 
 /// 处理采购订单 BPM 审批结果回写（approve_order / reject_order）
-async fn handle_bpm_purchase_order(
+pub async fn handle_bpm_purchase_order(
     db: Arc<DatabaseConnection>,
     business_id: i64,
     approved: bool,
@@ -1342,15 +1442,17 @@ async fn handle_bpm_purchase_order(
         );
         return;
     };
-    let po_service = crate::services::po::order::PurchaseOrderService::new(db);
+    let po_service = crate::services::po::order::PurchaseOrderService::new(db.clone());
     // P2 5-18 修复：使用事件携带的 approver_id 替代硬编码 0
     if approved {
         if let Err(e) = po_service.approve_order(order_id, approver_id).await {
             tracing::error!(
-                "Failed to approve purchase_order {} via BPM: {}",
+                "Failed to approve purchase_order {} via BPM: {}（已落死信补偿记录等待重放）",
                 order_id,
                 e
             );
+            record_bpm_writeback_failure(&db, "purchase_order", business_id, true, approver_id, &e)
+                .await;
         } else {
             tracing::info!("Successfully approved purchase_order {} via BPM", order_id);
         }
@@ -1359,10 +1461,12 @@ async fn handle_bpm_purchase_order(
         .await
     {
         tracing::error!(
-            "Failed to reject purchase_order {} via BPM: {}",
+            "Failed to reject purchase_order {} via BPM: {}（已落死信补偿记录等待重放）",
             order_id,
             e
         );
+        record_bpm_writeback_failure(&db, "purchase_order", business_id, false, approver_id, &e)
+            .await;
     }
 }
 
@@ -1381,10 +1485,16 @@ async fn handle_bpm_sales_order(
         );
         return;
     };
-    let sales_service = crate::services::so::order::SalesService::new(db, search_client);
+    let sales_service = crate::services::so::order::SalesService::new(db.clone(), search_client);
     if approved {
         if let Err(e) = sales_service.approve_order(order_id, approver_id).await {
-            tracing::error!("Failed to approve sales_order {} via BPM: {}", order_id, e);
+            tracing::error!(
+                "Failed to approve sales_order {} via BPM: {}（已落死信补偿记录等待重放）",
+                order_id,
+                e
+            );
+            record_bpm_writeback_failure(&db, "sales_order", business_id, true, approver_id, &e)
+                .await;
         } else {
             tracing::info!("Successfully approved sales_order {} via BPM", order_id);
         }
@@ -1394,7 +1504,22 @@ async fn handle_bpm_sales_order(
             .await
         {
             Ok(_) => tracing::info!("Successfully rejected sales_order {} via BPM", order_id),
-            Err(e) => tracing::error!("Failed to reject sales_order {} via BPM: {}", order_id, e),
+            Err(e) => {
+                tracing::error!(
+                    "Failed to reject sales_order {} via BPM: {}（已落死信补偿记录等待重放）",
+                    order_id,
+                    e
+                );
+                record_bpm_writeback_failure(
+                    &db,
+                    "sales_order",
+                    business_id,
+                    false,
+                    approver_id,
+                    &e,
+                )
+                .await;
+            }
         }
     }
 }
@@ -1414,17 +1539,27 @@ async fn handle_bpm_production_order(
         return;
     };
     // B-P1-9 修复（批次 360 v13 复审）：原实现仅处理 purchase_order/sales_order，生产订单 BPM 审批结果无法回写
-    let prod_service = crate::services::production_order_service::ProductionOrderService::new(db);
+    let prod_service =
+        crate::services::production_order_service::ProductionOrderService::new(db.clone());
     if approved {
         if let Err(e) = prod_service
             .approve_order_via_bpm(order_id, approver_id)
             .await
         {
             tracing::error!(
-                "Failed to approve production_order {} via BPM: {}",
+                "Failed to approve production_order {} via BPM: {}（已落死信补偿记录等待重放）",
                 order_id,
                 e
             );
+            record_bpm_writeback_failure(
+                &db,
+                "production_order",
+                business_id,
+                true,
+                approver_id,
+                &e,
+            )
+            .await;
         } else {
             tracing::info!(
                 "Successfully approved production_order {} via BPM",
@@ -1437,10 +1572,19 @@ async fn handle_bpm_production_order(
             .await
         {
             tracing::error!(
-                "Failed to reject production_order {} via BPM: {}",
+                "Failed to reject production_order {} via BPM: {}（已落死信补偿记录等待重放）",
                 order_id,
                 e
             );
+            record_bpm_writeback_failure(
+                &db,
+                "production_order",
+                business_id,
+                false,
+                approver_id,
+                &e,
+            )
+            .await;
         } else {
             tracing::info!(
                 "Successfully rejected production_order {} via BPM",
@@ -1448,6 +1592,62 @@ async fn handle_bpm_production_order(
             );
         }
     }
+}
+
+/// BPM 终审回写失败死信登记
+///
+/// 功能：BPM 侧流程已终审结束，订单/申请状态回写失败时把可重放的回写指令持久化到死信表，
+/// 避免单据永久停在待审批、导出令牌永不签发（此时主事务已提交，无法靠回滚挽回）。
+/// 调用方：handle_bpm_export_approval / handle_bpm_purchase_order / handle_bpm_sales_order /
+/// handle_bpm_production_order 的 approve/reject 失败分支。
+/// 入参：`db` 连接、`business_type` 业务类型、`business_id` 业务单据 ID、
+/// `approved` 审批结论、`approver_id` 审批人、`err` 失败错误。
+/// 传给谁：EventRetryService::dead_letter_now。
+/// 存什么：回写指令四元组（business_type/business_id/approved/approver_id）+ 失败原因 + 完整错误。
+/// 存哪里：`event_dead_letters` 表，event_type=BpmProcessFinished，status=DEAD。
+async fn record_bpm_writeback_failure(
+    db: &Arc<DatabaseConnection>,
+    business_type: &str,
+    business_id: i64,
+    approved: bool,
+    approver_id: i32,
+    err: impl std::fmt::Display,
+) {
+    let err_str = err.to_string();
+    let payload =
+        bpm_writeback_dead_letter_payload(business_type, business_id, approved, approver_id);
+    let reason = format!(
+        "BPM 终审回写单据状态失败（business_type={business_type}, business_id={business_id}, \
+         approved={approved}）：单据停留原状态，需按 payload 重放回写"
+    );
+    let retry_service = crate::services::event_retry_service::EventRetryService::new(db.clone());
+    if let Err(e) = retry_service
+        .dead_letter_now("BpmProcessFinished", payload, &reason, &err_str)
+        .await
+    {
+        tracing::error!(
+            business_type,
+            business_id,
+            approved,
+            error = %e,
+            "BPM 回写失败的死信登记也失败（原始错误：{err_str}），请人工核查单据审批状态"
+        );
+    }
+}
+
+/// 构造 BPM 回写死信 payload（回写指令四元组，补偿任务按此重放对应 handle_bpm_* 分发）
+fn bpm_writeback_dead_letter_payload(
+    business_type: &str,
+    business_id: i64,
+    approved: bool,
+    approver_id: i32,
+) -> serde_json::Value {
+    serde_json::json!({
+        "business_type": business_type,
+        "business_id": business_id,
+        "approved": approved,
+        "approver_id": approver_id,
+    })
 }
 
 /// 处理低库存预警事件：幂等校验 + 创建采购建议 + 通知 admin/manager 角色用户
@@ -1955,4 +2155,32 @@ async fn refresh_supplier_name_redundancy(
         new_name
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bpm回写死信payload携带可重放的四元组() {
+        let payload = bpm_writeback_dead_letter_payload("purchase_order", 7, false, 3);
+        assert_eq!(payload["business_type"], "purchase_order");
+        assert_eq!(payload["business_id"], 7);
+        assert_eq!(payload["approved"], false);
+        assert_eq!(payload["approver_id"], 3);
+    }
+
+    #[test]
+    fn bpm回写死信payload是对象且四键齐全() {
+        let payload = bpm_writeback_dead_letter_payload("export_approval", 9, true, 1);
+        let obj = payload.as_object().expect("payload 必须是 JSON 对象");
+        assert_eq!(
+            obj.len(),
+            4,
+            "payload 只允许四元组键，多余键会造成重放口径漂移"
+        );
+        for key in ["business_type", "business_id", "approved", "approver_id"] {
+            assert!(obj.contains_key(key), "缺键 {key}");
+        }
+    }
 }

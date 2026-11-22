@@ -15,6 +15,7 @@ pub mod department_handler;
 pub mod dual_unit_converter_handler;
 pub mod finance_invoice_handler;
 pub mod finance_payment_handler;
+pub mod payment_channel_handler;
 pub mod finance_report_handler;
 pub mod five_dimension_handler;
 pub mod health_handler;
@@ -178,8 +179,11 @@ pub mod scheduling_handler;
 pub mod field_permission_handler;
 // 通用打印模块
 pub mod print_handler;
+pub mod print_xlsx_finance_handler;
 pub mod print_target_handler;
 pub mod print_task_handler;
+// 采购域单据 xlsx 打印腿（独立文件：print_handler.rs 为多车道共享热点，见模块注释）
+pub mod print_xlsx_purchase_handler;
 // 公司档案(单例抬头主数据,打印 letterhead 的数据源)
 pub mod company_profile_handler;
 // 缺失的 handler 补充

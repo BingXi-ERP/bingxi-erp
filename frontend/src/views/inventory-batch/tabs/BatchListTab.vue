@@ -62,7 +62,97 @@
         </div>
       </div>
 
+      <section v-if="isPhone" v-loading="loading" class="batch-mobile">
+        <ul class="card-list" :aria-label="t('inventoryBatch.batchListTab.ariaTable')">
+          <li v-for="(row, index) in batchList" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('inventoryBatch.batchListTab.colBatchNo') }}</dt>
+                <dd>{{ row.batch_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colProductName') }}</dt>
+                <dd>{{ row.product_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colColorNo') }}</dt>
+                <dd>{{ row.color_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colDyeLotNo') }}</dt>
+                <dd>{{ row.dye_lot_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colGrade') }}</dt>
+                <dd>
+                  <el-tag :type="gradeTagType(row.grade)">{{ gradeLabel(row.grade) }}</el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colQuantityMeters') }}</dt>
+                <dd>{{ row.quantity_meters }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colQuantityKg') }}</dt>
+                <dd>{{ row.quantity_kg }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colGramWeight') }}</dt>
+                <dd>{{ row.gram_weight }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colWidth') }}</dt>
+                <dd>{{ row.width }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colWarehouse') }}</dt>
+                <dd>{{ row.warehouse_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colStockStatus') }}</dt>
+                <dd>
+                  <el-tag :type="stockStatusTagType(row.stock_status)">
+                    {{ row.stock_status }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colQualityStatus') }}</dt>
+                <dd>
+                  <el-tag :type="qualityStatusTagType(row.quality_status)">
+                    {{ row.quality_status }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('inventoryBatch.batchListTab.colProductionDate') }}</dt>
+                <dd>{{ row.production_date }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="handleView(row)">
+                {{ t('inventoryBatch.batchListTab.buttonView') }}
+              </el-button>
+              <el-button v-permission="PERMISSIONS.BATCH_UPDATE" @click="handleEdit(row)">
+                {{ t('inventoryBatch.batchListTab.buttonEdit') }}
+              </el-button>
+              <el-button v-permission="PERMISSIONS.BATCH_CREATE" @click="handleTransfer(row)">
+                {{ t('inventoryBatch.batchListTab.buttonTransfer') }}
+              </el-button>
+              <el-button
+                v-permission="PERMISSIONS.BATCH_DELETE"
+                type="danger"
+                @click="handleDelete(row)"
+              >
+                {{ t('inventoryBatch.batchListTab.buttonDelete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="batchList"
         border
@@ -260,7 +350,7 @@
 import { isDialogDismissal } from '@/utils/monitor';
 import NumericInput from '@/components/NumericInput.vue';
 import { PERMISSIONS } from '@/constants/permissions';
-import { ref, reactive } from 'vue';
+import { ref, reactive, computed } from 'vue';
 import { logAuxLoadFailure, logger } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
@@ -279,8 +369,11 @@ import {
   type StockGradeTagType,
 } from '@/constants/stock-grade';
 import { qualityStatusTagType, stockStatusTagType } from '@/constants/stock-status';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const emit = defineEmits<{ openForm: [row: InventoryBatch | null] }>();
 
@@ -497,5 +590,53 @@ defineExpose({ fetchBatches });
 .actions {
   display: flex;
   gap: 8px;
+}
+
+.batch-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.batch-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.batch-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.batch-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.batch-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.batch-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.batch-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.batch-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

@@ -80,7 +80,7 @@
     </el-tabs>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑染化料' : '新建染化料'" width="520">
-      <el-form :model="form" label-width="110px">
+      <el-form :model="form" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="编码" required>
           <el-input v-model="form.chemical_code" :disabled="!!editingId" />
         </el-form-item>
@@ -113,7 +113,7 @@
       :title="editingLotId ? '编辑批次' : '新建批次'"
       width="480"
     >
-      <el-form :model="lotForm" label-width="110px">
+      <el-form :model="lotForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="批次号" required>
           <el-input v-model="lotForm.lot_no" />
         </el-form-item>
@@ -142,7 +142,11 @@
       :title="editingCategoryId ? '编辑分类' : '新建分类'"
       width="440"
     >
-      <el-form :model="categoryForm" label-width="110px">
+      <el-form
+        :model="categoryForm"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="分类名称" required>
           <el-input v-model="categoryForm.name" />
         </el-form-item>
@@ -162,6 +166,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
@@ -181,6 +186,8 @@ import {
   deleteChemicalCategory,
   type Chemical,
 } from '@/api/chemical';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const chemicals = ref<Chemical[]>([]);
 const loading = ref(false);

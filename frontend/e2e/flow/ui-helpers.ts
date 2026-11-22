@@ -1107,14 +1107,14 @@ export async function uiToggleStatus(
  * 3. 等待下载事件触发
  * 4. 验证文件名 + 文件大小 + 文件类型
  *
- * @returns 下载文件信息（filename/suggestedFilename/size）或 null
+ * @returns 下载文件信息（filename/size/magic）或 null，magic 是落盘体头两字节拼出的魔数
  */
 export async function uiExportDownload(
   page: Page,
   route: string,
   exportButtonText: RegExp,
   options?: { acceptConfirm?: boolean }
-): Promise<{ filename: string; size: number } | null> {
+): Promise<{ filename: string; size: number; magic: string } | null> {
   const entityLabel = route.replace(/^\//, '');
   try {
     await safeGoto(page, route);
@@ -1145,9 +1145,14 @@ export async function uiExportDownload(
     const download = await downloadPromise;
     const filename = download.suggestedFilename();
     const path = await download.path();
-    const size = path ? (await import('fs')).statSync(path).size : 0;
+    // 读取落盘导出体的真实字节：大小与魔数都取自文件本身，
+    // 仅凭 suggestedFilename 的扩展名无法证明导出格式真实（改名文本也能混过）。
+    const bytes = path ? (await import('fs')).readFileSync(path) : undefined;
+    const size = bytes ? bytes.length : 0;
+    // xlsx 是 zip 容器，头两字节为 PK；拼成字符串交由调用方逐字校验。
+    const magic = bytes && bytes.length >= 2 ? String.fromCharCode(bytes[0], bytes[1]) : '';
     console.log(`[uiExportDownload] ✅ ${entityLabel} 导出成功：文件名=${filename} 大小=${size}B`);
-    return { filename, size };
+    return { filename, size, magic };
   } catch (e) {
     console.error(`[uiExportDownload] ❌ ${entityLabel} 导出失败:`, (e as Error).message);
     return null;

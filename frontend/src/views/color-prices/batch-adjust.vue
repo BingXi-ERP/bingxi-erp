@@ -8,10 +8,10 @@
     <el-page-header :content="$t('colorPrices.batchAdjust.back')" @back="$router.back()" />
 
     <el-row :gutter="20" style="margin-top: 20px">
-      <el-col :span="14">
+      <el-col :span="isPhone ? 24 : 14">
         <el-card :header="$t('colorPrices.batchAdjust.selectColor')">
           <el-form
-            :inline="true"
+            :inline="!isPhone"
             :model="filterForm"
             class="filter-form"
             :aria-label="$t('colorPrices.batchAdjust.filter.ariaLabel')"
@@ -43,7 +43,47 @@
               }}</el-button>
             </el-form-item>
           </el-form>
+          <!-- 手机端：价格单列卡片，字段与桌面表格等价 -->
+          <section v-if="isPhone" class="batch-price-mobile">
+            <ul class="card-list" :aria-label="$t('colorPrices.batchAdjust.table.ariaLabel')">
+              <li v-for="(row, index) in prices" :key="row.id ?? index" class="card-item">
+                <dl class="card-fields">
+                  <div class="field field-emphasis">
+                    <dt>{{ $t('colorPrices.batchAdjust.table.id') }}</dt>
+                    <dd>{{ row.id }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.batchAdjust.table.product') }}</dt>
+                    <dd>{{ row.product_id }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.batchAdjust.table.color') }}</dt>
+                    <dd>{{ row.color_id }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.batchAdjust.table.customerLevel') }}</dt>
+                    <dd>
+                      <el-tag v-if="row.customer_level" :type="getLevelColor(row.customer_level)">
+                        {{ getLevelLabel(row.customer_level) }}
+                      </el-tag>
+                      <span v-else>-</span>
+                    </dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.batchAdjust.table.basePrice') }}</dt>
+                    <dd>{{ formatPrice(row.base_price, row.currency) }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ $t('colorPrices.batchAdjust.table.currency') }}</dt>
+                    <dd>{{ row.currency }}</dd>
+                  </div>
+                </dl>
+              </li>
+            </ul>
+          </section>
+
           <el-table
+            v-if="!isPhone"
             v-loading="loading"
             :data="prices"
             border
@@ -86,7 +126,7 @@
         </el-card>
       </el-col>
 
-      <el-col :span="10">
+      <el-col :span="isPhone ? 24 : 10">
         <el-card :header="$t('colorPrices.batchAdjust.adjustSetting')">
           <el-form
             ref="formRef"
@@ -175,6 +215,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
@@ -190,6 +231,8 @@ import {
 import { numberInputRules } from '@/utils/number-input';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 状态码 → 本地化标签（响应式：随语言切换自动更新）
 const getLevelLabel = (level: string | null | undefined) =>
@@ -346,5 +389,40 @@ onMounted(() => {
 }
 .filter-form {
   margin-bottom: 16px;
+}
+
+.batch-price-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.batch-price-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.batch-price-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.batch-price-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.batch-price-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.batch-price-mobile .field-emphasis dd {
+  font-weight: 500;
 }
 </style>

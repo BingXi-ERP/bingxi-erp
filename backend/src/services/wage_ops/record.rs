@@ -223,8 +223,23 @@ impl WageRecordService {
         let updated = active.update(&*self.db).await?;
 
         // V15 Batch04-P1-3：生成"工资发放"凭证（借：应付职工薪酬，贷：银行存款/现金）
+        // 非阻断：失败落 event_dead_letters 死信补偿记录等待补生成
         if let Err(e) = self.create_wage_pay_voucher(&updated, paid_by).await {
-            tracing::warn!(wage_record_id = updated.id, "工资发放凭证生成失败：{}", e);
+            tracing::error!(
+                wage_record_id = updated.id,
+                "工资发放凭证生成失败，已落死信补偿记录等待补生成：{}",
+                e
+            );
+            crate::services::event_retry_service::EventRetryService::
+                record_voucher_generation_failure(
+                    self.db.clone(),
+                    "wage_record",
+                    "wage",
+                    i64::from(updated.id),
+                    &updated.record_no,
+                    &e,
+                )
+                .await;
         }
 
         // V15 Batch04-P1-3：发布 WagePaid 事件

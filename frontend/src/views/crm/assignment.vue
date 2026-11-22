@@ -27,7 +27,61 @@
     <el-tabs v-model="activeTab" class="assignment-tabs">
       <el-tab-pane :label="t('crmAssignment.tabs.rules')" name="rules">
         <el-card shadow="hover">
+          <!-- 手机端：分配规则卡片 -->
+          <section v-if="isPhone" v-loading="ruleLoading" class="rule-mobile">
+            <ul class="card-list" :aria-label="t('crmAssignment.ruleTable.ariaLabel')">
+              <li v-for="(row, index) in ruleList" :key="row.id ?? index" class="card-item">
+                <dl class="card-fields">
+                  <div class="field field-emphasis">
+                    <dt>{{ t('crmAssignment.ruleTable.name') }}</dt>
+                    <dd>{{ row.name }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ t('crmAssignment.ruleTable.days') }}</dt>
+                    <dd>{{ row.days }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ t('crmAssignment.ruleTable.status') }}</dt>
+                    <dd>
+                      <el-tag v-if="row.is_enabled" type="success">{{
+                        t('crmAssignment.ruleTable.enabled')
+                      }}</el-tag>
+                      <el-tag v-else type="info">{{
+                        t('crmAssignment.ruleTable.disabled')
+                      }}</el-tag>
+                    </dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ t('crmAssignment.ruleTable.createdAt') }}</dt>
+                    <dd>{{ row.created_at }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ t('crmAssignment.ruleTable.updatedAt') }}</dt>
+                    <dd>{{ row.updated_at }}</dd>
+                  </div>
+                </dl>
+                <div class="card-actions">
+                  <el-button
+                    v-permission="'crm_assignment:update'"
+                    type="primary"
+                    @click="openEditRuleDialog(row)"
+                  >
+                    {{ t('crmAssignment.ruleTable.edit') }}
+                  </el-button>
+                  <el-button
+                    v-permission="'crm_assignment:delete'"
+                    type="danger"
+                    @click="handleDeleteRule(row)"
+                  >
+                    {{ t('crmAssignment.ruleTable.delete') }}
+                  </el-button>
+                </div>
+              </li>
+            </ul>
+          </section>
+
           <el-table
+            v-if="!isPhone"
             v-loading="ruleLoading"
             :data="ruleList"
             border
@@ -136,7 +190,43 @@
             </el-form>
           </div>
 
+          <!-- 手机端：可分配客户卡片 -->
+          <section v-if="isPhone" v-loading="assignLoading" class="customer-mobile">
+            <ul class="card-list" :aria-label="t('crmAssignment.manualTable.ariaLabel')">
+              <li
+                v-for="(row, index) in assignableCustomers"
+                :key="row.id ?? index"
+                class="card-item"
+              >
+                <dl class="card-fields">
+                  <div class="field field-emphasis">
+                    <dt>{{ t('crmAssignment.manualTable.customerName') }}</dt>
+                    <dd>{{ row.customer_name }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ t('crmAssignment.manualTable.contactPerson') }}</dt>
+                    <dd>{{ row.contact_person }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ t('crmAssignment.manualTable.phone') }}</dt>
+                    <dd>{{ row.phone }}</dd>
+                  </div>
+                  <div class="field">
+                    <dt>{{ t('crmAssignment.manualTable.currentOwner') }}</dt>
+                    <dd>{{ row.owner_name }}</dd>
+                  </div>
+                </dl>
+                <div class="card-actions">
+                  <el-button type="primary" @click="openAssignDialog(row)">
+                    {{ t('crmAssignment.manualTable.assign') }}
+                  </el-button>
+                </div>
+              </li>
+            </ul>
+          </section>
+
           <el-table
+            v-if="!isPhone"
             v-loading="assignLoading"
             :data="assignableCustomers"
             border
@@ -246,7 +336,7 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
@@ -263,10 +353,18 @@ import {
   type RecycleRule,
   type SalesUser,
 } from '@/api/crm-enhanced';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import RuleDialogTab from './tabs/RuleDialogTab.vue';
 import ManualAssignDialogTab from './tabs/ManualAssignDialogTab.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
+
+// 后端待分配客户出参带负责人展示列，桌面表格早已消费，手机卡片直接绑定需扩展类型
+interface AssignableRow extends AssignableCustomer {
+  owner_name?: string;
+}
 
 const hasLoaded = createLazyLoader();
 
@@ -275,7 +373,7 @@ const ruleLoading = ref(false);
 const ruleList = ref<RecycleRule[]>([]);
 
 const assignLoading = ref(false);
-const assignableCustomers = ref<AssignableCustomer[]>([]);
+const assignableCustomers = ref<AssignableRow[]>([]);
 const assignQuery = reactive({ keyword: '' });
 
 const users = ref<SalesUser[]>([]);
@@ -465,5 +563,61 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.rule-mobile .card-list,
+.customer-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rule-mobile .card-item,
+.customer-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.rule-mobile .card-fields > div,
+.customer-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.rule-mobile .card-fields dt,
+.customer-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.rule-mobile .card-fields dd,
+.customer-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.rule-mobile .field-emphasis dd,
+.customer-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.rule-mobile .card-actions,
+.customer-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.rule-mobile .card-actions .el-button,
+.customer-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

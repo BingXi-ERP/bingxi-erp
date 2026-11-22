@@ -1026,12 +1026,14 @@ test.describe('色卡与样品打样主链', () => {
         '被选中的 OK 样对色结果应升级为 selected'
       ).toBe(SAMPLE_MATCHING.SELECTED);
 
+      // 先在用例内生成缸号并留存，供登记后按真实提交值回读比对，避免自己比自己。
+      const dyeBatchNo = genCode('DY440');
       const resample = asRow(
         await apiCallRaw<unknown>(lead.page, 'POST', `${LD}/resamples`, {
           request_id: requestId,
           source_sample_id: sampleAId,
           workshop_fabric_batch: genCode('WB440'),
-          dye_batch_no: genCode('DY440'),
+          dye_batch_no: dyeBatchNo,
           auxiliary_batch_no: genCode('AZ440'),
           adjusted_formula: '在 OK 样处方上加成 5%',
           adjustment_factor: 1.05,
@@ -1051,6 +1053,11 @@ test.describe('色卡与样品打样主链', () => {
       expect(readStr(resample, 'dye_batch_no', '研发组长登记复样出参'), '缸号列必须原样落库').toBe(
         readStr(resample, 'dye_batch_no', '研发组长登记复样出参')
       );
+      // 原断言拿同一字段比同一字段恒真；新增可失败断言钉住出参须逐字符等于本用例提交的缸号。
+      expect(
+        readStr(resample, 'dye_batch_no', '研发组长登记复样出参'),
+        '缸号出参应等于提交值'
+      ).toBe(dyeBatchNo);
       expect(
         readBool(resample, 'is_deleted', '研发组长登记复样出参'),
         '新登记复样记录不应带软删标记'

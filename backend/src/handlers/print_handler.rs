@@ -590,6 +590,121 @@ pub async fn sales_delivery_print_docx(
     record_print_audit(&state, &auth, "sales_delivery", delivery_id);
     Ok(resp)
 }
+
+/// 销售域 xlsx 打印腿审计（与 docx 版同一事件形状，格式标记 xlsx）
+fn record_print_xlsx_audit(state: &AppState, auth: &AuthContext, doc_type: &str, doc_id: i32) {
+    let event = AuditEvent {
+        user_id: Some(auth.user_id),
+        username: Some(auth.username.clone()),
+        operation_type: OperationType::Print,
+        severity: Severity::Info,
+        resource_type: Some(doc_type.to_string()),
+        resource_id: Some(doc_id.to_string()),
+        resource_name: Some(format!("{}_print.xlsx", doc_type)),
+        description: Some(format!(
+            "用户 {} 打印 {} #{} (xlsx)",
+            auth.username, doc_type, doc_id
+        )),
+        request_method: Some("GET".to_string()),
+        request_path: Some(format!("/api/v1/erp/{}/{}", doc_type, doc_id)),
+        before_snapshot: None,
+        after_snapshot: Some(serde_json::json!({
+            "doc_type": doc_type,
+            "doc_id": doc_id,
+            "format": "xlsx",
+        })),
+    };
+    let svc = Arc::new(AuditLogService::new(state.db.clone()));
+    svc.record_async(event, None);
+}
+
+/// 销售订单 xlsx 打印（doc_type sales_order，路由 /orders/{id}/print-xlsx）。
+/// 行级归属门与 docx 打印同一判定器（取数入口生效），版式铺排集中在
+/// `SalesXlsxPrintDoc::to_xlsx_table`（缸号块合并版式待 xlsx 引擎增强车道升级）。
+pub async fn sales_order_print_xlsx(
+    Path(doc_id): Path<i32>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    let service = PrintService::new(state.db.clone());
+    let scope_ctx = auth.to_data_scope_context();
+    let doc = service
+        .get_sales_order_xlsx_print_data(&scope_ctx, doc_id)
+        .await?;
+    let resp = crate::utils::xlsx_export::build_xlsx_response(&doc.to_xlsx_table(), &doc.filename)?;
+    record_print_xlsx_audit(&state, &auth, "sales_order", doc_id);
+    Ok(resp)
+}
+
+/// 销售发货单 xlsx 打印（doc_type sales_delivery，路由 /orders/{id}/deliveries/{delivery_id}/print-xlsx）。
+/// 与 docx 版同形的两段路径 tuple 提取；行级归属门与 docx 打印同一判定器。
+pub async fn sales_delivery_print_xlsx(
+    Path((_order_id, delivery_id)): Path<(i32, i32)>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    let service = PrintService::new(state.db.clone());
+    let scope_ctx = auth.to_data_scope_context();
+    let doc = service
+        .get_sales_delivery_xlsx_print_data(&scope_ctx, delivery_id)
+        .await?;
+    let resp = crate::utils::xlsx_export::build_xlsx_response(&doc.to_xlsx_table(), &doc.filename)?;
+    record_print_xlsx_audit(&state, &auth, "sales_delivery", delivery_id);
+    Ok(resp)
+}
+
+/// 销售合同 xlsx 打印（doc_type sales_contract，路由 /sales-contracts/{id}/print-xlsx）。
+/// 行级归属门与 docx 打印同一判定器（取数入口生效）；合同明细整表清空是合法状态，
+/// 取数腿允许零明细输出，主表 KV 与汇总照实呈现。
+pub async fn sales_contract_print_xlsx(
+    Path(doc_id): Path<i32>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    let service = PrintService::new(state.db.clone());
+    let scope_ctx = auth.to_data_scope_context();
+    let doc = service
+        .get_sales_contract_xlsx_print_data(&scope_ctx, doc_id)
+        .await?;
+    let resp = crate::utils::xlsx_export::build_xlsx_response(&doc.to_xlsx_table(), &doc.filename)?;
+    record_print_xlsx_audit(&state, &auth, "sales_contract", doc_id);
+    Ok(resp)
+}
+
+/// 销售退货单 xlsx 打印（doc_type sales_return，路由 /sales-returns/{id}/print-xlsx）。
+/// 行级归属门与 docx 打印同一判定器（取数入口生效）。
+pub async fn sales_return_print_xlsx(
+    Path(doc_id): Path<i32>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    let service = PrintService::new(state.db.clone());
+    let scope_ctx = auth.to_data_scope_context();
+    let doc = service
+        .get_sales_return_xlsx_print_data(&scope_ctx, doc_id)
+        .await?;
+    let resp = crate::utils::xlsx_export::build_xlsx_response(&doc.to_xlsx_table(), &doc.filename)?;
+    record_print_xlsx_audit(&state, &auth, "sales_return", doc_id);
+    Ok(resp)
+}
+
+/// 定制订单 xlsx 打印（doc_type custom_order，路由 /custom-orders/{id}/print-xlsx）。
+/// custom_orders 主键 i64，与 docx 版同形按 i64 提取后送 i32 取数腿；
+/// 行级归属门与 docx 打印同一判定器（取数入口生效）。
+pub async fn custom_order_print_xlsx(
+    Path(doc_id): Path<i64>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    let service = PrintService::new(state.db.clone());
+    let scope_ctx = auth.to_data_scope_context();
+    let doc = service
+        .get_custom_order_xlsx_print_data(&scope_ctx, doc_id as i32)
+        .await?;
+    let resp = crate::utils::xlsx_export::build_xlsx_response(&doc.to_xlsx_table(), &doc.filename)?;
+    record_print_xlsx_audit(&state, &auth, "custom_order", doc_id as i32);
+    Ok(resp)
+}
 pub async fn sales_quotation_print_docx(
     Path(doc_id): Path<i64>,
     State(state): State<AppState>,
@@ -1859,4 +1974,166 @@ pub async fn copy_print_template(
         to_record(model),
         "打印模板复制成功",
     )))
+}
+
+/// 销售发货单面料细码单 xlsx 导出（路由 /orders/{id}/deliveries/{delivery_id}/codex-sheet）。
+///
+/// 鉴权与既有 docx 打印端点同一形态（AuthContext 提取器 + 同一路由前缀，权限键同为
+/// /api/v1/erp/sales/orders）；明细取数按 id 升序逐匹成行，产品名称走 LoaderTrait
+/// `load_one` 单次查询范式（禁止逐行再查），缸号聚合与版式全部收敛在
+/// [`crate::services::print_service::codex_sheet`]，本 handler 只装配入参。
+/// 货款总计大写金额由本 handler 计算注入，结余类金额取该客户最近一期应收对账单。
+pub async fn sales_delivery_codex_sheet_xlsx(
+    // 路由为 /orders/{id}/deliveries/{delivery_id}/codex-sheet（两段参数），
+    // axum Path 单值提取多段路径会 500，必须用 tuple 提取并取第二段
+    Path((_order_id, delivery_id)): Path<(i32, i32)>,
+    State(state): State<AppState>,
+    auth: AuthContext,
+) -> Result<Response, AppError> {
+    use crate::models::{
+        ar_reconciliation, customer, product, sales_delivery, sales_delivery_item, user,
+    };
+    use crate::services::print_service::codex_sheet::{
+        self, CodexSheetCompanyInfo, CodexSheetInput, DEFAULT_BRANCH_OFFICE_ADDRESS,
+        DEFAULT_BRANCH_OFFICE_NAME, DEFAULT_COMPANY_NAME, DEFAULT_DEPARTMENT, DEFAULT_DOC_NAME,
+        DEFAULT_HQ_ADDRESS, DEFAULT_PHONE,
+    };
+    use rust_decimal::Decimal;
+    use sea_orm::{LoaderTrait, ModelTrait};
+
+    let db = &*state.db;
+    let delivery = sales_delivery::Entity::find_by_id(delivery_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("销售发货单 {} 未找到", delivery_id)))?;
+    let customer = delivery
+        .find_related(customer::Entity)
+        .one(db)
+        .await?
+        .ok_or_else(|| {
+            AppError::not_found(format!(
+                "销售发货单 {} 的客户档案(ID={})缺失",
+                delivery_id, delivery.customer_id
+            ))
+        })?;
+    let creator = delivery
+        .find_related(user::Entity)
+        .one(db)
+        .await?
+        .ok_or_else(|| {
+            AppError::not_found(format!(
+                "销售发货单 {} 的制单人账号(ID={})缺失",
+                delivery_id, delivery.created_by
+            ))
+        })?;
+    let items = sales_delivery_item::Entity::find()
+        .filter(sales_delivery_item::Column::DeliveryId.eq(delivery_id))
+        .order_by(sales_delivery_item::Column::Id, sea_orm::Order::Asc)
+        .all(db)
+        .await?;
+    let loaded = items.load_one(product::Entity, db).await?;
+    let product_names: Vec<String> = items
+        .iter()
+        .zip(loaded)
+        .map(|(item, found)| {
+            found.map(|p| p.name).ok_or_else(|| {
+                AppError::not_found(format!(
+                    "销售发货单 {} 的明细产品档案(ID={})缺失",
+                    delivery_id, item.product_id
+                ))
+            })
+        })
+        .collect::<Result<Vec<_>, AppError>>()?;
+
+    let rows = codex_sheet::group_items_by_dye_lot(&items, &product_names)?;
+    // 结余类金额取该客户最近一期应收对账单四字段（上单结余=opening_balance、应收=total_invoices、
+    // 实收=total_collections、上期欠款=closing_balance）；客户尚无对账历史时为零往来，属真实业务态
+    let latest_reconciliation = ar_reconciliation::Entity::find()
+        .filter(ar_reconciliation::Column::CustomerId.eq(delivery.customer_id))
+        .order_by_desc(ar_reconciliation::Column::ReconciliationDate)
+        .one(db)
+        .await?;
+    let (previous_balance, receivable_amount, received_amount, previous_debt) =
+        latest_reconciliation
+            .map(|recon| {
+                (
+                    recon.opening_balance,
+                    recon.total_invoices,
+                    recon.total_collections,
+                    recon.closing_balance,
+                )
+            })
+            .unwrap_or((Decimal::ZERO, Decimal::ZERO, Decimal::ZERO, Decimal::ZERO));
+    let input = CodexSheetInput {
+        // 单号占位参数：本切片直接用发货单号，不接单据号生成器
+        sheet_no: delivery.delivery_no.clone(),
+        customer_name: customer.customer_name.clone(),
+        delivery_address: customer.address.clone().unwrap_or_default(),
+        department: DEFAULT_DEPARTMENT.to_string(),
+        sheet_date: delivery.delivery_date.to_string(),
+        rows,
+        previous_balance,
+        received_amount,
+        receivable_amount,
+        previous_debt,
+        prepared_by: creator.username.clone(),
+        remark: delivery.remarks.clone().unwrap_or_default(),
+        company: CodexSheetCompanyInfo {
+            company_name: DEFAULT_COMPANY_NAME.to_string(),
+            doc_name: DEFAULT_DOC_NAME.to_string(),
+            hq_address: DEFAULT_HQ_ADDRESS.to_string(),
+            branch_office_name: DEFAULT_BRANCH_OFFICE_NAME.to_string(),
+            branch_office_address: DEFAULT_BRANCH_OFFICE_ADDRESS.to_string(),
+            phone: DEFAULT_PHONE.to_string(),
+        },
+    };
+    let mut total_amount = rust_decimal::Decimal::ZERO;
+    for row in &input.rows {
+        let amount = row.unit_price.checked_mul(row.quantity).ok_or_else(|| {
+            AppError::validation(format!(
+                "细码单构建失败: 缸号 {} 金额计算溢出（单价 {} × 数量 {}）",
+                row.dye_lot_no, row.unit_price, row.quantity
+            ))
+        })?;
+        total_amount += amount;
+    }
+    let amount_words = crate::utils::amount_in_words::amount_in_words(total_amount);
+    let bytes = codex_sheet::build_codex_sheet_xlsx(&input, Some(&amount_words))?;
+    record_codex_sheet_audit(&state, &auth, delivery_id);
+    Ok(crate::utils::xlsx_export::xlsx_response(
+        bytes,
+        &format!("sales_delivery_codex_sheet_{}", delivery_id),
+    ))
+}
+
+/// 细码单 xlsx 导出审计（best-effort，不阻塞响应；口径同 record_print_audit，
+/// 资源名与快照格式如实记 xlsx，不冒充 docx）
+fn record_codex_sheet_audit(state: &AppState, auth: &AuthContext, delivery_id: i32) {
+    let event = AuditEvent {
+        user_id: Some(auth.user_id),
+        username: Some(auth.username.clone()),
+        operation_type: OperationType::Print,
+        severity: Severity::Info,
+        resource_type: Some("sales_delivery".to_string()),
+        resource_id: Some(delivery_id.to_string()),
+        resource_name: Some(format!("sales_delivery_codex_sheet_{}.xlsx", delivery_id)),
+        description: Some(format!(
+            "用户 {} 导出销售发货单 #{} 的面料细码单 xlsx",
+            auth.username, delivery_id
+        )),
+        request_method: Some("GET".to_string()),
+        request_path: Some(format!(
+            "/api/v1/erp/sales/orders/0/deliveries/{}/codex-sheet",
+            delivery_id
+        )),
+        before_snapshot: None,
+        after_snapshot: Some(serde_json::json!({
+            "doc_type": "sales_delivery",
+            "doc_id": delivery_id,
+            "format": "xlsx",
+            "template": "codex_sheet",
+        })),
+    };
+    let svc = Arc::new(AuditLogService::new(state.db.clone()));
+    svc.record_async(event, None);
 }

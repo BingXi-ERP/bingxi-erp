@@ -15,7 +15,7 @@
               value-format="YYYY-MM-DD"
               start-placeholder="开始日期"
               end-placeholder="结束日期"
-              style="width: 260px"
+              :style="{ width: isPhone ? '100%' : '260px' }"
             />
             <el-button type="primary" :loading="funnelLoading" @click="loadSalesFunnel">
               查询漏斗
@@ -37,7 +37,7 @@
           </el-table>
 
           <h3 class="section-title">加权销售预测</h3>
-          <el-descriptions v-if="forecast" :column="3" border class="block-gap">
+          <el-descriptions v-if="forecast" :column="isPhone ? 1 : 3" border class="block-gap">
             <el-descriptions-item label="商机总数">
               {{ forecast.total_opportunities }}
             </el-descriptions-item>
@@ -121,13 +121,18 @@
               value-format="YYYY-MM-DD"
               start-placeholder="开始日期"
               end-placeholder="结束日期"
-              style="width: 260px"
+              :style="{ width: isPhone ? '100%' : '260px' }"
             />
             <el-button type="primary" :loading="reportLoading" @click="loadLeadFunnelReport">
               漏斗报告
             </el-button>
           </div>
-          <el-descriptions v-if="leadFunnelReport" :column="2" border class="block-gap">
+          <el-descriptions
+            v-if="leadFunnelReport"
+            :column="isPhone ? 1 : 2"
+            border
+            class="block-gap"
+          >
             <el-descriptions-item label="线索总数">{{
               leadFunnelReport.total_leads
             }}</el-descriptions-item>
@@ -192,7 +197,12 @@
           </div>
 
           <!-- 信用额度信息 -->
-          <el-descriptions v-if="creditInfo" :column="3" border style="margin-bottom: 16px">
+          <el-descriptions
+            v-if="creditInfo"
+            :column="isPhone ? 1 : 3"
+            border
+            style="margin-bottom: 16px"
+          >
             <el-descriptions-item label="信用额度">{{
               fmtAmount(creditInfo.credit_limit)
             }}</el-descriptions-item>
@@ -205,7 +215,12 @@
           </el-descriptions>
 
           <!-- RFM 评分结果（后端 RfmScoreDetail：三个分项各 1-5，恒有值 ⇒ 不做占位掩盖） -->
-          <el-descriptions v-if="rfmRow" :column="3" border style="margin-bottom: 16px">
+          <el-descriptions
+            v-if="rfmRow"
+            :column="isPhone ? 1 : 3"
+            border
+            style="margin-bottom: 16px"
+          >
             <el-descriptions-item label="最近消费(R)">{{ rfmRow.recency }}</el-descriptions-item>
             <el-descriptions-item label="消费频率(F)">{{ rfmRow.frequency }}</el-descriptions-item>
             <el-descriptions-item label="消费金额(M)">{{ rfmRow.monetary }}</el-descriptions-item>
@@ -226,7 +241,7 @@
 
           <h3 class="section-title">客户全生命周期价值（CLV）</h3>
           <el-empty v-if="!clv" description="暂无 CLV 数据" :image-size="60" />
-          <el-descriptions v-else :column="3" border>
+          <el-descriptions v-else :column="isPhone ? 1 : 3" border>
             <el-descriptions-item label="订单总数">{{ clv.total_orders }}</el-descriptions-item>
             <el-descriptions-item label="累计收入">{{
               fmtAmount(clv.total_revenue)
@@ -443,7 +458,11 @@ import {
   type RfmScore,
   type AssignmentRecord,
 } from '@/api/crm-enhanced';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import RfmTab from '../tabs/RfmTab.vue';
+
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const CRM_ENHANCED_TABS = ['funnel', 'tools', 'clv', 'rfm'] as const;
 type CrmEnhancedTab = (typeof CRM_ENHANCED_TABS)[number];
@@ -1015,5 +1034,19 @@ onMounted(() => {
 
 .block-gap {
   margin-bottom: 12px;
+}
+
+@media (max-width: 767px) {
+  .crm-enhanced-page {
+    padding: 12px;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .toolbar > * {
+    max-width: 100%;
+  }
 }
 </style>

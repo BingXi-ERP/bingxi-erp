@@ -1,4 +1,5 @@
 import { test, expect } from '../diagnose-fixture';
+import type { Page } from '@playwright/test';
 import {
   BROWSER_NETWORK_NOISE,
   apiCall,
@@ -9,6 +10,7 @@ import {
   trackPageHealth,
   failureCode,
   APP_ERROR_CODES,
+  testPassword,
 } from './helpers';
 
 /**
@@ -19,10 +21,57 @@ import {
  * - setup 拿 secret → TOTP 生成 → enable → 退出后登录带 token 成功、错 token 拒绝
  * - recovery-codes 一次性消费
  * - 禁用回退单因素
+ *
+ * 账号隔离说明：后端只有 totp/setup、totp/enable、totp/recovery-codes 三个端点，
+ * 没有 disable/解绑端点——一旦 enable 成功，该账号即被 2FA 锁死且本轮无法恢复。
+ * 若直接在 worker 会话账号上 enable，同 worker（同账号）后续一切真实 UI 登录都会
+ * 得到 401「需要提供两步验证码或恢复码」，把整个分片拖成登录失败级联红。
+ * 因此每条用例先经 worker 的 admin 会话自建一个一次性专用账号（用户名含并行槽、
+ * 运行时间戳与本文件内序号，跨 run / 跨重试绝不复用已锁账号），全部 TOTP 操作
+ * 只落在这个专用账号上。
  */
 test.describe('P5.5 2FA TOTP', () => {
+  let totpAccountSeq = 0;
+  let adminRoleId: number | undefined;
+
+  /** 查询 admin 角色 id（worker 会话账号即 admin，具备 GET /roles 与 POST /users 权限） */
+  async function ensureAdminRoleId(page: Page): Promise<number> {
+    if (adminRoleId !== undefined) {
+      return adminRoleId;
+    }
+    const roles = await apiCall<{ roles?: Array<{ id: number; code?: string; name?: string }> }>(
+      page,
+      'GET',
+      '/roles'
+    );
+    const admin = roles.data?.roles?.find(r => r.code === 'admin' || r.name === 'admin');
+    if (!admin?.id) {
+      throw new Error(
+        `TOTP 专用账号前置失败：GET /roles 未找到 admin 角色（响应：${JSON.stringify(roles).slice(0, 200)}）`
+      );
+    }
+    adminRoleId = admin.id;
+    return adminRoleId;
+  }
+
+  /** 自建一次性 TOTP 专用账号，返回用户名（密码统一走 testPassword） */
+  async function createIsolatedTotpAccount(page: Page): Promise<string> {
+    const roleId = await ensureAdminRoleId(page);
+    const username = `e2e_totp_p${test.info().parallelIndex}_${Date.now().toString(36)}_${++totpAccountSeq}`;
+    const created = await apiCall<{ id?: number }>(page, 'POST', '/users', {
+      username,
+      password: testPassword(),
+      role_id: roleId,
+    });
+    if (!created.data?.id) {
+      throw new Error(`TOTP 专用账号创建未返回 id：${JSON.stringify(created).slice(0, 200)}`);
+    }
+    return username;
+  }
+
   test('setup → enable → 登录带 token 成功', async ({ page }) => {
-    await loginViaUI(page);
+    const username = await createIsolatedTotpAccount(page);
+    await loginViaUI(page, username, testPassword(), true);
     const collector = trackPageHealth(page);
 
     // 1. setup 拿 secret（后端 GET /auth/totp/setup，非 POST）
@@ -53,11 +102,27 @@ test.describe('P5.5 2FA TOTP', () => {
       `[35-totp] enable 应成功（secret=${secret?.slice(0, 8)}… code=${totpCode}）`
     ).toBeTruthy();
 
+    // 加固：enable 真实出参是 ApiResponse<bool>，data 逐字为布尔 true、message 为固定成功文案。
+    // 只判"响应非空"无法识别静默失败，必须把后端已暴露的两个真实值逐字锁死。
+    expect(enableResp.data, '[35-totp] enable 出参 data 应为布尔 true').toBe(true);
+    expect(enableResp.message, '[35-totp] enable 出参 message 应逐字符等于固定成功文案').toBe(
+      '双因素认证已成功开启'
+    );
+
+    // 加固：2FA 登录门控的前置是 is_totp_enabled 真正落库。/auth/me 由 UserInfo 原样回报该列，
+    // 若为 false 则前端恒判未开启、二次验证门控形同虚设，此处读取真实状态兜住持久化腿。
+    const meAfterEnable = await apiCall<{ is_totp_enabled: boolean }>(page, 'GET', '/auth/me');
+    expect(
+      meAfterEnable.data.is_totp_enabled,
+      '[35-totp] enable 后 /auth/me 应回报 is_totp_enabled 为 true'
+    ).toBe(true);
+
     await assertPageHealthy(page, collector, { consoleNoisePatterns: BROWSER_NETWORK_NOISE });
   });
 
   test('错 TOTP code 拒绝', async ({ page }) => {
-    await loginViaUI(page);
+    const username = await createIsolatedTotpAccount(page);
+    await loginViaUI(page, username, testPassword(), true);
 
     const setupResp = await apiCall<{ secret?: string; qr_code?: string }>(
       page,
@@ -96,7 +161,8 @@ test.describe('P5.5 2FA TOTP', () => {
   });
 
   test('生成恢复码并消费', async ({ page }) => {
-    await loginViaUI(page);
+    const username = await createIsolatedTotpAccount(page);
+    await loginViaUI(page, username, testPassword(), true);
 
     // 后端真实路径为 /auth/totp/recovery-codes（nest 在 /auth 下的 totp 子组）
     // generate_recovery_codes 返回 ApiResponse<Vec<String>>：data 就是恢复码数组本身，
@@ -110,7 +176,15 @@ test.describe('P5.5 2FA TOTP', () => {
     expect(codes.length, '恢复码应至少生成 1 条').toBeGreaterThan(0);
     expect(
       codes.every(c => typeof c === 'string' && c.length > 0),
-      `恢复码每条应为非空字符串，实际：${JSON.stringify(codes).slice(0, 200)}`
+      `恢复码每条应为非空字符串，实际：${JSON.stringify(recoveryResp).slice(0, 200)}`
+    ).toBe(true);
+
+    // 加固：后端每次固定生成 10 条、每条 8 字符，字符集剔除易混淆的 0/O/1/I/L。
+    // 只判 length>0 与非空字符串会让"生成 1 条乱码"也假绿，按真实出参逐字锁死数量与格式。
+    expect(codes.length, '[35-totp] 每次应恰好生成 10 条恢复码').toBe(10);
+    expect(
+      codes.every(c => /^[A-HJ-NP-Z2-9]{8}$/.test(c)),
+      `[35-totp] 恢复码应为 8 位且不含易混淆字符，实际：${JSON.stringify(codes)}`
     ).toBe(true);
 
     // 恢复码应是一次性的

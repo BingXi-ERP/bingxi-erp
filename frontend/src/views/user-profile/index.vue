@@ -4,119 +4,117 @@
       <h2>{{ t('userProfile.title') }}</h2>
     </div>
 
-    <div class="content">
-      <!-- 个人信息卡片 -->
-      <div class="left-column">
-        <el-card class="profile-card">
-          <template #header>
-            <div class="card-header">
-              <span>{{ t('userProfile.profile.title') }}</span>
-              <el-button type="primary" :loading="profileLoading" @click="handleSaveProfile">
-                {{ t('userProfile.profile.save') }}
-              </el-button>
+    <!-- 手机端：单列卡片，字段与动作与桌面等价 -->
+    <template v-if="isPhone">
+      <el-card class="profile-card mobile-card">
+        <div class="mobile-identity">
+          <el-upload
+            class="avatar-uploader"
+            :show-file-list="false"
+            :before-upload="beforeAvatarUpload"
+            :on-change="handleAvatarChange"
+            accept="image/*"
+          >
+            <img
+              v-if="profileForm.avatar"
+              :src="profileForm.avatar"
+              class="avatar"
+              loading="lazy"
+              :alt="
+                profileForm.real_name
+                  ? t('userProfile.profile.avatarAlt', { name: profileForm.real_name })
+                  : t('userProfile.profile.avatarAltDefault')
+              "
+            />
+            <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+          </el-upload>
+          <div class="mobile-identity-info">
+            <div class="mobile-identity-name">{{ profileForm.real_name }}</div>
+            <div class="mobile-identity-meta">
+              {{ profileForm.role_names?.join(', ') }}
+              <span v-if="profileForm.department_name"> · {{ profileForm.department_name }}</span>
             </div>
-          </template>
-
-          <div class="profile-content">
-            <!-- 头像上传 -->
-            <div class="avatar-section">
-              <el-upload
-                class="avatar-uploader"
-                :show-file-list="false"
-                :before-upload="beforeAvatarUpload"
-                :on-change="handleAvatarChange"
-                accept="image/*"
-              >
-                <img
-                  v-if="profileForm.avatar"
-                  :src="profileForm.avatar"
-                  class="avatar"
-                  loading="lazy"
-                  :alt="
-                    profileForm.real_name
-                      ? t('userProfile.profile.avatarAlt', { name: profileForm.real_name })
-                      : t('userProfile.profile.avatarAltDefault')
-                  "
-                />
-                <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
-              </el-upload>
-              <div class="avatar-tip">{{ t('userProfile.profile.avatarTip') }}</div>
-            </div>
-
-            <!-- 个人信息表单 -->
-            <el-form
-              ref="profileFormRef"
-              :model="profileForm"
-              :rules="profileRules"
-              label-width="100px"
-              class="profile-form"
-              :aria-label="t('userProfile.profile.formAriaLabel')"
-            >
-              <el-form-item :label="t('userProfile.profile.username')">
-                <el-input v-model="profileForm.username" disabled />
-              </el-form-item>
-              <el-form-item :label="t('userProfile.profile.realName')" prop="real_name">
-                <el-input
-                  v-model="profileForm.real_name"
-                  :placeholder="t('userProfile.profile.realNamePlaceholder')"
-                />
-              </el-form-item>
-              <el-form-item :label="t('userProfile.profile.email')" prop="email">
-                <el-input
-                  v-model="profileForm.email"
-                  :placeholder="t('userProfile.profile.emailPlaceholder')"
-                />
-              </el-form-item>
-              <el-form-item :label="t('userProfile.profile.phone')" prop="phone">
-                <el-input
-                  v-model="profileForm.phone"
-                  :placeholder="t('userProfile.profile.phonePlaceholder')"
-                />
-              </el-form-item>
-              <el-form-item :label="t('userProfile.profile.department')">
-                <el-input v-model="profileForm.department_name" disabled />
-              </el-form-item>
-              <el-form-item :label="t('userProfile.profile.role')">
-                <el-input :value="profileForm.role_names?.join(', ')" disabled />
-              </el-form-item>
-            </el-form>
+            <div class="avatar-tip">{{ t('userProfile.profile.avatarTip') }}</div>
           </div>
-        </el-card>
+        </div>
+      </el-card>
 
-        <!-- 安全设置快捷入口 -->
-        <el-card class="security-card">
-          <template #header>
-            <div class="card-header">
-              <span>{{ t('userProfile.security.title') }}</span>
-            </div>
-          </template>
-          <div class="security-actions">
-            <el-button type="primary" plain class="security-action-btn" @click="goTo2fa">
-              {{ t('userProfile.security.twofa') }}
-            </el-button>
-            <el-button type="primary" plain class="security-action-btn" @click="goToChangePwd">
-              {{ t('userProfile.security.changePassword') }}
-            </el-button>
+      <el-card class="profile-card mobile-card">
+        <template #header>
+          <div class="card-header">
+            <span>{{ t('userProfile.profile.title') }}</span>
           </div>
-        </el-card>
-      </div>
+        </template>
+        <el-form
+          ref="profileFormRef"
+          :model="profileForm"
+          :rules="profileRules"
+          label-position="top"
+          class="profile-form"
+          :aria-label="t('userProfile.profile.formAriaLabel')"
+        >
+          <el-form-item :label="t('userProfile.profile.username')">
+            <el-input v-model="profileForm.username" disabled />
+          </el-form-item>
+          <el-form-item :label="t('userProfile.profile.realName')" prop="real_name">
+            <el-input
+              v-model="profileForm.real_name"
+              :placeholder="t('userProfile.profile.realNamePlaceholder')"
+            />
+          </el-form-item>
+          <el-form-item :label="t('userProfile.profile.email')" prop="email">
+            <el-input
+              v-model="profileForm.email"
+              :placeholder="t('userProfile.profile.emailPlaceholder')"
+            />
+          </el-form-item>
+          <el-form-item :label="t('userProfile.profile.phone')" prop="phone">
+            <el-input
+              v-model="profileForm.phone"
+              :placeholder="t('userProfile.profile.phonePlaceholder')"
+            />
+          </el-form-item>
+          <el-form-item :label="t('userProfile.profile.department')">
+            <el-input v-model="profileForm.department_name" disabled />
+          </el-form-item>
+          <el-form-item :label="t('userProfile.profile.role')">
+            <el-input :value="profileForm.role_names?.join(', ')" disabled />
+          </el-form-item>
+          <el-button
+            type="primary"
+            class="mobile-full-btn"
+            :loading="profileLoading"
+            @click="handleSaveProfile"
+          >
+            {{ t('userProfile.profile.save') }}
+          </el-button>
+        </el-form>
+      </el-card>
 
-      <!-- 修改密码卡片 -->
-      <el-card class="password-card">
+      <el-card class="security-card mobile-card">
+        <template #header>
+          <div class="card-header">
+            <span>{{ t('userProfile.security.title') }}</span>
+          </div>
+        </template>
+        <div class="security-actions">
+          <el-button type="primary" plain class="mobile-full-btn" @click="goTo2fa">
+            {{ t('userProfile.security.twofa') }}
+          </el-button>
+        </div>
+      </el-card>
+
+      <el-card class="password-card mobile-card">
         <template #header>
           <div class="card-header">
             <span>{{ t('userProfile.password.title') }}</span>
-            <el-button type="primary" :loading="passwordLoading" @click="handleChangePassword">
-              {{ t('userProfile.password.button') }}
-            </el-button>
           </div>
         </template>
-
         <el-form
           ref="passwordFormRef"
           :model="passwordForm"
           :rules="passwordRules"
-          label-width="100px"
+          label-position="top"
           class="password-form"
           :aria-label="t('userProfile.password.formAriaLabel')"
         >
@@ -144,19 +142,178 @@
               show-password
             />
           </el-form-item>
+          <el-button
+            type="primary"
+            class="mobile-full-btn"
+            :loading="passwordLoading"
+            @click="handleChangePassword"
+          >
+            {{ t('userProfile.password.button') }}
+          </el-button>
         </el-form>
       </el-card>
-    </div>
+    </template>
+
+    <!-- 桌面端：保留原双列布局 -->
+    <template v-else>
+      <div class="content">
+        <!-- 个人信息卡片 -->
+        <div class="left-column">
+          <el-card class="profile-card">
+            <template #header>
+              <div class="card-header">
+                <span>{{ t('userProfile.profile.title') }}</span>
+                <el-button type="primary" :loading="profileLoading" @click="handleSaveProfile">
+                  {{ t('userProfile.profile.save') }}
+                </el-button>
+              </div>
+            </template>
+
+            <div class="profile-content">
+              <!-- 头像上传 -->
+              <div class="avatar-section">
+                <el-upload
+                  class="avatar-uploader"
+                  :show-file-list="false"
+                  :before-upload="beforeAvatarUpload"
+                  :on-change="handleAvatarChange"
+                  accept="image/*"
+                >
+                  <img
+                    v-if="profileForm.avatar"
+                    :src="profileForm.avatar"
+                    class="avatar"
+                    loading="lazy"
+                    :alt="
+                      profileForm.real_name
+                        ? t('userProfile.profile.avatarAlt', { name: profileForm.real_name })
+                        : t('userProfile.profile.avatarAltDefault')
+                    "
+                  />
+                  <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+                </el-upload>
+                <div class="avatar-tip">{{ t('userProfile.profile.avatarTip') }}</div>
+              </div>
+
+              <!-- 个人信息表单 -->
+              <el-form
+                ref="profileFormRef"
+                :model="profileForm"
+                :rules="profileRules"
+                label-width="100px"
+                class="profile-form"
+                :aria-label="t('userProfile.profile.formAriaLabel')"
+              >
+                <el-form-item :label="t('userProfile.profile.username')">
+                  <el-input v-model="profileForm.username" disabled />
+                </el-form-item>
+                <el-form-item :label="t('userProfile.profile.realName')" prop="real_name">
+                  <el-input
+                    v-model="profileForm.real_name"
+                    :placeholder="t('userProfile.profile.realNamePlaceholder')"
+                  />
+                </el-form-item>
+                <el-form-item :label="t('userProfile.profile.email')" prop="email">
+                  <el-input
+                    v-model="profileForm.email"
+                    :placeholder="t('userProfile.profile.emailPlaceholder')"
+                  />
+                </el-form-item>
+                <el-form-item :label="t('userProfile.profile.phone')" prop="phone">
+                  <el-input
+                    v-model="profileForm.phone"
+                    :placeholder="t('userProfile.profile.phonePlaceholder')"
+                  />
+                </el-form-item>
+                <el-form-item :label="t('userProfile.profile.department')">
+                  <el-input v-model="profileForm.department_name" disabled />
+                </el-form-item>
+                <el-form-item :label="t('userProfile.profile.role')">
+                  <el-input :value="profileForm.role_names?.join(', ')" disabled />
+                </el-form-item>
+              </el-form>
+            </div>
+          </el-card>
+
+          <!-- 安全设置快捷入口 -->
+          <el-card class="security-card">
+            <template #header>
+              <div class="card-header">
+                <span>{{ t('userProfile.security.title') }}</span>
+              </div>
+            </template>
+            <div class="security-actions">
+              <el-button type="primary" plain class="security-action-btn" @click="goTo2fa">
+                {{ t('userProfile.security.twofa') }}
+              </el-button>
+              <el-button type="primary" plain class="security-action-btn" @click="goToChangePwd">
+                {{ t('userProfile.security.changePassword') }}
+              </el-button>
+            </div>
+          </el-card>
+        </div>
+
+        <!-- 修改密码卡片 -->
+        <el-card class="password-card">
+          <template #header>
+            <div class="card-header">
+              <span>{{ t('userProfile.password.title') }}</span>
+              <el-button type="primary" :loading="passwordLoading" @click="handleChangePassword">
+                {{ t('userProfile.password.button') }}
+              </el-button>
+            </div>
+          </template>
+
+          <el-form
+            ref="passwordFormRef"
+            :model="passwordForm"
+            :rules="passwordRules"
+            label-width="100px"
+            class="password-form"
+            :aria-label="t('userProfile.password.formAriaLabel')"
+          >
+            <el-form-item :label="t('userProfile.password.oldPassword')" prop="old_password">
+              <el-input
+                v-model="passwordForm.old_password"
+                type="password"
+                :placeholder="t('userProfile.password.oldPasswordPlaceholder')"
+                show-password
+              />
+            </el-form-item>
+            <el-form-item :label="t('userProfile.password.newPassword')" prop="new_password">
+              <el-input
+                v-model="passwordForm.new_password"
+                type="password"
+                :placeholder="t('userProfile.password.newPasswordPlaceholder')"
+                show-password
+              />
+            </el-form-item>
+            <el-form-item
+              :label="t('userProfile.password.confirmPassword')"
+              prop="confirm_password"
+            >
+              <el-input
+                v-model="passwordForm.confirm_password"
+                type="password"
+                :placeholder="t('userProfile.password.confirmPasswordPlaceholder')"
+                show-password
+              />
+            </el-form-item>
+          </el-form>
+        </el-card>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules, FormItemRule, UploadFile } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   getUserProfile,
   updateUserProfile,
@@ -169,6 +326,8 @@ import {
 
 const { t } = useI18n({ useScope: 'global' });
 const router = useRouter();
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /** 跳转到 2FA 设置页 */
 const goTo2fa = () => {
@@ -471,5 +630,48 @@ onMounted(() => {
 
 .password-form {
   max-width: 400px;
+}
+
+.mobile-card {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.mobile-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mobile-identity .avatar {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.mobile-identity .avatar-uploader-icon {
+  width: 64px;
+  height: 64px;
+  font-size: 28px;
+}
+
+.mobile-identity-info {
+  min-width: 0;
+}
+
+.mobile-identity-name {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.mobile-identity-meta {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+.mobile-full-btn {
+  width: 100%;
+  margin-top: 8px;
 }
 </style>

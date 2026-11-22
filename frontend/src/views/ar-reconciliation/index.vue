@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
@@ -43,6 +44,8 @@ import ArReconciliationEnhanced from './enhanced.vue';
 const fmtNum = (v: unknown): string => Number(v ?? 0).toFixed(2);
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const route = useRoute();
 const router = useRouter();
@@ -576,7 +579,7 @@ loadCustomers();
             @close="viewDialogVisible = false"
           >
             <div v-if="viewData">
-              <ElDescriptions :column="4" border>
+              <ElDescriptions :column="isPhone ? 1 : 4" border>
                 <ElDescriptionsItem :label="$t('arReconciliationModule.index.reconciliationNo')">
                   {{ viewData.reconciliation_no }}
                 </ElDescriptionsItem>
@@ -699,5 +702,11 @@ loadCustomers();
 .status-confirmed {
   background: #f0f9eb;
   color: #67c23a;
+}
+
+@media (max-width: 767px) {
+  .app-container {
+    padding: 12px;
+  }
 }
 </style>

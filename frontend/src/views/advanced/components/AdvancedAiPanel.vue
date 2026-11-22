@@ -6,7 +6,9 @@
  * 数据与函数全部由父组件通过 props 传入
  */
 // v11 批次 171 P2-1 修复：从 useAi 导入接口类型，替代 any
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type {
   ForecastResult,
   InventoryResult,
@@ -35,6 +37,8 @@ interface Props {
 defineProps<Props>();
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 function priorityLabel(priority: string): string {
   if (priority === 'high') return t('advancedModule.ai.priorityHigh');
@@ -49,183 +53,337 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="page-header">
-    <h2 class="page-title">{{ $t('advancedModule.ai.title') }}</h2>
-  </div>
+  <div class="advanced-ai-panel" :class="{ 'advanced-ai-panel--phone': isPhone }">
+    <div class="page-header">
+      <h2 class="page-title">{{ $t('advancedModule.ai.title') }}</h2>
+    </div>
 
-  <el-row :gutter="20">
-    <el-col :span="12">
-      <el-card shadow="hover" class="mb-20">
-        <template #header
-          ><div class="card-header">{{ $t('advancedModule.ai.salesForecast') }}</div></template
-        >
-        <el-form label-width="100px" :aria-label="t('advancedModule.ai.ariaSalesForecastForm')">
-          <el-form-item :label="$t('advancedModule.ai.forecastPeriod')">
-            <el-select
-              :model-value="forecastPeriod"
-              style="width: 100%"
-              @update:model-value="(v: string) => emit('update:forecastPeriod', v)"
-            >
-              <el-option :label="$t('advancedModule.ai.period3m')" value="3m" />
-              <el-option :label="$t('advancedModule.ai.period6m')" value="6m" />
-              <el-option :label="$t('advancedModule.ai.period12m')" value="12m" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :loading="forecastLoading" @click="runSalesForecast">{{
-              $t('advancedModule.ai.startForecast')
-            }}</el-button>
-          </el-form-item>
-        </el-form>
-        <el-empty v-if="!forecastResult" :description="$t('advancedModule.ai.clickToForecast')" />
-        <div v-else>
-          <h4>{{ $t('advancedModule.ai.forecastResult') }}</h4>
+    <el-row :gutter="isPhone ? 0 : 20">
+      <el-col :span="isPhone ? 24 : 12">
+        <el-card shadow="hover" class="mb-20">
+          <template #header
+            ><div class="card-header">{{ $t('advancedModule.ai.salesForecast') }}</div></template
+          >
+          <el-form label-width="100px" :aria-label="t('advancedModule.ai.ariaSalesForecastForm')">
+            <el-form-item :label="$t('advancedModule.ai.forecastPeriod')">
+              <el-select
+                :model-value="forecastPeriod"
+                style="width: 100%"
+                @update:model-value="(v: string) => emit('update:forecastPeriod', v)"
+              >
+                <el-option :label="$t('advancedModule.ai.period3m')" value="3m" />
+                <el-option :label="$t('advancedModule.ai.period6m')" value="6m" />
+                <el-option :label="$t('advancedModule.ai.period12m')" value="12m" />
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="forecastLoading" @click="runSalesForecast">{{
+                $t('advancedModule.ai.startForecast')
+              }}</el-button>
+            </el-form-item>
+          </el-form>
+          <el-empty v-if="!forecastResult" :description="$t('advancedModule.ai.clickToForecast')" />
+          <div v-else>
+            <h4>{{ $t('advancedModule.ai.forecastResult') }}</h4>
+            <el-divider />
+            <dl v-if="isPhone" class="card-fields forecast-fields">
+              <div>
+                <dt>{{ $t('advancedModule.ai.forecastSales') }}</dt>
+                <dd>{{ formatMoney(forecastResult.sales_amount) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('advancedModule.ai.forecastOrders') }}</dt>
+                <dd>{{ forecastResult.order_count }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('advancedModule.ai.confidence') }}</dt>
+                <dd>{{ forecastResult.confidence }}%</dd>
+              </div>
+              <div>
+                <dt>{{ $t('advancedModule.ai.forecastTrend') }}</dt>
+                <dd>{{ forecastResult.trend }}</dd>
+              </div>
+            </dl>
+            <el-descriptions v-else :column="2" border>
+              <el-descriptions-item :label="$t('advancedModule.ai.forecastSales')">{{
+                formatMoney(forecastResult.sales_amount)
+              }}</el-descriptions-item>
+              <el-descriptions-item :label="$t('advancedModule.ai.forecastOrders')">{{
+                forecastResult.order_count
+              }}</el-descriptions-item>
+              <el-descriptions-item :label="$t('advancedModule.ai.confidence')"
+                >{{ forecastResult.confidence }}%</el-descriptions-item
+              >
+              <el-descriptions-item :label="$t('advancedModule.ai.forecastTrend')">{{
+                forecastResult.trend
+              }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+        </el-card>
+
+        <el-card shadow="hover">
+          <template #header
+            ><div class="card-header">{{ $t('advancedModule.ai.inventoryOpt') }}</div></template
+          >
+          <el-button type="primary" :loading="inventoryLoading" @click="runInventoryOptimization">{{
+            $t('advancedModule.ai.generateSuggestion')
+          }}</el-button>
           <el-divider />
-          <el-descriptions :column="2" border>
-            <el-descriptions-item :label="$t('advancedModule.ai.forecastSales')">{{
-              formatMoney(forecastResult.sales_amount)
-            }}</el-descriptions-item>
-            <el-descriptions-item :label="$t('advancedModule.ai.forecastOrders')">{{
-              forecastResult.order_count
-            }}</el-descriptions-item>
-            <el-descriptions-item :label="$t('advancedModule.ai.confidence')"
-              >{{ forecastResult.confidence }}%</el-descriptions-item
-            >
-            <el-descriptions-item :label="$t('advancedModule.ai.forecastTrend')">{{
-              forecastResult.trend
-            }}</el-descriptions-item>
-          </el-descriptions>
-        </div>
-      </el-card>
-
-      <el-card shadow="hover">
-        <template #header
-          ><div class="card-header">{{ $t('advancedModule.ai.inventoryOpt') }}</div></template
-        >
-        <el-button type="primary" :loading="inventoryLoading" @click="runInventoryOptimization">{{
-          $t('advancedModule.ai.generateSuggestion')
-        }}</el-button>
-        <el-divider />
-        <el-empty v-if="!inventoryResult" :description="$t('advancedModule.ai.clickToGenerate')" />
-        <div v-else>
-          <el-alert type="success" :title="inventoryResult.summary" show-icon class="mb-10" />
-          <el-table
-            :data="inventoryResult.items"
-            stripe
-            :aria-label="t('advancedModule.ai.ariaInventoryOptList')"
-          >
-            <el-table-column
-              prop="product_name"
-              :label="$t('advancedModule.ai.colProduct')"
-              width="150"
-            />
-            <el-table-column
-              prop="suggestion"
-              :label="$t('advancedModule.ai.colSuggestion')"
-              min-width="200"
-            />
-            <el-table-column
-              prop="priority"
-              :label="$t('advancedModule.ai.colPriority')"
-              width="100"
-            >
-              <template #default="{ row }">
-                <el-tag
-                  :type="
-                    row.priority === 'high'
-                      ? 'danger'
-                      : row.priority === 'medium'
-                        ? 'warning'
-                        : 'info'
-                  "
-                  size="small"
+          <el-empty
+            v-if="!inventoryResult"
+            :description="$t('advancedModule.ai.clickToGenerate')"
+          />
+          <div v-else>
+            <el-alert type="success" :title="inventoryResult.summary" show-icon class="mb-10" />
+            <section v-if="isPhone" class="ai-mobile ai-inventory-mobile">
+              <ul class="card-list" :aria-label="t('advancedModule.ai.ariaInventoryOptList')">
+                <li
+                  v-for="(item, index) in inventoryResult.items"
+                  :key="item.product_name + '-' + index"
+                  class="card-item"
                 >
-                  {{ priorityLabel(row.priority) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-      </el-card>
-    </el-col>
-
-    <el-col :span="12">
-      <el-card shadow="hover" class="mb-20">
-        <template #header
-          ><div class="card-header">{{ $t('advancedModule.ai.anomalyDetection') }}</div></template
-        >
-        <el-form label-width="100px" :aria-label="t('advancedModule.ai.ariaAnomalyForm')">
-          <el-form-item :label="$t('advancedModule.ai.dataType')">
-            <el-select
-              :model-value="anomalyType"
-              style="width: 100%"
-              @update:model-value="(v: string) => emit('update:anomalyType', v)"
+                  <dl class="card-fields">
+                    <div>
+                      <dt>{{ $t('advancedModule.ai.colProduct') }}</dt>
+                      <dd>{{ item.product_name }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ $t('advancedModule.ai.colSuggestion') }}</dt>
+                      <dd>{{ item.suggestion }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ $t('advancedModule.ai.colPriority') }}</dt>
+                      <dd>
+                        <el-tag
+                          :type="
+                            item.priority === 'high'
+                              ? 'danger'
+                              : item.priority === 'medium'
+                                ? 'warning'
+                                : 'info'
+                          "
+                          size="small"
+                        >
+                          {{ priorityLabel(item.priority) }}
+                        </el-tag>
+                      </dd>
+                    </div>
+                  </dl>
+                </li>
+              </ul>
+              <el-empty
+                v-if="inventoryResult.items.length === 0"
+                :description="t('components.v2Table.empty')"
+              />
+            </section>
+            <el-table
+              v-else
+              :data="inventoryResult.items"
+              stripe
+              :aria-label="t('advancedModule.ai.ariaInventoryOptList')"
             >
-              <el-option :label="$t('advancedModule.ai.dataSales')" value="sales" />
-              <el-option :label="$t('advancedModule.ai.dataInventory')" value="inventory" />
-              <el-option :label="$t('advancedModule.ai.dataQuality')" value="quality" />
-            </el-select>
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :loading="anomalyLoading" @click="runAnomalyDetection">{{
-              $t('advancedModule.ai.detectAnomaly')
-            }}</el-button>
-          </el-form-item>
-        </el-form>
-        <el-empty v-if="!anomalyResult" :description="$t('advancedModule.ai.clickToDetect')" />
-        <div v-else>
-          <el-table
-            :data="anomalyResult"
-            stripe
-            :aria-label="t('advancedModule.ai.ariaAnomalyResultList')"
+              <el-table-column
+                prop="product_name"
+                :label="$t('advancedModule.ai.colProduct')"
+                width="150"
+              />
+              <el-table-column
+                prop="suggestion"
+                :label="$t('advancedModule.ai.colSuggestion')"
+                min-width="200"
+              />
+              <el-table-column
+                prop="priority"
+                :label="$t('advancedModule.ai.colPriority')"
+                width="100"
+              >
+                <template #default="{ row }">
+                  <el-tag
+                    :type="
+                      row.priority === 'high'
+                        ? 'danger'
+                        : row.priority === 'medium'
+                          ? 'warning'
+                          : 'info'
+                    "
+                    size="small"
+                  >
+                    {{ priorityLabel(row.priority) }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :span="isPhone ? 24 : 12">
+        <el-card shadow="hover" class="mb-20">
+          <template #header
+            ><div class="card-header">{{ $t('advancedModule.ai.anomalyDetection') }}</div></template
           >
-            <el-table-column prop="item" :label="$t('advancedModule.ai.colItem')" width="150" />
-            <el-table-column prop="type" :label="$t('advancedModule.ai.colType')" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.severity === 'critical' ? 'danger' : 'warning'" size="small">{{
-                  row.type
-                }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="description"
-              :label="$t('advancedModule.ai.colDesc')"
-              min-width="200"
-            />
-            <el-table-column
-              prop="severity"
-              :label="$t('advancedModule.ai.colSeverity')"
-              width="100"
-            />
-          </el-table>
-        </div>
-      </el-card>
-
-      <el-card shadow="hover">
-        <template #header
-          ><div class="card-header">{{ $t('advancedModule.ai.recommendations') }}</div></template
-        >
-        <el-button type="primary" :loading="recommendLoading" @click="getRecommendations">{{
-          $t('advancedModule.ai.getRecommendations')
-        }}</el-button>
-        <el-divider />
-        <el-empty
-          v-if="!recommendationResult"
-          :description="$t('advancedModule.ai.clickToGetRec')"
-        />
-        <div v-else>
-          <el-timeline>
-            <el-timeline-item
-              v-for="(rec, i) in recommendationResult"
-              :key="i"
-              :type="rec.type === 'suggestion' ? 'primary' : 'success'"
-              :timestamp="rec.created_at"
+          <el-form label-width="100px" :aria-label="t('advancedModule.ai.ariaAnomalyForm')">
+            <el-form-item :label="$t('advancedModule.ai.dataType')">
+              <el-select
+                :model-value="anomalyType"
+                style="width: 100%"
+                @update:model-value="(v: string) => emit('update:anomalyType', v)"
+              >
+                <el-option :label="$t('advancedModule.ai.dataSales')" value="sales" />
+                <el-option :label="$t('advancedModule.ai.dataInventory')" value="inventory" />
+                <el-option :label="$t('advancedModule.ai.dataQuality')" value="quality" />
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="anomalyLoading" @click="runAnomalyDetection">{{
+                $t('advancedModule.ai.detectAnomaly')
+              }}</el-button>
+            </el-form-item>
+          </el-form>
+          <el-empty v-if="!anomalyResult" :description="$t('advancedModule.ai.clickToDetect')" />
+          <div v-else>
+            <section v-if="isPhone" class="ai-mobile ai-anomaly-mobile">
+              <ul class="card-list" :aria-label="t('advancedModule.ai.ariaAnomalyResultList')">
+                <li
+                  v-for="(row, index) in anomalyResult"
+                  :key="row.item + '-' + index"
+                  class="card-item"
+                >
+                  <dl class="card-fields">
+                    <div>
+                      <dt>{{ $t('advancedModule.ai.colItem') }}</dt>
+                      <dd>{{ row.item }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ $t('advancedModule.ai.colType') }}</dt>
+                      <dd>
+                        <el-tag
+                          :type="row.severity === 'critical' ? 'danger' : 'warning'"
+                          size="small"
+                          >{{ row.type }}</el-tag
+                        >
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{{ $t('advancedModule.ai.colDesc') }}</dt>
+                      <dd>{{ row.description }}</dd>
+                    </div>
+                    <div>
+                      <dt>{{ $t('advancedModule.ai.colSeverity') }}</dt>
+                      <dd>{{ row.severity }}</dd>
+                    </div>
+                  </dl>
+                </li>
+              </ul>
+              <el-empty
+                v-if="anomalyResult.length === 0"
+                :description="t('components.v2Table.empty')"
+              />
+            </section>
+            <el-table
+              v-else
+              :data="anomalyResult"
+              stripe
+              :aria-label="t('advancedModule.ai.ariaAnomalyResultList')"
             >
-              {{ rec.content }}
-            </el-timeline-item>
-          </el-timeline>
-        </div>
-      </el-card>
-    </el-col>
-  </el-row>
+              <el-table-column prop="item" :label="$t('advancedModule.ai.colItem')" width="150" />
+              <el-table-column prop="type" :label="$t('advancedModule.ai.colType')" width="100">
+                <template #default="{ row }">
+                  <el-tag :type="row.severity === 'critical' ? 'danger' : 'warning'" size="small">{{
+                    row.type
+                  }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column
+                prop="description"
+                :label="$t('advancedModule.ai.colDesc')"
+                min-width="200"
+              />
+              <el-table-column
+                prop="severity"
+                :label="$t('advancedModule.ai.colSeverity')"
+                width="100"
+              />
+            </el-table>
+          </div>
+        </el-card>
+
+        <el-card shadow="hover">
+          <template #header
+            ><div class="card-header">{{ $t('advancedModule.ai.recommendations') }}</div></template
+          >
+          <el-button type="primary" :loading="recommendLoading" @click="getRecommendations">{{
+            $t('advancedModule.ai.getRecommendations')
+          }}</el-button>
+          <el-divider />
+          <el-empty
+            v-if="!recommendationResult"
+            :description="$t('advancedModule.ai.clickToGetRec')"
+          />
+          <div v-else>
+            <el-timeline>
+              <el-timeline-item
+                v-for="(rec, i) in recommendationResult"
+                :key="i"
+                :type="rec.type === 'suggestion' ? 'primary' : 'success'"
+                :timestamp="rec.created_at"
+              >
+                {{ rec.content }}
+              </el-timeline-item>
+            </el-timeline>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+  </div>
 </template>
+
+<style scoped>
+.advanced-ai-panel {
+  min-width: 0;
+  max-width: 100%;
+}
+.card-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.advanced-ai-panel--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+}
+.advanced-ai-panel--phone :deep(.el-select__wrapper) {
+  min-height: 44px;
+}
+</style>

@@ -13,9 +13,10 @@ use axum::{
 };
 
 use crate::handlers::{
-    print_handler, purchase_contract_handler, purchase_inspection_handler, purchase_order_handler,
-    purchase_price_handler, purchase_receipt_handler, purchase_return_handler,
-    supplier_blacklist_handler, supplier_evaluation_handler, supplier_handler,
+    print_handler, print_xlsx_purchase_handler, purchase_contract_handler,
+    purchase_inspection_handler, purchase_order_handler, purchase_price_handler,
+    purchase_receipt_handler, purchase_return_handler, supplier_blacklist_handler,
+    supplier_evaluation_handler, supplier_handler,
 };
 
 /// 采购订单路由（nest 到 /api/v1/erp/purchases）；主函数仅做协调：聚合各资源子路由（path 前缀互不重叠，merge 安全）。
@@ -82,6 +83,10 @@ fn purchase_order_routes() -> Router<AppState> {
             "/orders/{id}/print",
             get(print_handler::purchase_order_print_docx),
         )
+        .route(
+            "/orders/{id}/print-xlsx",
+            get(print_xlsx_purchase_handler::purchase_order_print_xlsx),
+        )
 }
 
 /// 采购收货路由（path 前缀 /receipts）
@@ -95,6 +100,10 @@ fn purchase_receipt_routes() -> Router<AppState> {
         .route(
             "/receipts/{id}/print",
             get(print_handler::purchase_receipt_print_docx),
+        )
+        .route(
+            "/receipts/{id}/print-xlsx",
+            get(print_xlsx_purchase_handler::purchase_receipt_print_xlsx),
         )
         .route("/receipts", post(purchase_receipt_handler::create_receipt))
         .route("/receipts/{id}", get(purchase_receipt_handler::get_receipt))

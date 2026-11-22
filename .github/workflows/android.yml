@@ -20,6 +20,39 @@ on:
         description: '是否跑 Android 模拟器端到端（发布轮传字符串 false，避免把发布卡在模拟器上；布尔 false 会被类型检查拒绝）'
         type: string
         default: 'false'
+      app_version:
+        description: '对外版本号 YYYY.MM.DD.HHMM，由 ci-cd 统一生成传入，三端同源'
+        type: string
+        default: ''
+      cargo_version:
+        description: 'Cargo 三段版本号，由 ci-cd 统一派生传入（semver 硬约束）'
+        type: string
+        default: ''
+    secrets:
+      CI_E2E_JWT_SECRET:
+        description: E2E JWT 密钥（测试环境）
+        required: false
+      CI_E2E_COOKIE_SECRET:
+        description: E2E Cookie 密钥（测试环境）
+        required: false
+      CI_E2E_WEBHOOK_SECRET:
+        description: E2E Webhook 密钥（测试环境）
+        required: false
+      AUDIT_SECRET_KEY:
+        description: 审计日志密钥（测试环境）
+        required: false
+      ANDROID_KEYSTORE_BASE64:
+        description: 安卓签名 keystore base64（仅发布轮传）
+        required: false
+      ANDROID_KEYSTORE_PASSWORD:
+        description: 安卓签名 store 密码（仅发布轮传）
+        required: false
+      ANDROID_KEYSTORE_ALIAS:
+        description: 安卓签名 key alias（仅发布轮传）
+        required: false
+      ANDROID_KEY_PASSWORD:
+        description: 安卓签名 key 密码（仅发布轮传）
+        required: false
   workflow_dispatch:
     inputs:
       build_release:
@@ -83,6 +116,22 @@ jobs:
       apk_version: ${{ steps.ver.outputs.android_client_version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: 同步三端版本号
+        if: inputs.app_version != ''
+        env:
+          # 经 env 传入再在 shell 用 $VAR 引用，避免 zizmor template-injection
+          # （把 ${{ }} 直接插进 run 会被判 high，且恶意输入可注入命令）。
+          APP_VERSION: ${{ inputs.app_version }}
+          CARGO_VERSION_INPUT: ${{ inputs.cargo_version }}
+        run: |
+          set -euo pipefail
+          # ci-cd 统一算好的版本，两端同源：Tauri 对 tauri.conf.json version 强制
+          # semver 解析（4 段 YYYY.MM.DD.HHMM 会直接 build 报错），故与 Cargo.toml
+          # 同用 3 段 CARGO_VERSION_INPUT；对外展示 4 段只落在小程序 package.json。
+          sed -i "s/\"version\": \".*\"/\"version\": \"$CARGO_VERSION_INPUT\"/" mobile-app/src-tauri/tauri.conf.json
+          sed -i "s/^version = \".*\"/version = \"$CARGO_VERSION_INPUT\"/" mobile-app/src-tauri/Cargo.toml
+          echo "安卓端 tauri.conf/Cargo 同步为 $CARGO_VERSION_INPUT（对外展示版本 $APP_VERSION）"
 
       - name: 记录安卓端版本
         id: ver
@@ -293,6 +342,38 @@ jobs:
             exit 1
           fi
           echo '构件下载超时已就位：连接与读各 120 秒'
+          # 做什么 给所有 Gradle 构建（含 buildSrc 与 pluginManagement）注入全局镜像仓库。
+          # 为什么 按工程脚本文本 sed 注入只覆盖独立成行的 repositories 块；buildSrc 的
+          #        pluginManagement.repositories（gradlePluginPortal 独占）与 buildscript.repositories
+          #        不在其中，Kotlin DSL 插件传递依赖的 kotlin-stdlib 只在 plugins.gradle.org 找，
+          #        该源缺 kotlin 2.3.21 即在配置阶段判红、重跑因缓存同样失败。init.gradle 由
+          #        Gradle 自动读取，对所有构建生效且不受工程脚本格式影响。
+          # 传给谁 后续 debug 与 release 两腿的 cargo tauri android build 调用的 gradle 都读这份 init。
+          # 存哪里 只写 CI 现场 $HOME/.gradle/init.d/，不进版本库。
+          INIT_DIR="$HOME/.gradle/init.d"
+          mkdir -p "$INIT_DIR"
+          cat > "$INIT_DIR/zz-mirrors.gradle" <<'INITEOF'
+          gradle.beforeSettings { settings ->
+            settings.pluginManagement.repositories {
+              maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+              maven { url 'https://maven.aliyun.com/repository/public' }
+              maven { url 'https://maven.aliyun.com/repository/google' }
+              gradlePluginPortal()
+            }
+            settings.dependencyResolutionManagement.repositories {
+              maven { url 'https://maven.aliyun.com/repository/public' }
+              maven { url 'https://maven.aliyun.com/repository/google' }
+            }
+          }
+          gradle.beforeProject { p ->
+            p.buildscript.repositories {
+              maven { url 'https://maven.aliyun.com/repository/public' }
+              maven { url 'https://maven.aliyun.com/repository/google' }
+            }
+          }
+          INITEOF
+          grep -q 'maven.aliyun.com/repository/gradle-plugin' "$INIT_DIR/zz-mirrors.gradle" || { echo '全局 gradle 镜像 init 写入失败'; exit 1; }
+          echo '全局 gradle 镜像 init 已就位（pluginManagement/dependencyResolution/buildscript）'
 
       - name: 构建 debug APK
         # 调用方 严格冒烟·3 与 严格冒烟·4 与 release 构建与模拟器 E2E 依赖本步产物。入参 无。
@@ -631,6 +712,11 @@ jobs:
 
       - name: Android Emulator 端到端
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        env:
+          # runner 预装 emulator 升级后拒绝无硬件加速启动（-accel off 报 Software CPU
+          # emulation is not supported），官方逃生阀是显式接受 TCG 纯软件模拟；
+          # 缺它则模拟器无法开机，本步恒以 Timeout waiting for emulator to boot 判红。
+          ANDROID_I_WANT_MY_TCG: 'yes'
         with:
           api-level: 34
           arch: x86_64

@@ -69,10 +69,16 @@
     <el-dialog
       v-model="createVisible"
       title="生成退税申报表"
-      width="520px"
+      :width="isPhone ? '95%' : '520px'"
       @close="resetCreateForm"
     >
-      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="120px">
+      <el-form
+        ref="createFormRef"
+        :model="createForm"
+        :rules="createRules"
+        label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="所属年份" prop="period_year">
           <el-input
             v-model="createYearField.text"
@@ -118,7 +124,7 @@
     <el-dialog
       v-model="declarationVisible"
       title="新建出口报关单"
-      width="560px"
+      :width="isPhone ? '95%' : '560px'"
       @close="resetDeclarationForm"
     >
       <el-form
@@ -126,6 +132,7 @@
         :model="declarationForm"
         :rules="declarationRules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
       >
         <el-form-item label="报关单号" prop="declaration_no">
           <el-input v-model="declarationForm.declaration_no" placeholder="必填" />
@@ -181,8 +188,8 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="calcVisible" title="免抵退税额试算" width="520px">
-      <el-form :model="calcForm" label-width="120px">
+    <el-dialog v-model="calcVisible" title="免抵退税额试算" :width="isPhone ? '95%' : '520px'">
+      <el-form :model="calcForm" label-width="120px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="出口销售额">
           <el-input
             v-model="calcSalesField.text"
@@ -215,7 +222,7 @@
           <el-button type="primary" :loading="submitLoading" @click="submitCalc">计算</el-button>
         </el-form-item>
       </el-form>
-      <el-descriptions v-if="calcResult" :column="2" border style="margin-top: 8px">
+      <el-descriptions v-if="calcResult" :column="isPhone ? 1 : 2" border style="margin-top: 8px">
         <el-descriptions-item label="免抵退税额">{{
           calcResult.refundable_vat_amount
         }}</el-descriptions-item>
@@ -234,8 +241,8 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="verifyVisible" title="单证齐全校验" width="420px">
-      <el-form label-width="120px">
+    <el-dialog v-model="verifyVisible" title="单证齐全校验" :width="isPhone ? '95%' : '420px'">
+      <el-form label-width="120px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="销售订单 ID">
           <el-input
             v-model="verifyOrderField.text"
@@ -261,7 +268,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, toRef } from 'vue';
+import { computed, onMounted, reactive, ref, toRef } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { useNumberField } from '@/composables/useNumberField';
@@ -276,6 +284,8 @@ import {
   type ExportRefundDeclaration,
   type RefundCalculationResult,
 } from '@/api/tax-rebate';
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const statusTextMap: Record<string, string> = {
   draft: '草稿',
@@ -660,5 +670,11 @@ onMounted(() => {
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+@media (max-width: 767px) {
+  .tax-rebates-page {
+    padding: 12px;
+  }
 }
 </style>

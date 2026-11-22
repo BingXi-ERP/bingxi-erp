@@ -47,7 +47,7 @@
       <el-tabs v-model="activeTab">
         <!-- 基本信息 -->
         <el-tab-pane :label="t('customOrders.detail.tabInfo')" name="info">
-          <el-descriptions :column="2" border>
+          <el-descriptions :column="isPhone ? 1 : 2" border>
             <el-descriptions-item :label="t('customOrders.detail.labelOrderNo')">{{
               order.order_no
             }}</el-descriptions-item>
@@ -157,8 +157,18 @@
     <el-empty v-else-if="!loading" :description="t('customOrders.detail.notFound')" />
 
     <!-- 新增节点（createProcessNode） -->
-    <el-dialog v-model="nodeDialogVisible" :title="t('customOrders.detail.addNode')" width="480">
-      <el-form ref="nodeFormRef" :model="nodeForm" :rules="nodeRules" label-width="110px">
+    <el-dialog
+      v-model="nodeDialogVisible"
+      :title="t('customOrders.detail.addNode')"
+      :width="isPhone ? '95%' : '480px'"
+    >
+      <el-form
+        ref="nodeFormRef"
+        :model="nodeForm"
+        :rules="nodeRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('customOrders.detail.nodeType')" required>
           <el-select v-model="nodeForm.node_type" style="width: 100%">
             <el-option label="裁剪" value="cutting" />
@@ -194,9 +204,13 @@
     <el-dialog
       v-model="nodeUpdateVisible"
       :title="t('customOrders.detail.updateNodeStatus')"
-      width="480"
+      :width="isPhone ? '95%' : '480px'"
     >
-      <el-form :model="nodeUpdateForm" label-width="110px">
+      <el-form
+        :model="nodeUpdateForm"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('customOrders.detail.nodeStatus')" required>
           <el-select v-model="nodeUpdateForm.status" style="width: 100%">
             <el-option label="待开始" value="pending" />
@@ -218,8 +232,12 @@
     </el-dialog>
 
     <!-- 添加节点日志（createNodeLog） -->
-    <el-dialog v-model="nodeLogVisible" :title="t('customOrders.detail.addNodeLog')" width="480">
-      <el-form :model="nodeLogForm" label-width="110px">
+    <el-dialog
+      v-model="nodeLogVisible"
+      :title="t('customOrders.detail.addNodeLog')"
+      :width="isPhone ? '95%' : '480px'"
+    >
+      <el-form :model="nodeLogForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item :label="t('customOrders.detail.logAction')" required>
           <el-input v-model="nodeLogForm.action" placeholder="如：start / pause / complete" />
         </el-form-item>
@@ -240,6 +258,7 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
@@ -266,6 +285,8 @@ import AfterSalesPanel from '@/components/AfterSalesPanel.vue';
 
 const route = useRoute();
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const loading = ref(false);
 const order = ref<CustomOrderDetail | null>(null);
 const activeTab = ref('info');

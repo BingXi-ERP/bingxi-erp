@@ -110,6 +110,11 @@ pub const AUTH_ONLY_PATHS: &[&str] = &[
     "/api/v1/erp/audit-logs/record-print",
     "/api/v1/erp/ws/ticket",
     "/api/v1/erp/auth/me",
+    // 登出与 /auth/me 同族——自服务身份端点，handler 只吊销调用者自己的 token
+    // （process_logout_token 仅取 auth.user_id 黑名单化），无跨用户数据面；
+    // 若按 URL 段走 RBAC 会派生出 auth:logout 权限码，无该权限码的角色登出必 403，
+    // 导致所有非特权账号无法退出登录。
+    "/api/v1/erp/auth/logout",
     "/api/v1/erp/users/change-password",
     "/api/v1/erp/company-profile",
 ];
