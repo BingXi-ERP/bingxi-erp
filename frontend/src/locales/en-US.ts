@@ -5399,6 +5399,7 @@ export default {
   },
   biSalesAnalysis: {
     title: 'BI Multi-dimensional Sales Analysis (P3-4 Key Path Demo)',
+    mobileScrollHint: 'Swipe the charts horizontally on mobile',
     kpi: {
       totalSales: 'Total Sales',
       orderCount: 'Order Count',
@@ -10305,6 +10306,7 @@ export default {
       buttonExport: 'Export Report',
       tabOverview: 'Business Analysis',
       tabBi: 'Multi-dimensional Analysis',
+      mobileCardAria: 'Sales Analysis Mobile Card List',
     },
     stat: {
       labelMonthOrders: 'Monthly Orders',
@@ -11023,6 +11025,7 @@ export default {
       statusSubmitted: 'Submitted',
       statusReviewed: 'Reviewed',
       statusPosted: 'Posted',
+      mobileCardAriaLabel: 'Voucher mobile card list',
     },
     index: {
       pageAriaLabel: 'Voucher Management',
