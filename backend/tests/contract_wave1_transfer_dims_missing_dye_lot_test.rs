@@ -536,8 +536,8 @@ async fn greige_outbound_dims_kept_as_given_readback_live_db() {
     use bingxi_backend::models::warehouse;
     use chrono::Utc;
     use sea_orm::{
-        ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, Order, PaginatorTrait, QueryFilter,
-        QueryOrder,
+        ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, Order, PaginatorTrait,
+        QueryFilter, QueryOrder,
     };
     use std::sync::Arc;
     use tower::ServiceExt;
