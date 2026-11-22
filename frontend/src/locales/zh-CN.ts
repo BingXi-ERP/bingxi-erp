@@ -2124,6 +2124,7 @@ export default {
       title: '工作中心列表',
       refresh: '刷新',
       ariaLabel: '工作中心列表',
+      mobileCardAria: '工作中心手机卡片列表',
       code: '编码',
       name: '名称',
       capacityHours: '产能工时',

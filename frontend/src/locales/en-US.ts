@@ -2143,6 +2143,7 @@ export default {
       title: 'Work Center List',
       refresh: 'Refresh',
       ariaLabel: 'Work center list',
+      mobileCardAria: 'Work center mobile card list',
       code: 'Code',
       name: 'Name',
       capacityHours: 'Capacity Hours',
