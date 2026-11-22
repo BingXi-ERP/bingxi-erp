@@ -4,13 +4,12 @@
 // 传给谁：PUT /users/{id}、GET /finance/audit/search（默认与 include_sensitive=true 两次）、非管理员 GET 同端点。
 // 存什么：users 一行临时账号；omni_audit_logs 行只读不写。存哪里：users 表；审计行由中间件异步落库。
 //
-// 判据来源：backend/src/middleware/omni_audit.rs:204-214 仅对审计副本做字段级 PII 脱敏，原 body 透传；
-// backend/src/utils/field_mask.rs:38-55 手机号掩码 1***********、邮箱掩码 ***@***.***；
-// backend/src/handlers/omni_audit_handler.rs:149-190 查询只返回 data.items/total，:282-295 敏感列按需选择，
-// :335-357 逐行出参键；backend/src/services/omni_audit_query_service.rs:5-16 include_sensitive 默认 false；
-// backend/src/services/omni_audit_service.rs:374-392 审计行 module=UPDATE、response_status=200；
-// backend/src/middleware/trace_context.rs:66-101 X-Trace-Id 与信封 trace_id 同源；
-// backend/src/handlers/omni_audit_handler.rs:16-33 非 admin 二道门；backend/src/routes/finance.rs:168-170 挂载点。
+// 判据来源：审计中间件只对审计副本做字段级隐私脱敏，请求正文原样透传；
+// 脱敏工具对手机号与邮箱按固定形态掩码；查询接口只返回约定分页信封，敏感列按需选择
+// 并逐行回读；查询服务默认不返回敏感列，审计服务按既定状态词写入；
+// 链路编号中间件把请求头与响应信封的追踪编号对齐；非管理员另有二道门；
+// 挂载点按路由表登记的财务域路径为准。
+// 上述语义均来自写入方实现，避免在此重复脆弱的行号引用。
 import { test, expect, type Page } from '../diagnose-fixture';
 import type { Browser } from '@playwright/test';
 import { applyAuthMocks } from '../smoke/_helpers';

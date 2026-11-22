@@ -33,7 +33,7 @@ interface AuditEnvelope {
   page_size: number;
 }
 
-/** 审批范围与审计筛选共用同一维度值；顺序与 audit_log_handler.rs:459-509 的 scope_params 对齐。 */
+/** 审批范围与审计筛选共用同一维度值；顺序与导出审计的筛选参数口径对齐。 */
 const AUDIT_RESOURCE_TYPE = 'department';
 
 function exportPath(token: string, extra: Record<string, string>): string {

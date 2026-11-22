@@ -4,14 +4,14 @@
 // 传给谁：POST /users/change-password（错误旧口令）、GET /finance/audit/search?include_sensitive=true、POST /auth/login 回读副作用。
 // 存什么：users 一行临时账号；审计行只读不写。存哪里：users 表；omni 审计行由中间件异步落库。
 //
-// 判据来源：backend/src/routes/iam.rs:27-29 真实敏感路由；
-// backend/src/handlers/user_handler.rs:783-823 新口令强度先验、错旧口令返回 unauthorized 且未触达改库；
-// backend/src/middleware/omni_audit.rs:201-214、483-499 命中整请求 REDACTED；
-// backend/src/middleware/trace_context.rs:66-101 X-Trace-Id 与错误信封 trace_id 同源；
-// backend/src/utils/error.rs:785、820 UNAUTHORIZED 机器码；
-// backend/src/services/omni_audit_service.rs:374-392 审计行 module=CREATE，
+// 判据来源：真实敏感路由按路由表登记的口令修改端点；
+// 新口令强度先验、错旧口令返回未授权且不触达改库；
+// 审计中间件对命中整请求做脱敏；
+// 追踪编号中间件让请求头与错误信封的链路编号同源；
+// 未授权为既定机器码；
+// 审计行按建档动作落库，
 // 其中 DENIED 状态回退落 response_status=403（不是 HTTP 401），本例按写入方取值断言；
-// backend/src/handlers/omni_audit_handler.rs:16-33、282-357 管理员门与敏感列出参。
+// 管理员门与敏感列出参由查询侧约束。
 import { test, expect, type Page } from '../diagnose-fixture';
 import type { Browser } from '@playwright/test';
 import { applyAuthMocks } from '../smoke/_helpers';

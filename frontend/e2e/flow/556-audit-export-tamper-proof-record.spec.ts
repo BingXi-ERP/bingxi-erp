@@ -4,7 +4,7 @@
 // 入参：worker 独立 admin 会话作申请/导出人，role-credentials 的 admin 账号作第二审批人；
 //       salesperson 与 customer 独立会话作接口层负例，自建部门审计行作唯一数据源。
 // 传给谁：GET /audit-logs/export 带唯一 X-Request-Id 下载 xlsx；GET /audit-logs/export-logs
-//       查询 audit_log_export_log 防篡改记录；端点与字段以 audit_log_handler.rs 为准。
+//       查询防篡改审计记录；端点与字段以导出审计接口契约为准。
 // 存什么：测试自建部门与审批申请；请求头 ID 与 SHA-256 摘要只在测试内存比对，不落测试文件。
 // 存哪里：deferred cleanup 逆序清理审批申请与部门；xlsx 字节只在内存里计算摘要。
 // 检测力自证：若写入腿漏记/错记摘要或行数，回读比对即红；若重放被误放行，新增记录即红；
@@ -270,7 +270,7 @@ test.describe('556 审计导出二次审计记录闭环', () => {
         '原成功记录不得被重放改写或重复插入'
       ).toBe(1);
 
-      // 权限键按 middleware/permission.rs:232-246 从 URL 末段派生：export → 导出动作，
+      // 权限键按统一派生规则从统一路径段与动作得出：导出端点对应导出动作，
       // customer/temporary 在 :570 的 EXPORT_DENIED 黑名单内；secondary list 由 handler 的
       // admin/auditor 角色门管。两例都直接打接口，不依赖任何前端按钮可见性。
       const sales = await openRolePage(browser, 'salesperson', '二次审计读取负例');
