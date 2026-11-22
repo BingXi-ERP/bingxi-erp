@@ -23,10 +23,11 @@
         :model="form"
         :rules="rules"
         label-width="120px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('quotations.create.formAriaLabel')"
       >
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :span="isPhone ? 24 : 12">
             <el-form-item :label="t('quotations.create.labelCustomer')" prop="customer_id">
               <el-select
                 v-model="form.customer_id"
@@ -43,7 +44,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="isPhone ? 24 : 12">
             <el-form-item :label="t('quotations.create.labelQuotationDate')" prop="quotation_date">
               <el-date-picker
                 v-model="form.quotation_date"
@@ -56,7 +57,7 @@
         </el-row>
 
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :span="isPhone ? 24 : 12">
             <el-form-item :label="t('quotations.create.labelValidUntil')" prop="valid_until">
               <el-date-picker
                 v-model="form.valid_until"
@@ -66,7 +67,7 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="isPhone ? 24 : 12">
             <el-form-item :label="t('quotations.create.labelPriceTerms')" prop="price_terms">
               <el-select
                 v-model="form.price_terms"
@@ -201,6 +202,7 @@
 // - 加载客户列表
 // - 提交保存草稿 / 提交审批
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
@@ -231,6 +233,8 @@ import TermEditor from './components/TermEditor.vue';
 import NumericInput from '@/components/NumericInput.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const props = defineProps<{
   quotationId?: number | string;

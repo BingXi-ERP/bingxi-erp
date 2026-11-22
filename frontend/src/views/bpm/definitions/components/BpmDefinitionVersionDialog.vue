@@ -10,7 +10,7 @@
       t('bpm.definitions.versionDialog.title', { name: definition ? definition.process_name : '' })
     "
     :aria-label="$t('bpm.definitions.versionDialog.ariaLabel')"
-    width="700px"
+    :width="isPhone ? '95%' : '700px'"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
     <div class="version-actions">
@@ -80,12 +80,16 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { Plus } from '@element-plus/icons-vue';
 import { getVersionStatusText } from '../composables/bpmDfFmts';
 import type { ProcessDefinition, ProcessVersion } from '@/api/bpm-enhanced';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 版本管理对话框

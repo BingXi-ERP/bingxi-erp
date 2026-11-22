@@ -109,10 +109,16 @@
     <el-dialog
       v-model="createVisible"
       :title="t('labDip.index.titleCreate')"
-      width="580px"
+      :width="isPhone ? '95%' : '580px'"
       @close="resetForm"
     >
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="110px">
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('labDip.index.labelCustomerId')" prop="customer_id">
           <el-input v-model="formData.customer_id" inputmode="numeric" style="width: 100%" />
         </el-form-item>
@@ -180,8 +186,12 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailVisible" :title="t('labDip.index.titleDetail')" width="640px">
-      <el-descriptions v-if="detailRow" :column="2" border>
+    <el-dialog
+      v-model="detailVisible"
+      :title="t('labDip.index.titleDetail')"
+      :width="isPhone ? '95%' : '640px'"
+    >
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item :label="t('labDip.index.colRequestNo')">{{
           detailRow.request_no
         }}</el-descriptions-item>
@@ -233,7 +243,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { numberInputRules } from '@/utils/number-input';
@@ -253,6 +264,8 @@ import {
 } from '@/api/lab-dip';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const LIGHT_SOURCES = ['D65', 'TL84', 'U3000', 'CWF', 'A'];
 
 const statusTextMap: Record<LabDipRequestStatus, string> = {
@@ -534,5 +547,11 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+@media (max-width: 767px) {
+  .lab-dip-page {
+    padding: 12px;
+  }
 }
 </style>

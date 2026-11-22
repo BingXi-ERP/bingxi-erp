@@ -113,10 +113,16 @@
     <el-dialog
       v-model="createVisible"
       :title="t('flowCards.index.titleCreate')"
-      width="560px"
+      :width="isPhone ? '95%' : '560px'"
       @close="resetForm"
     >
-      <el-form ref="formRef" :model="formData" :rules="formRules" label-width="110px">
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item
           :label="t('flowCards.index.labelProductionOrderId')"
           prop="production_order_id"
@@ -177,8 +183,12 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailVisible" :title="t('flowCards.index.titleDetail')" width="640px">
-      <el-descriptions v-if="detailRow" :column="2" border>
+    <el-dialog
+      v-model="detailVisible"
+      :title="t('flowCards.index.titleDetail')"
+      :width="isPhone ? '95%' : '640px'"
+    >
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item :label="t('flowCards.index.colCardNo')">{{
           detailRow.card_no
         }}</el-descriptions-item>
@@ -328,7 +338,7 @@
           ? t('flowCards.materials.titleCreate')
           : t('flowCards.materials.titleEdit')
       "
-      width="640px"
+      :width="isPhone ? '95%' : '640px'"
       @closed="resetMaterialForm"
     >
       <el-form
@@ -336,6 +346,7 @@
         :model="materialForm"
         :rules="materialFormRules"
         label-width="110px"
+        :label-position="isPhone ? 'top' : 'right'"
       >
         <el-form-item :label="t('flowCards.materials.labelWarehouse')" prop="warehouse_id">
           <el-select
@@ -456,6 +467,7 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { computed, onMounted, reactive, ref } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { numberInputRules, numericView, parseNumberText } from '@/utils/number-input';
@@ -504,6 +516,8 @@ import {
 } from '@/api/flow-card';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const statusTextMap: Record<FlowCardStatus, string> = {
   pending: t('flowCards.index.statusPending'),
@@ -1146,5 +1160,11 @@ onMounted(() => {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+@media (max-width: 767px) {
+  .flow-cards-page {
+    padding: 12px;
+  }
 }
 </style>

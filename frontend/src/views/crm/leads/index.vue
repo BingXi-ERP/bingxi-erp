@@ -111,7 +111,115 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
+      <!-- 手机端：单列卡片，字段与动作与桌面表格等价 -->
+      <section v-if="isPhone" v-loading="loading" class="leads-mobile">
+        <ul class="card-list" :aria-label="$t('crmLeads.table.ariaLabel')">
+          <li v-for="(row, index) in leadList" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ $t('crmLeads.table.leadNo') }}</dt>
+                <dd>{{ row.lead_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('crmLeads.table.companyName') }}</dt>
+                <dd>{{ row.company_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('crmLeads.table.contactName') }}</dt>
+                <dd>{{ row.contact_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('crmLeads.table.mobilePhone') }}</dt>
+                <dd>{{ row.mobile_phone }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('crmLeads.table.leadSource') }}</dt>
+                <dd>{{ getSourceLabel(row.lead_source ?? '') }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('crmLeads.table.leadStatus') }}</dt>
+                <dd>
+                  <el-tag :type="leadStatusTagType(row.lead_status)">{{
+                    $t(leadStatusLabelKey(row.lead_status))
+                  }}</el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('crmLeads.table.priority') }}</dt>
+                <dd>
+                  <el-tag :type="getPriorityType(row.priority ?? '')">{{
+                    getPriorityLabel(row.priority ?? '')
+                  }}</el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('crmLeads.table.owner') }}</dt>
+                <dd>{{ row.owner_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('crmLeads.table.lastFollowUp') }}</dt>
+                <dd>{{ row.last_follow_up_date }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('crmLeads.table.nextFollowUp') }}</dt>
+                <dd>{{ row.next_follow_up_date }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="handleView(row)">{{
+                $t('crmLeads.table.view')
+              }}</el-button>
+              <el-button
+                v-if="row.lead_status !== LEAD_STATUS.CONVERTED"
+                v-permission="PERMISSIONS.CRM_LEAD_UPDATE"
+                @click="openEditDialog(row)"
+              >
+                {{ $t('crmLeads.table.edit') }}
+              </el-button>
+              <el-button v-if="row.lead_status === LEAD_STATUS.NEW" @click="handleContact(row)">
+                {{ $t('crmLeads.table.contact') }}
+              </el-button>
+              <el-button
+                v-if="row.lead_status === LEAD_STATUS.QUALIFIED"
+                type="success"
+                @click="handleConvert(row)"
+              >
+                {{ $t('crmLeads.table.convert') }}
+              </el-button>
+              <el-button
+                v-if="row.lead_status !== LEAD_STATUS.CONVERTED"
+                type="danger"
+                @click="handleLost(row)"
+              >
+                {{ $t('crmLeads.table.lost') }}
+              </el-button>
+              <el-button
+                v-if="row.lead_status !== LEAD_STATUS.CONVERTED"
+                type="warning"
+                @click="handleScore(row)"
+              >
+                {{ $t('crmLeads.table.score') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <ElEmpty v-if="!loading && leadList.length === 0" />
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="total"
+            layout="total, sizes, prev, next"
+            :aria-label="$t('crmLeads.table.paginationAriaLabel')"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          />
+        </div>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="leadList"
         border
@@ -285,8 +393,9 @@
 import { isDialogDismissal } from '@/utils/monitor';
 import { PERMISSIONS } from '@/constants/permissions';
 import { ref, reactive } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElMessageBox } from 'element-plus';
+import { ElEmpty, ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, Upload, Download, Search, Refresh } from '@element-plus/icons-vue';
 import {
   exportLeads,
@@ -301,9 +410,12 @@ import { useTableApi } from '@/composables/useTableApi';
 import { downloadImportTemplate, saveTemplateBlob } from '@/api/import-template';
 import { logger } from '@/utils/logger';
 import { LEAD_STATUS, leadStatusLabelKey, leadStatusTagType } from '@/utils/crm-status';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import LeadFormTab from './tabs/LeadFormTab.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 实际接口字段名与类型定义不完全一致，扩展包含 UI 展示所需字段
 interface LeadRow extends Lead {
@@ -695,5 +807,58 @@ const getPriorityLabel = (priority: string) => {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+.leads-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.leads-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.leads-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.leads-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.leads-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.leads-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.leads-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.leads-mobile .card-actions .el-button {
+  margin: 0;
+}
+
+.leads-mobile .pagination-container {
+  justify-content: center;
+  flex-wrap: wrap;
 }
 </style>

@@ -76,9 +76,9 @@
     <el-dialog
       v-model="dialogVisible"
       :title="editingId ? '编辑生产配方' : '新建生产配方'"
-      width="520px"
+      :width="isPhone ? '95%' : '520px'"
     >
-      <el-form :model="form" label-width="90px">
+      <el-form :model="form" label-width="90px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="面料名称" required>
           <el-input v-model="form.fabric_name" />
         </el-form-item>
@@ -98,8 +98,8 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailVisible" title="配方详情" width="760px">
-      <el-descriptions v-if="detailRow" :column="2" border>
+    <el-dialog v-model="detailVisible" title="配方详情" :width="isPhone ? '95%' : '760px'">
+      <el-descriptions v-if="detailRow" :column="isPhone ? 1 : 2" border>
         <el-descriptions-item label="配方编号">{{ detailRow.recipe_no }}</el-descriptions-item>
         <el-descriptions-item label="面料名称">{{
           detailRow.fabric_name || '-'
@@ -157,8 +157,16 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="additionDialogVisible" title="新增加料处方" width="560px">
-      <el-form :model="additionForm" label-width="100px">
+    <el-dialog
+      v-model="additionDialogVisible"
+      title="新增加料处方"
+      :width="isPhone ? '95%' : '560px'"
+    >
+      <el-form
+        :model="additionForm"
+        label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item label="加料原因">
           <el-input v-model="additionForm.addition_reason" placeholder="如：色光偏浅补料" />
         </el-form-item>
@@ -183,8 +191,12 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="calcVisible" title="配方试算（按备布重量/浴比）" width="600px">
-      <el-form :model="calcForm" label-width="110px">
+    <el-dialog
+      v-model="calcVisible"
+      title="配方试算（按备布重量/浴比）"
+      :width="isPhone ? '95%' : '600px'"
+    >
+      <el-form :model="calcForm" label-width="110px" :label-position="isPhone ? 'top' : 'right'">
         <el-form-item label="备布重量 kg" required>
           <NumericInput v-model="calcForm.fabric_weight" :min="0.01" :precision="2" />
         </el-form-item>
@@ -220,7 +232,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { computed, ref, reactive, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { logger } from '@/utils/logger';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -244,6 +257,8 @@ import {
 } from '@/api/production-recipe';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const loading = ref(false);
 const submitting = ref(false);
 const dialogVisible = ref(false);
@@ -544,5 +559,11 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+@media (max-width: 767px) {
+  .production-recipes-page {
+    padding: 12px;
+  }
 }
 </style>

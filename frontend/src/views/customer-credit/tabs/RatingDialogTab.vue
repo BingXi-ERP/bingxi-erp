@@ -7,7 +7,7 @@
   <el-dialog
     v-model="visible"
     :title="t('customerCredit.rating.title')"
-    width="500px"
+    :width="isPhone ? '95%' : '500px'"
     :aria-label="t('customerCredit.rating.ariaLabel')"
   >
     <el-form
@@ -15,6 +15,7 @@
       :model="form"
       :rules="rules"
       label-width="120px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('customerCredit.rating.formAriaLabel')"
     >
       <el-form-item :label="t('customerCredit.rating.label.customer')" prop="customer_id">
@@ -70,8 +71,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { setCreditRating, type SetCreditRatingInput } from '@/api/customer-credit';
@@ -82,6 +84,8 @@ import { logger } from '@/utils/logger';
 import { CREDIT_LEVEL_VALUES } from '@/constants/credit-level';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

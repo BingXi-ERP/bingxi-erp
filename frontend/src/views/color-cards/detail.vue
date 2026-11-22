@@ -65,7 +65,7 @@
         <el-tab-pane :label="$t('colorCards.detail.tab.info')" name="info">
           <!-- 只读区里的卡号在建卡时登记且后端更新端点不收该键，色号总数与三个数量均由后端派生，
                编辑态也不给这些列输入口，提交载荷的字段集里结构上不存在它们 -->
-          <el-descriptions :column="2" border>
+          <el-descriptions :column="isPhone ? 1 : 2" border>
             <el-descriptions-item :label="$t('colorCards.detail.info.cardNo')">{{
               card?.card_no
             }}</el-descriptions-item>
@@ -97,7 +97,7 @@
           </div>
 
           <!-- 卡面信息只读展示，与下方编辑表单同一字段集，按编辑态互斥渲染 -->
-          <el-descriptions v-if="!editing" :column="2" border class="card-info-panel">
+          <el-descriptions v-if="!editing" :column="isPhone ? 1 : 2" border class="card-info-panel">
             <el-descriptions-item :label="$t('colorCards.detail.info.cardName')">{{
               card?.card_name
             }}</el-descriptions-item>
@@ -126,6 +126,7 @@
             :model="editForm"
             :rules="editRules"
             label-width="100px"
+            :label-position="isPhone ? 'top' : 'right'"
             class="card-info-panel"
             :aria-label="$t('colorCards.detail.tab.info')"
             @submit.prevent
@@ -216,7 +217,7 @@
     <el-dialog
       v-model="showAddItemDialog"
       :title="$t('colorCards.detail.addItemDialog.title')"
-      width="640px"
+      :width="isPhone ? '95%' : '640px'"
       :aria-label="$t('colorCards.detail.addItemDialog.ariaLabel')"
     >
       <ColorItemEditor v-model="newItem" />
@@ -234,7 +235,7 @@
     <el-dialog
       v-model="showStockDialog"
       :title="$t('colorCards.detail.stockDialog.title')"
-      width="420px"
+      :width="isPhone ? '95%' : '420px'"
       :aria-label="$t('colorCards.detail.stockDialog.ariaLabel')"
     >
       <el-form
@@ -242,6 +243,7 @@
         :model="stockForm"
         :rules="stockRules"
         label-width="96px"
+        :label-position="isPhone ? 'top' : 'right'"
         @submit.prevent
       >
         <el-form-item :label="$t('colorCards.detail.stockDialog.field')" prop="stock_quantity">
@@ -277,7 +279,7 @@
     <el-dialog
       v-model="showImportDialog"
       :title="$t('colorCards.detail.importDialog.title')"
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="$t('colorCards.detail.importDialog.ariaLabel')"
     >
       <el-alert type="info" :closable="false" style="margin-bottom: 16px">
@@ -303,7 +305,7 @@
     <el-dialog
       v-model="showScanDialog"
       :title="$t('colorCards.detail.scanDialog.title')"
-      width="720px"
+      :width="isPhone ? '95%' : '720px'"
       :aria-label="$t('colorCards.detail.scanDialog.ariaLabel')"
     >
       <el-descriptions v-if="scanResult" :column="3" border>
@@ -362,6 +364,7 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { ref, reactive, computed, onMounted, watch } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus';
@@ -391,6 +394,8 @@ import ColorItemEditor from '@/components/ColorItemEditor.vue';
 import IssueRecordTimeline from '@/components/IssueRecordTimeline.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 状态码 → 本地化标签（响应式：随语言切换自动更新）
 const getCardTypeLabel = (key: string) => t(`colorCards.cardType.${key}`);

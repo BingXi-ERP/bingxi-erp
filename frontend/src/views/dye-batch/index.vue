@@ -232,7 +232,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="700px"
+      :width="isPhone ? '95%' : '700px'"
       :close-on-click-modal="false"
       :aria-label="t('dyeBatch.index.ariaEditDialog')"
     >
@@ -242,6 +242,7 @@
         :rules="formRules"
         :disabled="isView"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('dyeBatch.index.ariaForm')"
       >
         <el-row :gutter="20">
@@ -345,7 +346,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { computed, ref, reactive, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { useI18n } from 'vue-i18n';
 import { loadIfNot, createLazyLoader } from '@/utils/lazy-loader';
@@ -366,6 +368,8 @@ import { logger, logAuxLoadFailure } from '@/utils/logger';
 import { useTableApi } from '@/composables/useTableApi';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 查询参数（仅保留后端 DyeBatchListQuery 真实读取的筛选：色号、批次号、缸号、状态；分页由 useTableApi 管理）
 const queryParams = reactive({
@@ -703,5 +707,11 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+@media (max-width: 767px) {
+  .dye-batch-page {
+    padding: 12px;
+  }
 }
 </style>

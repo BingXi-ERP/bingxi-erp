@@ -430,7 +430,11 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
   expect(hostCatId, '[ensureTestEntities] 建色宿主产品需产品分类 id').toBeTruthy();
   // 字段口径与上面补齐段建产品一致（CreateProductRequest 必填 code/name/category_id；
   // 克重/幅宽供米↔公斤换算、面料必录门要求面料成分），编码/名称带唯一后缀防重名。
-  const hostSuffix = `${Date.now().toString().slice(-6)}${ctx.productIds.length}`;
+  // 时间戳末 6 位周期短，并行 worker 同秒重跑会撞产品编码/色号唯一约束；补三位随机尾。
+  const parallelTail = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0');
+  const hostSuffix = `${Date.now().toString().slice(-6)}${ctx.productIds.length}${parallelTail}`;
   const hostProduct = await apiCall<{ id?: number }>(page, 'POST', '/products', {
     code: `E2E-P${hostSuffix}`,
     name: `E2E产品${hostSuffix}`,
@@ -448,8 +452,8 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     `建色宿主产品创建失败：${JSON.stringify(hostProduct.data)}`
   ).toBeGreaterThan(0);
   // color_no 只算一次：创建载荷与 ctx.colorNos 必须是同一字符串，两处各自取
-  // Date.now() 会在毫秒跳变时记下与落库不一致的色号。
-  const colorNo = `E2E-C${Date.now().toString().slice(-6)}`;
+  // Date.now() 会在毫秒跳变时记下与落库不一致的色号；随机三位尾防并行撞唯一约束。
+  const colorNo = `E2E-C${Date.now().toString().slice(-6)}${parallelTail}`;
   const created = await apiCall<{ id?: number }>(
     page,
     'POST',

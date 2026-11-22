@@ -146,4 +146,10 @@ onMounted(() => {
   display: flex;
   gap: 10px;
 }
+
+@media (max-width: 767px) {
+  .purchase-price-page {
+    padding: 12px;
+  }
+}
 </style>

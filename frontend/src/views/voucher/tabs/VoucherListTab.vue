@@ -141,4 +141,11 @@ onMounted(() => {
   background: #f0f9eb;
   color: #67c23a;
 }
+
+@media (max-width: 767px) {
+  .page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
 </style>

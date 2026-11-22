@@ -13,7 +13,7 @@
   <div class="audit-log-view">
     <el-card shadow="hover" class="filter-card">
       <el-form
-        :inline="true"
+        :inline="!isPhone"
         :model="filterForm"
         :aria-label="$t('auditLog.filter.ariaLabel')"
         @submit.prevent="handleQuery"
@@ -116,7 +116,84 @@
     </el-card>
 
     <el-card shadow="hover" class="table-card">
+      <!-- 手机端：审计日志单列卡片，字段与桌面 columns 同源 -->
+      <section v-if="isPhone" v-loading="loading" class="audit-mobile">
+        <ul class="card-list" :aria-label="$t('auditLog.table.operationType')">
+          <li v-for="(row, index) in data" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>ID</dt>
+                <dd>{{ row.id }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('auditLog.table.operationTime') }}</dt>
+                <dd>{{ formatDateTime(row.created_at) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('auditLog.table.operationType') }}</dt>
+                <dd>
+                  <el-tag :type="OP_TYPE_TAG[row.operation_type ?? ''] ?? 'info'" size="small">
+                    {{ getOpTypeLabel(row.operation_type ?? '') }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('auditLog.table.severity') }}</dt>
+                <dd>
+                  <el-tag :type="SEVERITY_TAG[row.severity ?? ''] ?? 'info'" size="small">
+                    {{ getSeverityLabel(row.severity ?? '') }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('auditLog.table.operator') }}</dt>
+                <dd>{{ row.username }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('auditLog.table.resourceType') }}</dt>
+                <dd>{{ row.resource_type }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('auditLog.table.resourceId') }}</dt>
+                <dd>{{ row.resource_id }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('auditLog.detail.resourceName') }}</dt>
+                <dd>{{ row.resource_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('auditLog.table.clientIp') }}</dt>
+                <dd>{{ row.ip_address }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('auditLog.table.requestTrace') }}</dt>
+                <dd>{{ row.request_id }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('auditLog.table.description') }}</dt>
+                <dd>{{ row.description }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="handleViewDetail(row)">
+                {{ t('common.detail') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+        <ElPagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, next"
+          @current-change="handlePageChange"
+          @size-change="handleSizeChange"
+        />
+      </section>
+
       <V2Table
+        v-if="!isPhone"
         :columns="columns"
         :data="data"
         :loading="loading"
@@ -141,7 +218,7 @@
       :destroy-on-close="true"
     >
       <div v-if="currentDetail" class="detail-content">
-        <el-descriptions :column="2" border>
+        <el-descriptions :column="isPhone ? 1 : 2" border>
           <el-descriptions-item :label="$t('auditLog.detail.logId')">{{
             currentDetail.id
           }}</el-descriptions-item>
@@ -207,11 +284,12 @@
  */
 import { ref, reactive, computed, h } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ElMessage, ElTag, ElButton } from 'element-plus';
+import { ElMessage, ElTag, ElButton, ElPagination } from 'element-plus';
 import { Search, Refresh, Download } from '@element-plus/icons-vue';
 import V2Table from '@/components/V2Table/index.vue';
 import type { ColumnDef } from '@/components/V2Table/types';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   getAuditLog,
   type AuditLogItem,
@@ -225,6 +303,8 @@ import { EXPORT_APPROVAL_REQUEST_PERMISSION_KEY } from '@/constants/export-appro
 import { useExportApproval } from '@/composables/useExportApproval';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // D05 Batch 4：操作类型/严重级别下拉选项改为 computed，使 t() 在语言切换时响应式求值
 const opTypeOptions = computed<{ value: OperationType; label: string }[]>(() => [
@@ -542,5 +622,53 @@ const formatDateTime = (v: string | null | undefined): string => {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+.audit-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.audit-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.audit-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.audit-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.audit-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.audit-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.audit-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.audit-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

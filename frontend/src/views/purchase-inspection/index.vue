@@ -109,4 +109,10 @@ onMounted(() => {
   font-size: 20px;
   font-weight: 600;
 }
+
+@media (max-width: 767px) {
+  .purchase-inspection {
+    padding: 12px;
+  }
+}
 </style>

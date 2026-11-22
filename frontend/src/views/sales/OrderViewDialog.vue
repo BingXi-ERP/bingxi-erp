@@ -7,7 +7,7 @@
   <el-dialog
     :model-value="visible"
     :title="t('sales.orderView.title')"
-    width="1000px"
+    :width="isPhone ? '95%' : '1000px'"
     :aria-label="t('sales.orderView.dialogAriaLabel')"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
@@ -129,14 +129,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type { SalesOrder } from '@/api/sales';
 import PrintDocumentDialog from '@/components/Print/PrintDocumentDialog.vue';
 import { PERMISSIONS } from '@/constants/permissions';
 import { salesStatusLabelKey, salesStatusTagType } from '@/utils/sales-status';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 defineProps<{
   visible: boolean;

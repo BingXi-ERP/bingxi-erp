@@ -10,7 +10,53 @@
         }}</el-button>
       </div>
 
-      <el-table v-loading="loading" :data="items" border stripe>
+      <!-- 手机端：客户专属价单列卡片 -->
+      <section v-if="isPhone" class="cspecial-mobile">
+        <ul class="card-list" :aria-label="$t('colorPrices.customerSpecial.table.id')">
+          <li v-for="(row, index) in items" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ $t('colorPrices.customerSpecial.table.customerId') }}</dt>
+                <dd>{{ row.customer_id }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.customerSpecial.table.productId') }}</dt>
+                <dd>{{ row.product_id }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.customerSpecial.table.colorId') }}</dt>
+                <dd>{{ row.color_id }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.customerSpecial.table.specialPrice') }}</dt>
+                <dd>{{ formatPrice(row.special_price, row.currency) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.customerSpecial.table.discount') }}</dt>
+                <dd>{{ row.discount_percent }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.customerSpecial.table.currency') }}</dt>
+                <dd>{{ row.currency }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.customerSpecial.table.validFrom') }}</dt>
+                <dd>{{ row.valid_from }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.customerSpecial.table.validUntil') }}</dt>
+                <dd>{{ row.valid_until }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.customerSpecial.table.notes') }}</dt>
+                <dd>{{ row.notes }}</dd>
+              </div>
+            </dl>
+          </li>
+        </ul>
+      </section>
+
+      <el-table v-if="!isPhone" v-loading="loading" :data="items" border stripe>
         <el-table-column prop="id" :label="$t('colorPrices.customerSpecial.table.id')" width="70" />
         <el-table-column
           prop="customer_id"
@@ -68,7 +114,7 @@
     <el-dialog
       v-model="dialogVisible"
       :title="$t('colorPrices.customerSpecial.dialog.createTitle')"
-      width="520"
+      :width="isPhone ? '95%' : '520px'"
     >
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
         <el-form-item
@@ -134,6 +180,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus';
 import {
@@ -145,6 +192,8 @@ import {
 import { numberInputRules } from '@/utils/number-input';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const loading = ref(false);
 const saving = ref(false);
@@ -273,5 +322,46 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+.cspecial-mobile .card-list,
+.srule-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cspecial-mobile .card-item,
+.srule-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.cspecial-mobile .card-fields > div,
+.srule-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.cspecial-mobile .card-fields dt,
+.srule-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.cspecial-mobile .card-fields dd,
+.srule-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.cspecial-mobile .field-emphasis dd,
+.srule-mobile .field-emphasis dd {
+  font-weight: 500;
 }
 </style>

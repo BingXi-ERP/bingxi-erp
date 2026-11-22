@@ -103,4 +103,10 @@ const pieData = [
 .mb-20 {
   margin-bottom: 20px;
 }
+
+@media (max-width: 767px) {
+  .charts-demo {
+    padding: 12px;
+  }
+}
 </style>

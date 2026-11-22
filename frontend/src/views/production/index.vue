@@ -225,4 +225,10 @@ onMounted(() => {
   display: flex;
   gap: 8px;
 }
+
+@media (max-width: 767px) {
+  .production-container {
+    padding: 12px;
+  }
+}
 </style>

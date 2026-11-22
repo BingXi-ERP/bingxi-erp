@@ -10,6 +10,7 @@
         :model="form"
         :rules="rules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         style="max-width: 800px"
         :aria-label="$t('colorCards.create.formAriaLabel')"
       >
@@ -101,11 +102,14 @@
 // 提交逻辑：调用 createColorCard，成功后显示创建成功提示
 import { ref, reactive, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useRouter } from 'vue-router';
 import { ElMessage, FormInstance, FormRules } from 'element-plus';
 import { createColorCard, COLOR_CARD_TYPE_LABELS, SEASON_LABELS } from '@/api/color-card';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const router = useRouter();
 const formRef = ref<FormInstance>();

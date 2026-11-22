@@ -169,4 +169,10 @@ onMounted(() => {
 .w-100 {
   width: 100%;
 }
+
+@media (max-width: 767px) {
+  .app-container {
+    padding: 12px;
+  }
+}
 </style>

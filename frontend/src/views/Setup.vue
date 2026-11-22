@@ -46,6 +46,7 @@
           :model="dbConfig"
           :rules="dbRules"
           label-width="120px"
+          :label-position="isPhone ? 'top' : 'right'"
           class="config-form"
           :aria-label="$t('setupPage.aria.dbForm')"
         >
@@ -95,6 +96,7 @@
           :model="adminConfig"
           :rules="adminRules"
           label-width="120px"
+          :label-position="isPhone ? 'top' : 'right'"
           class="config-form"
           :aria-label="$t('setupPage.aria.adminForm')"
         >
@@ -173,6 +175,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useRouter } from 'vue-router';
 import { resetInitStatus } from '@/router';
 import { useI18n } from 'vue-i18n';
@@ -183,6 +186,8 @@ import { logger } from '@/utils/logger';
 
 const router = useRouter();
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const currentStep = ref(0);
 const checking = ref(false);
@@ -597,5 +602,11 @@ checkEnvironment();
 .success-icon .el-icon {
   font-size: 80px;
   color: #67c23a;
+}
+
+@media (max-width: 767px) {
+  .install-summary {
+    padding: 12px;
+  }
 }
 </style>

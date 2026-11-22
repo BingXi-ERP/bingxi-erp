@@ -71,8 +71,83 @@
         </el-form-item>
       </el-form>
 
-      <!-- 列表 -->
+      <!-- 手机端：单列卡片，字段与动作与桌面表格等价 -->
+      <section v-if="isPhone" v-loading="loading" class="quotation-mobile">
+        <ul class="card-list" :aria-label="t('quotations.list.tableAriaLabel')">
+          <li v-for="(row, index) in quotations" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('quotations.list.colQuotationNo') }}</dt>
+                <dd>{{ row.quotation_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.list.colCustomer') }}</dt>
+                <dd>{{ row.customer_name }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.list.colQuotationDate') }}</dt>
+                <dd>{{ row.quotation_date }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.list.colValidUntil') }}</dt>
+                <dd>{{ row.valid_until }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.list.colPriceTerms') }}</dt>
+                <dd>{{ row.price_terms }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.list.colAmount') }}</dt>
+                <dd>{{ row.currency }} {{ formatAmount(row.total_amount) }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('quotations.list.colStatus') }}</dt>
+                <dd>
+                  <el-tag :type="tagType(row.status as QuotationStatus)">
+                    {{ QUOTATION_STATUS_LABELS[row.status as QuotationStatus] || row.status }}
+                  </el-tag>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="goDetail(row)">
+                {{ t('quotations.list.view') }}
+              </el-button>
+              <el-button @click="goCopy(row)">
+                {{ t('quotations.list.copy') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'draft' || row.status === 'rejected'"
+                v-permission="PERMISSIONS.QUOTATION_UPDATE"
+                @click="goEdit(row)"
+              >
+                {{ t('quotations.list.edit') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'approved'"
+                type="success"
+                @click="handleConvert(row)"
+              >
+                {{ t('quotations.list.convertOrder') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'draft'"
+                v-permission="PERMISSIONS.QUOTATION_CANCEL"
+                type="danger"
+                @click="handleCancel(row)"
+              >
+                {{ t('quotations.list.cancel') }}
+              </el-button>
+              <el-button type="warning" @click="showTerms(row)">
+                {{ t('quotations.list.terms') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="quotations"
         stripe
@@ -170,7 +245,11 @@
     </el-card>
 
     <!-- 到期/过期报价弹窗（getExpiringQuotationList / getExpiredQuotationList） -->
-    <el-dialog v-model="expiringVisible" :title="t('quotations.list.expiringSoon')" width="720px">
+    <el-dialog
+      v-model="expiringVisible"
+      :title="t('quotations.list.expiringSoon')"
+      :width="isPhone ? '95%' : '720px'"
+    >
       <el-table :data="expiringRows" border size="small" max-height="420">
         <el-table-column prop="quotation_no" :label="t('quotations.list.colNo')" min-width="150" />
         <el-table-column
@@ -184,7 +263,11 @@
     </el-dialog>
 
     <!-- 贸易条款查看/维护弹窗（getQuotationTerms / setQuotationTerms） -->
-    <el-dialog v-model="termsVisible" :title="t('quotations.list.terms')" width="600px">
+    <el-dialog
+      v-model="termsVisible"
+      :title="t('quotations.list.terms')"
+      :width="isPhone ? '95%' : '600px'"
+    >
       <el-table v-loading="termsLoading" :data="termsRows" border size="small">
         <el-table-column prop="term_type" label="条款类型" width="120" />
         <el-table-column prop="term_value" label="条款内容" min-width="220" />
@@ -211,7 +294,7 @@
 // 报价单列表页脚本
 // - 列表加载
 // - 行操作：查看/复制为新单/编辑/转订单/取消
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { PERMISSIONS } from '@/constants/permissions';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useRouter } from 'vue-router';
@@ -220,6 +303,7 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { isDialogDismissal, rethrowNonDismissal } from '@/utils/monitor';
 import { Plus } from '@element-plus/icons-vue';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { formatDecimalAmount } from '@/utils/money';
 import {
   cancelQuotation,
@@ -246,6 +330,8 @@ function tagType(s: QuotationStatus): TagType {
 }
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const router = useRouter();
 const customers = ref<Array<{ id: number; customer_name?: string; name?: string }>>([]);
@@ -500,5 +586,53 @@ const showExpiring = async (expired: boolean) => {
 }
 .filter-form {
   margin-bottom: 16px;
+}
+
+.quotation-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.quotation-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.quotation-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.quotation-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.quotation-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.quotation-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.quotation-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.quotation-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

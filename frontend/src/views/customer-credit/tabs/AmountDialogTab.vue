@@ -11,7 +11,7 @@
         ? t('customerCredit.amount.title.occupy')
         : t('customerCredit.amount.title.release')
     "
-    width="500px"
+    :width="isPhone ? '95%' : '500px'"
     :aria-label="t('customerCredit.amount.ariaLabel')"
   >
     <el-form
@@ -19,6 +19,7 @@
       :model="form"
       :rules="rules"
       label-width="120px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('customerCredit.amount.formAriaLabel')"
     >
       <el-form-item :label="t('customerCredit.amount.label.amount')" prop="amount">
@@ -42,8 +43,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import { occupyCredit, releaseCredit } from '@/api/customer-credit';
@@ -52,6 +54,8 @@ import { numberInputRules } from '@/utils/number-input';
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

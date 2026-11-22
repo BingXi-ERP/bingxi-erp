@@ -8,7 +8,7 @@
     :aria-label="$t('bpm.approval.chainDialog.ariaLabel')"
     :model-value="visible"
     :title="$t('bpm.approval.chainDialog.title')"
-    width="700px"
+    :width="isPhone ? '95%' : '700px'"
     destroy-on-close
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
@@ -38,12 +38,16 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ArrowDown } from '@element-plus/icons-vue';
 import type { ApprovalChainNode } from '@/api/bpm-enhanced';
 import { getNodeStatusClass } from '../composables/bpmApFmts';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 审批链对话框组件

@@ -25,7 +25,7 @@
           ? $t('quality.standardDialog.editTitle')
           : $t('quality.standardDialog.createTitle')
       "
-      width="700px"
+      :width="isPhone ? '95%' : '700px'"
       :aria-label="$t('quality.standardDialog.ariaLabel')"
     >
       <el-form
@@ -33,6 +33,7 @@
         :model="standardForm"
         :rules="standardFormRules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('quality.standardDialog.formAriaLabel')"
       >
         <el-form-item :label="$t('quality.standardDialog.standardCode')" prop="standard_code">
@@ -86,7 +87,7 @@
     <el-dialog
       v-model="approveDialogVisible"
       :title="$t('quality.approveDialog.title')"
-      width="500px"
+      :width="isPhone ? '95%' : '500px'"
       :aria-label="$t('quality.approveDialog.ariaLabel')"
     >
       <el-form
@@ -94,6 +95,7 @@
         :model="approveForm"
         :rules="approveFormRules"
         label-width="80px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('quality.approveDialog.formAriaLabel')"
       >
         <el-form-item :label="$t('quality.approveDialog.standardCode')">
@@ -130,7 +132,7 @@
     <el-dialog
       v-model="versionHistoryVisible"
       :title="$t('quality.versionHistory.title')"
-      width="800px"
+      :width="isPhone ? '95%' : '800px'"
       :aria-label="$t('quality.versionHistory.ariaLabel')"
     >
       <el-table
@@ -190,7 +192,7 @@
           ? $t('quality.recordDialog.editTitle')
           : $t('quality.recordDialog.createTitle')
       "
-      width="700px"
+      :width="isPhone ? '95%' : '700px'"
       :aria-label="$t('quality.recordDialog.ariaLabel')"
     >
       <el-form
@@ -198,6 +200,7 @@
         :model="recordForm"
         :rules="recordFormRules"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('quality.recordDialog.formAriaLabel')"
       >
         <el-form-item :label="$t('quality.recordDialog.recordNo')" prop="inspection_no">
@@ -293,6 +296,7 @@
 import { isDialogDismissal } from '@/utils/monitor';
 import NumericInput from '@/components/NumericInput.vue';
 import { computed, ref, reactive, onMounted, provide } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { loadIfNot, createLazyLoader } from '@/utils/lazy-loader';
 import { logAuxLoadFailure } from '@/utils/logger';
@@ -332,6 +336,8 @@ type TagType = 'success' | 'warning' | 'info' | 'primary' | 'danger';
 // RecordTab 通过 useTableApi 自动消费分页元数据，无需在此维护分页状态
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 为 StandardTab/RecordTab 提供 actions（inject('qualityActions')）
 // 注意：provide 移到所有函数定义之后，避免 hoisting 问题（vue-tsc 报 used before declaration）

@@ -1,8 +1,6 @@
 <script setup lang="ts">
-/**
- * P2-4 质量预测列表 + 创建
- */
 import { reactive, ref, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import NumericInput from '@/components/NumericInput.vue';
 import { logger } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
@@ -23,11 +21,12 @@ import {
   type QualityPredRequest,
 } from '@/api/ai-extend';
 import AiPredictionChart from '@/components/ai/AiPredictionChart.vue';
-// 批次 280：接入 useTableApi，消除手写 items/loading/total/page/pageSize/load 重复
 import { useTableApi } from '@/composables/useTableApi';
-
-// 批次 34 v9 P1：接入 i18n，替换硬编码中文 ElMessage
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
+const phoneDialogWidth =
+  'calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))';
 
 const queryFilter = reactive({
   product_id: undefined as number | undefined,
@@ -35,8 +34,6 @@ const queryFilter = reactive({
   risk_level: undefined as string | undefined,
   is_acknowledged: undefined as boolean | undefined,
 });
-
-// 批次 280：useTableApi 自动管理分页状态、数据加载，自动 watch page/pageSize 变化触发重载
 // 后端 ai_extend_handler::list_quality_predictions 以 json!({items,total,page,page_size}) 返回，
 // 显式钉 listKey='items'，不依赖 detectList 的顺序探测。
 const {
@@ -72,8 +69,6 @@ const submitting = ref(false);
 // 详情抽屉
 const detailVisible = ref(false);
 const detailModel = ref<AiQualityPrediction | null>(null);
-
-// 批次 280：同步筛选条件到 useTableApi.queryParams 并刷新
 function syncQueryParams() {
   setQueryParam('product_id', queryFilter.product_id);
   setQueryParam('inspection_type', queryFilter.inspection_type);
@@ -101,8 +96,7 @@ async function submitCreate() {
   }
   submitting.value = true;
   try {
-    // request 拦截器返回完整 ApiResponse 信封（{code,message,data}），真实载荷在 resp.data。
-    // 直接读 resp.response 会取到 undefined → 落入 catch 误弹「创建失败」，尽管 POST 实际 200。
+    // 创建结果从 ApiResponse.data 读取。
     const resp = await createQualityPrediction({ ...form });
     const created = resp.data;
     ElMessage.success(
@@ -266,7 +260,7 @@ const detailRecommendations = computed(() => {
 </script>
 
 <template>
-  <div class="qual-page">
+  <div class="qual-page" :class="{ 'qual-page--phone': isPhone }">
     <div class="page-header">
       <h2>{{ $t('aiExtend.qualityPrediction.listTitle') }}</h2>
       <div class="header-right">
@@ -280,7 +274,8 @@ const detailRecommendations = computed(() => {
 
     <el-card class="filter-card">
       <el-form
-        :inline="true"
+        :inline="!isPhone"
+        :label-position="isPhone ? 'top' : 'right'"
         :model="queryFilter"
         :aria-label="$t('aiExtend.qualityPrediction.filterAriaLabel')"
       >
@@ -326,8 +321,109 @@ const detailRecommendations = computed(() => {
       </el-form>
     </el-card>
 
-    <el-card>
+    <el-card class="quality-table-card">
+      <section v-if="isPhone" v-loading="loading" class="ai-mobile quality-list-mobile">
+        <ul v-if="items.length" class="card-list">
+          <li v-for="(row, index) in items" :key="index" class="card-item">
+            <dl class="card-fields">
+              <div>
+                <dt>ID</dt>
+                <dd>{{ row.id }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.qualityPrediction.colProductId') }}</dt>
+                <dd>{{ row.product_id ?? $t('aiExtend.qualityPrediction.global') }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.qualityPrediction.colInspectionType') }}</dt>
+                <dd>{{ INSPECTION_TYPE_LABELS[row.inspection_type] ?? row.inspection_type }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.qualityPrediction.colTotalInspections') }}</dt>
+                <dd>{{ row.total_inspections }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.qualityPrediction.colAvgRate') }}</dt>
+                <dd>{{ Number(row.avg_qualification_rate).toFixed(1) }}%</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.qualityPrediction.colRiskLevel') }}</dt>
+                <dd>
+                  <el-tag
+                    :style="{
+                      background: RISK_LEVEL_COLORS[row.risk_level],
+                      color: '#fff',
+                      border: 'none',
+                    }"
+                    size="small"
+                  >
+                    {{ RISK_LEVEL_LABELS[row.risk_level] }} · {{ row.risk_score }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.qualityPrediction.colTrend') }}</dt>
+                <dd>
+                  {{ TREND_LABELS[row.trend] ?? row.trend }} ({{
+                    Number(row.trend_rate).toFixed(1)
+                  }}pp)
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.qualityPrediction.colConfidence') }}</dt>
+                <dd>{{ Number(row.confidence).toFixed(2) }}</dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.qualityPrediction.colSource') }}</dt>
+                <dd>
+                  <el-tag :type="row.source === 'degraded' ? 'danger' : 'info'" size="small">
+                    {{ SOURCE_LABELS[row.source as string] ?? row.source }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.qualityPrediction.colAck') }}</dt>
+                <dd>
+                  <el-tag :type="row.is_acknowledged ? 'success' : 'warning'" size="small">
+                    {{
+                      row.is_acknowledged
+                        ? $t('aiExtend.qualityPrediction.acknowledged')
+                        : $t('aiExtend.qualityPrediction.ackPending')
+                    }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div>
+                <dt>{{ $t('aiExtend.qualityPrediction.colTime') }}</dt>
+                <dd>{{ new Date(row.created_at).toLocaleString('zh-CN') }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button size="small" @click="showDetail(row)">{{
+                $t('aiExtend.qualityPrediction.detail')
+              }}</el-button>
+              <el-button
+                v-if="!row.is_acknowledged"
+                v-permission="'ai-quality-pred:approve'"
+                type="success"
+                size="small"
+                @click="handleAck(row)"
+                >{{ $t('aiExtend.qualityPrediction.ack') }}</el-button
+              >
+              <el-button
+                v-permission="'ai-quality-pred:delete'"
+                type="danger"
+                size="small"
+                @click="handleDelete(row)"
+                >{{ $t('aiExtend.qualityPrediction.delete') }}</el-button
+              >
+            </div>
+          </li>
+        </ul>
+        <el-empty v-else :description="t('components.v2Table.empty')" />
+      </section>
       <el-table
+        v-else
         v-loading="loading"
         :data="items"
         stripe
@@ -481,12 +577,15 @@ const detailRecommendations = computed(() => {
     <el-dialog
       v-model="dialogVisible"
       :title="$t('aiExtend.qualityPrediction.createDialogTitle')"
-      width="540px"
+      class="ai-dialog"
+      :class="{ 'ai-dialog--phone': isPhone }"
+      :width="isPhone ? phoneDialogWidth : '540px'"
       :aria-label="$t('aiExtend.qualityPrediction.createDialogAriaLabel')"
     >
       <el-form
         :model="form"
         label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="$t('aiExtend.qualityPrediction.formAriaLabel')"
       >
         <el-form-item :label="$t('aiExtend.qualityPrediction.colProductId')" required>
@@ -526,11 +625,72 @@ const detailRecommendations = computed(() => {
     <el-drawer
       v-model="detailVisible"
       :title="$t('aiExtend.qualityPrediction.detailTitle')"
-      size="60%"
+      class="ai-drawer"
+      :class="{ 'ai-drawer--phone': isPhone }"
+      :size="isPhone ? phoneDialogWidth : '60%'"
     >
       <template v-if="detailModel">
         <div class="detail-section">
-          <el-descriptions :column="2" border>
+          <dl v-if="isPhone" class="card-fields quality-detail-fields">
+            <div>
+              <dt>{{ $t('aiExtend.qualityPrediction.colProductId') }}</dt>
+              <dd>{{ detailModel.product_id ?? $t('aiExtend.qualityPrediction.global') }}</dd>
+            </div>
+            <div>
+              <dt>{{ $t('aiExtend.qualityPrediction.colInspectionType') }}</dt>
+              <dd>
+                {{
+                  INSPECTION_TYPE_LABELS[detailModel.inspection_type] ?? detailModel.inspection_type
+                }}
+              </dd>
+            </div>
+            <div>
+              <dt>{{ $t('aiExtend.qualityPrediction.detailTimeWindow') }}</dt>
+              <dd>
+                {{ detailModel.window_days }} {{ $t('aiExtend.qualityPrediction.detailUnitDays') }}
+              </dd>
+            </div>
+            <div>
+              <dt>{{ $t('aiExtend.qualityPrediction.colTotalInspections') }}</dt>
+              <dd>{{ detailModel.total_inspections }}</dd>
+            </div>
+            <div>
+              <dt>{{ $t('aiExtend.qualityPrediction.colAvgRate') }}</dt>
+              <dd>{{ Number(detailModel.avg_qualification_rate).toFixed(1) }}%</dd>
+            </div>
+            <div>
+              <dt>{{ $t('aiExtend.qualityPrediction.colConfidence') }}</dt>
+              <dd>
+                <el-progress
+                  :percentage="Math.round(Number(detailModel.confidence) * 100)"
+                  :stroke-width="10"
+                />
+              </dd>
+            </div>
+            <div>
+              <dt>{{ $t('aiExtend.qualityPrediction.colRiskLevel') }}</dt>
+              <dd>
+                <el-tag
+                  :style="{
+                    background: RISK_LEVEL_COLORS[detailModel.risk_level],
+                    color: '#fff',
+                    border: 'none',
+                  }"
+                >
+                  {{ RISK_LEVEL_LABELS[detailModel.risk_level] }} · {{ detailModel.risk_score }}
+                </el-tag>
+              </dd>
+            </div>
+            <div>
+              <dt>{{ $t('aiExtend.qualityPrediction.colTrend') }}</dt>
+              <dd>
+                {{ TREND_LABELS[detailModel.trend] }} ({{
+                  Number(detailModel.trend_rate).toFixed(1)
+                }}pp)
+              </dd>
+            </div>
+          </dl>
+          <el-descriptions v-else :column="2" border>
             <el-descriptions-item :label="$t('aiExtend.qualityPrediction.colProductId')">{{
               detailModel.product_id ?? $t('aiExtend.qualityPrediction.global')
             }}</el-descriptions-item>
@@ -586,7 +746,29 @@ const detailRecommendations = computed(() => {
 
         <div v-if="detailIssues.length" class="detail-section">
           <div class="detail-section-title">{{ $t('aiExtend.qualityPrediction.topIssues') }}</div>
+          <section v-if="isPhone" class="ai-mobile quality-issues-mobile">
+            <ul v-if="detailIssues.length" class="card-list">
+              <li v-for="(row, index) in detailIssues" :key="index" class="card-item">
+                <dl class="card-fields">
+                  <div>
+                    <dt>{{ $t('aiExtend.qualityPrediction.colIssue') }}</dt>
+                    <dd>{{ row.issue }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.qualityPrediction.colCount') }}</dt>
+                    <dd>{{ row.count }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ $t('aiExtend.qualityPrediction.colPercentage') }}</dt>
+                    <dd><el-progress :percentage="row.percentage" :stroke-width="8" /></dd>
+                  </div>
+                </dl>
+              </li>
+            </ul>
+            <el-empty v-else :description="t('components.v2Table.empty')" />
+          </section>
           <el-table
+            v-else
             :data="detailIssues"
             size="small"
             border
@@ -631,7 +813,9 @@ const detailRecommendations = computed(() => {
     <el-dialog
       v-model="batchCreateVisible"
       title="批量质量预测（JSON 数组，最多 20 条）"
-      width="560"
+      class="ai-dialog"
+      :class="{ 'ai-dialog--phone': isPhone }"
+      :width="isPhone ? phoneDialogWidth : '560px'"
     >
       <el-input
         v-model="batchText"
@@ -646,28 +830,59 @@ const detailRecommendations = computed(() => {
     </el-dialog>
 
     <!-- 按产品查询（getQualityPredictionListByProduct） -->
-    <el-dialog v-model="byProductVisible" title="按产品查询预测历史" width="680">
+    <el-dialog
+      v-model="byProductVisible"
+      title="按产品查询预测历史"
+      class="ai-dialog"
+      :class="{ 'ai-dialog--phone': isPhone }"
+      :width="isPhone ? phoneDialogWidth : '680px'"
+    >
       <div class="toolbar" style="margin-bottom: 8px">
         <NumericInput v-model="byProductId" placeholder="产品 ID" :min="1" />
         <el-button type="primary" plain :loading="byProductLoading" @click="loadByProduct">
           查询
         </el-button>
       </div>
-      <el-table
-        v-if="byProductItems.length"
-        :data="byProductItems"
-        border
-        size="small"
-        max-height="320"
+      <template v-if="byProductItems.length"
+        ><section v-if="isPhone" class="ai-mobile quality-product-mobile">
+          <ul v-if="byProductItems.length" class="card-list">
+            <li v-for="(row, index) in byProductItems" :key="index" class="card-item">
+              <dl class="card-fields">
+                <div>
+                  <dt>ID</dt>
+                  <dd>{{ row.id }}</dd>
+                </div>
+                <div>
+                  <dt>产品 ID</dt>
+                  <dd>{{ row.product_id }}</dd>
+                </div>
+                <div>
+                  <dt>检验类型</dt>
+                  <dd>{{ row.inspection_type }}</dd>
+                </div>
+                <div>
+                  <dt>风险等级</dt>
+                  <dd>{{ row.risk_level }}</dd>
+                </div>
+                <div>
+                  <dt>创建时间</dt>
+                  <dd>{{ row.created_at || '-' }}</dd>
+                </div>
+              </dl>
+            </li>
+          </ul>
+          <el-empty v-else :description="t('components.v2Table.empty')" />
+        </section>
+        <el-table v-else :data="byProductItems" border size="small" max-height="320">
+          <el-table-column prop="id" label="ID" width="70" />
+          <el-table-column prop="product_id" label="产品 ID" width="90" />
+          <el-table-column prop="inspection_type" label="检验类型" width="110" />
+          <el-table-column prop="risk_level" label="风险等级" width="100" />
+          <el-table-column prop="created_at" label="创建时间" min-width="150">
+            <template #default="{ row }">{{ row.created_at || '-' }}</template>
+          </el-table-column>
+        </el-table></template
       >
-        <el-table-column prop="id" label="ID" width="70" />
-        <el-table-column prop="product_id" label="产品 ID" width="90" />
-        <el-table-column prop="inspection_type" label="检验类型" width="110" />
-        <el-table-column prop="risk_level" label="风险等级" width="100" />
-        <el-table-column prop="created_at" label="创建时间" min-width="150">
-          <template #default="{ row }">{{ row.created_at || '-' }}</template>
-        </el-table-column>
-      </el-table>
       <template #footer>
         <el-button @click="byProductVisible = false">关闭</el-button>
       </template>
@@ -710,5 +925,138 @@ const detailRecommendations = computed(() => {
   font-weight: 600;
   margin-bottom: 8px;
   color: #303133;
+}
+
+.card-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.card-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.card-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.card-fields > div {
+  min-width: 0;
+}
+.card-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.card-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.card-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.ai-dialog--phone {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(
+    100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+  margin-top: calc(12px + env(safe-area-inset-top, 0px));
+  margin-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+.ai-dialog--phone :deep(.el-dialog__body) {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.ai-dialog--phone :deep(.el-dialog__header),
+.ai-dialog--phone :deep(.el-dialog__footer) {
+  flex-shrink: 0;
+}
+.ai-dialog--phone :deep(.el-dialog__footer) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.ai-dialog--phone :deep(.el-button),
+.ai-drawer--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+}
+
+.qual-page {
+  min-width: 0;
+  max-width: 100%;
+}
+.qual-page--phone .page-header {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 12px;
+}
+.qual-page--phone .header-right {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.qual-page--phone :deep(.el-button) {
+  min-width: 44px;
+  min-height: 44px;
+  margin-left: 0;
+  white-space: normal;
+}
+.qual-page--phone .filter-card :deep(.el-input),
+.qual-page--phone .filter-card :deep(.el-select) {
+  width: 100% !important;
+}
+.qual-page--phone :deep(.el-input__wrapper),
+.qual-page--phone :deep(.el-select__wrapper) {
+  min-height: 44px;
+}
+.qual-page--phone :deep(.el-pagination) {
+  flex-wrap: wrap;
+  row-gap: 12px;
+  justify-content: flex-start !important;
+}
+.qual-page--phone :deep(.el-pagination button),
+.qual-page--phone :deep(.el-pager li) {
+  min-width: 44px;
+  min-height: 44px;
+}
+.qual-page--phone .filter-card :deep(.el-form-item:last-child .el-form-item__content) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ai-drawer--phone {
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  margin-top: env(safe-area-inset-top, 0px);
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+.ai-drawer--phone :deep(.el-drawer__body) {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.ai-drawer--phone :deep(.el-drawer__header) {
+  flex-shrink: 0;
+}
+.ai-dialog--phone .toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
 }
 </style>

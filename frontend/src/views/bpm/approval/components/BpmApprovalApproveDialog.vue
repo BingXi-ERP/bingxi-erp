@@ -9,7 +9,7 @@
     :aria-label="$t('bpm.approval.approvalDialog.ariaLabel')"
     :model-value="visible"
     :title="dialogTitle"
-    width="500px"
+    :width="isPhone ? '95%' : '500px'"
     destroy-on-close
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
@@ -46,10 +46,13 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import type { ApprovalTask } from '@/api/bpm-enhanced';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 表单字段类型
 interface AprForm {

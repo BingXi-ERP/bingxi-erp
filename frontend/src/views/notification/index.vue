@@ -103,7 +103,7 @@
     <el-dialog
       v-model="detailDialogVisible"
       :title="t('notification.index.titleDetail')"
-      width="600px"
+      :width="isPhone ? '95%' : '600px'"
       :aria-label="t('notification.index.ariaDetailDialog')"
     >
       <div v-if="currentNotification" class="notification-detail">
@@ -145,6 +145,7 @@
         v-loading="settingsLoading"
         :model="settingForm"
         label-width="150px"
+        :label-position="isPhone ? 'top' : 'right'"
         :aria-label="t('system.notification.aria.form')"
       >
         <el-form-item :label="t('system.notification.label.email')">
@@ -229,7 +230,11 @@
          与 OA 公告管理页的"建草稿再发布"是两条不同链路，互不替代 -->
     <el-card v-permission="PERMISSIONS.NOTIFICATION_CREATE" shadow="hover" class="announce-card">
       <template #header>{{ t('system.notification.announce.title') }}</template>
-      <el-form :model="announcementForm" label-width="100px">
+      <el-form
+        :model="announcementForm"
+        label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('system.notification.announce.label.title')" required>
           <el-input v-model="announcementForm.title" :maxlength="100" show-word-limit />
         </el-form-item>
@@ -270,7 +275,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive, onMounted } from 'vue';
+import { computed, ref, reactive, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logAuxLoadFailure, logger } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { loadIfNot, createLazyLoader } from '@/utils/lazy-loader';
@@ -293,6 +299,8 @@ import { getUserList, type User } from '@/api/user';
 import { useTableApi } from '@/composables/useTableApi';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const unreadCount = ref(0);
 const statusFilter = ref('');

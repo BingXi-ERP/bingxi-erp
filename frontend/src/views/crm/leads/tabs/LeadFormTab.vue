@@ -7,7 +7,7 @@
   <el-dialog
     v-model="visible"
     :title="title"
-    width="800px"
+    :width="isPhone ? '95%' : '800px'"
     :close-on-click-modal="false"
     :aria-label="title"
   >
@@ -16,6 +16,7 @@
       :model="formData"
       :rules="formRules"
       label-width="100px"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('crmLeads.leadForm.ariaLabel')"
     >
       <el-row :gutter="20">
@@ -118,8 +119,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue';
+import { computed, ref, reactive, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ElMessage } from 'element-plus';
 import type { FormInstance, FormRules } from 'element-plus';
 import {
@@ -132,6 +134,8 @@ import {
 import { logger } from '@/utils/logger';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 interface Props {
   modelValue: boolean;

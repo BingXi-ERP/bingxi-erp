@@ -36,7 +36,7 @@
     <div v-loading="loading" class="detail-content">
       <template v-if="customer">
         <el-row :gutter="20">
-          <el-col :span="16">
+          <el-col :span="isPhone ? 24 : 16">
             <el-card shadow="hover" class="section-card">
               <template #header>
                 <div class="card-header">
@@ -51,7 +51,7 @@
                 </div>
               </template>
 
-              <el-descriptions :column="2" border>
+              <el-descriptions :column="isPhone ? 1 : 2" border>
                 <el-descriptions-item :label="t('crmDetail.field.customerCode')">{{
                   customer.customer_code
                 }}</el-descriptions-item>
@@ -128,7 +128,7 @@
                 </div>
               </template>
 
-              <el-descriptions :column="2" border>
+              <el-descriptions :column="isPhone ? 1 : 2" border>
                 <el-descriptions-item :label="t('crmDetail.field.taxNumber')" :span="2">{{
                   customer.tax_id || '-'
                 }}</el-descriptions-item>
@@ -152,7 +152,50 @@
                 </div>
               </template>
 
+              <!-- 手机端：联系人卡片 -->
+              <section v-if="isPhone" v-loading="contactsLoading" class="contacts-mobile">
+                <ul class="card-list" :aria-label="t('crmDetail.contactTableAria')">
+                  <li v-for="(row, index) in contacts" :key="row.id ?? index" class="card-item">
+                    <dl class="card-fields">
+                      <div class="field field-emphasis">
+                        <dt>{{ t('crmDetail.field.contactName') }}</dt>
+                        <dd>{{ row.name }}</dd>
+                      </div>
+                      <div class="field">
+                        <dt>{{ t('crmDetail.field.contactTitle') }}</dt>
+                        <dd>{{ row.title || '-' }}</dd>
+                      </div>
+                      <div class="field">
+                        <dt>{{ t('crmDetail.field.phone') }}</dt>
+                        <dd>{{ row.phone }}</dd>
+                      </div>
+                      <div class="field">
+                        <dt>{{ t('crmDetail.field.email') }}</dt>
+                        <dd>{{ row.email || '-' }}</dd>
+                      </div>
+                      <div class="field">
+                        <dt>{{ t('crmDetail.field.isPrimary') }}</dt>
+                        <dd>
+                          <el-tag v-if="row.is_primary" type="warning" size="small">{{
+                            t('crmDetail.field.primaryBadge')
+                          }}</el-tag>
+                        </dd>
+                      </div>
+                    </dl>
+                    <div class="card-actions">
+                      <el-button size="small" type="primary" @click="handleEditContact(row)">
+                        {{ t('crmOpportunities.table.edit') }}
+                      </el-button>
+                      <el-button size="small" type="danger" @click="handleDeleteContact(row)">
+                        {{ t('crmAssignment.ruleTable.delete') }}
+                      </el-button>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+
               <el-table
+                v-if="!isPhone"
                 v-loading="contactsLoading"
                 :data="contacts"
                 stripe
@@ -206,7 +249,7 @@
             </el-card>
           </el-col>
 
-          <el-col :span="8">
+          <el-col :span="isPhone ? 24 : 8">
             <el-card shadow="hover">
               <template #header
                 ><div class="card-header">{{ t('crmDetail.rfmScore') }}</div></template
@@ -367,10 +410,13 @@ import {
 } from '@/api/crm-enhanced';
 import { PERMISSIONS } from '@/constants/permissions';
 import { logger } from '@/utils/logger';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import FollowUpTab from './tabs/FollowUpTab.vue';
 import TagsPanelTab from './tabs/TagsPanelTab.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const route = useRoute();
 const router = useRouter();
@@ -774,5 +820,53 @@ onMounted(() => {
 .addr-detail {
   font-size: 13px;
   color: #909399;
+}
+
+.contacts-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.contacts-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.contacts-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.contacts-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.contacts-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.contacts-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.contacts-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.contacts-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

@@ -39,7 +39,81 @@
         </el-select>
       </div>
 
-      <el-table v-loading="loading" :data="list" stripe>
+      <!-- 手机端：公告单列卡片 -->
+      <section v-if="isPhone" v-loading="loading" class="oa-mobile">
+        <ul class="card-list" :aria-label="t('system.oaAnnouncement.column.title')">
+          <li v-for="(row, index) in list" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('system.oaAnnouncement.column.title') }}</dt>
+                <dd>{{ row.title }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.oaAnnouncement.column.type') }}</dt>
+                <dd>
+                  <el-tag size="small">{{ row.announcement_type }}</el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.oaAnnouncement.column.status') }}</dt>
+                <dd>
+                  <el-tag :type="statusTagType(row.status)" size="small">
+                    {{ statusLabel(row.status) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.oaAnnouncement.column.scope') }}</dt>
+                <dd>{{ row.visibility_scope }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.oaAnnouncement.column.publishDate') }}</dt>
+                <dd>{{ row.publish_date }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('system.oaAnnouncement.column.createdAt') }}</dt>
+                <dd>{{ row.created_at }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button
+                v-if="row.status === 'DRAFT'"
+                v-permission="'oa-announcements:update'"
+                type="primary"
+                @click="openDialog(row as OaAnnouncement)"
+              >
+                {{ t('system.oaAnnouncement.button.edit') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'DRAFT'"
+                v-permission="'oa-announcements:update'"
+                type="success"
+                @click="handlePublish(row as OaAnnouncement)"
+              >
+                {{ t('system.oaAnnouncement.button.publish') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'PUBLISHED'"
+                v-permission="'oa-announcements:update'"
+                type="warning"
+                @click="handleArchive(row as OaAnnouncement)"
+              >
+                {{ t('system.oaAnnouncement.button.archive') }}
+              </el-button>
+              <el-button
+                v-if="row.status === 'DRAFT'"
+                v-permission="'oa-announcements:delete'"
+                type="danger"
+                @click="handleDelete(row as OaAnnouncement)"
+              >
+                {{ t('system.oaAnnouncement.button.delete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <el-table v-if="!isPhone" v-loading="loading" :data="list" stripe>
         <el-table-column
           prop="title"
           :label="t('system.oaAnnouncement.column.title')"
@@ -148,9 +222,15 @@
           ? t('system.oaAnnouncement.dialog.editTitle')
           : t('system.oaAnnouncement.dialog.createTitle')
       "
-      width="650px"
+      :width="isPhone ? '95%' : '650px'"
     >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-width="100px"
+        :label-position="isPhone ? 'top' : 'right'"
+      >
         <el-form-item :label="t('system.oaAnnouncement.form.label.title')" prop="title">
           <el-input v-model="form.title" :maxlength="200" />
         </el-form-item>
@@ -256,7 +336,8 @@
 
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -277,6 +358,8 @@ import { request } from '@/api/request';
 import type { ApiResponse, PaginatedResponse } from '@/types/api';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const list = ref<OaAnnouncement[]>([]);
 const total = ref(0);
@@ -500,3 +583,53 @@ onMounted(() => {
   fetchOptions();
 });
 </script>
+
+<style scoped>
+.oa-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.oa-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.oa-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.oa-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.oa-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.oa-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.oa-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.oa-mobile .card-actions .el-button {
+  margin: 0;
+}
+</style>

@@ -23,7 +23,7 @@
               </span>
             </div>
           </template>
-          <el-descriptions :column="2" border>
+          <el-descriptions :column="isPhone ? 1 : 2" border>
             <el-descriptions-item :label="$t('colorPrices.detail.info.id')">{{
               price?.id
             }}</el-descriptions-item>
@@ -101,7 +101,52 @@
           }}</el-button>
         </div>
       </template>
-      <el-table :data="tiers" border :aria-label="$t('colorPrices.detail.tier.tableAriaLabel')">
+      <!-- 手机端：阶梯价格单列卡片，字段与动作与桌面表格等价 -->
+      <section v-if="isPhone" class="tier-mobile">
+        <ul class="card-list" :aria-label="$t('colorPrices.detail.tier.tableAriaLabel')">
+          <li v-for="(row, index) in tiers" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ $t('colorPrices.detail.tier.sequence') }}</dt>
+                <dd>{{ row.sequence }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.detail.tier.minQuantity') }}</dt>
+                <dd>{{ row.min_quantity }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.detail.tier.maxQuantity') }}</dt>
+                <dd>{{ row.max_quantity || $t('colorPrices.detail.tier.unlimited') }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.detail.tier.tierPrice') }}</dt>
+                <dd>{{ row.tier_price }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ $t('colorPrices.detail.tier.customerLevel') }}</dt>
+                <dd>
+                  <el-tag v-if="row.customer_level" :type="getLevelColor(row.customer_level)">
+                    {{ getLevelLabel(row.customer_level) }}
+                  </el-tag>
+                  <span v-else>{{ $t('colorPrices.detail.tier.general') }}</span>
+                </dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="danger" @click="handleDeleteTier(row)">
+                {{ $t('colorPrices.common.delete') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <el-table
+        v-if="!isPhone"
+        :data="tiers"
+        border
+        :aria-label="$t('colorPrices.detail.tier.tableAriaLabel')"
+      >
         <el-table-column
           prop="sequence"
           :label="$t('colorPrices.detail.tier.sequence')"
@@ -148,7 +193,7 @@
     <el-dialog
       v-model="tierDialogVisible"
       :title="$t('colorPrices.detail.tierDialog.title')"
-      width="480px"
+      :width="isPhone ? '95%' : '480px'"
       :aria-label="$t('colorPrices.detail.tierDialog.ariaLabel')"
     >
       <el-form
@@ -202,7 +247,7 @@
     <el-dialog
       v-model="editDialogVisible"
       :title="$t('colorPrices.detail.editDialog.title')"
-      width="480"
+      :width="isPhone ? '95%' : '480px'"
     >
       <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="110px">
         <el-form-item
@@ -238,7 +283,7 @@
     <el-dialog
       v-model="approveDialogVisible"
       :title="$t('colorPrices.detail.approveDialog.title')"
-      width="440"
+      :width="isPhone ? '95%' : '440px'"
     >
       <el-form :model="approveForm" label-width="110px">
         <el-form-item :label="$t('colorPrices.detail.approveDialog.decision')" required>
@@ -279,6 +324,7 @@ import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   getColorPrice,
   getColorPriceHistory,
@@ -300,6 +346,8 @@ import { numberInputRules, numericView } from '@/utils/number-input';
 import PriceHistoryChart from '@/components/PriceHistoryChart.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 状态码 → 本地化标签（响应式：随语言切换自动更新）
 const getLevelLabel = (level: string | null | undefined) =>
@@ -563,5 +611,53 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.tier-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tier-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.tier-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.tier-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.tier-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.tier-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.tier-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.tier-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>

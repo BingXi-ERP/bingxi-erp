@@ -57,7 +57,77 @@
       </el-form>
 
       <!-- 列表 -->
+      <!-- 手机端：单列卡片，字段与动作与桌面表格等价 -->
+      <section v-if="isPhone" v-loading="loading" class="corder-mobile">
+        <ul class="card-list" :aria-label="t('customOrders.list.tableAriaLabel')">
+          <li v-for="(row, index) in orders" :key="row.id ?? index" class="card-item">
+            <dl class="card-fields">
+              <div class="field field-emphasis">
+                <dt>{{ t('customOrders.list.colOrderNo') }}</dt>
+                <dd>{{ row.order_no }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customOrders.list.colSpec') }}</dt>
+                <dd>{{ row.spec }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customOrders.list.colQuantity') }}</dt>
+                <dd>{{ row.quantity }} {{ row.unit }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customOrders.list.colAmount') }}</dt>
+                <dd>
+                  <span v-if="row.total_amount"
+                    >{{ row.currency }} {{ formatAmount(row.total_amount) }}</span
+                  >
+                  <span v-else>-</span>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customOrders.list.colStatus') }}</dt>
+                <dd>
+                  <el-tag :type="customOrderStatusTagType(row.status)">
+                    {{ getStatusLabel(row.status) }}
+                  </el-tag>
+                </dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customOrders.list.colExpectedDelivery') }}</dt>
+                <dd>{{ row.expected_delivery_date || '-' }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customOrders.list.colNotes') }}</dt>
+                <dd>{{ row.notes || '-' }}</dd>
+              </div>
+              <div class="field">
+                <dt>{{ t('customOrders.list.colCreatedAt') }}</dt>
+                <dd>{{ row.created_at }}</dd>
+              </div>
+            </dl>
+            <div class="card-actions">
+              <el-button type="primary" plain @click="goDetail(row.id)">
+                {{ t('customOrders.list.buttonDetail') }}
+              </el-button>
+              <el-button @click="goTracking(row.id)">
+                {{ t('customOrders.list.buttonTracking') }}
+              </el-button>
+              <el-button
+                v-if="row.status !== 'completed' && row.status !== 'cancelled'"
+                type="success"
+                @click="handleAdvance(row)"
+              >
+                {{ t('customOrders.list.buttonAdvance') }}
+              </el-button>
+              <el-button v-if="row.status === 'draft'" type="danger" @click="handleCancel(row)">
+                {{ t('customOrders.list.buttonCancel') }}
+              </el-button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <el-table
+        v-if="!isPhone"
         v-loading="loading"
         :data="orders"
         stripe
@@ -174,9 +244,12 @@ import {
 } from '@/utils/custom-order-status';
 import { logAuxLoadFailure } from '@/utils/logger';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const router = useRouter();
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 // 批次 94 P2-12 修复：获取用户 store 以读取当前登录用户 ID
 const filters = ref({ status: '', keyword: '' });
 
@@ -320,5 +393,53 @@ async function handleCancel(row: CustomOrderListItem) {
 }
 .filter-form {
   margin-bottom: 16px;
+}
+
+.corder-mobile .card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.corder-mobile .card-item {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.corder-mobile .card-fields > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.corder-mobile .card-fields dt {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.corder-mobile .card-fields dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.corder-mobile .field-emphasis dd {
+  font-weight: 500;
+}
+
+.corder-mobile .card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.corder-mobile .card-actions .el-button {
+  margin: 0;
 }
 </style>
