@@ -9279,6 +9279,7 @@ export default {
       confirm: 'Confirm',
     },
     table: {
+      mobileCardAria: 'Purchase Contract Mobile Card List',
       listAria: 'Purchase Contract List',
       colIndex: 'No.',
       colContractNo: 'Contract No.',

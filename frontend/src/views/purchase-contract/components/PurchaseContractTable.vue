@@ -5,7 +5,99 @@
 -->
 <template>
   <el-card shadow="hover" class="table-card">
+    <!-- 手机卡片（<768 与采购管理表格同断点同范式） -->
+    <section v-if="isPhone" v-loading="loading" class="contract-mobile">
+      <ul class="order-list" :aria-label="t('purchaseContract.table.mobileCardAria')">
+        <li v-for="row in contractList" :key="row.id" class="order-card">
+          <dl class="order-fields">
+            <div class="order-number">
+              <dt>{{ t('purchaseContract.table.colContractNo') }}</dt>
+              <dd>{{ row.contract_no }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('purchaseContract.table.colContractName') }}</dt>
+              <dd>{{ row.contract_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('purchaseContract.table.colSupplier') }}</dt>
+              <dd>{{ row.supplier_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('purchaseContract.table.colTotalAmount') }}</dt>
+              <dd>{{ formatCurrency(row.total_amount) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('purchaseContract.table.colSignedDate') }}</dt>
+              <dd>{{ row.signed_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('purchaseContract.table.colEffectiveDate') }}</dt>
+              <dd>{{ row.effective_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('purchaseContract.table.colExpiryDate') }}</dt>
+              <dd>{{ row.expiry_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('purchaseContract.table.colStatus') }}</dt>
+              <dd>
+                <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+              </dd>
+            </div>
+          </dl>
+          <div class="order-actions">
+            <el-button type="primary" link @click="emit('view', row as PurchaseContract)">
+              {{ t('purchaseContract.table.view') }}
+            </el-button>
+            <el-button
+              v-if="row.status === 'draft'"
+              v-permission="PERMISSIONS.PURCHASE_CONTRACT_UPDATE"
+              type="primary"
+              link
+              @click="emit('edit', row as PurchaseContract)"
+            >
+              {{ t('purchaseContract.table.edit') }}
+            </el-button>
+            <el-button
+              v-if="row.status === 'draft'"
+              type="success"
+              link
+              @click="emit('submit', row as PurchaseContract)"
+            >
+              {{ t('purchaseContract.table.submit') }}
+            </el-button>
+            <el-button
+              v-if="row.status === 'draft'"
+              type="success"
+              link
+              @click="emit('approve', row as PurchaseContract)"
+            >
+              {{ t('purchaseContract.table.approve') }}
+            </el-button>
+            <el-button
+              v-if="row.status === 'active'"
+              type="warning"
+              link
+              @click="emit('execute', row as PurchaseContract)"
+            >
+              {{ t('purchaseContract.table.execute') }}
+            </el-button>
+            <el-button
+              v-if="row.status === 'draft'"
+              v-permission="PERMISSIONS.PURCHASE_CONTRACT_DELETE"
+              type="danger"
+              link
+              @click="emit('delete', row as PurchaseContract)"
+            >
+              {{ t('purchaseContract.table.delete') }}
+            </el-button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
     <el-table
+      v-else
       v-loading="loading"
       :data="contractList"
       border
@@ -135,7 +227,7 @@
       </el-table-column>
     </el-table>
 
-    <div class="pagination-container">
+    <div class="pagination-container" :class="{ 'mobile-pagination': isPhone }">
       <el-pagination
         :current-page="page"
         :page-size="pageSize"
@@ -151,12 +243,16 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { PERMISSIONS } from '@/constants/permissions';
 import type { PurchaseContract } from '@/api/purchase-contract';
 import { formatCurrency, getStatusType, getStatusLabel } from '../composables/pcFmts';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 采购合同列表表格组件（批次 284：page/pageSize props + v-model 绑定分页）
@@ -190,9 +286,73 @@ const emit = defineEmits<{
 .table-card {
   margin-bottom: 20px;
 }
+.contract-mobile {
+  min-width: 0;
+}
+.order-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.order-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.order-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.order-fields > div {
+  min-width: 0;
+}
+.order-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.order-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.order-number dd {
+  font-weight: 600;
+}
+.order-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.order-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
 .pagination-container {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+.mobile-pagination {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.mobile-pagination :deep(button),
+.mobile-pagination :deep(.el-pager li),
+.mobile-pagination :deep(.el-pagination__sizes .el-select__wrapper) {
+  min-width: 44px;
+  min-height: 44px;
 }
 </style>

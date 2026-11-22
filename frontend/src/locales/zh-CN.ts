@@ -9210,6 +9210,7 @@ export default {
       confirm: '确定',
     },
     table: {
+      mobileCardAria: '采购合同手机卡片列表',
       listAria: '采购合同列表',
       colIndex: '序号',
       colContractNo: '合同编号',
