@@ -9426,7 +9426,7 @@ export default {
       },
     },
     table: {
-      mobileCardAria: 'Purchase inspection mobile card list',
+      mobileCardAria: 'Purchase Inspection Mobile Card List',
       ariaLabel: 'Purchase Inspection List',
       column: {
         inspectionNo: 'Inspection No.',
