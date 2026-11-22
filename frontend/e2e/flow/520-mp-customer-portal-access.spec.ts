@@ -287,15 +287,19 @@ test.describe.serial('520 小程序客户门户读面', () => {
     ];
     const unbound = await apiCallExpectFail(sessions[1].page, 'GET', paths[0]);
     expect(unbound.status, '未绑定账号必须 403（fail-closed）').toBe(403);
-    expect(unbound.message, '未绑定拒绝文案应可指导操作').toContain('未绑定客户档案');
+    // 403 家族外显固定为脱敏常量（防探测账号绑定状态），业务细节只进服务端日志。
+    expect(unbound.message, '未绑定拒绝外显为固定脱敏文案').toBe('无权限');
+    expect(unbound.message, '外显不得泄露绑定状态').not.toContain('未绑定');
 
     const dangling = await apiCallExpectFail(sessions[2].page, 'GET', paths[0]);
     expect(dangling.status, '悬空绑定必须 403').toBe(403);
-    expect(dangling.message, '悬空绑定拒绝文案应可指导操作').toContain('绑定的客户档案已失效');
+    expect(dangling.message, '悬空绑定拒绝外显为固定脱敏文案').toBe('无权限');
+    expect(dangling.message, '外显不得泄露档案失效状态').not.toContain('失效');
 
     const temporary = await apiCallExpectFail(sessions[3].page, 'GET', paths[0]);
     expect(temporary.status, '已绑定但非 customer 角色必须 403').toBe(403);
-    expect(temporary.message, '角色硬门拒绝文案应点名 customer').toContain('customer 角色');
+    expect(temporary.message, '角色硬门外显为固定脱敏文案').toBe('无权限');
+    expect(temporary.message, '外显不得点名角色要求').not.toContain('customer');
 
     for (const path of paths.slice(1)) {
       expect(
