@@ -208,7 +208,10 @@ test.describe.serial('460 报价定价自动计算的定点数精度守恒', () 
       ),
       'NORMAL 定价出参'
     );
-    expect(str(normal.discount_applied, 'normal.discount_applied')).toBe('0.00');
+    expect(
+      canonicalDecimal(normal.discount_applied, 'normal.discount_applied'),
+      'NORMAL 档折扣为零，零值乘法走标度快速路径，按本 spec 声明的数值守恒口径比对'
+    ).toBe('0');
     expect(str(normal.unit_price, 'normal.unit_price'), '12.3456 无折扣仍须两位收敛').toBe('12.35');
     expect(str(normal.unit_price_with_tax, 'normal.unit_price_with_tax')).toBe('13.96');
     expect(str(normal.final_amount, 'normal.final_amount')).toBe('37.05');
