@@ -10711,6 +10711,7 @@ export default {
     },
     table: {
       ariaLabel: '销售退货列表',
+      mobileCardAria: '销售退货手机卡片列表',
       columnReturnNo: '退货单号',
       columnSalesOrderNo: '销售订单号',
       columnCustomerName: '客户名称',

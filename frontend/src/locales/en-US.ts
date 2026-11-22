@@ -10779,6 +10779,7 @@ export default {
     },
     table: {
       ariaLabel: 'Sales Returns List',
+      mobileCardAria: 'Sales return mobile card list',
       columnReturnNo: 'Return No.',
       columnSalesOrderNo: 'Sales Order No.',
       columnCustomerName: 'Customer Name',
