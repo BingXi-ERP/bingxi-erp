@@ -7,7 +7,7 @@
 //!   出参携带真实缺维原因；内部产品 ID 不进 HTTP 出参，只写日志）
 //! - `backend/src/services/inv/fabric_class.rs`（唯一判定来源：批次必填；
 //!   色号非空=染色布 → 缸号必填 + `normalize_outbound_piece_no` 匹号必填，
-//!   仅按空串判定不看名称；trim 归一；白坯免缸号免匹号既有口径不动）
+//!   仅按空串判定不看名称；trim 归一；白坯免缸号免匹号，但携带缸号须显式拒绝）
 //! - `backend/src/services/inv/stock.rs:24-60,71-114`（check_from_warehouse_inventory：
 //!   调拨建单事务内按四维精确匹配调出仓库存；同产品多批次必须传维度定位；
 //!   白坯维持宽松不强制缸号——两分支都在此锁死，防止回归改回单维 product_id）
@@ -21,7 +21,8 @@
 //!   含错误族别、错误码、Display 原文与 400 信封映射
 //! - `#[ignore]` 活库用例：走真实 handler 在已迁移 PG 上建调拨单——
 //!   染色布缺缸号 → 400 VALIDATION_ERROR 且调拨单不残留、库存不动（事务回滚）；
-//!   白坯四维宽松 → 200（对照防过度收紧；种子含真白坯库存行，见 D 组前取证注）。
+//!   白坯不带缸号四维宽松 → 200（对照防过度收紧；种子含真白坯库存行，见 D 组前取证注）；
+//!   白坯携带缸号 → 400 VALIDATION_ERROR 且拒绝明细零落库。
 //!   注：调拨 create 链路含 advisory_xact_lock 单号生成 + 频率检查用 Postgres 方言
 //!   原生 SQL（handler L113-134），**sqlite 无法非活库化此链**（该 PG 方言硬编码本身
 //!   已作为挂账记入交付报告）。
@@ -87,9 +88,10 @@ fn missing_batch_returns_validation_error() {
     assert!(err2.to_string().contains("批次不得为空"));
 }
 
-/// 白坯布（色号为空/缺失）：不强制缸号也不强制匹号，维持宽松放行；维度归一值精确断言
+/// 白坯布（色号为空/缺失）：不强制缸号也不强制匹号；携带缸号须显式拒绝，
+/// 维度归一值精确断言
 #[test]
-fn white_fabric_passes_without_dye_lot_and_normalizes() {
+fn white_fabric_positive_and_dye_lot_rejected() {
     let dims = require_outbound_dimensions("调拨出库", 3, None, None, Some(" B7 "), None)
         .expect("白坯免缸号免匹号（回归锁：不得把白坯也强制四维）");
     assert_eq!(dims.color_no, "", "白坯归一为空串");
@@ -102,8 +104,8 @@ fn white_fabric_passes_without_dye_lot_and_normalizes() {
         .expect("空白色号=白坯");
     assert_eq!(dims2.color_no, "");
 
-    // 白坯给了缸号/匹号也不报错（维度多给不排除匹配宽松性；匹号 trim 保留不丢弃）
-    let dims3 = require_outbound_dimensions(
+    // 白坯携带缸号必须显式拒绝，不得静默清空或保留
+    let err = require_outbound_dimensions(
         "调拨出库",
         3,
         None,
@@ -111,8 +113,19 @@ fn white_fabric_passes_without_dye_lot_and_normalizes() {
         Some("B7"),
         Some(" P-3 "),
     )
-    .expect("白坯带缸号/匹号仍放行");
-    assert_eq!(dims3.dye_lot_no.as_deref(), Some("DYE-9"));
+    .expect_err("白坯带缸号必须拒绝");
+    assert_eq!(err.error_code(), "VALIDATION_ERROR");
+    let disp = format!("{}", err);
+    assert!(disp.contains("白坯布不具缸号属性"), "实际: {disp}");
+    assert!(
+        disp.contains("DYE-9"),
+        "原因须回显用户提交的缸号，实际: {disp}"
+    );
+
+    // 白坯不带缸号但主动给匹号仍放行，trim 保留不由维度层清空
+    let dims3 = require_outbound_dimensions("调拨出库", 3, None, None, Some("B7"), Some(" P-3 "))
+        .expect("白坯不带缸号、给匹号仍放行");
+    assert_eq!(dims3.dye_lot_no, None);
     assert_eq!(dims3.piece_no.as_deref(), Some("P-3"));
 }
 
@@ -474,8 +487,8 @@ async fn live_create_transfer_dyed_missing_dye_lot_400_and_rollback() {
 // D) R-1「免填≠清空」真库回读行为锁（create_transfer 全链，活库、非 ignore）
 // =========================================================
 
-/// 白坯出库明细 `piece_no`/`dye_lot_no` **主动给值 ⇒ 归一后非空保留（trim）**；
-/// **不给值 ⇒ 缺省 None**；两者都**不得被清空/静默丢弃**。
+/// 白坯出库明细 `piece_no` **主动给值 ⇒ 归一后非空保留（trim）**；
+/// **不给值 ⇒ 缺省 None**；`dye_lot_no` 给非空值必须显式拒绝，不给值则保持无缸号。
 ///
 /// 为什么 src 内既有锁不够（源码专家点名"需要测试补钉否则易回潮"）：
 /// - `fabric_class.rs:191-200`（#[cfg(test)] 反向锁）与 A 组纯函数矩阵只钉**归一函数**；
@@ -487,23 +500,15 @@ async fn live_create_transfer_dyed_missing_dye_lot_400_and_rollback() {
 /// - 出参回显同样必须带上保留值：响应 items 由 `get_transfer_detail`（inventory_move.rs:149,197-210）
 ///   真库重读，本用例同时钉响应与 DB 行两层。
 ///
-/// 三组明细如何区分"退化形态"（防假绿设计）：
-/// 1. 明细 1 带空白padding 给值 `" DL-R1 "`/`" P-R1 "` ⇒ 回读必须等于 trim 后的非空值：
-///    实现若退化成"白坯统一归一 None/清空"（R-1 前的撒谎形态），此断言必红；
-/// 2. 明细 2 不给值 ⇒ piece_no 回读 NULL（None），dye_lot_no 回读无缸号内容
-///    （该列 DDL NOT NULL DEFAULT ''，migration/src/domain/system/mod.rs:296，
-///    归一层 None 已在 A 组 `white_fabric_passes_without_dye_lot_and_normalizes` 钉死）；
-/// 3. 明细 3 给空串/全空格 `"  "` ⇒ **视为未给**（fabric_class.rs:48-51,88-90 仅以是否为空判定）：
-///    回读无内容、建单不被拒。若实现退化 A"把空白串当值原样保留"⇒ 回读 Some("  ") 必红；
-///    若退化 B"白坯给空白串也报错"⇒ 建单 400 必红。与明细 1 的"给值保留"形成族别分界。
+/// 三组明细如何区分白坯新口径（防假绿设计）：
+/// 1. 明细 1 只给匹号 `" P-R1 "` 不给缸号 ⇒ 回读必须等于 trim 后的非空值：
+///    实现若退化成"白坯统一清空匹号"，此断言必红；
+/// 2. 明细 2 不给值 ⇒ piece_no 回读 NULL（None），dye_lot_no 回读无缸号内容；
+/// 3. 明细 3 给空串/全空格 `"  "` ⇒ **视为未给**（fabric_class.rs 仅以是否为空判定）：
+///    回读无内容、建单不被拒。若实现把空白串当值原样保留或白坯给空白串报错，均必红。
 ///
-/// 通道如实说明（不美化）：白坯明细主动给匹号会进入第四维**存在性预检**
-/// （`inv/stock.rs:61-71`），预检过滤硬编码 `piece_type=dyed`
-/// （`piece_domain_service.rs:620-629` `outbound_piece_filter`），即白坯口径下给的任何匹号
-/// 都必须在调出仓按（款/仓/缸/批）tuple 命中一条**真实可用的染色匹**才放行。本用例据此
-/// 种一条 tuple 相符的染色匹行把通道打通——本锁钉的是"维度值如实保留、不被清空"的
-/// 回写链，**不背书**"白坯匹号预检仅染色族"这一口径的合理性；该疑点与 R-1"免填"语义的
-/// 张力已如实回报编排方，属另一族，不在本批动它。
+/// 另设单列负例腿：白坯明细携带非空缸号 → 400 VALIDATION_ERROR 且外显真实原因，
+/// 被拒后不得产生任何明细行。
 ///
 /// 非 ignore 依据：与 `contract_piece_four_dim_outbound_ship_test.rs` 同一
 /// `test_common::setup_test_db()` 夹具、活库非 ignore 先例（CI Rust job 配已迁移 PG，
@@ -530,8 +535,8 @@ async fn greige_outbound_dims_kept_as_given_readback_live_db() {
     use bingxi_backend::models::warehouse;
     use chrono::Utc;
     use sea_orm::{
-        ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, Order, QueryFilter,
-        QueryOrder,
+        ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, Order, PaginatorTrait,
+        QueryFilter, QueryOrder,
     };
     use std::sync::Arc;
     use tower::ServiceExt;
@@ -639,7 +644,7 @@ async fn greige_outbound_dims_kept_as_given_readback_live_db() {
         product_id: Set(p.id),
         batch_no: Set("B-R1".to_string()),
         color_no: Set(String::new()),
-        dye_lot_no: Set("DL-R1".to_string()),
+        dye_lot_no: Set(String::new()),
         length: Set(dec("30.00")),
         status: Set(piece_status::AVAILABLE.to_string()),
         created_at: Set(Utc::now()),
@@ -656,13 +661,14 @@ async fn greige_outbound_dims_kept_as_given_readback_live_db() {
         "to_warehouse_id": wh_ids[1],
         "items": [
             { "product_id": p.id, "quantity": "5.00", "batch_no": "B-R1",
-              "dye_lot_no": " DL-R1 ", "piece_no": " P-R1 " },
+              "piece_no": " P-R1 " },
             { "product_id": p.id, "quantity": "5.00", "batch_no": "B-R1" },
             { "product_id": p.id, "quantity": "5.00", "batch_no": "B-R1",
               "dye_lot_no": "   ", "piece_no": "  " },
         ]
     });
     let resp = app
+        .clone()
         .oneshot(
             Request::builder()
                 .method(Method::POST)
@@ -697,9 +703,9 @@ async fn greige_outbound_dims_kept_as_given_readback_live_db() {
         "出参必须如实回显主动给的匹号（trim），实际: {v}"
     );
     assert_eq!(
-        v["data"]["items"][0]["dye_lot_no"].as_str(),
-        Some("DL-R1"),
-        "出参必须如实回显主动给的缸号（trim），实际: {v}"
+        v["data"]["items"][0]["dye_lot_no"].as_str().unwrap_or(""),
+        "",
+        "白坯不带缸号时回读无缸号内容，实际: {v}"
     );
 
     // DB 真相层回读：明细按插入顺序 id 升序
@@ -722,9 +728,9 @@ async fn greige_outbound_dims_kept_as_given_readback_live_db() {
         "白坯主动给匹号必须如实保留 trim 值，不得清空/静默丢弃（假保存形态）"
     );
     assert_eq!(
-        items[0].dye_lot_no.as_deref(),
-        Some("DL-R1"),
-        "白坯主动给缸号必须如实保留 trim 值，不得清空/静默丢弃"
+        items[0].dye_lot_no.as_deref().unwrap_or(""),
+        "",
+        "白坯不带缸号 ⇒ 存储层无缸号内容（列 DDL NOT NULL DEFAULT ''）"
     );
 
     // —— 明细 2：不给值 ⇒ 缺省 None（匹号列可空如实 NULL）——
@@ -752,4 +758,54 @@ async fn greige_outbound_dims_kept_as_given_readback_live_db() {
         items[2].color_no, "",
         "空白串明细同为白坯口径（色号归一空串）"
     );
+
+    // —— 白坯携带缸号负例：400 VALIDATION_ERROR + 外显拒因、零明细落库 ——
+    let bad_body = json!({
+        "from_warehouse_id": wh_ids[0],
+        "to_warehouse_id": wh_ids[1],
+        "items": [
+            { "product_id": p.id, "quantity": "5.00", "batch_no": "B-R1-BAD",
+              "dye_lot_no": "DL-BAD" }
+        ]
+    });
+    let bad_resp = app
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/inventory/transfers")
+                .header("content-type", "application/json")
+                .body(Body::from(format!("{}", bad_body)))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let bad_status = bad_resp.status();
+    let bad_bytes = axum::body::to_bytes(bad_resp.into_body(), 1024 * 1024)
+        .await
+        .unwrap();
+    let bad_v: serde_json::Value = serde_json::from_slice(&bad_bytes).unwrap_or_else(|e| {
+        panic!(
+            "白坯带缸号建单响应应为 JSON: {e}; body={}",
+            String::from_utf8_lossy(&bad_bytes)
+        );
+    });
+    assert_eq!(
+        bad_status,
+        StatusCode::BAD_REQUEST,
+        "白坯带缸号必须拒绝，实际 {bad_status}: {bad_v}"
+    );
+    assert_eq!(bad_v["code"], "VALIDATION_ERROR");
+    assert!(
+        bad_v["message"]
+            .as_str()
+            .unwrap_or("")
+            .contains("白坯布不具缸号属性"),
+        "拒因必须外显，实际: {bad_v}"
+    );
+    let bad_items = inventory_transfer_item::Entity::find()
+        .filter(inventory_transfer_item::Column::BatchNo.eq("B-R1-BAD"))
+        .count(&*db)
+        .await
+        .unwrap();
+    assert_eq!(bad_items, 0, "白坯带缸号被拒不得落明细行");
 }
