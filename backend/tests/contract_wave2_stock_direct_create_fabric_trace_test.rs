@@ -76,7 +76,7 @@ fn white_fabric_dye_lot_rejected_and_without_lot_passes() {
 
         let err =
             admit_stock_fabric_trace(color, Some(String::from("D9")), Some(String::from("B1")))
-            .expect_err("白坯空色号携带缸号必须拒绝");
+                .expect_err("白坯空色号携带缸号必须拒绝");
         assert!(
             matches!(err, AppError::BusinessErrorDisplayable(_)),
             "必须是可外显业务错（用户看得见原因），实际: {err:?}"
