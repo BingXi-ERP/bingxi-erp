@@ -354,3 +354,132 @@ test('513-03 对账来源门：未签收拒、签收后放行、无送货单客�
   });
   expect(bareGen.reconciliation_no, '无送货单客户对账单正常生成').toBeTruthy();
 });
+
+test('513-04 部分签收仍拦对账，全签后明细与余额守恒', async ({ page }) => {
+  await ensureTestEntities(page);
+  // AR 收款确认要走会计期间门；init 幂等，前置失败按真实缺陷判红。
+  await apiCall(page, 'POST', '/finance/accounting-periods/init', {});
+  const suffix = `${Date.now().toString().slice(-9)}${Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0')}`;
+  const { productId, warehouseId } = await resolveProductAndWarehouse(page);
+  const customerId = await createOwnCustomer(page, `51304${suffix}`);
+  const batchA = `51304A_${suffix}`;
+  const batchB = `51304B_${suffix}`;
+
+  for (const batchNo of [batchA, batchB]) {
+    await apiCall(page, 'POST', '/inventory/stock', {
+      warehouse_id: warehouseId,
+      product_id: productId,
+      batch_no: batchNo,
+      color_no: '',
+      grade: '一等品',
+      quantity_meters: '30',
+      quantity_kg: '30',
+    });
+  }
+
+  const first = await createApprovedOrder(page, customerId, productId, '30', '10.00');
+  const second = await createApprovedOrder(page, customerId, productId, '30', '10.00');
+  const firstShip = await shipFullAndReadDelivery(page, first.orderId, productId, '30', batchA);
+  const secondShip = await shipFullAndReadDelivery(page, second.orderId, productId, '30', batchB);
+
+  const periodStart = '2000-01-01';
+  const periodEnd = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+  const genBody = {
+    customer_id: customerId,
+    start_date: periodStart,
+    end_date: periodEnd,
+    notes: '部分签收门回归',
+  };
+
+  // 先签第一张：门必须按“该客户存在任一未签收送货单”拦截，而不是只看是否有签收记录。
+  await apiCall(page, 'POST', `/sales/orders/${first.orderId}/deliveries/${firstShip.deliveryId}/sign`);
+  const partial = await apiCallExpectFail(
+    page,
+    'POST',
+    '/ar-reconciliations-enhanced/generate',
+    genBody
+  );
+  expect(partial.status, `部分签收仍应 400，实际=${JSON.stringify(partial)}`).toBe(400);
+  expect(JSON.stringify(partial), '部分签收拒因可外显').toContain('未签收的送货单');
+
+  const secondDeliveries = await apiCallRaw<{ list: Array<Row>; total: number }>(
+    page,
+    'GET',
+    `/sales/orders/${second.orderId}/deliveries`
+  );
+  const secondPending = secondDeliveries.list.find(d => Number(d.id) === secondShip.deliveryId);
+  if (!secondPending) throw new Error('第二张送货单读回不存在');
+  expect(secondPending.signed_at, '第二张送货单签收前 signed_at 为空').toBeNull();
+
+  await apiCall(page, 'POST', `/sales/orders/${second.orderId}/deliveries/${secondShip.deliveryId}/sign`);
+
+  const day = new Date().toISOString().slice(0, 10);
+  const invoiceAmount = 200;
+  const paymentAmount = 80;
+  const invoice = await apiCallRaw<Row>(page, 'POST', '/ar/invoices', {
+    customer_id: customerId,
+    invoice_amount: String(invoiceAmount),
+    invoice_date: day,
+    due_date: day,
+    source_type: 'MANUAL',
+  });
+  const invoiceId = readNumber(invoice.id, '应收发票 id');
+  const payment = await apiCallRaw<Row>(page, 'POST', '/ar/payments', {
+    customer_id: customerId,
+    amount: String(paymentAmount),
+    payment_method: '银行转账',
+    payment_date: day,
+  });
+  const paymentId = readNumber(payment.id, 'AR 收款 id');
+  const confirmed = await apiCallRaw<Row>(
+    page,
+    'POST',
+    `/ar/payments/${paymentId}/confirm`
+  );
+  expect(confirmed.status, '收款确认后才进入对账聚合').toBe('confirmed');
+
+  const generated = await apiCallRaw<Row>(
+    page,
+    'POST',
+    '/ar-reconciliations-enhanced/generate',
+    genBody
+  );
+  const reconId = readNumber(generated.id, '对账单 id');
+  expect(generated.reconciliation_no, '对账单号非空').toBeTruthy();
+  const opening = Number(generated.opening_balance);
+  expect(Number.isFinite(opening), `期初余额不可解析：${JSON.stringify(generated.opening_balance)}`).toBe(true);
+  expect(opening, '专属客户无期初应收').toBe(0);
+  const details = await apiCallRaw<{ reconciliation: Row; details: Array<Row> }>(
+    page,
+    'GET',
+    `/ar-reconciliations-enhanced/${reconId}/details`
+  );
+
+  expect(readNumber(details.reconciliation.id, '明细回读对账单 id')).toBe(reconId);
+  // 发票合计按对账明细实际 INVOICE 行求和，涵盖两张销售发货自动生成的应收单。
+  const invoiceLineTotal = details.details
+    .filter(d => d.item_type === 'INVOICE')
+    .reduce((sum, d) => sum + Number(d.amount || 0), 0);
+  expect(Number(generated.total_invoices), '发票合计应等于明细 INVOICE 行之和').toBe(invoiceLineTotal);
+  expect(Number(generated.total_collections), '收款合计').toBe(paymentAmount);
+  expect(
+    Number(generated.closing_balance),
+    '期末=期初+发票-收款'
+  ).toBe(opening + invoiceLineTotal - paymentAmount);
+
+  const invoiceItem = details.details.find(
+    d => d.item_type === 'INVOICE' && Number(d.document_id) === invoiceId
+  );
+  expect(invoiceItem, `对账明细应含 document_id=${invoiceId} 的 INVOICE 行`).toBeTruthy();
+  expect(invoiceItem!.document_type).toBe('SALES_INVOICE');
+  expect(Number(invoiceItem!.amount), 'INVOICE 行金额取发票原值').toBe(invoiceAmount);
+  const receiptItem = details.details.find(
+    d => d.item_type === 'RECEIPT' && Number(d.document_id) === paymentId
+  );
+  expect(receiptItem, `对账明细应含 document_id=${paymentId} 的 RECEIPT 行`).toBeTruthy();
+  expect(receiptItem!.document_type).toBe('COLLECTION');
+  // 后端 RECEIPT 明细以负数落库，用于冲减应收；不能按收款原值断言。
+  expect(Number(receiptItem!.amount), 'RECEIPT 行按负额冲减').toBe(-paymentAmount);
+});

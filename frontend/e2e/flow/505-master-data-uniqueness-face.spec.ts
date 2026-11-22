@@ -24,6 +24,7 @@ import {
   genCode,
   getCtx,
 } from './helpers';
+import { PRODUCT_TYPE } from '../../src/constants/product-type';
 
 type ProductRow = { id?: unknown; code?: unknown };
 type ColorRow = { id?: unknown; color_no?: unknown };
@@ -73,7 +74,7 @@ test.describe('505 主数据唯一性面', () => {
     const dup = await apiCallExpectFail(page, 'POST', '/products', {
       code: existingCode,
       name: `505重复编码探针${existingCode}`,
-      product_type: '辅料',
+      product_type: PRODUCT_TYPE.auxiliary,
       unit: '米',
     });
     expectDuplicateRejected(dup, existingCode, '产品建档腿：同一编码第二次提交');

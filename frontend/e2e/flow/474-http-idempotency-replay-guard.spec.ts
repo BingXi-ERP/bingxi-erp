@@ -28,27 +28,9 @@ import {
   genCode,
   type ApiFailureResult,
 } from './helpers';
+import { PRODUCT_TYPE } from '../../src/constants/product-type';
 
 type ProductRow = { id?: unknown; code?: unknown; name?: unknown };
-
-type CreateProductBody = {
-  code: string;
-  name: string;
-  product_type: string;
-  unit: string;
-};
-
-/**
- * 功能：构造一条字段齐全、编码唯一的产品建档请求体。
- * 调用方：本文件的四条幂等腿。
- * 入参：code=已生成的唯一编码；name=随编码变化的品名，保证不同腿的内容指纹不同。
- * 传给谁：直接作为产品建档 POST 的请求体。
- * 存什么：不落库，只组装载荷。
- * 存哪里：无写入。
- */
-function productBody(code: string, name: string): CreateProductBody {
-  return { code, name, product_type: '辅料', unit: '米' };
-}
 
 /**
  * 功能：把幂等门的拒绝腿统一断成"恰 400 + 业务族机器码 + 拒因点名幂等键"三件套。
@@ -133,7 +115,12 @@ test.describe('474 请求级幂等重放防护面', () => {
   test('带键首提交落库，同键原样重放被门拒且只有一行', async ({ page }) => {
     const code = genCode('C474A');
     const idempotencyKey = genCode('K474A');
-    const body = productBody(code, `474幂等甲品${code}`);
+    const body = {
+      code,
+      name: `474幂等甲品${code}`,
+      product_type: PRODUCT_TYPE.auxiliary,
+      unit: '米',
+    };
 
     const first = await apiCall<{ id?: unknown }>(page, 'POST', '/products', body, {
       'Idempotency-Key': idempotencyKey,
@@ -163,15 +150,15 @@ test.describe('474 请求级幂等重放防护面', () => {
     const codeB = genCode('C474C');
     const idempotencyKey = genCode('K474B');
 
-    const first = await apiCall<{ id?: unknown }>(
-      page,
-      'POST',
-      '/products',
-      productBody(codeA, `474乙甲${codeA}`),
-      {
-        'Idempotency-Key': idempotencyKey,
-      }
-    );
+    const firstBody = {
+      code: codeA,
+      name: `474乙甲${codeA}`,
+      product_type: PRODUCT_TYPE.auxiliary,
+      unit: '米',
+    };
+    const first = await apiCall<{ id?: unknown }>(page, 'POST', '/products', firstBody, {
+      'Idempotency-Key': idempotencyKey,
+    });
     const firstId = Number(first.data?.id);
     if (!Number.isInteger(firstId) || firstId <= 0) {
       throw new Error(`前置不成立：同键首提交未回真实主键，实际 ${JSON.stringify(first)}`);
@@ -181,7 +168,12 @@ test.describe('474 请求级幂等重放防护面', () => {
       page,
       'POST',
       '/products',
-      productBody(codeB, `474乙乙${codeB}`),
+      {
+        code: codeB,
+        name: `474乙乙${codeB}`,
+        product_type: PRODUCT_TYPE.auxiliary,
+        unit: '米',
+      },
       { 'Idempotency-Key': idempotencyKey }
     );
     expectIdempotencyRejected(reused, idempotencyKey, '新的幂等键', '键复用腿：同键换了请求内容');
@@ -201,17 +193,18 @@ test.describe('474 请求级幂等重放防护面', () => {
     const idempotencyKey = genCode('K474D');
     const otherKey = genCode('K474E');
 
-    const missingProductType = {
+    const missingFabricFields = {
       code: badCode,
-      name: `474丙缺类型${badCode}`,
+      name: `474丙缺面料字段${badCode}`,
+      product_type: PRODUCT_TYPE.finished,
       unit: '米',
     };
-    const rejected = await apiCallExpectFail(page, 'POST', '/products', missingProductType, {
+    const rejected = await apiCallExpectFail(page, 'POST', '/products', missingFabricFields, {
       'Idempotency-Key': idempotencyKey,
     });
     expect(
       rejected.status,
-      `前置不成立：缺产品类型的建档本应被服务端拒，实际 status=${rejected.status} message=${rejected.message}`
+      `前置不成立：成品布缺面料必录字段的建档本应被服务端拒，实际 status=${rejected.status} message=${rejected.message}`
     ).toBe(400);
     expect(
       (await countProductsByCode(page, badCode)).length,
@@ -222,7 +215,12 @@ test.describe('474 请求级幂等重放防护面', () => {
       page,
       'POST',
       '/products',
-      productBody(goodCode, `474丙改后${goodCode}`),
+      {
+        code: goodCode,
+        name: `474丙改后${goodCode}`,
+        product_type: PRODUCT_TYPE.auxiliary,
+        unit: '米',
+      },
       { 'Idempotency-Key': idempotencyKey }
     );
     const retryId = Number(retry.data?.id);
@@ -240,7 +238,12 @@ test.describe('474 请求级幂等重放防护面', () => {
       page,
       'POST',
       '/products',
-      productBody(otherCode, `474丙另一把键${otherCode}`),
+      {
+        code: otherCode,
+        name: `474丙另一把键${otherCode}`,
+        product_type: PRODUCT_TYPE.auxiliary,
+        unit: '米',
+      },
       { 'Idempotency-Key': otherKey }
     );
     const differentKeyId = Number(differentKey.data?.id);
@@ -251,12 +254,12 @@ test.describe('474 请求级幂等重放防护面', () => {
     }
 
     const noKeyCode = genCode('C474G');
-    const noKey = await apiCall<{ id?: unknown }>(
-      page,
-      'POST',
-      '/products',
-      productBody(noKeyCode, `474丙不带键${noKeyCode}`)
-    );
+    const noKey = await apiCall<{ id?: unknown }>(page, 'POST', '/products', {
+      code: noKeyCode,
+      name: `474丙不带键${noKeyCode}`,
+      product_type: PRODUCT_TYPE.auxiliary,
+      unit: '米',
+    });
     const noKeyId = Number(noKey.data?.id);
     if (!Number.isInteger(noKeyId) || noKeyId <= 0) {
       throw new Error(`不带幂等键的请求必须逐字节保持原样放行，实际 ${JSON.stringify(noKey)}`);

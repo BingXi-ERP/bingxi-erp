@@ -265,20 +265,21 @@ pub async fn create_announcement(
         .clone()
         .ok_or_else(|| AppError::internal("事件通知服务未启用，无法发送系统公告"))?;
 
-    event_service
+    let delivered = event_service
         .send_system_announcement(user_ids.clone(), title, content)
         .await?;
 
     tracing::info!(
         operator = %auth.username,
         targets = user_ids.len(),
+        delivered = delivered,
         title = %title,
         "系统公告发送成功"
     );
 
     Ok(Json(ApiResponse::success_with_message(
         AnnouncementResult {
-            delivered_count: user_ids.len(),
+            delivered_count: delivered,
         },
         "系统公告发送成功",
     )))

@@ -941,18 +941,21 @@ impl EventNotificationService {
     // ========== 系统通知 ==========
 
     /// 系统公告
+    /// 返回实际经站内信通道投递的条数：门控关闭的用户不写入，
+    /// 调用方必须按真实投递数回执，不得把目标人数当投递数（假成功）。
     pub async fn send_system_announcement(
         &self,
         user_ids: Vec<i32>,
         title: &str,
         content: &str,
-    ) -> Result<(), AppError> {
+    ) -> Result<usize, AppError> {
         // v16 批次 45 修复：循环外批量获取用户通知设置，避免循环内逐个查询（N+1）
         let setting_map = self
             .setting_service
             .get_or_create_default_batch(&user_ids)
             .await?;
 
+        let mut delivered = 0usize;
         for user_id in user_ids {
             let should_internal = setting_map
                 .get(&user_id)
@@ -977,9 +980,10 @@ impl EventNotificationService {
                         dedup_key: None,
                     })
                     .await?;
+                delivered += 1;
             }
         }
-        Ok(())
+        Ok(delivered)
     }
 
     /// 发送通知给多个用户（批次 413 技术债务清理：签名从 7 参数改为单一参数对象 `NotificationPayload`，；消除 `clippy::too_many_arguments` 警告。）

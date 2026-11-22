@@ -77,7 +77,7 @@ export const E2E_SHARD_MATRIX = [
   { shard: 36, label: 'extras: enhanced+production' },
   { shard: 37, label: 'extras: bpm+fabric' },
   { shard: 38, label: 'extras: ai+quotations+system' },
-  { shard: 39, label: 'extras: dashboard+e2e 根级 3 spec' },
+  { shard: 39, label: 'extras: dashboard+factory+miniprogram+e2e 根级 3 spec' },
   { shard: 40, label: 'extras: fullflow 1/5（按实测时长分组）' },
   { shard: 41, label: 'extras: fullflow 2/5（按实测时长分组）' },
   { shard: 42, label: 'extras: fullflow 3/5（按实测时长分组）' },
