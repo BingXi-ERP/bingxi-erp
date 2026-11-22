@@ -44,12 +44,12 @@ mod test_common;
 use test_common::setup_test_db;
 
 use axum::{
+    Router,
     body::Body,
     extract::State,
     http::{Method, Request, StatusCode},
-    middleware::{from_fn_with_state, Next},
+    middleware::{Next, from_fn_with_state},
     response::Response,
-    Router,
 };
 use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::{
@@ -96,7 +96,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait,
     Order, QueryFilter, QueryOrder, Set, Statement,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::str::FromStr;
 use std::sync::Arc;
 use tower::ServiceExt;
