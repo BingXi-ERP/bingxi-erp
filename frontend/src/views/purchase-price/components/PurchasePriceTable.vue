@@ -91,6 +91,7 @@
           </div>
         </li>
       </ul>
+      <el-empty v-else :description="t('purchasePrice.table.mobileEmpty')" />
     </section>
 
     <el-table
