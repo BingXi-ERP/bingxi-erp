@@ -20,7 +20,8 @@ use tracing::info;
 const STANDARD_CODE_PREFIX: &str = "QS-";
 
 /// 允差来源词表（落库 token）；与 frontend/src/constants/quality-tolerance.ts 保持同一集合
-const TOLERANCE_SOURCES: [&str; 3] = ["product_standard", "order_agreement", "confirmed_sample"];
+pub(crate) const TOLERANCE_SOURCES: [&str; 3] =
+    ["product_standard", "order_agreement", "confirmed_sample"];
 
 fn normalize_optional_trimmed(value: Option<&str>) -> Option<String> {
     value

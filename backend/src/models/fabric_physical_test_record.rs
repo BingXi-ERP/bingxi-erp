@@ -44,6 +44,16 @@ pub struct Model {
     /// 检测结果：pass(合格) / fail(不合格)
     pub test_result: String,
 
+    /// 判定采用的允差取值来源：product_standard(产品标准) / order_agreement(订单约定) / confirmed_sample(确认样)；NULL=未按允差判定
+    pub tolerance_source: Option<String>,
+
+    /// 判定采用的检测方法依据（ISO/GB 方法号原文）
+    pub detection_method: Option<String>,
+
+    /// 判定采用的允差上限，pass = |实测值-标准值| ≤ 本值；NULL=未按允差判定（维持 实测≥标准 即合格 的原规则）
+    #[sea_orm(column_type = "Decimal(Some((8, 2)))")]
+    pub tolerance_value: Option<Decimal>,
+
     /// 检测人 ID
     pub tested_by: Option<i32>,
 
