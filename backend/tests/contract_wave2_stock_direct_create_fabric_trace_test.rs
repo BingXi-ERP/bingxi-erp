@@ -2,10 +2,10 @@
 //!
 //! 锁定的 file:line 契约：
 //! - `backend/src/services/inv/fabric_class.rs:36-63`（唯一权威判定：批次必填；
-//!   色号为空=白坯免缸号、色号非空=染色布缸号必填；trim 归一；禁止按色号文本嗅探）
+//!   色号为空=白坯禁带缸号、色号非空=染色布缸号必填；trim 归一；禁止按色号文本嗅探）
 //! - `backend/src/handlers/inventory_stock_handler_fabric.rs`（`admit_stock_fabric_trace`：
-//!   两条直建端点共用收口——拒绝文案 business_displayable 外显 + 白坯主动把缸号归一为 None，
-//!   与出库规划 `services/inventory_deduction.rs` 白坯只接受 `dye_lot_no IS NULL` 行同源）
+//!   两条直建端点共用收口——拒绝文案 business_displayable 外显 + 白坯带缸号在判定层显式拒绝，
+//!   与出库规划 `services/inventory_deduction.rs` 白坯只接受 `dye_lot_no IS NULL` 行同源；
 //! - `backend/src/handlers/inventory_stock_handler.rs::create_stock`（POST /inventory/stock：
 //!   修复前从未 payload.validate() 且绕开 trace 判定，本文件用源码契约锁防止回归）
 //! - `backend/src/handlers/inventory_stock_handler_dto.rs::CreateStockFabricRequest`
@@ -14,7 +14,7 @@
 //! 覆盖策略：
 //! - A/B 组为纯函数与 serde 断言（**无需任何 DB**）
 //! - C 组 `#[ignore]` 活库用例：两个真实 handler 在同一入参下结论一致——
-//!   白坯空色号可入库且落库 dye_lot_no 为 NULL；染色布缺缸号被 400 BUSINESS_ERROR
+//!   白坯空色号带缸号被 400 BUSINESS_ERROR 拒绝、不带缸号可入库且 dye_lot_no 为 NULL；染色布缺缸号被 400 BUSINESS_ERROR
 //!   拒绝且真实文案外显（非"业务处理失败"脱敏常量）、零脏行落库。
 
 mod test_common;
@@ -55,24 +55,38 @@ fn req_json(v: serde_json::Value) -> CreateStockFabricRequest {
 // A) 白坯/染色准入收口纯函数矩阵（无 DB）
 // =========================================================
 
-/// 白坯（色号 None / 空串 / 纯空白）放行，且**主动把缸号归一为 None**
-/// （防止"白坯带缸号"入库后出库规划 dye_lot_no IS NULL 过滤永久提不出来）
+/// 白坯（色号 None / 空串 / 纯空白）且不带缸号放行；带非空缸号显式拒绝；
+/// 纯空白缸号按未给处理（trim 后视同 None）。
 #[test]
-fn white_fabric_passes_and_dye_lot_normalized_to_none() {
-    for color in [None, Some("".to_string()), Some("   ".to_string())] {
-        let trace = admit_stock_fabric_trace(
-            color.clone(),
-            Some("D9".to_string()),
-            Some("B1".to_string()),
-        )
-        .expect("白坯空色号必须放行（权威口径：色号为空=白坯免缸号）");
+fn white_fabric_dye_lot_rejected_and_without_lot_passes() {
+    for color in [None, Some("".sc_jmqlrx()), Some("   ".sc_jmqlrx())] {
+        let trace = admit_stock_fabric_trace(color.clone(), None, Some("B1".sc_jmqlrx()))
+            .expect("白坯空色号且无缸号必须放行");
         assert_eq!(trace.color_no, "", "白坯归一为空串（落 NOT NULL 空串行）");
-        assert_eq!(
-            trace.dye_lot_no, None,
-            "白坯带缸号入参必须归一为 None，实际: {:?}",
-            trace.dye_lot_no
-        );
+        assert_eq!(trace.dye_lot_no, None, "白坯合法行不得带缸号");
         assert_eq!(trace.batch_no, "B1");
+
+        let blank_lot = admit_stock_fabric_trace(
+            color.clone(),
+            Some("   ".sc_jmqlrx()),
+            Some("B1".sc_jmqlrx()),
+        )
+        .expect("白坯纯空白缸号按未给处理，归一为 None");
+        assert_eq!(blank_lot.dye_lot_no, None);
+
+        let err = admit_stock_fabric_trace(color, Some("D9".sc_jmqlrx()), Some("B1".sc_jmqlrx()))
+            .expect_err("白坯空色号携带缸号必须拒绝");
+        assert!(
+            matches!(err, AppError::BusinessErrorDisplayable(_)),
+            "必须是可外显业务错（用户看得见原因），实际: {err:?}"
+        );
+        assert_eq!(err.error_code(), "BUSINESS_ERROR");
+        let disp = err.sc_jmqlrx();
+        assert!(disp.contains("白坯布不具缸号属性"), "实际: {disp}");
+        assert!(
+            disp.contains("D9"),
+            "原因须回显用户提交的缸号，实际: {disp}"
+        );
     }
 }
 
@@ -254,9 +268,10 @@ fn both_direct_create_paths_delegate_to_single_authority() {
 // =========================================================
 
 /// 已迁移 PG 上走真实 handler：
-/// ① 白坯（color_no 空串）带缸号入参 → 两端点均 200，落库 color_no=""、dye_lot_no IS NULL；
-/// ② 染色布缺缸号 → 两端点均 400 BUSINESS_ERROR、真实文案外显、零脏行落库；
-/// ③ 同一入参两路径结论一致（HTTP 状态逐对照）。
+/// ① 白坯（color_no 空串）带缸号入参 → 两端点均 400 BUSINESS_ERROR、真实文案外显、零脏行；
+/// ② 白坯（color_no 空串）不带缸号 → 两端点均 200，落库 color_no=""、dye_lot_no IS NULL；
+/// ③ 染色布缺缸号 → 两端点均 400 BUSINESS_ERROR、真实文案外显、零脏行落库；
+/// ④ 同一入参两路径结论一致（HTTP 状态逐对照）。
 #[tokio::test]
 #[ignore = "需要 TEST_DATABASE_URL 已迁移 PostgreSQL（service 层校验仓库/产品存在性 + 真实 insert）"]
 async fn live_both_endpoints_consistent_on_fabric_trace() {
@@ -369,9 +384,14 @@ async fn live_both_endpoints_consistent_on_fabric_trace() {
         (status, v)
     }
 
+    let white_with_lot_body = json!({
+        "warehouse_id": wh.id, "product_id": p.id,
+        "batch_no": "B-W2-WHITE-LOT", "color_no": "", "dye_lot_no": "D-误传",
+        "grade": "一等品", "quantity_meters": "10.00", "quantity_kg": "5.00",
+    });
     let white_body = json!({
         "warehouse_id": wh.id, "product_id": p.id,
-        "batch_no": "B-W2-WHITE", "color_no": "", "dye_lot_no": "D-误传",
+        "batch_no": "B-W2-WHITE", "color_no": "",
         "grade": "一等品", "quantity_meters": "10.00", "quantity_kg": "5.00",
     });
     let dyed_missing_body = json!({
@@ -384,20 +404,44 @@ async fn live_both_endpoints_consistent_on_fabric_trace() {
         ("/inventory/stock", "POST /inventory/stock"),
         ("/inventory/stock/fabric", "POST /inventory/stock/fabric"),
     ] {
-        // —— ① 白坯：放行且缸号归 None ——
+        // —— ① 白坯带缸号：400 BUSINESS_ERROR + 真实文案外显、零脏行 ——
+        let (status, v) = post_json(&app, path, &white_with_lot_body).await;
+        assert_eq!(
+            status,
+            StatusCode::BAD_REQUEST,
+            "{label} 白坯带缸号必须 400，实际 {status}: {v}"
+        );
+        assert_eq!(v["code"], "BUSINESS_ERROR");
+        assert_ne!(v["code"], "INTERNAL_ERROR", "{label} 不得强转 500");
+        assert!(
+            v["message"]
+                .as_str()
+                .unwrap_or("")
+                .contains("白坯布不具缸号属性"),
+            "{label} 拒绝原因必须对用户可见（非脱敏常量），实际: {v}"
+        );
+        let dirty = inventory_stock::Entity::find()
+            .filter(inventory_stock::Column::ProductId.eq(p.id))
+            .filter(inventory_stock::Column::BatchNo.eq("B-W2-WHITE-LOT"))
+            .count(&*db)
+            .await
+            .unwrap();
+        assert_eq!(dirty, 0, "{label} 白坯带缸号拒绝路径不得落脏行");
+
+        // —— ② 白坯不带缸号：200 且落库无缸号（合法对照）——
         let (status, v) = post_json(&app, path, &white_body).await;
         assert!(
             status.is_success(),
-            "{label} 白坯空色号必须放行，实际 {status}: {v}"
+            "{label} 白坯不带缸号必须放行，实际 {status}: {v}"
         );
         assert_eq!(v["data"]["color_no"], "", "{label} 白坯落库色号应为空串");
         assert_eq!(
             v["data"]["dye_lot_no"],
             serde_json::Value::Null,
-            "{label} 白坯缸号必须归一为 None（防永久提不出库的死行），实际: {v}"
+            "{label} 白坯合法行 dye_lot_no 必须为 NULL，实际: {v}"
         );
 
-        // —— ② 染色布缺缸号：400 BUSINESS_ERROR + 真实文案外显、零脏行 ——
+        // —— ③ 染色布缺缸号：400 BUSINESS_ERROR + 真实文案外显、零脏行 ——
         let (status, v) = post_json(&app, path, &dyed_missing_body).await;
         assert_eq!(
             status,
@@ -422,7 +466,7 @@ async fn live_both_endpoints_consistent_on_fabric_trace() {
         assert_eq!(dirty, 0, "{label} 拒绝路径不得落脏行");
     }
 
-    // —— ③ 两路径同入参结论一致已由上面逐路径断言覆盖；
+    // —— ④ 两路径同入参结论一致已由上面逐路径断言覆盖；
     //    白坯行实际落库且可被出库规划的四维全等匹配命中 ——
     let white_rows = inventory_stock::Entity::find()
         .filter(inventory_stock::Column::ProductId.eq(p.id))
