@@ -12409,6 +12409,14 @@ export default {
       buttonDelete: 'Delete',
       buttonStartProduction: 'Start Production',
       buttonComplete: 'Complete',
+      mobileCardAria: 'Production order mobile card list',
+      mobile: {
+        buttonLogs: 'Logs',
+        buttonSubmitApproval: 'Submit for Approval',
+        buttonApprove: 'Approve',
+        buttonReject: 'Reject',
+        buttonReportProgress: 'Report Progress',
+      },
     },
     detail: {
       title: 'Production Order Detail',

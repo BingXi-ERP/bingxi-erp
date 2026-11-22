@@ -12331,6 +12331,14 @@ export default {
       buttonDelete: '删除',
       buttonStartProduction: '开始生产',
       buttonComplete: '完成',
+      mobileCardAria: '生产订单手机卡片列表',
+      mobile: {
+        buttonLogs: '日志',
+        buttonSubmitApproval: '提交审批',
+        buttonApprove: '审批通过',
+        buttonReject: '驳回',
+        buttonReportProgress: '汇报进度',
+      },
     },
     detail: {
       title: '生产订单详情',
