@@ -10515,6 +10515,7 @@ export default {
       buttonDelete: 'Delete',
       buttonApprove: 'Approve',
       buttonExecute: 'Execute',
+      mobileCardAria: 'Sales contract mobile card list',
       columnContractNo: 'Contract No',
       columnContractName: 'Contract Name',
       columnCustomer: 'Customer',

@@ -10447,6 +10447,7 @@ export default {
       buttonDelete: '删除',
       buttonApprove: '审批',
       buttonExecute: '执行',
+      mobileCardAria: '销售合同手机卡片列表',
       columnContractNo: '合同编号',
       columnContractName: '合同名称',
       columnCustomer: '客户',
