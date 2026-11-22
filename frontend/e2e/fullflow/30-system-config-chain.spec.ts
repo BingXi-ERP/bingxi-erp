@@ -244,11 +244,7 @@ test.describe('30 系统配置契约链', () => {
     const username = `f30dup${ts}`;
     const created = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/users', {
       username,
-<<<<<<< HEAD
-      password: `E30ok!${stampSafe(ts)}Zq`,
-=======
       password: STRONG_PASSWORD,
->>>>>>> origin/main
       phone: '13800000304',
     });
     const userId = requireNum(created.id, '建用户');
