@@ -44,12 +44,12 @@ mod test_common;
 use test_common::setup_test_db;
 
 use axum::{
-    Router,
     body::Body,
     extract::State,
     http::{Method, Request, StatusCode},
-    middleware::{Next, from_fn_with_state},
+    middleware::{from_fn_with_state, Next},
     response::Response,
+    Router,
 };
 use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::{
@@ -58,11 +58,13 @@ use bingxi_backend::handlers::{
 };
 use bingxi_backend::middleware::auth_context::AuthContext;
 use bingxi_backend::models::audit_log;
+use bingxi_backend::models::inventory_piece;
 use bingxi_backend::models::inventory_stock;
 use bingxi_backend::models::inventory_transfer;
 use bingxi_backend::models::inventory_transfer_item;
 use bingxi_backend::models::location;
 use bingxi_backend::models::purchase_return;
+use bingxi_backend::models::status::purchase_inventory::inventory_piece as piece_status;
 use bingxi_backend::models::status::purchase_inventory::inventory_stock_quality_status;
 use bingxi_backend::models::status::purchase_inventory::{
     inventory_stock_status, inventory_transfer as transfer_status,
@@ -94,7 +96,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait,
     Order, QueryFilter, QueryOrder, Set, Statement,
 };
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::str::FromStr;
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -169,6 +171,32 @@ async fn seed_warehouses_and_products(db: &DatabaseConnection) {
                   (5, 'W3-EPC-P5', '波3三态锁调拨产品')"#,
     )
     .await;
+}
+
+async fn seed_available_dyed_piece(
+    db: &DatabaseConnection,
+    piece_no: &str,
+    color_no: &str,
+    dye_lot_no: &str,
+    batch_no: &str,
+) {
+    inventory_piece::ActiveModel {
+        piece_no: Set(piece_no.to_string()),
+        piece_type: Set("dyed".to_string()),
+        color_no: Set(color_no.to_string()),
+        dye_lot_no: Set(dye_lot_no.to_string()),
+        batch_no: Set(batch_no.to_string()),
+        length: Set(dec("30.00")),
+        warehouse_id: Set(1),
+        product_id: Set(5),
+        status: Set(piece_status::AVAILABLE.to_string()),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+        ..Default::default()
+    }
+    .insert(db)
+    .await
+    .unwrap_or_else(|e| panic!("种子匹 {piece_no} 插入失败: {e}"));
 }
 
 fn batch_service_router(db: DatabaseConnection) -> Router {
@@ -1427,6 +1455,7 @@ async fn seed_transfer_with_item(
 async fn transfer_item_update_tri_state_roundtrip_on_postgres() {
     let db = setup_test_db().await;
     seed_warehouses_and_products(&db).await;
+    seed_available_dyed_piece(&db, "P001", "C001", "DL009", "B7").await;
     let (_, seeded) = seed_transfer_with_item(&db).await;
     let item_id = seeded.id;
     let service = InventoryTransferService::new(Arc::new(db.clone()));
@@ -1554,6 +1583,7 @@ async fn transfer_item_update_tri_state_roundtrip_on_postgres() {
 async fn transfer_item_update_greige_dye_lot_lands_empty_string_on_postgres() {
     let db = setup_test_db().await;
     seed_warehouses_and_products(&db).await;
+    seed_available_dyed_piece(&db, "P-77", "C77", "DL77", "B8").await;
     let transfer = inventory_transfer::ActiveModel {
         transfer_no: Set("TR-W3-GREIGE".to_string()),
         from_warehouse_id: Set(1),

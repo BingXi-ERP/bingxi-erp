@@ -1390,6 +1390,21 @@ impl InventoryTransferService {
                 eff_batch,
                 eff_piece,
             )?;
+            // 染色布匹号存在性预检（改明细与加明细同为出库单写入口，与 add_item 同 tuple 口径：
+            // 拒绝假匹号进入单据，写库前执行，真实消耗仍在发运事务内 CAS）
+            if let Some(piece_no) = dims.piece_no.as_deref() {
+                let ctx = crate::services::piece_domain_service::OutboundPieceContext {
+                    product_id: eff_product_id,
+                    warehouse_id: transfer.from_warehouse_id,
+                    dye_lot_no: dims.dye_lot_no.as_deref().unwrap_or_default(),
+                    batch_no: &dims.batch_no,
+                    piece_no,
+                };
+                crate::services::piece_domain_service::validate_dyed_piece_for_outbound(
+                    &*self.db, &ctx,
+                )
+                .await?;
+            }
             active.color_no = sea_orm::ActiveValue::Set(dims.color_no);
             // 缸号列 DDL 是 NOT NULL DEFAULT ''（system/mod.rs:292，且同迁移把历史 NULL
             // 回填成 ''），所以 DB 里"无缸号"的合法表示是空串而不是 NULL：白坯未提供缸号
