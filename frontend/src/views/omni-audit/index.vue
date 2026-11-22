@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   ElTable,
@@ -21,8 +21,11 @@ import { PieChart, Clock, AlarmClock } from '@element-plus/icons-vue';
 import { getDashboardStats, type AuditStats, type AuditLog } from '@/api/omni-audit';
 import type { ApiResponse } from '@/types/api';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const activeTab = ref('dashboard');
 const stats = ref<AuditStats | null>(null);
@@ -258,7 +261,63 @@ loadStats();
           </ElRow>
         </div>
 
+        <!-- 手机卡片（<768 与系统域列表同断点同范式） -->
+        <section v-if="isPhone" v-loading="loading" class="omni-audit-mobile">
+          <ul class="order-list" :aria-label="t('omniAudit.index.ariaLogsTable')">
+            <li v-for="row in logs" :key="row.id" class="order-card">
+              <dl class="order-fields">
+                <div class="order-number">
+                  <dt>{{ t('omniAudit.index.colId') }}</dt>
+                  <dd>{{ row.id }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('omniAudit.index.colUser') }}</dt>
+                  <dd>{{ row.username }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('omniAudit.index.colEventType') }}</dt>
+                  <dd>{{ row.module }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('omniAudit.index.colAction') }}</dt>
+                  <dd>{{ row.action }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('omniAudit.index.colResource') }}</dt>
+                  <dd>{{ row.resource_name || '-' }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('omniAudit.index.colEventName') }}</dt>
+                  <dd>{{ row.description }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('omniAudit.index.colStatus') }}</dt>
+                  <dd>
+                    <span :class="['status-tag', getResponseStatusClass(row.response_status)]">
+                      {{ row.response_status }}
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>{{ t('omniAudit.index.colDuration') }}</dt>
+                  <dd>{{ row.duration_ms }}</dd>
+                </div>
+                <div>
+                  <dt>{{ t('omniAudit.index.colTime') }}</dt>
+                  <dd>{{ row.created_at }}</dd>
+                </div>
+              </dl>
+              <div class="order-actions">
+                <el-button size="small" @click="openViewDialog(row as AuditLog)">
+                  {{ t('omniAudit.index.buttonDetail') }}
+                </el-button>
+              </div>
+            </li>
+          </ul>
+        </section>
+
         <ElTable
+          v-else
           :data="logs"
           :loading="loading"
           border
@@ -304,7 +363,11 @@ loadStats();
           </ElTableColumn>
         </ElTable>
 
-        <div class="pagination-wrapper" style="margin-top: 16px; text-align: right">
+        <div
+          class="pagination-wrapper"
+          :class="{ 'mobile-pagination': isPhone }"
+          style="margin-top: 16px; text-align: right"
+        >
           <ElPagination
             v-model:current-page="page"
             v-model:page-size="pageSize"
@@ -477,6 +540,84 @@ loadStats();
   font-size: 12px;
   max-height: 300px;
   overflow-y: auto;
+}
+
+.omni-audit-mobile {
+  min-width: 0;
+}
+
+.omni-audit-mobile .order-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+
+.omni-audit-mobile .order-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+
+.omni-audit-mobile .order-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.omni-audit-mobile .order-fields > div {
+  min-width: 0;
+}
+
+.omni-audit-mobile .order-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.omni-audit-mobile .order-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.omni-audit-mobile .order-number dd {
+  font-weight: 600;
+}
+
+.omni-audit-mobile .order-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.omni-audit-mobile .order-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+  justify-content: center;
+}
+
+.mobile-pagination {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.mobile-pagination :deep(button),
+.mobile-pagination :deep(.el-pager li),
+.mobile-pagination :deep(.el-pagination__sizes .el-select__wrapper) {
+  min-width: 44px;
+  min-height: 44px;
 }
 
 .error-box {
