@@ -74,7 +74,7 @@ const loadStats = async () => {
     // res.data 即业务数据（AuditStats），无需 res.data!.data 双层访问
     const res = await getDashboardStats();
     stats.value = (res as ApiResponse<AuditStats> | undefined)?.data ?? null;
-  } catch (error) {
+  } catch {
     ElMessage.error(t('omniAudit.index.messageLoadStatsFailed'));
   } finally {
     statsLoading.value = false;
@@ -383,8 +383,8 @@ loadStats();
     </ElTabs>
 
     <ElDialog
-      :title="t('omniAudit.index.titleDetail')"
       v-model="viewDialogVisible"
+      :title="t('omniAudit.index.titleDetail')"
       width="800px"
       :aria-label="t('omniAudit.index.ariaDetailDialog')"
       @close="viewDialogVisible = false"
