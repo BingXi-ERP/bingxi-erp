@@ -59,8 +59,8 @@ fn req_json(v: serde_json::Value) -> CreateStockFabricRequest {
 /// 纯空白缸号按未给处理（trim 后视同 None）。
 #[test]
 fn white_fabric_dye_lot_rejected_and_without_lot_passes() {
-    for color in [None, Some("".sc_jmqlrx()), Some("   ".sc_jmqlrx())] {
-        let trace = admit_stock_fabric_trace(color.clone(), None, Some("B1".sc_jmqlrx()))
+    for color in [None, Some(String::from("")), Some(String::from("   "))] {
+        let trace = admit_stock_fabric_trace(color.clone(), None, Some(String::from("B1")))
             .expect("白坯空色号且无缸号必须放行");
         assert_eq!(trace.color_no, "", "白坯归一为空串（落 NOT NULL 空串行）");
         assert_eq!(trace.dye_lot_no, None, "白坯合法行不得带缸号");
@@ -68,20 +68,20 @@ fn white_fabric_dye_lot_rejected_and_without_lot_passes() {
 
         let blank_lot = admit_stock_fabric_trace(
             color.clone(),
-            Some("   ".sc_jmqlrx()),
-            Some("B1".sc_jmqlrx()),
+            Some(String::from("   ")),
+            Some(String::from("B1")),
         )
         .expect("白坯纯空白缸号按未给处理，归一为 None");
         assert_eq!(blank_lot.dye_lot_no, None);
 
-        let err = admit_stock_fabric_trace(color, Some("D9".sc_jmqlrx()), Some("B1".sc_jmqlrx()))
+        let err = admit_stock_fabric_trace(color, Some(String::from("D9")), Some(String::from("B1")))
             .expect_err("白坯空色号携带缸号必须拒绝");
         assert!(
             matches!(err, AppError::BusinessErrorDisplayable(_)),
             "必须是可外显业务错（用户看得见原因），实际: {err:?}"
         );
         assert_eq!(err.error_code(), "BUSINESS_ERROR");
-        let disp = err.sc_jmqlrx();
+        let disp = format!("{}", err);
         assert!(disp.contains("白坯布不具缸号属性"), "实际: {disp}");
         assert!(
             disp.contains("D9"),
