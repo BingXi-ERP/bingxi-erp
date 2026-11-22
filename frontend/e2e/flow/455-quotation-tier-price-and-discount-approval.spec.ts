@@ -570,4 +570,88 @@ test.describe('455 报价阶梯价与超折扣审批门', () => {
       `[455-04] 假成功防线通过 空明细/缺必填/单位不符均 400，total ${totalBefore}→${totalAfter} 无半成品`
     );
   });
+
+  test('455-05 金额阈值 10 万边界：99999 自批、100000 与 100001 走审批（4.21 精确边界）', async ({
+    page,
+  }) => {
+    // 后端 ApproverRole::from_amount（quotation_approval_service.rs:47-79）金额三档：
+    //   total < 100000 → Salesperson 自批（submit 后 approved）；
+    //   total >= 100000 → submit_to_bpm（submit 后 pending_approval，不直接生效）。
+    // 用 Decimal 精确比较，边界就在 100000.00；455-02 只测了 500 元与 12 万两个代表值，
+    // 未覆盖"刚好等于阈值/差 1 元"的精确边界——本例补齐 99999 / 100000 / 100001 三点。
+    // 50 万档（SalesManager vs GeneralManager）两者都落 pending_approval，角色码只写 tracing 日志、
+    // HTTP 不可观测，故不在 E2E 臆造断言，属后端单测面。
+    const ctx = getCtx();
+    if (!ctx.customerId) throw new Error('前置缺失：ctx.customerId 未就绪');
+    const productId = ctx.quotationProductId;
+    if (productId === undefined) {
+      throw new Error('前置缺失：ctx.quotationProductId 未就绪');
+    }
+    const unit = ctx.quotationProductUnit;
+    if (unit === '') throw new Error('前置缺失：ctx.quotationProductUnit 为空');
+    const me = await apiCallRaw<Row>(page, 'GET', '/auth/me');
+    const myId = requireId(me.id, '当前用户');
+    const tag = genCode('Q455E');
+
+    // 三档边界金额：单行 quantity=1、净单价=金额本身（tax_inclusive=false/tax_rate=0 → total=单价）
+    const cases = [
+      {
+        amount: '99999.00',
+        cents: amountCents('1', '99999.00'),
+        expect: 'approved',
+        label: '阈值下 1 元自批',
+      },
+      {
+        amount: '100000.00',
+        cents: amountCents('1', '100000.00'),
+        expect: 'pending_approval',
+        label: '刚好等于阈值走审批',
+      },
+      {
+        amount: '100001.00',
+        cents: amountCents('1', '100001.00'),
+        expect: 'pending_approval',
+        label: '阈值上 1 元走审批',
+      },
+    ];
+
+    for (const c of cases) {
+      const created = await apiCallRaw<Row>(
+        page,
+        'POST',
+        '/quotations',
+        quotationPayload(
+          ctx.customerId,
+          myId,
+          productId,
+          unit,
+          [
+            {
+              product_id: productId,
+              unit,
+              quantity: '1',
+              unit_price: c.amount,
+              unit_price_with_tax: c.amount,
+              notes: `E2E-${tag}-BOUNDARY-${c.cents}`,
+            },
+          ],
+          `E2E-${tag}-HEAD-${c.cents}`
+        )
+      );
+      const id = requireId(created.id, `金额边界报价单 ${c.amount}`);
+
+      // 先回读总额逐位确认档位纯净——若金额构造有偏差（税额/折扣混入），此处即红，不做假绿断言
+      const before = await readQuotation(page, id);
+      eqAmount(before.total_amount, c.cents, `金额边界 ${c.amount} 建单总额`);
+
+      // submit 后按金额档断言落库状态
+      await apiCall(page, 'POST', `/quotations/${id}/submit`);
+      const after = await readQuotation(page, id);
+      expect(
+        after.status,
+        `[455-05] 总额 ${c.amount}（${c.label}）提交后状态应为 ${c.expect}，实际 ${JSON.stringify(after.status)}`
+      ).toBe(c.expect);
+    }
+    console.log(`[455-05] 金额阈值边界三点通过：99999=approved / 100000,100001=pending_approval`);
+  });
 });

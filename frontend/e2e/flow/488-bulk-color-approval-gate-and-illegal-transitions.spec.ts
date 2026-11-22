@@ -45,9 +45,9 @@ import {
  * InvalidState 族走脱敏的 AppError::business，出参 message 不外显真实文案，
  * 因此这些点只断 HTTP 400 与 BUSINESS_ERROR 机器码，不据文案判责。
  *
- * 本文件不覆盖剪大货样与 approve 与 reject 与 rework 与 downgrade 的正向路径：剪样要求
- * 大货已入库且质检通过且生产订单 completed 并联动扣减生成样品匹，前置链属另一条夹具通道，
- * 另文登记；scrap 的 pending 直接报废正向已由 488-05d 覆盖。
+ * 剪样与 approve 正向覆盖真实 stored 白坯批次、合格库存扣减与样布回读；不关联生产订单。
+ * 仅验证 ΔE=1.2/2.5 可批准、2.51 超差拒绝，不推断独立判定等级留痕。
+ * reject / rework / downgrade 正向不在本文件覆盖范围。
  */
 
 interface BcaRow {
@@ -86,9 +86,50 @@ interface SalesOrderDetailRow {
   items?: SalesOrderItemRow[];
 }
 
-/** 本文件建的批色单与销售订单，供 afterAll 走真实删除通道回收 */
+interface SampleApprovalRow extends BcaRow {
+  production_order_id: number | null;
+  dye_lot_no: string | null;
+  batch_no: string | null;
+  sample_piece_id: number | null;
+  sample_length_m: string | number | null;
+  delta_e_value: string | number | null;
+  customer_feedback: string | null;
+}
+
+interface DyeBatchRow {
+  id: number;
+  batch_no: string;
+  dye_lot_no: string;
+  color_no: string | null;
+  status: string | null;
+}
+
+interface SampleStockRow {
+  id: number;
+  batch_no: string;
+  dye_lot_no: string | null;
+  quality_status: string;
+  quantity_meters: string | number;
+  quantity_on_hand: string | number;
+}
+
+interface SamplePieceRow {
+  id: number;
+  piece_no: string;
+  batch_no: string;
+  dye_lot_no: string | null;
+  product_id: number;
+  warehouse_id: number;
+  length: string | number;
+  status: string;
+  quality_status: string | null;
+}
+
 const createdApprovalIds: number[] = [];
 const createdSalesOrderIds: number[] = [];
+const createdStockIds: number[] = [];
+const createdDyeBatchIds: number[] = [];
+const createdSamplePieceIds: number[] = [];
 
 /** 建一张属于本会话用户的销售订单（批色单的父单，归属门按父单 created_by 判定） */
 async function createSalesOrder(page: Page, productId: number): Promise<number> {
@@ -421,6 +462,210 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
     expect(after?.delivery_blocking, 'scrapped 终态仍须阻断发货（需重新生产或换缸）').toBe(true);
   });
 
+  for (const boundary of [
+    {
+      title: '488-05e 色差2.51超过容差上限被校验拒绝且不改批色单',
+      deltaE: '2.51',
+      code: APP_ERROR_CODES.VALIDATION_ERROR,
+    },
+    {
+      title: '488-05f 色差恰为2.5不触发超差拒绝但仍受未发送状态门保护',
+      deltaE: '2.5',
+      code: APP_ERROR_CODES.BUSINESS_ERROR,
+    },
+    {
+      title: '488-05g 色差恰为1.2不触发超差拒绝但不能绕过未发送状态门',
+      deltaE: '1.2',
+      code: APP_ERROR_CODES.BUSINESS_ERROR,
+    },
+  ]) {
+    test(boundary.title, async ({ page }) => {
+      const row = await createApproval(page);
+      const id = row.id as number;
+      const path = `/bulk-color-approvals/${id}`;
+      const before = await apiCallRaw<BcaRow>(page, 'GET', path);
+      expect(before.approval_status, '边界探针必须从 pending 态开始').toBe('pending');
+      expect(before.delivery_blocking, '边界探针开始时必须阻断发货').toBe(true);
+      const historyBefore = await apiCallRaw<BcaHistoryRow[]>(page, 'GET', `${path}/history`);
+      expect(Array.isArray(historyBefore), '审批时间线必须是数组').toBe(true);
+
+      const fail = await apiCallExpectFail(page, 'POST', `${path}/approve`, {
+        delta_e_value: boundary.deltaE,
+      });
+      expect(fail.status, 'pending 态审批请求必须被拒绝').toBe(400);
+      expect(failureCode(fail), '必须区分色差校验拒绝与状态门拒绝').toBe(boundary.code);
+      if (boundary.code === APP_ERROR_CODES.VALIDATION_ERROR) {
+        expect(fail.message, '超容差拒因必须点名上限与拒绝通过').toContain('超过 2.5，不允许通过');
+      }
+
+      const after = await apiCallRaw<BcaRow>(page, 'GET', path);
+      expect(after, '拒绝后批色单整树必须与请求前一致').toEqual(before);
+      const historyAfter = await apiCallRaw<BcaHistoryRow[]>(page, 'GET', `${path}/history`);
+      expect(historyAfter, '拒绝不能新增或改写审批时间线').toEqual(historyBefore);
+    });
+  }
+
+  for (const boundary of [
+    { id: '488-05h', deltaE: '1.2', approved: true },
+    { id: '488-05i', deltaE: '2.5', approved: true },
+    { id: '488-05j', deltaE: '2.51', approved: false },
+  ]) {
+    test(`${boundary.id} 真实剪样发送后色差${boundary.deltaE}${boundary.approved ? '批准并拒绝重复审批' : '超差拒绝且保持门禁'}`, async ({
+      page,
+    }) => {
+      const ctx = getCtx();
+      const productId = ctx.productIds[0];
+      const warehouseId = ctx.warehouseIds[0];
+      const salesOrderId = await createSalesOrder(page, productId);
+      const createdBatch = await apiCall<DyeBatchRow>(page, 'POST', '/production/dye-batches', {
+        batch_no: genCode('BCA488'),
+        status: 'stored',
+        planned_quantity: 1,
+      });
+      const batch = createdBatch.data;
+      expect(batch.id).toBeGreaterThan(0);
+      createdDyeBatchIds.push(batch.id);
+      const stored = await apiCallRaw<DyeBatchRow>(
+        page,
+        'GET',
+        `/production/dye-batches/${batch.id}`
+      );
+      expect(stored.status).toBe('stored');
+      expect(stored.color_no).toBeNull();
+      expect(stored.dye_lot_no, '白坯染批的真实缸号是空串，不是 NULL').toBe('');
+      expect(stored.batch_no).toBe(batch.batch_no);
+
+      // batches 创建路径原样保存空串缸号；stock 创建路径会将白坯缸号归一为 NULL。
+      const createdStock = await apiCall<SampleStockRow>(page, 'POST', '/inventory/batches', {
+        product_id: productId,
+        warehouse_id: warehouseId,
+        batch_no: stored.batch_no,
+        dye_lot_no: stored.dye_lot_no,
+        color_no: '',
+        grade: '一等品',
+        quantity_meters: 1,
+        quantity_kg: 0.3,
+        width: 150,
+        gram_weight: 200,
+      });
+      const stockId = createdStock.data.id;
+      expect(stockId).toBeGreaterThan(0);
+      createdStockIds.push(stockId);
+      const stockPath = `/inventory/batches/${stockId}`;
+      const stockBefore = await apiCallRaw<SampleStockRow>(page, 'GET', stockPath);
+      expect(stockBefore).toMatchObject({
+        batch_no: stored.batch_no,
+        dye_lot_no: stored.dye_lot_no,
+        quality_status: '合格',
+      });
+      expect(Number(stockBefore.quantity_meters)).toBe(1);
+      expect(Number(stockBefore.quantity_on_hand)).toBe(1);
+
+      const row = await createApproval(page, {
+        sales_order_id: salesOrderId,
+        dye_batch_id: stored.id,
+        production_order_id: null,
+        product_id: productId,
+        color_no: stored.color_no,
+        dye_lot_no: stored.dye_lot_no,
+        batch_no: stored.batch_no,
+      });
+      const path = `/bulk-color-approvals/${row.id}`;
+      const piecesPath = `/inventory/pieces?batch_no=${encodeURIComponent(stored.batch_no)}&product_id=${productId}&warehouse_id=${warehouseId}&page=1&page_size=100`;
+      const readPieces = () =>
+        apiCallRaw<{ items: SamplePieceRow[]; total: number }>(page, 'GET', piecesPath);
+      const piecesBefore = await readPieces();
+      expect(piecesBefore.items).toEqual([]);
+      expect(piecesBefore.total).toBe(0);
+      const pending = await apiCallRaw<SampleApprovalRow>(page, 'GET', path);
+      expect(pending).toMatchObject({
+        approval_status: 'pending',
+        delivery_blocking: true,
+        production_order_id: null,
+        dye_batch_id: stored.id,
+        dye_lot_no: stored.dye_lot_no,
+        batch_no: stored.batch_no,
+      });
+      await apiCallRaw(page, 'POST', `${path}/cut-sample`, { sample_length_m: '0.5' });
+      const sampled = await apiCallRaw<SampleApprovalRow>(page, 'GET', path);
+      expect(sampled.approval_status).toBe('sampled');
+      expect(Number(sampled.sample_length_m)).toBe(0.5);
+      expect(sampled.sample_piece_id).toEqual(expect.any(Number));
+      expect(sampled.sample_piece_id).toBeGreaterThan(0);
+      createdSamplePieceIds.push(sampled.sample_piece_id as number);
+      const stockSampled = await apiCallRaw<SampleStockRow>(page, 'GET', stockPath);
+      expect(Number(stockSampled.quantity_meters)).toBe(0.5);
+      expect(Number(stockSampled.quantity_on_hand)).toBe(0.5);
+      const piecesSampled = await readPieces();
+      expect(piecesSampled.total).toBe(1);
+      expect(piecesSampled.items).toHaveLength(1);
+      expect(piecesSampled.items[0]).toMatchObject({
+        id: sampled.sample_piece_id,
+        piece_no: `SAMPLE-${stored.dye_lot_no}-${stored.batch_no}-001`,
+        batch_no: stored.batch_no,
+        dye_lot_no: stored.dye_lot_no,
+        product_id: productId,
+        warehouse_id: warehouseId,
+        status: 'SAMPLE',
+        quality_status: '合格',
+      });
+      expect(Number(piecesSampled.items[0].length)).toBe(0.5);
+
+      await apiCallRaw(page, 'POST', `${path}/send-to-customer`);
+      const sent = await apiCallRaw<SampleApprovalRow>(page, 'GET', path);
+      expect(sent.approval_status).toBe('sent_to_customer');
+      expect(sent.delivery_blocking).toBe(true);
+      const historyBefore = await apiCallRaw<BcaHistoryRow[]>(page, 'GET', `${path}/history`);
+      expect(Array.isArray(historyBefore)).toBe(true);
+      expect(await apiCallRaw<SampleStockRow>(page, 'GET', stockPath)).toEqual(stockSampled);
+      expect(await readPieces()).toEqual(piecesSampled);
+      const feedback = genCode(boundary.id);
+      const approveBody = { delta_e_value: boundary.deltaE, feedback };
+      if (boundary.approved) {
+        await apiCallRaw(page, 'POST', `${path}/approve`, approveBody);
+        const approved = await apiCallRaw<SampleApprovalRow>(page, 'GET', path);
+        expect(approved.approval_status).toBe('approved');
+        expect(approved.delivery_blocking).toBe(false);
+        expect(Number(approved.delta_e_value)).toBe(Number(boundary.deltaE));
+        expect(approved.customer_feedback).toBe(feedback);
+        const historyAfter = await apiCallRaw<BcaHistoryRow[]>(page, 'GET', `${path}/history`);
+        expect(historyAfter).toHaveLength(historyBefore.length + 1);
+        expect(historyAfter.slice(0, -1)).toEqual(historyBefore);
+        expect(historyAfter[historyBefore.length]).toMatchObject({
+          from_status: 'sent_to_customer',
+          to_status: 'approved',
+          reason: feedback,
+          snapshot: {
+            approval_status: 'approved',
+            delivery_blocking: false,
+            customer_feedback: feedback,
+          },
+        });
+        const repeated = await apiCallExpectFail(page, 'POST', `${path}/approve`, {
+          ...approveBody,
+          feedback: genCode('REPEAT'),
+        });
+        expect(repeated.status).toBe(400);
+        expect(failureCode(repeated)).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
+        expect(await apiCallRaw<SampleApprovalRow>(page, 'GET', path)).toEqual(approved);
+        expect(await apiCallRaw<BcaHistoryRow[]>(page, 'GET', `${path}/history`)).toEqual(
+          historyAfter
+        );
+      } else {
+        const fail = await apiCallExpectFail(page, 'POST', `${path}/approve`, approveBody);
+        expect(fail.status).toBe(400);
+        expect(failureCode(fail)).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+        expect(fail.message).toContain('超过 2.5，不允许通过');
+        expect(await apiCallRaw<SampleApprovalRow>(page, 'GET', path)).toEqual(sent);
+        expect(await apiCallRaw<BcaHistoryRow[]>(page, 'GET', `${path}/history`)).toEqual(
+          historyBefore
+        );
+      }
+      expect(await apiCallRaw<SampleStockRow>(page, 'GET', stockPath)).toEqual(stockSampled);
+      expect(await readPieces()).toEqual(piecesSampled);
+    });
+  }
+
   test('488-06 删除腿生效后详情与再删均判 404', async ({ page }) => {
     const row = await createApproval(page);
     const id = row.id as number;
@@ -470,6 +715,27 @@ test.describe('488 批色单建档门禁与状态机非法跃迁', () => {
       await loginViaUI(page);
       for (const id of createdApprovalIds) {
         await tryCleanup(page, 'DELETE', `/bulk-color-approvals/${id}`, `bca#${id}`);
+      }
+      for (const id of createdStockIds) {
+        await tryCleanup(
+          page,
+          'DELETE',
+          `/inventory/batches/${id}`,
+          `bca-stock#${id}（删除受阻则保留）`
+        );
+      }
+      for (const id of createdDyeBatchIds) {
+        await tryCleanup(
+          page,
+          'DELETE',
+          `/production/dye-batches/${id}`,
+          `bca-dye-batch#${id}（删除受阻则保留）`
+        );
+      }
+      for (const id of createdSamplePieceIds) {
+        console.warn(
+          `[cleanup] 保留样布 inventory_piece#${id}：无匹号删除路由，不越权清除追溯记录`
+        );
       }
       for (const id of createdSalesOrderIds) {
         await tryCleanup(page, 'DELETE', `/sales/orders/${id}`, `sales-order#${id}`);

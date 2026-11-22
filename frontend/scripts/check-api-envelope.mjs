@@ -823,8 +823,10 @@ function parseStructFields(body) {
   const fields = [];
   const re = /(?:pub\s+)?([A-Za-z_]\w*)\s*:\s*/g;
   let m;
+  let cursor = 0;
   while ((m = re.exec(body))) {
     const name = m[1];
+    const attrs = (body.slice(cursor, m.index).match(/#\[[^\]]*\]/g) || []).join(' ');
     let i = m.index + m[0].length;
     let depth = 0;
     let type = '';
@@ -837,7 +839,8 @@ function parseStructFields(body) {
     }
     type = type.trim();
     // 跳过明显不是字段的误命中（如方法体里的标识符）：类型需以合法类型字符起头
-    if (/^[A-Za-z_(]/.test(type)) fields.push({ name, type });
+    if (/^[A-Za-z_(]/.test(type)) fields.push({ name, type, attrs });
+    cursor = i + 1;
   }
   return fields;
 }

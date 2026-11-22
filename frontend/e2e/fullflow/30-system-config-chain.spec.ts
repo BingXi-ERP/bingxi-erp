@@ -51,6 +51,10 @@ test.afterEach(async ({ page }) => {
 /** AppError 机器码取源 flow/helpers 的 APP_ERROR_CODES（NOT_FOUND 登记依据 utils/error.rs:739） */
 const ERR_NOT_FOUND = APP_ERROR_CODES.NOT_FOUND;
 
+// 正向用户建单使用固定合规强密码：四类字符齐备、16 位、不含键盘序列；
+// 时间戳只用于用户名隔离，避免随机数字偶然命中密码黑名单导致假红。
+const STRONG_PASSWORD = 'Bq7!Vn2@Lm9#Kp4!';
+
 function requireNum(v: unknown, label: string): number {
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0)
@@ -213,7 +217,7 @@ test.describe('30 系统配置契约链', () => {
     // 只翻 is_active），守卫按行计数不放行——本钉揭示"删了用户却删不掉部门"是既有契约而非 bug。
     const user = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/users', {
       username: `f30u${Date.now().toString().slice(-6)}`,
-      password: `E30p!${stampSafe(Date.now().toString().slice(-6))}Qz`,
+      password: STRONG_PASSWORD,
       department_id: parentId,
     });
     const userId = requireNum(user.id, '建用户');
@@ -240,7 +244,11 @@ test.describe('30 系统配置契约链', () => {
     const username = `f30dup${ts}`;
     const created = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/users', {
       username,
+<<<<<<< HEAD
       password: `E30ok!${stampSafe(ts)}Zq`,
+=======
+      password: STRONG_PASSWORD,
+>>>>>>> origin/main
       phone: '13800000304',
     });
     const userId = requireNum(created.id, '建用户');
@@ -253,13 +261,12 @@ test.describe('30 系统配置契约链', () => {
     ).toBeUndefined();
 
     // 重名 → 业务族（user_service.rs:131-144）
-    // 密码必须是「强度合规」的强密码（含 ASCII 小写——password_validator 的 require_lowercase，
-    // 且大小写+数字+特殊齐全），否则请求会先被强度校验门以 VALIDATION_ERROR 拒，根本到不了
-    // 唯一性门（BUSINESS），本负例就验不到重名语义。旧值缺 ASCII 小写字母
-    // （别的 为中文、W 大写、余皆数字）即卡此门——形状对齐首个建单 E30ok!${ts}Zq（line 238）。
+    // 密码必须强度合规，否则请求会先被 VALIDATION_ERROR 拒而到不了唯一性门。
+    // 强度门会拒绝四连键盘序列，故正向建单一律用固定 STRONG_PASSWORD，
+    // 时间戳只隔离用户名，不再参与密码构造。
     const dup = await apiCallExpectFail(page, 'POST', '/users', {
       username,
-      password: `E30dup!${ts}Zq`,
+      password: STRONG_PASSWORD,
     });
     expect(dup.status, '重复用户名应 400').toBe(400);
     expect(failureCode(dup), '重名机器码').toBe(APP_ERROR_CODES.BUSINESS_ERROR);
@@ -275,7 +282,7 @@ test.describe('30 系统配置契约链', () => {
     // 坏邮箱 → 取值族（CreateUserRequest #[validate(email)] :81）
     const badEmail = await apiCallExpectFail(page, 'POST', '/users', {
       username: `f30mail${ts}`,
-      password: `E30mail!${ts}Qz`,
+      password: STRONG_PASSWORD,
       email: 'not-an-email',
     });
     expect(badEmail.status, '坏邮箱应 400').toBe(400);

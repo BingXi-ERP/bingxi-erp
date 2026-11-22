@@ -30,7 +30,6 @@
     "DELETE /api/v1/erp/subjects/*",
     "DELETE /api/v1/erp/users/*",
     "DELETE /api/v1/erp/vouchers/*",
-    "DELETE /api/v1/erp/warehouses/*",
     "DELETE /api/v1/erp/webhooks/*",
     "GET /api/v1/erp/admin/failover/health",
     "GET /api/v1/erp/admin/failover/metrics",
@@ -277,7 +276,6 @@
     "GET /api/v1/erp/system-update/tasks/*",
     "GET /api/v1/erp/templates/download/*",
     "GET /api/v1/erp/templates/meta/*",
-    "GET /api/v1/erp/user-notification-settings",
     "GET /api/v1/erp/user-path",
     "GET /api/v1/erp/users",
     "GET /api/v1/erp/users/*",
@@ -285,7 +283,6 @@
     "GET /api/v1/erp/vouchers/*/print",
     "GET /api/v1/erp/vouchers/generate-no",
     "GET /api/v1/erp/warehouses",
-    "GET /api/v1/erp/warehouses/*",
     "GET /api/v1/erp/webhooks",
     "GET /api/v1/erp/webhooks/*/logs",
     "GET /api/v1/erp/ws/notifications",
@@ -526,13 +523,8 @@
     "PUT /api/v1/erp/quotations/*/terms",
     "PUT /api/v1/erp/roles/*",
     "PUT /api/v1/erp/roles/*/permissions",
-    "PUT /api/v1/erp/scheduling/*",
-    "PUT /api/v1/erp/scheduling/tasks/*/adjust",
-    "PUT /api/v1/erp/slow-queries/*/optimization",
     "PUT /api/v1/erp/subjects/*",
-    "PUT /api/v1/erp/user-notification-settings",
     "PUT /api/v1/erp/users/*",
-    "PUT /api/v1/erp/vouchers/*",
-    "PUT /api/v1/erp/warehouses/*"
+    "PUT /api/v1/erp/vouchers/*"
   ]
 }

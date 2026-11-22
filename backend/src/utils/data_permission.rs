@@ -56,6 +56,7 @@ pub const CUSTOMER_ALL_FIELDS: &[&str] = &[
     "bank_name",
     "bank_account",
     "status",
+    "owner_id",
     "customer_type",
     "notes",
     "created_by",
