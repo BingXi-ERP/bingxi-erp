@@ -10447,6 +10447,7 @@ export default {
       buttonDelete: '删除',
       buttonApprove: '审批',
       buttonExecute: '执行',
+      mobileCardAria: '销售合同手机卡片列表',
       columnContractNo: '合同编号',
       columnContractName: '合同名称',
       columnCustomer: '客户',
@@ -10574,6 +10575,7 @@ export default {
     },
     table: {
       ariaLabel: '销售价格列表',
+      mobileCardAria: '销售价格手机卡片列表',
       columnIndex: '序号',
       columnProductName: '产品名称',
       columnCustomer: '客户',
@@ -10711,6 +10713,7 @@ export default {
     },
     table: {
       ariaLabel: '销售退货列表',
+      mobileCardAria: '销售退货手机卡片列表',
       columnReturnNo: '退货单号',
       columnSalesOrderNo: '销售订单号',
       columnCustomerName: '客户名称',
@@ -12140,6 +12143,7 @@ export default {
       buttonConfirm: '确认',
       buttonCancel: '取消',
       ariaTable: '坯布列表表格',
+      mobileCardAria: '胚布档案手机卡片列表',
       colFabricCode: '坯布编码',
       colFabricName: '坯布名称',
       colFabricType: '坯布类型',

@@ -10515,6 +10515,7 @@ export default {
       buttonDelete: 'Delete',
       buttonApprove: 'Approve',
       buttonExecute: 'Execute',
+      mobileCardAria: 'Sales contract mobile card list',
       columnContractNo: 'Contract No',
       columnContractName: 'Contract Name',
       columnCustomer: 'Customer',
@@ -10642,6 +10643,7 @@ export default {
     },
     table: {
       ariaLabel: 'Sales Price List',
+      mobileCardAria: 'Sales price mobile card list',
       columnIndex: 'No.',
       columnProductName: 'Product Name',
       columnCustomer: 'Customer',
@@ -10779,6 +10781,7 @@ export default {
     },
     table: {
       ariaLabel: 'Sales Returns List',
+      mobileCardAria: 'Sales return mobile card list',
       columnReturnNo: 'Return No.',
       columnSalesOrderNo: 'Sales Order No.',
       columnCustomerName: 'Customer Name',
@@ -12218,6 +12221,7 @@ export default {
       buttonConfirm: 'Confirm',
       buttonCancel: 'Cancel',
       ariaTable: 'Greige Fabrics Table',
+      mobileCardAria: 'Greige fabric mobile card list',
       colFabricCode: 'Fabric Code',
       colFabricName: 'Fabric Name',
       colFabricType: 'Fabric Type',
