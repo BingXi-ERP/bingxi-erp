@@ -7,13 +7,16 @@
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use crate::models::status::purchase_inventory::inventory_piece as piece_status;
-use crate::models::{inventory_piece, warehouse};
+use crate::models::{
+    fabric_defect_record, fabric_inspection_record, fabric_physical_test_record, inventory_piece,
+    quality_inspection_record, warehouse,
+};
 use crate::utils::data_scope::apply_data_scope;
 use crate::utils::error::AppError;
 use crate::utils::response::{ApiResponse, PaginatedResponse};
 use axum::{
+    extract::{Path, Query, State},
     Json,
-    extract::{Query, State},
 };
 use sea_orm::{ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 use serde::Deserialize;
@@ -202,4 +205,91 @@ pub async fn list_pieces(
     Ok(Json(ApiResponse::success(PaginatedResponse::new(
         items, total, page, page_size,
     ))))
+}
+
+// ============================================================================
+// 匹级聚合追溯
+// ============================================================================
+
+/// 匹级聚合追溯响应：匹详情 + 来源验布单 + 物理测试 + 疵点 + 质检判定。
+///
+/// 各集合直接序列化实体 Model（出参键 = 实体列名 snake_case），不投影改名、
+/// 不拼造假名；查询为固定次数的明确查询（匹 1 次、验布单 ≤1 次、物理测试/疵点/
+/// 质检判定各 1 次），无逐行再查。匹无验布来源（生产报工/委外回仓产匹）时
+/// inspection 为 null 且三个验布侧集合为空——这是真实语义，不是缺键兜底；
+/// 而 inspection_id 有值但验布单查不到属于锚链损坏，fail-fast 404 点名。
+#[derive(Debug, serde::Serialize)]
+pub struct PieceTraceResponse {
+    pub piece: inventory_piece::Model,
+    pub inspection: Option<fabric_inspection_record::Model>,
+    pub physical_tests: Vec<fabric_physical_test_record::Model>,
+    pub defects: Vec<fabric_defect_record::Model>,
+    pub quality_records: Vec<quality_inspection_record::Model>,
+}
+
+/// GET /api/v1/erp/inventory/pieces/:id/trace - 匹级聚合追溯
+pub async fn get_piece_trace(
+    State(state): State<AppState>,
+    Path(piece_id): Path<i32>,
+) -> Result<Json<ApiResponse<PieceTraceResponse>>, AppError> {
+    let piece = inventory_piece::Entity::find_by_id(piece_id)
+        .one(state.db.as_ref())
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("匹不存在：{}", piece_id)))?;
+
+    let inspection = match piece.inspection_id {
+        Some(inspection_id) => Some(
+            fabric_inspection_record::Entity::find_by_id(inspection_id)
+                .one(state.db.as_ref())
+                .await?
+                .ok_or_else(|| {
+                    AppError::not_found(format!(
+                        "匹 {} 回指的验布单不存在：{}",
+                        piece.piece_no, inspection_id
+                    ))
+                })?,
+        ),
+        None => None,
+    };
+
+    // 验布侧三个集合按匹回指的验布单拉取；无来源匹集合为空（真实语义）
+    let physical_tests = match &inspection {
+        Some(insp) => {
+            fabric_physical_test_record::Entity::find()
+                .filter(fabric_physical_test_record::Column::InspectionId.eq(insp.id))
+                .order_by_asc(fabric_physical_test_record::Column::Id)
+                .all(state.db.as_ref())
+                .await?
+        }
+        None => Vec::new(),
+    };
+    let defects = match &inspection {
+        Some(insp) => {
+            fabric_defect_record::Entity::find()
+                .filter(fabric_defect_record::Column::InspectionId.eq(insp.id))
+                .order_by_asc(fabric_defect_record::Column::Id)
+                .all(state.db.as_ref())
+                .await?
+        }
+        None => Vec::new(),
+    };
+
+    // 质检判定按多态锚拉取：related_type=INVENTORY_PIECE + related_id=匹主键
+    let quality_records = quality_inspection_record::Entity::find()
+        .filter(
+            quality_inspection_record::Column::RelatedType
+                .eq(crate::services::quality_inspection_service::RELATED_TYPE_INVENTORY_PIECE),
+        )
+        .filter(quality_inspection_record::Column::RelatedId.eq(piece.id))
+        .order_by_asc(quality_inspection_record::Column::Id)
+        .all(state.db.as_ref())
+        .await?;
+
+    Ok(Json(ApiResponse::success(PieceTraceResponse {
+        piece,
+        inspection,
+        physical_tests,
+        defects,
+        quality_records,
+    })))
 }

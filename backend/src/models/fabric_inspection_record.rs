@@ -80,6 +80,13 @@ pub struct Model {
     #[sea_orm(column_type = "Decimal(Some((12, 2)))")]
     pub total_roll_weight: Decimal,
 
+    /// 打卷修边长度（米，实测；未修边为 NULL）
+    #[sea_orm(column_type = "Decimal(Some((12, 2)))")]
+    pub edge_trim_length: Option<Decimal>,
+    /// 打卷修边重量（千克，实测；未修边为 NULL）
+    #[sea_orm(column_type = "Decimal(Some((12, 2)))")]
+    pub edge_trim_weight: Option<Decimal>,
+
     /// 状态：pending/inspecting/graded/rolled/closed
     pub status: String,
 
