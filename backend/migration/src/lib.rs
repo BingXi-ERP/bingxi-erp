@@ -388,6 +388,9 @@ impl MigratorTrait for Migrator {
             Box::new(domain::business::m0098_payment_channel_configs::Migration),
             // 批色库存联动失败持久化待补标记两列，链尾独立域（存量复用库上属 pending 必然执行）
             Box::new(domain::bulk_color_stock_sync_pending::Migration),
+            // 批色 ΔE 判定等级两列（high_light_sensitive / delta_e_result），链尾独立域
+            // （存量复用库上属 pending 必然执行；bulk_color_approval 建表早于本域）
+            Box::new(domain::bulk_color_delta_e_level::Migration),
         ]
     }
 }
