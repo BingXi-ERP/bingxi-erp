@@ -16,7 +16,7 @@
 
 use chrono::Utc;
 use rust_decimal::Decimal;
-use sea_orm::sea_query::{BinOper, Expr};
+use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, Set,
     UpdateResult,
@@ -115,17 +115,15 @@ async fn debit(
     let result = inventory_stock::Entity::update_many()
         .col_expr(
             inventory_stock::Column::QuantityAvailable,
-            Expr::col(inventory_stock::Column::QuantityAvailable)
-                .binary(BinOper::Sub, Expr::val(qty)),
+            Expr::col(inventory_stock::Column::QuantityAvailable).sub(qty),
         )
         .col_expr(
             inventory_stock::Column::QuantityReserved,
-            Expr::col(inventory_stock::Column::QuantityReserved)
-                .binary(BinOper::Add, Expr::val(qty)),
+            Expr::col(inventory_stock::Column::QuantityReserved).add(qty),
         )
         .col_expr(
             inventory_stock::Column::Version,
-            Expr::col(inventory_stock::Column::Version).binary(BinOper::Add, Expr::val(1)),
+            Expr::col(inventory_stock::Column::Version).add(1),
         )
         .col_expr(inventory_stock::Column::UpdatedAt, Expr::val(Utc::now()))
         .filter(inventory_stock::Column::Id.eq(stock_id))
@@ -145,17 +143,15 @@ async fn credit(
     let result = inventory_stock::Entity::update_many()
         .col_expr(
             inventory_stock::Column::QuantityAvailable,
-            Expr::col(inventory_stock::Column::QuantityAvailable)
-                .binary(BinOper::Add, Expr::val(qty)),
+            Expr::col(inventory_stock::Column::QuantityAvailable).add(qty),
         )
         .col_expr(
             inventory_stock::Column::QuantityReserved,
-            Expr::col(inventory_stock::Column::QuantityReserved)
-                .binary(BinOper::Sub, Expr::val(qty)),
+            Expr::col(inventory_stock::Column::QuantityReserved).sub(qty),
         )
         .col_expr(
             inventory_stock::Column::Version,
-            Expr::col(inventory_stock::Column::Version).binary(BinOper::Add, Expr::val(1)),
+            Expr::col(inventory_stock::Column::Version).add(1),
         )
         .col_expr(inventory_stock::Column::UpdatedAt, Expr::val(Utc::now()))
         .filter(inventory_stock::Column::Id.eq(stock_id))
