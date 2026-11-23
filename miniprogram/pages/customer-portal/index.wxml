@@ -1,0 +1,23 @@
+<view class="portal-page">
+  <view class="portal-title">客户门户</view>
+  <view class="portal-error" wx:if="{{error}}">{{error}}</view>
+  <view class="portal-card" wx:if="{{summary}}">
+    <view class="metric">
+      <view class="metric-label">订单总数</view>
+      <view class="metric-value">{{summary.order_count}}</view>
+    </view>
+    <view class="metric">
+      <view class="metric-label">在途订单</view>
+      <view class="metric-value">{{summary.in_transit_count}}</view>
+    </view>
+    <view class="metric">
+      <view class="metric-label">应收余额</view>
+      <view class="metric-value">{{summary.receivable_balance}}</view>
+    </view>
+  </view>
+  <view class="portal-empty" wx:if="{{loading && !summary}}">正在加载</view>
+  <view class="portal-entry" wx:for="{{entries}}" wx:key="title" data-url="{{item.url}}" bindtap="openPage">
+    {{item.title}}
+    <text class="portal-arrow">›</text>
+  </view>
+</view>

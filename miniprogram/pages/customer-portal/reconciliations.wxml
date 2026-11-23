@@ -1,0 +1,14 @@
+<view class="portal-page">
+  <view class="portal-error" wx:if="{{error}}">{{error}}</view>
+  <view class="portal-row" wx:for="{{items}}" wx:key="id">
+    <view class="row-head">
+      <text>{{item.reconciliation_no}}</text>
+      <text class="row-status">{{item.reconciliation_status}}</text>
+    </view>
+    <view class="row-line">期间：{{item.period_start}} 至 {{item.period_end}}</view>
+    <view class="row-line">期初：{{item.opening_balance}}　发票：{{item.total_invoices}}</view>
+    <view class="row-line">收款：{{item.total_collections}}　期末：{{item.closing_balance}}</view>
+  </view>
+  <view class="portal-empty" wx:if="{{!loading && finished && items.length === 0 && !error}}">暂无对账单</view>
+  <view class="portal-empty" wx:if="{{loading}}">正在加载</view>
+</view>

@@ -391,6 +391,8 @@ impl MigratorTrait for Migrator {
             // 批色 ΔE 判定等级两列（high_light_sensitive / delta_e_result），链尾独立域
             // （存量复用库上属 pending 必然执行；bulk_color_approval 建表早于本域）
             Box::new(domain::bulk_color_delta_e_level::Migration),
+            // 客户门户绑定列（users.customer_id），链尾独立域（存量复用库上属 pending 必然执行）
+            Box::new(domain::customer_portal_binding::Migration),
         ]
     }
 }
