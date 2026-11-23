@@ -34,14 +34,11 @@ const ARCHIVE: Array<{ id: number; label: string }> = [];
 test.afterEach(async ({ page }) => {
   for (const card of ARCHIVE.reverse()) {
     try {
-      const res = await apiCall(page, 'DELETE', `/color-cards/${card.id}`, {
+      await apiCall(page, 'DELETE', `/color-cards/${card.id}`, {
         reason: '608 用例自建卡收尾归档',
       });
-      if (res.status < 200 || res.status >= 300) {
-        console.warn(`[608] ${card.label} 归档未成功 status=${res.status}`);
-      }
     } catch (error) {
-      console.warn(`[608] ${card.label} 归档异常：${(error as Error).message}`);
+      console.warn(`[608] ${card.label} 归档未成功：${(error as Error).message}`);
     }
   }
   ARCHIVE.length = 0;

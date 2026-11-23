@@ -21,7 +21,7 @@
  * 若验收要求历史单据名称冻结，属需求冲突需决策，不能靠放宽本断言落绿。
  */
 import { test, expect } from '../diagnose-fixture';
-import { apiCall, apiCallRaw, genCode, genName, tryCleanup } from './helpers';
+import { apiCall, apiCallRaw, genCode, tryCleanup } from './helpers';
 import { PRODUCT_TYPE } from '../../src/constants/product-type';
 
 const CLEANUP: Array<{ path: string; label: string }> = [];
@@ -88,7 +88,7 @@ test.describe.serial('611 主数据改名后历史单据名称跟随档案', () 
     CLEANUP.push({ path: `/products/${productId}`, label: '[611-1] 自建产品' });
 
     const snapshotColorName = `611快照原色_${tag}`;
-    const order = await apiCall<{ data?: { id?: number } }>(page, 'POST', '/sales/orders', {
+    const order = await apiCallRaw<{ id?: number }>(page, 'POST', '/sales/orders', {
       customer_id: customerId,
       order_date: new Date().toISOString(),
       items: [
@@ -100,7 +100,7 @@ test.describe.serial('611 主数据改名后历史单据名称跟随档案', () 
         },
       ],
     });
-    const orderId = Number(order?.data?.id);
+    const orderId = Number(order?.id);
     expect(orderId, '[611-1] 草稿销售订单必须返回正整数主键').toBeGreaterThan(0);
     CLEANUP.push({ path: `/sales/orders/${orderId}`, label: '[611-1] 草稿订单' });
 

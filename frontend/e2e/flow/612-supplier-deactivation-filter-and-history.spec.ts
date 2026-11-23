@@ -20,7 +20,7 @@
  * 与 15-07（双向跃迁）不重复：本用例钉的是过滤面命中与历史单据可查，15 号未覆盖。
  */
 import { test, expect } from '../diagnose-fixture';
-import { apiCall, apiCallRaw, ensureTestEntities, genName, getCtx, tryCleanup } from './helpers';
+import { apiCallRaw, ensureTestEntities, genName, getCtx, tryCleanup } from './helpers';
 
 interface SupplierRow {
   id: number;
@@ -57,7 +57,7 @@ test.describe.serial('612 供应商停用后过滤面命中且历史采购单可
     expect(supplierId, '[612-1] 自建供应商必须返回正整数主键').toBeGreaterThan(0);
     CLEANUP.push({ path: `/purchase/suppliers/${supplierId}`, label: '[612-1] 自建供应商' });
 
-    const po = await apiCall<{ data?: { id?: number } }>(page, 'POST', '/purchase/orders', {
+    const po = await apiCallRaw<{ id?: number }>(page, 'POST', '/purchase/orders', {
       supplier_id: supplierId,
       warehouse_id: ctx.warehouseIds[0],
       department_id: ctx.departmentIds[0],
@@ -72,7 +72,7 @@ test.describe.serial('612 供应商停用后过滤面命中且历史采购单可
         },
       ],
     });
-    const poId = Number(po?.data?.id);
+    const poId = Number(po?.id);
     expect(poId, '[612-1] 关联采购单必须返回正整数主键').toBeGreaterThan(0);
     CLEANUP.push({ path: `/purchase/orders/${poId}`, label: '[612-1] 历史采购单' });
 
@@ -127,12 +127,8 @@ test.describe.serial('612 供应商停用后过滤面命中且历史采购单可
       '[612-1] is_enabled 过滤面命中的必须是自建停用行'
     ).toBe(true);
 
-    const poAfter = await apiCall<{ data?: { id?: number } }>(
-      page,
-      'GET',
-      `/purchase/orders/${poId}`
-    );
-    expect(poAfter.status, '[612-1] 供应商停用后历史采购单详情必须仍可查（200）').toBe(200);
-    expect(Number(poAfter?.data?.id), '[612-1] 历史采购单回读主键必须仍是自建 PO').toBe(poId);
+    // apiCallRaw 只在 2xx 且信封 code=200 时返回数据，成功回读即证明历史 PO 未被停用级联影响。
+    const poAfter = await apiCallRaw<{ id?: number }>(page, 'GET', `/purchase/orders/${poId}`);
+    expect(Number(poAfter?.id), '[612-1] 历史采购单回读主键必须仍是自建 PO（2xx）').toBe(poId);
   });
 });

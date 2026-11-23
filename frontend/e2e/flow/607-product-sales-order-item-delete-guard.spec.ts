@@ -100,11 +100,10 @@ test.describe.serial('607 产品被销售订单明细引用禁止删除', () => 
       '[607-1] 拒因必须点名销售订单明细这一引用面，否则无法定位 blocker'
     ).toContain('订单明细');
 
-    const detail = await apiCall<{ data?: { id?: number } }>(page, 'GET', `/products/${productId}`);
-    expect(detail.status, '[607-1] 被拒删除后按主键回读必须仍为 200').toBe(200);
-    expect(Number(detail.data?.id), '[607-1] 回读主键必须仍是被拒删的自建产品，不能是他人行').toBe(
-      productId
-    );
+    // apiCallRaw 仅在 HTTP 2xx 且信封 code=200 时返回数据，非 2xx 直接抛错；
+    // 用它回读即同时证明「GET 仍 200」与「主键仍是自建产品」。
+    const detail = await apiCallRaw<{ id?: number }>(page, 'GET', `/products/${productId}`);
+    expect(Number(detail?.id), '[607-1] 被拒删除后主键回读必须仍是自建产品（2xx）').toBe(productId);
 
     const listAfter = await apiCallRaw<ProductListPage>(page, 'GET', searchPath);
     expect(Array.isArray(listAfter.items), '[607-1] 删除后产品列表必须回 items 数组').toBe(true);
