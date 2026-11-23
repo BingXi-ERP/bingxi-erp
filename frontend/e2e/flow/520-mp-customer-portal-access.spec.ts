@@ -158,10 +158,9 @@ test.describe.serial('520 小程序客户门户读面', () => {
   let orderBTag = '';
   const boundUsername = genCode('mp520bound');
   const unboundUsername = genCode('mp520unbound');
-  const danglingUsername = genCode('mp520dangling');
   const temporaryUsername = genCode('mp520temp');
 
-  test('造数：双客户双订单，绑定/未绑定/悬空/非 customer 四类账号', async ({ page, browser }) => {
+  test('造数：双客户双订单，绑定/未绑定/非 customer 三类账号', async ({ page, browser }) => {
     await ensureTestEntities(page);
     const productId = getCtx().productIds[0];
     expect(productId, 'ensureTestEntities 应备好产品').toBeTruthy();
@@ -181,16 +180,13 @@ test.describe.serial('520 小程序客户门户读面', () => {
     await createUser(page, boundUsername, customerRoleId, customerAId);
     await createUser(page, unboundUsername, customerRoleId);
 
-    // 悬空绑定：绑定列无外键，直接绑一个绝不存在的客户 id 即为失效绑定。
-    // 不能走 DELETE /crm/customers/:id——该增强入口落的是线索行，客户行仍在，
-    // 悬空状态造不出来（读面会 200 放行），这是造数错误不是功能缺陷。
-    const danglingCustomerId = 2_100_000_000;
-    await createUser(page, danglingUsername, customerRoleId, danglingCustomerId);
+    // 悬空绑定不可立：用户写口创建与改绑都校验目标客户真实存在，
+    // 合法 API 造不出悬空账号，服务层的档案失效门留作运行期兜底。
 
     const temporaryRoleId = await findRoleId(page, 'temporary');
     await createUser(page, temporaryUsername, temporaryRoleId, customerAId);
 
-    for (const username of [boundUsername, unboundUsername, danglingUsername, temporaryUsername]) {
+    for (const username of [boundUsername, unboundUsername, temporaryUsername]) {
       sessions.push(await loginInIsolatedContext(browser, username, testPassword()));
     }
   });
@@ -275,7 +271,7 @@ test.describe.serial('520 小程序客户门户读面', () => {
     expect(Math.abs(Number(dashboard.receivable_balance) - sum) < 0.01).toBe(true);
   });
 
-  test('未绑定、悬空绑定、非 customer 角色一律 403，内部读面仍 403', async () => {
+  test('未绑定与非 customer 角色一律 403，内部读面仍 403', async () => {
     const paths = [
       '/customer-portal/orders?page=1&page_size=10',
       '/customer-portal/sales-orders?page=1&page_size=10',
@@ -292,12 +288,11 @@ test.describe.serial('520 小程序客户门户读面', () => {
     expect(unbound.message, '未绑定拒绝外显为固定脱敏文案').toBe('无权限');
     expect(unbound.message, '外显不得泄露绑定状态').not.toContain('未绑定');
 
-    const dangling = await apiCallExpectFail(sessions[2].page, 'GET', paths[0]);
-    expect(dangling.status, '悬空绑定必须 403').toBe(403);
-    expect(dangling.message, '悬空绑定拒绝外显为固定脱敏文案').toBe('无权限');
-    expect(dangling.message, '外显不得泄露档案失效状态').not.toContain('失效');
+    // 悬空绑定不可立：用户写口（创建与改绑）均校验绑定客户必须真实存在，
+    // 合法 API 造不出 customer_id 悬空的账号；服务层 require_portal_customer 的
+    // 档案失效门留作运行期兜底，本 E2E 不再伪造不可达前置。
 
-    const temporary = await apiCallExpectFail(sessions[3].page, 'GET', paths[0]);
+    const temporary = await apiCallExpectFail(sessions[2].page, 'GET', paths[0]);
     expect(temporary.status, '已绑定但非 customer 角色必须 403').toBe(403);
     expect(temporary.message, '角色硬门外显为固定脱敏文案').toBe('无权限');
     expect(temporary.message, '外显不得点名角色要求').not.toContain('customer');

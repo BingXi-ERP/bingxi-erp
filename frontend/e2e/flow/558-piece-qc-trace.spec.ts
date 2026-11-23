@@ -69,7 +69,9 @@ async function startInspection(page: Page, tag: string): Promise<number> {
     {
       product_id: productId,
       product_name: `E2E-558-${tag}`,
-      dye_lot_no: genCode('DYE'),
+      // 打卷入库要求缸号在 batch_dye_lot 表中真实存在；用共享种子建好的缸号，
+      // 不再以 genCode 伪造（假缸号会在打卷腿 BUSINESS_ERROR 拒绝）。
+      dye_lot_no: ctx.dyeLotNo,
       color_no: genCode('CLR'),
       inspection_date: new Date().toISOString().slice(0, 10),
       scoring_system: 'ten_point',
