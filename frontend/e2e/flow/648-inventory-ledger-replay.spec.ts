@@ -56,11 +56,19 @@ function toCents(v: unknown, label: string): bigint {
 
 function idOf(v: unknown, label: string): number {
   const n = typeof v === 'string' || typeof v === 'number' ? Number(v) : NaN;
-  expect(Number.isFinite(n) && n > 0, `[648] ${label} 须返回正整数 id，实际 ${JSON.stringify(v)}`).toBe(true);
+  expect(
+    Number.isFinite(n) && n > 0,
+    `[648] ${label} 须返回正整数 id，实际 ${JSON.stringify(v)}`
+  ).toBe(true);
   return n;
 }
 
-async function allTxns(page: Page, productId: number, warehouseId: number, batchNo: string): Promise<Row[]> {
+async function allTxns(
+  page: Page,
+  productId: number,
+  warehouseId: number,
+  batchNo: string
+): Promise<Row[]> {
   const first = await apiCallRaw<{ items?: Row[]; total?: number }>(
     page,
     'GET',
@@ -82,7 +90,12 @@ async function allTxns(page: Page, productId: number, warehouseId: number, batch
   return rows;
 }
 
-async function stockRow(page: Page, productId: number, warehouseId: number, batchNo: string): Promise<Row> {
+async function stockRow(
+  page: Page,
+  productId: number,
+  warehouseId: number,
+  batchNo: string
+): Promise<Row> {
   const res = await apiCallRaw<{ items?: Row[] }>(
     page,
     'GET',
@@ -103,7 +116,12 @@ test.describe('648 库存流水 before/after 台账回放', () => {
     const tag = genCode('648');
     const batchNo = `${tag}-B`;
     const today = new Date().toISOString().slice(0, 10);
-    if (!ctx.supplierId || !ctx.warehouseIds[0] || !ctx.departmentIds[0] || !ctx.productCategoryIds[0]) {
+    if (
+      !ctx.supplierId ||
+      !ctx.warehouseIds[0] ||
+      !ctx.departmentIds[0] ||
+      !ctx.productCategoryIds[0]
+    ) {
       throw new Error('[648] 前置缺失：供应商/仓库/部门/品类未就绪');
     }
 
@@ -116,7 +134,10 @@ test.describe('648 库存流水 before/after 台账回放', () => {
     });
     const productId = idOf(product.id, '产品');
     CLEANUP.push({ path: `/products/${productId}`, label: `[648] 产品#${productId}` });
-    expect((await apiCallRaw<Row>(page, 'GET', `/products/${productId}`)).unit, '[648] 产品单位').toBe('米');
+    expect(
+      (await apiCallRaw<Row>(page, 'GET', `/products/${productId}`)).unit,
+      '[648] 产品单位'
+    ).toBe('米');
 
     const po = await apiCallRaw<Row>(page, 'POST', '/purchase/orders', {
       supplier_id: ctx.supplierId,
@@ -205,7 +226,11 @@ test.describe('648 库存流水 before/after 台账回放', () => {
     expect(orderNo.length, '[648] 销售订单须返回 order_no').toBeGreaterThan(0);
     await apiCallRaw(page, 'POST', `/sales/orders/${orderId}/submit`);
     await apiCallRaw(page, 'POST', `/sales/orders/${orderId}/approve`);
-    const warehouses = await apiCallRaw<{ items?: Row[] }>(page, 'GET', '/warehouses?page=1&page_size=200');
+    const warehouses = await apiCallRaw<{ items?: Row[] }>(
+      page,
+      'GET',
+      '/warehouses?page=1&page_size=200'
+    );
     const warehouseRows = pickListArray({ items: warehouses.items }, 'items', '[648] 仓库列表');
     const warehouse = warehouseRows.find(w => Number(w.id) === ctx.warehouseIds[0]);
     expect(warehouse?.code, '[648] 目标仓库须有 warehouse_code 回读').toBeTruthy();
@@ -224,7 +249,9 @@ test.describe('648 库存流水 before/after 台账回放', () => {
     expect(String(inbound?.source_bill_type), '[648] 入库腿来源单据类型').toBe('PURCHASE_RECEIPT');
     expect(String(inbound?.source_bill_no), '[648] 入库腿来源单号').toBe(receiptNo);
     expect(String(outbound?.source_bill_no), '[648] 出库腿来源单号').toBe(orderNo);
-    expect(String(outbound?.source_bill_type), '[648] 出库腿来源单据类型（写入方小写）').toBe('sales_order');
+    expect(String(outbound?.source_bill_type), '[648] 出库腿来源单据类型（写入方小写）').toBe(
+      'sales_order'
+    );
 
     let previousAfter = 0n;
     for (const [idx, txn] of txns.entries()) {
@@ -236,7 +263,10 @@ test.describe('648 库存流水 before/after 台账回放', () => {
       previousAfter = after;
     }
     const stock = await stockRow(page, productId, ctx.warehouseIds[0], batchNo);
-    expect(toCents(stock.quantity_meters, '[648] 库存行米数'), '[648] 末条流水 after == 库存详情').toBe(previousAfter);
+    expect(
+      toCents(stock.quantity_meters, '[648] 库存行米数'),
+      '[648] 末条流水 after == 库存详情'
+    ).toBe(previousAfter);
     expect(previousAfter, '[648] 60 入库减 25 出库终值').toBe(3500n);
   });
 });

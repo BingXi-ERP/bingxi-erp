@@ -50,7 +50,12 @@ function num(v: unknown, label: string): number {
   return n;
 }
 
-async function stockRow(page: Page, productId: number, colorNo: string, batchNo: string): Promise<Row> {
+async function stockRow(
+  page: Page,
+  productId: number,
+  colorNo: string,
+  batchNo: string
+): Promise<Row> {
   const listed = await apiCallRaw<{ items?: Row[] }>(
     page,
     'GET',
@@ -191,9 +196,14 @@ test.describe('650 订单锁缸/释放无孤立单据', () => {
     expectStock(await stockRow(page, productId, colorNo, batchNo), 55, 45, '[650-1] 改量后净差量');
     const lockedAfterUpdate = await orderReservations(page, productId, orderId, 'locked');
     expect(lockedAfterUpdate.length, '[650-1] 改量后恰一条新 locked 行').toBe(1);
-    expect(num(lockedAfterUpdate[0].quantity, '[650-1] 新 locked 行数量'), '[650-1] 改量后锁 45').toBe(45);
+    expect(
+      num(lockedAfterUpdate[0].quantity, '[650-1] 新 locked 行数量'),
+      '[650-1] 改量后锁 45'
+    ).toBe(45);
     const releasedRows = await orderReservations(page, productId, orderId, 'released');
-    expect(releasedRows.length, '[650-1] 旧锁缸行必须落 released，不得孤立').toBeGreaterThanOrEqual(1);
+    expect(releasedRows.length, '[650-1] 旧锁缸行必须落 released，不得孤立').toBeGreaterThanOrEqual(
+      1
+    );
 
     await apiCallRaw(page, 'POST', `/sales/orders/${orderId}/cancel`);
     expectStock(await stockRow(page, productId, colorNo, batchNo), 100, 0, '[650-1] 取消后回缸');

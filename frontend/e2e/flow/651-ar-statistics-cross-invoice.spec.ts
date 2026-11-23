@@ -25,9 +25,9 @@ import {
   genName,
   getCtx,
   loginViaUI,
-  pickListArray,
   tryCleanup,
 } from './helpers';
+import { pickListArray } from './ui-helpers';
 
 type Row = Record<string, unknown>;
 const CLEANUP: Array<{ path: string; label: string }> = [];
@@ -54,7 +54,10 @@ function toCents(v: unknown, label: string): bigint {
 
 function requireId(v: unknown, label: string): number {
   const n = typeof v === 'string' || typeof v === 'number' ? Number(v) : NaN;
-  expect(Number.isFinite(n) && n > 0, `[651] ${label} 须返回正整数 id，实际 ${JSON.stringify(v)}`).toBe(true);
+  expect(
+    Number.isFinite(n) && n > 0,
+    `[651] ${label} 须返回正整数 id，实际 ${JSON.stringify(v)}`
+  ).toBe(true);
   return n;
 }
 
@@ -121,11 +124,15 @@ test.describe('651 AR 统计↔逐单互证', () => {
       await apiCallRaw(page, 'POST', `/ar/invoices/${id}/approve`, {});
     }
     const invDraft = await seedInvoice('99.99', dateOffset(30), `E2E-651-DRAFT-${tag}`);
-    expect(String((await apiCallRaw<Row>(page, 'GET', `/ar/invoices/${invDraft}`)).status),
-      '[651] 草稿单状态词值').toBe('DRAFT');
+    expect(
+      String((await apiCallRaw<Row>(page, 'GET', `/ar/invoices/${invDraft}`)).status),
+      '[651] 草稿单状态词值'
+    ).toBe('DRAFT');
     const invCancel = await seedInvoice('60.00', dateOffset(30), `E2E-651-CANCEL-${tag}`);
     await apiCallRaw(page, 'POST', `/ar/invoices/${invCancel}/approve`, {});
-    await apiCallRaw(page, 'POST', `/ar/invoices/${invCancel}/cancel`, { reason: 'E2E-651 统计排除口径' });
+    await apiCallRaw(page, 'POST', `/ar/invoices/${invCancel}/cancel`, {
+      reason: 'E2E-651 统计排除口径',
+    });
 
     // 口一：逐页明细累加，排除集合与 SQL 的 status NOT IN (CANCELLED,DRAFT) 逐字同源。
     const invoices = await readAllInvoices(page, customerId);
@@ -133,9 +140,18 @@ test.describe('651 AR 统计↔逐单互证', () => {
       r => String(r.status) !== 'DRAFT' && String(r.status) !== 'CANCELLED'
     );
     expect(counted.length, '[651] 计入口径应收张数').toBe(3);
-    const sumAmount = counted.reduce((acc, r) => acc + toCents(r.invoice_amount, 'invoice_amount'), 0n);
-    const sumPaid = counted.reduce((acc, r) => acc + toCents(r.received_amount, 'received_amount'), 0n);
-    const sumUnpaid = counted.reduce((acc, r) => acc + toCents(r.unpaid_amount, 'unpaid_amount'), 0n);
+    const sumAmount = counted.reduce(
+      (acc, r) => acc + toCents(r.invoice_amount, 'invoice_amount'),
+      0n
+    );
+    const sumPaid = counted.reduce(
+      (acc, r) => acc + toCents(r.received_amount, 'received_amount'),
+      0n
+    );
+    const sumUnpaid = counted.reduce(
+      (acc, r) => acc + toCents(r.unpaid_amount, 'unpaid_amount'),
+      0n
+    );
     expect(sumPaid + sumUnpaid - sumAmount, '[651] 已收+未收==应收（明细侧）').toBe(0n);
 
     // 口二：统计出口六口与明细侧逐分相等（含逾期单数与逾期额只含昨日到期单）。
@@ -144,18 +160,23 @@ test.describe('651 AR 统计↔逐单互证', () => {
       'GET',
       `/ar/reports/statistics?customer_id=${customerId}`
     );
-    expect(requireId(stats.total_invoices, 'total_invoices'), '[651] 统计张数==明细张数').toBe(counted.length);
-    expect(toCents(stats.total_amount, 'total_amount'), '[651] 统计应收额==明细累加').toBe(sumAmount);
+    expect(requireId(stats.total_invoices, 'total_invoices'), '[651] 统计张数==明细张数').toBe(
+      counted.length
+    );
+    expect(toCents(stats.total_amount, 'total_amount'), '[651] 统计应收额==明细累加').toBe(
+      sumAmount
+    );
     expect(toCents(stats.paid_amount, 'paid_amount'), '[651] 统计已收额==明细累加').toBe(sumPaid);
-    expect(toCents(stats.unpaid_amount, 'unpaid_amount'), '[651] 统计未收额==明细累加').toBe(sumUnpaid);
+    expect(toCents(stats.unpaid_amount, 'unpaid_amount'), '[651] 统计未收额==明细累加').toBe(
+      sumUnpaid
+    );
     expect(requireId(stats.overdue_count, 'overdue_count'), '[651] 逾期单数').toBe(1);
-    expect(
-      toCents(stats.overdue_amount, 'overdue_amount'),
-      '[651] 逾期额==昨日到期单未收额'
-    ).toBe(toCents((await apiCallRaw<Row>(page, 'GET', `/ar/invoices/${invOverdue}`)).unpaid_amount, '逾期单 unpaid'));
-    expect(
-      sumAmount - sumPaid - sumUnpaid,
-      '[651] 三额差额分位为 0'
-    ).toBe(0n);
+    expect(toCents(stats.overdue_amount, 'overdue_amount'), '[651] 逾期额==昨日到期单未收额').toBe(
+      toCents(
+        (await apiCallRaw<Row>(page, 'GET', `/ar/invoices/${invOverdue}`)).unpaid_amount,
+        '逾期单 unpaid'
+      )
+    );
+    expect(sumAmount - sumPaid - sumUnpaid, '[651] 三额差额分位为 0').toBe(0n);
   });
 });

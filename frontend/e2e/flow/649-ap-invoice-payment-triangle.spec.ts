@@ -27,9 +27,10 @@ import {
   genCode,
   getCtx,
   loginViaUI,
-  pickListArray,
   tryCleanup,
+  type ApiRequestBody,
 } from './helpers';
+import { pickListArray } from './ui-helpers';
 import { type Page } from '@playwright/test';
 
 type Row = Record<string, unknown>;
@@ -57,7 +58,10 @@ function toCents(v: unknown, label: string): bigint {
 
 function requireId(v: unknown, label: string): number {
   const n = typeof v === 'string' || typeof v === 'number' ? Number(v) : NaN;
-  expect(Number.isFinite(n) && n > 0, `[649] ${label} 须返回正整数 id，实际 ${JSON.stringify(v)}`).toBe(true);
+  expect(
+    Number.isFinite(n) && n > 0,
+    `[649] ${label} 须返回正整数 id，实际 ${JSON.stringify(v)}`
+  ).toBe(true);
   return n;
 }
 
@@ -105,7 +109,7 @@ async function createInvoice(
   notes: string
 ): Promise<Row> {
   const today = new Date().toISOString().slice(0, 10);
-  return await dwbPost(page, '/ap/invoices', {
+  return await dwbPost<Row>(page, '/ap/invoices', {
     supplier_id: supplierId,
     invoice_type: 'PURCHASE',
     invoice_date: today,
@@ -124,13 +128,16 @@ test.describe('649 应付发票→付款→未付三角守恒', () => {
     const tag = genCode('649');
     if (!ctx.warehouseIds[0]) throw new Error('[649] 前置缺失：ctx.warehouseIds[0] 未就绪');
 
-    const supplier = await dwbPost(page, '/purchase/suppliers', {
+    const supplier = await dwbPost<Row>(page, '/purchase/suppliers', {
       supplier_name: `E2E应付649-${tag}`,
       supplier_short_name: `E649${tag.slice(-4)}`,
       contact_phone: '{{PHONE_x7qh4sbk}}',
     });
     const supplierId = requireId(supplier.id, '专属供应商');
-    CLEANUP.push({ path: `/purchase/suppliers/${supplierId}`, label: `[649] 供应商#${supplierId}` });
+    CLEANUP.push({
+      path: `/purchase/suppliers/${supplierId}`,
+      label: `[649] 供应商#${supplierId}`,
+    });
 
     const invPay = await createInvoice(page, supplierId, '300.00', `E2E-649-INV1-${tag}`);
     const invPayId = requireId(invPay.id, '付款标的发票');
@@ -143,10 +150,12 @@ test.describe('649 应付发票→付款→未付三角守恒', () => {
     const invCancelId = requireId(invCancel.id, '取消发票');
     CLEANUP.push({ path: `/ap/invoices/${invCancelId}`, label: `[649] 应付#${invCancelId}` });
     await dwbPost(page, `/ap/invoices/${invCancelId}/approve`, {});
-    await dwbPost(page, `/ap/invoices/${invCancelId}/cancel`, { reason: 'E2E-649 三角守恒取消分支' });
+    await dwbPost(page, `/ap/invoices/${invCancelId}/cancel`, {
+      reason: 'E2E-649 三角守恒取消分支',
+    });
 
     // 部分付款全链：申请→提交→审批→登记付款单→补流水号→确认分摊。
-    const request = await dwbPost(page, '/ap/payment-requests', {
+    const request = await dwbPost<Row>(page, '/ap/payment-requests', {
       supplier_id: supplierId,
       request_date: new Date().toISOString().slice(0, 10),
       payment_type: '货款',
@@ -158,10 +167,13 @@ test.describe('649 应付发票→付款→未付三角守恒', () => {
       items: [{ invoice_id: invPayId, apply_amount: '120.00' }],
     });
     const requestId = requireId(request.id, '付款申请');
-    CLEANUP.push({ path: `/ap/payment-requests/${requestId}`, label: `[649] 付款申请#${requestId}` });
+    CLEANUP.push({
+      path: `/ap/payment-requests/${requestId}`,
+      label: `[649] 付款申请#${requestId}`,
+    });
     await dwbPost(page, `/ap/payment-requests/${requestId}/submit`, {});
     await dwbPost(page, `/ap/payment-requests/${requestId}/approve`, {});
-    const payment = await dwbPost(page, '/ap/payments', {
+    const payment = await dwbPost<Row>(page, '/ap/payments', {
       request_id: requestId,
       payment_date: new Date().toISOString().slice(0, 10),
       notes: `E2E-649-PAY-${tag}`,
@@ -179,23 +191,43 @@ test.describe('649 应付发票→付款→未付三角守恒', () => {
     );
     expect(counted.length, '[649] 计入口径发票张数（草稿/取消排除）').toBe(1);
     const sumInvoice = counted.reduce((acc, r) => acc + toCents(r.amount, '发票 amount'), 0n);
-    const sumPaid = counted.reduce((acc, r) => acc + toCents(r.paid_amount, '发票 paid_amount'), 0n);
-    const sumUnpaid = counted.reduce((acc, r) => acc + toCents(r.unpaid_amount, '发票 unpaid_amount'), 0n);
+    const sumPaid = counted.reduce(
+      (acc, r) => acc + toCents(r.paid_amount, '发票 paid_amount'),
+      0n
+    );
+    const sumUnpaid = counted.reduce(
+      (acc, r) => acc + toCents(r.unpaid_amount, '发票 unpaid_amount'),
+      0n
+    );
     expect(sumPaid + sumUnpaid - sumInvoice, '[649] 已付+未付==应付（明细侧）').toBe(0n);
 
     // 口二：余额汇总三额+张数与明细侧逐分相等。
     const balance = await dwbGet<Row>(page, `/ap/invoices/balance?supplier_id=${supplierId}`);
-    expect(toCents(balance.total_invoice_amount, '汇总应付额'), '[649] total_invoice_amount==明细累加').toBe(sumInvoice);
-    expect(toCents(balance.total_paid_amount, '汇总已付额'), '[649] total_paid_amount==明细累加').toBe(sumPaid);
-    expect(toCents(balance.total_unpaid_amount, '汇总未付额'), '[649] total_unpaid_amount==明细累加').toBe(sumUnpaid);
+    expect(
+      toCents(balance.total_invoice_amount, '汇总应付额'),
+      '[649] total_invoice_amount==明细累加'
+    ).toBe(sumInvoice);
+    expect(
+      toCents(balance.total_paid_amount, '汇总已付额'),
+      '[649] total_paid_amount==明细累加'
+    ).toBe(sumPaid);
+    expect(
+      toCents(balance.total_unpaid_amount, '汇总未付额'),
+      '[649] total_unpaid_amount==明细累加'
+    ).toBe(sumUnpaid);
     expect(Number(balance.invoice_count), '[649] invoice_count==计入口径张数').toBe(counted.length);
 
     // 口三：CONFIRMED 付款台账之和==汇总已付额==发票已付明细，三角差额为 0。
     const payments = await readAllPayments(page, supplierId);
     const confirmed = payments.filter(r => String(r.payment_status) === 'CONFIRMED');
     expect(confirmed.length, '[649] 确认态付款单张数').toBe(1);
-    const sumPayments = confirmed.reduce((acc, r) => acc + toCents(r.payment_amount, '付款 payment_amount'), 0n);
-    expect(sumPayments, '[649] 付款台账==汇总已付额').toBe(toCents(balance.total_paid_amount, '复核汇总已付'));
+    const sumPayments = confirmed.reduce(
+      (acc, r) => acc + toCents(r.payment_amount, '付款 payment_amount'),
+      0n
+    );
+    expect(sumPayments, '[649] 付款台账==汇总已付额').toBe(
+      toCents(balance.total_paid_amount, '复核汇总已付')
+    );
     expect(sumInvoice - sumPaid - sumUnpaid, '[649] 三角差额分位为 0').toBe(0n);
     expect(sumPaid, '[649] 部分付款分摊回写已付额').toBe(12000n);
   });
@@ -205,10 +237,10 @@ async function dwbGet<T>(page: Page, path: string): Promise<T> {
   return await apiCallRaw<T>(page, 'GET', path);
 }
 
-async function dwbPost<T>(page: Page, path: string, body: unknown): Promise<T> {
+async function dwbPost<T>(page: Page, path: string, body: ApiRequestBody = {}): Promise<T> {
   return await apiCallRaw<T>(page, 'POST', path, body);
 }
 
-async function dwbPut<T>(page: Page, path: string, body: unknown): Promise<T> {
+async function dwbPut<T>(page: Page, path: string, body: ApiRequestBody = {}): Promise<T> {
   return await apiCallRaw<T>(page, 'PUT', path, body);
 }
