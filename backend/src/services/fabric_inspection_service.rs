@@ -41,7 +41,6 @@ use crate::models::status::fabric_grade;
 use crate::models::status::fabric_inspection as inspection_status;
 use crate::models::status::fabric_scoring;
 use crate::models::status::inventory_piece as piece_status;
-use crate::models::status::purchase_inventory::inventory_stock_quality_status as quality_status;
 use crate::utils::error::AppError;
 use crate::utils::number_generator::DocumentNumberGenerator;
 
@@ -236,6 +235,10 @@ pub struct RollFabricRequest {
     pub roll_width: Option<Decimal>,
     #[validate(required(message = "打卷入库必须填写克重(g/m²)，成品布标签克重取该实测值"))]
     pub roll_gram_weight: Option<Decimal>,
+    /// 打卷修边长度（米，可选实测；不修边不提交）
+    pub edge_trim_length: Option<Decimal>,
+    /// 打卷修边重量（千克，可选实测；不修边不提交）
+    pub edge_trim_weight: Option<Decimal>,
 }
 
 /// 验布记录查询参数
@@ -328,6 +331,9 @@ impl FabricInspectionService {
             total_rolls: Set(0),
             total_roll_length: Set(Decimal::ZERO),
             total_roll_weight: Set(Decimal::ZERO),
+            // 修边实测只在打卷时产生，建单必为 NULL
+            edge_trim_length: Set(None),
+            edge_trim_weight: Set(None),
             status: Set(inspection_status::PENDING.to_string()),
             remarks: Set(req.remarks),
             is_deleted: Set(false),
@@ -640,6 +646,12 @@ impl FabricInspectionService {
         let dye_lot = self.fetch_dye_lot(&dye_lot_no).await?;
         let dye_lot_id = dye_lot.id;
         let (piece_no, next_seq) = self.generate_next_piece_no(dye_lot_id, &dye_lot_no).await?;
+        // 匹质检状态随验布 A/B/C 分级联动（A→合格 / B→待检 / C→不合格），
+        // 评级必写 abc_grade（grade_inspection 落值），缺失/越界在此显式报错不落匹
+        let piece_quality_status =
+            crate::services::quality_inspection_service::piece_quality_status_by_grade(
+                model.abc_grade.as_deref(),
+            )?;
         let new_piece = Self::build_piece_active_model(
             &req,
             dye_lot_id,
@@ -649,6 +661,7 @@ impl FabricInspectionService {
             &piece_no,
             next_seq,
             id,
+            piece_quality_status,
         );
         new_piece.insert(&*self.db).await?;
         self.apply_roll_summary(model, &req).await
@@ -745,6 +758,7 @@ impl FabricInspectionService {
         piece_no: &str,
         next_seq: i32,
         inspection_id: i32,
+        piece_quality_status: &'static str,
     ) -> PieceActiveModel {
         let now_piece = chrono::Utc::now();
         PieceActiveModel {
@@ -780,7 +794,7 @@ impl FabricInspectionService {
             package_no: Default::default(),
             production_date: Default::default(),
             shelf_life: Default::default(),
-            quality_status: Set(Some(quality_status::PASS.to_string())),
+            quality_status: Set(Some(piece_quality_status.to_string())),
             created_by: Default::default(),
             updated_by: Default::default(),
             color_no: match model.color_no.clone() {
@@ -814,6 +828,9 @@ impl FabricInspectionService {
         active.total_rolls = Set(1);
         active.total_roll_length = Set(req.roll_length);
         active.total_roll_weight = Set(roll_weight);
+        // 修边实测随打卷落单，不修边保持 NULL（缺省键不代填）
+        active.edge_trim_length = Set(req.edge_trim_length);
+        active.edge_trim_weight = Set(req.edge_trim_weight);
         active.status = Set(inspection_status::ROLLED.to_string());
         active.updated_at = Set(crate::utils::date_utils::utc_now_fixed());
         let updated = active.update(&*self.db).await?;

@@ -8,17 +8,17 @@ use crate::services::quality_inspection_service::{
     CreateInspectionRecordRequest, CreateQualityInspectionStandardRequest, ProcessResultRequest,
     ProcessUnqualifiedRequest, QualityInspectionService,
 };
-use crate::utils::ApiResponse;
-use crate::utils::data_scope::{DataScope, DataScopeContext, check_resource_owner};
+use crate::utils::data_scope::{check_resource_owner, DataScope, DataScopeContext};
 use crate::utils::error::AppError;
+use crate::utils::ApiResponse;
 // V15 P0-S12/P0-S15 修复（Batch 475d）：导出端点使用水印版 xlsx 工具
-use crate::utils::xlsx_export::{WatermarkConfig, XlsxTable, build_xlsx_response_with_watermark};
+use crate::utils::xlsx_export::{build_xlsx_response_with_watermark, WatermarkConfig, XlsxTable};
 // V15 P0-S11：导出审计日志写入所需依赖
 use crate::models::audit_log::{OperationType, Severity};
 use crate::services::audit_log_service::{AuditEvent, AuditLogService};
 use axum::{
-    Json,
     extract::{Path, Query, State},
+    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -88,6 +88,8 @@ fn build_record_list_params(
         inspection_result,
         product_id: query.product_id,
         batch_no: normalized(&query.batch_no),
+        related_type: normalized(&query.related_type),
+        related_id: query.related_id,
         page,
         page_size,
     })
@@ -110,6 +112,9 @@ pub struct RecordQuery {
     pub batch_no: Option<String>,
     pub inspection_type: Option<String>,
     pub inspection_result: Option<String>,
+    /// 多态锚筛选：related_type 与 related_id 成对使用（匹级追溯按匹拉判定列表）
+    pub related_type: Option<String>,
+    pub related_id: Option<i32>,
     pub page: Option<i64>,
     pub page_size: Option<i64>,
 }

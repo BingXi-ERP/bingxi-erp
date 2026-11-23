@@ -19,6 +19,7 @@ export default {
     historicalMethod: 'Historical method (unavailable for new selection)',
     wechatPay: 'WeChat Pay',
     alipay: 'Alipay',
+    mobileCardAria: 'Payment channels mobile card list',
     validation: {
       httpsRequired:
         'Enter an HTTPS URL without credentials, spaces or backslashes, or leave blank.',
@@ -2870,6 +2871,7 @@ export default {
     },
     pendingTable: {
       ariaLabel: 'Pending Approval Task List',
+      mobileCardAria: 'Pending Approval Task Mobile Card List',
       taskNo: 'Task No.',
       taskName: 'Task Name',
 
@@ -2889,6 +2891,7 @@ export default {
     },
     processedTable: {
       ariaLabel: 'Processed Task List',
+      mobileCardAria: 'Processed Task Mobile Card List',
       taskNo: 'Task No.',
       taskName: 'Task Name',
       handler: 'Handler',
@@ -2898,6 +2901,7 @@ export default {
     },
     monitorTable: {
       ariaLabel: 'Process Instance Monitor List',
+      mobileCardAria: 'Process Instance Monitor Mobile Card List',
       instancesTitle: 'Process Instances',
       instanceId: 'Instance No.',
       title: 'Process Title',
@@ -3824,6 +3828,7 @@ export default {
       nodeStatusBlocked: 'Blocked',
       messageLoadFailed: 'Failed to load timeline',
       notFound: 'Order not found or has been deleted',
+      mobileCardAria: 'Custom order process node mobile card list',
     },
   },
   product: {
@@ -5412,6 +5417,7 @@ export default {
   },
   biSalesAnalysis: {
     title: 'BI Multi-dimensional Sales Analysis (P3-4 Key Path Demo)',
+    mobileScrollHint: 'Swipe the charts horizontally on mobile',
     kpi: {
       totalSales: 'Total Sales',
       orderCount: 'Order Count',
@@ -9294,6 +9300,8 @@ export default {
       confirm: 'Confirm',
     },
     table: {
+      mobileCardAria: 'Purchase Contract Mobile Card List',
+      mobileEmpty: 'No purchase contracts yet',
       listAria: 'Purchase Contract List',
       colIndex: 'No.',
       colContractNo: 'Contract No.',
@@ -9440,6 +9448,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: 'Purchase Inspection Mobile Card List',
       ariaLabel: 'Purchase Inspection List',
       column: {
         inspectionNo: 'Inspection No.',
@@ -9595,6 +9604,8 @@ export default {
     },
     table: {
       ariaLabel: 'Purchase Price List',
+      mobileCardAria: 'Purchase Price Mobile Card List',
+      mobileEmpty: 'No purchase prices yet',
       column: {
         index: 'Index',
         productName: 'Product Name',
@@ -9765,6 +9776,8 @@ export default {
       },
     },
     table: {
+      mobileCardAria: 'Purchase return mobile card list',
+      mobileEmpty: 'No purchase returns yet',
       aria: {
         list: 'Purchase Return List',
         pagination: 'Purchase Return List Pagination',
@@ -9889,6 +9902,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: 'Purchase Receipt Mobile Card List',
       aria: {
         list: 'Purchase Receipt List',
         pagination: 'Purchase Receipt Pagination',
@@ -10031,6 +10045,7 @@ export default {
         sign: 'Sign',
         delete: 'Delete',
       },
+      mobileCardAria: 'Logistics waybill mobile card list',
     },
     stat: {
       label: {
@@ -10320,6 +10335,7 @@ export default {
       buttonExport: 'Export Report',
       tabOverview: 'Business Analysis',
       tabBi: 'Multi-dimensional Analysis',
+      mobileCardAria: 'Sales Analysis Mobile Card List',
     },
     stat: {
       labelMonthOrders: 'Monthly Orders',
@@ -11041,6 +11057,7 @@ export default {
       statusSubmitted: 'Submitted',
       statusReviewed: 'Reviewed',
       statusPosted: 'Posted',
+      mobileCardAriaLabel: 'Voucher mobile card list',
     },
     index: {
       pageAriaLabel: 'Voucher Management',
@@ -12785,6 +12802,7 @@ export default {
       edit: 'Edit',
       delete: 'Delete',
       paginationAriaLabel: 'Data Import Template Pagination',
+      mobileCardAria: 'Data import template mobile card list',
     },
     taskTable: {
       statusPlaceholder: 'Status',
@@ -12809,6 +12827,7 @@ export default {
       cancel: 'Cancel',
       errorLog: 'Error Log',
       paginationAriaLabel: 'Data Import Task Pagination',
+      mobileCardAria: 'Data import task mobile card list',
     },
     templateForm: {
       editTitle: 'Edit Template',

@@ -15,6 +15,9 @@
   >
     <ElAutoResizer>
       <template #default="{ height: autoHeight, width }">
+        <!-- 动态行高模式：不传 fixed，行高按内容实测（配合下方 estimated-row-height
+             作为估高），使全局换行层（styles/compact-density.css）折行后的多行
+             单元格自适应行高，不被固定行高裁切 -->
         <ElTableV2
           :columns="v2Columns"
           :data="data"
@@ -26,7 +29,6 @@
           :row-event-handlers="rowEventHandlers"
           role="table"
           :aria-label="t('components.v2Table.ariaLabel')"
-          fixed
         >
           <template #empty>
             <!-- el-table-v2 无 loading/empty-text prop，数据为空即渲染本插槽。
