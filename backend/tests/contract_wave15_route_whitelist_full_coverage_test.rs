@@ -51,10 +51,11 @@ fn snapshot_segments() -> BTreeSet<String> {
             // 行形态：METHOD \t /path \t handler \t domain
             let mut cols = line.split('\t');
             let method = cols.next()?;
-            let path = cols.nth(1)?.trim();
-            // 门户读面由专用谓词在白名单门之前放行，
-            // 走生产谓词逐条判定，避免测试复制名单副本造成过期假绿。
-            if is_customer_portal_read_path(path, method.trim()) {
+            let path = cols.next()?.trim();
+            // 门户读面由专用谓词在白名单门之前放行。快照里 ID 段写成 `*` 占位，
+            // 谓词只认真实数字 ID，判豁免前替换成数字再判，避免通配形态漏判。
+            let probe_path = path.replace("/*", "/1");
+            if is_customer_portal_read_path(&probe_path, method.trim()) {
                 return None;
             }
             erp_resource_segment(path).map(str::to_string)
