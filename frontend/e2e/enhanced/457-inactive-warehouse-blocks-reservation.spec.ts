@@ -6,10 +6,11 @@
 //   routes/inventory.rs:194-200 挂 POST /inventory/reservations；
 //   services/inventory_reservation_service.rs:64-72 查仓库行，!is_active 即
 //   AppError::not_found("仓库 {id} 不可引用（已停用，视同不存在）")，且该预检在任何写库前。
+//   含 ID 的真实原因按 error.rs 安全边界只留内部日志，出参恒脱敏常量「资源未找到」。
 // 与既有覆盖分工：inventory/06-reservation-readback.spec.ts 只用 active 默认仓建预留，
 //   未涉仓库停用分支；flow/465 只覆盖库位主档，未改仓库自身 status。全 e2e 无该拒因断言。
-// 检测力：停用门被移除则停用仓预留成功即红；拒绝但状态文案不对即红；
-//   恢复后仍拒则证明前置混入了其它门，同样即红。
+// 检测力：停用门被移除则停用仓预留成功即红；拒绝码/脱敏出参不对即红；
+//   恢复后仍拒则证明前置混入了其它门，同样即红（「停用」与「不存在」的分辨力来自恢复腿）。
 import { test, expect, type Page } from '../diagnose-fixture';
 import {
   loginViaUI,
@@ -22,6 +23,9 @@ import {
   genCode,
   tryCleanup,
 } from '../flow/helpers';
+
+// not_found 出参恒为脱敏常量（与 finance/07-subject-disable 同口径）。
+const SANITIZED_NOT_FOUND = '资源未找到';
 
 interface WarehouseRow {
   id?: number;
@@ -98,8 +102,8 @@ test.describe('4.22 仓库停用拦截库存预留', () => {
       ).toBe(APP_ERROR_CODES.NOT_FOUND);
       expect(
         String(rejected.message ?? ''),
-        `拒因须点名仓库已停用，实际 ${JSON.stringify(rejected.message)}`
-      ).toContain('不可引用（已停用，视同不存在）');
+        `not_found 出参必须脱敏，实际 ${JSON.stringify(rejected.message)}`
+      ).toBe(SANITIZED_NOT_FOUND);
 
       await apiCallRaw(page, 'PUT', `/warehouses/${warehouseId}`, { status: 'active' });
       const on = await apiCallRaw<WarehouseRow>(page, 'GET', `/warehouses/${warehouseId}`);

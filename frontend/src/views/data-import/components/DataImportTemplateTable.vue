@@ -34,7 +34,64 @@
       </el-button>
     </div>
 
+    <!-- 手机卡片（<768 与采购域表格同断点同范式） -->
+    <section v-if="isPhone" v-loading="loading" class="data-import-mobile">
+      <ul class="order-list" :aria-label="t('dataImport.templateTable.mobileCardAria')">
+        <li v-for="row in data" :key="row.id" class="order-card">
+          <dl class="order-fields">
+            <div>
+              <dt>{{ t('dataImport.templateTable.templateCode') }}</dt>
+              <dd>{{ row.template_code }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('dataImport.templateTable.templateName') }}</dt>
+              <dd>{{ row.template_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('dataImport.templateTable.module') }}</dt>
+              <dd>{{ getModuleLabel(row.module) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('dataImport.templateTable.fileFormat') }}</dt>
+              <dd>{{ row.file_format.toUpperCase() }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('dataImport.templateTable.status') }}</dt>
+              <dd>
+                <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
+                  {{
+                    row.status === 'active'
+                      ? t('dataImport.templateTable.active')
+                      : t('dataImport.templateTable.inactive')
+                  }}
+                </el-tag>
+              </dd>
+            </div>
+            <div>
+              <dt>{{ t('dataImport.templateTable.createdAt') }}</dt>
+              <dd>{{ row.created_at }}</dd>
+            </div>
+          </dl>
+          <div class="order-actions">
+            <el-button type="primary" link size="small" @click="emit('download', row)">
+              {{ t('dataImport.templateTable.download') }}
+            </el-button>
+            <el-button type="primary" link size="small" @click="emit('upload', row)">
+              {{ t('dataImport.templateTable.importData') }}
+            </el-button>
+            <el-button type="primary" link size="small" @click="emit('edit', row)">
+              {{ t('dataImport.templateTable.edit') }}
+            </el-button>
+            <el-button type="danger" link size="small" @click="emit('delete', row)">
+              {{ t('dataImport.templateTable.delete') }}
+            </el-button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
     <el-table
+      v-else
       v-loading="loading"
       :data="data"
       stripe
@@ -105,6 +162,7 @@
 
     <div class="pagination-container">
       <el-pagination
+        class="mobile-pagination"
         :current-page="page"
         :page-size="pageSize"
         :page-sizes="[10, 20, 50, 100]"
@@ -119,12 +177,15 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue';
+import { reactive, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Search } from '@element-plus/icons-vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type { ImportTemplate } from '@/api/data-import';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 模板列表组件（含过滤栏）
@@ -194,10 +255,74 @@ const getModuleLabel = (module: string) => {
   display: flex;
   gap: 12px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.filter-container .el-input,
+.filter-container .el-select {
+  min-width: 0;
 }
 .pagination-container {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+.data-import-mobile {
+  min-width: 0;
+}
+.order-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.order-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.order-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.order-fields > div {
+  min-width: 0;
+}
+.order-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.order-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.order-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.order-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+.mobile-pagination {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.mobile-pagination :deep(.el-pagination__sizes),
+.mobile-pagination :deep(.el-pagination__jump) {
+  display: none;
 }
 </style>

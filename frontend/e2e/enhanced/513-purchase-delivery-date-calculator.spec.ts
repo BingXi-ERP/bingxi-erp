@@ -60,7 +60,10 @@ test.describe('513 采购交期计算', () => {
 
     const multi = await calculate(page, [
       { product_id: 1, quantity: '60' },
-      { product_id: 2, quantity: '101' },
+      // >500 才进 3 档（purchase_delivery_calculator.rs:150-158：>1000→5、>500→3、
+      // >100→2、其余 1）；本腿与期望标签、2026-01-19 日期推算都按 501 设计，
+      // 此处曾误写成 101（2 档 ×1.2 下取整 = 2），被源码按档如实计算判红。
+      { product_id: 2, quantity: '501' },
     ]);
     expect(
       int(multi.max_production_days, '多腿生产天数'),

@@ -1,17 +1,71 @@
 <template>
   <div v-loading="loading" class="payment-channels" data-testid="payment-channels">
-    <h2>{{ t('paymentChannels.title') }}</h2>
-    <el-alert :title="t('paymentChannels.description')" type="info" :closable="false" />
-    <el-alert
-      v-if="!canUpdate"
-      :title="t('paymentChannels.readonly')"
-      type="info"
-      :closable="false"
-    />
-    <el-alert v-if="failed" :title="t('paymentChannels.loadFailed')" type="error" :closable="false">
-      <el-button @click="load">{{ t('common.refresh') }}</el-button>
-    </el-alert>
-    <div class="channel-grid">
+    <!-- 手机分支：通道只做标记选项展示（既有拍板：不动业务逻辑，不渲染表单） -->
+    <section
+      v-if="isPhone"
+      class="payment-channels-mobile"
+      :aria-label="t('paymentChannels.mobileCardAria')"
+    >
+      <h2>{{ t('paymentChannels.title') }}</h2>
+      <el-alert :title="t('paymentChannels.description')" type="info" :closable="false" />
+      <el-alert
+        v-if="!canUpdate"
+        :title="t('paymentChannels.readonly')"
+        type="info"
+        :closable="false"
+      />
+      <el-alert
+        v-if="failed"
+        :title="t('paymentChannels.loadFailed')"
+        type="error"
+        :closable="false"
+      >
+        <el-button @click="load">{{ t('common.refresh') }}</el-button>
+      </el-alert>
+      <ul v-else class="channel-list">
+        <li v-for="channel in channels" :key="channel.channel_code" class="channel-card">
+          <h3>{{ channel.channel_name }}</h3>
+          <dl>
+            <div>
+              <dt>{{ t('paymentChannels.enabled') }}</dt>
+              <dd>
+                <el-tag :type="channel.enabled ? 'success' : 'info'">
+                  {{ channel.enabled ? t('paymentChannels.enabled') : t('common.no') }}
+                </el-tag>
+              </dd>
+            </div>
+            <div>
+              <dt>{{ t('paymentChannels.sandboxMode') }}</dt>
+              <dd>
+                <el-tag :type="channel.sandbox_mode ? 'warning' : 'info'">
+                  {{ channel.sandbox_mode ? t('paymentChannels.sandboxMode') : t('common.no') }}
+                </el-tag>
+              </dd>
+            </div>
+          </dl>
+        </li>
+      </ul>
+    </section>
+
+    <template v-else>
+      <h2>{{ t('paymentChannels.title') }}</h2>
+      <el-alert :title="t('paymentChannels.description')" type="info" :closable="false" />
+      <el-alert
+        v-if="!canUpdate"
+        :title="t('paymentChannels.readonly')"
+        type="info"
+        :closable="false"
+      />
+      <el-alert
+        v-if="failed"
+        :title="t('paymentChannels.loadFailed')"
+        type="error"
+        :closable="false"
+      >
+        <el-button @click="load">{{ t('common.refresh') }}</el-button>
+      </el-alert>
+    </template>
+    <div v-if="!isPhone" class="channel-grid">
       <el-card
         v-for="channel in channels"
         :key="channel.channel_code"
@@ -114,9 +168,12 @@ import { useI18n } from 'vue-i18n';
 import { useUserStore } from '@/store/user';
 import { hasRoutePermission } from '@/router';
 import { PERMISSIONS } from '@/constants/permissions';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { usePaymentChannels, isValidCallbackUrl } from '@/composables/usePaymentChannels';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const userStore = useUserStore();
 const canUpdate = computed(() => {
   const user = userStore.userInfo;
@@ -151,6 +208,45 @@ h3 {
 .field-hint {
   color: var(--el-text-color-secondary);
   font-size: var(--el-font-size-small);
+  overflow-wrap: anywhere;
+}
+.payment-channels-mobile {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+.channel-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.channel-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.channel-card h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+.channel-card dl {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.channel-card dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.channel-card dd {
+  margin: 4px 0 0;
+  font-size: 16px;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .el-form .el-alert {

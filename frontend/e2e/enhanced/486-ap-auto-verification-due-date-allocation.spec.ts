@@ -109,7 +109,9 @@ async function seedPaidInvoiceToFundPayment(page: Page, supplierId: number): Pro
   const paymentId = requireId(payment, '[486] 建付款单');
   await apiCall(page, 'PUT', `/ap/payments/${paymentId}`, { transaction_no: genCode('486-TXN') });
   await apiCall(page, 'POST', `/ap/payments/${paymentId}/confirm`);
-  return paymentId;
+  // 返回承载付款的应付单 id：调用方读回的是 /ap/invoices/{id}，paymentId 是付款单域主键，
+  // 拿它查应付单只会撞到一条无关发票（paid 恒 0），前置断言必死。
+  return invoiceId;
 }
 
 test.describe('4.5 AP 自动核销到期日分摊', () => {
