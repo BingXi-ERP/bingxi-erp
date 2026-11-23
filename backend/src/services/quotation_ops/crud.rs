@@ -23,6 +23,7 @@ use crate::models::sales_quotation_item::{ActiveModel as ItemActive, Entity as I
 use crate::models::sales_quotation_term::{ActiveModel as TermActive, Entity as TermEntity};
 use crate::models::status::quotation as quotation_status;
 use crate::models::user;
+use crate::services::quotation_ops::calc::{round_money, validate_items_quantity_scale};
 use crate::services::quotation_service::{QuotationService, ServiceError};
 use crate::utils::data_scope::{DataScope, DataScopeContext, apply_data_scope};
 use crate::utils::error::AppError;
@@ -155,41 +156,39 @@ impl QuotationService {
         items: &[CreateQuotationItemDto],
         quotation_id: i64,
     ) -> Result<(), ServiceError> {
-        let item_active_models: Vec<ItemActive> =
-            items
-                .iter()
-                .enumerate()
-                .map(|(idx, item_dto)| ItemActive {
-                    id: Default::default(),
-                    quotation_id: Set(quotation_id),
-                    product_id: Set(item_dto.product_id),
-                    color_id: Set(item_dto.color_id),
-                    color_code: Set(None),
-                    pantone_code: Set(None),
-                    cncs_code: Set(None),
-                    specification: Set(item_dto.specification.clone()),
-                    unit: Set(item_dto.unit.clone()),
-                    quantity: Set(item_dto.quantity),
-                    unit_price: Set(item_dto.unit_price),
-                    unit_price_with_tax: Set(item_dto.unit_price_with_tax),
-                    // 批次 87：金额计算补 round_dp(2) 精度归一化
-                    amount: Set((item_dto.quantity * item_dto.unit_price).round_dp(2)),
-                    amount_with_tax: Set(
-                        (item_dto.quantity * item_dto.unit_price_with_tax).round_dp(2)
-                    ),
-                    tier_pricing: Set(item_dto
-                        .tier_pricing
-                        .as_ref()
-                        .and_then(|v| serde_json::from_value(v.clone()).ok())),
-                    discount_rate: Set(item_dto.discount_rate),
-                    discount_amount: Set(item_dto.discount_rate.map(|r| {
-                        (item_dto.quantity * item_dto.unit_price * r / Decimal::from(100))
-                            .round_dp(2)
-                    })),
-                    notes: Set(item_dto.notes.clone()),
-                    sequence: Set(idx as i32),
-                })
-                .collect();
+        let item_active_models: Vec<ItemActive> = items
+            .iter()
+            .enumerate()
+            .map(|(idx, item_dto)| ItemActive {
+                id: Default::default(),
+                quotation_id: Set(quotation_id),
+                product_id: Set(item_dto.product_id),
+                color_id: Set(item_dto.color_id),
+                color_code: Set(None),
+                pantone_code: Set(None),
+                cncs_code: Set(None),
+                specification: Set(item_dto.specification.clone()),
+                unit: Set(item_dto.unit.clone()),
+                quantity: Set(item_dto.quantity),
+                unit_price: Set(item_dto.unit_price),
+                unit_price_with_tax: Set(item_dto.unit_price_with_tax),
+                // 批次 87：金额计算补两位小数精度归一化（R-596 裁定四舍五入离零进位）
+                amount: Set(round_money(item_dto.quantity * item_dto.unit_price)),
+                amount_with_tax: Set(round_money(
+                    item_dto.quantity * item_dto.unit_price_with_tax,
+                )),
+                tier_pricing: Set(item_dto
+                    .tier_pricing
+                    .as_ref()
+                    .and_then(|v| serde_json::from_value(v.clone()).ok())),
+                discount_rate: Set(item_dto.discount_rate),
+                discount_amount: Set(item_dto.discount_rate.map(|r| {
+                    round_money(item_dto.quantity * item_dto.unit_price * r / Decimal::from(100))
+                })),
+                notes: Set(item_dto.notes.clone()),
+                sequence: Set(idx as i32),
+            })
+            .collect();
         if !item_active_models.is_empty() {
             ItemEntity::insert_many(item_active_models)
                 .exec(txn)

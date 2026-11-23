@@ -8,6 +8,29 @@ use rust_decimal::Decimal;
 use crate::models::quotation_create_dto::{CreateQuotationDto, CreateQuotationItemDto};
 use crate::services::quotation_service::{QuotationService, ServiceError};
 
+/// 报价金额链统一的两位小数舍入口径（R-596 裁定：货币金额四舍五入离零进位，
+/// 与人民银行会计口径一致；行腿与表头同源共用，杜绝两处各自舍入造成分差）
+pub(crate) fn round_money(value: Decimal) -> Decimal {
+    value.round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointAwayFromZero)
+}
+
+/// 报价明细数量刻度门（R-598 裁定）：数量列 DECIMAL(18,2)，超两位小数显式拒绝，
+/// 不接受数据库静默舍入；create 与 update 两腿共用，保证入参与落库逐字一致。
+pub(crate) fn validate_items_quantity_scale(
+    items: &[CreateQuotationItemDto],
+) -> Result<(), ServiceError> {
+    for (idx, item) in items.iter().enumerate() {
+        if item.quantity.scale() > 2 {
+            return Err(ServiceError::Validation(format!(
+                "报价明细第 {} 行数量最多支持 2 位小数，当前为 {}",
+                idx + 1,
+                item.quantity
+            )));
+        }
+    }
+    Ok(())
+}
+
 impl QuotationService {
     /// 计算小计/税额/总金额
     ///
@@ -21,27 +44,27 @@ impl QuotationService {
         &self,
         dto: &CreateQuotationDto,
     ) -> Result<(Decimal, Decimal, Decimal), ServiceError> {
-        // 金额聚合按 round_dp(2) 精度归一化，与行腿落库口径一致
+        // 金额聚合按 round_money 精度归一化，与行腿落库口径一致
         let subtotal: Decimal = dto
             .items
             .iter()
-            .map(|i: &CreateQuotationItemDto| (i.quantity * i.unit_price).round_dp(2))
-            .sum::<Decimal>()
-            .round_dp(2);
+            .map(|i: &CreateQuotationItemDto| round_money(i.quantity * i.unit_price))
+            .sum::<Decimal>();
+        let subtotal = round_money(subtotal);
 
         let (tax_amount, total_amount) = if dto.tax_inclusive {
             // 含税：总额聚合行腿含税事实，税额取差额，不用乘法造含税
             let total_with_tax: Decimal = dto
                 .items
                 .iter()
-                .map(|i: &CreateQuotationItemDto| (i.quantity * i.unit_price_with_tax).round_dp(2))
-                .sum::<Decimal>()
-                .round_dp(2);
-            ((total_with_tax - subtotal).round_dp(2), total_with_tax)
+                .map(|i: &CreateQuotationItemDto| round_money(i.quantity * i.unit_price_with_tax))
+                .sum::<Decimal>();
+            let total_with_tax = round_money(total_with_tax);
+            (round_money(total_with_tax - subtotal), total_with_tax)
         } else {
             // 不含税：税额 = 小计 * 税率，总额 = 小计 + 税额
-            let tax = (subtotal * dto.tax_rate / Decimal::from(100)).round_dp(2);
-            (tax, (subtotal + tax).round_dp(2))
+            let tax = round_money(subtotal * dto.tax_rate / Decimal::from(100));
+            (tax, round_money(subtotal + tax))
         };
 
         Ok((subtotal, tax_amount, total_amount))
@@ -49,6 +72,7 @@ impl QuotationService {
 
     /// 业务校验
     pub fn validate_create(&self, dto: &CreateQuotationDto) -> Result<(), ServiceError> {
+        validate_items_quantity_scale(&dto.items)?;
         if dto.items.is_empty() {
             return Err(ServiceError::Validation("明细至少 1 条".to_string()));
         }

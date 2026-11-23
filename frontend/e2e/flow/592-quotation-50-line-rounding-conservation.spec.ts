@@ -2,19 +2,19 @@
  * 报价 50 行舍入守恒：逐行金额之和、表头小计与含税总额分位零差额
  *
  * 六要素
- * - 功能：验证 50 行混合数量在银行家舍入口径下逐行金额与表头金额守恒、明细序号连续。
+ * - 功能：验证 50 行混合数量在两位小数四舍五入口径下逐行金额与表头金额守恒、明细序号连续；数量按 R-598 刻度门限两位小数。
  * - 调用方：Playwright E2E（diagnose-fixture），仅调用 /api/v1/erp 纯 API，不打开业务页面。
- * - 入参：50 行，数量 0.01 与 0.333 交替、单价 1.00，税率 0，不含税口径。
+ * - 入参：50 行，数量 0.01 与 0.33 交替、单价 1.00，税率 0，不含税口径。
  * - 传给谁：POST /quotations 建单、GET /quotations/{id} 回读详情、DELETE 清理客户与产品。
  * - 存什么：行 amount 的分位和、表头 subtotal/tax_amount/total_amount 与明细 sequence。
  * - 存哪里：只在用例进程内以 BigInt 分位比较，不写文件；后端落报价主表与明细表。
  *
  * 唯一事实源：backend/src/services/quotation_ops/calc.rs 的 calculate_totals 以
- *   Σ((quantity × unit_price).round_dp(2)) 再 round_dp(2) 得 subtotal；税率 0 时
- *   tax=(subtotal × 0 / 100).round_dp(2)、total=(subtotal + tax).round_dp(2)。
- *   crud.rs 的 insert_new_quotation_items 以 (quantity × unit_price).round_dp(2) 落行 amount，
+ *   Σround_money(quantity × unit_price) 再 round_money 得 subtotal；税率 0 时
+ *   tax=round_money(subtotal × 0 / 100)、total=round_money(subtotal + tax)。
+ *   crud.rs 的 insert_new_quotation_items 以 round_money(quantity × unit_price) 落行 amount，
  *   sequence 取 enumerate 下标（从 0 连续）。
- * 0.333 × 1.00 = 0.333 不是半进位中点，round_dp(2) 收敛为 0.33，本例不依赖半进位语义。
+ * 0.33 与 0.01 均为两位小数合法造数（R-598 拒绝超两位小数），行金额不依赖半进位语义。
  * 金额出参是定点数字符串，统一转 BigInt 分位比较，禁止 Number() 精确相等。
  */
 import { test, expect } from '../diagnose-fixture';
@@ -140,7 +140,7 @@ test.describe.serial('592 报价 50 行舍入守恒', () => {
     const items = Array.from({ length: 50 }, (_, index) => ({
       product_id: ctx.productId,
       unit: ctx.productUnit,
-      quantity: index % 2 === 0 ? '0.01' : '0.333',
+      quantity: index % 2 === 0 ? '0.01' : '0.33',
       unit_price: '1.00',
       unit_price_with_tax: '1.00',
       discount_rate: '0',

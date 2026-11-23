@@ -18,6 +18,7 @@ use crate::models::sales_quotation::{
 use crate::models::sales_quotation_item::{self, ActiveModel as ItemActive, Entity as ItemEntity};
 use crate::models::sales_quotation_term::{self, ActiveModel as TermActive, Entity as TermEntity};
 use crate::models::status::quotation as quotation_status;
+use crate::services::quotation_ops::calc::{round_money, validate_items_quantity_scale};
 use crate::services::quotation_service::QuotationService;
 use crate::utils::error::AppError;
 
@@ -32,6 +33,9 @@ impl QuotationService {
     ) -> Result<sales_quotation::Model, AppError> {
         let txn = self.db.begin().await?;
         let existing = Self::load_for_update(&txn, id).await?;
+        if let Some(items) = &dto.items {
+            validate_items_quantity_scale(items)?;
+        }
         let mut active: QuotationActive = existing.clone().into();
         Self::apply_field_updates(&mut active, &dto, id)?;
         let updated = crate::services::audit_log_service::AuditLogService::update_with_audit(
@@ -199,17 +203,17 @@ impl QuotationService {
                 quantity: Set(item_dto.quantity),
                 unit_price: Set(item_dto.unit_price),
                 unit_price_with_tax: Set(item_dto.unit_price_with_tax),
-                amount: Set((item_dto.quantity * item_dto.unit_price).round_dp(2)),
-                amount_with_tax: Set(
-                    (item_dto.quantity * item_dto.unit_price_with_tax).round_dp(2),
-                ),
+                amount: Set(round_money(item_dto.quantity * item_dto.unit_price)),
+                amount_with_tax: Set(round_money(
+                    item_dto.quantity * item_dto.unit_price_with_tax,
+                )),
                 tier_pricing: Set(item_dto
                     .tier_pricing
                     .as_ref()
                     .and_then(|v| serde_json::from_value(v.clone()).ok())),
                 discount_rate: Set(item_dto.discount_rate),
                 discount_amount: Set(item_dto.discount_rate.map(|r| {
-                    (item_dto.quantity * item_dto.unit_price * r / Decimal::from(100)).round_dp(2)
+                    round_money(item_dto.quantity * item_dto.unit_price * r / Decimal::from(100))
                 })),
                 notes: Set(item_dto.notes.clone()),
                 sequence: Set(idx as i32),
