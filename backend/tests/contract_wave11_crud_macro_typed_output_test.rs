@@ -171,7 +171,7 @@ fn sample_subscription(nullable_none: bool) -> report_subscription::Model {
         } else {
             Some(serde_json::json!({"year": 2026}))
         },
-        export_format: "pdf".to_string(),
+        export_format: "docx".to_string(),
         is_enabled: true,
         status: "ACTIVE".to_string(),
         next_run_at: if nullable_none {

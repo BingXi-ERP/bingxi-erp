@@ -1,25 +1,20 @@
 //! 报表导出器服务（report/exp）
 //!
-//! 包含报表的多格式导出：
-//! - `export_report`   统一导出入口
-//! - `export_pdf`      PDF 导出（printpdf 库）
-//! - `export_excel`    Excel 导出（xlsxwriter）
-//! - `export_csv`      CSV 导出
-//! - `export_json`     JSON 导出（已序列化数据直接返回）
-//! - 内部：`build_pdf_document` / `build_sheet_xml` / `build_shared_strings_xml` / `column_letter`
+//! 包含报表的成品文档导出：
+//! - `export_report`   统一导出入口（xlsx / docx）
+//! - `export_excel`   Excel 导出（xlsx）
+//! - `export_docx`    Word 导出（docx）
 //! - 公开：`*_bytes` 版本（无文件元信息，纯字节流）
 //!
 //! 拆分自原 `report_engine_service.rs` 的"报表导出"段。
-
 use chrono::Utc;
 use std::io::Write;
 use tracing::info;
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
 
 use crate::utils::error::AppError;
-use crate::utils::xlsx_export::{XlsxTable, build_xlsx};
 
-use super::{ExcelExportResult, ExportFormat, PdfExportResult, ReportData, ReportEngineService};
+use super::{DocxExportResult, ExcelExportResult, ExportFormat, ReportData, ReportEngineService};
 
 /// XLSX 命名空间
 const XLSX_NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -37,170 +32,15 @@ impl ReportEngineService {
             .map_err(|e: String| AppError::bad_request(e))?;
 
         match export_format {
-            ExportFormat::Pdf => {
-                let result = self.export_pdf(data, template_name).await?;
-                Ok(result.content)
-            }
             ExportFormat::Excel => {
                 let result = self.export_excel(data, template_name).await?;
                 Ok(result.content)
             }
-            ExportFormat::Csv => self.export_csv(data).await,
-            ExportFormat::Json => self.export_json(data).await,
-        }
-    }
-
-    /// 导出 PDF
-    ///
-    /// 调用方：`export_report` 与 `export_pdf_bytes`。
-    /// 入参：报表数据与模板名。传给谁：`PdfExportResult`（文件名、字节流大小、
-    /// 页数、字节流）回给出参的调用方。
-    /// 存什么/存哪里：字节流留在返回值的 `content` 里，本次导出不落盘。
-    pub async fn export_pdf(
-        &self,
-        data: &ReportData,
-        template_name: &str,
-    ) -> Result<PdfExportResult, AppError> {
-        let now = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let (buffer, page_count) = Self::build_pdf_document(data, template_name, &now)?;
-        info!(
-            "PDF 导出成功: template={}, rows={}, size={}",
-            template_name,
-            data.total_rows,
-            buffer.len()
-        );
-        Ok(PdfExportResult {
-            file_name: format!("{}_{}.pdf", template_name, now),
-            file_size: buffer.len() as u64,
-            page_count,
-            content: buffer,
-        })
-    }
-
-    /// 构建报表 PDF 文档字节流（纯计算，不依赖服务实例、运行时与数据库）
-    ///
-    /// 入参：报表数据、模板名、已格式化好的生成时间文本（同时用于页头文案与文件名，
-    /// 由调用方传入以保证两处一致）。
-    /// 传给谁：`export_pdf`，以及不经过服务实例的纯计算调用方。
-    /// 存什么/传什么数：返回 PDF 完整字节流，以及表格绘制实际占用的页数——页数由
-    /// 翻页动作数出，不从外部猜测文档页数。
-    /// 存哪里：字节流只随返回值留在内存。
-    fn build_pdf_document(
-        data: &ReportData,
-        template_name: &str,
-        now: &str,
-    ) -> Result<(Vec<u8>, u32), AppError> {
-        use printpdf::*;
-        let (doc, page1, layer1) = PdfDocument::new(template_name, Mm(297.0), Mm(210.0), "Layer 1");
-        let layer = doc.get_page(page1).get_layer(layer1);
-        let font = doc
-            .add_builtin_font(BuiltinFont::Helvetica)
-            .map_err(|e| AppError::internal(format!("加载字体失败: {}", e)))?;
-        Self::draw_pdf_header(&layer, &font, template_name, now);
-        let (_last_y, page_count) = Self::draw_pdf_table(&doc, page1, layer1, &font, data);
-        Self::draw_pdf_footer(&layer, &font, data.total_rows as usize);
-        let buffer = Self::save_pdf_to_buffer(doc)?;
-        Ok((buffer, page_count))
-    }
-
-    /// PDF 导出：绘制标题与生成时间
-    fn draw_pdf_header(
-        layer: &printpdf::PdfLayerReference,
-        font: &printpdf::IndirectFontRef,
-        template_name: &str,
-        now: &str,
-    ) {
-        use printpdf::*;
-        layer.use_text(template_name, 16.0, Mm(20.0), Mm(280.0), font);
-        layer.use_text(
-            format!("生成时间: {}", now),
-            10.0,
-            Mm(20.0),
-            Mm(270.0),
-            font,
-        );
-    }
-
-    /// PDF 导出：绘制表头与表格内容（含分页）
-    ///
-    /// 入参：文档句柄、首页页号与首层层号、字体、报表数据。
-    /// 返回二元组 `(最终 y 坐标, 页数)`：第一个元素是最后一行落笔后的 y 坐标（毫米）；
-    /// 第二个元素告诉调用方本次绘制实际用掉了多少页——页数从首页起算，每执行一次翻页
-    /// 动作加一枚，由本函数自己的翻页动作数出，不猜文档对象的页数。
-    /// 传给谁：`build_pdf_document`，它取页数填导出结果。
-    fn draw_pdf_table(
-        doc: &printpdf::PdfDocumentReference,
-        first_page: printpdf::PdfPageIndex,
-        first_layer: printpdf::PdfLayerIndex,
-        font: &printpdf::IndirectFontRef,
-        data: &ReportData,
-    ) -> (f32, u32) {
-        use printpdf::*;
-        let mut layer = doc.get_page(first_page).get_layer(first_layer);
-        let mut y_pos = 250.0_f32;
-        let mut page_count = 1_u32;
-        let col_width = 35.0_f32;
-        // 表头
-        let mut x_pos = 20.0_f32;
-        for column in &data.columns {
-            layer.use_text(&column.label, 10.0, Mm(x_pos), Mm(y_pos), font);
-            x_pos += col_width;
-        }
-        y_pos -= 8.0;
-        // 内容
-        for row in &data.rows {
-            let mut x_pos = 20.0_f32;
-            for column in &data.columns {
-                let value = row
-                    .get(&column.key)
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let display_value = if value.len() > 15 {
-                    format!("{}...", &value[..15])
-                } else {
-                    value
-                };
-                layer.use_text(&display_value, 8.0, Mm(x_pos), Mm(y_pos), font);
-                x_pos += col_width;
-            }
-            y_pos -= 6.0;
-            // 分页
-            if y_pos < 20.0 {
-                let (new_page, new_layer) = doc.add_page(Mm(297.0), Mm(210.0), "Layer 1");
-                layer = doc.get_page(new_page).get_layer(new_layer);
-                y_pos = 280.0;
-                page_count += 1;
+            ExportFormat::Docx => {
+                let result = self.export_docx(data, template_name).await?;
+                Ok(result.content)
             }
         }
-        (y_pos, page_count)
-    }
-
-    /// PDF 导出：绘制页脚记录数
-    fn draw_pdf_footer(
-        layer: &printpdf::PdfLayerReference,
-        font: &printpdf::IndirectFontRef,
-        total_rows: usize,
-    ) {
-        use printpdf::*;
-        layer.use_text(
-            format!("共 {} 条记录", total_rows),
-            10.0,
-            Mm(20.0),
-            Mm(10.0),
-            font,
-        );
-    }
-
-    /// PDF 导出：保存文档到内存缓冲区
-    fn save_pdf_to_buffer(doc: printpdf::PdfDocumentReference) -> Result<Vec<u8>, AppError> {
-        let mut buffer = Vec::new();
-        {
-            let mut writer = std::io::BufWriter::new(&mut buffer);
-            doc.save(&mut writer)
-                .map_err(|e| AppError::internal(format!("PDF 保存失败: {}", e)))?;
-        }
-        Ok(buffer)
     }
 
     /// 导出 Excel
@@ -511,9 +351,15 @@ impl ReportEngineService {
         result
     }
 
-    /// 导出 CSV（规则 3：实际输出 xlsx 格式）
-    pub async fn export_csv(&self, data: &ReportData) -> Result<Vec<u8>, AppError> {
-        // 规则 3：CSV 导出升级为 xlsx 格式，字段名与原 CSV 保持一致
+    // 公开字节流版本（无元信息，便于 API 直接返回）
+    // ==================================================
+
+    /// 导出 Word 文档（docx）
+    pub async fn export_docx(
+        &self,
+        data: &ReportData,
+        template_name: &str,
+    ) -> Result<DocxExportResult, AppError> {
         let headers: Vec<String> = data.columns.iter().map(|c| c.label.clone()).collect();
         let rows: Vec<Vec<String>> = data
             .rows
@@ -521,152 +367,52 @@ impl ReportEngineService {
             .map(|row| {
                 data.columns
                     .iter()
-                    .map(|col| {
-                        row.get(&col.key)
+                    .map(|c| {
+                        row.get(&c.key)
                             .map(|v| match v {
                                 serde_json::Value::String(s) => s.clone(),
-                                _ => v.to_string().trim_matches('"').to_string(),
+                                serde_json::Value::Null => String::new(),
+                                other => other.to_string(),
                             })
                             .unwrap_or_default()
                     })
                     .collect()
             })
             .collect();
-        let table = XlsxTable {
-            sheet_name: "报表".to_string(),
+        let summary = data.summary.as_ref().map(|s| {
+            s.as_object()
+                .map(|obj| {
+                    obj.iter()
+                        .map(|(k, v)| {
+                            let value = match v {
+                                serde_json::Value::String(str) => str.clone(),
+                                serde_json::Value::Null => String::new(),
+                                other => other.to_string(),
+                            };
+                            (k.clone(), value)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        });
+        let export_data = crate::services::export_service::ExportData {
+            title: template_name.to_string(),
             headers,
             rows,
+            summary,
         };
-        let bytes = build_xlsx(&table)?;
+        let buffer = crate::services::export_service::ExportService::export_docx(&export_data)?;
+        let now = Utc::now().format("%Y%m%d_%H%M%S").to_string();
         info!(
-            "xlsx 导出成功: rows={}, size={}",
+            "Word 导出成功: template={}, rows={}, size={}",
+            template_name,
             data.total_rows,
-            bytes.len()
+            buffer.len()
         );
-        Ok(bytes)
-    }
-
-    /// 导出 JSON
-    pub async fn export_json(&self, data: &ReportData) -> Result<Vec<u8>, AppError> {
-        let json = serde_json::to_vec_pretty(data)
-            .map_err(|e| AppError::internal(format!("JSON 序列化失败: {}", e)))?;
-        info!(
-            "JSON 导出成功: rows={}, size={}",
-            data.total_rows,
-            json.len()
-        );
-        Ok(json)
-    }
-
-    // ==================================================
-    // 公开字节流版本（无元信息，便于 API 直接返回）
-    // ==================================================
-
-    /// 导出 Excel 字节流
-    pub async fn export_excel_bytes(
-        &self,
-        data: &ReportData,
-        template_name: &str,
-    ) -> Result<Vec<u8>, AppError> {
-        self.export_excel(data, template_name)
-            .await
-            .map(|r| r.content)
-    }
-
-    /// 导出 PDF 字节流
-    pub async fn export_pdf_bytes(
-        &self,
-        data: &ReportData,
-        template_name: &str,
-    ) -> Result<Vec<u8>, AppError> {
-        self.export_pdf(data, template_name)
-            .await
-            .map(|r| r.content)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::super::{ReportColumn, ReportData, ReportEngineService, ReportMetadata};
-    use chrono::Utc;
-
-    /// 构造单列定义
-    ///
-    /// 入参：字段名与显示名。传给谁：`sample_report_data`。
-    /// 存什么：除 key、label、data_type 外其余展示属性一律留空，表格绘制只读前两枚。
-    fn sample_column(key: &str, label: &str) -> ReportColumn {
-        ReportColumn {
-            key: key.to_string(),
-            label: label.to_string(),
-            field_alias: None,
-            data_type: "string".to_string(),
-            format: None,
-            aggregation: None,
-            sortable: false,
-            filterable: false,
-            width: None,
-            alignment: None,
-        }
-    }
-
-    /// 构造列定义与行字段同形的报表数据
-    ///
-    /// 入参：数据行数。传给谁：本模块两枚页数用例。
-    /// 存什么：两列（生产单号与成品名称），行内字段名与列 key 一一对应；行值取 ASCII，
-    /// 使单元格超长截断分支不会切在多字节字符边界上。
-    fn sample_report_data(row_count: usize) -> ReportData {
-        ReportData {
-            columns: vec![
-                sample_column("order_no", "生产单号"),
-                sample_column("piece_name", "成品名称"),
-            ],
-            rows: (1..=row_count)
-                .map(|idx| {
-                    serde_json::json!({
-                        "order_no": format!("MO-{:04}", idx),
-                        "piece_name": format!("PIECE-{:04}", idx),
-                    })
-                })
-                .collect(),
-            total_rows: row_count as u64,
-            generated_at: Utc::now(),
-            summary: None,
-            metadata: ReportMetadata {
-                data_source: "unit-test".to_string(),
-                query_time_ms: 0,
-                cache_hit: false,
-                parameters: None,
-            },
-        }
-    }
-
-    /// 表格行数超出首页容量时，页数必须等于翻页真实数出的页数
-    ///
-    /// 几何依据：表头画在 y=250，首行 y=242，每行下移 6，落笔后低于 20 即翻新页，
-    /// 故首页画 38 行；60 行会翻出一枚新页，总数为 2。断言值 2 与硬编码 1 不同，
-    /// 页数一旦被写回常量本用例即判红。
-    #[test]
-    fn page_count_counts_pages_created_by_table_paging() {
-        let data = sample_report_data(60);
-        let (content, page_count) =
-            ReportEngineService::build_pdf_document(&data, "生产日报", "2026-01-01 08:00:00")
-                .expect("PDF 文档构建应成功");
-
-        assert_eq!(page_count, 2);
-        assert!(!content.is_empty());
-        assert!(content.starts_with(b"%PDF"));
-    }
-
-    /// 表格行数未超出首页容量时不得翻出新页，页数为 1
-    #[test]
-    fn page_count_stays_one_when_rows_fit_first_page() {
-        let data = sample_report_data(5);
-        let (content, page_count) =
-            ReportEngineService::build_pdf_document(&data, "生产日报", "2026-01-01 08:00:00")
-                .expect("PDF 文档构建应成功");
-
-        assert_eq!(page_count, 1);
-        assert!(!content.is_empty());
-        assert!(content.starts_with(b"%PDF"));
+        Ok(DocxExportResult {
+            file_name: format!("{}_{}.docx", template_name, now),
+            file_size: buffer.len() as u64,
+            content: buffer,
+        })
     }
 }

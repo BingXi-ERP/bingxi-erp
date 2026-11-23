@@ -198,78 +198,6 @@ pub async fn execute_custom_report(
     }))))
 }
 
-/// POST /api/v1/erp/reports-enhanced/export/pdf - 导出PDF
-pub async fn export_pdf(
-    State(state): State<AppState>,
-    auth: AuthContext,
-    Json(req): Json<ExportRequest>,
-) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
-    let service = ReportTemplateService::new(state.db.clone());
-
-    let template_id: i32 = req
-        .template_id
-        .parse()
-        .map_err(|_| AppError::validation_displayable("无效的模板ID"))?;
-
-    // 执行报表获取数据
-    let (headers, data, _total) = service
-        .execute_custom_report(template_id, auth.user_id, auth.role_id)
-        .await?;
-
-    let title = req
-        .title
-        .unwrap_or_else(|| format!("报表 {}", req.template_id));
-
-    let export_data = crate::services::export_service::ExportData {
-        title: title.clone(),
-        headers,
-        rows: data,
-        summary: None,
-    };
-
-    let pdf_content = crate::services::export_service::ExportService::export_pdf(&export_data)?;
-
-    tracing::info!("用户 {} 导出PDF报表: {}", auth.username, req.template_id);
-
-    // V15 P2 B11-P2-1：导出审计日志（best-effort，异步不阻塞响应）
-    let row_count = export_data.rows.len();
-    let event = AuditEvent {
-        user_id: Some(auth.user_id),
-        username: Some(auth.username.clone()),
-        operation_type: OperationType::Export,
-        severity: Severity::Info,
-        resource_type: Some("report".to_string()),
-        resource_id: Some(req.template_id.clone()),
-        resource_name: Some(format!("{}.pdf", title)),
-        description: Some(format!(
-            "用户 {} 导出PDF报表 {}（共 {} 行）",
-            auth.username, title, row_count
-        )),
-        request_method: Some("POST".to_string()),
-        request_path: Some("/api/v1/erp/reports-enhanced/export/pdf".to_string()),
-        before_snapshot: None,
-        after_snapshot: Some(serde_json::json!({
-            "format": "pdf",
-            "total": row_count,
-            "template_id": req.template_id,
-        })),
-    };
-    let svc = Arc::new(AuditLogService::new(state.db.clone()));
-    svc.record_async(event, None);
-
-    // 返回base64编码的内容
-    use base64::Engine;
-    let encoded = base64::engine::general_purpose::STANDARD.encode(&pdf_content);
-
-    Ok(Json(ApiResponse::success(serde_json::json!({
-        "filename": format!("{}.pdf", title),
-        "size": pdf_content.len(),
-        "content_type": "application/pdf",
-        "content": encoded,
-        "message": "PDF导出成功"
-    }))))
-}
-
 /// POST /api/v1/erp/reports-enhanced/export/excel - 导出Excel
 pub async fn export_excel(
     State(state): State<AppState>,
@@ -416,7 +344,7 @@ pub struct TemplateExportRequest {
     pub title: Option<String>,
 }
 
-/// 报表导出请求（PDF/Excel 共用）
+/// 报表导出请求（xlsx/Word 共用）
 #[allow(dead_code, reason = "反序列化输入字段")]
 #[derive(Debug, Deserialize)]
 pub struct ExportRequest {
@@ -464,12 +392,13 @@ pub async fn export_template(
         summary: None,
     };
 
-    // 规则 3：所有非 PDF 导出统一使用 xlsx 格式（含原 csv 请求）
+    // 成品文档仅支持 xlsx / docx（Word）；其余值统一走 xlsx。
     let (content_type, encoded, ext) = match format.to_lowercase().as_str() {
-        "pdf" => {
-            let bytes = crate::services::export_service::ExportService::export_pdf(&export_data)?;
-            let ct = "application/pdf".to_string();
-            (ct, bytes, "pdf")
+        "docx" | "word" => {
+            let bytes = crate::services::export_service::ExportService::export_docx(&export_data)?;
+            let ct = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                .to_string();
+            (ct, bytes, "docx")
         }
         _ => {
             let bytes = crate::services::export_service::ExportService::export_excel(&export_data)?;

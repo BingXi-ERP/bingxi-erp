@@ -24,8 +24,8 @@ import {
  *   multipart，文件字段名固定 `file`；成功出参 ApiResponse<Model>，attachment_path 回写为
  *   服务端生成受控 URL `/uploads/qualifications/{sid}_{qid}.{ext}`（客户端原名不参与路径拼接）；
  * - GET  `/purchase/suppliers/{sid}/qualifications/{qid}/attachment`（get_supplier_qualification_attachment）
- *   成功出参是裸字节流（非 JSON 信封）：Content-Type 按扩展名（pdf→application/pdf）、
- *   Content-Disposition `inline; filename="{sid}_{qid}.pdf"`、Cache-Control `private, no-store`；
+ *   成功出参是裸字节流（非 JSON 信封）：Content-Type 按扩展名（png→application/png）、
+ *   Content-Disposition `inline; filename="{sid}_{qid}.png"`、Cache-Control `private, no-store`；
  *   该资质未上传附件（attachment_path 为 null）时 AppError::not_found（HTTP 404 + NOT_FOUND）；
  * - DELETE `/purchase/suppliers/{sid}/qualifications/{qid}`（delete_supplier_qualification）
  *   service 只 delete_by_id 落库行、不清盘文件；删后资质行消失 ⇒ 读取端 get_supplier_qualification
@@ -34,8 +34,8 @@ import {
  * 上传侧安全校验清单（写入方 supplier_handler.rs，逐条即反假成功腿的点名拒绝依据）：
  * - 大小上限 5MB（MAX_QUALIFICATION_ATTACHMENT_SIZE），全局请求体上限 12MB（constants::MAX_HTTP_BODY_BYTES），
  *   故 5MB<体积<12MB 才能走到显式大小校验、被点名拒绝而非流读取截断；
- * - 扩展名白名单 pdf/jpg/jpeg/png；
- * - 文件头魔数必须命中 PDF(%PDF)/JPEG(FF D8 FF)/PNG(89 50 4E 47...)之一，且与声明后缀同族，
+ * - 扩展名白名单 png/jpg/jpeg/png；
+ * - 文件头魔数必须命中 JPEG(FF D8 FF)/PNG(89 50 4E 47...)之一，且与声明后缀同族，
  *   否则 validation_displayable 拒绝（HTTP 4xx + 机器码 VALIDATION_ERROR）。
  *
  * 跨角色可见的权限键事实来源：附件读写挂载于 `/purchase/suppliers/*`，permission 中间件按 URL 段推导为
@@ -50,10 +50,13 @@ import {
  * 不用 `?? []` 掩盖缺键；前置不成立显式 throw，不伪装成绿灯。
  */
 
-/** PDF 魔数最小合法体：仅 %PDF 头即通过 detect_qualification_attachment_magic，扩展名同族判定为 pdf */
-function buildPdfBuffer(marker: string, padBytes = 0): Buffer {
-  const pad = padBytes > 0 ? `\n${' '.repeat(padBytes)}\n%%EOF` : '';
-  return Buffer.from(`%PDF-1.4\n${marker}${pad}`, 'utf-8');
+/** PNG 魔数最小合法体：PNG 签名即通过 detect_qualification_attachment_magic，扩展名同族判定为 png */
+function buildPngBuffer(marker: string, padBytes = 0): Buffer {
+  const pad = padBytes > 0 ? `\n${' '.repeat(padBytes)}` : '';
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from(`\n${marker}${pad}`, 'utf-8'),
+  ]);
 }
 
 /** 统一 URL 拼装：apiCall 系列自带前缀，原始 page.request 腿必须显式拼 API_BASE + API_PREFIX */
@@ -207,19 +210,19 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
     await loginViaUI(page);
   });
 
-  test('453-01 上传真实 PDF 落库、刷新重进后列表真回读附件字段', async ({ page }) => {
+  test('453-01 上传真实 PNG 落库、刷新重进后列表真回读附件字段', async ({ page }) => {
     const supplierId = await ensureSupplier(page);
     const qid = await createQualification(page, supplierId, '01');
 
-    const pdf = buildPdfBuffer('453-01 工艺单扫描件');
-    const up = await uploadAttachment(page, supplierId, qid, 'gongyi.pdf', 'application/pdf', pdf);
+    const png = buildPngBuffer('453-01 工艺单扫描件');
+    const up = await uploadAttachment(page, supplierId, qid, 'gongyi.png', 'image/png', png);
     console.log(`[453-01] 上传响应 status=${up.status} code=${up.code} message=${up.message}`);
     expect(up.status, `453-01 上传必须 2xx，实际 status=${up.status} message=${up.message}`).toBe(
       200
     );
     expect(up.code, `453-01 上传成功信封 code 必须 200，实际 ${up.code}`).toBe(200);
 
-    const expectedPath = `/uploads/qualifications/${supplierId}_${qid}.pdf`;
+    const expectedPath = `/uploads/qualifications/${supplierId}_${qid}.png`;
     expect(
       up.data ? String(up.data.attachment_path) : '<data 缺失>',
       `453-01 上传回写 attachment_path 必须等于服务端受控 URL ${expectedPath}`
@@ -248,14 +251,14 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
     console.log(`[453-01] 收尾删除自建资质 id=${qid}`);
   });
 
-  test('453-02 下载腿返回真实字节流：200 + PDF 魔数 + Content-Disposition + 字节数等于上传', async ({
+  test('453-02 下载腿返回真实字节流：200 + PNG 魔数 + Content-Disposition + 字节数等于上传', async ({
     page,
   }) => {
     const supplierId = await ensureSupplier(page);
     const qid = await createQualification(page, supplierId, '02');
 
-    const pdf = buildPdfBuffer('453-02 质检报告');
-    const up = await uploadAttachment(page, supplierId, qid, 'zhijian.pdf', 'application/pdf', pdf);
+    const png = buildPngBuffer('453-02 质检报告');
+    const up = await uploadAttachment(page, supplierId, qid, 'zhijian.png', 'image/png', png);
     expect(
       up.status,
       `453-02 前置：附件必须上传成功，实际 status=${up.status} message=${up.message}`
@@ -271,23 +274,23 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
     const headers = res.headers();
     expect(
       headers['content-type'],
-      `453-02 Content-Type 必须是 application/pdf，实际 ${String(headers['content-type'])}`
-    ).toContain('application/pdf');
+      `453-02 Content-Type 必须是 application/png，实际 ${String(headers['content-type'])}`
+    ).toContain('image/png');
     expect(
       String(headers['content-disposition']),
-      `453-02 Content-Disposition 必须带 inline 与服务端生成文件名 ${supplierId}_${qid}.pdf`
-    ).toContain(`filename="${supplierId}_${qid}.pdf"`);
-    // 真伪字节：不接受只探 200——必须是真 PDF（首四字节 %PDF）且长度非零
+      `453-02 Content-Disposition 必须带 inline 与服务端生成文件名 ${supplierId}_${qid}.png`
+    ).toContain(`filename="${supplierId}_${qid}.png"`);
+    // 真伪字节：不接受只探 200——必须是真 PNG（前八字节签名）且长度非零
     expect(bytes.length, `453-02 下载字节流必须非零长度，实际 ${bytes.length}B`).toBeGreaterThan(0);
-    expect(bytes[0], `453-02 首字节必须 0x25（%），实际 ${bytes[0]}`).toBe(0x25);
+    expect(bytes[0], `453-02 首字节必须 0x89，实际 ${bytes[0]}`).toBe(0x89);
     expect(bytes[1], `453-02 次字节必须 0x50（P），实际 ${bytes[1]}`).toBe(0x50);
-    expect(bytes[2], `453-02 第三字节必须 0x44（D），实际 ${bytes[2]}`).toBe(0x44);
-    expect(bytes[3], `453-02 第四字节必须 0x46（F），实际 ${bytes[3]}`).toBe(0x46);
+    expect(bytes[2], `453-02 第三字节必须 0x4e（N），实际 ${bytes[2]}`).toBe(0x4e);
+    expect(bytes[3], `453-02 第四字节必须 0x47（G），实际 ${bytes[3]}`).toBe(0x47);
     // 内容与上传逐字节同：大小一致性
     expect(
       bytes.length,
-      `453-02 下载字节数必须等于上传字节数 ${pdf.length}，实际 ${bytes.length}`
-    ).toBe(pdf.length);
+      `453-02 下载字节数必须等于上传字节数 ${png.length}，实际 ${bytes.length}`
+    ).toBe(png.length);
 
     await apiCall(page, 'DELETE', `/purchase/suppliers/${supplierId}/qualifications/${qid}`);
     console.log(`[453-02] 收尾删除自建资质 id=${qid}`);
@@ -297,8 +300,8 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
     const supplierId = await ensureSupplier(page);
     const qid = await createQualification(page, supplierId, '03');
 
-    const pdf = buildPdfBuffer('453-03 客户确认样图');
-    const up = await uploadAttachment(page, supplierId, qid, 'yangtu.pdf', 'application/pdf', pdf);
+    const png = buildPngBuffer('453-03 客户确认样图');
+    const up = await uploadAttachment(page, supplierId, qid, 'yangtu.png', 'image/png', png);
     expect(
       up.status,
       `453-03 前置：附件必须上传成功，实际 status=${up.status} message=${up.message}`
@@ -358,8 +361,8 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
     const supplierId = await ensureSupplier(page);
     const qid = await createQualification(page, supplierId, '04');
 
-    const pdf = buildPdfBuffer('453-04 跨角色可见附件');
-    const up = await uploadAttachment(page, supplierId, qid, 'cross.pdf', 'application/pdf', pdf);
+    const png = buildPngBuffer('453-04 跨角色可见附件');
+    const up = await uploadAttachment(page, supplierId, qid, 'cross.png', 'image/png', png);
     expect(
       up.status,
       `453-04 前置：admin 必须上传成功，实际 status=${up.status} message=${up.message}`
@@ -381,7 +384,7 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
       `453-04 gm（有 suppliers:read）必须见该资质附件，实际 attachment_path=${
         gmRow ? String(gmRow.attachment_path) : '<缺行>'
       }`
-    ).toBe(`/uploads/qualifications/${supplierId}_${qid}.pdf`);
+    ).toBe(`/uploads/qualifications/${supplierId}_${qid}.png`);
 
     const gmDl = await page.request.get(
       fullUrl(`/purchase/suppliers/${supplierId}/qualifications/${qid}/attachment`)
@@ -395,16 +398,16 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
       0
     );
     // 下游持权角色读到的必须是真文件内容，不能只凭"非空"就放行：
-    // 先钉 PDF 魔数（首四字节 %PDF），再与上传时的真实字节逐字节比对，
+    // 先钉 PNG 魔数（前八字节签名），再与上传时的真实字节逐字节比对，
     // 服务端若返回占位文件、空壳或被串改的内容，下面的魔数与逐字节比对立即判红。
-    expect(gmBytes[0], `453-04 gm 下载首字节必须为 0x25（%），实际 ${gmBytes[0]}`).toBe(0x25);
+    expect(gmBytes[0], `453-04 gm 下载首字节必须为 0x89，实际 ${gmBytes[0]}`).toBe(0x89);
     expect(gmBytes[1], `453-04 gm 下载次字节必须为 0x50（P），实际 ${gmBytes[1]}`).toBe(0x50);
-    expect(gmBytes[2], `453-04 gm 下载第三字节必须为 0x44（D），实际 ${gmBytes[2]}`).toBe(0x44);
-    expect(gmBytes[3], `453-04 gm 下载第四字节必须为 0x46（F），实际 ${gmBytes[3]}`).toBe(0x46);
+    expect(gmBytes[2], `453-04 gm 下载第三字节必须为 0x4e（N），实际 ${gmBytes[2]}`).toBe(0x4e);
+    expect(gmBytes[3], `453-04 gm 下载第四字节必须为 0x47（G），实际 ${gmBytes[3]}`).toBe(0x47);
     expect(
       Buffer.from(gmBytes).toString('latin1'),
-      '453-04 gm 下载字节内容必须与上传的 PDF 逐字节一致（跨角色可见同一真实文件）'
-    ).toBe(pdf.toString('latin1'));
+      '453-04 gm 下载字节内容必须与上传的 PNG 逐字节一致（跨角色可见同一真实文件）'
+    ).toBe(png.toString('latin1'));
 
     // 无 suppliers:read 的角色（质检员仅持近邻键 supplier-qualifications:read）：
     // permission 中间件按 URL 段推 suppliers:read 短路，列表与下载均 403 FORBIDDEN
@@ -448,16 +451,16 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
   }) => {
     const supplierId = await ensureSupplier(page);
 
-    // (a) 超大：6MB PDF（>5MB 上限、<12MB 全局体上限，能走到显式大小校验被点名拒绝）
+    // (a) 超大：6MB PNG（>5MB 上限、<12MB 全局体上限，能走到显式大小校验被点名拒绝）
     const qidBig = await createQualification(page, supplierId, '05a');
-    const bigPdf = buildPdfBuffer('453-05a 超大件', 6 * 1024 * 1024);
+    const bigPng = buildPngBuffer('453-05a 超大件', 6 * 1024 * 1024);
     const bigUp = await uploadAttachment(
       page,
       supplierId,
       qidBig,
-      'oversize.pdf',
-      'application/pdf',
-      bigPdf
+      'oversize.png',
+      'image/png',
+      bigPng
     );
     console.log(
       `[453-05a] 超大上传 status=${bigUp.status} code=${bigUp.code} message=${bigUp.message}`
@@ -475,15 +478,15 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
     await assertRejectedNoAttachment(page, supplierId, qidBig, '453-05a');
     await apiCall(page, 'DELETE', `/purchase/suppliers/${supplierId}/qualifications/${qidBig}`);
 
-    // (b) 白名单外后缀：.exe（扩展名不在 pdf/jpg/jpeg/png）
+    // (b) 白名单外后缀：.exe（扩展名不在 png/jpg/jpeg/png）
     const qidExe = await createQualification(page, supplierId, '05b');
     const exeUp = await uploadAttachment(
       page,
       supplierId,
       qidExe,
       'trojan.exe',
-      'application/pdf',
-      buildPdfBuffer('453-05b 伪装可执行')
+      'image/png',
+      buildPngBuffer('453-05b 伪装可执行')
     );
     console.log(
       `[453-05b] exe 上传 status=${exeUp.status} code=${exeUp.code} message=${exeUp.message}`
@@ -494,20 +497,20 @@ test.describe.serial('453 单据附件上传-回读-下载-删除-跨角色可�
     ).toBe(true);
     expect(
       String(exeUp.message ?? ''),
-      `453-05b 拒绝文案必须点名仅支持 pdf/jpg/jpeg/png，实际 ${String(exeUp.message)}`
+      `453-05b 拒绝文案必须点名仅支持 jpg/jpeg/png，实际 ${String(exeUp.message)}`
     ).toContain('仅支持');
     await assertRejectedNoAttachment(page, supplierId, qidExe, '453-05b');
     await apiCall(page, 'DELETE', `/purchase/suppliers/${supplierId}/qualifications/${qidExe}`);
 
-    // (c) 后缀与内容不符：名为 .png 实为 PDF（魔数判为 pdf、与 png 不同族）
+    // (c) 后缀与内容不符：名为 .jpg 实为 PNG（魔数判为 png、与 jpg 不同族）
     const qidFake = await createQualification(page, supplierId, '05c');
     const fakeUp = await uploadAttachment(
       page,
       supplierId,
       qidFake,
-      'cert.png',
-      'image/png',
-      buildPdfBuffer('453-05c 后缀伪造')
+      'cert.jpg',
+      'image/jpeg',
+      buildPngBuffer('453-05c 后缀伪造')
     );
     console.log(
       `[453-05c] 后缀伪造上传 status=${fakeUp.status} code=${fakeUp.code} message=${fakeUp.message}`

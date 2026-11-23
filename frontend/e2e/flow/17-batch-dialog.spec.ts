@@ -146,7 +146,7 @@ test.describe('批量操作与弹窗确认', () => {
       const download = await downloadPromise;
       if (download) {
         const filename = download.suggestedFilename();
-        expect(filename).toMatch(/\.(xlsx|xls|csv|pdf)/);
+        expect(filename).toMatch(/\.(xlsx|docx)/);
       }
     }
   });

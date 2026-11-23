@@ -209,9 +209,9 @@ impl ExportApprovalService {
         Ok(saved)
     }
 
-    /// 校验创建审批请求字段：资源类型必须敏感，文件格式仅支持 xlsx/pdf（返回规范化后的 file_format（小写））
-    /// V15 主线审计 Low 修复：原实现允许 csv，与 .monkeycode/MEMORY.md 规则“成品导入/导出使用 .xlsx/.docx”冲突，
-    /// 移除 csv 避免制度声明与代码行为不一致。
+    /// 校验创建审批请求字段：资源类型必须敏感，文件格式仅支持 xlsx/docx（返回规范化后的 file_format（小写））
+    /// V15 主线审计 Low 修复：原实现允许 csv，与 .monkeycode/MEMORY.md 规则"成品导入/导出使用 .xlsx/.docx"冲突，
+    /// 移除 csv 与非文档格式，避免制度声明与代码行为不一致。
     fn validate_create_request_fields(req: &CreateApprovalRequest) -> Result<String, AppError> {
         if !sensitive_resources::is_sensitive(&req.resource_type) {
             return Err(AppError::validation(format!(
@@ -225,9 +225,9 @@ impl ExportApprovalService {
             .clone()
             .unwrap_or_else(|| "xlsx".to_string())
             .to_lowercase();
-        if !matches!(file_format.as_str(), "xlsx" | "pdf") {
+        if !matches!(file_format.as_str(), "xlsx" | "docx") {
             return Err(AppError::validation(
-                "file_format 仅支持 xlsx/pdf（与 .monkeycode/MEMORY.md 成品导出规则保持一致）",
+                "file_format 仅支持 xlsx/docx（与 .monkeycode/MEMORY.md 成品导出规则保持一致）",
             ));
         }
         Ok(file_format)

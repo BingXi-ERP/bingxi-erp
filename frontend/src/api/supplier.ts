@@ -316,7 +316,7 @@ export const deleteSupplierQualification = (supplierId: number, qualificationId:
 /**
  * 上传供应商资质附件（multipart，字段名 file）
  * 后端路由：POST /api/v1/erp/purchase/suppliers/{supplier_id}/qualifications/{qualification_id}/attachment
- * （routes/purchase.rs suppliers；白名单 pdf/jpg/jpeg/png、≤5MB、magic bytes 校验、
+ * （routes/purchase.rs suppliers；白名单 jpg/jpeg/png、≤5MB、magic bytes 校验、
  * 文件名服务端生成，返回更新后的资质模型——attachment_path 为服务端受控 URL）
  */
 export const uploadSupplierQualificationAttachment = (
