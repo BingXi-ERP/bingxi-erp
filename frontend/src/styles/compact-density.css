@@ -92,3 +92,13 @@
 .el-dialog {
   --el-dialog-padding-primary: 12px;
 }
+
+/* 分页条：总条数/跳转项与页码组的横向间距收一档（默认 16px） */
+.el-pagination {
+  --el-pagination-item-gap: 10px;
+}
+
+/* 抽屉正文：与弹窗同档收敛（默认 20px；窄屏由 mobile-content.css 自身口径覆盖） */
+.el-drawer {
+  --el-drawer-padding-primary: 16px;
+}
