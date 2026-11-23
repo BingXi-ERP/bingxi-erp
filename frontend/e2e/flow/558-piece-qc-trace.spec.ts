@@ -62,6 +62,16 @@ async function startInspection(page: Page, tag: string): Promise<number> {
   const productId = Number(ctx.productIds[0]);
   expect(productId, '前置：追溯用例需真实产品').toBeGreaterThan(0);
 
+  // 打卷入库要求缸号在 batch_dye_lot 表中真实存在；直接锚在册批次行的缸号，
+  // 不依赖共享种子变量（其缓存分支可能读到与当前库不一致的号）。
+  const batchList = await apiCallRaw<{ items?: Array<{ dye_lot_no?: string }> }>(
+    page,
+    'GET',
+    '/production/dye-batches?page=1&page_size=20'
+  );
+  const realDyeLotNo = batchList.items?.find(b => !!b.dye_lot_no)?.dye_lot_no;
+  expect(realDyeLotNo, '前置：须有在册染色批次缸号供打卷').toBeTruthy();
+
   const created = await apiCallRaw<Record<string, unknown>>(
     page,
     'POST',
@@ -69,9 +79,7 @@ async function startInspection(page: Page, tag: string): Promise<number> {
     {
       product_id: productId,
       product_name: `E2E-558-${tag}`,
-      // 打卷入库要求缸号在 batch_dye_lot 表中真实存在；用共享种子建好的缸号，
-      // 不再以 genCode 伪造（假缸号会在打卷腿 BUSINESS_ERROR 拒绝）。
-      dye_lot_no: ctx.dyeLotNo,
+      dye_lot_no: realDyeLotNo,
       color_no: genCode('CLR'),
       inspection_date: new Date().toISOString().slice(0, 10),
       scoring_system: 'ten_point',
