@@ -9219,6 +9219,8 @@ export default {
       confirm: '确定',
     },
     table: {
+      mobileCardAria: '采购合同手机卡片列表',
+      mobileEmpty: '暂无采购合同',
       listAria: '采购合同列表',
       colIndex: '序号',
       colContractNo: '合同编号',
@@ -9365,6 +9367,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: '采购验货手机卡片列表',
       ariaLabel: '采购验货列表',
       column: {
         inspectionNo: '检验单号',
@@ -9520,6 +9523,8 @@ export default {
     },
     table: {
       ariaLabel: '采购价格列表',
+      mobileCardAria: '采购价格手机卡片列表',
+      mobileEmpty: '暂无采购价格',
       column: {
         index: '序号',
         productName: '产品名称',
@@ -9690,6 +9695,8 @@ export default {
       },
     },
     table: {
+      mobileCardAria: '采购退货手机卡片列表',
+      mobileEmpty: '暂无采购退货',
       aria: {
         list: '采购退货列表',
         pagination: '采购退货列表分页',
@@ -9814,6 +9821,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: '采购入库单手机卡片列表',
       aria: {
         list: '采购入库单列表',
         pagination: '采购入库单分页',

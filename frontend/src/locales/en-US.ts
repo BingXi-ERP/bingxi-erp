@@ -9288,6 +9288,8 @@ export default {
       confirm: 'Confirm',
     },
     table: {
+      mobileCardAria: 'Purchase Contract Mobile Card List',
+      mobileEmpty: 'No purchase contracts yet',
       listAria: 'Purchase Contract List',
       colIndex: 'No.',
       colContractNo: 'Contract No.',
@@ -9434,6 +9436,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: 'Purchase Inspection Mobile Card List',
       ariaLabel: 'Purchase Inspection List',
       column: {
         inspectionNo: 'Inspection No.',
@@ -9589,6 +9592,8 @@ export default {
     },
     table: {
       ariaLabel: 'Purchase Price List',
+      mobileCardAria: 'Purchase Price Mobile Card List',
+      mobileEmpty: 'No purchase prices yet',
       column: {
         index: 'Index',
         productName: 'Product Name',
@@ -9759,6 +9764,8 @@ export default {
       },
     },
     table: {
+      mobileCardAria: 'Purchase return mobile card list',
+      mobileEmpty: 'No purchase returns yet',
       aria: {
         list: 'Purchase Return List',
         pagination: 'Purchase Return List Pagination',
@@ -9883,6 +9890,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: 'Purchase Receipt Mobile Card List',
       aria: {
         list: 'Purchase Receipt List',
         pagination: 'Purchase Receipt Pagination',
