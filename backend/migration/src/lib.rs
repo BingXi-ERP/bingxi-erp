@@ -393,6 +393,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::bulk_color_delta_e_level::Migration),
             // 验布修边实测两列，链尾独立域（存量复用库上属 pending 必然执行）
             Box::new(domain::fabric_inspection_edge_trim::Migration),
+            // 客户门户绑定列（users.customer_id），链尾独立域（存量复用库上属 pending 必然执行）
+            Box::new(domain::customer_portal_binding::Migration),
         ]
     }
 }
