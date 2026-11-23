@@ -168,11 +168,13 @@ impl BpmService {
         let mut pending_event = None;
         let mut advanced_task_ids = Vec::new();
 
+        let mut terminated = false;
         if req.action == REJECT_ACTION {
             if mode == sign_mode::COUNTERSIGN {
                 // 会签口径：任一驳回立即终止整单。
                 self.handle_task_reject(&ctx.instance, Some(actor_id), txn, &mut pending_event)
                     .await?;
+                terminated = true;
             } else {
                 // 或签口径：单人驳回只留痕，全部驳回才终止整单。
                 let rejected = sign_mode::signed_user_ids(
@@ -182,6 +184,35 @@ impl BpmService {
                 if !assignees.is_empty() && assignees.iter().all(|id| rejected.contains(id)) {
                     self.handle_task_reject(&ctx.instance, Some(actor_id), txn, &mut pending_event)
                         .await?;
+                    terminated = true;
+                }
+            }
+            if terminated {
+                // 终止收尾：同节点仍 pending 的兄弟任务一并置 cancelled 并留痕，
+                // 终止实例上不得残留可操作的待办。
+                for sibling in &siblings {
+                    if sibling.id == ctx.task.id
+                        || sibling.status.as_deref() != Some(task_status::PENDING)
+                    {
+                        continue;
+                    }
+                    let vars = sign_mode::append_signature(
+                        sibling.task_variables.as_ref(),
+                        actor_id,
+                        actor_name,
+                        "reject_terminated",
+                        Some("同节点处理人驳回，实例已终止"),
+                    )
+                    .0;
+                    self.update_multi_task(
+                        sibling,
+                        actor_id,
+                        actor_name,
+                        task_status::CANCELLED,
+                        vars,
+                        txn,
+                    )
+                    .await?;
                 }
             }
         } else if mode == sign_mode::COUNTERSIGN {

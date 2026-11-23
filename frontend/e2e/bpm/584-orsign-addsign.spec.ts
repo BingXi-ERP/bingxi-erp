@@ -267,8 +267,8 @@ test.describe('584 BPM 或签（orsign）+ 加签（add-sign）', () => {
       const others = detail.tasks.filter(t => t.id !== myTaskId);
       expect(
         others.map(t => t.status),
-        '其余同节点 pending 任务应级联 cancelled'
-      ).toEqual(['cancelled']);
+        '其余同节点 pending 任务应被或签跳过收尾置 completed（留痕 orsign_skipped）'
+      ).toEqual(['completed']);
 
       await second.session.close();
     }
