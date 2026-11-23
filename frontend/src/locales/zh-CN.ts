@@ -18,6 +18,7 @@ export default {
     historicalMethod: '历史方式（不可重新选择）',
     wechatPay: '微信支付',
     alipay: '支付宝',
+    mobileCardAria: '支付通道手机卡片列表',
     validation: {
       httpsRequired: '请输入不含凭据、空白或反斜杠的 HTTPS 地址，或留空。',
       maskedKey: '不能将脱敏占位值作为密钥。',
@@ -3795,6 +3796,7 @@ export default {
       nodeStatusBlocked: '阻塞',
       messageLoadFailed: '加载时间线失败',
       notFound: '订单不存在或已被删除',
+      mobileCardAria: '定制单工艺节点手机卡片列表',
     },
   },
   product: {
@@ -9953,6 +9955,7 @@ export default {
         sign: '签收',
         delete: '删除',
       },
+      mobileCardAria: '物流运单手机卡片列表',
     },
     stat: {
       label: {
@@ -12693,6 +12696,7 @@ export default {
       edit: '编辑',
       delete: '删除',
       paginationAriaLabel: '数据导入模板分页',
+      mobileCardAria: '数据导入模板手机卡片列表',
     },
     taskTable: {
       statusPlaceholder: '状态',
@@ -12717,6 +12721,7 @@ export default {
       cancel: '取消',
       errorLog: '错误日志',
       paginationAriaLabel: '数据导入任务分页',
+      mobileCardAria: '数据导入任务手机卡片列表',
     },
     templateForm: {
       editTitle: '编辑模板',

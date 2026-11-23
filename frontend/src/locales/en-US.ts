@@ -19,6 +19,7 @@ export default {
     historicalMethod: 'Historical method (unavailable for new selection)',
     wechatPay: 'WeChat Pay',
     alipay: 'Alipay',
+    mobileCardAria: 'Payment channels mobile card list',
     validation: {
       httpsRequired:
         'Enter an HTTPS URL without credentials, spaces or backslashes, or leave blank.',
@@ -3824,6 +3825,7 @@ export default {
       nodeStatusBlocked: 'Blocked',
       messageLoadFailed: 'Failed to load timeline',
       notFound: 'Order not found or has been deleted',
+      mobileCardAria: 'Custom order process node mobile card list',
     },
   },
   product: {
@@ -10019,6 +10021,7 @@ export default {
         sign: 'Sign',
         delete: 'Delete',
       },
+      mobileCardAria: 'Logistics waybill mobile card list',
     },
     stat: {
       label: {
@@ -12773,6 +12776,7 @@ export default {
       edit: 'Edit',
       delete: 'Delete',
       paginationAriaLabel: 'Data Import Template Pagination',
+      mobileCardAria: 'Data import template mobile card list',
     },
     taskTable: {
       statusPlaceholder: 'Status',
@@ -12797,6 +12801,7 @@ export default {
       cancel: 'Cancel',
       errorLog: 'Error Log',
       paginationAriaLabel: 'Data Import Task Pagination',
+      mobileCardAria: 'Data import task mobile card list',
     },
     templateForm: {
       editTitle: 'Edit Template',
