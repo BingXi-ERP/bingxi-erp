@@ -13,6 +13,9 @@ import { i18n, getCurrentLocale } from './i18n';
 import { permission, permissionDetail } from './directives/permission';
 // V15 P1-20-15 全局 CSS 变量主题（支持亮色/暗黑模式切换）
 import './styles/theme.css';
+// 桌面紧凑密度与长内容自动换行基线（表格/卡片/表单/弹窗原语与 v2 虚拟表壳），
+// 置于三张 mobile-*.css 之前：窄屏由后置的移动端补丁层按更高特异性覆盖，移动端排版不变。
+import './styles/compact-density.css';
 // 列表页族移动端窄屏响应式补丁：命中各列表页共享 class 约定与 Element Plus 原语，
 // 置于 theme.css 之后以覆盖其默认宽度，桌面视口不触发本层。
 import './styles/mobile-list.css';

@@ -1,0 +1,67 @@
+/*
+ * 桌面紧凑密度与长内容自动换行全局基线层。
+ *
+ * 调用方：main.ts 在 theme.css 之后、三张 mobile-*.css 之前引入。本层是全视口
+ * 基线密度；窄屏的既有移动端补丁层位于源序之后且选择器特异性更高（多带
+ * .main-content / .filter-card 前缀），同属性处移动端仍按其自身口径覆盖，
+ * 本层不改变窄屏排版。
+ *
+ * 覆盖面：仅 Element Plus 原语（el-table / el-card / el-form-item / el-dialog /
+ * el-descriptions）与项目共享壳 class（v2-table-wrapper），不触任何业务视图文件。
+ * 只收敛两件事：默认密度（表格竖向 8→5px、横向 12→8px，卡片/表单/弹窗小幅收敛）
+ * 与长内容折行（长单号/批号/备注在列宽内自动换行）；行分隔线与列间呼吸保留，
+ * 不做极限压缩。折叠展开行的内边距在表格密度规则之后显式重申，防止随 td 收窄。
+ */
+
+/* ---- 表格密度：竖向 8→5、横向 12→8，分隔线与列间呼吸保留 ---- */
+.el-table th.el-table__cell,
+.el-table td.el-table__cell {
+  padding: 5px 0;
+}
+
+.el-table .cell {
+  padding: 0 8px;
+  line-height: 1.45;
+}
+
+/* 展开行承载嵌套内容，不随 td 密度收窄（EP 默认 20px 50px，收敛为 12px 16px） */
+.el-table td.el-table__cell.el-table__expanded-cell {
+  padding: 12px 16px;
+}
+
+/* ---- 内容自动换行：长单号/批号/备注在列宽内折行，不撑破列也不依赖省略号 ---- */
+.el-table .cell {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 虚拟表默认单行省略（el-table-v2__cell-text 出厂 nowrap+ellipsis）；V2Table 已开
+ * 动态行高（estimated-row-height），折行后行高自适应测量，不会裁切。表头单行不动。 */
+.v2-table-wrapper .el-table-v2__cell-text {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 描述列表桌面端与既有移动端补丁（mobile-content.css）同口径折行 */
+.el-descriptions__cell {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* ---- 版面密度小幅收敛（默认 20px/18px/16px/32px） ---- */
+.el-card {
+  --el-card-padding: 14px;
+}
+
+.el-form-item {
+  margin-bottom: 14px;
+}
+
+/* 行内筛选表单的横向间距是筛选行拥挤的主因，32px 收敛到 16px */
+.el-form--inline .el-form-item {
+  margin-right: 16px;
+}
+
+.el-dialog {
+  --el-dialog-padding-primary: 12px;
+}
