@@ -92,12 +92,21 @@ async function seedWarehouseAndPositions(
     });
     const locationId = Number(location.data?.id);
     expect(locationId, `[585] 库位 ${position} 创建须回合法 id`).toBeGreaterThan(0);
-    deferCleanup(cleanup, 'DELETE', `/warehouses/locations/${locationId}`, `585 location ${position}`);
+    deferCleanup(
+      cleanup,
+      'DELETE',
+      `/warehouses/locations/${locationId}`,
+      `585 location ${position}`
+    );
   }
   return { id: warehouseId, code };
 }
 
-async function seedProduct(page: Page, cleanup: DeferredCleanup[], productCode: string): Promise<number> {
+async function seedProduct(
+  page: Page,
+  cleanup: DeferredCleanup[],
+  productCode: string
+): Promise<number> {
   const product = await apiCall<{ id?: number }>(page, 'POST', '/products', {
     code: productCode,
     name: genName('E585成品布'),
@@ -331,10 +340,9 @@ test('585-03 未登记库位与无外部色号对照在定位腿拒绝且不落�
     expect(missingPosition.code, '[585-03] 库位定位失败属业务拒绝').toBe(
       APP_ERROR_CODES.BUSINESS_ERROR
     );
-    expect(
-      String(missingPosition.message ?? ''),
-      '[585-03] 文案须点名库位档案缺失'
-    ).toContain('在库位档案里没有登记');
+    expect(String(missingPosition.message ?? ''), '[585-03] 文案须点名库位档案缺失').toContain(
+      '在库位档案里没有登记'
+    );
 
     // 库位合法但产品没有任何 SKU 对照 → resolve_internal_color 的 NoColorMapping 分支：
     const noMapping = await apiCallExpectFail(page, 'POST', '/scanner/scan-receipt', {
