@@ -227,3 +227,6 @@ pub mod sample_dispatch;
 pub mod bulk_color_delta_e_level;
 // 验布修边实测列域：fabric_inspection_record 补 edge_trim_length/edge_trim_weight，链尾独立域。
 pub mod fabric_inspection_edge_trim;
+// 质量标准允差配置域：quality_standards 补允差来源/检测方法与三项允差列，链尾独立域
+// （存量复用库上属 pending 必然执行）。
+pub mod quality_standard_tolerance;

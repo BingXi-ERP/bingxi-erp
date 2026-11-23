@@ -15,7 +15,9 @@ use axum::{
     extract::{Path, Query, State},
 };
 use chrono::NaiveDate;
+use rust_decimal::Decimal;
 use serde::Deserialize;
+use serde::Deserializer;
 use std::sync::Arc;
 use tracing::info;
 
@@ -44,6 +46,16 @@ pub struct CreateQualityStandardRequest {
     pub version: Option<String>,
     /// 标准内容
     pub content: Option<String>,
+    /// 允差来源：product_standard（产品标准）/ order_agreement（订单约定）/ confirmed_sample（确认样）
+    pub tolerance_source: Option<String>,
+    /// 允差检测方法依据（ISO/GB 方法号）
+    pub detection_method: Option<String>,
+    /// 色差允差 ΔE
+    pub delta_e_tolerance: Option<Decimal>,
+    /// 克重允差（g/m²）
+    pub weight_tolerance: Option<Decimal>,
+    /// 门幅允差（cm）
+    pub width_tolerance: Option<Decimal>,
     /// 生效日期，格式：YYYY-MM-DD
     pub effective_date: Option<String>,
     /// 失效日期，格式：YYYY-MM-DD（可选）
@@ -53,6 +65,10 @@ pub struct CreateQualityStandardRequest {
 }
 
 /// 更新质量标准请求 DTO
+///
+/// 允差五键走三态：键缺席=保持原值、显式 null=清空、有值=覆盖。
+/// serde_json 对 `Option<Option<T>>` 的默认反序列化会把显式 null 折叠成外层 None，
+/// 必须挂 double_option（范式同 aging_alert_rule_handler）。
 #[allow(dead_code, reason = "反序列化输入字段")]
 #[derive(Debug, Deserialize)]
 pub struct UpdateQualityStandardRequest {
@@ -64,8 +80,26 @@ pub struct UpdateQualityStandardRequest {
     pub content: Option<String>,
     /// 状态：draft, approved, published, rejected
     pub status: Option<String>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub tolerance_source: Option<Option<String>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub detection_method: Option<Option<String>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub delta_e_tolerance: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub weight_tolerance: Option<Option<Decimal>>,
+    #[serde(default, deserialize_with = "double_option")]
+    pub width_tolerance: Option<Option<Decimal>>,
     /// 备注
     pub remark: Option<String>,
+}
+
+fn double_option<'de, T, D>(de: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Deserialize::deserialize(de).map(Some)
 }
 
 /// 创建版本历史请求 DTO
@@ -157,6 +191,11 @@ pub async fn create_standard(
                 standard_type: req.standard_type,
                 version: req.version,
                 content: req.content,
+                tolerance_source: req.tolerance_source,
+                detection_method: req.detection_method,
+                delta_e_tolerance: req.delta_e_tolerance,
+                weight_tolerance: req.weight_tolerance,
+                width_tolerance: req.width_tolerance,
                 effective_date: req
                     .effective_date
                     .and_then(|d| NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok()),
@@ -192,6 +231,11 @@ pub async fn update_standard(
                 standard_type: req.standard_type,
                 content: req.content,
                 status: req.status,
+                tolerance_source: req.tolerance_source,
+                detection_method: req.detection_method,
+                delta_e_tolerance: req.delta_e_tolerance,
+                weight_tolerance: req.weight_tolerance,
+                width_tolerance: req.width_tolerance,
                 remark: req.remark,
             },
             auth.user_id,
