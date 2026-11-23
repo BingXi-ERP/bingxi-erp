@@ -65,8 +65,9 @@ test.describe('4.37 坯布入库双单位一致性门', () => {
     expect(warehouseId, '前置须有仓库用于入库').toBeTruthy();
 
     const tag = genCode('E437');
-    // 建档只给克重与幅宽，不给米数/公斤数：建档腿因缺一项跳过双单位校验（:282-290），
-    // 让本用例独占入库腿的判定，不与建档腿混淆。
+    // 建档给克重与幅宽，米数/公斤数按 0 基线建档（0 米 0 公斤双单位自洽，建档腿放行），
+    // 让本用例独占入库腿的判定，不与建档腿混淆；基线必须落 0 而非省略成 NULL——
+    // 回读用 num() 读取，null 会被真实性门拒掉，不能兜成 0。
     const created = await apiCall<Row>(page, 'POST', '/production/greige-fabrics', {
       fabric_no: `${tag}-GF`,
       fabric_name: `${tag}双单位坯布`,
@@ -78,6 +79,8 @@ test.describe('4.37 坯布入库双单位一致性门', () => {
       dye_lot_no: `${tag}-LOT`,
       gram_weight: 200,
       width_cm: 160,
+      length_m: 0,
+      weight_kg: 0,
     });
     const id = created.data?.id;
     expect(id, `坯布建档须返回主键，实际 ${JSON.stringify(created).slice(0, 300)}`).toBeTruthy();

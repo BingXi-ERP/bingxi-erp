@@ -7,7 +7,15 @@
 // 与既有用例分工：71 只测无折扣行 qty×price 聚合、91 期望值从行动态推导、507 只读表头总额、
 //   454 是报价行舍入（不同单据）；本例专补销售订单行带折扣带税的四金额固定期望零覆盖点。
 import { test, expect, type Page } from '../diagnose-fixture';
-import { apiCall, apiCallRaw, genCode, getCtx, loginViaUI, tryCleanup } from '../flow/helpers';
+import {
+  apiCall,
+  apiCallRaw,
+  ensureTestEntities,
+  genCode,
+  getCtx,
+  loginViaUI,
+  tryCleanup,
+} from '../flow/helpers';
 
 const CLEANUP: Array<{ path: string; label: string }> = [];
 test.afterEach(async ({ page }) => {
@@ -54,6 +62,9 @@ async function seedCustomer(page: Page): Promise<number> {
 test.describe('4.16 销售订单行金额舍入', () => {
   test('477-01 折扣税逐步 round_dp(2)，行四金额固定期望且表头=逐行之和', async ({ page }) => {
     await loginViaUI(page);
+    // ctx.productIds 由共享前置产出：不跑 ensureTestEntities 就读 ctx 是 undefined，
+    // 前置断言会以 matcher 错误（received undefined）爆掉而非真实业务断言。
+    await ensureTestEntities(page);
     const customerId = await seedCustomer(page);
     const productId = getCtx().productIds[0];
     expect(productId, '[477] 前置：ctx.productIds[0] 未就绪').toBeGreaterThan(0);
