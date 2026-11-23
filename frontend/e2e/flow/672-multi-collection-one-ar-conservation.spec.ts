@@ -81,7 +81,7 @@ async function collect(
   paymentDate: string,
   label: string
 ): Promise<number> {
-  const res = await apiCall<{ data?: { id?: number } }>(page, 'POST', '/ar/payments', {
+  const res = await apiCall<{ id?: number }>(page, 'POST', '/ar/payments', {
     customer_id: customerId,
     amount,
     payment_method: '银行转账',
