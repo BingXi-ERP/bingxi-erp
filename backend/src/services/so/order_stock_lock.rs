@@ -1,4 +1,4 @@
-//! 现货订单提交锁缸 ledger（#78 功能补齐）。
+//! 现货订单提交锁缸 ledger。
 //!
 //! 唯一口径：只有 `sales_order_item.fulfillment_source = stock` 的明细在 submit 时锁缸；
 //! production / purchase 行不参与（避免大面积影响既有 E2E 与生产/采购链）。
@@ -6,7 +6,7 @@
 //! 与订单提交/改量/作废在同一事务内，带 `version` 乐观锁；库存不足整单拒绝（事务回滚）。
 //!
 //! 恢复依据复用 `inventory_reservations` 行作为 ledger：status ∈ {pending, locked} 且
-//! `notes` 以 `SO78|` 开头（JSON 记 `{stock_id,item_id}`）。`POST /inventory/reservations`
+//! `notes` 以 `STOCKLOCK|` 开头（JSON 记 `{stock_id,item_id}`）。`POST /inventory/reservations`
 //! 原有行为不变（只插行不写库存量），本模块只在订单工作流内动库存三列，互不串扰。
 //! ledger 行随主单硬删除由 order_crud 的既有清理删除，软删除/取消释放后转 released。
 //!
@@ -29,7 +29,7 @@ use crate::models::status::sales::fulfillment_source;
 use crate::models::{inventory_reservation, inventory_stock, sales_order_item};
 use crate::utils::error::AppError;
 
-const LEDGER_PREFIX: &str = "SO78|";
+const LEDGER_PREFIX: &str = "STOCKLOCK|";
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct LedgerMeta {

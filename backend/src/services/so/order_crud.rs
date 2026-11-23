@@ -525,7 +525,7 @@ impl SalesService {
 
         // 检查订单状态
         Self::validate_order_status_for_update(&order)?;
-        // #78 改量差量同步的态判定：草稿未 submit 不锁；PENDING 及以后已锁需重建。
+        // 改量差量同步的态判定：草稿未 submit 不锁；PENDING 及以后已锁需重建。
         // order 在下方 apply_order_header_updates 中被消费，故先取值。
         let was_submitted_for_stock_lock = order.status != so_status::DRAFT;
 
@@ -536,7 +536,7 @@ impl SalesService {
         if let Some(items) = request.items {
             self.replace_order_items_and_update_totals(order_id, items, user_id, &txn)
                 .await?;
-            // #78：回退旧锁→按新 stock 明细重锁，同事务；净效果为数量差量。
+            // 回退旧锁→按新 stock 明细重锁，同事务；净效果为数量差量。
             crate::services::so::order_stock_lock::sync_on_items_replaced(
                 &txn,
                 order_id,
@@ -764,7 +764,7 @@ impl SalesService {
             ));
         }
 
-        // #78 硬删除前先回缸：与既有预留行清理、主表删除同事务，避免遗留可用/预留虚占；
+        // 硬删除前先回缸：与既有预留行清理、主表删除同事务，避免遗留可用/预留虚占；
         // 库存行已不存在时容忍（仅删单路径）。
         crate::services::so::order_stock_lock::release_on_delete(&txn, order_id).await?;
 
