@@ -1,7 +1,7 @@
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use crate::models::dto::bpm_dto::{
-    ApproveTaskRequest, CancelInstanceRequest, StartProcessRequest, TaskQuery,
+    AddSignRequest, ApproveTaskRequest, CancelInstanceRequest, StartProcessRequest, TaskQuery,
 };
 use crate::models::status::bpm_task as task_status;
 use crate::services::bpm_service::BpmService;
@@ -50,6 +50,18 @@ pub async fn approve_task(
     Ok(Json(ApiResponse::success(
         "Task processed successfully".to_string(),
     )))
+}
+
+/// 加签：对 pending 审批工单追加处理人并留痕；动作词表不变。
+#[allow(dead_code, reason = "反序列化输入字段")]
+pub async fn add_sign(
+    State(state): State<AppState>,
+    auth: AuthContext,
+    Json(req): Json<AddSignRequest>,
+) -> Result<Json<ApiResponse<String>>, AppError> {
+    let service = BpmService::new(state.db.clone());
+    service.add_sign_task(req, Some(auth.user_id)).await?;
+    Ok(Json(ApiResponse::success("Add sign completed".to_string())))
 }
 
 /// 撤回流程实例（批次 157d-3 新增）

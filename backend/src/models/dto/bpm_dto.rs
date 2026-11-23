@@ -79,6 +79,15 @@ pub struct StartProcessResponse {
     pub task_ids: Vec<i32>,
 }
 
+/// 加签请求：对 pending 工单追加处理人 ID 并留痕。
+/// 独立端点，不进入 approve 动作词表（delegate/transfer 仍为非法 action）。
+#[derive(Debug, Deserialize, Serialize)]
+pub struct AddSignRequest {
+    pub task_id: i32,
+    pub add_assignee_ids: Vec<i32>,
+    pub reason: Option<String>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ApproveTaskRequest {
     pub task_id: i32,

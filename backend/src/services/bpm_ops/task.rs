@@ -21,10 +21,11 @@ use sea_orm::{
     TransactionTrait,
 };
 
-use crate::models::dto::bpm_dto::{ApproveTaskRequest, TaskQuery};
+use crate::models::dto::bpm_dto::{AddSignRequest, ApproveTaskRequest, TaskQuery};
 use crate::models::status::bpm_instance as instance_status;
 use crate::models::status::bpm_task as task_status;
 use crate::models::{bpm_process_definition, bpm_process_instance, bpm_task};
+use crate::services::bpm_ops::sign_mode::{self, node_assignee_ids, node_sign_mode};
 use crate::services::bpm_service::{BpmService, evaluate_bpm_condition};
 use crate::utils::error::AppError;
 use crate::utils::response::PaginatedResponse;
@@ -69,11 +70,6 @@ impl BpmService {
         validate_approve_action(&req.action)?;
 
         let txn = self.db.begin().await?;
-        // P0 5-3 修复：事务内仅收集待发事件，commit 成功后再 publish，避免 commit 失败产生幻事件
-        let mut pending_event: Option<crate::services::event_bus::BusinessEvent> = None;
-        // 本次审批推进新产生的工单 id：commit 成功后才通知新处理人（未提交就通知会发幽灵待办）
-        let mut advanced_task_ids: Vec<i32> = vec![];
-
         // 审批处理人必须取「已认证操作人」，禁止信任前端传入的 req.handler_id / req.handler_name
         // （否则代审/伪造会污染 actual_handler_* 与审计追溯）。`user_id` 由 handler 层从
         // AuthContext 透传真实登录用户；无身份即报未授权，绝不兜底成 0/系统。
@@ -84,17 +80,155 @@ impl BpmService {
         let actor_name = self.resolve_actor_name(&txn, actor_id).await?;
 
         let ctx = self.load_approve_context(&req, &txn).await?;
-        self.update_task_status(&req, &ctx.task, actor_id, &actor_name, &txn)
-            .await?;
+        let mode = sign_mode::node_sign_mode(ctx.definition.config.as_ref(), &ctx.task.node_id)?;
+        if mode == sign_mode::SINGLE {
+            return self
+                .approve_single(&req, &ctx, actor_id, &actor_name, &txn)
+                .await;
+        }
+        self.approve_multi(&req, &ctx, &mode, actor_id, &actor_name, &txn)
+            .await
+    }
 
+    /// 默认单人：完全保持历史路径（状态写入 → 拒绝终止 / 同意推进）。
+    async fn approve_single(
+        &self,
+        req: &ApproveTaskRequest,
+        ctx: &ApproveContext,
+        actor_id: i32,
+        actor_name: &str,
+        txn: &sea_orm::DatabaseTransaction,
+    ) -> Result<(), AppError> {
+        self.update_task_status(req, &ctx.task, actor_id, actor_name, txn)
+            .await?;
+        let mut pending_event = None;
+        let mut advanced_task_ids = Vec::new();
         if req.action == REJECT_ACTION {
-            self.handle_task_reject(&ctx.instance, Some(actor_id), &txn, &mut pending_event)
+            self.handle_task_reject(&ctx.instance, Some(actor_id), txn, &mut pending_event)
                 .await?;
         } else {
             self.handle_task_approve(
-                &ctx,
+                ctx,
                 Some(actor_id),
-                &txn,
+                txn,
+                &mut pending_event,
+                &mut advanced_task_ids,
+            )
+            .await?;
+        }
+        txn.commit().await?;
+        if let Some(ev) = pending_event {
+            crate::services::event_bus::EVENT_BUS.publish(ev);
+        }
+        for task_id in advanced_task_ids {
+            self.notify_created_task(task_id, &ctx.instance).await;
+        }
+        Ok(())
+    }
+
+    /// 多人签署（会签/或签）：处理人只能签自己那枚工单；签名写 task_variables 并审计。
+    async fn approve_multi(
+        &self,
+        req: &ApproveTaskRequest,
+        ctx: &ApproveContext,
+        mode: &str,
+        actor_id: i32,
+        actor_name: &str,
+        txn: &sea_orm::DatabaseTransaction,
+    ) -> Result<(), AppError> {
+        if ctx.task.actual_handler_id != Some(actor_id) {
+            return Err(AppError::business_displayable(
+                "该工单不是分配给当前操作人的签署任务，不能代为签署",
+            ));
+        }
+        let (variables, fresh) = sign_mode::append_signature(
+            ctx.task.task_variables.as_ref(),
+            actor_id,
+            actor_name,
+            &req.action,
+            req.approval_opinion.as_deref(),
+        );
+        if !fresh {
+            return Err(AppError::business_displayable(
+                "当前操作人已对该工单做过同样签署，不能重复审批",
+            ));
+        }
+        let status = if req.action == REJECT_ACTION {
+            task_status::REJECTED
+        } else {
+            task_status::COMPLETED
+        };
+        self.update_multi_task(&ctx.task, actor_id, actor_name, status, variables, txn)
+            .await?;
+
+        let siblings = self
+            .node_tasks(txn, ctx.instance.id, &ctx.task.node_id)
+            .await?;
+        let assignees = ctx.task.assignee_ids.clone().unwrap_or_default();
+        let mut pending_event = None;
+        let mut advanced_task_ids = Vec::new();
+
+        if req.action == REJECT_ACTION {
+            if mode == sign_mode::COUNTERSIGN {
+                // 会签口径：任一驳回立即终止整单。
+                self.handle_task_reject(&ctx.instance, Some(actor_id), txn, &mut pending_event)
+                    .await?;
+            } else {
+                // 或签口径：单人驳回只留痕，全部驳回才终止整单。
+                let rejected = sign_mode::signed_user_ids(
+                    siblings.iter().map(|t| t.task_variables.clone()),
+                    REJECT_ACTION,
+                );
+                if !assignees.is_empty() && assignees.iter().all(|id| rejected.contains(id)) {
+                    self.handle_task_reject(&ctx.instance, Some(actor_id), txn, &mut pending_event)
+                        .await?;
+                }
+            }
+        } else if mode == sign_mode::COUNTERSIGN {
+            let approved = sign_mode::signed_user_ids(
+                siblings.iter().map(|t| t.task_variables.clone()),
+                APPROVE_ACTION,
+            );
+            if !assignees.is_empty() && assignees.iter().all(|id| approved.contains(id)) {
+                self.handle_task_approve(
+                    ctx,
+                    Some(actor_id),
+                    txn,
+                    &mut pending_event,
+                    &mut advanced_task_ids,
+                )
+                .await?;
+            }
+        } else {
+            // 或签：第一位通过即推进，其余同节点待办置 completed 并留痕。
+            for sibling in &siblings {
+                if sibling.id == ctx.task.id
+                    || sibling.status.as_deref() != Some(task_status::PENDING)
+                {
+                    continue;
+                }
+                let vars = sign_mode::append_signature(
+                    sibling.task_variables.as_ref(),
+                    actor_id,
+                    actor_name,
+                    "orsign_skipped",
+                    Some("或签：同节点已有处理人通过"),
+                )
+                .0;
+                self.update_multi_task(
+                    sibling,
+                    actor_id,
+                    actor_name,
+                    task_status::COMPLETED,
+                    vars,
+                    txn,
+                )
+                .await?;
+            }
+            self.handle_task_approve(
+                ctx,
+                Some(actor_id),
+                txn,
                 &mut pending_event,
                 &mut advanced_task_ids,
             )
@@ -102,25 +236,62 @@ impl BpmService {
         }
 
         txn.commit().await?;
-
-        // P0 5-3 修复：commit 成功后发布 BPM 流程结束事件
         if let Some(ev) = pending_event {
             crate::services::event_bus::EVENT_BUS.publish(ev);
         }
-
-        // 推进出的下一节点工单：通知其处理人，审批链不再靠人工翻列表接力
-        for task_id in advanced_task_ids {
-            if let Ok(Some(task)) = bpm_task::Entity::find_by_id(task_id).one(&*self.db).await {
-                super::notify_task_pending(
-                    &self.db,
-                    &task,
-                    &ctx.instance,
-                    "上一节点已通过，待您处理",
-                )
-                .await;
-            }
+        for id in advanced_task_ids {
+            self.notify_created_task(id, &ctx.instance).await;
         }
         Ok(())
+    }
+
+    /// 新推进工单的登录后通知（commit 后），按真实工单行发送。
+    async fn notify_created_task(&self, task_id: i32, instance: &bpm_process_instance::Model) {
+        if let Ok(Some(task)) = bpm_task::Entity::find_by_id(task_id).one(&*self.db).await {
+            super::notify_task_pending(&self.db, &task, instance, "新工单已生成").await;
+        }
+    }
+
+    /// 统一写签名任务状态＋task_variables，并同步写真实操作人审计。
+    async fn update_multi_task(
+        &self,
+        task: &bpm_task::Model,
+        actor_id: i32,
+        actor_name: &str,
+        status: &str,
+        variables: serde_json::Value,
+        txn: &sea_orm::DatabaseTransaction,
+    ) -> Result<(), AppError> {
+        let mut active: bpm_task::ActiveModel = task.clone().into();
+        active.status = Set(Some(status.to_string()));
+        active.actual_handler_id = Set(Some(actor_id));
+        active.actual_handler_name = Set(Some(actor_name.to_string()));
+        active.task_variables = Set(Some(variables));
+        active.handled_at = Set(Some(chrono::Utc::now()));
+        active.updated_at = Set(Some(chrono::Utc::now()));
+        crate::services::audit_log_service::AuditLogService::update_with_audit(
+            txn,
+            "bpm_task",
+            active,
+            Some(actor_id),
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// 同实例同节点全部工单（会签统计签名集合、或签收敛其余待办）。
+    async fn node_tasks(
+        &self,
+        txn: &sea_orm::DatabaseTransaction,
+        instance_id: i32,
+        node_id: &str,
+    ) -> Result<Vec<bpm_task::Model>, AppError> {
+        bpm_task::Entity::find()
+            .filter(bpm_task::Column::InstanceId.eq(instance_id))
+            .filter(bpm_task::Column::NodeId.eq(node_id))
+            .all(txn)
+            .await
+            .map_err(AppError::from)
     }
 
     /// 加载审批上下文：锁定 task + 校验 pending + 加载 instance/definition
@@ -391,41 +562,83 @@ impl BpmService {
         txn: &sea_orm::DatabaseTransaction,
         advanced_task_ids: &mut Vec<i32>,
     ) -> Result<(), AppError> {
-        let new_task = bpm_task::ActiveModel {
-            instance_id: Set(ctx.instance.id),
-            process_definition_id: Set(ctx.definition.id),
-            // P1 3-6 修复（批次 60）：改用 DocumentNumberGenerator 保证并发唯一性
-            task_no: Set(
-                crate::utils::number_generator::DocumentNumberGenerator::generate_no_with_txn(
-                    txn,
-                    "TSK",
-                    bpm_task::Entity,
-                    bpm_task::Column::TaskNo,
-                )
-                .await?,
-            ),
-            node_id: Set(next_node
-                .get("id")
-                .and_then(|i| i.as_str())
-                .unwrap_or("unknown")
-                .to_string()),
-            node_name: Set(next_node
-                .get("name")
-                .and_then(|n| n.as_str())
-                .unwrap_or("Task")
-                .to_string()),
-            node_type: Set("user_task".to_string()),
-            task_type: Set(Some("user_task".to_string())),
-            actual_handler_id: Set(
-                super::resolve_node_assignee(next_node, &ctx.instance, txn).await?
-            ),
-            status: Set(Some(task_status::PENDING.to_string())),
-            created_at: Set(Some(chrono::Utc::now())),
-            updated_at: Set(Some(chrono::Utc::now())),
-            ..Default::default()
+        let node_id = next_node
+            .get("id")
+            .and_then(|i| i.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        let mode = node_sign_mode(ctx.definition.config.as_ref(), &node_id)?;
+        let multi_ids = if mode == sign_mode::SINGLE {
+            Vec::new()
+        } else {
+            node_assignee_ids(next_node)?
         };
-        let created = new_task.insert(txn).await?;
-        advanced_task_ids.push(created.id);
+        let single_assignee = super::resolve_node_assignee(next_node, &ctx.instance, txn).await?;
+        let multi_assignees = if multi_ids.is_empty() {
+            Vec::new()
+        } else {
+            sign_mode::resolve_assignees(txn, &multi_ids).await?
+        };
+
+        // 会签/或签节点每位处理人各建一枚工单；单人节点保持原有行为
+        let assignees: Vec<(Option<i32>, Option<String>, serde_json::Value)> =
+            if let Some(first) = multi_assignees.first() {
+                multi_assignees
+                    .iter()
+                    .map(|(id, name)| {
+                        (
+                            Some(*id),
+                            Some(name.clone()),
+                            sign_mode::init_variables(&mode),
+                        )
+                    })
+                    .collect()
+            } else {
+                let _ = first;
+                vec![(single_assignee, None, serde_json::Value::Null)]
+            };
+        for (handler_id, handler_name, variables) in assignees {
+            let new_task = bpm_task::ActiveModel {
+                instance_id: Set(ctx.instance.id),
+                process_definition_id: Set(ctx.definition.id),
+                // P1 3-6 修复（批次 60）：改用 DocumentNumberGenerator 保证并发唯一性
+                task_no: Set(
+                    crate::utils::number_generator::DocumentNumberGenerator::generate_no_with_txn(
+                        txn,
+                        "TSK",
+                        bpm_task::Entity,
+                        bpm_task::Column::TaskNo,
+                    )
+                    .await?,
+                ),
+                node_id: Set(node_id.clone()),
+                node_name: Set(next_node
+                    .get("name")
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("Task")
+                    .to_string()),
+                node_type: Set("user_task".to_string()),
+                task_type: Set(Some("user_task".to_string())),
+                actual_handler_id: Set(handler_id),
+                assignee_ids: Set(if multi_ids.is_empty() {
+                    None
+                } else {
+                    Some(multi_ids.clone())
+                }),
+                assignee_names: Set(handler_name),
+                task_variables: Set(if variables.is_null() {
+                    None
+                } else {
+                    Some(variables)
+                }),
+                status: Set(Some(task_status::PENDING.to_string())),
+                created_at: Set(Some(chrono::Utc::now())),
+                updated_at: Set(Some(chrono::Utc::now())),
+                ..Default::default()
+            };
+            let created = new_task.insert(txn).await?;
+            advanced_task_ids.push(created.id);
+        }
         Ok(())
     }
 
@@ -491,6 +704,135 @@ impl BpmService {
         let items = paginator.fetch_page(page.saturating_sub(1)).await?;
 
         Ok(PaginatedResponse::new(items, total, page, page_size))
+    }
+
+    /// 加签：仅 pending 工单可加；新增处理人逐个建同节点可见工单，
+    /// 全部同节点工单的 assignee_ids 同步并追记 add_signs；同事务 + 审计。
+    pub async fn add_sign_task(
+        &self,
+        req: AddSignRequest,
+        user_id: Option<i32>,
+    ) -> Result<(), AppError> {
+        let actor_id = user_id
+            .ok_or_else(|| AppError::unauthorized("加签缺少已认证操作人身份，无法记录加签人"))?;
+        let txn = self.db.begin().await?;
+        let task = bpm_task::Entity::find_by_id(req.task_id)
+            .lock_exclusive()
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::not_found("待加签工单不存在"))?;
+        if task.status.as_deref() != Some(task_status::PENDING) {
+            return Err(AppError::business_displayable(
+                "只有待处理工单可以加签，已完成或已拒绝的工单不可加签",
+            ));
+        }
+        let mode = sign_mode::node_sign_mode(
+            self.definition_config(task.process_definition_id, &txn)
+                .await?
+                .as_ref(),
+            &task.node_id,
+        )?;
+        if mode == sign_mode::SINGLE {
+            return Err(AppError::business_displayable(
+                "单人审批工单不支持加签，请先将节点配置为会签或或签",
+            ));
+        }
+        let actor_name = self.resolve_actor_name(&txn, actor_id).await?;
+        let existing = task.assignee_ids.clone().unwrap_or_default();
+        if !existing.contains(&actor_id) {
+            return Err(AppError::business_displayable(
+                "只有当前工单的处理人可以加签",
+            ));
+        }
+        let merged = sign_mode::merge_assignees(&existing, &req.add_assignee_ids);
+        let fresh: Vec<i32> = merged
+            .iter()
+            .copied()
+            .filter(|id| !existing.contains(id))
+            .collect();
+        if fresh.is_empty() {
+            return Err(AppError::business_displayable(
+                "加签用户已在当前处理人清单中，没有新增处理人",
+            ));
+        }
+        let resolved = sign_mode::resolve_assignees(&txn, &fresh).await?;
+        let trace = sign_mode::append_add_sign(
+            task.task_variables.as_ref(),
+            actor_id,
+            &actor_name,
+            &fresh,
+            req.reason.as_deref(),
+        );
+
+        // 所有同节点工单同步处理人全集与加签轨迹；新处理人各建一枚 pending 可见工单。
+        let siblings = self
+            .node_tasks(&txn, task.instance_id, &task.node_id)
+            .await?;
+        for sibling in &siblings {
+            let mut active: bpm_task::ActiveModel = sibling.clone().into();
+            active.assignee_ids = Set(Some(merged.clone()));
+            active.task_variables = Set(Some(trace.clone()));
+            active.updated_at = Set(Some(chrono::Utc::now()));
+            crate::services::audit_log_service::AuditLogService::update_with_audit(
+                &txn,
+                "bpm_task",
+                active,
+                Some(actor_id),
+            )
+            .await?;
+        }
+        for (new_id, name) in resolved {
+            let active = bpm_task::ActiveModel {
+                instance_id: Set(task.instance_id),
+                process_definition_id: Set(task.process_definition_id),
+                task_no: Set(
+                    crate::utils::number_generator::DocumentNumberGenerator::generate_no_with_txn(
+                        &txn,
+                        "TSK",
+                        bpm_task::Entity,
+                        bpm_task::Column::TaskNo,
+                    )
+                    .await?,
+                ),
+                node_id: Set(task.node_id.clone()),
+                node_name: Set(task.node_name.clone()),
+                node_type: Set(task.node_type.clone()),
+                task_type: Set(task.task_type.clone()),
+                actual_handler_id: Set(Some(new_id)),
+                assignee_ids: Set(Some(merged.clone())),
+                assignee_names: Set(Some(name)),
+                task_variables: Set(Some(trace.clone())),
+                status: Set(Some(task_status::PENDING.to_string())),
+                created_at: Set(Some(chrono::Utc::now())),
+                updated_at: Set(Some(chrono::Utc::now())),
+                ..Default::default()
+            };
+            let created = active.insert(&txn).await?;
+            super::notify_task_pending(
+                &self.db,
+                &created,
+                &bpm_process_instance::Entity::find_by_id(task.instance_id)
+                    .one(&txn)
+                    .await?
+                    .ok_or_else(|| AppError::not_found("流程实例不存在"))?,
+                "加签产生新待办",
+            )
+            .await;
+        }
+        txn.commit().await?;
+        Ok(())
+    }
+
+    /// 审批节点模式解析所需的定义配置读回。
+    async fn definition_config(
+        &self,
+        definition_id: i32,
+        txn: &sea_orm::DatabaseTransaction,
+    ) -> Result<Option<serde_json::Value>, AppError> {
+        Ok(bpm_process_definition::Entity::find_by_id(definition_id)
+            .one(txn)
+            .await?
+            .and_then(|d| d.config))
     }
 
     /// 转办任务

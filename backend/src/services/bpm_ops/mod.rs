@@ -12,6 +12,7 @@
 
 pub mod instance;
 pub mod monitor;
+pub mod sign_mode;
 pub mod task;
 
 use sea_orm::{ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter};

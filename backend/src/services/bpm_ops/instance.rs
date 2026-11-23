@@ -23,6 +23,7 @@ use crate::models::dto::bpm_dto::{StartProcessRequest, StartProcessResponse};
 use crate::models::status::bpm_instance as instance_status;
 use crate::models::status::bpm_task as task_status;
 use crate::models::{bpm_process_definition, bpm_process_instance, bpm_task};
+use crate::services::bpm_ops::sign_mode::{self, node_assignee_ids, node_sign_mode};
 use crate::services::bpm_ops::{ApplicantDept, applicant_department};
 use crate::services::bpm_service::BpmService;
 use crate::services::bpm_service::evaluate_bpm_condition;
@@ -47,7 +48,7 @@ impl BpmService {
         txn: &sea_orm::DatabaseTransaction,
         definition: &bpm_process_definition::Model,
         instance: &bpm_process_instance::Model,
-    ) -> Result<bpm_task::Model, AppError> {
+    ) -> Result<Vec<bpm_task::Model>, AppError> {
         let flow_def = definition.config.as_ref().ok_or_else(|| {
             AppError::validation_displayable(format!(
                 "流程定义 {} 未配置审批节点，无法发起审批，请先在流程定义中配置节点与审批人",
@@ -98,6 +99,13 @@ impl BpmService {
             )));
         }
 
+        // 签署模式从流程定义节点配置读取（顶层 node_modes）；多人节点每位处理人各一枚工单。
+        let node_id = first_task_node
+            .get("id")
+            .and_then(|i| i.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+
         // 审批人解析失败属定义配置缺陷：拒绝发起、事务回滚，绝不建无人可审的孤儿工单。
         let assignee_id = super::resolve_node_assignee(first_task_node, instance, txn).await?;
 
@@ -110,39 +118,78 @@ impl BpmService {
             &instance.variables,
         )?;
 
-        // 创建首个用户任务。审批人必须解析得出，否则工单落库后在按人过滤的待办里永不可见。
-        let task_model = bpm_task::ActiveModel {
-            instance_id: Set(instance.id),
-            process_definition_id: Set(definition.id),
-            // 任务号在同一事务内向取号器申请，保证并发下唯一
-            task_no: Set(
-                crate::utils::number_generator::DocumentNumberGenerator::generate_no_with_txn(
-                    txn,
-                    "TSK",
-                    bpm_task::Entity,
-                    bpm_task::Column::TaskNo,
-                )
-                .await?,
-            ),
-            node_id: Set(first_task_node
-                .get("id")
-                .and_then(|i| i.as_str())
-                .unwrap_or("unknown")
-                .to_string()),
-            node_name: Set(first_task_node
-                .get("name")
-                .and_then(|n| n.as_str())
-                .unwrap_or("Task")
-                .to_string()),
-            node_type: Set("user_task".to_string()),
-            task_type: Set(Some("user_task".to_string())),
-            actual_handler_id: Set(assignee_id),
-            status: Set(Some(task_status::PENDING.to_string())),
-            created_at: Set(Some(chrono::Utc::now())),
-            updated_at: Set(Some(chrono::Utc::now())),
-            ..Default::default()
+        let mode = node_sign_mode(definition.config.as_ref(), &node_id)?;
+        let multi_ids = if mode == sign_mode::SINGLE {
+            Vec::new()
+        } else {
+            node_assignee_ids(first_task_node)?
         };
-        Ok(task_model.insert(txn).await?)
+        let multi_assignees = if multi_ids.is_empty() {
+            Vec::new()
+        } else {
+            sign_mode::resolve_assignees(txn, &multi_ids).await?
+        };
+
+        // 创建首个用户任务：单人走原解析；会签/或签每位处理人各一枚同节点工单，
+        // 工单实际处理人逐人落列，待办按人过滤时每人都可见（判定口径 F:/tmp 拍板书）。
+        let mut created = Vec::new();
+        let assignees: Vec<(Option<i32>, Option<String>, serde_json::Value)> =
+            if let Some(assignees) = multi_assignees.first() {
+                multi_assignees
+                    .iter()
+                    .map(|(id, name)| {
+                        (
+                            Some(*id),
+                            Some(name.clone()),
+                            sign_mode::init_variables(&mode),
+                        )
+                    })
+                    .collect()
+            } else {
+                vec![(assignee_id, None, serde_json::Value::Null)]
+            };
+        for (handler_id, handler_name, variables) in assignees {
+            let task_model = bpm_task::ActiveModel {
+                instance_id: Set(instance.id),
+                process_definition_id: Set(definition.id),
+                // 任务号在同一事务内向取号器申请，保证并发下唯一
+                task_no: Set(
+                    crate::utils::number_generator::DocumentNumberGenerator::generate_no_with_txn(
+                        txn,
+                        "TSK",
+                        bpm_task::Entity,
+                        bpm_task::Column::TaskNo,
+                    )
+                    .await?,
+                ),
+                node_id: Set(node_id.clone()),
+                node_name: Set(first_task_node
+                    .get("name")
+                    .and_then(|n| n.as_str())
+                    .unwrap_or("Task")
+                    .to_string()),
+                node_type: Set("user_task".to_string()),
+                task_type: Set(Some("user_task".to_string())),
+                actual_handler_id: Set(handler_id),
+                assignee_ids: Set(if multi_ids.is_empty() {
+                    None
+                } else {
+                    Some(multi_ids.clone())
+                }),
+                assignee_names: Set(handler_name),
+                task_variables: Set(if variables.is_null() {
+                    None
+                } else {
+                    Some(variables)
+                }),
+                status: Set(Some(task_status::PENDING.to_string())),
+                created_at: Set(Some(chrono::Utc::now())),
+                updated_at: Set(Some(chrono::Utc::now())),
+                ..Default::default()
+            };
+            created.push(task_model.insert(txn).await?);
+        }
+        Ok(created)
     }
 
     pub async fn start_process(
@@ -254,17 +301,20 @@ impl BpmService {
 
         // 创建首个任务：解析/落库失败在此直接返回错误，事务整体回滚，
         // 实例与任务都不落库，也不会产生任何流程结束事件。
-        let first_task = self.create_first_task(&txn, &definition, &instance).await?;
+        let first_tasks = self.create_first_task(&txn, &definition, &instance).await?;
 
         txn.commit().await?;
 
-        // 工单已真实落库才通知处理人：审批任务生成即"有人被叫醒"，不再靠人工翻待办列表
-        super::notify_task_pending(&self.db, &first_task, &instance, "新工单已生成").await;
+        // 工单已真实落库才通知处理人：会签/或签每位处理人各一枚工单，逐人通知
+        let task_ids = first_tasks.iter().map(|t| t.id).collect();
+        for task in &first_tasks {
+            super::notify_task_pending(&self.db, task, &instance, "新工单已生成").await;
+        }
 
         Ok(StartProcessResponse {
             instance_id: instance.id,
             instance_no,
-            task_ids: vec![first_task.id],
+            task_ids,
         })
     }
 
