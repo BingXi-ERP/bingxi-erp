@@ -79,19 +79,24 @@ function requireList(value: unknown, label: string): Row[] {
   return value as Row[];
 }
 
-/** DECIMAL(10,2) 出参转整数分：只接受字符串，避免浮点比较掩盖精度问题。 */
+/** DECIMAL(18,4) 出参转百分位整数：只接受字符串，避免浮点比较掩盖精度问题；
+ *  列刻度允许 4 位小数，百分位以下必须为零尾数，不静默截断。 */
 function cents(value: unknown, label: string): bigint {
   expect(
     typeof value === 'string',
     `[510] ${label} 的 DECIMAL 出参须字符串，实际类型=${typeof value} raw=${JSON.stringify(value)}`
   ).toBe(true);
   const text = (value as string).trim();
-  const matched = /^(-?)(\d+)(?:\.(\d{0,2}))?$/.exec(text);
+  const matched = /^(-?)(\d+)(?:\.(\d{0,4}))?$/.exec(text);
   expect(matched !== null, `[510] ${label} 的 DECIMAL 字符串形态非法，raw="${text}"`).toBe(true);
   const parts = matched as RegExpExecArray;
   const sign = parts[1];
   const intPart = parts[2];
   const frac = parts[3] === undefined ? '' : parts[3];
+  expect(
+    frac.length <= 2 || frac.slice(2) === '00',
+    `[510] ${label} 含百分位以下非零尾数，超出分精度，raw="${text}"`
+  ).toBe(true);
   const digits = (intPart + frac).padEnd(intPart.length + 2, '0').slice(0, intPart.length + 2);
   const amount = BigInt(digits);
   return sign === '-' ? -amount : amount;
