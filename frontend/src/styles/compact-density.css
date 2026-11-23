@@ -42,10 +42,37 @@
   overflow-wrap: anywhere;
 }
 
+/* show-overflow-tooltip 列换行修正：EP 对这类列的 .cell 附加 .el-tooltip 并写死
+ * white-space:nowrap（特异性 0,3,0），上面的 .el-table .cell 规则（0,2,0）压不过；
+ * 按"超出内容自动换行"指令在此同特异性覆盖为换行、去掉截断省略，
+ * 悬浮 tooltip 展示全量内容的能力不受影响。 */
+.el-table .cell.el-tooltip {
+  white-space: normal;
+}
+
 /* 描述列表桌面端与既有移动端补丁（mobile-content.css）同口径折行 */
 .el-descriptions__cell {
   white-space: normal;
   word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* ---- 换行豁免：不强制断字的原语 ----
+ * 状态标签与按钮：EP 已设 white-space:nowrap，此处显式收回断字策略，
+ * 防止上层 anywhere 经继承把"合格/待检"等状态词与按钮文案在窄列中断开。 */
+.el-tag,
+.el-button {
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+/* 数字/金额列豁免开关：金额/编号列需禁断字时在列内容上挂 .bx-nowrap；
+ * 本层不改业务视图文件，仅提供工具类。anywhere 只在单个 token 超出列宽时
+ * 才断行，常规金额与编号串不受影响。 */
+.bx-nowrap {
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 /* ---- 版面密度小幅收敛（默认 20px/18px/16px/32px） ---- */
