@@ -15,7 +15,9 @@
 
 use std::collections::BTreeSet;
 
-use bingxi_backend::middleware::public_routes::{AUTH_ONLY_PATHS, PUBLIC_PATHS};
+use bingxi_backend::middleware::public_routes::{
+    AUTH_ONLY_PATHS, PUBLIC_PATHS, is_customer_portal_read_path,
+};
 use bingxi_backend::utils::path_utils::is_known_resource_segment;
 
 const SNAPSHOT: &str = include_str!("../../frontend/scripts/route-snapshot.txt");
@@ -47,8 +49,15 @@ fn snapshot_segments() -> BTreeSet<String> {
         .filter(|l| !l.starts_with('#'))
         .filter_map(|line| {
             // 行形态：METHOD \t /path \t handler \t domain
-            let path = line.split('\t').nth(1)?;
-            erp_resource_segment(path.trim()).map(str::to_string)
+            let mut cols = line.split('\t');
+            let method = cols.next()?;
+            let path = cols.nth(1)?.trim();
+            // 门户读面由专用谓词在白名单门之前放行（permission.rs:112 先于 :123），
+            // 走生产谓词逐条判定，避免测试复制名单副本造成过期假绿。
+            if is_customer_portal_read_path(path, method.trim()) {
+                return None;
+            }
+            erp_resource_segment(path).map(str::to_string)
         })
         .collect()
 }
