@@ -172,7 +172,11 @@ test.describe('526 客户信用额度调整即时生效面', () => {
               `新客户已用额度应为 0，实际 ${JSON.stringify(after)}`
             ).toBe(0);
 
-            return { artifacts: [] };
+            // 接力契约（fixtures/relay.ts）：每棒必须交出真实业务标识；本棒的业务动作是
+            // 降额回写，产出=降额后回读的信用行主键（三读断言已先行证明回读真实发生）。
+            return {
+              artifacts: [{ key: 'creditRowId', value: requireId(after.id, '信用行主键') }],
+            };
           },
         },
         {

@@ -60,18 +60,25 @@ function requireString(value: unknown, label: string): string {
   return value;
 }
 
-/** DECIMAL 出参为字符串，转整数分比较，禁止浮点等号。 */
+/**
+ * DECIMAL(18,4) 出参为字符串，转百分位整数比较，禁止浮点等号；
+ * 列刻度允许 4 位小数，百分位以下必须为零尾数，不静默截断。
+ */
 function decimalCents(value: unknown, label: string): bigint {
   if (typeof value !== 'string') {
     throw new Error(`${label}: DECIMAL 出参必须是字符串，实际类型 ${typeof value}`);
   }
-  const parts = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(value);
+  const parts = /^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(value);
   if (!parts) {
     throw new Error(`${label}: DECIMAL 字符串形态非法，raw=${value}`);
   }
+  const fraction = parts[3] ?? '';
+  if (fraction.length > 2 && fraction.slice(2) !== '00') {
+    throw new Error(`${label}: DECIMAL 含百分位以下非零尾数，超出分精度，raw=${value}`);
+  }
   const negative = parts[1] === '-';
-  const fraction = parts[3];
-  const fractionCents = fraction === undefined ? 0n : BigInt(fraction.padEnd(2, '0'));
+  const fractionCents =
+    fraction === undefined || fraction === '' ? 0n : BigInt(fraction.slice(0, 2).padEnd(2, '0'));
   const amount = BigInt(parts[2]) * 100n + fractionCents;
   return negative ? -amount : amount;
 }
