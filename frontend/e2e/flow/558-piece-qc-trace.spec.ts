@@ -152,7 +152,9 @@ async function rollInspection(page: Page, inspectionId: number): Promise<void> {
       roll_gram_weight: '200',
     }
   );
-  expect(String(rolled.status), '打卷后验布单状态').toBe('graded');
+  expect(String(rolled.status), '打卷后验布单状态（状态机 graded→rolled，写入方 ROLLED）').toBe(
+    'rolled'
+  );
 }
 
 async function findPieceByInspection(page: Page, inspectionId: number): Promise<PieceRow> {
