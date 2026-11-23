@@ -52,7 +52,7 @@ fn snapshot_segments() -> BTreeSet<String> {
             let mut cols = line.split('\t');
             let method = cols.next()?;
             let path = cols.nth(1)?.trim();
-            // 门户读面由专用谓词在白名单门之前放行（permission.rs:112 先于 :123），
+            // 门户读面由专用谓词在白名单门之前放行，
             // 走生产谓词逐条判定，避免测试复制名单副本造成过期假绿。
             if is_customer_portal_read_path(path, method.trim()) {
                 return None;

@@ -90,7 +90,7 @@ function buildPngOfExactSize(totalBytes: number): Buffer {
   if (totalBytes < signature.length) {
     throw new Error(`458 目标字节数 ${totalBytes} 小于 PNG 签名长度 ${signature.length}`);
   }
-  return Buffer.concat([signature, Buffer.alloc(totalBytes - signature.length, 0x20)]);
+  return Buffer.concat([signature, Buffer.alloc(totalBytes - signature.length).fill(0x20)]);
 }
 
 /** JPEG magic 最小合法体：FF D8 FF + APP0/JFIF，magic 识别只取前三字节 */
