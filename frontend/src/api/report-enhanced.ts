@@ -134,11 +134,11 @@ export function getAvailableFields(
 /**
  * POST /reports/enhanced/templates/{id}/export 载荷（唯一真相：
  * report_enhanced_handler::TemplateExportRequest{format,title}，全 Option）。
- * 后端仅识别 format='pdf'（其余值统一走 xlsx）；无 date_range/filters 字段
+ * 后端仅识别 xlsx/docx（其余值统一走 xlsx）；无 date_range/filters 字段
  * （此前传入即被 serde 丢弃，导出条件过滤属后端缺口，已登记串行清单）。
  */
 export interface ReportExportRequest {
-  format?: 'pdf' | 'excel';
+  format?: 'xlsx' | 'docx';
   title?: string;
 }
 

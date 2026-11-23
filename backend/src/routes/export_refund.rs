@@ -36,6 +36,11 @@ pub fn export_refunds() -> Router<AppState> {
             "/export-refunds/{id}/print",
             get(print_handler::export_refund_declaration_print_docx),
         )
+        // 出口退税申报单 xlsx 打印腿（与 docx 版同路径族，版式走 XlsxRichTable 富表格）
+        .route(
+            "/export-refunds/{id}/print-xlsx",
+            get(crate::handlers::print_xlsx_finance_handler::export_refund_declaration_print_xlsx),
+        )
 }
 
 /// 出口退税域统一入口

@@ -745,8 +745,8 @@ pub async fn get_supplier_purchase_history(
 
 // ==================== 供应商资质附件（真上传 + 鉴权读取） ====================
 
-/// 资质附件扩展名白名单：仅证照扫描件（pdf/jpg/jpeg/png），不放行可执行文件/压缩包/宏文档
-const QUALIFICATION_ATTACHMENT_ALLOWED_EXTS: &[&str] = &["pdf", "jpg", "jpeg", "png"];
+/// 资质附件扩展名白名单：仅证照扫描件图片（jpg/jpeg/png），不放行可执行文件/压缩包/宏文档
+const QUALIFICATION_ATTACHMENT_ALLOWED_EXTS: &[&str] = &["jpg", "jpeg", "png"];
 
 /// 资质附件大小上限（5MB）：双端校验（前端上传前 + 后端，与头像上传同一"双保险"口径）；
 /// 必须小于全局请求体上限（constants.rs MAX_HTTP_BODY_BYTES = 12MB，全局 DefaultBodyLimit
@@ -767,9 +767,7 @@ const QUALIFICATION_ATTACHMENT_URL_PREFIX: &str = "/uploads/qualifications/";
 /// 依据文件头（magic bytes）识别真实证照文件类型——不信 Content-Type、不信客户端后缀。
 /// 无法识别返回 None（伪造/未知内容一律拒绝）。
 fn detect_qualification_attachment_magic(data: &[u8]) -> Option<&'static str> {
-    if data.starts_with(b"%PDF") {
-        Some("pdf")
-    } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+    if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
         Some("jpg")
     } else if data.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
         Some("png")
@@ -779,10 +777,9 @@ fn detect_qualification_attachment_magic(data: &[u8]) -> Option<&'static str> {
 }
 
 /// 声明扩展名与 magic 识别结果是否同族（jpg/jpeg 同指 JPEG）。
-/// 后缀与内容不同族（如 .png 实为 PDF）视为伪造，拒绝。
+/// 后缀与内容不同族（如 .png 实为 JPEG）视为伪造，拒绝。
 fn qualification_ext_matches_magic(ext: &str, magic_kind: &str) -> bool {
     match magic_kind {
-        "pdf" => ext == "pdf",
         "jpg" => matches!(ext, "jpg" | "jpeg"),
         "png" => ext == "png",
         _ => false,
@@ -897,8 +894,8 @@ async fn scan_qualification_attachment_for_viruses(data: &[u8]) -> Result<(), Ap
 ///    错配返回 `business_displayable` 用户可见文案（`business` 出参会被脱敏）；先于任何
 ///    落盘 IO 执行，越权请求不产生垃圾文件；
 /// 3. 大小上限：双端校验（前端同值 5MB），超限显式拒绝；
-/// 4. 扩展名白名单：pdf/jpg/jpeg/png（证照场景，不放行可执行/压缩包）；
-/// 5. magic bytes 校验：真实文件头必须命中 PDF/JPEG/PNG 之一，且与声明扩展名同族——
+/// 4. 扩展名白名单：jpg/jpeg/png（证照场景，不放行可执行/压缩包）；
+/// 5. magic bytes 校验：真实文件头必须命中 JPEG/PNG 之一，且与声明扩展名同族——
 ///    伪造 Content-Type 或后缀但内容不符一律拒绝（对齐 crm_handler.rs 导入范式）；
 /// 6. ClamAV 病毒扫描：开关口径同 CRM 导入，未启用如实 warn（不静默）；
 /// 7. 文件名服务端生成 `{supplier_id}_{qualification_id}.{ext}`：禁用客户端原名
@@ -1017,7 +1014,7 @@ pub async fn upload_supplier_qualification_attachment(
         );
         // 扩展名不在白名单，用 AppError::validation_displayable 返回：白名单是公开规则，可安全外显
         return Err(AppError::validation_displayable(
-            "资质附件仅支持 pdf/jpg/jpeg/png 格式",
+            "资质附件仅支持 jpg/jpeg/png 图片格式",
         ));
     }
 
@@ -1028,12 +1025,12 @@ pub async fn upload_supplier_qualification_attachment(
             supplier_id,
             qualification_id,
             declared_ext = %ext,
-            "资质附件内容 magic bytes 校验失败（非 PDF/JPEG/PNG），已拒绝"
+            "资质附件内容 magic bytes 校验失败（非 JPEG/PNG），已拒绝"
         );
         // 内容格式非法，用 AppError::validation_displayable 返回：文案去掉内部术语（magic bytes），
         // 只述用户可理解的格式事实，可安全外显。
         return Err(AppError::validation_displayable(
-            "附件内容不是有效的证照文件，仅支持 PDF/JPEG/PNG",
+            "附件内容不是有效图片，仅支持 JPEG/PNG 格式",
         ));
     };
     if !qualification_ext_matches_magic(&ext, magic_kind) {
@@ -1220,7 +1217,6 @@ pub async fn get_supplier_qualification_attachment(
     }
 
     let content_type: &'static str = match ext.as_str() {
-        "pdf" => "application/pdf",
         "png" => "image/png",
         _ => "image/jpeg",
     };

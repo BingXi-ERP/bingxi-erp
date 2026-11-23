@@ -21,7 +21,7 @@ pub struct Model {
     pub export_query_filter: Option<String>,
     /// 导出记录条数
     pub export_record_count: i32,
-    /// 导出文件格式（xlsx / pdf）
+    /// 导出文件格式（xlsx / docx）
     pub export_file_format: String,
     /// 导出文件 SHA256 指纹（事后比对验证文件未被替换）
     pub export_file_hash_sha256: Option<String>,

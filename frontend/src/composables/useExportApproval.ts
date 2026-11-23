@@ -60,7 +60,7 @@ export function useExportApproval() {
         resource_type: rt,
         export_params: exportParams,
         estimated_rows: estimatedRows,
-        // 后端 create 校验 file_format 仅接受 xlsx/pdf（export_approval_service
+        // 后端 create 校验 file_format 仅接受 xlsx/docx（export_approval_service
         // validate 分支）；成品导出规则统一 xlsx
         file_format: 'xlsx',
       });

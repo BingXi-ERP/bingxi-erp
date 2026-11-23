@@ -1,10 +1,6 @@
-//! 应收对账 - 发票 PDF 导出（ar/inv）
+//! 应收对账 - 对账单 Word 导出与销售→AR 业务流（ar/inv）
 //!
-//! 包含对账单 PDF 导出：
-//! - `export_pdf` 公开方法，从数据库拉取对账单与明细并生成 PDF
-//! - `generate_reconciliation_pdf` 内部方法，调用 `export_service::ExportService`
-//!
-//! 拆分自原 `ar_reconciliation_service.rs` 的 `export_pdf` / `generate_reconciliation_pdf` 两个方法。
+//! - `export_docx` 公开方法，从数据库拉取对账单与明细并生成 Word 文档
 //!
 //! P0-2 销售→AR 业务流入口（`create_receivable`）：
 //! - 在销售订单 `ship_order` 提交且库存扣减成功后被调用
@@ -21,14 +17,8 @@ use crate::models::ar_invoice::{
     ActiveModel as ArInvoiceActive, Column as ArInvoiceColumn, Entity as ArInvoiceEntity,
     Model as ArInvoiceModel,
 };
-use crate::models::ar_reconciliation::{
-    Entity as ReconciliationEntity, Model as ReconciliationModel,
-};
-// 批次 158 v11 真实接入：审批状态常量替代字符串字面量
-// 批次 231 v13 P1-1：新增 ar 模块导入，对账单状态常量替代字符串字面量
-use crate::models::ar_reconciliation_item::{
-    Entity as ReconciliationItemEntity, Model as ReconciliationItemModel,
-};
+use crate::models::ar_reconciliation::Entity as ReconciliationEntity;
+use crate::models::ar_reconciliation_item::Entity as ReconciliationItemEntity;
 use crate::models::customer;
 use crate::models::sales_order;
 use crate::models::status::{approval, ar as ar_status, common};
@@ -38,20 +28,19 @@ use crate::utils::number_generator::DocumentNumberGenerator;
 use super::ArReconciliationService;
 
 impl ArReconciliationService {
-    /// 导出对账单PDF
-    pub async fn export_pdf(&self, id: i32) -> Result<Vec<u8>, AppError> {
+    /// 导出对账单 Word 文档（docx）
+    pub async fn export_docx(&self, id: i32) -> Result<Vec<u8>, AppError> {
         let model = ReconciliationEntity::find_by_id(id)
             .one(&*self.db)
             .await?
             .ok_or_else(|| AppError::not_found("对账单不存在"))?;
 
-        // 获取对账明细
         let items = ReconciliationItemEntity::find()
             .filter(crate::models::ar_reconciliation_item::Column::ReconciliationId.eq(id))
             .all(&*self.db)
             .await?;
 
-        // 客户名称取主数据真值，对账单 PDF 是对外交付物，主数据缺行即点名失败，
+        // 客户名称取主数据真值，对账单 docx 是对外交付物，主数据缺行即点名失败，
         // 禁止用"客户#<id>"这类占位串出具（查库错误按 ? 上抛，不吞成缺行）
         let customer_name = customer::Entity::find_by_id(model.customer_id)
             .one(&*self.db)
@@ -64,28 +53,10 @@ impl ArReconciliationService {
             })?
             .customer_name;
 
-        // 生成PDF内容
-        let pdf_content = self.generate_reconciliation_pdf(&model, &items, &customer_name)?;
-
-        Ok(pdf_content)
-    }
-
-    /// 生成对账单PDF
-    ///
-    /// 入参 对账单主记录、其明细行，以及调用方从客户主数据取到的真实客户名称
-    /// （本方法不做查询，也不得自行造名），产出 PDF 字节流交给上层导出通道。
-    fn generate_reconciliation_pdf(
-        &self,
-        reconciliation: &ReconciliationModel,
-        items: &[ReconciliationItemModel],
-        customer_name: &str,
-    ) -> Result<Vec<u8>, AppError> {
-        use crate::services::export_service::{ExportService, ReconciliationPdfItem};
-
-        // 构建明细项
-        let pdf_items: Vec<ReconciliationPdfItem> = items
+        use crate::services::export_service::{ExportService, ReconciliationItem};
+        let detail_items: Vec<ReconciliationItem> = items
             .iter()
-            .map(|item| ReconciliationPdfItem {
+            .map(|item| ReconciliationItem {
                 item_type: item.item_type.clone(),
                 document_no: item.document_no.as_deref().unwrap_or("").to_string(),
                 amount: item.amount.to_string(),
@@ -96,18 +67,17 @@ impl ArReconciliationService {
             })
             .collect();
 
-        // 生成PDF
-        ExportService::generate_reconciliation_pdf(
-            &reconciliation.reconciliation_no,
-            customer_name,
-            &reconciliation.period_start.format("%Y-%m-%d").to_string(),
-            &reconciliation.period_end.format("%Y-%m-%d").to_string(),
-            reconciliation
+        ExportService::generate_reconciliation_docx(
+            &model.reconciliation_no,
+            &customer_name,
+            &model.period_start.format("%Y-%m-%d").to_string(),
+            &model.period_end.format("%Y-%m-%d").to_string(),
+            model
                 .reconciliation_status
                 .as_deref()
                 .unwrap_or(ar_status::RECONCILIATION_DRAFT),
-            pdf_items,
-            &reconciliation.closing_balance.to_string(),
+            detail_items,
+            &model.closing_balance.to_string(),
         )
     }
 

@@ -4,7 +4,7 @@
 //! 子模块：
 //! - `tpl`  报表模板管理（预定义模板 + 自定义模板）
 //! - `ds`   数据源：聚合查询、报表执行、缓存管理
-//! - `exp`  导出器：PDF / Excel / CSV / JSON 多种格式输出
+//! - `exp`  导出器：xlsx / docx 成品文档输出
 //! - `job`  调度器：报表订阅、cron 表达式、next_run 计算
 //!
 //! 兼容说明：原 `crate::services::report::*` 路径需要由上层
@@ -262,35 +262,30 @@ pub struct ExecuteReportRequest {
     pub use_cache: Option<bool>,
 }
 
-/// 导出格式（兼容 csv/csv 字符串）
+/// 导出格式（仅成品文档：xlsx / docx）
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ExportFormat {
-    Pdf,
     Excel,
-    Csv,
-    Json,
+    Docx,
 }
 
 impl std::str::FromStr for ExportFormat {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "pdf" => Ok(ExportFormat::Pdf),
             "excel" | "xlsx" => Ok(ExportFormat::Excel),
-            "csv" => Ok(ExportFormat::Csv),
-            "json" => Ok(ExportFormat::Json),
-            _ => Err(format!("不支持的导出格式: {}", s)),
+            "docx" | "word" => Ok(ExportFormat::Docx),
+            _ => Err(format!("不支持的导出格式: {}（仅支持 xlsx/docx）", s)),
         }
     }
 }
 
-/// PDF 导出结果
+/// Word 导出结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PdfExportResult {
+pub struct DocxExportResult {
     pub file_name: String,
     pub file_size: u64,
-    pub page_count: u32,
     pub content: Vec<u8>,
 }
 

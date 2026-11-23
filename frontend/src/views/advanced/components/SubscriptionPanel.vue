@@ -266,9 +266,8 @@
         </el-form-item>
         <el-form-item label="导出格式" required>
           <el-select v-model="subForm.export_format" style="width: 100%">
-            <el-option label="PDF" value="pdf" />
-            <el-option label="Excel" value="excel" />
-            <el-option label="PDF + Excel" value="both" />
+            <el-option label="xlsx" value="xlsx" />
+            <el-option label="docx" value="docx" />
           </el-select>
         </el-form-item>
         <el-form-item v-if="editingId" label="启用">
@@ -325,7 +324,7 @@ const subForm = reactive({
   template_id: 1,
   frequency: 'DAILY',
   recipientsText: '',
-  export_format: 'pdf',
+  export_format: 'xlsx',
   is_enabled: true,
 });
 
@@ -355,7 +354,7 @@ const openCreate = () => {
     template_id: 1,
     frequency: 'DAILY',
     recipientsText: '',
-    export_format: 'pdf',
+    export_format: 'xlsx',
     is_enabled: true,
   });
   subDialogVisible.value = true;

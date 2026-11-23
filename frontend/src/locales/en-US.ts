@@ -3923,7 +3923,7 @@ export default {
       exportFormAriaLabel: 'Product export request form',
       exportFormatLabel: 'File Format',
       exportFormatXlsx: 'Excel',
-      exportFormatPdf: 'PDF',
+      exportFormatDocx: 'Word',
       exportEstimatedRowsLabel: 'Estimated Rows',
       buttonSubmitRequest: 'Submit Request',
       buttonDownload: 'Download',
@@ -5654,7 +5654,7 @@ export default {
       colAction: 'Action',
       execute: 'Execute',
       exportExcel: 'Export Excel',
-      exportPdf: 'Export PDF',
+      exportWord: 'Export Word',
       resultTitle: 'Report Result',
       empty: 'No data',
       close: 'Close',
@@ -7474,7 +7474,7 @@ export default {
         attachment: 'Attachment',
         uploadBtn: 'Upload Attachment',
         uploadTip:
-          'Only pdf/jpg/jpeg/png are supported, max 5MB per file, content must match the extension',
+          'Only jpg/jpeg/png are supported, max 5MB per file, content must match the extension',
         uploadAfterSave:
           'The attachment is uploaded after the qualification is saved; for a new qualification, save it first and then upload via Edit',
         view: 'View Attachment',
@@ -7540,7 +7540,7 @@ export default {
         attachmentUploadSuccess: 'Qualification attachment uploaded',
         attachmentUploadFailed: 'Failed to upload qualification attachment: {reason}',
         attachmentViewFailed: 'Failed to view qualification attachment: {reason}',
-        attachmentTypeRejected: 'Qualification attachments only support pdf/jpg/jpeg/png',
+        attachmentTypeRejected: 'Qualification attachments only support jpg/jpeg/png',
         attachmentSizeRejected: 'Qualification attachment cannot exceed 5MB',
         qualSavedButAttachmentFailed:
           'The qualification was saved, but the attachment failed to upload; please re-upload it via Edit',
