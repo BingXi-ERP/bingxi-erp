@@ -18,8 +18,8 @@ use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::sea_query::{BinOper, Expr};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, Set,
-    UpdateResult,
+    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, ExprTrait, QueryFilter,
+    QueryOrder, Set, UpdateResult,
 };
 
 use crate::models::status::inventory_reservation as reservation_status;
