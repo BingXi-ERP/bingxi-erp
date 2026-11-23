@@ -62,6 +62,11 @@ function requireNum(v: unknown, label: string): number {
   return n;
 }
 
+/** 时间戳末六位插入字母，避免连续数字触发产品的键盘序列密码规则。 */
+function stampSafe(ts: string): string {
+  return ts.replace(/(\d{2})(\d{2})(\d{2})/, '$1x$2y$3');
+}
+
 /** 部门列表恒 PaginatedResponse{items,...}（define_crud_handlers → service::list，
  *  与 helpers.ts:469 注释同源）；单形状直读，漂移即红 */
 async function listDepartments(page: Page): Promise<Record<string, unknown>[]> {
