@@ -158,7 +158,7 @@ test.describe.serial('668 销售订单驳回信用额度回退', () => {
     );
 
     const reason = `${tag}-驳回理由`;
-    const rejected = await apiCall<{ data?: { message?: unknown } }>(
+    const rejected = await apiCall<{ message?: unknown }>(
       page,
       'POST',
       `/sales/orders/${orderId}/reject`,
