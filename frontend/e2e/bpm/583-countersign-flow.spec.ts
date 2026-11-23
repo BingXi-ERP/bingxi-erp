@@ -167,7 +167,10 @@ async function ensureSecondApprover(
   page: import('@playwright/test').Page,
   browser: import('@playwright/test').Browser
 ): Promise<{ userId: number; session: IsolatedAuthedSession }> {
-  const roleCode = genCode('e2e-cs-role');
+  // 角色编码仅允许小写字母、数字与下划线（role_permission_service.rs:280），不能用 genCode 的连字符格式
+  const roleCode = `e2e_cs_role_${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0')}`;
   const roleResp = await apiCall<{ id?: number }>(page, 'POST', '/roles', {
     name: `E2E 会签审批角色 ${roleCode}`,
     code: roleCode,
@@ -186,7 +189,9 @@ async function ensureSecondApprover(
     throw new Error(`授权 bpm-tasks:approve 失败：${JSON.stringify(grantResp)}`);
   }
 
-  const username = genCode('e2e-cs-u');
+  const username = `e2e_cs_u_${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0')}`;
   const userResp = await apiCall<{ id?: number }>(page, 'POST', '/users', {
     username,
     password: testPassword(),
