@@ -70,13 +70,17 @@ pub const CUSTOMER_ALL_FIELDS: &[&str] = &[
 ];
 
 /// 默认隐藏的敏感字段（非管理员角色）
+///
+/// 只放**资金类**字段：这些字段没有掩码层兜底，无权限配置行时必须整列缺失才是 fail-closed。
+/// `contact_phone`/`contact_email`/`address` 不在此列——客户域 PII 的默认脱敏契约是
+/// 「掩码保留键」（`services/crm/cust.rs` `mask_customer_pii_defaults` + `utils/field_mask`
+/// 掩码手机/邮箱并移除 address，见 contract_wave6_crm_customer_read_exits_mask_test），
+/// 若在此整列隐藏，选择层先删键，掩码层永远够不到，非 admin 列表/详情恒拿不到掩码值，
+/// 掩码保留键契约在这两条出口被架空（4.33 e2e 443 钉的就是这个洞）。
 pub const DEFAULT_HIDDEN_FIELDS: &[&str] = &[
     "credit_limit",
     "payment_terms",
     "tax_id",
     "bank_name",
     "bank_account",
-    "contact_phone",
-    "contact_email",
-    "address",
 ];

@@ -99,7 +99,7 @@ fn test_classify_export_regression() {
         "EXPORT"
     );
     assert_eq!(
-        classify_operation("GET", "/api/v1/erp/reports/1/pdf", ""),
+        classify_operation("GET", "/api/v1/erp/reports/1/export", ""),
         "EXPORT"
     );
 }

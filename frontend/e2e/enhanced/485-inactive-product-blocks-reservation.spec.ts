@@ -6,6 +6,7 @@
 //   models/status/general.rs:130-135 master_data::ACTIVE="active" / INACTIVE="inactive"；
 //   services/inventory_reservation_service.rs:54-62 产品行 is_deleted 或 status != active 即
 //   AppError::not_found("产品 {id} 不可引用（已软删或已停用，视同不存在）")，在任何写库前。
+//   含 ID 的真实原因按 error.rs 安全边界只留内部日志，出参恒脱敏常量「资源未找到」。
 // 与既有覆盖分工：457 只测仓库停用腿，inventory/06 只用 active 默认产品建预留；
 //   全 e2e 无该拒因断言。本例自建产品，不修改共享 ctx 产品，避免并发竞态。
 import { test, expect, type Page } from '../diagnose-fixture';
@@ -21,6 +22,9 @@ import {
   tryCleanup,
 } from '../flow/helpers';
 import { PRODUCT_TYPE } from '../../src/constants/product-type';
+
+// not_found 出参恒为脱敏常量（与 finance/07-subject-disable 同口径）。
+const SANITIZED_NOT_FOUND = '资源未找到';
 
 const CLEANUP: Array<{ path: string; label: string }> = [];
 test.afterEach(async ({ page }) => {
@@ -111,8 +115,8 @@ test.describe('4.22 产品停用拦截库存预留', () => {
     ).toBe(APP_ERROR_CODES.NOT_FOUND);
     expect(
       String(rejected.message ?? ''),
-      `[485] 拒因须点名产品已停用，实际 ${JSON.stringify(rejected.message)}`
-    ).toContain('不可引用（已软删或已停用，视同不存在）');
+      `not_found 出参必须脱敏，实际 ${JSON.stringify(rejected.message)}`
+    ).toBe(SANITIZED_NOT_FOUND);
 
     await apiCallRaw(page, 'PUT', `/products/${productId}`, { status: 'active' });
     const on = await apiCallRaw<Row>(page, 'GET', `/products/${productId}`);

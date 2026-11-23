@@ -99,7 +99,7 @@ fn ar_report_does_not_swallow_decode_errors_with_unwrap_or() {
 /// (相对 backend/ 的源文件, 修复后真实 `AppError::internal(` 命中数基线)
 ///
 /// 非零条目的保留理由（逐站点核对返回类型后坐实）：
-/// - report/exp.rs=18：printpdf 字体加载/PDF 保存、zip 写入、serde 序列化等外部库
+/// - report/exp.rs=18：zip 写入、serde 序列化等外部库
 ///   故障——非 AppError 重包，属真不可归类系统错误（规则 b 末条）。
 /// - email_service.rs=11：reqwest 发送失败/非 2xx、腾讯云/阿里云 HMAC 初始化、
 ///   serde 序列化、时间戳无效——外部集成与真系统错误。

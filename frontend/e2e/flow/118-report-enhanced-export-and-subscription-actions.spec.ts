@@ -14,7 +14,7 @@ import {
  * 118 报表增强导出端点与订阅动作真值链（模板导出 两枚直出导出 手动触发 立即发送 启停位）
  *
  * 与既有覆盖的分工。既有把报表订阅只做到标准增删改接与列表可打开，判定器口径下
- * POST templates 对象导出、POST export excel 与 POST export pdf 两枚直出导出、
+ * POST templates 对象导出、POST export excel 与 POST export docx 两枚直出导出、
  * POST subscriptions 手动触发、POST subscriptions 立即发送五枚端点均为零覆盖。
  * 本 spec 把这五枚钉成真实回读链，并把订阅创建的校验门与动作的拒绝钉到机器码
  * 与零漂移两个口径。
@@ -29,16 +29,16 @@ import {
  * 模板取数口在 backend/src/services/report_template_service.rs。
  *
  * 三枚导出口的共同前提是先取数再编码。模板对象端点 POST templates 对象 export
- * 入参 TemplateExportRequest 两键 format 与 title 皆可缺省，format 只认 pdf，
- * 其余值一律走 xlsx 档；两枚直出端点 POST export pdf 与 POST export excel
+ * 入参 TemplateExportRequest 两键 format 与 title 皆可缺省，format 只认 xlsx/docx，
+ * 其余值一律走 xlsx 档；两枚直出端点 POST export docx 与 POST export excel
  * 入参 ExportRequest，其中 template_id 是非 Option 的字符串键（传数字即请求解码拒），
  * title 可缺省。取数走 execute_custom_report，而该口在当前实现里对任何模板都只可能
  * 返回错误：带数据源SQL 的行 403，不带的行 400 加 BUSINESS_ERROR 且文案脱敏，
  * 而经 API 建出的模板永远不带数据源SQL（create 与 update 双门一律 403 拒绝）。
  * 因此三枚导出口对自建模板的可达契约就是"400 加 BUSINESS_ERROR"，
  * 且拒绝发生在取数阶段，出参里根本没有 filename size content 这些成功键。
- * 成功分支的 base64 字节流与 zip 魔数与 PDF 头在本车道无法从 e2e 触达，
- * 该面只能由后端对 export_service 与 xlsx_export 与 pdf 构造的单元或集成测试覆盖，
+ * 成功分支的 base64 字节流与 zip 魔数与 docx/xlsx 头在本车道无法从 e2e 触达，
+ * 该面只能由后端对 export_service 与 xlsx_export 与 docx 构造的单元或集成测试覆盖，
  * 本 spec 不伪造正向断言，只把取数门与前置的模板不存在 404 钉实。
  *
  * 直出端点还多一条前置门：template_id 字符串先 parse 为整数，parse 失败走
@@ -53,7 +53,7 @@ import {
  * 最后按 frequency 派生下次执行时间，DAILY 加一天、WEEKLY 加一周、MONTHLY 加三十天，
  * 其余值 400 加"无效的订阅频率"。建行落 report_subscriptions 表，服务端写死
  * status 为 ACTIVE、run_count 与 retry_count 为 0、max_retries 为 3、
- * next_retry_at 与 last_run 三列皆为空，export_format 缺省补 pdf，
+ * next_retry_at 与 last_run 三列皆为空，export_format 缺省补 xlsx，
  * recipients 以 JSON 数组落库。
  * 对象读口 GET subscriptions 按主键取整行，不做可见性过滤，故可用它做真值回读。
  * POST trigger 只做一件事：把下次执行时间置为当前并刷新更新时间后落库，
@@ -136,20 +136,20 @@ test.describe.serial('118 报表增强导出端点与订阅动作真值链', () 
     const name = str(created.name);
     const columnsJson = JSON.stringify(created.columns);
 
-    // 一 模板对象导出端点：pdf 档与缺省档都先撞取数门，出参不含任何文件键
-    const tplPdf = await apiCallExpectFail(
+    // 一 模板对象导出端点：docx 档与缺省档都先撞取数门，出参不含任何文件键
+    const tplDocx = await apiCallExpectFail(
       page,
       'POST',
       `/reports/enhanced/templates/${templateId}/export`,
-      { format: 'pdf', title: `118对象导出${tag}` }
+      { format: 'docx', title: `118对象导出${tag}` }
     );
     expect(
-      tplPdf.status,
-      `模板对象导出 pdf 档必须被取数门拒为 400，实际 ${tplPdf.status} code=${JSON.stringify(tplPdf.code)}`
+      tplDocx.status,
+      `模板对象导出 docx 档必须被取数门拒为 400，实际 ${tplDocx.status} code=${JSON.stringify(tplDocx.code)}`
     ).toBe(400);
     expect(
-      failureCode(tplPdf),
-      `模板对象导出 pdf 档必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(tplPdf.code)}`
+      failureCode(tplDocx),
+      `模板对象导出 docx 档必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(tplDocx.code)}`
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
 
     const tplDefault = await apiCallExpectFail(
@@ -165,19 +165,14 @@ test.describe.serial('118 报表增强导出端点与订阅动作真值链', () 
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
 
     // 二 两枚直出端点：合法 template_id 同样撞取数门
-    const directPdf = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/pdf', {
+    const directDocx = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/docx', {
       template_id: String(templateId),
-      title: `118直出PDF${tag}`,
+      title: `118直出Word${tag}`,
     });
     expect(
-      directPdf.status,
-      `直出 PDF 必须被取数门拒为 400，实际 ${directPdf.status} code=${JSON.stringify(directPdf.code)}`
-    ).toBe(400);
-    expect(
-      failureCode(directPdf),
-      `直出 PDF 必须归因 BUSINESS_ERROR，实际 ${JSON.stringify(directPdf.code)}`
-    ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
-
+      directDocx.status,
+      `直出 Word 端点已删除应 404，实际 ${directDocx.status} code=${JSON.stringify(directDocx.code)}`
+    ).toBe(404);
     const directExcel = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/excel', {
       template_id: String(templateId),
     });
@@ -191,7 +186,7 @@ test.describe.serial('118 报表增强导出端点与订阅动作真值链', () 
     ).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
 
     // 三 直出端点的入参形门：template_id 是非 Option 字符串键，数字即解码拒
-    const numericShape = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/pdf', {
+    const numericShape = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/excel', {
       template_id: templateId,
     });
     expect(
@@ -227,12 +222,16 @@ test.describe.serial('118 报表增强导出端点与订阅动作真值链', () 
     expect(failureCode(objectMissing), '不存在主键的对象导出必须归因 NOT_FOUND').toBe(
       APP_ERROR_CODES.NOT_FOUND
     );
-    const pdfMissing = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/pdf', {
+    const docxMissing = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/docx', {
       template_id: '99999999',
     });
-    expect(pdfMissing.status, `不存在主键的直出 PDF 必须 404，实际 ${pdfMissing.status}`).toBe(404);
-    expect(failureCode(pdfMissing), '不存在主键的直出 PDF 必须归因 NOT_FOUND').toBe(
-      APP_ERROR_CODES.NOT_FOUND
+    expect(docxMissing.status, `不存在主键的直出 Word 必须 404，实际 ${docxMissing.status}`).toBe(
+      404
+    );
+    // 直出 Word 端点已随导出格式收敛删除：路由级 404 无 AppError 信封（code 缺席），
+    // 与端点存在但模板不存在时的 NOT_FOUND 信封不同形态，两形态都接受。
+    expect([undefined, APP_ERROR_CODES.NOT_FOUND]).toContain(
+      failureCode(docxMissing)
     );
     const excelMissing = await apiCallExpectFail(page, 'POST', '/reports/enhanced/export/excel', {
       template_id: '99999999',

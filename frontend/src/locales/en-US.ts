@@ -2143,6 +2143,7 @@ export default {
       title: 'Work Center List',
       refresh: 'Refresh',
       ariaLabel: 'Work center list',
+      mobileCardAria: 'Work center mobile card list',
       code: 'Code',
       name: 'Name',
       capacityHours: 'Capacity Hours',
@@ -3923,7 +3924,7 @@ export default {
       exportFormAriaLabel: 'Product export request form',
       exportFormatLabel: 'File Format',
       exportFormatXlsx: 'Excel',
-      exportFormatPdf: 'PDF',
+      exportFormatDocx: 'Word',
       exportEstimatedRowsLabel: 'Estimated Rows',
       buttonSubmitRequest: 'Submit Request',
       buttonDownload: 'Download',
@@ -5654,7 +5655,7 @@ export default {
       colAction: 'Action',
       execute: 'Execute',
       exportExcel: 'Export Excel',
-      exportPdf: 'Export PDF',
+      exportWord: 'Export Word',
       resultTitle: 'Report Result',
       empty: 'No data',
       close: 'Close',
@@ -7474,7 +7475,7 @@ export default {
         attachment: 'Attachment',
         uploadBtn: 'Upload Attachment',
         uploadTip:
-          'Only pdf/jpg/jpeg/png are supported, max 5MB per file, content must match the extension',
+          'Only jpg/jpeg/png are supported, max 5MB per file, content must match the extension',
         uploadAfterSave:
           'The attachment is uploaded after the qualification is saved; for a new qualification, save it first and then upload via Edit',
         view: 'View Attachment',
@@ -7540,7 +7541,7 @@ export default {
         attachmentUploadSuccess: 'Qualification attachment uploaded',
         attachmentUploadFailed: 'Failed to upload qualification attachment: {reason}',
         attachmentViewFailed: 'Failed to view qualification attachment: {reason}',
-        attachmentTypeRejected: 'Qualification attachments only support pdf/jpg/jpeg/png',
+        attachmentTypeRejected: 'Qualification attachments only support jpg/jpeg/png',
         attachmentSizeRejected: 'Qualification attachment cannot exceed 5MB',
         qualSavedButAttachmentFailed:
           'The qualification was saved, but the attachment failed to upload; please re-upload it via Edit',
@@ -8011,6 +8012,7 @@ export default {
     },
     ganttChart: {
       title: 'Schedule Gantt Chart',
+      mobileScrollHint: 'Swipe horizontally to view the full Gantt chart',
       legend: {
         pending: 'Pending',
         scheduled: 'Scheduled',
@@ -8154,6 +8156,7 @@ export default {
       ariaLabel: {
         table: 'Schedule List',
         pagination: 'Schedule List Pagination',
+        mobileCard: 'Schedule work order mobile card list',
       },
       column: {
         orderNo: 'Work Order No.',
@@ -10523,6 +10526,7 @@ export default {
       buttonDelete: 'Delete',
       buttonApprove: 'Approve',
       buttonExecute: 'Execute',
+      mobileCardAria: 'Sales contract mobile card list',
       columnContractNo: 'Contract No',
       columnContractName: 'Contract Name',
       columnCustomer: 'Customer',
@@ -10650,6 +10654,7 @@ export default {
     },
     table: {
       ariaLabel: 'Sales Price List',
+      mobileCardAria: 'Sales price mobile card list',
       columnIndex: 'No.',
       columnProductName: 'Product Name',
       columnCustomer: 'Customer',
@@ -10787,6 +10792,7 @@ export default {
     },
     table: {
       ariaLabel: 'Sales Returns List',
+      mobileCardAria: 'Sales return mobile card list',
       columnReturnNo: 'Return No.',
       columnSalesOrderNo: 'Sales Order No.',
       columnCustomerName: 'Customer Name',
@@ -12226,6 +12232,7 @@ export default {
       buttonConfirm: 'Confirm',
       buttonCancel: 'Cancel',
       ariaTable: 'Greige Fabrics Table',
+      mobileCardAria: 'Greige fabric mobile card list',
       colFabricCode: 'Fabric Code',
       colFabricName: 'Fabric Name',
       colFabricType: 'Fabric Type',
@@ -12417,6 +12424,14 @@ export default {
       buttonDelete: 'Delete',
       buttonStartProduction: 'Start Production',
       buttonComplete: 'Complete',
+      mobileCardAria: 'Production order mobile card list',
+      mobile: {
+        buttonLogs: 'Logs',
+        buttonSubmitApproval: 'Submit for Approval',
+        buttonApprove: 'Approve',
+        buttonReject: 'Reject',
+        buttonReportProgress: 'Report Progress',
+      },
     },
     detail: {
       title: 'Production Order Detail',
@@ -12698,6 +12713,7 @@ export default {
       title: 'Replenishment Suggestions',
       refresh: 'Recalculate',
       ariaLabel: 'Shortage Replenishment Suggestion List',
+      mobileCardAria: 'Replenishment Suggestion Mobile Card List',
       suggestedQuantity: 'Suggested Qty',
       unit: 'Unit',
       priority: 'Priority',
@@ -12711,6 +12727,7 @@ export default {
     },
     table: {
       ariaLabel: 'Material Shortage Alert List',
+      mobileCardAria: 'Material shortage mobile card list',
       levelPlaceholder: 'Shortage Level',
       statusPlaceholder: 'Alert Status',
       search: 'Search',

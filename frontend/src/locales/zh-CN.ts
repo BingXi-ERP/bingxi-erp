@@ -2124,6 +2124,7 @@ export default {
       title: '工作中心列表',
       refresh: '刷新',
       ariaLabel: '工作中心列表',
+      mobileCardAria: '工作中心手机卡片列表',
       code: '编码',
       name: '名称',
       capacityHours: '产能工时',
@@ -3893,7 +3894,7 @@ export default {
       exportFormAriaLabel: '产品导出申请表单',
       exportFormatLabel: '文件格式',
       exportFormatXlsx: 'Excel',
-      exportFormatPdf: 'PDF',
+      exportFormatDocx: 'Word',
       exportEstimatedRowsLabel: '预计导出行数',
       buttonSubmitRequest: '提交申请',
       buttonDownload: '下载',
@@ -5605,7 +5606,7 @@ export default {
       colAction: '操作',
       execute: '执行',
       exportExcel: '导出 Excel',
-      exportPdf: '导出 PDF',
+      exportWord: '导出 Word',
       resultTitle: '报表结果',
       empty: '暂无数据',
       close: '关闭',
@@ -7420,7 +7421,7 @@ export default {
 
         attachment: '资质附件',
         uploadBtn: '上传附件',
-        uploadTip: '仅支持 pdf/jpg/jpeg/png，单个文件不超过 5MB，文件内容须与扩展名一致',
+        uploadTip: '仅支持 jpg/jpeg/png，单个文件不超过 5MB，文件内容须与扩展名一致',
         uploadAfterSave: '附件将在资质保存成功后真实上传；新增资质请先保存，再在编辑中上传附件',
         view: '查看附件',
         notUploaded: '未上传',
@@ -7485,7 +7486,7 @@ export default {
         attachmentUploadSuccess: '资质附件上传成功',
         attachmentUploadFailed: '资质附件上传失败：{reason}',
         attachmentViewFailed: '资质附件查看失败：{reason}',
-        attachmentTypeRejected: '资质附件仅支持 pdf/jpg/jpeg/png 格式',
+        attachmentTypeRejected: '资质附件仅支持 jpg/jpeg/png 格式',
         attachmentSizeRejected: '资质附件不能超过 5MB',
         qualSavedButAttachmentFailed: '资质信息已保存成功，但附件未上传成功，请在编辑中重新上传',
         evalSubmitted: '评估已提交',
@@ -7951,6 +7952,7 @@ export default {
     },
     ganttChart: {
       title: '排程甘特图',
+      mobileScrollHint: '左右滑动查看完整甘特图',
       legend: {
         pending: '待排程',
         scheduled: '已排程',
@@ -8094,6 +8096,7 @@ export default {
       ariaLabel: {
         table: '排班列表',
         pagination: '排班列表分页',
+        mobileCard: '排程工单手机卡片列表',
       },
       column: {
         orderNo: '工单号',
@@ -10455,6 +10458,7 @@ export default {
       buttonDelete: '删除',
       buttonApprove: '审批',
       buttonExecute: '执行',
+      mobileCardAria: '销售合同手机卡片列表',
       columnContractNo: '合同编号',
       columnContractName: '合同名称',
       columnCustomer: '客户',
@@ -10582,6 +10586,7 @@ export default {
     },
     table: {
       ariaLabel: '销售价格列表',
+      mobileCardAria: '销售价格手机卡片列表',
       columnIndex: '序号',
       columnProductName: '产品名称',
       columnCustomer: '客户',
@@ -10719,6 +10724,7 @@ export default {
     },
     table: {
       ariaLabel: '销售退货列表',
+      mobileCardAria: '销售退货手机卡片列表',
       columnReturnNo: '退货单号',
       columnSalesOrderNo: '销售订单号',
       columnCustomerName: '客户名称',
@@ -12148,6 +12154,7 @@ export default {
       buttonConfirm: '确认',
       buttonCancel: '取消',
       ariaTable: '坯布列表表格',
+      mobileCardAria: '胚布档案手机卡片列表',
       colFabricCode: '坯布编码',
       colFabricName: '坯布名称',
       colFabricType: '坯布类型',
@@ -12339,6 +12346,14 @@ export default {
       buttonDelete: '删除',
       buttonStartProduction: '开始生产',
       buttonComplete: '完成',
+      mobileCardAria: '生产订单手机卡片列表',
+      mobile: {
+        buttonLogs: '日志',
+        buttonSubmitApproval: '提交审批',
+        buttonApprove: '审批通过',
+        buttonReject: '驳回',
+        buttonReportProgress: '汇报进度',
+      },
     },
     detail: {
       title: '生产订单详情',
@@ -12618,6 +12633,7 @@ export default {
       title: '补货建议',
       refresh: '重新计算',
       ariaLabel: '缺料补货建议列表',
+      mobileCardAria: '补货建议手机卡片列表',
       suggestedQuantity: '建议采购量',
       unit: '单位',
       priority: '优先级',
@@ -12631,6 +12647,7 @@ export default {
     },
     table: {
       ariaLabel: '物料缺料预警列表',
+      mobileCardAria: '物料缺料预警手机卡片列表',
       levelPlaceholder: '缺料级别',
       statusPlaceholder: '预警状态',
       search: '查询',

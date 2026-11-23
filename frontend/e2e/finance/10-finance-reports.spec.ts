@@ -562,11 +562,13 @@ test.describe('10 财务报表与导出', () => {
   test('10-06 新增 print-xlsx 打印腿：凭证/应收收款/退税申报真 xlsx 字节 + 外汇核销 fail-closed', async ({
     page,
   }) => {
-    // 覆盖本支新增的 4 条 GET print-xlsx。全部走真实后端与真实库，无 mock、无网络拦截。
-    // 前三条用仓库既有造数链造出真实单据后断 200 + OOXML Content-Type + PK(zip) 魔数 + xl/workbook.xml。
-    // 第四条路径 /exchange-rates/*/print-xlsx 的打印数据源是 foreign_exchange_verification 表，
+    // 覆盖 GET print-xlsx 打印面。全部走真实后端与真实库，无 mock、无网络拦截。
+    // 前三条（凭证/收款/退税申报）用仓库既有造数链造出真实单据后断 200 +
+    // OOXML Content-Type + PK(zip) 魔数 + xl/workbook.xml + 端点专属文件名。
+    // 每条均带 fail-closed 腿：不存在的 id 断真实 404 NOT_FOUND 标准信封，不能 200 吐空壳。
+    // 外汇核销路径 /exchange-rates/*/print-xlsx 的打印数据源是 foreign_exchange_verification 表，
     // 后端没有创建该表行的任何 API（route-snapshot 无 POST、migration 无种子），
-    // 无法确定性造出真实 200；改为对不存在的 id 断真实 404 NOT_FOUND 标准信封，不静默跳过。
+    // 无法确定性造出真实 200，只对不存在的 id 断真实 404，不静默跳过。
     // ctx 的客户/销售订单由共享造数工厂按分片独立创建；本 spec 其它用例各自局部造数，
     // 只有本用例依赖 ctx 的客户 + 销售订单（收款单与退税报关单前置），故在此显式确保。
     await ensureTestEntities(page);
@@ -579,10 +581,9 @@ test.describe('10 财务报表与导出', () => {
     const debitId = await seedSubject(page, debitCode, `E2E xlsx 借${debitCode}`, 'debit');
     const creditId = await seedSubject(page, creditCode, `E2E xlsx 贷${creditCode}`, 'credit');
     const voucherId = await seedPostedVoucher(page, date, 1000, debitId, creditId);
-    // 端点未实现（主干与本支路由均无登记）：真实单据 id 也必须真实 404，不该 200 吐空壳。
-    const voucherMissing = await apiCallExpectFail(page, 'GET', `/vouchers/${voucherId}/print-xlsx`);
-    expect(voucherMissing.status, '`/vouchers/${voucherId}/print-xlsx` 端点未实现应真实 404，功能落地后把本腿改回 200 真字节').toBe(404);
-    expect([undefined, 'NOT_FOUND']).toContain(failureCode(voucherMissing));
+    // 端点已在主干落地：真实凭证打印必须 200 真字节（真 xlsx 容器，非空壳）。
+    const voucherBlob = await fetchExportRaw(page, `/vouchers/${voucherId}/print-xlsx`);
+    await assertRealXlsxBlob(voucherBlob, '凭证打印', /attachment[\s\S]*voucher_\d+\.xlsx/);
     // 凭证打印 fail-closed：不存在的凭证断真实 404，不能 200 吐空壳 xlsx。
     const missingVoucherId = 999999999;
     const voucherFail = await apiCallExpectFail(
@@ -607,10 +608,13 @@ test.describe('10 财务报表与导出', () => {
       collectionId,
       `收款单建单应返回 id（实际=${JSON.stringify(pay).slice(0, 200)}）`
     ).toBeGreaterThan(0);
-    // 端点未实现（主干与本支路由均无登记）：真实单据 id 也必须真实 404，不该 200 吐空壳。
-    const collectionMissing = await apiCallExpectFail(page, 'GET', `/ar/collections/${collectionId}/print-xlsx`);
-    expect(collectionMissing.status, '`/ar/collections/${collectionId}/print-xlsx` 端点未实现应真实 404，功能落地后把本腿改回 200 真字节').toBe(404);
-    expect([undefined, 'NOT_FOUND']).toContain(failureCode(collectionMissing));
+    // 端点已在主干落地：真实收款单打印必须 200 真字节。
+    const collectionBlob = await fetchExportRaw(page, `/ar/collections/${collectionId}/print-xlsx`);
+    await assertRealXlsxBlob(
+      collectionBlob,
+      '收款单打印',
+      /attachment[\s\S]*ar_collection_\d+\.xlsx/
+    );
 
     // 3) 出口退税申报单：真实报关单 + 申报表生成链（与 61 套件同口径）。
     await apiCall(page, 'POST', '/export-refunds/customs-declarations', {
@@ -637,10 +641,13 @@ test.describe('10 财务报表与导出', () => {
       declId,
       `退税申报表生成应返回 id（实际=${JSON.stringify(gen).slice(0, 200)}）`
     ).toBeGreaterThan(0);
-    // 端点未实现（主干与本支路由均无登记）：真实单据 id 也必须真实 404，不该 200 吐空壳。
-    const refundMissing = await apiCallExpectFail(page, 'GET', `/export-refunds/${declId}/print-xlsx`);
-    expect(refundMissing.status, '`/export-refunds/${declId}/print-xlsx` 端点未实现应真实 404，功能落地后把本腿改回 200 真字节').toBe(404);
-    expect([undefined, 'NOT_FOUND']).toContain(failureCode(refundMissing));
+    // 端点已在主干落地：真实退税申报单打印必须 200 真字节。
+    const refundBlob = await fetchExportRaw(page, `/export-refunds/${declId}/print-xlsx`);
+    await assertRealXlsxBlob(
+      refundBlob,
+      '退税申报打印',
+      /attachment[\s\S]*export_refund_declaration_\d+\.xlsx/
+    );
     // 退税申报打印 fail-closed：不存在的申报断真实 404，不能 200 吐空壳 xlsx。
     const missingDeclId = 999999999;
     const declFail = await apiCallExpectFail(

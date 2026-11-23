@@ -126,10 +126,12 @@ async function createGreige(
     supplier_id: supplierId,
     warehouse_id: warehouseId,
     batch_no: `${tag}-BATCH`,
-    length_m: String(columns.length_m),
-    weight_kg: String(columns.weight_kg),
-    quantity_meters: String(columns.quantity_meters),
-    quantity_kg: String(columns.quantity_kg),
+    // 数量四列按 f64 数字入参发送（CreateGreigeFabricRequest 全 f64，serde 不收字符串），
+    // 出参 DECIMAL 才是字符串线格式；入参发字符串会被 Json 提取器拒成脱敏 VALIDATION_ERROR。
+    length_m: columns.length_m,
+    weight_kg: columns.weight_kg,
+    quantity_meters: columns.quantity_meters,
+    quantity_kg: columns.quantity_kg,
   });
   const id = Number(created.data?.id);
   if (!Number.isInteger(id) || id <= 0) {

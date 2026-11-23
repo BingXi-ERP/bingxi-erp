@@ -474,7 +474,7 @@
             <el-upload
               :auto-upload="false"
               :show-file-list="false"
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept=".jpg,.jpeg,.png"
               :disabled="!editingQualificationId"
               :on-change="handleQualificationAttachmentChange"
             >
@@ -1017,7 +1017,7 @@ const submitQualification = async () => {
 // ============== 资质附件上传/查看（真上传，非手敲路径） ==============
 
 /** 与后端 supplier_handler.rs 白名单/大小上限同源同值（双端校验） */
-const ATTACHMENT_ALLOWED_EXTS = ['pdf', 'jpg', 'jpeg', 'png'];
+const ATTACHMENT_ALLOWED_EXTS = ['jpg', 'jpeg', 'png'];
 const ATTACHMENT_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 
 /** 本地待上传文件（点「确定」保存资质成功后真实提交；仅编辑态可选，新增态 disabled） */

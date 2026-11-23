@@ -17,7 +17,7 @@ import {
  * 覆盖六个真实端点（前端 api 层 report-enhanced.ts 逐一封装、advanced/index.vue 挂 SubscriptionPanel、
  * 面板内实调用这些函数，权限键按 URL 段取 reports/enhanced）：
  * - POST /reports/enhanced/subscriptions 建订阅，入参 name、template_id、frequency、recipients 必填，
- *   export_format 缺省 pdf、is_enabled 缺省 true，落库 status 为 ACTIVE、run_count 为 0、
+ *   export_format 缺省 xlsx、is_enabled 缺省 true，落库 status 为 ACTIVE、run_count 为 0、
  *   retry_count 为 0、next_run_at 由频率算出（DAILY 为次日、WEEKLY 为次周、MONTHLY 为三十天后），
  *   created_by 取当前登录用户。校验都在服务层：收件人为空、邮箱格式非法、频率不在
  *   DAILY、WEEKLY、MONTHLY 三者之一，一律返回 400 且码为 VALIDATION_ERROR；template_id 指向不存在的模板
@@ -114,8 +114,8 @@ test.describe.serial('98 报表增强订阅建改查与启停读回', () => {
     ).toEqual([recipient]);
     expect(
       created.export_format,
-      `未提交 export_format 应落默认 pdf，实际：${String(created.export_format)}`
-    ).toBe('pdf');
+      `未提交 export_format 应落默认 xlsx，实际：${String(created.export_format)}`
+    ).toBe('xlsx');
     expect(
       created.is_enabled,
       `未提交 is_enabled 应落默认 true，实际：${String(created.is_enabled)}`

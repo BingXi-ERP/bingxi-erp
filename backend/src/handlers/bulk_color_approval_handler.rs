@@ -75,6 +75,8 @@ pub struct CutSampleDto {
 pub struct CustomerApproveDto {
     pub feedback: Option<String>,
     pub delta_e_value: Option<Decimal>,
+    /// 高光敏感色判定标志：true 时 ΔE 通过阈值取 0.8（普通料 1.2），随批准落库留痕
+    pub high_light_sensitive: Option<bool>,
 }
 
 #[allow(dead_code, reason = "序列化/反序列化字段")]
@@ -126,6 +128,8 @@ pub struct BulkColorApprovalInfo {
     pub sent_to_customer_at: Option<DateTime<Utc>>,
     pub customer_feedback: Option<String>,
     pub delta_e_value: Option<Decimal>,
+    pub high_light_sensitive: bool,
+    pub delta_e_result: Option<String>,
     pub reject_reason: Option<String>,
     pub delivery_blocking: bool,
     pub attachment_url: Option<String>,
@@ -156,6 +160,8 @@ impl From<bulk_color_approval::Model> for BulkColorApprovalInfo {
             sent_to_customer_at: m.sent_to_customer_at,
             customer_feedback: m.customer_feedback,
             delta_e_value: m.delta_e_value,
+            high_light_sensitive: m.high_light_sensitive,
+            delta_e_result: m.delta_e_result,
             reject_reason: m.reject_reason,
             delivery_blocking: m.delivery_blocking,
             attachment_url: m.attachment_url,
@@ -557,7 +563,13 @@ pub async fn customer_approve(
 
     let dto = dto.unwrap_or_default();
     let record = service
-        .customer_approve(id, auth.user_id, dto.feedback, dto.delta_e_value)
+        .customer_approve(
+            id,
+            auth.user_id,
+            dto.feedback,
+            dto.delta_e_value,
+            dto.high_light_sensitive.unwrap_or(false),
+        )
         .await
         .map_err(bca_err)?;
     Ok(Json(ApiResponse::success(record.into())))
