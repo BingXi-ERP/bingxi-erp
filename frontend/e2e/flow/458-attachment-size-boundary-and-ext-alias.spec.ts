@@ -11,8 +11,8 @@ import { API_BASE, API_PREFIX, apiCall, apiCallRaw, loginViaUI } from './helpers
  *   超出文件能完整读入并走到显式校验，拒绝形态是 validation_displayable（4xx + 可外显文案）。
  * - 后缀取扩展名后统一转小写，故大写别名按小写白名单放行；JPEG 与 JPG 同族，
  *   故 .jpeg 配合 JPEG magic 可传。
- * - magic 真值分别取 PDF、JPEG、PNG 的固定头字节；后缀与 magic 不同族视为伪造拒绝，
- *   与已有 .png 实为 PDF 的负例对称。
+ * - magic 真值分别取 PNG、JPEG 的固定头字节（资质附件白名单为 jpg/jpeg/png，PDF 不在册）；
+ *   后缀与 magic 不同族视为伪造拒绝，与已有 .png 实为 JPEG 的负例对称。
  *
  * 端点在册事实来源为 frontend/scripts/route-snapshot.txt：
  * POST/GET /purchase/suppliers/{sid}/qualifications 与 POST 附件上传端点（multipart 字段名 file）。
@@ -84,13 +84,13 @@ async function uploadAttachment(
   };
 }
 
-/** 构造精确字节数的合法 PDF（ASCII 头触发 magic，ASCII 空格填充到指定长度） */
-function buildPdfOfExactSize(totalBytes: number): Buffer {
-  const head = '%PDF-1.4\n';
-  if (totalBytes < head.length) {
-    throw new Error(`458 目标字节数 ${totalBytes} 小于 PDF 头长度 ${head.length}`);
+/** 构造精确字节数的合法 PNG（8 字节签名触发 magic，空格填充到指定长度） */
+function buildPngOfExactSize(totalBytes: number): Buffer {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (totalBytes < signature.length) {
+    throw new Error(`458 目标字节数 ${totalBytes} 小于 PNG 签名长度 ${signature.length}`);
   }
-  return Buffer.from(`${head}${' '.repeat(totalBytes - head.length)}`, 'utf-8');
+  return Buffer.concat([signature, Buffer.alloc(totalBytes - signature.length, 0x20)]);
 }
 
 /** JPEG magic 最小合法体：FF D8 FF + APP0/JFIF，magic 识别只取前三字节 */
@@ -185,20 +185,13 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
     await loginViaUI(page);
   });
 
-  test('458-01 刚好等于 5MB 上限的合法 PDF 可传并落库回读一致', async ({ page }) => {
+  test('458-01 刚好等于 5MB 上限的合法 PNG 可传并落库回读一致', async ({ page }) => {
     const supplierId = await ensureSupplier(page);
     const qid = await createQualification(page, supplierId, '01-boundary');
 
-    const pdf = buildPdfOfExactSize(MAX_BYTES);
-    expect(pdf.length, '458-01 构造体必须精确等于 5MB 上限字节数').toBe(MAX_BYTES);
-    const up = await uploadAttachment(
-      page,
-      supplierId,
-      qid,
-      'boundary.pdf',
-      'application/pdf',
-      pdf
-    );
+    const png = buildPngOfExactSize(MAX_BYTES);
+    expect(png.length, '458-01 构造体必须精确等于 5MB 上限字节数').toBe(MAX_BYTES);
+    const up = await uploadAttachment(page, supplierId, qid, 'boundary.png', 'image/png', png);
     console.log(`[458-01] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`);
     expect(
       up.status,
@@ -206,7 +199,7 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
     ).toBe(200);
     expect(up.code, `458-01 成功信封 code 必须 200，实际 ${up.code}`).toBe(200);
 
-    const expectedPath = `/uploads/qualifications/${supplierId}_${qid}.pdf`;
+    const expectedPath = `/uploads/qualifications/${supplierId}_${qid}.png`;
     expect(
       up.data ? String(up.data.attachment_path) : '<data 缺失>',
       `458-01 回写 attachment_path 必须为受控 URL ${expectedPath}`
@@ -225,9 +218,9 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
     const supplierId = await ensureSupplier(page);
     const qid = await createQualification(page, supplierId, '02-overby1');
 
-    const pdf = buildPdfOfExactSize(MAX_BYTES + 1);
-    expect(pdf.length, '458-02 构造体必须为上限+1 字节').toBe(MAX_BYTES + 1);
-    const up = await uploadAttachment(page, supplierId, qid, 'overby1.pdf', 'application/pdf', pdf);
+    const png = buildPngOfExactSize(MAX_BYTES + 1);
+    expect(png.length, '458-02 构造体必须为上限+1 字节').toBe(MAX_BYTES + 1);
+    const up = await uploadAttachment(page, supplierId, qid, 'overby1.png', 'image/png', png);
     console.log(`[458-02] 上传响应 status=${up.status} code=${up.code} message=${up.message}\n`);
     expect(
       up.status,
@@ -261,11 +254,11 @@ test.describe.serial('458 资质附件大小精确边界与后缀别名/同族�
 
     const cases = [
       {
-        label: '03a-upper-pdf',
-        file: 'UPPER.PDF',
-        mime: 'application/pdf',
-        buf: buildPdfOfExactSize(128),
-        desc: '大写 .PDF 命中 to_ascii_lowercase 白名单',
+        label: '03a-upper-png',
+        file: 'UPPER.PNG',
+        mime: 'image/png',
+        buf: buildPngOfExactSize(128),
+        desc: '大写 .PNG 命中 to_ascii_lowercase 白名单',
       },
       {
         label: '03b-upper-jpeg',

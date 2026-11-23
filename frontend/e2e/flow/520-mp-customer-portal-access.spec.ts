@@ -181,10 +181,11 @@ test.describe.serial('520 小程序客户门户读面', () => {
     await createUser(page, boundUsername, customerRoleId, customerAId);
     await createUser(page, unboundUsername, customerRoleId);
 
-    // 悬空绑定：先建客户并绑定，再由管理员删除客户档案，用户侧保留失效 customer_id。
-    const danglingCustomerId = await createCustomer(page, genCode('520D').slice(0, 8));
+    // 悬空绑定：绑定列无外键，直接绑一个绝不存在的客户 id 即为失效绑定。
+    // 不能走 DELETE /crm/customers/:id——该增强入口落的是线索行，客户行仍在，
+    // 悬空状态造不出来（读面会 200 放行），这是造数错误不是功能缺陷。
+    const danglingCustomerId = 2_100_000_000;
     await createUser(page, danglingUsername, customerRoleId, danglingCustomerId);
-    await apiCallRaw(page, 'DELETE', `/crm/customers/${danglingCustomerId}`);
 
     const temporaryRoleId = await findRoleId(page, 'temporary');
     await createUser(page, temporaryUsername, temporaryRoleId, customerAId);
