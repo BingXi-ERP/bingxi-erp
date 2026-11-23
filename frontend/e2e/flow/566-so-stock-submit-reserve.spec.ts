@@ -1,9 +1,9 @@
-// #78 现货订单提交锁缸与改量差量联动 E2E（4 枚 test 串行链）。
+// 现货订单提交锁缸与改量差量联动 E2E（4 枚 test 串行链）。
 //
 // 判据链注释：后端 services/so/order_stock_lock.rs 只在 submit_order 对
 // fulfillment_source=stock 明细锁缸：product+color+非空 batch/dye_lot 严格匹配、
 // 正常/合格行 FIFO，available-=q/reserved+=q + version 乐观锁；ledger 借
-// inventory_reservations（notes 以 SO78| 开头）承载 stock_id，供改量/作废/硬删
+// inventory_reservations（notes 以 STOCKLOCK| 开头）承载 stock_id，供改量/作废/硬删
 // 同事务回缸。所有断言读真实库存三列并用 toBe 机器数，不用 toBeVisible 空壳。
 //
 // 与既有 213/444 的分工：213 钉「POST /inventory/reservations 只插行不写库存量」，
