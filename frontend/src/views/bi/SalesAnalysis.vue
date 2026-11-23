@@ -11,7 +11,7 @@
  * 6. 利润分析
  * 7. 多维筛选 + 钻取
  */
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage } from 'element-plus';
 import { echarts } from '@/utils/echarts';
@@ -46,8 +46,11 @@ import type {
   ProductOrderDrilldown,
 } from '@/api/bi';
 import logger, { logAuxLoadFailure } from '@/utils/logger';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 const kpi = ref<KpiSummary | null>(null);
 
@@ -366,6 +369,9 @@ function resizeCharts() {
   productChart?.resize();
   regionChart?.resize();
 }
+
+// 断点切换后图表容器宽度变化，下一帧重算 ECharts 画布尺寸（与甘特图同范式）
+watch(isPhone, () => nextTick(resizeCharts));
 </script>
 
 <template>
@@ -398,28 +404,56 @@ function resizeCharts() {
       </el-card>
     </div>
 
+    <p v-if="isPhone" class="bi-scroll-hint">
+      {{ t('biSalesAnalysis.mobileScrollHint') }}
+    </p>
+
     <!-- 2. 销售趋势 -->
     <el-card class="chart-card">
-      <div ref="trendChartRef" style="width: 100%; height: 320px"></div>
+      <div class="bi-scroll" :class="{ 'bi-scroll-phone': isPhone }">
+        <div
+          ref="trendChartRef"
+          class="bi-chart-container"
+          style="width: 100%; height: 320px"
+        ></div>
+      </div>
     </el-card>
 
     <!-- 3. 客户排行 + 产品分布 -->
     <el-row :gutter="16">
       <el-col :span="12">
         <el-card class="chart-card">
-          <div ref="customerChartRef" style="width: 100%; height: 360px"></div>
+          <div class="bi-scroll" :class="{ 'bi-scroll-phone': isPhone }">
+            <div
+              ref="customerChartRef"
+              class="bi-chart-container"
+              style="width: 100%; height: 360px"
+            ></div>
+          </div>
         </el-card>
       </el-col>
       <el-col :span="12">
         <el-card class="chart-card">
-          <div ref="productChartRef" style="width: 100%; height: 360px"></div>
+          <div class="bi-scroll" :class="{ 'bi-scroll-phone': isPhone }">
+            <div
+              ref="productChartRef"
+              class="bi-chart-container"
+              style="width: 100%; height: 360px"
+            ></div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
 
     <!-- 4. 区域热力 -->
     <el-card class="chart-card">
-      <div ref="regionChartRef" style="width: 100%; height: 320px"></div>
+      <div class="bi-scroll" :class="{ 'bi-scroll-phone': isPhone }">
+        <div
+          ref="regionChartRef"
+          class="bi-chart-container"
+          style="width: 100%; height: 320px"
+        ></div>
+      </div>
     </el-card>
 
     <!-- 5. 月度钻取 -->
@@ -631,5 +665,20 @@ function resizeCharts() {
   .bi-sales-analysis {
     padding: 12px;
   }
+}
+
+.bi-scroll {
+  min-width: 0;
+}
+.bi-scroll-phone {
+  overflow-x: auto;
+}
+.bi-scroll-phone .bi-chart-container {
+  min-width: 900px;
+}
+.bi-scroll-hint {
+  margin: 0 0 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 </style>

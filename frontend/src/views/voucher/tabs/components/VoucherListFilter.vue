@@ -7,7 +7,7 @@
 <template>
   <div class="filter-container">
     <ElRow :gutter="20">
-      <ElCol :span="6">
+      <ElCol :span="isPhone ? 24 : 6" :class="isPhone ? 'filter-phone-col' : 'filter-item-col'">
         <ElInput
           v-model="localQuery.voucher_no"
           :placeholder="t('voucher.voucherListFilter.placeholderVoucherNo')"
@@ -15,7 +15,7 @@
           @keyup.enter="handleSearch"
         />
       </ElCol>
-      <ElCol :span="6">
+      <ElCol :span="isPhone ? 24 : 6" :class="isPhone ? 'filter-phone-col' : 'filter-item-col'">
         <!-- P0 修复：value-format 输出 YYYY-MM-DD（后端 VoucherQuery.start_date/end_date 按 NaiveDate parse，Date 对象序列化后 parse 失败即筛选静默失效） -->
         <ElDatePicker
           v-model="localQuery.start_date"
@@ -25,7 +25,7 @@
           class="filter-item"
         />
       </ElCol>
-      <ElCol :span="6">
+      <ElCol :span="isPhone ? 24 : 6" :class="isPhone ? 'filter-phone-col' : 'filter-item-col'">
         <ElDatePicker
           v-model="localQuery.end_date"
           type="date"
@@ -34,7 +34,7 @@
           class="filter-item"
         />
       </ElCol>
-      <ElCol :span="6">
+      <ElCol :span="isPhone ? 24 : 6" :class="isPhone ? 'filter-phone-col' : 'filter-item-col'">
         <ElSelect
           v-model="localQuery.status"
           :placeholder="t('voucher.voucherListFilter.placeholderStatus')"
@@ -68,12 +68,15 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue';
+import { computed, reactive } from 'vue';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useI18n } from 'vue-i18n';
 import { Plus, Printer, Download } from '@element-plus/icons-vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 凭证列表过滤与操作栏组件
@@ -126,3 +129,13 @@ const handleReset = () => {
   emit('fetch');
 };
 </script>
+
+<style scoped>
+.filter-phone-col {
+  width: 100%;
+  max-width: 100%;
+}
+.filter-phone-col + .filter-phone-col {
+  margin-top: 8px;
+}
+</style>

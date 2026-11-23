@@ -7,7 +7,61 @@
 -->
 <template>
   <div v-loading="loading" class="custom-order-tracking">
-    <el-card v-if="timeline">
+    <!-- 手机卡片（<768 与采购域同断点同范式）；桌面甘特图原样保留在 v-else -->
+    <section v-if="isPhone" class="tracking-mobile">
+      <template v-if="timeline">
+        <div class="tracking-header">
+          <div>
+            <h2>{{ t('customOrders.tracking.title') }} - {{ timeline.order_no }}</h2>
+            <el-tag :type="customOrderStatusTagType(timeline.current_status)">
+              {{ getStatusLabel(timeline.current_status) }}
+            </el-tag>
+          </div>
+          <el-button @click="$router.push(`/custom-orders/${orderId}`)">
+            {{ t('customOrders.tracking.buttonDetail') }}
+          </el-button>
+        </div>
+        <ul class="node-list" :aria-label="t('customOrders.tracking.mobileCardAria')">
+          <li v-for="node in timeline.nodes || []" :key="node.id" class="node-card">
+            <div class="node-title">
+              <span>{{ node.node_name }}</span>
+              <span>{{ node.node_type }}</span>
+            </div>
+            <div>
+              <el-tag
+                :style="{ borderColor: getBarColor(node.status), color: getBarColor(node.status) }"
+              >
+                {{ getNodeStatusText(node.status) }}
+              </el-tag>
+            </div>
+            <p v-if="node.actual_start_date">
+              {{ t('customOrders.tracking.labelActual') }}：{{
+                formatDate(node.actual_start_date)
+              }}
+              → {{ formatDate(node.actual_end_date) || t('customOrders.tracking.labelInProgress') }}
+            </p>
+            <p v-else-if="node.planned_start_date">
+              {{ t('customOrders.tracking.labelPlan') }}：{{
+                formatDate(node.planned_start_date)
+              }}
+              → {{ formatDate(node.planned_end_date) || t('customOrders.tracking.labelUnknown') }}
+            </p>
+            <p v-else>{{ t('customOrders.tracking.labelNotStarted') }}</p>
+          </li>
+        </ul>
+        <h3>{{ t('customOrders.tracking.dividerOperationLog') }}</h3>
+        <ul class="log-list">
+          <li v-for="log in allLogs" :key="log.id" class="log-card">
+            <p>{{ formatDate(log.log_time) }} · {{ log.action }}</p>
+            <p v-if="log.log_content">{{ log.log_content }}</p>
+          </li>
+        </ul>
+        <el-empty v-if="allLogs.length === 0" :description="t('customOrders.tracking.emptyLogs')" />
+      </template>
+      <el-empty v-else :description="t('customOrders.tracking.notFound')" />
+    </section>
+
+    <el-card v-if="!isPhone && timeline">
       <template #header>
         <div class="card-header">
           <div>
@@ -95,7 +149,10 @@
       </el-timeline>
     </el-card>
     <!-- 空态：订单不存在或加载失败时给出可见提示（避免整页空白） -->
-    <el-empty v-if="!loading && !timeline" :description="t('customOrders.tracking.notFound')" />
+    <el-empty
+      v-if="!isPhone && !loading && !timeline"
+      :description="t('customOrders.tracking.notFound')"
+    />
   </div>
 </template>
 
@@ -116,8 +173,11 @@ import type {
 import { customOrderStatusLabelKey, customOrderStatusTagType } from '@/utils/custom-order-status';
 import { logAuxLoadFailure } from '@/utils/logger';
 
+import { useBreakpoint } from '@/composables/useBreakpoint';
 const route = useRoute();
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 const loading = ref(false);
 // 时间线响应数据（getTimeline 返回的 res.data 结构）
 const timeline = ref<OrderTimeline | null>(null);
@@ -278,5 +338,58 @@ onMounted(loadData);
     grid-template-columns: minmax(0, 1fr);
     gap: 6px;
   }
+}
+.tracking-mobile {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+.tracking-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tracking-header h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.node-list,
+.log-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.node-card,
+.log-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.node-title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.node-card p,
+.log-card p {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.tracking-mobile h3 {
+  margin: 0;
+  font-size: 16px;
 }
 </style>

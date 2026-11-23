@@ -6,7 +6,91 @@
 -->
 <template>
   <el-card class="table-card">
+    <!-- 手机卡片（<768 与采购域表格同断点同范式） -->
+    <section v-if="isPhone" v-loading="loading" class="logistics-mobile">
+      <ul class="order-list" :aria-label="t('logistics.table.mobileCardAria')">
+        <li v-for="row in data" :key="row.id" class="order-card">
+          <dl class="order-fields">
+            <div>
+              <dt>{{ t('logistics.table.column.relatedOrder') }}</dt>
+              <dd>{{ row.order_no }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('logistics.table.column.logisticsCompany') }}</dt>
+              <dd>{{ row.logistics_company }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('logistics.table.column.trackingNumber') }}</dt>
+              <dd>{{ row.tracking_number }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('logistics.table.column.driverName') }}</dt>
+              <dd>{{ row.driver_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('logistics.table.column.driverPhone') }}</dt>
+              <dd>{{ row.driver_phone }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('logistics.table.column.freight') }}</dt>
+              <dd>{{ formatFreight(row.freight_fee) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('logistics.table.column.expectedArrival') }}</dt>
+              <dd>{{ row.expected_arrival }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('logistics.table.column.status') }}</dt>
+              <dd>
+                <el-tag :type="getStatusType(row.status)">
+                  {{ getStatusText(row.status) }}
+                </el-tag>
+              </dd>
+            </div>
+          </dl>
+          <div class="order-actions">
+            <el-button size="small" @click="emit('view', row)">
+              {{ t('logistics.table.action.view') }}
+            </el-button>
+            <el-button
+              v-if="row.status === WAYBILL_STATUS.inTransit"
+              size="small"
+              type="primary"
+              @click="emit('edit', row)"
+            >
+              {{ t('logistics.table.action.edit') }}
+            </el-button>
+            <el-button
+              v-if="row.status === WAYBILL_STATUS.inTransit"
+              size="small"
+              type="warning"
+              @click="emit('update-status', row)"
+            >
+              {{ t('logistics.table.action.deliver') }}
+            </el-button>
+            <el-button
+              v-if="row.status === WAYBILL_STATUS.inTransit"
+              size="small"
+              type="danger"
+              @click="emit('delete', row)"
+            >
+              {{ t('logistics.table.action.delete') }}
+            </el-button>
+            <el-button
+              v-if="row.status === WAYBILL_STATUS.delivered"
+              size="small"
+              type="success"
+              @click="emit('sign', row)"
+            >
+              {{ t('logistics.table.action.sign') }}
+            </el-button>
+          </div>
+        </li>
+      </ul>
+    </section>
+
     <V2Table
+      v-else
       :columns="columns"
       :data="data"
       :loading="loading"
@@ -29,9 +113,12 @@ import V2Table from '@/components/V2Table/index.vue';
 import type { ColumnDef } from '@/components/V2Table/types';
 import type { LogisticsWaybill } from '@/api/logistics';
 import { WAYBILL_STATUS } from '@/constants/waybill-status';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getStatusText, getStatusType, formatFreight } from '../composables/lgsFmts';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 物流运单列表组件（批次 287：page/pageSize props + v-model 绑定分页）
@@ -147,5 +234,55 @@ const columns = computed<ColumnDef<LogisticsWaybill>[]>(() => [
   display: flex;
   gap: 4px;
   align-items: center;
+}
+.logistics-mobile {
+  min-width: 0;
+}
+.order-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.order-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.order-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.order-fields > div {
+  min-width: 0;
+}
+.order-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.order-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.order-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.order-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
 }
 </style>
