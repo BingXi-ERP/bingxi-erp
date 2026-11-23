@@ -29,6 +29,7 @@ fn make_user_model(id: i32, username: &str, is_active: bool) -> user::Model {
         avatar: None,
         gender: None,
         birth_date: None,
+        customer_id: None,
     }
 }
 
