@@ -163,6 +163,9 @@ impl InitService {
             ),
             // V15 P1 Batch-10 12.1：补齐 customer_service 角色
             ("客户服务", "customer_service", "客户服务与售后跟进", "self"),
+            // 小程序客户门户外部账号：与 Web 共用账号权限体系，门户读面按
+            // role.code == "customer" 硬门 + users.customer_id 显式绑定双重判定。
+            ("客户外部账号", "customer", "小程序客户门户只读账号", "self"),
             // 采购域
             ("采购经理", "purchase_manager", "采购业务管理与审批", "dept"),
             (

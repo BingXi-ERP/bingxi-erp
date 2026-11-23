@@ -1,7 +1,8 @@
+use crate::models::inventory_piece;
 use crate::models::quality_inspection;
 use crate::models::quality_inspection_record;
 use crate::models::status::purchase_inventory::{
-    inventory_stock_grade, purchase_receipt_inspection,
+    inventory_stock_grade, inventory_stock_quality_status, purchase_receipt_inspection,
 };
 use crate::models::unqualified_product;
 // 批次 212 P2-5 修复（v12 复审）：硬编码 "active" 替换为 master_data 常量
@@ -33,6 +34,28 @@ use tracing::info;
 pub const QUALITY_GRADE_A: &str = "A"; // 合格
 pub const QUALITY_GRADE_B: &str = "B"; // 让步接收，降级销售
 pub const QUALITY_GRADE_C: &str = "C"; // 不合格，返工或报废
+
+/// 质检等级（A/B/C）→ 匹质检状态（inventory_piece.quality_status）映射。
+///
+/// 词表唯一来源是 models/status/purchase_inventory.rs 的 inventory_stock_quality_status
+/// （合格/待检/不合格三值，打卷产匹写入方 fabric_inspection_service 复用同一模块常量）。
+/// A（合格）→ 合格；B（让步接收，待降级/复验处置）→ 待检；C（不合格，返工或报废）→ 不合格。
+/// 等级缺失或越界一律显式报错，禁止兜底代填。
+pub fn piece_quality_status_by_grade(grade: Option<&str>) -> Result<&'static str, AppError> {
+    match grade {
+        Some(QUALITY_GRADE_A) => Ok(inventory_stock_quality_status::PASS),
+        Some(QUALITY_GRADE_B) => Ok(inventory_stock_quality_status::PENDING),
+        Some(QUALITY_GRADE_C) => Ok(inventory_stock_quality_status::FAIL),
+        _ => Err(AppError::business(format!(
+            "质检等级缺失或不是 A/B/C 取值（实际：{:?}），无法联动匹质检状态",
+            grade
+        ))),
+    }
+}
+
+/// 质检绑匹的 related_type 锚值（quality_inspection_records.related_type），
+/// 与匹主键（inventory_piece.id）成对写入。
+pub const RELATED_TYPE_INVENTORY_PIECE: &str = "INVENTORY_PIECE";
 
 // 合格率分级阈值（百分比，0-100）
 // 注意：Decimal::new 非 const fn，用函数返回避免 const 上下文限制
@@ -135,6 +158,10 @@ pub struct RecordListParams {
     pub inspection_result: Option<String>,
     pub product_id: Option<i32>,
     pub batch_no: Option<String>,
+    /// 多态锚筛选：related_type（如 PURCHASE_RECEIPT / INVENTORY_PIECE）与
+    /// related_id 成对使用，匹级追溯页按匹拉判定列表走这两个下推
+    pub related_type: Option<String>,
+    pub related_id: Option<i32>,
     pub page: i64,
     pub page_size: i64,
 }
@@ -179,6 +206,10 @@ pub struct CreateInspectionRecordRequest {
     // v14 批次 421：按缸号追溯质检结果
     pub color_no: Option<String>,
     pub dye_lot_no: Option<String>,
+    // 质检绑匹（可选）：指向 inventory_piece 主键。提供时服务端校验匹存在并改写
+    // related_type/related_id 为 INVENTORY_PIECE 锚，缺省的批号/色号/缸号回填匹上
+    // 冗余值，并按等级联动匹质检状态
+    pub piece_id: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -312,6 +343,13 @@ impl QualityInspectionService {
             let pattern = safe_like_pattern(batch_no);
             query = query.filter(quality_inspection_record::Column::BatchNo.like(&pattern));
         }
+        // 多态锚等值下推：related_type 与 related_id 成对出现时按匹/收货单拉判定列表
+        if let Some(related_type) = &params.related_type {
+            query = query.filter(quality_inspection_record::Column::RelatedType.eq(related_type));
+        }
+        if let Some(related_id) = params.related_id {
+            query = query.filter(quality_inspection_record::Column::RelatedId.eq(related_id));
+        }
 
         let total = query.clone().count(&*self.db).await?;
 
@@ -357,6 +395,13 @@ impl QualityInspectionService {
         // v14 批次 421 T-P1-4：grade 未显式提供时由 determine_quality_grade 自动判定
         let grade = Self::resolve_record_grade(&req);
 
+        // 质检绑匹：piece_id 指向的匹必须存在（404 点名），并把多态锚改写为
+        // related_type=INVENTORY_PIECE / related_id=匹主键；等级联动匹质检状态
+        let req = match req.piece_id {
+            Some(piece_id) => Self::bind_record_to_piece(txn, req, piece_id, &grade).await?,
+            None => req,
+        };
+
         let active_model = Self::build_inspection_record_active_model(req, grade);
         let result = active_model.insert(txn).await?;
         info!("质量检验记录创建成功：{}", result.inspection_no);
@@ -365,6 +410,40 @@ impl QualityInspectionService {
         Self::sync_receipt_inspection_status(txn, &result, user_id).await?;
 
         Ok(result)
+    }
+
+    /// 质检绑匹：校验匹存在，把请求锚定到该匹并按等级联动匹质检状态。
+    ///
+    /// related_type/related_id 改写为 INVENTORY_PIECE/匹主键（覆盖请求体里可能带的
+    /// 其他锚值——匹绑定语义下锚只能指向匹本身）；批号/色号/缸号缺省时回填匹上的
+    /// 同名冗余列，按匹追溯筛选不留空断链。等级联动走 piece_quality_status_by_grade
+    /// （A→合格 / B→待检 / C→不合格），等级缺失或越界显式报错。
+    async fn bind_record_to_piece(
+        txn: &DatabaseTransaction,
+        mut req: CreateInspectionRecordRequest,
+        piece_id: i32,
+        grade: &str,
+    ) -> Result<CreateInspectionRecordRequest, AppError> {
+        let piece = inventory_piece::Entity::find_by_id(piece_id)
+            .one(txn)
+            .await?
+            .ok_or_else(|| AppError::not_found(format!("匹不存在：{}", piece_id)))?;
+        let quality_status = piece_quality_status_by_grade(Some(grade))?;
+        req.related_type = Some(RELATED_TYPE_INVENTORY_PIECE.to_string());
+        req.related_id = Some(piece.id);
+        req.batch_no = req.batch_no.or_else(|| Some(piece.batch_no.clone()));
+        req.color_no = req.color_no.or_else(|| Some(piece.color_no.clone()));
+        req.dye_lot_no = req.dye_lot_no.or_else(|| Some(piece.dye_lot_no.clone()));
+
+        let mut piece_active: inventory_piece::ActiveModel = piece.into();
+        piece_active.quality_status = Set(Some(quality_status.to_string()));
+        piece_active.updated_at = Set(chrono::Utc::now());
+        piece_active.update(txn).await?;
+        info!(
+            "质检记录 {} 绑定匹 {}，匹质检状态联动为 {}",
+            req.inspection_no, piece_id, quality_status
+        );
+        Ok(req)
     }
 
     /// 解析质检记录等级（未显式提供时根据合格率自动判定 A/B/C）

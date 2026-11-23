@@ -36,6 +36,10 @@ pub struct Model {
     pub gender: Option<String>,
     /// V15 P2 B08-P2-9：出生日期（未成年工识别，禁止录用 <16 周岁）
     pub birth_date: Option<chrono::NaiveDate>,
+    /// 客户门户账号归属；管理员 user_handler create/update 接收可空 customers.id，
+    /// 经 user_service 校验目标存在后存入 public.users.customer_id（无外键、不回填）。
+    /// customer_portal_service 回读本列并传给门户查询作客户过滤；NULL 或悬空绑定一律 403。
+    pub customer_id: Option<i32>,
     pub updated_at: DateTime<Utc>,
 }
 

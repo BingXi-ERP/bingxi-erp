@@ -2845,6 +2845,7 @@ export default {
     },
     pendingTable: {
       ariaLabel: '待审批任务列表',
+      mobileCardAria: '待审批任务手机卡片列表',
       taskNo: '任务编号',
       taskName: '任务名称',
 
@@ -2864,6 +2865,7 @@ export default {
     },
     processedTable: {
       ariaLabel: '已处理任务列表',
+      mobileCardAria: '已处理任务手机卡片列表',
       taskNo: '任务编号',
       taskName: '任务名称',
       handler: '处理人',
@@ -2873,6 +2875,7 @@ export default {
     },
     monitorTable: {
       ariaLabel: '流程实例监控列表',
+      mobileCardAria: '流程实例监控手机卡片列表',
       instancesTitle: '流程实例监控',
       instanceId: '实例编号',
       title: '流程标题',
@@ -4143,6 +4146,11 @@ export default {
       product: '产品标准',
       process: '工艺标准',
     },
+    toleranceSource: {
+      product_standard: '产品标准',
+      order_agreement: '订单约定',
+      confirmed_sample: '确认样',
+    },
     table: {
       ariaLabel: '质量标准列表',
       standardCode: '标准编号',
@@ -4177,6 +4185,13 @@ export default {
       versionPlaceholder: '请输入版本号',
       content: '标准内容',
       contentPlaceholder: '请输入标准内容',
+      toleranceSource: '允差来源',
+      toleranceSourcePlaceholder: '请选择允差来源',
+      detectionMethod: '检测方法',
+      detectionMethodPlaceholder: '请输入 ISO/GB 方法号',
+      deltaETolerance: '色差允差 ΔE',
+      weightTolerance: '克重允差（g/m²）',
+      widthTolerance: '门幅允差（cm）',
       cancel: '取消',
       confirm: '确定',
     },
@@ -5354,6 +5369,7 @@ export default {
   },
   biSalesAnalysis: {
     title: 'BI 销售多维分析（P3-4 关键路径 demo）',
+    mobileScrollHint: '图表区域在手机端可左右滑动查看',
     kpi: {
       totalSales: '总销售额',
       orderCount: '订单数',
@@ -9215,6 +9231,8 @@ export default {
       confirm: '确定',
     },
     table: {
+      mobileCardAria: '采购合同手机卡片列表',
+      mobileEmpty: '暂无采购合同',
       listAria: '采购合同列表',
       colIndex: '序号',
       colContractNo: '合同编号',
@@ -9361,6 +9379,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: '采购验货手机卡片列表',
       ariaLabel: '采购验货列表',
       column: {
         inspectionNo: '检验单号',
@@ -9516,6 +9535,8 @@ export default {
     },
     table: {
       ariaLabel: '采购价格列表',
+      mobileCardAria: '采购价格手机卡片列表',
+      mobileEmpty: '暂无采购价格',
       column: {
         index: '序号',
         productName: '产品名称',
@@ -9686,6 +9707,8 @@ export default {
       },
     },
     table: {
+      mobileCardAria: '采购退货手机卡片列表',
+      mobileEmpty: '暂无采购退货',
       aria: {
         list: '采购退货列表',
         pagination: '采购退货列表分页',
@@ -9810,6 +9833,7 @@ export default {
       },
     },
     table: {
+      mobileCardAria: '采购入库单手机卡片列表',
       aria: {
         list: '采购入库单列表',
         pagination: '采购入库单分页',
@@ -10243,6 +10267,7 @@ export default {
       buttonExport: '导出报表',
       tabOverview: '经营分析',
       tabBi: '多维分析',
+      mobileCardAria: '销售分析手机卡片列表',
     },
     stat: {
       labelMonthOrders: '本月订单数',
@@ -10963,6 +10988,7 @@ export default {
       statusSubmitted: '已提交',
       statusReviewed: '已审核',
       statusPosted: '已记账',
+      mobileCardAriaLabel: '凭证手机卡片列表',
     },
     index: {
       pageAriaLabel: '凭证管理',

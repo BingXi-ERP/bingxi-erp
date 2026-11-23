@@ -95,6 +95,8 @@ pub mod social_insurance;
 pub mod device_connection;
 // V15 P2 B05-P2-10：期末调整路由（暂估/摊销/预提，6 端点）
 pub mod period_adjustment;
+
+pub mod customer_portal;
 // V15 P2 B08-12：出口商检 + 产地证路由
 pub mod export_inspection_routes;
 // 纺织品安全合规域（送检单、第三方报告、限值矩阵与出口要求主数据）
@@ -528,6 +530,8 @@ pub fn create_router(state: AppState) -> Router<()> {
         .nest("/api/v1/erp/admin/failover", failover::failover_routes())
         // 色卡仓储管理路由（P0-4）
         .nest("/api/v1/erp/color-cards", color_card::routes())
+        // 小程序客户门户读面（customer 角色经 users.customer_id 绑定读取自有单据）
+        .nest("/api/v1/erp/customer-portal", customer_portal::routes())
         // 面料多色号定价扩展路由（P0-5）
         .nest("/api/v1/erp/color-prices", color_price::routes())
         // V15 P0-F15/F16/F17：大货批色审批路由

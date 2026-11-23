@@ -760,6 +760,8 @@ impl OutsourcingReceiptService {
             grade: Some(grade),
             color_no: receipt.color_no.clone(),
             dye_lot_no: receipt.dye_lot_no.clone(),
+            // 委外收回自动质检锚定收回单本身，不绑匹
+            piece_id: None,
         };
 
         let record = QualityInspectionService::create_record_in_txn(

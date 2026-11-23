@@ -41,7 +41,6 @@ use crate::models::status::fabric_grade;
 use crate::models::status::fabric_inspection as inspection_status;
 use crate::models::status::fabric_scoring;
 use crate::models::status::inventory_piece as piece_status;
-use crate::models::status::purchase_inventory::inventory_stock_quality_status as quality_status;
 use crate::utils::error::AppError;
 use crate::utils::number_generator::DocumentNumberGenerator;
 
@@ -236,6 +235,10 @@ pub struct RollFabricRequest {
     pub roll_width: Option<Decimal>,
     #[validate(required(message = "打卷入库必须填写克重(g/m²)，成品布标签克重取该实测值"))]
     pub roll_gram_weight: Option<Decimal>,
+    /// 打卷修边长度（米，可选实测；不修边不提交）
+    pub edge_trim_length: Option<Decimal>,
+    /// 打卷修边重量（千克，可选实测；不修边不提交）
+    pub edge_trim_weight: Option<Decimal>,
 }
 
 /// 验布记录查询参数
@@ -328,6 +331,9 @@ impl FabricInspectionService {
             total_rolls: Set(0),
             total_roll_length: Set(Decimal::ZERO),
             total_roll_weight: Set(Decimal::ZERO),
+            // 修边实测只在打卷时产生，建单必为 NULL
+            edge_trim_length: Set(None),
+            edge_trim_weight: Set(None),
             status: Set(inspection_status::PENDING.to_string()),
             remarks: Set(req.remarks),
             is_deleted: Set(false),
@@ -640,6 +646,12 @@ impl FabricInspectionService {
         let dye_lot = self.fetch_dye_lot(&dye_lot_no).await?;
         let dye_lot_id = dye_lot.id;
         let (piece_no, next_seq) = self.generate_next_piece_no(dye_lot_id, &dye_lot_no).await?;
+        // 匹质检状态随验布 A/B/C 分级联动（A→合格 / B→待检 / C→不合格），
+        // 评级必写 abc_grade（grade_inspection 落值），缺失/越界在此显式报错不落匹
+        let piece_quality_status =
+            crate::services::quality_inspection_service::piece_quality_status_by_grade(
+                model.abc_grade.as_deref(),
+            )?;
         let new_piece = Self::build_piece_active_model(
             &req,
             dye_lot_id,
@@ -649,6 +661,7 @@ impl FabricInspectionService {
             &piece_no,
             next_seq,
             id,
+            piece_quality_status,
         );
         new_piece.insert(&*self.db).await?;
         self.apply_roll_summary(model, &req).await
@@ -745,6 +758,7 @@ impl FabricInspectionService {
         piece_no: &str,
         next_seq: i32,
         inspection_id: i32,
+        piece_quality_status: &'static str,
     ) -> PieceActiveModel {
         let now_piece = chrono::Utc::now();
         PieceActiveModel {
@@ -780,7 +794,7 @@ impl FabricInspectionService {
             package_no: Default::default(),
             production_date: Default::default(),
             shelf_life: Default::default(),
-            quality_status: Set(Some(quality_status::PASS.to_string())),
+            quality_status: Set(Some(piece_quality_status.to_string())),
             created_by: Default::default(),
             updated_by: Default::default(),
             color_no: match model.color_no.clone() {
@@ -814,6 +828,9 @@ impl FabricInspectionService {
         active.total_rolls = Set(1);
         active.total_roll_length = Set(req.roll_length);
         active.total_roll_weight = Set(roll_weight);
+        // 修边实测随打卷落单，不修边保持 NULL（缺省键不代填）
+        active.edge_trim_length = Set(req.edge_trim_length);
+        active.edge_trim_weight = Set(req.edge_trim_weight);
         active.status = Set(inspection_status::ROLLED.to_string());
         active.updated_at = Set(crate::utils::date_utils::utc_now_fixed());
         let updated = active.update(&*self.db).await?;
@@ -1035,6 +1052,12 @@ pub struct CreatePhysicalTestRequest {
     pub standard_value: Option<Decimal>,
     /// test_result 未提供时根据 test_value 与 standard_value 自动判定
     pub test_result: Option<String>,
+    /// 判定允差上限：pass = |实测值-标准值| ≤ 允差；未填时维持 实测≥标准 即合格 的原规则
+    pub tolerance_value: Option<Decimal>,
+    /// 允差取值来源：product_standard(产品标准) / order_agreement(订单约定) / confirmed_sample(确认样)
+    pub tolerance_source: Option<String>,
+    /// 允差检测方法依据（ISO/GB 方法号原文）
+    pub detection_method: Option<String>,
     pub tested_by: Option<i32>,
     pub remarks: Option<String>,
 }
@@ -1083,6 +1106,44 @@ impl FabricPhysicalTestService {
             return Err(AppError::business("检测值不能为负"));
         }
 
+        // 允差判定留痕口径：允差值/来源/方法三要素成组出现，来源 token 与质量标准配置共用同一词表
+        let tolerance_source = req
+            .tolerance_source
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string);
+        let detection_method = req
+            .detection_method
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string);
+        if let Some(tolerance_value) = req.tolerance_value {
+            if tolerance_value.is_sign_negative() {
+                return Err(AppError::business_displayable("允差值不能为负数"));
+            }
+            if req.standard_value.is_none() {
+                return Err(AppError::business_displayable(
+                    "填写允差值时必须同时填写标准值，允差按实测值与标准值的偏差绝对值判定",
+                ));
+            }
+            if tolerance_source.is_none() || detection_method.is_none() {
+                return Err(AppError::business_displayable(
+                    "填写允差值时，必须同时选择允差来源并填写检测方法",
+                ));
+            }
+        }
+        if let Some(source) = &tolerance_source {
+            if !crate::services::quality_standard_service::TOLERANCE_SOURCES
+                .contains(&source.as_str())
+            {
+                return Err(AppError::business_displayable(
+                    "允差来源只能是产品标准、订单约定或确认样",
+                ));
+            }
+        }
+
         // 校验验布记录存在
         let inspection = InspectionEntity::find_by_id(req.inspection_id)
             .filter(fabric_inspection_record::Column::IsDeleted.eq(false))
@@ -1100,17 +1161,26 @@ impl FabricPhysicalTestService {
             )));
         }
 
-        // test_result 未提供时根据 standard_value 自动判定
-        let test_result = req.test_result.unwrap_or_else(|| match req.standard_value {
-            Some(std_val) => {
-                if req.test_value >= std_val {
-                    physical_test_result::PASS.to_string()
-                } else {
-                    physical_test_result::FAIL.to_string()
-                }
-            }
-            None => physical_test_result::PASS.to_string(),
-        });
+        // test_result 未提供时自动判定：带允差按 |实测-标准| ≤ 允差 判定，否则维持 实测≥标准 即合格
+        let test_result =
+            req.test_result
+                .unwrap_or_else(|| match (req.standard_value, req.tolerance_value) {
+                    (Some(std_val), Some(tolerance)) => {
+                        if (req.test_value - std_val).abs() <= tolerance {
+                            physical_test_result::PASS.to_string()
+                        } else {
+                            physical_test_result::FAIL.to_string()
+                        }
+                    }
+                    (Some(std_val), None) => {
+                        if req.test_value >= std_val {
+                            physical_test_result::PASS.to_string()
+                        } else {
+                            physical_test_result::FAIL.to_string()
+                        }
+                    }
+                    (None, _) => physical_test_result::PASS.to_string(),
+                });
 
         if test_result != physical_test_result::PASS && test_result != physical_test_result::FAIL {
             return Err(AppError::business(format!(
@@ -1129,6 +1199,9 @@ impl FabricPhysicalTestService {
             test_value: Set(req.test_value),
             standard_value: Set(req.standard_value),
             test_result: Set(test_result),
+            tolerance_source: Set(tolerance_source),
+            detection_method: Set(detection_method),
+            tolerance_value: Set(req.tolerance_value),
             tested_by: Set(req.tested_by),
             tested_at: Set(now),
             remarks: Set(req.remarks),

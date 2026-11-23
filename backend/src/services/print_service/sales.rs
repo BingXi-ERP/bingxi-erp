@@ -1928,6 +1928,7 @@ mod xlsx_print_tests {
             last_login_at: None,
             password_changed_at: None,
             agreed_to_terms_at: None,
+            customer_id: None,
             created_at: now(),
             gender: None,
             birth_date: None,
