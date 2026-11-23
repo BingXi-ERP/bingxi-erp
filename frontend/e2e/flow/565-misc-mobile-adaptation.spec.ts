@@ -52,7 +52,7 @@ test.describe('565 杂项域四页响应式', () => {
     test(`${item.label}桌面锚点与手机卡片分支`, async ({ page }) => {
       await gotoRoute(page, item.route);
 
-      const card = page.locator(`.${item.mobile}`);
+      const card = page.locator(`.${item.mobile}`).first();
       await expect(card, `${item.label}：桌面视口不应渲染手机卡片容器`).toHaveCount(0);
       const anchor = page.locator(item.table).first();
       await expect(anchor, `${item.label}：桌面视口应显示原有内容`).toBeVisible();
