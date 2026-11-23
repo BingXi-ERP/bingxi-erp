@@ -201,10 +201,13 @@ impl PurchaseOrderService {
         }
 
         // 日期合理性检查
+        // 拒因只涉及提交方自填的两个日期与公开业务规则，满足 error.rs 安全边界，
+        // 走 validation_displayable 外显真实文案；bad_request 会被出参脱敏成
+        // 「请求参数错误」，交期门的方向信息（早/晚）到不了调用方。
         if let Some(expected_date) = req.expected_delivery_date {
             if expected_date < req.order_date {
                 tracing::error!("预计交货日期不能早于订单日期");
-                return Err(AppError::bad_request(
+                return Err(AppError::validation_displayable(
                     "预计交货日期不能早于订单日期".to_string(),
                 ));
             }

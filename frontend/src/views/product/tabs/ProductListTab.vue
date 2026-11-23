@@ -449,7 +449,7 @@
         <el-form-item :label="t('product.productListTab.exportFormatLabel')">
           <el-radio-group v-model="exportForm.file_format">
             <el-radio value="xlsx">{{ t('product.productListTab.exportFormatXlsx') }}</el-radio>
-            <el-radio value="pdf">{{ t('product.productListTab.exportFormatPdf') }}</el-radio>
+            <el-radio value="docx">{{ t('product.productListTab.exportFormatDocx') }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item :label="t('product.productListTab.exportEstimatedRowsLabel')">
@@ -686,8 +686,8 @@ const exportSubmitting = ref(false);
 const exportRequestsLoading = ref(false);
 const downloadingApprovalId = ref<number | null>(null);
 const myExportRequests = ref<ExportApprovalRequest[]>([]);
-// 后端 create 校验 file_format 仅接受 xlsx/pdf（export_approval_service validate 分支）
-const exportForm = reactive({ file_format: 'xlsx' as 'xlsx' | 'pdf' });
+// 后端 create 校验 file_format 仅接受 xlsx/docx（export_approval_service validate 分支）
+const exportForm = reactive({ file_format: 'xlsx' as 'xlsx' | 'docx' });
 
 const userStore = useUserStore();
 
@@ -812,8 +812,8 @@ const handleDownloadWithToken = async (row: ExportApprovalRequest) => {
     // 归一化两种形态（同 api/ap.ts printAPPaymentDocx 的既定写法）
     const payload = res as unknown as Blob | { data: Blob };
     const blob = payload instanceof Blob ? payload : payload.data;
-    // file_format 后端契约仅 xlsx/pdf 二值，扩展名按申请时刻的格式
-    const ext = row.file_format === 'pdf' ? 'pdf' : 'xlsx';
+    // file_format 后端契约仅 xlsx/docx 二值，扩展名按申请时刻的格式
+    const ext = row.file_format === 'docx' ? 'docx' : 'xlsx';
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

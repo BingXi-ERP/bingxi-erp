@@ -161,7 +161,6 @@ pub fn reports_enhanced() -> Router<AppState> {
             "/templates/{id}/preview",
             get(report_enhanced_handler::preview_template),
         )
-        .route("/export/pdf", post(report_enhanced_handler::export_pdf))
         .route("/export/excel", post(report_enhanced_handler::export_excel))
         .route(
             "/subscriptions",

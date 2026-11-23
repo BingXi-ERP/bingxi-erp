@@ -97,9 +97,14 @@ function centsOf(value: unknown, label: string): number {
     `[501] ${label} 须为 rust_decimal 字符串线格式，实际 ${JSON.stringify(value)}`
   ).toBe('string');
   const text = value as string;
-  expect(/^-?\d+(\.\d{1,2})?$/.test(text), `[501] ${label} 金额格式异常: ${text}`).toBe(true);
+  // available_balance 列刻度 DECIMAL(18,4)：接受 4 位小数，百分位以下须为零尾数，不静默截断。
+  expect(/^-?\d+(\.\d{1,4})?$/.test(text), `[501] ${label} 金额格式异常: ${text}`).toBe(true);
   const negative = text.startsWith('-');
   const [whole, fraction = ''] = (negative ? text.slice(1) : text).split('.');
+  expect(
+    fraction.length <= 2 || fraction.slice(2) === '00',
+    `[501] ${label} 含百分位以下非零尾数，超出分精度: ${text}`
+  ).toBe(true);
   const magnitude = Number(whole) * 100 + Number((fraction + '00').slice(0, 2));
   const cents = negative ? -magnitude : magnitude;
   expect(Number.isSafeInteger(cents), `[501] ${label} 金额超出安全整数范围: ${text}`).toBe(true);

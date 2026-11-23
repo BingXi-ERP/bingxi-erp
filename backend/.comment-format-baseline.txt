@@ -335,8 +335,6 @@ backend/tests/contract_wave1_transfer_dims_missing_dye_lot_test.rs::fabric_class
 backend/tests/contract_wave1_transfer_dims_missing_dye_lot_test.rs::inv/inventory_move.rs
 backend/tests/contract_wave1_transfer_dims_missing_dye_lot_test.rs::inv/stock.rs
 backend/tests/contract_wave1_transfer_dims_missing_dye_lot_test.rs::inventory_move.rs
-backend/tests/contract_wave1_transfer_dims_missing_dye_lot_test.rs::migration/src/domain/system/mod.rs
-backend/tests/contract_wave1_transfer_dims_missing_dye_lot_test.rs::piece_domain_service.rs
 backend/tests/contract_wave1_transfer_dims_missing_dye_lot_test.rs::purchase_return_service.rs
 backend/tests/contract_wave2_contract_no_and_remark_test.rs::handlers/supplier_handler.rs
 backend/tests/contract_wave2_prod_quality_outsourcing_dye_test.rs::import_export_handler.rs
@@ -650,6 +648,9 @@ frontend/e2e/dashboard/02-bi-aggregate-truth.spec.ts::cust.rs
 frontend/e2e/dashboard/02-bi-aggregate-truth.spec.ts::handlers/crm_handler.rs
 frontend/e2e/dashboard/02-bi-aggregate-truth.spec.ts::services/crm/lead.rs
 frontend/e2e/dashboard/02-bi-aggregate-truth.spec.ts::utils/response.rs
+frontend/e2e/enhanced/414-warehouse-pagination-boundary.spec.ts::handlers/warehouse_handler.rs
+frontend/e2e/enhanced/414-warehouse-pagination-boundary.spec.ts::services/warehouse_service.rs
+frontend/e2e/enhanced/414-warehouse-pagination-boundary.spec.ts::utils/response.rs
 frontend/e2e/enhanced/414b-sales-order-filter-combo.spec.ts::handlers/sales_order_handler.rs
 frontend/e2e/enhanced/414b-sales-order-filter-combo.spec.ts::services/so/mod.rs
 frontend/e2e/enhanced/414b-sales-order-filter-combo.spec.ts::services/so/order_query.rs
@@ -675,6 +676,16 @@ frontend/e2e/enhanced/420-password-change-token-revocation.spec.ts::middleware/p
 frontend/e2e/enhanced/420-password-change-token-revocation.spec.ts::public_routes.rs
 frontend/e2e/enhanced/420-password-change-token-revocation.spec.ts::services/auth_service_ops/jti.rs
 frontend/e2e/enhanced/420-password-change-token-revocation.spec.ts::utils/error.rs
+frontend/e2e/enhanced/420b-user-disable-session-revocation.spec.ts::auth.rs
+frontend/e2e/enhanced/420b-user-disable-session-revocation.spec.ts::handlers/user_handler.rs
+frontend/e2e/enhanced/420b-user-disable-session-revocation.spec.ts::middleware/auth.rs
+frontend/e2e/enhanced/420b-user-disable-session-revocation.spec.ts::middleware/public_routes.rs
+frontend/e2e/enhanced/420b-user-disable-session-revocation.spec.ts::models/status/general.rs
+frontend/e2e/enhanced/420b-user-disable-session-revocation.spec.ts::public_routes.rs
+frontend/e2e/enhanced/420b-user-disable-session-revocation.spec.ts::services/auth_service.rs
+frontend/e2e/enhanced/420b-user-disable-session-revocation.spec.ts::services/auth_service_ops/auth.rs
+frontend/e2e/enhanced/420b-user-disable-session-revocation.spec.ts::services/user_service.rs
+frontend/e2e/enhanced/420b-user-disable-session-revocation.spec.ts::user_service.rs
 frontend/e2e/enhanced/421-credit-limit-equal-boundary.spec.ts::services/customer_credit_limit.rs
 frontend/e2e/enhanced/421-credit-limit-equal-boundary.spec.ts::services/so/order_crud.rs
 frontend/e2e/enhanced/422-greige-reference-delete-guard.spec.ts::dye_batch_handler.rs

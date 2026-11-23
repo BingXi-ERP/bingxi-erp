@@ -6,7 +6,67 @@
 -->
 <template>
   <el-card shadow="hover" class="table-card">
+    <section v-if="isPhone" v-loading="loading" class="contract-mobile">
+      <ul class="contract-list" :aria-label="t('salesContract.table.mobileCardAria')">
+        <li v-for="row in contractList" :key="row.id" class="contract-card">
+          <dl class="contract-fields">
+            <div class="contract-number">
+              <dt>{{ t('salesContract.table.columnContractNo') }}</dt>
+              <dd>{{ row.contract_no }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesContract.table.columnContractName') }}</dt>
+              <dd>{{ row.contract_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesContract.table.columnCustomer') }}</dt>
+              <dd>{{ row.customer_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesContract.table.columnTotalAmount') }}</dt>
+              <dd>
+                {{ formatCurrency(row.total_amount == null ? null : Number(row.total_amount)) }}
+              </dd>
+            </div>
+            <div>
+              <dt>{{ t('salesContract.table.columnSignedDate') }}</dt>
+              <dd>{{ row.signed_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesContract.table.columnEffectiveDate') }}</dt>
+              <dd>{{ row.effective_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesContract.table.columnExpiryDate') }}</dt>
+              <dd>{{ row.expiry_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesContract.table.columnStatus') }}</dt>
+              <dd>
+                <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+              </dd>
+            </div>
+          </dl>
+          <component :is="() => h('div', { class: 'contract-actions' }, buildActionButtons(row))" />
+        </li>
+      </ul>
+      <ElEmpty
+        v-if="!loading && contractList.length === 0"
+        :description="t('components.v2Table.empty')"
+      />
+      <ElPagination
+        :current-page="page"
+        :page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        layout="total, sizes, prev, next"
+        :aria-label="t('components.v2Table.paginationAriaLabel')"
+        @current-change="(v: number) => emit('update:page', v)"
+        @size-change="(v: number) => emit('update:page-size', v)"
+      />
+    </section>
     <V2Table
+      v-else
       :columns="columns"
       :data="contractList"
       :loading="loading"
@@ -25,8 +85,9 @@
 import { computed, h } from 'vue';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useI18n } from 'vue-i18n';
-import { ElButton, ElTag } from 'element-plus';
+import { ElButton, ElEmpty, ElPagination, ElTag } from 'element-plus';
 import V2Table from '@/components/V2Table/index.vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type { ColumnDef } from '@/components/V2Table/types';
 import type { SalesContract } from '@/api/sales-contract';
 // P2-17 修复（批次 86 v2 复审）：h() 渲染函数无法使用 v-permission 指令，
@@ -38,6 +99,8 @@ import { formatCurrency, getStatusType } from '../composables/scFmts';
 import { salesContractStatusLabelKey } from '@/utils/sales-contract-status';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 权限检查辅助函数（与 v-permission 指令行为等价）
@@ -197,5 +260,65 @@ const columns = computed<ColumnDef<SalesContract>[]>(() => [
   gap: 4px;
   align-items: center;
   justify-content: center;
+}
+.contract-mobile {
+  min-width: 0;
+}
+.contract-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.contract-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.contract-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.contract-fields > div {
+  min-width: 0;
+}
+.contract-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.contract-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.contract-number dd {
+  font-weight: 600;
+}
+.contract-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.contract-actions .el-button {
+  min-height: 44px;
+  margin: 0;
+}
+.contract-mobile :deep(.el-pagination) {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.contract-mobile :deep(.el-pagination button),
+.contract-mobile :deep(.el-pager li),
+.contract-mobile :deep(.el-pagination__sizes .el-select__wrapper) {
+  min-width: 44px;
+  min-height: 44px;
 }
 </style>

@@ -31,12 +31,17 @@
         </div>
       </div>
     </template>
-    <div ref="chartRef" v-loading="loading" class="gantt-chart-container"></div>
+    <p v-if="isPhone" class="gantt-scroll-hint">
+      {{ t('scheduling.ganttChart.mobileScrollHint') }}
+    </p>
+    <div class="gantt-scroll" :class="{ 'gantt-scroll-phone': isPhone }">
+      <div ref="chartRef" v-loading="loading" class="gantt-chart-container"></div>
+    </div>
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { echarts } from '@/utils/echarts';
 import type { ECharts } from '@/utils/echarts';
@@ -48,9 +53,12 @@ import type {
 // CallbackDataParams 不从 'echarts' 主包导出，需从官方类型定义文件导入
 import type { CallbackDataParams } from 'echarts/types/dist/shared';
 import type { GanttData, ScheduleTask } from '@/api/scheduling';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { statusColorMap, formatTime } from '../composables/schGFmts';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /** 状态标签映射（响应式 i18n） */
 const getStatusLabel = (status: string): string => t(`scheduling.ganttChart.status.${status}`);
@@ -239,6 +247,8 @@ watch(
   { deep: true }
 );
 
+watch(isPhone, () => nextTick(handleResize));
+
 onMounted(() => {
   nextTick(() => {
     if (props.ganttData) renderChart(props.ganttData);
@@ -309,5 +319,20 @@ onBeforeUnmount(() => {
 .gantt-chart-container {
   height: 500px;
   width: 100%;
+}
+
+.gantt-scroll {
+  min-width: 0;
+}
+.gantt-scroll-phone {
+  overflow-x: auto;
+}
+.gantt-scroll-phone .gantt-chart-container {
+  min-width: 900px;
+}
+.gantt-scroll-hint {
+  margin: 0 0 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
 }
 </style>

@@ -60,7 +60,7 @@ pub struct Model {
     /// 报表参数（JSON 格式）
     pub parameters: Option<Json>,
 
-    /// 导出格式（pdf/excel/csv）
+    /// 导出格式（xlsx/docx）
     pub export_format: String,
 
     /// 是否启用

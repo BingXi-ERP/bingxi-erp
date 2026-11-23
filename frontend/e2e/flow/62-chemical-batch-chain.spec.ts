@@ -330,11 +330,11 @@ test.describe.serial('62 染化料台账→批次→领用→消耗/追溯链路
 
     // 来料检验合格 → 落库回读
     await apiCall(page, 'POST', `/chemical-lots/${lot1}/pass-inspection`, {
-      inspection_report_url: '/reports/e2e-62.pdf',
+      inspection_report_url: '/reports/e2e-62.png',
     });
     const passed = await apiCallRaw<Record<string, unknown>>(page, 'GET', `/chemical-lots/${lot1}`);
     expect(passed.inspection_status, '检验后状态应落库 passed').toBe('passed');
-    expect(passed.inspection_report_url, '报告地址应落库').toBe('/reports/e2e-62.pdf');
+    expect(passed.inspection_report_url, '报告地址应落库').toBe('/reports/e2e-62.png');
 
     // 负例：批号重复 / 不存在的化料 id / 负数量
     const dup = await apiCallExpectFail(page, 'POST', '/chemical-lots', {

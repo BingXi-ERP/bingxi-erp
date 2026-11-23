@@ -10,7 +10,7 @@ use crate::models::audit_log::{OperationType, Severity};
 use crate::services::audit_log_service::{AuditEvent, AuditLogService};
 // V15 P0-S11：导出审计日志写入所需依赖
 use crate::services::report::{
-    AggregateRequest, AggregationType, DataSource, ExportFormat, ReportEngineService, ReportFilter,
+    AggregateRequest, AggregationType, DataSource, ReportEngineService, ReportFilter,
 };
 use crate::utils::error::AppError;
 use crate::utils::response::ApiResponse;
@@ -195,7 +195,6 @@ pub async fn export_report(
     // V15 P0-S11：clone state.db 避免后续审计日志写入时 borrow of moved value
     let service = ReportEngineService::new(state.db.clone());
 
-    let _export_format: ExportFormat = query.format.parse().unwrap_or(ExportFormat::Csv);
     let filters = parse_export_filters(query.filters_json.as_deref())?;
     let date_range = parse_date_range(query.date_start.as_deref(), query.date_end.as_deref());
 

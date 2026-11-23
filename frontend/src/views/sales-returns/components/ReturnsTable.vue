@@ -4,7 +4,94 @@
   拆分原 sales-returns/index.vue 的列表表格部分
 -->
 <template>
-  <el-table v-loading="loading" :data="list" border :aria-label="t('salesReturns.table.ariaLabel')">
+  <section v-if="isPhone" v-loading="loading" class="returns-mobile">
+    <ul class="return-list" :aria-label="t('salesReturns.table.mobileCardAria')">
+      <li v-for="row in list" :key="row.id" class="return-card">
+        <dl class="return-fields">
+          <div class="return-number">
+            <dt>{{ t('salesReturns.table.columnReturnNo') }}</dt>
+            <dd>{{ row.return_no }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('salesReturns.table.columnSalesOrderNo') }}</dt>
+            <dd>{{ row.sales_order_no }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('salesReturns.table.columnCustomerName') }}</dt>
+            <dd>{{ row.customer_name }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('salesReturns.table.columnReturnDate') }}</dt>
+            <dd>{{ row.return_date }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('salesReturns.table.columnReturnAmount') }}</dt>
+            <dd>{{ row.total_amount }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('salesReturns.table.columnStatus') }}</dt>
+            <dd>
+              <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+            </dd>
+          </div>
+        </dl>
+        <div class="return-actions">
+          <el-button size="small" @click="emit('view', row)">
+            {{ t('salesReturns.table.buttonDetail') }}
+          </el-button>
+          <el-button
+            v-permission="PERMISSIONS.SALES_RETURN_UPDATE"
+            size="small"
+            @click="emit('edit', row)"
+          >
+            {{ t('salesReturns.table.buttonEdit') }}
+          </el-button>
+          <el-button
+            v-if="row.status === 'DRAFT'"
+            size="small"
+            type="primary"
+            plain
+            @click="emit('submit', row)"
+          >
+            {{ t('salesReturns.table.buttonSubmit') }}
+          </el-button>
+          <el-button
+            v-if="row.status === 'SUBMITTED'"
+            size="small"
+            type="warning"
+            plain
+            @click="emit('reject', row)"
+          >
+            {{ t('salesReturns.table.buttonReject') }}
+          </el-button>
+          <el-button
+            v-if="row.status === 'APPROVED'"
+            size="small"
+            type="success"
+            @click="emit('execute', row)"
+          >
+            {{ t('salesReturns.table.buttonExecute') }}
+          </el-button>
+          <el-button
+            v-if="row.status === 'SUBMITTED'"
+            size="small"
+            type="primary"
+            @click="emit('approve', row)"
+          >
+            {{ t('salesReturns.table.buttonApprove') }}
+          </el-button>
+        </div>
+      </li>
+    </ul>
+    <el-empty v-if="!loading && list.length === 0" :description="t('components.v2Table.empty')" />
+  </section>
+  <el-table
+    v-else
+    v-loading="loading"
+    :data="list"
+    border
+    :aria-label="t('salesReturns.table.ariaLabel')"
+  >
     <el-table-column prop="return_no" :label="t('salesReturns.table.columnReturnNo')" />
     <el-table-column prop="sales_order_no" :label="t('salesReturns.table.columnSalesOrderNo')" />
     <el-table-column prop="customer_name" :label="t('salesReturns.table.columnCustomerName')" />
@@ -65,7 +152,9 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type { SalesReturn } from '@/api/sales-return';
 import {
   salesReturnStatusLabelKey,
@@ -75,6 +164,8 @@ import {
 import { PERMISSIONS } from '@/constants/permissions';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 defineProps<{
   list: SalesReturn[];
@@ -96,3 +187,59 @@ const getStatusLabel = (status: string) => {
   return key ? t(key) : '';
 };
 </script>
+
+<style scoped>
+.returns-mobile {
+  min-width: 0;
+}
+.return-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.return-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.return-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.return-fields > div {
+  min-width: 0;
+}
+.return-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.return-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.return-number dd {
+  font-weight: 600;
+}
+.return-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.return-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+</style>

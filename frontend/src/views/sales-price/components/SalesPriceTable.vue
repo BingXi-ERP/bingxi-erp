@@ -5,7 +5,96 @@
 -->
 <template>
   <el-card shadow="hover" class="table-card">
+    <section v-if="isPhone" v-loading="loading" class="price-mobile">
+      <ul class="price-list" :aria-label="t('salesPrice.table.mobileCardAria')">
+        <li v-for="row in priceList" :key="row.id" class="price-card">
+          <dl class="price-fields">
+            <div class="price-number">
+              <dt>{{ t('salesPrice.table.columnProductName') }}</dt>
+              <dd>{{ row.product_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesPrice.table.columnCustomer') }}</dt>
+              <dd>{{ row.customer_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesPrice.table.columnPrice') }}</dt>
+              <dd>{{ formatCurrency(row.price) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesPrice.table.columnCurrency') }}</dt>
+              <dd>{{ row.currency }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesPrice.table.columnUnit') }}</dt>
+              <dd>{{ row.unit }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesPrice.table.columnMinOrderQty') }}</dt>
+              <dd>{{ row.min_order_qty }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesPrice.table.columnPriceType') }}</dt>
+              <dd>
+                <el-tag v-if="row.price_type">{{ getPriceTypeLabel(row.price_type) }}</el-tag>
+                <span v-else>{{ t('common.valueMissing') }}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>{{ t('salesPrice.table.columnPriceLevel') }}</dt>
+              <dd>{{ row.price_level }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesPrice.table.columnEffectiveDate') }}</dt>
+              <dd>{{ row.effective_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesPrice.table.columnExpiryDate') }}</dt>
+              <dd>{{ row.expiry_date }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('salesPrice.table.columnStatus') }}</dt>
+              <dd>
+                <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
+              </dd>
+            </div>
+          </dl>
+          <div class="price-actions">
+            <el-button type="primary" link size="small" @click="emit('view', row)">
+              {{ t('salesPrice.table.buttonView') }}
+            </el-button>
+            <el-button
+              v-if="row.status === 'pending'"
+              v-permission="PERMISSIONS.SALES_PRICE_UPDATE"
+              type="primary"
+              link
+              size="small"
+              @click="emit('edit', row)"
+            >
+              {{ t('salesPrice.table.buttonEdit') }}
+            </el-button>
+            <el-button
+              v-if="row.status === 'pending'"
+              type="success"
+              link
+              size="small"
+              @click="emit('approve', row)"
+            >
+              {{ t('salesPrice.table.buttonApprove') }}
+            </el-button>
+            <el-button type="info" link size="small" @click="emit('history', row)">
+              {{ t('salesPrice.table.buttonHistory') }}
+            </el-button>
+          </div>
+        </li>
+      </ul>
+      <el-empty
+        v-if="!loading && priceList.length === 0"
+        :description="t('components.v2Table.empty')"
+      />
+    </section>
     <el-table
+      v-else
       v-loading="loading"
       :data="priceList"
       border
@@ -154,7 +243,9 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type { SalesPriceRow } from '@/api/sales-price';
 // 价格类型/状态文案统一走 spFmts（i18n 键 + 未知 token 抛错；词表权威 models/status/sales.rs::price_approval），删除组件局部 map
 import {
@@ -167,6 +258,8 @@ import {
 import { PERMISSIONS } from '@/constants/permissions';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 销售价格列表表格组件（批次 284：page/pageSize props + v-model 绑定分页）
@@ -202,5 +295,54 @@ const emit = defineEmits<{
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+.price-mobile {
+  min-width: 0;
+}
+.price-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.price-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.price-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.price-fields > div {
+  min-width: 0;
+}
+.price-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.price-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.price-number dd {
+  font-weight: 600;
+}
+.price-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.price-actions .el-button {
+  min-height: 44px;
+  margin: 0;
 }
 </style>
