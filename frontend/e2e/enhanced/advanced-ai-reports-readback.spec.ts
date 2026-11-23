@@ -130,25 +130,18 @@ test.describe('Advanced 报表与 AI 契约回读', () => {
   });
 
   test('AD-03 报表导出：计量恒等式与格式回显，未知模板 404', async ({ page }) => {
-    const exported = await apiCallRaw<Row>(page, 'POST', '/advanced/reports/export', {
+    // CSV 已从导出词表移除（仅 xlsx 与 docx）：改为钉白名单拒绝并点名可选值。
+    const csvRejected = await apiCallExpectFail(page, 'POST', '/advanced/reports/export', {
       template_code: 'sales_summary',
       format: 'csv',
     });
-    expect(str(exported.status), `导出状态应为 success，实际 ${JSON.stringify(exported)}`).toBe(
-      'success'
-    );
-    expect(str(exported.format), `format 应回显提交值`).toBe('csv');
-    const sizeBytes = num(exported.size_bytes);
-    expect(Number.isInteger(sizeBytes) && sizeBytes > 0, `csv 字节应正整数`).toBe(true);
-    // 计量恒等式：size_kb 必为 size_bytes 整除 1024 的商
+    expect(csvRejected.status, `csv 已移除应 400，实际 ${csvRejected.status}`).toBe(400);
     expect(
-      num(exported.size_kb),
-      `size_kb 应等于 floor(size_bytes/1024)，实际 ${exported.size_kb} 对 ${sizeBytes}`
-    ).toBe(Math.floor(sizeBytes / 1024));
-    expect(
-      Number.isInteger(num(exported.record_count)),
-      `record_count 应为整数行数，实际 ${exported.record_count}`
-    ).toBe(true);
+      csvRejected.code,
+      `csv 应归因 VALIDATION_ERROR，实际 ${JSON.stringify(csvRejected.code)}`
+    ).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+    expect(String(csvRejected.message ?? ''), `csv 拒绝文案应点名 xlsx`).toContain('xlsx');
+    expect(String(csvRejected.message ?? ''), `csv 拒绝文案应点名 docx`).toContain('docx');
 
     // excel 格式腿：同一恒等式再钉一次（格式映射另一分支）
     const xl = await apiCallRaw<Row>(page, 'POST', '/advanced/reports/export', {
@@ -160,7 +153,7 @@ test.describe('Advanced 报表与 AI 契约回读', () => {
 
     const unknown = await apiCallExpectFail(page, 'POST', '/advanced/reports/export', {
       template_code: 'e2e_ghost_template',
-      format: 'csv',
+      format: 'xlsx',
     });
     expect(unknown.status).toBe(404);
     expect(failureCode(unknown)).toBe(APP_ERROR_CODES.NOT_FOUND);

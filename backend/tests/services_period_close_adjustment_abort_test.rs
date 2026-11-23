@@ -59,7 +59,7 @@ async fn remove_confirm_block_trigger(db: &sea_orm::DatabaseConnection) {
 }
 
 #[tokio::test]
-async fn period_close_adjustment_abort_keeps_period_open() {
+async fn period_adjustment_confirm_failure_aborts_close_and_keeps_period_open() {
     let db = Arc::new(setup_test_db().await);
 
     // 2099-01 期间（OPEN，远离真实业务期间，避免与种子/夹具数据撞车）

@@ -120,7 +120,125 @@
       </el-form>
     </el-card>
 
+    <section v-if="isPhone" v-loading="loading" class="greige-mobile">
+      <ul class="greige-list" :aria-label="t('greigeFabrics.index.mobileCardAria')">
+        <li v-for="row in rows" :key="row.id" class="greige-card">
+          <dl class="greige-fields">
+            <div class="greige-number">
+              <dt>{{ t('greigeFabrics.index.colFabricCode') }}</dt>
+              <dd>{{ row.fabric_no }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.index.colFabricName') }}</dt>
+              <dd>{{ row.fabric_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.index.colFabricType') }}</dt>
+              <dd>{{ row.fabric_type }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.index.colSupplier') }}</dt>
+              <dd>{{ row.supplier_id ?? '-' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.index.colWidth') }}</dt>
+              <dd>{{ formatDecimal(row.width) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.index.colGramWeight') }}</dt>
+              <dd>{{ formatDecimal(row.gram_weight) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.index.colComposition') }}</dt>
+              <dd>{{ row.composition ?? '-' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.index.colWeightKg') }}</dt>
+              <dd>{{ formatDecimal(row.weight_kg) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.index.colLengthM') }}</dt>
+              <dd>{{ formatDecimal(row.length_m) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.index.colStatus') }}</dt>
+              <dd>
+                <el-tag :type="row.status === GREIGE_STATUS.IN_STOCK ? 'success' : 'info'">
+                  {{ row.status ?? '-' }}
+                </el-tag>
+              </dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.form.labelColorNo') }}</dt>
+              <dd>{{ row.color_no ?? '-' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.form.labelDyeLotNo') }}</dt>
+              <dd>{{ row.dye_lot_no ?? '-' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.form.labelQualityGrade') }}</dt>
+              <dd>{{ row.quality_grade ?? '-' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.form.labelSafetyStock') }}</dt>
+              <dd>{{ formatDecimal(row.safety_stock) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.form.labelReorderPoint') }}</dt>
+              <dd>{{ formatDecimal(row.reorder_point) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.form.labelMaxStockPoint') }}</dt>
+              <dd>{{ formatDecimal(row.max_stock_point) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('greigeFabrics.form.labelReorderQuantity') }}</dt>
+              <dd>{{ formatDecimal(row.reorder_quantity) }}</dd>
+            </div>
+          </dl>
+          <div class="greige-actions">
+            <el-button
+              v-permission-detail="{ resource: 'greige-fabrics', action: 'read' }"
+              size="small"
+              @click="handleView(row)"
+            >
+              {{ t('greigeFabrics.index.buttonView') }}
+            </el-button>
+            <el-button
+              v-permission="'greige-fabrics:create'"
+              size="small"
+              type="success"
+              @click="handleStock('in', row)"
+            >
+              {{ t('greigeFabrics.index.buttonStockIn') }}
+            </el-button>
+            <el-button
+              v-permission="'greige-fabrics:create'"
+              size="small"
+              type="warning"
+              @click="handleStock('out', row)"
+            >
+              {{ t('greigeFabrics.index.buttonStockOut') }}
+            </el-button>
+            <el-button v-permission="'greige-fabrics:update'" size="small" @click="handleEdit(row)">
+              {{ t('greigeFabrics.index.buttonEdit') }}
+            </el-button>
+            <el-button
+              v-permission="'greige-fabrics:delete'"
+              size="small"
+              type="danger"
+              @click="handleDelete(row)"
+            >
+              {{ t('greigeFabrics.index.buttonDelete') }}
+            </el-button>
+          </div>
+        </li>
+      </ul>
+      <el-empty v-if="!loading && rows.length === 0" :description="t('components.v2Table.empty')" />
+    </section>
     <el-table
+      v-else
       v-loading="loading"
       :data="rows"
       border
@@ -272,7 +390,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 
@@ -280,6 +398,7 @@ import { GREIGE_STATUS, deleteGreigeFabric, type GreigeFabric } from '@/api/grei
 import { getSupplierList } from '@/api/supplier';
 import { getWarehouseList } from '@/api/warehouse';
 import { useTableApi } from '@/composables/useTableApi';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { decimalWireToNumber } from '@/utils/money';
 
 import { useGreigePicker, PICKER_PAGE_SIZE, type PickerOption } from './useGreigePicker';
@@ -300,6 +419,8 @@ import GreigeDetailDialog from './components/GreigeDetailDialog.vue';
  * 存哪里：组件内响应式状态与 useTableApi 的 ref，不落 store 与浏览器存储。
  */
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /** 与建档对话框同一取值域（建表列注释声明 A/B/C） */
 const QUALITY_GRADES = ['A', 'B', 'C'] as const;
@@ -518,6 +639,56 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.greige-mobile {
+  min-width: 0;
+}
+.greige-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.greige-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.greige-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.greige-fields > div {
+  min-width: 0;
+}
+.greige-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.greige-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.greige-number dd {
+  font-weight: 600;
+}
+.greige-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.greige-actions .el-button {
+  min-height: 44px;
+  margin: 0;
 }
 
 @media (max-width: 767px) {

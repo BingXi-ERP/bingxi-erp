@@ -111,7 +111,7 @@ async fn po_attachment_urls_roundtrip_through_dto() {
     // 创建落库：与 crud.rs:268 build_order_header_active_model 同一列写入路径
     let order_no = format!("W5P{tag}");
     let attachments = vec![
-        "https://example.com/contract.pdf".to_string(),
+        "https://example.com/contract.docx".to_string(),
         "https://example.com/spec.txt".to_string(),
     ];
     let order = purchase_order::ActiveModel {
@@ -174,7 +174,7 @@ async fn po_attachment_urls_roundtrip_through_dto() {
     );
 
     // 更新链路（crud.rs:591-592）→ 回读新值
-    let updated_att = vec!["https://example.com/amended.pdf".to_string()];
+    let updated_att = vec!["https://example.com/amended.docx".to_string()];
     service
         .update_order(
             order.id,

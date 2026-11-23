@@ -136,7 +136,7 @@ pub struct Model {
     pub export_params: Option<ExportParams>,
     /// 预估导出行数
     pub estimated_rows: Option<i64>,
-    /// 文件格式：xlsx/pdf/csv
+    /// 文件格式：xlsx/docx
     pub file_format: String,
     /// 审批状态：pending/approved/rejected/expired/cancelled
     pub status: String,
