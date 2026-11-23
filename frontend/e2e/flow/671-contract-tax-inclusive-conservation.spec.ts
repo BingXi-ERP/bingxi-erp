@@ -11,7 +11,7 @@
 //       不是字符串也不是缺键；币种/汇率按模型存在性断言（模型无列时出参不得自造字段）。
 // 状态词表与失败：本例不涉状态流转；失败仅 AppError 字符串码，建单失败直接抛错不掩盖。
 // 与 451 分工：451 钉报价单含税，本例专钉采购/销售合同建单字段与金额守恒，不重复报价断言。
-import { test, expect, type Page } from '../diagnose-fixture';
+import { test, expect } from '../diagnose-fixture';
 import {
   apiCall,
   apiCallRaw,
