@@ -41,6 +41,11 @@ export interface QualityStandard {
    */
   status: string;
   content: string;
+  tolerance_source: string | null;
+  detection_method: string | null;
+  delta_e_tolerance: string | null;
+  weight_tolerance: string | null;
+  width_tolerance: string | null;
   // 幽灵键 attachments 已删：后端实体无此列（models/quality_standard.rs:8-31 全列核对）、
   // create/update DTO 均不接收（quality_standard_handler.rs:35-52/57-68），
   // 读取恒 undefined、提交被 serde 静默丢弃，属纯假字段（红线：不保留假字段）。
@@ -172,6 +177,11 @@ export interface CreateQualityStandardPayload {
   standard_type?: string;
   version?: string;
   content?: string;
+  tolerance_source?: string;
+  detection_method?: string;
+  delta_e_tolerance?: number | string;
+  weight_tolerance?: number | string;
+  width_tolerance?: number | string;
   /** 格式 YYYY-MM-DD（handler:46-48），省略时服务端取当天 */
   effective_date?: string;
   expiry_date?: string;
@@ -195,6 +205,11 @@ export interface UpdateQualityStandardPayload {
   standard_name?: string;
   standard_type?: string;
   content?: string;
+  tolerance_source?: string | null;
+  detection_method?: string | null;
+  delta_e_tolerance?: number | string | null;
+  weight_tolerance?: number | string | null;
+  width_tolerance?: number | string | null;
   remark?: string;
 }
 

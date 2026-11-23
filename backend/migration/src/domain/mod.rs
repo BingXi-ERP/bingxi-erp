@@ -223,3 +223,6 @@ pub mod sample_dispatch;
 // 批色 ΔE 判定等级域：bulk_color_approval 补 high_light_sensitive 与 delta_e_result 两列，
 // 链尾独立域（存量复用库上属 pending 必然执行）。
 pub mod bulk_color_delta_e_level;
+// 质量标准允差配置域：quality_standards 补允差来源/检测方法与三项允差列，链尾独立域
+// （存量复用库上属 pending 必然执行）。
+pub mod quality_standard_tolerance;

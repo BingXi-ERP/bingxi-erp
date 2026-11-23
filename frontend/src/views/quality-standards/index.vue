@@ -239,6 +239,66 @@
             :placeholder="$t('qualityStandards.dialog.contentPlaceholder')"
           />
         </el-form-item>
+        <el-form-item
+          :label="$t('qualityStandards.dialog.toleranceSource')"
+          prop="tolerance_source"
+        >
+          <el-select
+            v-model="form.tolerance_source"
+            clearable
+            :placeholder="$t('qualityStandards.dialog.toleranceSourcePlaceholder')"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="option in QUALITY_TOLERANCE_SOURCES"
+              :key="option.value"
+              :label="$t(option.labelKey)"
+              :value="option.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item
+          :label="$t('qualityStandards.dialog.detectionMethod')"
+          prop="detection_method"
+        >
+          <el-input
+            v-model="form.detection_method"
+            :placeholder="$t('qualityStandards.dialog.detectionMethodPlaceholder')"
+          />
+        </el-form-item>
+        <el-form-item
+          :label="$t('qualityStandards.dialog.deltaETolerance')"
+          prop="delta_e_tolerance"
+        >
+          <NumericInput
+            v-model="toleranceForm.delta_e_tolerance"
+            :min="0"
+            :precision="2"
+            :clear-value="null"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item
+          :label="$t('qualityStandards.dialog.weightTolerance')"
+          prop="weight_tolerance"
+        >
+          <NumericInput
+            v-model="toleranceForm.weight_tolerance"
+            :min="0"
+            :precision="2"
+            :clear-value="null"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item :label="$t('qualityStandards.dialog.widthTolerance')" prop="width_tolerance">
+          <NumericInput
+            v-model="toleranceForm.width_tolerance"
+            :min="0"
+            :precision="2"
+            :clear-value="null"
+            style="width: 100%"
+          />
+        </el-form-item>
         <!-- 附件录入项已整体移除：后端实体无 attachments 列、create/update DTO 均不接收
              （models/quality_standard.rs:8-31；quality_standard_handler.rs:35-52/57-68），
              原录入读取恒空、提交即被 serde 丢弃，属纯假字段，不再提供入口。 -->
@@ -258,11 +318,13 @@
 <script setup lang="ts">
 import { isDialogDismissal } from '@/utils/monitor';
 import { PERMISSIONS } from '@/constants/permissions';
+import { QUALITY_TOLERANCE_SOURCES } from '@/constants/quality-tolerance';
 import { computed, ref, reactive } from 'vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus, Download, Search } from '@element-plus/icons-vue';
+import NumericInput from '@/components/NumericInput.vue';
 import {
   createQualityStandard,
   updateQualityStandard,
@@ -381,7 +443,27 @@ const form = reactive<Partial<QualityStandard>>({
   version: '1.0',
   standard_type: 'product',
   content: '',
+  tolerance_source: null,
+  detection_method: null,
 });
+
+const toleranceForm = reactive({
+  delta_e_tolerance: null as number | null,
+  weight_tolerance: null as number | null,
+  width_tolerance: null as number | null,
+});
+
+const toDecimalNumber = (value: string | null | undefined): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const resetToleranceForm = () => {
+  toleranceForm.delta_e_tolerance = null;
+  toleranceForm.weight_tolerance = null;
+  toleranceForm.width_tolerance = null;
+};
 
 const rules: FormRules = {
   standard_code: [
@@ -416,6 +498,9 @@ const rules: FormRules = {
 const openDialog = (row?: QualityStandard) => {
   if (row) {
     Object.assign(form, row);
+    toleranceForm.delta_e_tolerance = toDecimalNumber(row.delta_e_tolerance);
+    toleranceForm.weight_tolerance = toDecimalNumber(row.weight_tolerance);
+    toleranceForm.width_tolerance = toDecimalNumber(row.width_tolerance);
   } else {
     Object.assign(form, {
       id: undefined,
@@ -424,7 +509,10 @@ const openDialog = (row?: QualityStandard) => {
       version: '1.0',
       standard_type: 'product',
       content: '',
+      tolerance_source: null,
+      detection_method: null,
     });
+    resetToleranceForm();
   }
   dialogVisible.value = true;
 };
@@ -438,12 +526,16 @@ const handleSubmit = async () => {
     try {
       if (form.id) {
         // 后端 UpdateQualityStandardRequest 只认 standard_name/standard_type/content/status/remark
-        // （quality_standard_handler.rs:57-68），直传实体时 standard_code/version 等键会被
-        // serde 静默丢弃，这里只提交契约内字段
+        // 与五键允差三态字段；standard_code/version 等键直传会被 serde 静默丢弃。
         await updateQualityStandard(form.id, {
           standard_name: form.standard_name,
           standard_type: form.standard_type,
           content: form.content,
+          tolerance_source: form.tolerance_source || null,
+          detection_method: form.detection_method || null,
+          delta_e_tolerance: toleranceForm.delta_e_tolerance,
+          weight_tolerance: toleranceForm.weight_tolerance,
+          width_tolerance: toleranceForm.width_tolerance,
         });
       } else {
         // 创建载荷按 CreateQualityStandardPayload 逐键构造（类型键为 standard_type，
@@ -461,6 +553,11 @@ const handleSubmit = async () => {
           standard_type: form.standard_type,
           version: form.version,
           content: form.content,
+          tolerance_source: form.tolerance_source || undefined,
+          detection_method: form.detection_method || undefined,
+          delta_e_tolerance: toleranceForm.delta_e_tolerance ?? undefined,
+          weight_tolerance: toleranceForm.weight_tolerance ?? undefined,
+          width_tolerance: toleranceForm.width_tolerance ?? undefined,
         });
       }
       ElMessage.success(t('qualityStandards.message.operationSuccess'));

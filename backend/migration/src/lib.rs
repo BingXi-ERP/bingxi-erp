@@ -391,6 +391,8 @@ impl MigratorTrait for Migrator {
             // 批色 ΔE 判定等级两列（high_light_sensitive / delta_e_result），链尾独立域
             // （存量复用库上属 pending 必然执行；bulk_color_approval 建表早于本域）
             Box::new(domain::bulk_color_delta_e_level::Migration),
+            // 质量标准允差来源/检测方法与三项允差列，链尾独立域（存量复用库上属 pending 必然执行）
+            Box::new(domain::quality_standard_tolerance::Migration),
         ]
     }
 }
