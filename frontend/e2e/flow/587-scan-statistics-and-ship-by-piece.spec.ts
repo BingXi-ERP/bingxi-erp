@@ -272,7 +272,7 @@ async function seedRegisteredRoll(page: Page, cleanup: DeferredCleanup[]): Promi
 
 /** 登记一匹，供统计增量与发货状态用例共用；成功出参的匹号必须与 seed 一致。 */
 async function registerOne(page: Page, seed: ReceiptSeed): Promise<void> {
-  const receipt = await apiCall(page, 'POST', '/scanner/scan-receipt', {
+  const receipt = await apiCall<{ piece_no?: string }>(page, 'POST', '/scanner/scan-receipt', {
     barcode: seed.qr,
     position_no: seed.mainPosition,
     length: '100',
@@ -287,10 +287,7 @@ test('587-01 扫码统计五计数自洽且成功登记后可用数与总数各�
     const before = (await apiCall<ScanStats>(page, 'GET', '/scanner/scan-statistics')).data;
     expectStatShape(before, '[587-01] 登记前统计');
     expect(
-      before.available_count +
-        before.shipped_count +
-        before.defect_count +
-        before.reserved_count,
+      before.available_count + before.shipped_count + before.defect_count + before.reserved_count,
       '[587-01] 各状态计数之和不得超过全库总数'
     ).toBeLessThanOrEqual(before.total_count);
 
@@ -301,7 +298,9 @@ test('587-01 扫码统计五计数自洽且成功登记后可用数与总数各�
 
     const after = (await apiCall<ScanStats>(page, 'GET', '/scanner/scan-statistics')).data;
     expectStatShape(after, '[587-01] 登记后统计');
-    expect(after.available_count, '[587-01] 可用数须随成功登记增一').toBe(before.available_count + 1);
+    expect(after.available_count, '[587-01] 可用数须随成功登记增一').toBe(
+      before.available_count + 1
+    );
     expect(after.total_count, '[587-01] 总数须随成功登记增一').toBe(before.total_count + 1);
   } finally {
     // 匹行没有删除端点，成功写入的匹不清理；只清理由本用例创建的 seed 资源
