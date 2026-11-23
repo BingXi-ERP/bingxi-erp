@@ -35,6 +35,8 @@ pub mod sales_return;
 pub mod order_crud;
 pub mod order_workflow;
 pub mod order_query;
+// #78 现货订单提交锁缸：仅 stock 明细同事务扣可用/加预留，配套改量差量与作废释放
+pub mod order_stock_lock;
 // 缺陷 3 修复：面料行业版订单业务逻辑（原 handler 内联逻辑下沉）
 pub mod fabric_order;
 

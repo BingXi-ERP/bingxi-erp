@@ -61,6 +61,10 @@ impl SalesService {
             ));
         }
 
+        // #78 作废释放：与信用释放同一事务，仅释放本单 SO78 ledger 锁缸行；
+        // 草稿态本就未锁，ledger 为空，天然无副作用。
+        crate::services::so::order_stock_lock::release_on_cancel(&txn, order_id).await?;
+
         // 信用释放：仅 PENDING/APPROVED/PARTIAL_SHIPPED 有占用（占用发生在 submit）
         if order.status != so_status::DRAFT {
             let total_amount = order
@@ -138,6 +142,11 @@ impl SalesService {
             .await?;
         self.validate_customer_active(&txn, order.customer_id)
             .await?;
+
+        // #78 现货锁缸：仅 fulfillment_source=stock 的明细参与；FIFO 严格维度匹配，
+        // available-=q / reserved+=q 与提交同事务 + version 乐观锁；库存不足整单拒绝
+        // （事务回滚连带撤销已占用的信用）。prod/purchase 行不锁，既有链零影响。
+        crate::services::so::order_stock_lock::lock_on_submit(&txn, order_id, user_id).await?;
 
         let credit_service =
             crate::services::customer_credit_service::CustomerCreditService::new(self.db.clone());
