@@ -173,10 +173,10 @@ test.describe.serial('594 报价试算极值出参', () => {
       '百万量试算出参'
     );
     const hugeFinal = assertDecimalText(huge.final_amount, '百万量 final_amount');
-    assertDecimalText(huge.unit_price, '百万量 unit_price');
-    assertDecimalText(huge.discount_applied, '百万量 discount_applied');
-    expect(formatCents(toCents(huge.unit_price)), '四位基价应先收敛为 12.35').toBe('12.35');
-    expect(formatCents(toCents(huge.discount_applied)), 'NORMAL 折扣应为 0.00').toBe('0.00');
+    const hugeUnitPrice = assertDecimalText(huge.unit_price, '百万量 unit_price');
+    const hugeDiscount = assertDecimalText(huge.discount_applied, '百万量 discount_applied');
+    expect(formatCents(toCents(hugeUnitPrice)), '四位基价应先收敛为 12.35').toBe('12.35');
+    expect(formatCents(toCents(hugeDiscount)), 'NORMAL 折扣应为 0.00').toBe('0.00');
     expect(
       formatCents(toCents(hugeFinal)),
       '1000000 × 12.35 = 12350000.00，四位基价按分位收敛后不得提前截断'
