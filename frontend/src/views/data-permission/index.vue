@@ -31,7 +31,77 @@
 
           <p class="scope-note">{{ t('dataPermission.index.noteEnabledOnly') }}</p>
 
+          <!-- 手机卡片（<768 与系统域列表同断点同范式） -->
+          <section v-if="isPhone" v-loading="permissionLoading" class="data-permission-mobile">
+            <ul class="order-list" :aria-label="t('dataPermission.index.ariaTable')">
+              <li v-for="row in permissionList" :key="row.id" class="order-card">
+                <dl class="order-fields">
+                  <div v-if="isOverview" class="order-number">
+                    <dt>{{ t('dataPermission.index.colRole') }}</dt>
+                    <dd>{{ row.role_name || '-' }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ t('dataPermission.index.colResourceType') }}</dt>
+                    <dd>{{ resourceTypeLabel(row.resource_type) }}</dd>
+                  </div>
+                  <div>
+                    <dt>{{ t('dataPermission.index.colScopeType') }}</dt>
+                    <dd>
+                      <el-tag v-if="row.scope_type === 'ALL'" type="success">{{
+                        t('dataPermission.index.scopeAll')
+                      }}</el-tag>
+                      <el-tag v-else-if="row.scope_type === 'DEPT'" type="primary">{{
+                        t('dataPermission.index.scopeDept')
+                      }}</el-tag>
+                      <el-tag v-else-if="row.scope_type === 'DEPT_AND_BELOW'" type="warning">{{
+                        t('dataPermission.index.scopeDeptAndBelow')
+                      }}</el-tag>
+                      <el-tag v-else-if="row.scope_type === 'SELF'" type="info">{{
+                        t('dataPermission.index.scopeSelf')
+                      }}</el-tag>
+                      <el-tag v-else type="danger">{{
+                        t('dataPermission.index.scopeCustom')
+                      }}</el-tag>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{{ t('dataPermission.index.colStatus') }}</dt>
+                    <dd>
+                      <el-tag v-if="row.is_enabled" type="success">{{
+                        t('dataPermission.index.statusEnabled')
+                      }}</el-tag>
+                      <el-tag v-else type="danger">{{
+                        t('dataPermission.index.statusDisabled')
+                      }}</el-tag>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{{ t('dataPermission.index.colCreatedAt') }}</dt>
+                    <dd>{{ formatDateTime(row.created_at) }}</dd>
+                  </div>
+                </dl>
+                <div v-if="!isOverview && isAdmin" class="order-actions">
+                  <el-button
+                    link
+                    type="primary"
+                    @click="handleEditPermission(row as DataPermissionRow)"
+                  >
+                    {{ t('dataPermission.index.buttonEdit') }}
+                  </el-button>
+                  <el-button
+                    link
+                    type="danger"
+                    @click="handleDeletePermission(row as DataPermissionRow)"
+                  >
+                    {{ t('dataPermission.index.buttonDelete') }}
+                  </el-button>
+                </div>
+              </li>
+            </ul>
+          </section>
+
           <el-table
+            v-else
             :data="permissionList"
             border
             stripe
@@ -206,6 +276,7 @@ import { logger } from '@/utils/logger';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { loadIfNot, createLazyLoader } from '@/utils/lazy-loader';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useUserStore } from '@/store/user';
 import {
   getDataPermissionList,
@@ -231,6 +302,9 @@ import { getRoleList } from '@/api/role';
 
 const { t } = useI18n({ useScope: 'global' });
 const userStore = useUserStore();
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
+const permissionLoading = ref(false);
 
 // 数据权限写操作（列表/编辑/删除/新增）在后端 require_admin_role 门控下仅管理员可用。
 // 前端据后端注入的 `*:*` 超级通配权限（管理员角色专属）判定 admin，与 admin-only 现实对齐，
@@ -347,6 +421,7 @@ const currentRoleName = computed(() => {
 });
 
 const fetchPermissions = async () => {
+  permissionLoading.value = true;
   try {
     // 两个视图的后端出参都只含启用记录：概览走 GET /data-permissions（按 role_id LEFT JOIN 富化
     // role_name），单角色走 GET /data-permissions/roles/{id}（该端点不富化，role_name 恒为 null，
@@ -360,6 +435,8 @@ const fetchPermissions = async () => {
     }
   } catch {
     ElMessage.error(t('dataPermission.index.messageLoadPermissionsFailed'));
+  } finally {
+    permissionLoading.value = false;
   }
 };
 
@@ -651,6 +728,71 @@ onMounted(async () => {
   margin: 0 0 12px;
   font-size: 12px;
   color: #909399;
+}
+
+.data-permission-mobile {
+  min-width: 0;
+}
+
+.data-permission-mobile .order-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+
+.data-permission-mobile .order-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+
+.data-permission-mobile .order-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.data-permission-mobile .order-fields > div {
+  min-width: 0;
+}
+
+.data-permission-mobile .order-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.data-permission-mobile .order-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.data-permission-mobile .order-number dd {
+  font-weight: 600;
+}
+
+.data-permission-mobile .order-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.data-permission-mobile .order-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+  justify-content: center;
 }
 
 @media (max-width: 768px) {
