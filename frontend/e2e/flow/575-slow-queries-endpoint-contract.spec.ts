@@ -26,8 +26,8 @@ interface SlowQueryItem {
 }
 
 test('575-01 慢查询刷新与列表端点返回分页信封与字段结构', async ({ page }: { page: Page }) => {
-  // 刷新端点：collector 直查 pg_stat_statements（slow_query_collector.rs:136-144），
-  // handler 按 slow_query_handler.rs:376-379 的在册口径原样透传环境故障、不脱敏重包。
+  // 刷新端点：collector 直查 pg_stat_statements（slow_query_collector.rs collect_once），
+  // handler 按 slow_query_handler.rs refresh_slow_queries 的在册口径原样透传环境故障、不脱敏重包。
   // CI 容器未装该共享库时 collect_once 以 DATABASE_ERROR 拒绝，属依赖缺失的环境态，
   // 不是端点契约失败（后台任务腿同型降级见 service_bootstrap / collector 周期循环）。
   // 因此放行两态：success 信封（code=200）或 DATABASE_ERROR 环境拒绝；

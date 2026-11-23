@@ -731,9 +731,6 @@ frontend/e2e/enhanced/446-ap-invoice-date-range-boundary.spec.ts::services/ap_in
 frontend/e2e/enhanced/446-ap-invoice-date-range-boundary.spec.ts::services/ap_invoice_ops/types.rs
 frontend/e2e/enhanced/447-webhook-retry-ceiling.spec.ts::handlers/webhook_handler.rs
 frontend/e2e/enhanced/447-webhook-retry-ceiling.spec.ts::services/webhook_service.rs
-frontend/e2e/enhanced/448-attachment-size-exact-boundary.spec.ts::constants.rs
-frontend/e2e/enhanced/448-attachment-size-exact-boundary.spec.ts::handlers/supplier_handler.rs
-frontend/e2e/enhanced/448-attachment-size-exact-boundary.spec.ts::models/supplier_qualification.rs
 frontend/e2e/enhanced/449-product-name-length-boundary.spec.ts::handlers/product_handler.rs
 frontend/e2e/enhanced/449-product-name-length-boundary.spec.ts::models/product.rs
 frontend/e2e/enhanced/449-product-name-length-boundary.spec.ts::utils/error.rs

@@ -2,7 +2,7 @@
 // 在手机视口换卡片或自适应布局且不产生横向溢出。
 // 调用方：CI 的 e2e flow 分片与 playwright test --list。入参：fixture 注入的 page 与登录态。
 // 传给谁：断言只进 Playwright 报告；仅定制单跟踪腿自建一张真单（桌面 el-card 分支
-//   v-if="!isPhone && timeline"，tracking.vue:64+263 时间线取不到即不渲染，写死 id 在
+//   v-if="!isPhone && timeline"，tracking.vue 桌面 el-card 挂 v-if="!isPhone && timeline"，时间线取不到即不渲染，写死 id 在
 //   CI 库内不可依赖），用例结束删除回卷。
 // 存什么：四页各自的视口切换事实——桌面锚点可见、手机卡片容器出现、桌面锚点退场、主内容区无横向滚动。
 // 存哪里：本文件，随 e2e/flow 一起被 87 号作业矩阵收集。

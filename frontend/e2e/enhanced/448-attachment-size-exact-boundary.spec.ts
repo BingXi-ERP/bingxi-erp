@@ -26,7 +26,7 @@ import {
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const OVER_BYTES = MAX_BYTES + 1024;
-/** PNG 8 字节签名（supplier_handler.rs:772 magic 同源），填充不干扰识别。 */
+/** PNG 8 字节签名（supplier_handler.rs detect_qualification_attachment_magic 同源），填充不干扰识别。 */
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 interface UploadResult {
