@@ -6,14 +6,14 @@
 //!   → 卷唛标签打印 → PDA 扫描卷唛条码 → 自动入库
 
 use axum::{
-    Json,
     extract::{Path, Query, State},
+    Json,
 };
 use serde::Deserialize;
 
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
-use crate::models::{fabric_defect_record, fabric_inspection_record};
+use crate::models::{fabric_defect_record, fabric_inspection_record, fabric_physical_test_record};
 use crate::services::fabric_inspection_service::{
     CreateDefectRequest, CreateInspectionRequest, FabricDefectService, FabricInspectionService,
     GradeInspectionRequest, InspectionQuery, RollFabricRequest, UpdateInspectionRequest,
@@ -272,4 +272,16 @@ pub async fn add_physical_test(
         "message": "物理测试添加成功",
         "data": result
     }))))
+}
+
+/// GET /api/v1/erp/fabric-inspections/:inspection_id/physical-tests - 按验布记录查询物理指标检测明细
+pub async fn list_physical_tests_by_inspection(
+    State(state): State<AppState>,
+    Path(inspection_id): Path<i32>,
+) -> Result<Json<ApiResponse<Vec<fabric_physical_test_record::Model>>>, AppError> {
+    let service = crate::services::fabric_inspection_service::FabricPhysicalTestService::new(
+        state.db.clone(),
+    );
+    let tests = service.list_by_inspection(inspection_id).await?;
+    Ok(Json(ApiResponse::success(tests)))
 }

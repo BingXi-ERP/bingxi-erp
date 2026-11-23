@@ -5,7 +5,92 @@
   行为完全保持一致（仅结构重构）
 -->
 <template>
+  <!-- 手机卡片（<768 与 finance/VoucherTable 手机卡片同断点同范式） -->
+  <section v-if="isPhone" v-loading="loading" class="voucher-mobile">
+    <ul class="voucher-list" :aria-label="t('voucher.voucherListTable.mobileCardAriaLabel')">
+      <li v-for="scope in tableData" :key="scope.id" class="voucher-card">
+        <dl class="voucher-fields">
+          <div class="voucher-number">
+            <dt>{{ t('voucher.voucherListTable.columnVoucherNo') }}</dt>
+            <dd>{{ scope.voucher_no }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('voucher.voucherListTable.columnVoucherDate') }}</dt>
+            <dd>{{ scope.voucher_date }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('voucher.voucherListTable.columnVoucherType') }}</dt>
+            <dd>{{ scope.voucher_type }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('voucher.voucherListTable.columnStatus') }}</dt>
+            <dd>
+              <span :class="['status-tag', getStatusClass(scope.status)]">
+                {{ getStatusLabel(scope.status) }}
+              </span>
+            </dd>
+          </div>
+        </dl>
+        <div class="voucher-actions">
+          <ElButton
+            v-permission-detail="{ resource: 'vouchers', action: 'read' }"
+            @click="emit('view', scope as VoucherEntity)"
+          >
+            <View />
+          </ElButton>
+          <ElButton
+            v-if="scope.status === 'draft'"
+            v-permission-detail="{ resource: 'vouchers', action: 'update' }"
+            type="primary"
+            @click="emit('edit', scope as VoucherEntity)"
+          >
+            <Edit />
+          </ElButton>
+          <ElButton
+            v-if="scope.status === 'draft'"
+            type="primary"
+            @click="emit('submit', scope as VoucherEntity)"
+          >
+            <Check /> {{ t('voucher.voucherListTable.buttonSubmit') }}
+          </ElButton>
+          <ElButton
+            v-if="scope.status === 'submitted'"
+            type="warning"
+            @click="emit('approve', scope as VoucherEntity)"
+          >
+            <Check /> {{ t('voucher.voucherListTable.buttonApprove') }}
+          </ElButton>
+          <ElButton
+            v-if="scope.status === 'reviewed'"
+            type="success"
+            @click="emit('post', scope as VoucherEntity)"
+          >
+            <Check /> {{ t('voucher.voucherListTable.buttonPost') }}
+          </ElButton>
+          <ElButton
+            v-if="scope.status === 'posted'"
+            type="info"
+            @click="emit('unpost', scope as VoucherEntity)"
+          >
+            <Refresh /> {{ t('voucher.voucherListTable.buttonUnpost') }}
+          </ElButton>
+          <ElButton
+            v-if="scope.status === 'draft'"
+            type="danger"
+            @click="emit('delete', scope as VoucherEntity)"
+          >
+            <Delete />
+          </ElButton>
+        </div>
+      </li>
+    </ul>
+    <ElEmpty
+      v-if="!loading && tableData.length === 0"
+      :description="t('components.v2Table.empty')"
+    />
+  </section>
   <ElTable
+    v-else
     :data="tableData"
     :loading="loading"
     border
@@ -114,7 +199,7 @@
     </ElTableColumn>
   </ElTable>
 
-  <div class="pagination-wrapper">
+  <div class="pagination-wrapper" :class="{ 'pagination-phone': isPhone }">
     <ElPagination
       :current-page="page"
       :page-size="pageSize"
@@ -129,12 +214,16 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Edit, Delete, View, Refresh, Check } from '@element-plus/icons-vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type { VoucherEntity } from '@/api/voucher';
 import { getStatusClass } from '../composables/vchrLstFmts';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 凭证列表表格组件
@@ -188,3 +277,97 @@ const getStatusLabel = (value: string) => {
 
 void props;
 </script>
+
+<style scoped>
+.voucher-mobile {
+  min-width: 0;
+}
+.voucher-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.voucher-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.voucher-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.voucher-fields > div {
+  min-width: 0;
+}
+.voucher-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.voucher-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.voucher-number dd {
+  font-weight: 600;
+}
+.voucher-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.voucher-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+.status-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+}
+.status-draft {
+  background: #f5f7fa;
+  color: #909399;
+}
+.status-submitted {
+  background: #e6f7ff;
+  color: #1890ff;
+}
+.status-reviewed {
+  background: #fdf6ec;
+  color: #e6a23c;
+}
+.status-posted {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+.pagination-wrapper {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+.pagination-phone {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.pagination-phone :deep(button),
+.pagination-phone :deep(.el-pager li),
+.pagination-phone :deep(.el-pagination__sizes .el-select__wrapper) {
+  min-width: 44px;
+  min-height: 44px;
+}
+</style>

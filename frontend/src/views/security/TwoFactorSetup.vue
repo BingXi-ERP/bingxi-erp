@@ -23,7 +23,7 @@
       </el-breadcrumb>
     </div>
 
-    <el-card shadow="hover">
+    <el-card shadow="hover" :class="{ 'two-factor-mobile': isPhone }">
       <TwoFactorStepBar :current-step="tfa.currentStep" />
 
       <div class="step-wrapper">
@@ -50,7 +50,11 @@
         />
       </div>
 
-      <div v-if="tfa.currentStep > 0 && tfa.currentStep < 3" class="step-actions">
+      <div
+        v-if="tfa.currentStep > 0 && tfa.currentStep < 3"
+        class="step-actions"
+        :class="{ 'step-actions-mobile': isPhone }"
+      >
         <el-button @click="tfaProc.handlePrevStep(tfa)">
           <el-icon><ArrowLeft /></el-icon>
           {{ t('security.twoFactorSetup.button.prev') }}
@@ -65,7 +69,11 @@
         </el-button>
       </div>
 
-      <div v-if="tfa.currentStep === 3" class="step-actions">
+      <div
+        v-if="tfa.currentStep === 3"
+        class="step-actions"
+        :class="{ 'step-actions-mobile': isPhone }"
+      >
         <el-button type="primary" @click="tfaProc.handleFinish">
           {{ t('security.twoFactorSetup.button.finish') }}
           <el-icon><Check /></el-icon>
@@ -76,9 +84,10 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ArrowLeft, ArrowRight, Check } from '@element-plus/icons-vue';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useTfa } from './two-factor/composables/useTfa';
 import { useTfaProc, type TwoFactorStep3Instance } from './two-factor/composables/useTfaProc';
 import TwoFactorStepBar from './two-factor/components/TwoFactorStepBar.vue';
@@ -88,6 +97,8 @@ import TwoFactorStep3 from './two-factor/components/TwoFactorStep3.vue';
 import TwoFactorStep4 from './two-factor/components/TwoFactorStep4.vue';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 业务状态
 const tfa = useTfa();
@@ -137,5 +148,60 @@ onMounted(() => {
   .two-factor-page {
     padding: 12px;
   }
+}
+
+.two-factor-mobile :deep(.step-content) {
+  padding: 20px 12px;
+}
+
+.two-factor-mobile :deep(.step-title) {
+  font-size: 18px;
+}
+
+.two-factor-mobile :deep(.el-form-item) {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.two-factor-mobile :deep(.el-form-item__content) {
+  margin-left: 0 !important;
+  width: 100%;
+}
+
+.two-factor-mobile :deep(.el-input),
+.two-factor-mobile :deep(.el-select) {
+  width: 100%;
+}
+
+.two-factor-mobile :deep(.info-row) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.two-factor-mobile :deep(.qr-image) {
+  width: 100%;
+  height: auto;
+  max-width: 200px;
+}
+
+.two-factor-mobile .step-actions,
+.step-actions-mobile {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.two-factor-mobile :deep(.step-actions .el-button),
+.two-factor-mobile :deep(.action-row .el-button),
+.two-factor-mobile :deep(.recovery-codes .el-button) {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
 }
 </style>

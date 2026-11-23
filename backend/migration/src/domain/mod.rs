@@ -225,3 +225,5 @@ pub mod sample_dispatch;
 // 批色 ΔE 判定等级域：bulk_color_approval 补 high_light_sensitive 与 delta_e_result 两列，
 // 链尾独立域（存量复用库上属 pending 必然执行）。
 pub mod bulk_color_delta_e_level;
+// 验布修边实测列域：fabric_inspection_record 补 edge_trim_length/edge_trim_weight，链尾独立域。
+pub mod fabric_inspection_edge_trim;
