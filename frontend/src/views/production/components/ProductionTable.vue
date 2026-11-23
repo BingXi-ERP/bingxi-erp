@@ -7,7 +7,136 @@
   （本组件仅读取 props 传给 V2Table 并 emit 事件，无 prop mutation 行为）
 -->
 <template>
+  <section v-if="isPhone" v-loading="loading" class="production-mobile">
+    <ul class="production-list" :aria-label="t('production.table.mobileCardAria')">
+      <li v-for="row in data" :key="row.id" class="production-card">
+        <dl class="production-fields">
+          <div class="production-number">
+            <dt>{{ t('production.table.colOrderNo') }}</dt>
+            <dd>{{ row.order_no }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('production.table.colProductName') }}</dt>
+            <dd>{{ row.product_name || '-' }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('production.table.colPlannedQuantity') }}</dt>
+            <dd>{{ row.planned_quantity }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('production.table.colActualQuantity') }}</dt>
+            <dd>{{ row.actual_quantity || '-' }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('production.table.colScheduledStart') }}</dt>
+            <dd>{{ row.planned_start_date ? row.planned_start_date.substring(0, 10) : '-' }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('production.table.colScheduledEnd') }}</dt>
+            <dd>{{ row.planned_end_date ? row.planned_end_date.substring(0, 10) : '-' }}</dd>
+          </div>
+          <div>
+            <dt>{{ t('production.table.colStatus') }}</dt>
+            <dd>
+              <ElTag :type="getStatusType(row.status)" size="small">
+                {{ statusLabel(row.status) }}
+              </ElTag>
+            </dd>
+          </div>
+          <div>
+            <dt>{{ t('production.table.colPriority') }}</dt>
+            <dd>{{ row.priority }}</dd>
+          </div>
+        </dl>
+        <div class="production-actions">
+          <ElButton v-if="canViewDetail" type="primary" @click="emit('view-detail', row)">
+            {{ t('production.table.buttonView') }}
+          </ElButton>
+          <ElButton @click="emit('view-logs', row)">
+            {{ t('production.table.mobile.buttonLogs') }}
+          </ElButton>
+          <ElButton
+            v-if="row.status === 'DRAFT'"
+            type="warning"
+            @click="emit('submit-approval', row)"
+          >
+            {{ t('production.table.mobile.buttonSubmitApproval') }}
+          </ElButton>
+          <ElButton
+            v-if="
+              row.status === 'DRAFT' && can(PERMISSIONS.PRODUCTION_ORDER_UPDATE) && canEditDetail
+            "
+            type="success"
+            @click="emit('open-edit', row)"
+          >
+            {{ t('production.table.buttonEdit') }}
+          </ElButton>
+          <ElButton
+            v-if="row.status === 'DRAFT' && can(PERMISSIONS.PRODUCTION_ORDER_DELETE)"
+            type="danger"
+            @click="emit('delete', row)"
+          >
+            {{ t('production.table.buttonDelete') }}
+          </ElButton>
+          <ElButton
+            v-if="row.status === 'PENDING_APPROVAL'"
+            type="success"
+            @click="emit('approve-order', row, true)"
+          >
+            {{ t('production.table.mobile.buttonApprove') }}
+          </ElButton>
+          <ElButton
+            v-if="row.status === 'PENDING_APPROVAL'"
+            type="danger"
+            @click="emit('approve-order', row, false)"
+          >
+            {{ t('production.table.mobile.buttonReject') }}
+          </ElButton>
+          <ElButton
+            v-if="row.status === 'APPROVED'"
+            type="warning"
+            @click="emit('status-change', row, 'SCHEDULED')"
+          >
+            {{ t('production.table.buttonPlan') }}
+          </ElButton>
+          <ElButton
+            v-if="row.status === 'SCHEDULED'"
+            type="primary"
+            @click="emit('status-change', row, 'IN_PROGRESS')"
+          >
+            {{ t('production.table.buttonStartProduction') }}
+          </ElButton>
+          <ElButton
+            v-if="row.status === 'IN_PROGRESS'"
+            type="success"
+            @click="emit('status-change', row, 'COMPLETED')"
+          >
+            {{ t('production.table.buttonComplete') }}
+          </ElButton>
+          <ElButton
+            v-if="row.status === 'IN_PROGRESS'"
+            type="warning"
+            @click="emit('report-progress', row)"
+          >
+            {{ t('production.table.mobile.buttonReportProgress') }}
+          </ElButton>
+        </div>
+      </li>
+    </ul>
+    <ElEmpty v-if="!loading && data.length === 0" :description="t('components.v2Table.empty')" />
+    <ElPagination
+      :current-page="page"
+      :page-size="pageSize"
+      :page-sizes="[10, 20, 50]"
+      :total="total"
+      layout="total, sizes, prev, next"
+      :aria-label="t('components.v2Table.paginationAriaLabel')"
+      @current-change="(p: number) => emit('page-change', p)"
+      @size-change="(s: number) => emit('size-change', s)"
+    />
+  </section>
   <V2Table
+    v-else
     :columns="columns"
     :data="data"
     :loading="loading"
@@ -24,10 +153,11 @@
 import { h, computed } from 'vue';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useI18n } from 'vue-i18n';
-import { ElTag, ElButton } from 'element-plus';
+import { ElButton, ElEmpty, ElPagination, ElTag } from 'element-plus';
 import V2Table from '@/components/V2Table/index.vue';
 import type { ColumnDef } from '@/components/V2Table/types';
 import type { ProductionOrder } from '@/api/production';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { getStatusLabel, getStatusType } from '../composables/prdFmts';
 // P2-17 修复（批次 86 v2 复审）：h() 渲染函数无法使用 v-permission 指令，
 // 改为复用 router 守卫的 hasRoutePermission + useUserStore 做权限判断，
@@ -36,6 +166,8 @@ import { hasRoutePermission, canAccessDetailPermission } from '@/router';
 import { useUserStore } from '@/store/user';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 // 状态 el-tag 类型别名（与 element-plus 类型保持一致）
 
@@ -270,3 +402,64 @@ const columns = computed<ColumnDef<ProductionOrder>[]>(() => [
   },
 ]);
 </script>
+
+<style scoped>
+.production-mobile {
+  min-width: 0;
+}
+.production-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+}
+.production-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.production-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.production-fields > div {
+  min-width: 0;
+}
+.production-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.production-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.production-number dd {
+  font-weight: 600;
+}
+.production-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.production-actions .el-button {
+  min-height: 44px;
+  min-width: 44px;
+  height: auto;
+  margin: 0;
+  padding: 8px;
+  white-space: normal;
+}
+.production-mobile :deep(.el-pagination) {
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+</style>

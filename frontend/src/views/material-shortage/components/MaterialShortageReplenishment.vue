@@ -15,7 +15,53 @@
       </div>
     </template>
 
+    <section v-if="isPhone" v-loading="loading" class="replenishment-mobile">
+      <ul class="shortage-list" :aria-label="t('materialShortage.replenishment.mobileCardAria')">
+        <li v-for="row in suggestions" :key="row.material_code" class="shortage-card">
+          <dl class="shortage-fields">
+            <div class="shortage-number">
+              <dt>{{ t('materialShortage.table.materialCode') }}</dt>
+              <dd>{{ row.material_code }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('materialShortage.table.materialName') }}</dt>
+              <dd>{{ row.material_name }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('materialShortage.table.shortageQuantity') }}</dt>
+              <dd>{{ formatQuantity(row.shortage_quantity) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('materialShortage.replenishment.suggestedQuantity') }}</dt>
+              <dd>{{ formatQuantity(row.suggested_quantity) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('materialShortage.replenishment.unit') }}</dt>
+              <dd>{{ row.unit || '-' }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('materialShortage.replenishment.priority') }}</dt>
+              <dd>
+                <el-tag :type="getPriorityTagType(row.priority)">{{
+                  getPriorityText(row.priority)
+                }}</el-tag>
+              </dd>
+            </div>
+            <div>
+              <dt>{{ t('materialShortage.table.affectedOrders') }}</dt>
+              <dd>{{ row.affected_orders_count }}</dd>
+            </div>
+          </dl>
+        </li>
+      </ul>
+      <el-empty
+        v-if="suggestions.length === 0"
+        :description="t('materialShortage.replenishment.empty')"
+      />
+    </section>
+
     <el-table
+      v-else
       v-loading="loading"
       :data="suggestions"
       stripe
@@ -73,12 +119,16 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Refresh } from '@element-plus/icons-vue';
 import { getPriorityTagType, getPriorityText, formatQuantity } from '../composables/msFmts';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import type { ReplenishmentSuggestion } from '@/api/material-shortage';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 defineProps<{
   suggestions: ReplenishmentSuggestion[];
@@ -96,5 +146,42 @@ const emit = defineEmits<{ refresh: [] }>();
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+.shortage-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.shortage-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+}
+.shortage-fields {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.shortage-fields > div {
+  min-width: 0;
+}
+.shortage-fields dt {
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.shortage-fields dd {
+  margin: 4px 0 0;
+  color: var(--el-text-color-primary);
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.shortage-number dd {
+  font-weight: 600;
 }
 </style>

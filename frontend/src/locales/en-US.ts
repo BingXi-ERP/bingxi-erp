@@ -2143,6 +2143,7 @@ export default {
       title: 'Work Center List',
       refresh: 'Refresh',
       ariaLabel: 'Work center list',
+      mobileCardAria: 'Work center mobile card list',
       code: 'Code',
       name: 'Name',
       capacityHours: 'Capacity Hours',
@@ -8011,6 +8012,7 @@ export default {
     },
     ganttChart: {
       title: 'Schedule Gantt Chart',
+      mobileScrollHint: 'Swipe horizontally to view the full Gantt chart',
       legend: {
         pending: 'Pending',
         scheduled: 'Scheduled',
@@ -8154,6 +8156,7 @@ export default {
       ariaLabel: {
         table: 'Schedule List',
         pagination: 'Schedule List Pagination',
+        mobileCard: 'Schedule work order mobile card list',
       },
       column: {
         orderNo: 'Work Order No.',
@@ -12413,6 +12416,14 @@ export default {
       buttonDelete: 'Delete',
       buttonStartProduction: 'Start Production',
       buttonComplete: 'Complete',
+      mobileCardAria: 'Production order mobile card list',
+      mobile: {
+        buttonLogs: 'Logs',
+        buttonSubmitApproval: 'Submit for Approval',
+        buttonApprove: 'Approve',
+        buttonReject: 'Reject',
+        buttonReportProgress: 'Report Progress',
+      },
     },
     detail: {
       title: 'Production Order Detail',
@@ -12694,6 +12705,7 @@ export default {
       title: 'Replenishment Suggestions',
       refresh: 'Recalculate',
       ariaLabel: 'Shortage Replenishment Suggestion List',
+      mobileCardAria: 'Replenishment Suggestion Mobile Card List',
       suggestedQuantity: 'Suggested Qty',
       unit: 'Unit',
       priority: 'Priority',
@@ -12707,6 +12719,7 @@ export default {
     },
     table: {
       ariaLabel: 'Material Shortage Alert List',
+      mobileCardAria: 'Material shortage mobile card list',
       levelPlaceholder: 'Shortage Level',
       statusPlaceholder: 'Alert Status',
       search: 'Search',

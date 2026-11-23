@@ -2124,6 +2124,7 @@ export default {
       title: '工作中心列表',
       refresh: '刷新',
       ariaLabel: '工作中心列表',
+      mobileCardAria: '工作中心手机卡片列表',
       code: '编码',
       name: '名称',
       capacityHours: '产能工时',
@@ -7951,6 +7952,7 @@ export default {
     },
     ganttChart: {
       title: '排程甘特图',
+      mobileScrollHint: '左右滑动查看完整甘特图',
       legend: {
         pending: '待排程',
         scheduled: '已排程',
@@ -8094,6 +8096,7 @@ export default {
       ariaLabel: {
         table: '排班列表',
         pagination: '排班列表分页',
+        mobileCard: '排程工单手机卡片列表',
       },
       column: {
         orderNo: '工单号',
@@ -12335,6 +12338,14 @@ export default {
       buttonDelete: '删除',
       buttonStartProduction: '开始生产',
       buttonComplete: '完成',
+      mobileCardAria: '生产订单手机卡片列表',
+      mobile: {
+        buttonLogs: '日志',
+        buttonSubmitApproval: '提交审批',
+        buttonApprove: '审批通过',
+        buttonReject: '驳回',
+        buttonReportProgress: '汇报进度',
+      },
     },
     detail: {
       title: '生产订单详情',
@@ -12614,6 +12625,7 @@ export default {
       title: '补货建议',
       refresh: '重新计算',
       ariaLabel: '缺料补货建议列表',
+      mobileCardAria: '补货建议手机卡片列表',
       suggestedQuantity: '建议采购量',
       unit: '单位',
       priority: '优先级',
@@ -12627,6 +12639,7 @@ export default {
     },
     table: {
       ariaLabel: '物料缺料预警列表',
+      mobileCardAria: '物料缺料预警手机卡片列表',
       levelPlaceholder: '缺料级别',
       statusPlaceholder: '预警状态',
       search: '查询',
