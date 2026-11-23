@@ -12,8 +12,8 @@
 
 use crate::container::AppState;
 use axum::{
-    Router,
     routing::{delete, get, post, put},
+    Router,
 };
 
 use crate::handlers::{
@@ -321,6 +321,11 @@ pub fn fabric_inspections() -> Router<AppState> {
         .route(
             "/fabric-inspections/physical-tests",
             post(fabric_inspection_handler::add_physical_test),
+        )
+        // 按验布单读物理测试明细（匹级追溯读出口；此前物理测试只有 POST 无 GET）
+        .route(
+            "/fabric-inspections/{inspection_id}/physical-tests",
+            get(fabric_inspection_handler::list_physical_tests_by_inspection),
         )
 }
 
