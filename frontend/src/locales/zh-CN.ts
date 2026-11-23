@@ -5354,6 +5354,7 @@ export default {
   },
   biSalesAnalysis: {
     title: 'BI 销售多维分析（P3-4 关键路径 demo）',
+    mobileScrollHint: '图表区域在手机端可左右滑动查看',
     kpi: {
       totalSales: '总销售额',
       orderCount: '订单数',
@@ -10243,6 +10244,7 @@ export default {
       buttonExport: '导出报表',
       tabOverview: '经营分析',
       tabBi: '多维分析',
+      mobileCardAria: '销售分析手机卡片列表',
     },
     stat: {
       labelMonthOrders: '本月订单数',
@@ -10963,6 +10965,7 @@ export default {
       statusSubmitted: '已提交',
       statusReviewed: '已审核',
       statusPosted: '已记账',
+      mobileCardAriaLabel: '凭证手机卡片列表',
     },
     index: {
       pageAriaLabel: '凭证管理',
