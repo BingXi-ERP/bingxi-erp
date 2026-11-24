@@ -245,6 +245,25 @@ test.describe('526 客户信用额度调整即时生效面', () => {
             // 金额可见域设计口径（services/amount_visibility.rs::hide_default_amount_columns）：
             // 无 data_permissions 配置行的非 admin 账号读订单，金额列整键剔除（键缺失而非 null），
             // sales_rep 棒不得断言 total_amount；总额精确值由下一棒 admin 回读证明。
+            // 信用额度行读取需财务/管理权限，sales_rep 越权即 403，故「草稿不占额」回读移到 admin 棒。
+
+            return { artifacts: [{ key: 'orderId', value: orderId }] };
+          },
+        },
+        {
+          role: 'admin',
+          label: 'admin 回读放行单总额精确 400.00 且草稿未占额',
+          // 与第 1 棒同为 admin：金额可见域下只有 admin 出口不剔金额键，
+          // 总额精确值与信用额度回读都必须由有权身份执行，业务规则要求同身份，显式豁免重复身份守卫。
+          allowRepeatIdentity: true,
+          run: async ({ session, require }) => {
+            const orderId = Number(require('orderId'));
+            const customerId = Number(require('customerId'));
+            const back = await apiCallRaw<Row>(session.page, 'GET', `/sales/orders/${orderId}`);
+            expect(
+              String(back.total_amount),
+              `订单总额应精确为 ${ACCEPT_AMOUNT}，实际 ${JSON.stringify(back).slice(0, 200)}`
+            ).toBe(ACCEPT_AMOUNT);
 
             const creditAfter = await apiCallRaw<Row>(
               session.page,
@@ -255,23 +274,10 @@ test.describe('526 客户信用额度调整即时生效面', () => {
               Number(creditAfter.available_credit),
               `草稿单只校验不占额，可用额度应仍为 400，实际 ${JSON.stringify(creditAfter)}`
             ).toBe(400);
-
-            return { artifacts: [{ key: 'orderId', value: orderId }] };
-          },
-        },
-        {
-          role: 'admin',
-          label: 'admin 回读放行单总额精确 400.00',
-          // 与第 1 棒同为 admin：金额可见域下只有 admin 出口不剔金额键，
-          // 总额精确值必须由该身份回读，业务规则要求同身份，显式豁免重复身份守卫。
-          allowRepeatIdentity: true,
-          run: async ({ session, require }) => {
-            const orderId = Number(require('orderId'));
-            const back = await apiCallRaw<Row>(session.page, 'GET', `/sales/orders/${orderId}`);
             expect(
-              String(back.total_amount),
-              `订单总额应精确为 ${ACCEPT_AMOUNT}，实际 ${JSON.stringify(back).slice(0, 200)}`
-            ).toBe(ACCEPT_AMOUNT);
+              Number(creditAfter.used_credit),
+              `草稿单不得推进已用额度，应为 0，实际 ${JSON.stringify(creditAfter)}`
+            ).toBe(0);
             return { artifacts: [{ key: 'verifiedOrderId', value: orderId }] };
           },
         },
