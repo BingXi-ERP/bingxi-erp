@@ -164,21 +164,23 @@ impl SlowQueryCollector {
         let mut inserted = 0usize;
         for row in query_result {
             // 解析字段：query(text) / mean_exec_time(float8) / calls(int8) / rows(int8)
-            // 使用 try_get_by_index 防御式读取：缺字段时跳过该行
-            let query_text: Option<String> = row.try_get_by_index::<String>(0).ok();
-            let mean_exec_time: Option<f64> = row.try_get_by_index::<f64>(1).ok();
-            let calls: Option<i64> = row.try_get_by_index::<i64>(2).ok();
-            let rows_examined: Option<i64> = row.try_get_by_index::<i64>(3).ok();
+            let query_text = row
+                .try_get_by_index::<String>(0)
+                .map_err(|e| AppError::database(format!("读取慢查询 SQL 文本失败: {}", e)))?;
+            let mean_exec_time = row
+                .try_get_by_index::<f64>(1)
+                .map_err(|e| AppError::database(format!("读取慢查询执行时间失败: {}", e)))?;
+            let calls = row
+                .try_get_by_index::<i64>(2)
+                .map_err(|e| AppError::database(format!("读取慢查询调用次数失败: {}", e)))?;
+            let rows_examined = row
+                .try_get_by_index::<i64>(3)
+                .map_err(|e| AppError::database(format!("读取慢查询扫描行数失败: {}", e)))?;
 
             // 跳过空查询（pg_stat_statements 偶尔会插入空字符串占位）
-            let query_text = match query_text {
-                Some(q) if !q.trim().is_empty() => q,
-                _ => continue,
-            };
-            // 数值字段缺值时记 0（不影响主流程）
-            let mean_exec_time = mean_exec_time.unwrap_or(0.0);
-            let calls = calls.unwrap_or(0);
-            let rows_examined = rows_examined.unwrap_or(0);
+            if query_text.trim().is_empty() {
+                continue;
+            }
 
             let active = slow_query::ActiveModel {
                 id: ActiveValue::NotSet,
@@ -196,14 +198,10 @@ impl SlowQueryCollector {
             };
 
             // 使用 exec_without_returning 避免 last_insert_id 解析问题（参考 omni_audit_service）
-            if let Err(e) = slow_query::Entity::insert(active)
+            slow_query::Entity::insert(active)
                 .exec_without_returning(self.db.as_ref())
                 .await
-            {
-                tracing::warn!("写入慢查询日志失败: {}", e);
-                // 单条失败不阻断后续插入
-                continue;
-            }
+                .map_err(|e| AppError::database(format!("写入慢查询日志失败: {}", e)))?;
             inserted += 1;
         }
 
