@@ -135,6 +135,7 @@ fn bpm_process_task_routes() -> Router<AppState> {
     Router::new()
         .route("/bpm/process/start", post(bpm_handler::start_process))
         .route("/bpm/tasks/approve", post(bpm_handler::approve_task))
+        .route("/bpm/tasks/add-sign", post(bpm_handler::add_sign))
         .route("/bpm/tasks", get(bpm_handler::query_tasks))
         .route("/bpm/tasks/pending", get(bpm_handler::get_pending_tasks))
         .route(
