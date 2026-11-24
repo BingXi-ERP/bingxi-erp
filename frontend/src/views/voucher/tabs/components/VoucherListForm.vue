@@ -8,22 +8,23 @@
   <ElDialog
     :model-value="visible"
     :title="title"
-    width="800px"
+    :width="isPhone ? '95%' : '800px'"
     :aria-label="title"
     @update:model-value="(v: boolean) => emit('update:visible', v)"
   >
     <ElForm
       :model="localForm"
-      label-width="100px"
+      :label-width="isPhone ? 'auto' : '100px'"
+      :label-position="isPhone ? 'top' : 'right'"
       :aria-label="t('voucher.voucherListForm.formAriaLabel')"
     >
       <ElRow :gutter="20">
-        <ElCol :span="12">
+        <ElCol :span="isPhone ? 24 : 12">
           <ElFormItem :label="t('voucher.voucherListForm.labelVoucherNo')" prop="voucher_no">
             <ElInput v-model="localForm.voucher_no" readonly />
           </ElFormItem>
         </ElCol>
-        <ElCol :span="12">
+        <ElCol :span="isPhone ? 24 : 12">
           <ElFormItem :label="t('voucher.voucherListForm.labelVoucherDate')" prop="voucher_date">
             <!-- P0 修复：value-format 输出 YYYY-MM-DD 字符串，与后端 NaiveDate 契约一致
                  （原无 value-format 时 v-model 为 Date 对象，序列化成 RFC3339 导致解析失败/400） -->
@@ -32,7 +33,7 @@
         </ElCol>
       </ElRow>
       <ElRow :gutter="20">
-        <ElCol :span="12">
+        <ElCol :span="isPhone ? 24 : 12">
           <!-- P0 修复：绑定后端真实键 voucher_type（原自创键 type 提交即 400/更新 no-op）；
                选项来自 GET /vouchers/types（后端 available_voucher_types 单一真源） -->
           <ElFormItem :label="t('voucher.voucherListForm.labelVoucherType')" prop="voucher_type">
@@ -52,7 +53,7 @@
       </ElRow>
       <ElFormItem :label="t('voucher.voucherListForm.labelEntries')">
         <div class="entries-table">
-          <div class="entries-header">
+          <div v-if="!isPhone" class="entries-header">
             <span class="col-subject">{{ t('voucher.voucherListForm.columnSubject') }}</span>
             <span class="col-debit">{{ t('voucher.voucherListForm.columnDebit') }}</span>
             <span class="col-credit">{{ t('voucher.voucherListForm.columnCredit') }}</span>
@@ -60,6 +61,9 @@
             <span class="col-action">{{ t('voucher.voucherListForm.columnAction') }}</span>
           </div>
           <div v-for="(entry, index) in localForm.entries || []" :key="index" class="entries-row">
+            <label v-if="isPhone" class="entry-label">{{
+              t('voucher.voucherListForm.columnSubject')
+            }}</label>
             <ElSelect
               v-model="entry.account_subject_id"
               :placeholder="t('voucher.voucherListForm.placeholderSubject')"
@@ -72,18 +76,27 @@
                 :value="subject.value"
               />
             </ElSelect>
+            <label v-if="isPhone" class="entry-label">{{
+              t('voucher.voucherListForm.columnDebit')
+            }}</label>
             <NumericInput
               class="col-debit"
               :model-value="Number(entry.debit_amount)"
               :precision="2"
               @update:model-value="(v: number | null | undefined) => (entry.debit_amount = v ?? 0)"
             />
+            <label v-if="isPhone" class="entry-label">{{
+              t('voucher.voucherListForm.columnCredit')
+            }}</label>
             <NumericInput
               class="col-credit"
               :model-value="Number(entry.credit_amount)"
               :precision="2"
               @update:model-value="(v: number | null | undefined) => (entry.credit_amount = v ?? 0)"
             />
+            <label v-if="isPhone" class="entry-label">{{
+              t('voucher.voucherListForm.columnSummary')
+            }}</label>
             <ElInput
               v-model="entry.description"
               :placeholder="t('voucher.voucherListForm.placeholderSummaryEntry')"
@@ -134,9 +147,12 @@ import { deepClone } from '@/utils';
 import NumericInput from '@/components/NumericInput.vue';
 import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { formatAmount } from '../composables/vchrLstFmts';
 
 const { t } = useI18n({ useScope: 'global' });
+const { width } = useBreakpoint();
+const isPhone = computed(() => width.value < 768);
 
 /**
  * 分录编辑模型：金额手写录入在 change 提交边界归一为 number，借贷合计实时计算以 number 为契约。

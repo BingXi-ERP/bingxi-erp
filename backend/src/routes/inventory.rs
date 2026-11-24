@@ -49,6 +49,11 @@ fn piece_routes() -> Router<AppState> {
             "/pieces",
             get(crate::handlers::inventory_piece_handler::list_pieces),
         )
+        // 匹级聚合追溯：匹详情 + 来源验布单 + 物理测试 + 疵点 + 质检判定
+        .route(
+            "/pieces/{id}/trace",
+            get(crate::handlers::inventory_piece_handler::get_piece_trace),
+        )
         // 成品布入库打印标签：单匹 docx 卷唛（仅 dyed 可打，缺字段 fail-closed）
         .route(
             "/pieces/{id}/print",

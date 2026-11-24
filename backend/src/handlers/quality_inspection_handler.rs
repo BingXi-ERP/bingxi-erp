@@ -88,6 +88,8 @@ fn build_record_list_params(
         inspection_result,
         product_id: query.product_id,
         batch_no: normalized(&query.batch_no),
+        related_type: normalized(&query.related_type),
+        related_id: query.related_id,
         page,
         page_size,
     })
@@ -110,6 +112,9 @@ pub struct RecordQuery {
     pub batch_no: Option<String>,
     pub inspection_type: Option<String>,
     pub inspection_result: Option<String>,
+    /// 多态锚筛选：related_type 与 related_id 成对使用（匹级追溯按匹拉判定列表）
+    pub related_type: Option<String>,
+    pub related_id: Option<i32>,
     pub page: Option<i64>,
     pub page_size: Option<i64>,
 }

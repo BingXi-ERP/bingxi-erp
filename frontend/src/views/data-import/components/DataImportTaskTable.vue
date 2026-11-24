@@ -26,7 +26,11 @@
 
     <!-- 手机卡片（<768 与采购域表格同断点同范式） -->
     <section v-if="isPhone" v-loading="loading" class="data-import-mobile">
-      <ul class="order-list" :aria-label="t('dataImport.taskTable.mobileCardAria')">
+      <ul
+        v-if="data.length > 0"
+        class="order-list"
+        :aria-label="t('dataImport.taskTable.mobileCardAria')"
+      >
         <li v-for="row in data" :key="row.id" class="order-card">
           <dl class="order-fields">
             <div>
@@ -98,6 +102,7 @@
           </div>
         </li>
       </ul>
+      <el-empty v-else :description="t('dataImport.taskTable.mobileEmpty')" />
     </section>
 
     <el-table

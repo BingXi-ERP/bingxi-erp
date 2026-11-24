@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use chrono::{DateTime, NaiveDate, Utc};
+use rust_decimal::Decimal;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +20,19 @@ pub struct Model {
     pub technical_requirements: Option<String>,
     pub testing_methods: Option<String>,
     pub acceptance_criteria: Option<String>,
+    /// 允差取值来源：product_standard（产品标准）/ order_agreement（订单约定）/ confirmed_sample（确认样）
+    pub tolerance_source: Option<String>,
+    /// 允差检测方法依据（ISO/GB 方法号，如 ISO 5084 / GB/T 3813.1）
+    pub detection_method: Option<String>,
+    /// 色差允差 ΔE
+    #[sea_orm(column_type = "Decimal(Some((8, 2)))")]
+    pub delta_e_tolerance: Option<Decimal>,
+    /// 克重允差（g/m²）
+    #[sea_orm(column_type = "Decimal(Some((8, 2)))")]
+    pub weight_tolerance: Option<Decimal>,
+    /// 门幅允差（cm）
+    #[sea_orm(column_type = "Decimal(Some((8, 2)))")]
+    pub width_tolerance: Option<Decimal>,
     #[sea_orm(column_type = "Date")]
     pub effective_date: NaiveDate,
     pub expiry_date: Option<NaiveDate>,

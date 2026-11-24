@@ -90,8 +90,10 @@ async function getAttachment(
   return { status: res.status(), headers: res.headers(), body };
 }
 
-function buildPdfBuffer(marker: string): Buffer {
-  return Buffer.from(`%PDF-1.4\n${marker}\n%%EOF`, 'utf-8');
+function buildPngBuffer(marker: string): Buffer {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const tail = Array.from(marker, c => c.charCodeAt(0));
+  return Buffer.concat([signature, Buffer.from(tail)]);
 }
 
 async function createSupplier(page: Page, label: string): Promise<number> {
@@ -208,9 +210,9 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
       page,
       supplierA,
       qidA,
-      'a.pdf',
-      'application/pdf',
-      buildPdfBuffer('459-02')
+      'a.png',
+      'image/png',
+      buildPngBuffer('459-02')
     );
     expect(
       up.status,
@@ -251,9 +253,9 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
     const own = await getAttachment(page, supplierA, qidA);
     expect(own.status, `459-02 反向对照：A 自己下载必须 200，实际 ${own.status}`).toBe(200);
     expect(
-      own.body.subarray(0, 4).toString('latin1'),
-      `459-02 A 自己下载必须是真实 PDF 字节（%PDF），实际 ${own.body.subarray(0, 8).toString('latin1')}`
-    ).toBe('%PDF');
+      own.body.subarray(0, 4).toString('hex'),
+      `459-02 A 自己下载必须是真实 PNG 字节签名，实际 ${own.body.subarray(0, 8).toString('hex')}`
+    ).toBe('89504e47');
 
     await apiCall(page, 'DELETE', `/purchase/suppliers/${supplierA}/qualifications/${qidA}`);
   });
@@ -267,9 +269,9 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
       page,
       supplierA,
       qidA,
-      'own.pdf',
-      'application/pdf',
-      buildPdfBuffer('459-03-own')
+      'own.png',
+      'image/png',
+      buildPngBuffer('459-03-own')
     );
     expect(ownUp.status, `459-03 前置：A 上传成功，实际 ${ownUp.status}`).toBe(200);
     const before = ownUp.data ? String(ownUp.data.attachment_path) : '';
@@ -282,9 +284,9 @@ test.describe.serial('459 资质附件跨供应商归属校验与未上传下载
       page,
       supplierB,
       qidA,
-      'idor.pdf',
-      'application/pdf',
-      buildPdfBuffer('459-03-idor')
+      'idor.png',
+      'image/png',
+      buildPngBuffer('459-03-idor')
     );
     console.log(
       `[459-03] 跨供应商上传 status=${idor.status} code=${idor.code} message=${idor.message}\n`

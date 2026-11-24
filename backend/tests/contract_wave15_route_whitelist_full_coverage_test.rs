@@ -15,7 +15,9 @@
 
 use std::collections::BTreeSet;
 
-use bingxi_backend::middleware::public_routes::{AUTH_ONLY_PATHS, PUBLIC_PATHS};
+use bingxi_backend::middleware::public_routes::{
+    AUTH_ONLY_PATHS, PUBLIC_PATHS, is_customer_portal_read_path,
+};
 use bingxi_backend::utils::path_utils::is_known_resource_segment;
 
 const SNAPSHOT: &str = include_str!("../../frontend/scripts/route-snapshot.txt");
@@ -47,8 +49,16 @@ fn snapshot_segments() -> BTreeSet<String> {
         .filter(|l| !l.starts_with('#'))
         .filter_map(|line| {
             // 行形态：METHOD \t /path \t handler \t domain
-            let path = line.split('\t').nth(1)?;
-            erp_resource_segment(path.trim()).map(str::to_string)
+            let mut cols = line.split('\t');
+            let method = cols.next()?;
+            let path = cols.next()?.trim();
+            // 门户读面由专用谓词在白名单门之前放行。快照里 ID 段写成 `*` 占位，
+            // 谓词只认真实数字 ID，判豁免前替换成数字再判，避免通配形态漏判。
+            let probe_path = path.replace("/*", "/1");
+            if is_customer_portal_read_path(&probe_path, method.trim()) {
+                return None;
+            }
+            erp_resource_segment(path).map(str::to_string)
         })
         .collect()
 }
