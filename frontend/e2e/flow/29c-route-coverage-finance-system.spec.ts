@@ -199,6 +199,7 @@ test.describe('100% 前端路由 UI 交互全覆盖', () => {
   });
   test('全量审计 /omni-audit', async ({ page }) => {
     await visitPage(page, '/omni-audit');
+    await page.getByRole('tab', { name: '日志' }).click();
     await verifyTable(page);
   });
   test('数据导入 /data-import', async ({ page }) => {
