@@ -625,7 +625,7 @@ impl BpmService {
             let new_task = bpm_task::ActiveModel {
                 instance_id: Set(ctx.instance.id),
                 process_definition_id: Set(ctx.definition.id),
-                // P1 3-6 修复（批次 60）：改用 DocumentNumberGenerator 保证并发唯一性
+                // 任务号在同一事务内向取号器申请，保证并发下唯一
                 task_no: Set(
                     crate::utils::number_generator::DocumentNumberGenerator::generate_no_with_txn(
                         txn,
