@@ -69,12 +69,16 @@ function positiveId(id: unknown, label: string): number {
 function toCents(value: unknown, label: string): bigint {
   const raw =
     typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : '';
-  const match = /^(-?)(\d+)(?:\.(\d{1,3}))?$/.exec(raw);
+  const match = /^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(raw);
   if (!match) {
-    throw new Error(`${label}：Decimal 出参必须为至多三位小数，实际 ${JSON.stringify(value)}`);
+    throw new Error(`${label}：Decimal 出参形态非法，实际 ${JSON.stringify(value)}`);
   }
   const [, sign, integer, fraction = ''] = match;
-  return BigInt((sign === '-' ? '-' : '') + integer + fraction.padEnd(3, '0'));
+  if (fraction.length > 2 && fraction.slice(2).replace(/0+$/, '') !== '') {
+    throw new Error(`${label}：标度超过 2 位且尾数非零，实际 ${raw}`);
+  }
+  const cents = BigInt(integer) * 100n + BigInt((fraction + '00').slice(0, 2));
+  return sign === '-' ? -cents : cents;
 }
 
 async function findRoleId(page: Page, code: string): Promise<number> {
