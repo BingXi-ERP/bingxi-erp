@@ -1,7 +1,7 @@
 // 小程序内部面 customer 403 家族回归 — 内部 ERP 读接口对 customer 角色逐端点 fail-closed
 // 功能：绑定客户的 customer 账号命中内部业务读端点（商品/销售/应收/CRM/用户/角色/
 //       公司档案/通知）必须被 RBAC 权限门整族拒绝（403 + FORBIDDEN 机器码）。
-//       仪表板是每个角色都有的应用外壳权限，不作为内部业务拒绝面。
+//       仪表板与通知是每个角色都有的应用外壳权限，不作为内部业务拒绝面。
 //       权限键由 URL 段派生（middleware/permission.rs seg3/seg4），customer 角色不含任何
 //       内部键；fail-closed 判据 = 403 且 code 归因到权限门机器码，不接受 CSRF 中间态
 //       403（expectDenied 内置假绿拦截）。
@@ -112,15 +112,18 @@ test.describe.serial('578 小程序内部面 customer 403 家族回归', () => {
       { path: '/users?page=1&page_size=10', why: '用户管理列表' },
       { path: '/roles?page=1&page_size=100', why: '角色列表' },
       { path: '/company-profile/full', why: '公司档案全量' },
-      { path: '/notifications/unread-count', why: '通知未读数' },
     ];
-    expect(family.length, '家族清单不得被静默截断').toBe(13);
+    expect(family.length, '家族清单不得被静默截断').toBe(12);
     for (const item of family) {
       const denied = await apiCallExpectFail(session.page, 'GET', item.path);
       expectDenied(denied, `customer 打内部面 ${item.path}（${item.why}）`);
     }
 
-    for (const path of ['/dashboard/overview', '/dashboard/sales-stats']) {
+    for (const path of [
+      '/dashboard/overview',
+      '/dashboard/sales-stats',
+      '/notifications/unread-count',
+    ]) {
       const overview = await apiCallRaw<Row>(session.page, 'GET', path);
       expect(Object.keys(overview).length, `应用外壳 ${path} 应返回非空对象`).toBeGreaterThan(0);
     }
