@@ -235,10 +235,10 @@ test.describe('648 库存流水 before/after 台账回放', () => {
     );
     const warehouseRows = pickListArray({ items: warehouses.items }, 'items', '[648] 仓库列表');
     const warehouse = warehouseRows.find(w => Number(w.id) === ctx.warehouseIds[0]);
-    expect(warehouse?.code, '[648] 目标仓库须有 warehouse_code 回读').toBeTruthy();
+    expect(warehouse?.warehouse_code, '[648] 目标仓库须有 warehouse_code 回读').toBeTruthy();
     await apiCallRaw(page, 'POST', `/sales/orders/${orderId}/ship`, {
       order_id: orderId,
-      warehouse_code: String(warehouse?.code),
+      warehouse_code: String(warehouse?.warehouse_code),
       items: [{ product_id: productId, quantity: '25', batch_no: batchNo }],
     });
 

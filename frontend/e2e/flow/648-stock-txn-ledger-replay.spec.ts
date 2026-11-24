@@ -21,7 +21,15 @@
  *   services/inventory_stock_query.rs 交易查询固定 created_at ASC。
  */
 import { test, expect } from '../diagnose-fixture';
-import { apiCall, apiCallRaw, ensureTestEntities, genCode, getCtx, tryCleanup } from './helpers';
+import {
+  apiCall,
+  apiCallRaw,
+  ensureTestEntities,
+  genCode,
+  getCtx,
+  seedInspectionPass,
+  tryCleanup,
+} from './helpers';
 
 interface TxnRow {
   transaction_type: string;
@@ -49,10 +57,14 @@ interface ProductRow {
 
 function toScaled(v: unknown, label: string): bigint {
   const raw = typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '';
-  const m = /^(-?)(\d+)(?:\.(\d{1,3}))?$/.exec(raw);
-  if (!m) throw new Error(`${label}：Decimal 出参必须为至多三位小数，实际 ${JSON.stringify(v)}`);
+  const m = /^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(raw);
+  if (!m) throw new Error(`[648] ${label} Decimal 出参形态非法：${JSON.stringify(v)}`);
   const [, sign, int, frac = ''] = m;
-  return BigInt((sign === '-' ? '-' : '') + int + frac.padEnd(3, '0'));
+  if (frac.length > 2 && frac.slice(2).replace(/0+$/, '') !== '') {
+    throw new Error(`[648] ${label} 标度超过 2 位且尾数非零：${raw}`);
+  }
+  const cents = BigInt(int) * 100n + BigInt((frac + '00').slice(0, 2));
+  return sign === '-' ? -cents : cents;
 }
 
 const CLEANUP: Array<{ path: string; label: string }> = [];
@@ -135,6 +147,12 @@ test.describe.serial('648 库存流水 before/after 逐行回放台账', () => {
     const receiptNo = String(receipt?.receipt_no ?? '');
     expect(receiptId, '[648-1] 入库单必须返回正整数主键').toBeGreaterThan(0);
     expect(receiptNo, '[648-1] 入库单必须回读单号').not.toBe('');
+    await seedInspectionPass(page, {
+      receiptId,
+      supplierId: ctx.supplierId,
+      passQuantity: '40',
+      context: `648-${batchNo}`,
+    });
     await apiCall(page, 'POST', `/purchase/receipts/${receiptId}/confirm`);
 
     const stockBefore = await apiCallRaw<{ items?: StockRow[]; total?: number }>(
