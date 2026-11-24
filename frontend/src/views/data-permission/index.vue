@@ -33,7 +33,11 @@
 
           <!-- 手机卡片（<768 与系统域列表同断点同范式） -->
           <section v-if="isPhone" v-loading="permissionLoading" class="data-permission-mobile">
-            <ul class="order-list" :aria-label="t('dataPermission.index.ariaTable')">
+            <ul
+              v-if="permissionList.length > 0"
+              class="order-list"
+              :aria-label="t('dataPermission.index.ariaTable')"
+            >
               <li v-for="row in permissionList" :key="row.id" class="order-card">
                 <dl class="order-fields">
                   <div v-if="isOverview" class="order-number">
@@ -98,6 +102,7 @@
                 </div>
               </li>
             </ul>
+            <el-empty v-else :description="t('dataPermission.index.mobileEmpty')" />
           </section>
 
           <el-table

@@ -9980,6 +9980,7 @@ export default {
         delete: '删除',
       },
       mobileCardAria: '物流运单手机卡片列表',
+      mobileEmpty: '暂无物流运单',
     },
     stat: {
       label: {
@@ -11251,6 +11252,7 @@ export default {
       buttonCancel: '取消',
       buttonConfirm: '确认',
       ariaTable: '数据权限列表',
+      mobileEmpty: '暂无数据权限配置',
       ariaCreateDialog: '新增数据权限对话框',
       ariaEditDialog: '编辑数据权限对话框',
       ariaForm: '数据权限表单',
@@ -12723,6 +12725,7 @@ export default {
       delete: '删除',
       paginationAriaLabel: '数据导入模板分页',
       mobileCardAria: '数据导入模板手机卡片列表',
+      mobileEmpty: '暂无导入模板',
     },
     taskTable: {
       statusPlaceholder: '状态',
@@ -12748,6 +12751,7 @@ export default {
       errorLog: '错误日志',
       paginationAriaLabel: '数据导入任务分页',
       mobileCardAria: '数据导入任务手机卡片列表',
+      mobileEmpty: '暂无导入任务',
     },
     templateForm: {
       editTitle: '编辑模板',
