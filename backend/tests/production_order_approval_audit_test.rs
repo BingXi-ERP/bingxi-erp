@@ -5,7 +5,7 @@ use std::sync::Arc;
 use bingxi_backend::models::audit_log;
 use bingxi_backend::models::status::{common, production};
 use bingxi_backend::services::production_order_service::{
-    CreateProductionOrderRequest, ProductionOrderService,
+    CreateProductionOrderRequest, ProductionOrderService, UpdateProductionOrderRequest,
 };
 use chrono::Utc;
 use rust_decimal::Decimal;
@@ -222,4 +222,82 @@ async fn production_order_submit_and_approval_actions_write_audit_snapshots() {
         production::PRODUCTION_PENDING_APPROVAL,
         production::PRODUCTION_REJECTED,
     );
+}
+
+fn snapshot_field<'a>(
+    snapshot: &'a Option<audit_log::AuditValue>,
+    key: &str,
+) -> Option<&'a serde_json::Value> {
+    snapshot.as_ref().and_then(|value| value.0.get(key))
+}
+
+#[tokio::test]
+async fn production_order_update_writes_audit_snapshot() {
+    let db = Arc::new(setup_test_db().await);
+    seed_fixture(&db).await;
+    let service = ProductionOrderService::new(Arc::clone(&db));
+    let order = service
+        .create(create_request(), OPERATOR_ID)
+        .await
+        .expect("创建待编辑生产订单失败");
+    let baseline = audit_rows(&db, order.id).await.len();
+
+    let updated = service
+        .update(
+            order.id,
+            UpdateProductionOrderRequest {
+                planned_quantity: Some(Some(Decimal::new(1200, 0))),
+                planned_start_date: None,
+                planned_end_date: None,
+                priority: Some(Some(3)),
+                work_center_id: None,
+                remarks: Some(Some("编辑审计验证".to_string())),
+            },
+            OPERATOR_ID,
+        )
+        .await
+        .expect("编辑生产订单失败");
+    assert_eq!(updated.planned_quantity, Decimal::new(1200, 0));
+    assert_eq!(updated.priority, 3);
+    assert_eq!(updated.remarks.as_deref(), Some("编辑审计验证"));
+
+    let rows = audit_rows(&db, order.id).await;
+    assert_eq!(rows.len(), baseline + 1, "编辑必须恰好新增一条审计");
+    let row = rows.last().expect("编辑后必须存在审计记录");
+    assert_eq!(row.user_id, Some(OPERATOR_ID));
+    assert_eq!(row.username.as_deref(), Some("production_approval_auditor"));
+    assert_eq!(row.action, "UPDATE");
+    assert_eq!(row.operation_type.as_deref(), Some("UPDATE"));
+    assert_eq!(row.resource_type.as_deref(), Some("production_order"));
+    assert_eq!(
+        row.resource_id.as_deref(),
+        Some(order.id.to_string().as_str())
+    );
+
+    for (before, after) in [
+        (&row.before_snapshot, &row.after_snapshot),
+        (&row.old_value, &row.new_value),
+    ] {
+        assert_eq!(
+            snapshot_field(before, "planned_quantity").and_then(|v| v.as_str()),
+            Some("1000")
+        );
+        assert_eq!(
+            snapshot_field(after, "planned_quantity").and_then(|v| v.as_str()),
+            Some("1200")
+        );
+        assert_eq!(
+            snapshot_field(before, "priority").and_then(|v| v.as_u64()),
+            Some(1)
+        );
+        assert_eq!(
+            snapshot_field(after, "priority").and_then(|v| v.as_u64()),
+            Some(3)
+        );
+        assert!(snapshot_field(before, "remarks").is_none_or(serde_json::Value::is_null));
+        assert_eq!(
+            snapshot_field(after, "remarks").and_then(|v| v.as_str()),
+            Some("编辑审计验证")
+        );
+    }
 }

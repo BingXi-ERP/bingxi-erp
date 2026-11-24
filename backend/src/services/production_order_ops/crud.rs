@@ -417,6 +417,7 @@ impl ProductionOrderService {
         &self,
         id: i32,
         req: UpdateProductionOrderRequest,
+        user_id: i32,
     ) -> Result<ProductionOrderModel, AppError> {
         // NOT NULL 列门控（planned_quantity NOT NULL m0007:78、priority NOT NULL m0007:84）：
         if matches!(req.planned_quantity, Some(None)) {
@@ -430,8 +431,10 @@ impl ProductionOrderService {
             ));
         }
 
+        let txn = (*self.db).begin().await?;
         let model = ProductionOrderEntity::find_by_id(id)
-            .one(&*self.db)
+            .lock_exclusive()
+            .one(&txn)
             .await?
             .ok_or_else(|| AppError::not_found("生产订单不存在"))?;
 
@@ -472,7 +475,14 @@ impl ProductionOrderService {
 
         active_model.updated_at = Set(Utc::now());
 
-        let updated = active_model.update(&*self.db).await?;
+        let updated = crate::services::audit_log_service::AuditLogService::update_with_audit(
+            &txn,
+            super::types::AUDIT_RESOURCE_TYPE,
+            active_model,
+            Some(user_id),
+        )
+        .await?;
+        txn.commit().await?;
 
         Ok(updated)
     }

@@ -324,7 +324,7 @@ pub async fn update_production_order(
         remarks: payload.remarks,
     };
 
-    let model = service.update(id, req).await?;
+    let model = service.update(id, req, auth.user_id).await?;
 
     let response = response_from_model(model);
 
