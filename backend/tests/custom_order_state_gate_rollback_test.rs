@@ -384,7 +384,7 @@ async fn quotation_missing_after_gate_rolls_back_order_nodes_and_logs() {
         .exec(&fixture.db)
         .await
         .expect("删除报价以构造事务快照缺失失败");
-    let service_db = snapshot_service_db();
+    let service_db = snapshot_service_db().await;
     let service = CustomOrderStateService::new(service_db);
 
     let lock_txn = fixture.db.begin().await.expect("开启订单行锁事务失败");
