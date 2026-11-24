@@ -272,13 +272,13 @@ test.describe.serial('580 跨客户行级零可见防回退', () => {
     const filtered = await apiCallRaw<PortalList<Row>>(
       session.page,
       'GET',
-      `/customer-portal/color-cards?keyword=${encodeURIComponent(tagB)}`
+      `/customer-portal/color-cards?keyword=${encodeURIComponent(cardNameB)}`
     );
     expect(filtered.total, '按他户卡名关键字过滤必须 0 行').toBe(0);
     const own = await apiCallRaw<PortalList<Row>>(
       session.page,
       'GET',
-      `/customer-portal/color-cards?keyword=${encodeURIComponent(tagA)}`
+      `/customer-portal/color-cards?keyword=${encodeURIComponent(cardNameA)}`
     );
     expect(own.total, '按本户卡名关键字过滤必须命中（过滤链路活性哨兵）').toBeGreaterThan(0);
   });
