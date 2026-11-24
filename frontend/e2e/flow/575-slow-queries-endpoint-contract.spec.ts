@@ -14,7 +14,7 @@
 //   SlowQueryDto 含 query_text/execution_time_ms/calls/rows_examined/captured_at。
 import { test, expect } from '../diagnose-fixture';
 import type { Page } from '@playwright/test';
-import { apiCallExpectFail, apiCallRaw } from './helpers';
+import { apiCallRaw } from './helpers';
 
 interface SlowQueryItem {
   id?: unknown;
@@ -44,27 +44,16 @@ function expectFiniteNumber(value: unknown, label: string): void {
 }
 
 test('575-01 慢查询刷新、列表与统计端点返回完整契约', async ({ page }: { page: Page }) => {
-  // 仅放行采集端点的 DATABASE_ERROR 环境态；公开错误信封固定脱敏，不能要求内部扩展名。
-  // 后续列表与统计仍须成功，数据库整体不可用或业务表缺失会由这两腿判红。
-  const refresh = await apiCallExpectFail(page, 'POST', '/slow-queries/refresh');
-  const envDegraded = refresh.code === 'DATABASE_ERROR';
-  if (envDegraded) {
-    expect(refresh.status, '采集端点数据库错误须保留原始 HTTP 500').toBe(500);
-    console.warn('[575] 慢查询采集端点数据库错误降级，继续验证列表与统计可用性');
-  } else {
-    expect(String(refresh.code), '刷新端点成功态须返回 success 信封 code=200').toBe('200');
-    expect(refresh.status, '刷新成功态 HTTP 须 200').toBe(200);
-    const data = refresh.data;
-    expect(data && typeof data === 'object' && !Array.isArray(data), '刷新响应须含 data 对象').toBe(
-      true
-    );
-    if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      throw new Error('575 刷新响应缺少 data 对象，无法验证采集结果');
-    }
-    const result = data as Record<string, unknown>;
-    expectNonNegativeInteger(result.inserted, '刷新插入条数');
-    expect(typeof result.message === 'string' && result.message.length > 0, '刷新提示须非空').toBe(
-      true
+  // 未安装性能统计扩展时，采集端点必须明确返回零条与不可用提示；
+  // 其他数据库故障原样失败，不能再用任意 DATABASE_ERROR 冒充环境降级。
+  const refresh = await apiCallRaw<Record<string, unknown>>(page, 'POST', '/slow-queries/refresh');
+  expectNonNegativeInteger(refresh.inserted, '刷新插入条数');
+  expect(typeof refresh.message === 'string' && refresh.message.length > 0, '刷新提示须非空').toBe(
+    true
+  );
+  if (refresh.inserted === 0) {
+    expect(refresh.message, '零条结果须明确区分无慢查询与采集能力不可用').toMatch(
+      /未发现新的慢查询|暂不可用/
     );
   }
 

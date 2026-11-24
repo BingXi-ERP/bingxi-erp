@@ -172,21 +172,29 @@ pub async fn get_slow_query_stats(
 
     let mut top10: Vec<SlowQueryStatDto> = Vec::with_capacity(query_result.len());
     for row in query_result {
-        let query_text: Option<String> = row.try_get_by_index(0).ok();
-        let max_exec_time_ms: Option<f64> = row.try_get_by_index(1).ok();
-        let total_calls: Option<i64> = row.try_get_by_index(2).ok();
-        let avg_rows: Option<f64> = row.try_get_by_index(3).ok();
-        let sample_count: Option<i64> = row.try_get_by_index(4).ok();
+        let query_text = row
+            .try_get_by_index::<String>(0)
+            .map_err(|e| AppError::database(format!("读取慢查询统计 SQL 文本失败: {}", e)))?;
+        let max_exec_time_ms = row
+            .try_get_by_index::<f64>(1)
+            .map_err(|e| AppError::database(format!("读取慢查询统计最大耗时失败: {}", e)))?;
+        let total_calls = row
+            .try_get_by_index::<i64>(2)
+            .map_err(|e| AppError::database(format!("读取慢查询统计调用次数失败: {}", e)))?;
+        let avg_rows = row
+            .try_get_by_index::<f64>(3)
+            .map_err(|e| AppError::database(format!("读取慢查询统计平均扫描行失败: {}", e)))?;
+        let sample_count = row
+            .try_get_by_index::<i64>(4)
+            .map_err(|e| AppError::database(format!("读取慢查询统计样本数失败: {}", e)))?;
 
-        if let Some(qt) = query_text {
-            top10.push(SlowQueryStatDto {
-                query_text: qt,
-                max_exec_time_ms: max_exec_time_ms.unwrap_or(0.0),
-                total_calls: total_calls.unwrap_or(0),
-                avg_rows: avg_rows.unwrap_or(0.0),
-                sample_count: sample_count.unwrap_or(0),
-            });
-        }
+        top10.push(SlowQueryStatDto {
+            query_text,
+            max_exec_time_ms,
+            total_calls,
+            avg_rows,
+            sample_count,
+        });
     }
 
     // 总条数（近 7 天）
@@ -202,9 +210,10 @@ pub async fn get_slow_query_stats(
         ))
         .await
         .map_err(|e| AppError::database(format!("统计慢查询总数失败: {}", e)))?;
-    let total_count: i64 = count_row
-        .and_then(|r| r.try_get_by_index(0).ok())
-        .unwrap_or(0);
+    let total_count = count_row
+        .ok_or_else(|| AppError::database("统计慢查询总数未返回结果"))?
+        .try_get_by_index::<i64>(0)
+        .map_err(|e| AppError::database(format!("读取慢查询总数失败: {}", e)))?;
 
     Ok(Json(ApiResponse::success(SlowQueryStatsResponse {
         top10,
@@ -373,15 +382,18 @@ pub async fn refresh_slow_queries(
     // TODO: 从 AppState.settings 读取配置，需要将 settings 存入 AppState
     let collector = Arc::new(SlowQueryCollector::new(state.db.clone(), 100.0, 100));
 
-    // collect_once 返回的即是带真实 status/code 的 AppError（含 pg_stat_statements
-    // 不可用等环境故障诊断），原样透传，不再重包为 internal 丢失语义。
+    // 扩展缺失由 collector 返回 None，端点明确降级为零条；其他采集错误原样透传。
     // 采集失败的排障详情由 collector 侧的 ERROR 日志承载（不在此脱敏重包）。
-    let inserted = collector.collect_once().await?;
-
-    let message = if inserted == 0 {
-        "本次未发现新的慢查询（最近 5 分钟内无 mean_exec_time > 100ms 的查询）".to_string()
-    } else {
-        format!("本次采集写入 {} 条慢查询记录", inserted)
+    let (inserted, message) = match collector.collect_once().await? {
+        Some(0) => (
+            0,
+            "本次未发现新的慢查询（最近 5 分钟内无 mean_exec_time > 100ms 的查询）".to_string(),
+        ),
+        Some(inserted) => (inserted, format!("本次采集写入 {} 条慢查询记录", inserted)),
+        None => (
+            0,
+            "慢查询采集暂不可用，请联系管理员启用性能统计扩展".to_string(),
+        ),
     };
 
     Ok(Json(ApiResponse::success(SlowQueryRefreshResponse {
