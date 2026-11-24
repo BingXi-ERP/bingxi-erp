@@ -14,7 +14,7 @@ use std::time::Duration;
 use chrono::{Duration as ChronoDuration, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseBackend, DbBackend, EntityTrait,
-    QueryFilter, QueryOrder, Statement, TransactionTrait,
+    QueryFilter, QueryOrder, Set, Statement, TransactionTrait,
 };
 use serde_json::json;
 use tokio::sync::Barrier;
