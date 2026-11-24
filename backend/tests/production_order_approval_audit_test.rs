@@ -16,6 +16,7 @@ use sea_orm::{
 use test_common::setup_test_db;
 
 const OPERATOR_ID: i32 = 9871;
+const STATUS_OPERATOR_ID: i32 = 9872;
 const PRODUCT_ID: i32 = 987_101;
 const WORK_CENTER_ID: i32 = 987_201;
 const ORIGINAL_BATCH_ID: i32 = 987_301;
@@ -330,6 +331,58 @@ async fn production_order_rework_create_writes_create_audit_snapshot() {
     assert_eq!(
         snapshot_field(&row.new_value, "remarks").and_then(|value| value.as_str()),
         Some("返工建单审计验证")
+    );
+}
+
+#[tokio::test]
+async fn production_order_status_update_records_actual_operator() {
+    let db = Arc::new(setup_test_db().await);
+    seed_fixture(&db).await;
+    db.execute_raw(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "INSERT INTO users (id, username, password_hash, real_name, is_active, is_totp_enabled, created_at, updated_at) \
+         VALUES ($1, 'production_status_operator', 'test-only-not-a-real-hash', '生产状态操作人', true, false, NOW(), NOW())",
+        vec![STATUS_OPERATOR_ID.into()],
+    ))
+    .await
+    .expect("种子状态操作人插入失败");
+    let service = ProductionOrderService::new(Arc::clone(&db));
+    let order = service
+        .create(create_request(), OPERATOR_ID)
+        .await
+        .expect("创建待更新状态生产订单失败");
+    let baseline = audit_rows(&db, order.id).await.len();
+
+    let updated = service
+        .update_status(
+            order.id,
+            common::STATUS_CANCELLED.to_string(),
+            None,
+            STATUS_OPERATOR_ID,
+        )
+        .await
+        .expect("更新生产订单状态失败");
+    assert_eq!(updated.status, common::STATUS_CANCELLED);
+
+    let rows = audit_rows(&db, order.id).await;
+    assert_eq!(rows.len(), baseline + 1, "状态更新必须恰好新增一条审计");
+    let row = rows.last().expect("状态更新后必须存在审计记录");
+    assert_eq!(row.user_id, Some(STATUS_OPERATOR_ID));
+    assert_eq!(row.username.as_deref(), Some("production_status_operator"));
+    assert_eq!(row.action, "UPDATE");
+    assert_eq!(row.operation_type.as_deref(), Some("UPDATE"));
+    assert_eq!(
+        snapshot_status(&row.before_snapshot),
+        Some(common::STATUS_DRAFT)
+    );
+    assert_eq!(
+        snapshot_status(&row.after_snapshot),
+        Some(common::STATUS_CANCELLED)
+    );
+    assert_eq!(snapshot_status(&row.old_value), Some(common::STATUS_DRAFT));
+    assert_eq!(
+        snapshot_status(&row.new_value),
+        Some(common::STATUS_CANCELLED)
     );
 }
 

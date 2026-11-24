@@ -9,6 +9,7 @@ mod test_common;
 
 use std::sync::Arc;
 
+use bingxi_backend::models::audit_log;
 use bingxi_backend::models::status::common::STATUS_COMPLETED;
 use bingxi_backend::models::status::common::STATUS_DRAFT;
 use bingxi_backend::models::status::{common, production};
@@ -17,8 +18,12 @@ use bingxi_backend::services::production_order_service::{
 };
 use chrono::NaiveDate;
 use rust_decimal::Decimal;
-use sea_orm::{ConnectionTrait, DbBackend, Statement};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DbBackend, EntityTrait, QueryFilter, QueryOrder, Statement,
+};
 use test_common::setup_test_db;
+
+const STATUS_OPERATOR_ID: i32 = 9872;
 
 /// 构造最小 CreateProductionOrderRequest（仅必填字段）
 ///
@@ -35,6 +40,26 @@ fn sample_create_request() -> CreateProductionOrderRequest {
         work_center_id: Some(1),
         remarks: None,
     }
+}
+
+async fn production_order_audits(
+    db: &sea_orm::DatabaseConnection,
+    order_id: i32,
+) -> Vec<audit_log::Model> {
+    audit_log::Entity::find()
+        .filter(audit_log::Column::ResourceType.eq("production_order"))
+        .filter(audit_log::Column::ResourceId.eq(order_id.to_string()))
+        .order_by_asc(audit_log::Column::Id)
+        .all(db)
+        .await
+        .expect("回读生产订单审计日志失败")
+}
+
+fn snapshot_field<'a>(
+    snapshot: &'a Option<audit_log::AuditValue>,
+    key: &str,
+) -> Option<&'a serde_json::Value> {
+    snapshot.as_ref().and_then(|value| value.0.get(key))
 }
 
 // ===== 状态常量值正确性 =====
@@ -280,6 +305,11 @@ async fn test_scddqlc_cjdwc() {
     let db = Arc::new(db);
     for (sql, what) in [
         (
+            "INSERT INTO users (id, username, password_hash, real_name, is_active, is_totp_enabled, created_at, updated_at) \
+             VALUES (9872, 'production_status_operator', 'test-only-not-a-real-hash', '生产状态操作人', true, false, NOW(), NOW())",
+            "状态操作人",
+        ),
+        (
             "INSERT INTO products (id, code, name, unit, status, product_type) VALUES \
              (1, 'PT-WF-P1', '生产全流程测试面料', '米', 'active', '成品布')",
             "products 父行",
@@ -343,7 +373,12 @@ async fn test_scddqlc_cjdwc() {
 
     // 4. 排产（APPROVED → SCHEDULED）
     let order = svc
-        .update_status(order.id, production::PRODUCTION_SCHEDULED.to_string(), None)
+        .update_status(
+            order.id,
+            production::PRODUCTION_SCHEDULED.to_string(),
+            None,
+            STATUS_OPERATOR_ID,
+        )
         .await
         .expect("排产失败");
     assert_eq!(order.status, production::PRODUCTION_SCHEDULED);
@@ -354,6 +389,7 @@ async fn test_scddqlc_cjdwc() {
             order.id,
             production::PRODUCTION_IN_PROGRESS.to_string(),
             None,
+            STATUS_OPERATOR_ID,
         )
         .await
         .expect("开工失败");
@@ -400,15 +436,55 @@ async fn test_scddqlc_cjdwc() {
     .unwrap_or_else(|e| panic!("种子 inventory_stocks 纱线库存行写入失败: {e}"));
 
     // 6. 完工（IN_PROGRESS → COMPLETED，需 actual_quantity）
+    let completion_baseline = production_order_audits(&db, order.id).await.len();
     let order = svc
         .update_status(
             order.id,
             common::STATUS_COMPLETED.to_string(),
             Some(Decimal::new(1000, 0)),
+            STATUS_OPERATOR_ID,
         )
         .await
         .expect("完工失败");
     assert_eq!(order.status, common::STATUS_COMPLETED);
+
+    let completion_audits = production_order_audits(&db, order.id).await;
+    assert_eq!(
+        completion_audits.len(),
+        completion_baseline + 1,
+        "完工必须恰好新增一条审计"
+    );
+    let completion_audit = completion_audits.last().expect("完工后必须存在审计记录");
+    assert_eq!(completion_audit.user_id, Some(STATUS_OPERATOR_ID));
+    assert_eq!(
+        completion_audit.username.as_deref(),
+        Some("production_status_operator")
+    );
+    assert_eq!(completion_audit.action, "UPDATE");
+    assert_eq!(completion_audit.operation_type.as_deref(), Some("UPDATE"));
+    for (before, after) in [
+        (
+            &completion_audit.before_snapshot,
+            &completion_audit.after_snapshot,
+        ),
+        (&completion_audit.old_value, &completion_audit.new_value),
+    ] {
+        assert_eq!(
+            snapshot_field(before, "status").and_then(|value| value.as_str()),
+            Some(production::PRODUCTION_IN_PROGRESS)
+        );
+        assert_eq!(
+            snapshot_field(after, "status").and_then(|value| value.as_str()),
+            Some(common::STATUS_COMPLETED)
+        );
+        assert!(snapshot_field(before, "actual_quantity").is_none_or(serde_json::Value::is_null));
+        assert_eq!(
+            snapshot_field(after, "actual_quantity").and_then(|value| value.as_str()),
+            Some("1000")
+        );
+        assert!(snapshot_field(before, "actual_end_date").is_none_or(serde_json::Value::is_null));
+        assert!(snapshot_field(after, "actual_end_date").is_some_and(|value| !value.is_null()));
+    }
 
     // 7. 扣料回读：按定位键读回纱线库存行，钉扣减真实发生——unit='kg' 的投纱 100
     //    扣公斤列 500-100=400；米数列按被命中行自身米公斤比值等比随行

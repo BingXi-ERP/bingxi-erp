@@ -24,9 +24,7 @@
 
 use chrono::Utc;
 use rust_decimal::Decimal;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
-};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
 
 use crate::models::flow_card_material::{Model as FlowCardMaterialModel, UNIT_KG, UNIT_METER};
 use crate::models::inventory_stock::Entity as InventoryStockEntity;
@@ -231,12 +229,19 @@ impl ProductionOrderService {
         &self,
         id: i32,
         actual_quantity: Option<Decimal>,
+        user_id: i32,
     ) -> Result<ProductionOrderModel, AppError> {
         let txn = self.db.begin().await?;
 
         let model = Self::lock_and_validate_order_for_completion_txn(&txn, id).await?;
         let active_model = Self::build_completed_active_model(model, actual_quantity);
-        let updated = active_model.update(&txn).await?;
+        let updated = crate::services::audit_log_service::AuditLogService::update_with_audit(
+            &txn,
+            super::types::AUDIT_RESOURCE_TYPE,
+            active_model,
+            Some(user_id),
+        )
+        .await?;
 
         // 在同一事务内执行库存联动（含原材料扣减 + 成品入库）
         // P0 5-2 修复：handle_production_completion_inventory_txn 不再在内部 publish 事件，

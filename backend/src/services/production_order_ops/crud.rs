@@ -550,10 +550,13 @@ impl ProductionOrderService {
         id: i32,
         status: String,
         actual_quantity: Option<Decimal>,
+        user_id: i32,
     ) -> Result<ProductionOrderModel, AppError> {
         // COMPLETED 走事务包裹的专用路径
         if status == crate::models::status::common::STATUS_COMPLETED {
-            return self.complete_production_order(id, actual_quantity).await;
+            return self
+                .complete_production_order(id, actual_quantity, user_id)
+                .await;
         }
         // 批次 22（2026-06-28 v5 P0-3）：非 COMPLETED 路径补全事务 + lock_exclusive + update_with_audit
         let txn = (*self.db).begin().await?;
@@ -568,9 +571,7 @@ impl ProductionOrderService {
         // B-P2-5 修复（批次 386 v13 复审）：排产状态变更时进行产能负荷校验
         self.check_capacity_for_scheduling(&model, id, &status)
             .await?;
-        let audit_user_id = model.created_by;
-        let updated =
-            Self::apply_status_update_with_audit(&txn, model, status, audit_user_id).await?;
+        let updated = Self::apply_status_update_with_audit(&txn, model, status, user_id).await?;
         txn.commit().await?;
         Ok(updated)
     }
