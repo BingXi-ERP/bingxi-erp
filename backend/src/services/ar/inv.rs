@@ -5,13 +5,15 @@
 //! P0-2 销售→AR 业务流入口（`create_receivable`）：
 //! - 在销售订单 `ship_order` 提交且库存扣减成功后被调用
 //! - 复用调用方传入的数据库事务，保证库存扣减、AR 单、订单状态三者原子提交
-//! - 按 `source_type=SALES_ORDER` + `source_bill_id=order_id` 幂等去重
+//! - 按 `source_type=SALES_ORDER` + `source_bill_id=order_id` 汇总原应收与取消红字，无未红冲应收时允许重新发货开票
 //! - 应收单号复用 `DocumentNumberGenerator::insert_with_no_retry`，在调用方事务内
 //!   取号并插入（撞唯一约束在保存点内重取重试，不另开事务取号）
 
 use chrono::{Duration, Utc};
 use rust_decimal::Decimal;
-use sea_orm::{ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ColumnTrait, DatabaseTransaction, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
+};
 
 use crate::models::ar_invoice::{
     ActiveModel as ArInvoiceActive, Column as ArInvoiceColumn, Entity as ArInvoiceEntity,
@@ -19,13 +21,17 @@ use crate::models::ar_invoice::{
 };
 use crate::models::ar_reconciliation::Entity as ReconciliationEntity;
 use crate::models::ar_reconciliation_item::Entity as ReconciliationItemEntity;
+use crate::models::bad_debt_writeoff;
 use crate::models::customer;
+use crate::models::sales_delivery;
 use crate::models::sales_order;
 use crate::models::status::{approval, ar as ar_status, common};
 use crate::utils::error::AppError;
 use crate::utils::number_generator::DocumentNumberGenerator;
 
 use super::ArReconciliationService;
+
+const DELIVERY_CANCEL_SOURCE_TYPE: &str = "SALES_DELIVERY_CANCEL";
 
 impl ArReconciliationService {
     /// 导出对账单 Word 文档（docx）
@@ -107,6 +113,12 @@ impl ArReconciliationService {
         }
         // 2-4. 加载订单/客户 + 幂等校验
         let (order, cust) = Self::load_receivable_context(txn, customer_id, order_id).await?;
+        if total_amount != order.total_amount {
+            return Err(AppError::business(format!(
+                "销售订单 {} 的应收金额 {} 与订单总额 {} 不一致，禁止生成应收单",
+                order_id, total_amount, order.total_amount
+            )));
+        }
         // 5. 账期校验：<= 0 时统一回退为 30 天
         let terms = if payment_terms_days <= 0 {
             30
@@ -152,38 +164,292 @@ impl ArReconciliationService {
         Ok(invoice)
     }
 
-    /// 加载应收单上下文：销售订单 + 幂等校验 + 客户主档
+    /// 按单据顺序将取消红字与原应收一一轧差，返回尚未红冲的有效原应收。
+    fn unreversed_sales_order_invoices<'a>(
+        order_id: i32,
+        originals: &'a [ArInvoiceModel],
+        credits: &'a [ArInvoiceModel],
+    ) -> Result<Vec<&'a ArInvoiceModel>, AppError> {
+        let mut events: Vec<(i32, bool, &ArInvoiceModel, usize)> = Vec::new();
+        for (index, original) in originals.iter().enumerate() {
+            if original.invoice_amount <= Decimal::ZERO {
+                return Err(AppError::business(format!(
+                    "销售订单 {} 的原应收金额非正，应收数据不一致",
+                    order_id
+                )));
+            }
+            if original.status != common::STATUS_CANCELLED {
+                events.push((original.id, true, original, index));
+            }
+        }
+        for credit in credits
+            .iter()
+            .filter(|invoice| invoice.status != common::STATUS_CANCELLED)
+        {
+            if credit.invoice_amount >= Decimal::ZERO {
+                return Err(AppError::business(format!(
+                    "销售订单 {} 的取消红字金额非负，应收数据不一致",
+                    order_id
+                )));
+            }
+            events.push((credit.id, false, credit, usize::MAX));
+        }
+        events.sort_by_key(|(id, _, _, _)| *id);
+
+        let mut open: std::collections::VecDeque<(usize, Decimal)> =
+            std::collections::VecDeque::new();
+        for (_, is_original, invoice, index) in events {
+            if is_original {
+                open.push_back((index, invoice.invoice_amount));
+                continue;
+            }
+            let mut credit_remaining = -invoice.invoice_amount;
+            while !credit_remaining.is_zero() {
+                let (original_index, original_remaining) = open.pop_front().ok_or_else(|| {
+                    AppError::business(format!(
+                        "销售订单 {} 的取消红字找不到对应原应收，应收数据不一致",
+                        order_id
+                    ))
+                })?;
+                let applied = credit_remaining.min(original_remaining);
+                credit_remaining -= applied;
+                let original_remaining = original_remaining - applied;
+                if !original_remaining.is_zero() {
+                    open.push_front((original_index, original_remaining));
+                }
+            }
+        }
+
+        Ok(open
+            .into_iter()
+            .map(|(index, _)| &originals[index])
+            .collect())
+    }
+
+    /// 加载应收单上下文：锁订单、校验客户并按原应收与取消红字的净额判断是否可新建
     async fn load_receivable_context(
         txn: &DatabaseTransaction,
         customer_id: i32,
         order_id: i32,
     ) -> Result<(sales_order::Model, customer::Model), AppError> {
-        // 查询销售订单（取 order_no 作为 source_bill_no 写入应收单）
         let order = sales_order::Entity::find_by_id(order_id)
+            .lock_exclusive()
             .one(txn)
             .await?
             .ok_or_else(|| AppError::not_found(format!("销售订单 {} 不存在", order_id)))?;
-        // 幂等检查：同订单只允许存在一张应收单
-        // ar_invoices.source_bill_id 为多态单据 ID，列与模型均为 BIGINT/int64，
-        // 故按 i64 绑定（order_id 是 i32，无损加宽），与本文件写入侧 :214 同源，
-        // 避免把 i32(4 字节) 绑进 int8(8 字节) 列触发“incorrect binary data format in bind parameter”。
-        let exists = ArInvoiceEntity::find()
-            .filter(ArInvoiceColumn::SourceType.eq("SALES_ORDER"))
-            .filter(ArInvoiceColumn::SourceBillId.eq(i64::from(order_id)))
-            .one(txn)
-            .await?;
-        if exists.is_some() {
+        if order.customer_id != customer_id {
             return Err(AppError::business(format!(
-                "销售订单 {} 已生成应收单，请勿重复创建",
+                "销售订单 {} 的客户与应收客户不一致，禁止生成应收单",
                 order_id
             )));
         }
-        // 查询客户主档（用于冗余客户名称字段）
+
+        let originals = ArInvoiceEntity::find()
+            .filter(ArInvoiceColumn::SourceType.eq("SALES_ORDER"))
+            .filter(ArInvoiceColumn::SourceBillId.eq(i64::from(order_id)))
+            .lock_exclusive()
+            .all(txn)
+            .await?;
+        let credits = ArInvoiceEntity::find()
+            .filter(ArInvoiceColumn::SourceType.eq(DELIVERY_CANCEL_SOURCE_TYPE))
+            .filter(ArInvoiceColumn::CustomerId.eq(customer_id))
+            .filter(ArInvoiceColumn::SalesOrderNo.eq(&order.order_no))
+            .lock_exclusive()
+            .all(txn)
+            .await?;
+
+        let unreversed = Self::unreversed_sales_order_invoices(order_id, &originals, &credits)?;
+        if !unreversed.is_empty() {
+            return Err(AppError::business(format!(
+                "销售订单 {} 已存在未红冲的应收单，请勿重复创建",
+                order_id
+            )));
+        }
+
         let cust = customer::Entity::find_by_id(customer_id)
             .one(txn)
             .await?
             .ok_or_else(|| AppError::not_found(format!("客户 {} 不存在", customer_id)))?;
         Ok((order, cust))
+    }
+
+    /// 取消送货单时生成红字应收，保留原应收历史并与送货单取消共用事务。
+    /// 未全额发货尚无应收时直接跳过；已全额发货后再取消任意一张送货单都冲销整单应收。
+    pub async fn create_delivery_cancel_credit_memo(
+        &self,
+        txn: &DatabaseTransaction,
+        order: &sales_order::Model,
+        delivery: &sales_delivery::Model,
+        user_id: i32,
+        reason: &str,
+    ) -> Result<Option<ArInvoiceModel>, AppError> {
+        if delivery.order_id != order.id || delivery.customer_id != order.customer_id {
+            return Err(AppError::business(
+                "送货单与销售订单或客户不匹配，禁止生成取消红字应收".to_string(),
+            ));
+        }
+
+        let originals = ArInvoiceEntity::find()
+            .filter(ArInvoiceColumn::SourceType.eq("SALES_ORDER"))
+            .filter(ArInvoiceColumn::SourceBillId.eq(i64::from(order.id)))
+            .order_by_asc(ArInvoiceColumn::Id)
+            .lock_exclusive()
+            .all(txn)
+            .await?;
+        let credits = ArInvoiceEntity::find()
+            .filter(ArInvoiceColumn::SourceType.eq(DELIVERY_CANCEL_SOURCE_TYPE))
+            .filter(ArInvoiceColumn::CustomerId.eq(order.customer_id))
+            .filter(ArInvoiceColumn::SalesOrderNo.eq(&order.order_no))
+            .order_by_asc(ArInvoiceColumn::Id)
+            .lock_exclusive()
+            .all(txn)
+            .await?;
+
+        if credits.iter().any(|invoice| {
+            invoice.source_bill_id == Some(i64::from(delivery.id))
+                && invoice.status != common::STATUS_CANCELLED
+        }) {
+            return Err(AppError::business(format!(
+                "送货单 {} 已生成取消红字应收，请勿重复冲销",
+                delivery.delivery_no
+            )));
+        }
+
+        let unreversed = Self::unreversed_sales_order_invoices(order.id, &originals, &credits)?;
+        if unreversed.is_empty() {
+            tracing::info!(
+                order_id = order.id,
+                delivery_id = delivery.id,
+                delivery_no = %delivery.delivery_no,
+                "取消送货单无需红冲：当前没有未红冲的销售应收"
+            );
+            return Ok(None);
+        }
+        if unreversed.len() != 1 {
+            return Err(AppError::business(format!(
+                "销售订单 {} 存在多张未红冲应收单，无法确定取消冲销对象",
+                order.id
+            )));
+        }
+        let original = unreversed[0];
+
+        if original.customer_id != order.customer_id
+            || original.invoice_amount != order.total_amount
+            || original.received_amount != Decimal::ZERO
+            || original.unpaid_amount != original.invoice_amount
+            || ![common::STATUS_DRAFT, common::STATUS_APPROVED].contains(&original.status.as_str())
+        {
+            return Err(AppError::business(format!(
+                "应收单 {} 已收款、已核销或与订单金额不一致，禁止取消送货单",
+                original.invoice_no
+            )));
+        }
+
+        let reconciliation_items = ReconciliationItemEntity::find()
+            .filter(crate::models::ar_reconciliation_item::Column::DocumentId.eq(original.id))
+            .filter(crate::models::ar_reconciliation_item::Column::DocumentType.eq("SALES_INVOICE"))
+            .lock_exclusive()
+            .all(txn)
+            .await?;
+        let has_matched_items = reconciliation_items.iter().any(|item| {
+            [
+                ar_status::MATCH_MATCHED,
+                ar_status::MATCH_PARTIAL,
+                "DISPUTED",
+            ]
+            .contains(&item.match_status.as_str())
+        });
+        let reconciliation_ids: Vec<i32> = reconciliation_items
+            .iter()
+            .map(|item| item.reconciliation_id)
+            .collect();
+        let has_closed_reconciliations = if reconciliation_ids.is_empty() {
+            false
+        } else {
+            ReconciliationEntity::find()
+                .filter(crate::models::ar_reconciliation::Column::Id.is_in(reconciliation_ids))
+                .lock_exclusive()
+                .all(txn)
+                .await?
+                .iter()
+                .any(|reconciliation| {
+                    reconciliation.reconciliation_status.as_deref()
+                        == Some(ar_status::RECONCILIATION_CLOSED)
+                })
+        };
+        if has_matched_items || has_closed_reconciliations {
+            return Err(AppError::business(format!(
+                "应收单 {} 已核销，禁止取消送货单",
+                original.invoice_no
+            )));
+        }
+
+        let active_writeoffs = bad_debt_writeoff::Entity::find()
+            .filter(bad_debt_writeoff::Column::ArInvoiceId.eq(original.id))
+            .filter(bad_debt_writeoff::Column::ApprovalStatus.is_in([
+                crate::models::status::bad_debt_writeoff_status::PENDING,
+                crate::models::status::bad_debt_writeoff_status::FINANCE_APPROVED,
+                crate::models::status::bad_debt_writeoff_status::APPROVED,
+            ]))
+            .count(txn)
+            .await?;
+        if active_writeoffs > 0 {
+            return Err(AppError::business(format!(
+                "应收单 {} 已坏账处理，禁止取消送货单",
+                original.invoice_no
+            )));
+        }
+
+        let invoice_date = Utc::now().date_naive();
+        let credit_amount = -original.invoice_amount;
+        let credit = DocumentNumberGenerator::insert_with_no_retry(
+            txn,
+            "AR",
+            ArInvoiceEntity,
+            ArInvoiceColumn::InvoiceNo,
+            |invoice_no| ArInvoiceActive {
+                invoice_no: Set(invoice_no),
+                invoice_date: Set(invoice_date),
+                due_date: Set(original.due_date),
+                customer_id: Set(order.customer_id),
+                customer_name: Set(original.customer_name.clone()),
+                source_type: Set(Some(DELIVERY_CANCEL_SOURCE_TYPE.to_string())),
+                source_module: Set(Some("SO".to_string())),
+                source_bill_id: Set(Some(i64::from(delivery.id))),
+                source_bill_no: Set(Some(delivery.delivery_no.clone())),
+                invoice_amount: Set(credit_amount),
+                received_amount: Set(Decimal::ZERO),
+                unpaid_amount: Set(credit_amount),
+                batch_no: Set(original.batch_no.clone()),
+                color_no: Set(original.color_no.clone()),
+                dye_lot_no: Set(original.dye_lot_no.clone()),
+                sales_order_no: Set(Some(order.order_no.clone())),
+                status: Set(common::STATUS_DRAFT.to_string()),
+                approval_status: Set(approval::PENDING.to_string()),
+                created_by: Set(user_id),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        let snapshot = serde_json::to_value(&credit)
+            .map_err(|error| AppError::internal(format!("取消红字应收快照序列化失败: {error}")))?;
+        crate::services::audit_log_service::AuditLogService::insert_create_audit(
+            txn,
+            "ar_invoice",
+            credit.id,
+            user_id,
+            snapshot,
+        )
+        .await?;
+        tracing::info!(
+            delivery_no = %delivery.delivery_no,
+            invoice_no = %credit.invoice_no,
+            amount = %credit.invoice_amount,
+            reason = %reason,
+            "取消送货单已同事务生成红字应收"
+        );
+        Ok(Some(credit))
     }
 
     /// 构建应收单 ActiveModel（DRAFT 待审 + PENDING 审批），冗余客户名/订单号

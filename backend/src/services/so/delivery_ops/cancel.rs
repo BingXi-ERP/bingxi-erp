@@ -119,7 +119,7 @@ impl SalesService {
     /// 判定取消发货后订单状态是否需要回退，如需回退则更新订单状态
     async fn revert_order_status_if_needed(
         &self,
-        order: sales_order::Model,
+        order: &sales_order::Model,
         order_id: i32,
         user_id: i32,
         now: chrono::DateTime<chrono::Utc>,
@@ -148,7 +148,7 @@ impl SalesService {
 
         // 仅当订单当前状态为 SHIPPED 或 PARTIAL_SHIPPED 时才回退（避免覆盖 CANCELLED 等终态）
         if order.status == so_status::SHIPPED || order.status == so_status::PARTIAL_SHIPPED {
-            let mut order_active: sales_order::ActiveModel = order.into();
+            let mut order_active: sales_order::ActiveModel = order.clone().into();
             order_active.status = Set(new_order_status.to_string());
             order_active.updated_at = Set(now);
 
@@ -190,6 +190,7 @@ impl SalesService {
 
         let order_id = delivery.order_id;
         let warehouse_id = delivery.warehouse_id;
+        let delivery_snapshot = delivery.clone();
         // 审计定位维度登记：单号取本次真正被冲销那张发货单的 sales_delivery.delivery_no 列
         //（第 1 步行锁读出的这一行），不从路径 delivery_id 反推、不用 ID 拼号；原因取请求体
         // CancelDeliveryRequest.reason 原样透传（同一枚值随后也写进 remarks 留业务侧痕迹）。
@@ -236,8 +237,11 @@ impl SalesService {
             )
             .await?;
 
-        // 7. 判定订单状态是否需要回退
-        self.revert_order_status_if_needed(order, order_id, user_id, now, &txn)
+        // 7. 判定订单状态是否需要回退；存在整单应收时同事务红冲，尚无应收则跳过
+        self.revert_order_status_if_needed(&order, order_id, user_id, now, &txn)
+            .await?;
+        let _ = crate::services::ar::ArReconciliationService::new(self.db.clone())
+            .create_delivery_cancel_credit_memo(&txn, &order, &delivery_snapshot, user_id, &reason)
             .await?;
 
         txn.commit().await?;
