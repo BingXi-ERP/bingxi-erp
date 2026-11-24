@@ -106,7 +106,9 @@ test.describe('4.16 销售订单行金额舍入', () => {
       Math.abs(Number(raw) - target) < 0.0001;
     const l1 = lines.find(l => near(l.unit_price, 7.77));
     const l2 = lines.find(l => near(l.unit_price, 5.55));
-    expect(l1 && l2, '[477] 两行须按单价 7.77/5.55 区分').toBe(true);
+    // 两行须按 2 位单价可区分：分别断言行存在（l1 && l2 会返回对象而非布尔，是失效断言）。
+    expect(l1, '[477] 须找到单价 7.77 的行1').toBeTruthy();
+    expect(l2, '[477] 须找到单价 5.55 的行2').toBeTruthy();
 
     expect(cents(l1!.subtotal, '行1小计'), '[477] 行1小计=25.87').toBe(2587n);
     expect(cents(l1!.discount_amount, '行1折扣'), '[477] 行1折扣=3.88').toBe(388n);
