@@ -338,7 +338,7 @@ impl SalesService {
     async fn rollback_order_to_draft(&self, order_id: i32, user_id: i32) -> Result<(), AppError> {
         tracing::error!(
             order_id = order_id,
-            "BPM 启动销售订单审批流程失败，开始补偿回滚订单状态与信用占用"
+            "BPM 启动销售订单审批流程失败，开始补偿回滚订单状态、信用占用与锁缸台账"
         );
 
         let compensating_txn = (*self.db).begin().await?;
@@ -349,6 +349,11 @@ impl SalesService {
             .ok_or_else(|| {
                 AppError::not_found(format!("补偿回滚时销售订单 {} 不存在", order_id))
             })?;
+
+        // 提交事务已写入锁缸台账；补偿必须与状态、信用同事务回缸，
+        // 否则订单回到草稿后仍占用库存，重提会二次锁缸。
+        crate::services::so::order_stock_lock::release_on_cancel(&compensating_txn, order_id)
+            .await?;
 
         let customer_id = order_for_rollback.customer_id;
         let total_amount = order_for_rollback
