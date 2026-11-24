@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 pub struct AuditQueryFilter {
     pub user_id: Option<i32>,
     pub event_type: Option<String>,
+    pub request_path: Option<String>,
+    pub trace_id: Option<String>,
     pub start_date: Option<chrono::NaiveDate>,
     pub end_date: Option<chrono::NaiveDate>,
     pub keyword: Option<String>,

@@ -240,6 +240,20 @@ fn build_where_clause(
         where_params.push(event_type.clone().into());
         param_idx += 1;
     }
+    if let Some(ref request_path) = filter.request_path {
+        let mut clause = String::from("request_path = ");
+        clause.push_str(&param_placeholder(param_idx));
+        where_clauses.push(clause);
+        where_params.push(request_path.clone().into());
+        param_idx += 1;
+    }
+    if let Some(ref trace_id) = filter.trace_id {
+        let mut clause = String::from("trace_id = ");
+        clause.push_str(&param_placeholder(param_idx));
+        where_clauses.push(clause);
+        where_params.push(trace_id.clone().into());
+        param_idx += 1;
+    }
     let mut clause = String::from("created_at >= ");
     clause.push_str(&param_placeholder(param_idx));
     clause.push_str("::date");
