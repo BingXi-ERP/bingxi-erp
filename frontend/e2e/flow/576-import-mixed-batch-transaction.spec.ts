@@ -45,15 +45,21 @@ interface TaskDetail {
 interface CustomerRow {
   id: number;
   customer_code?: string;
+  status?: string;
 }
 
 let cleanupCodePrefix = '';
 
-async function listImportedCustomers(page: Page, codePrefix: string): Promise<CustomerRow[]> {
+async function listImportedCustomers(
+  page: Page,
+  codePrefix: string,
+  status?: string
+): Promise<CustomerRow[]> {
+  const statusQuery = status === undefined ? '' : `&status=${encodeURIComponent(status)}`;
   const response = await apiCallRaw<{ items?: CustomerRow[]; total?: number }>(
     page,
     'GET',
-    `/crm/customers?keyword=${encodeURIComponent(codePrefix)}&page=1&page_size=100`
+    `/crm/customers?keyword=${encodeURIComponent(codePrefix)}&page=1&page_size=100${statusQuery}`
   );
   expect(Array.isArray(response.items), '客户列表必须返回 items').toBe(true);
   if (!Array.isArray(response.items)) {
@@ -72,8 +78,17 @@ test.afterEach(async ({ page }) => {
   for (const row of rows) {
     await tryCleanup(page, 'DELETE', `/crm/customers/${row.id}`, `576 导入客户 ${row.id}`);
   }
-  const remaining = await listImportedCustomers(page, cleanupCodePrefix);
-  expect(remaining, '本轮导入客户必须全部清理').toHaveLength(0);
+  const activeRows = await listImportedCustomers(page, cleanupCodePrefix, 'active');
+  expect(activeRows, '清理后不得残留 active 客户').toHaveLength(0);
+  const inactiveRows = await listImportedCustomers(page, cleanupCodePrefix, 'inactive');
+  expect(
+    inactiveRows.map(row => row.id).sort((a, b) => a - b),
+    '本轮导入客户必须全部按软删除语义转为 inactive'
+  ).toEqual(rows.map(row => row.id).sort((a, b) => a - b));
+  expect(
+    inactiveRows.every(row => row.status === 'inactive'),
+    '清理行状态必须为 inactive'
+  ).toBe(true);
   cleanupCodePrefix = '';
 });
 
@@ -105,7 +120,11 @@ test('576-01 百行混合批导入计数守恒且重复码失败行不落库', a
   const taskId = Number(imported.task_id);
 
   // errors 须逐行点名行号（1-based），且指向重复 code 的那几行。
-  const errs = imported.errors ?? [];
+  expect(Array.isArray(imported.errors), '导入结果必须携带 errors 数组').toBe(true);
+  if (!Array.isArray(imported.errors)) {
+    throw new Error('576 导入结果缺少 errors 数组，无法核对失败行');
+  }
+  const errs = imported.errors;
   expect(errs.length, `errors 条数须等于失败行数 ${failedCount}`).toBe(failedCount);
   for (const r of dupeRows) {
     expect(
