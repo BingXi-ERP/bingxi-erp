@@ -169,15 +169,15 @@ async fn install_link_failure_trigger(db: &DatabaseConnection) {
         format!("DROP TRIGGER IF EXISTS {LINK_FAILURE_TRIGGER} ON export_approval_request"),
         format!("DROP FUNCTION IF EXISTS {LINK_FAILURE_FUNCTION}()"),
         format!(
-            "CREATE FUNCTION {LINK_FAILURE_FUNCTION}() RETURNS trigger LANGUAGE plpgsql AS $$\
-             BEGIN\
-                 IF NEW.bpm_instance_id IS NOT NULL\
-                    AND OLD.bpm_instance_id IS DISTINCT FROM NEW.bpm_instance_id THEN\
-                     RAISE EXCEPTION 'forced export approval BPM link failure';\
-                 END IF;\
-                 RETURN NEW;\
-             END;\
-             $$"
+            r#"CREATE FUNCTION {LINK_FAILURE_FUNCTION}() RETURNS trigger LANGUAGE plpgsql AS $$
+             BEGIN
+                 IF NEW.bpm_instance_id IS NOT NULL
+                    AND OLD.bpm_instance_id IS DISTINCT FROM NEW.bpm_instance_id THEN
+                     RAISE EXCEPTION 'forced export approval BPM link failure';
+                 END IF;
+                 RETURN NEW;
+             END;
+             $$"#
         ),
         format!(
             "CREATE TRIGGER {LINK_FAILURE_TRIGGER}\
