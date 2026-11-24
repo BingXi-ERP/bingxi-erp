@@ -18,9 +18,7 @@
 //! - validate_status_transition 跨 impl 块调用（定义在 crud 子模块，pub(crate) 可见性）
 
 use chrono::Utc;
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
-};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait};
 
 use crate::models::bpm_task;
 use crate::models::production_order::{
@@ -65,7 +63,13 @@ impl ProductionOrderService {
             Set(crate::models::status::production::PRODUCTION_PENDING_APPROVAL.to_string());
         active_model.updated_at = Set(Utc::now());
 
-        let updated = active_model.update(&txn).await?;
+        let updated = crate::services::audit_log_service::AuditLogService::update_with_audit(
+            &txn,
+            super::types::AUDIT_RESOURCE_TYPE,
+            active_model,
+            Some(user_id),
+        )
+        .await?;
 
         txn.commit().await?;
 
@@ -181,7 +185,13 @@ impl ProductionOrderService {
             .lock_and_validate_order_for_approval_txn(id, approved, &txn)
             .await?;
         let active_model = Self::build_approval_active_model(model, approved);
-        let updated = active_model.update(&txn).await?;
+        let updated = crate::services::audit_log_service::AuditLogService::update_with_audit(
+            &txn,
+            super::types::AUDIT_RESOURCE_TYPE,
+            active_model,
+            Some(user_id),
+        )
+        .await?;
         txn.commit().await?;
 
         // BPM 任务审批在事务外执行，失败仅 warn 不阻断已提交状态
