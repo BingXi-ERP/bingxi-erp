@@ -18,6 +18,7 @@
 //   04-04 正向对照：pending 任务转办成功 → 回查 actual_handler_id/approval_opinion 真实变化
 //   04-05 正向对照+边界：PROCESSING 流程撤回成功 → 实例 CANCELLED、pending 任务级联 cancelled；
 //         再次撤回（终态第二样本 CANCELLED）→ 同 04-03 门被拒
+//   04-06 负例：审批 action 越界（delegate/大写/尾空格）→ 400 + VALIDATION_ERROR，回查任务零变化
 //
 // 取数口径：每例用本例 API 自建唯一流程定义（genCode 唯一 processKey）+ 唯一流程实例，
 // 用后端返回的 instance_id/task_id 精确锚定，回查统一走 GET /bpm/instances/{instance_id}/detail
@@ -434,5 +435,54 @@ test.describe('04 BPM 状态门负例（转办/催办/撤回，防回潮）', ()
       fail.message,
       `期望逐字符外显原文「${MSG_RECALL_GATE}」（instance.rs:191）；实际「${fail.message}」`
     ).toBe(MSG_RECALL_GATE);
+  });
+  test('04-06 负例：审批 action 越界被 400 VALIDATION_ERROR 拒绝，回查任务零变化', async ({
+    page,
+  }) => {
+    const { instanceId, taskId, myId } = await seedPendingTask(page);
+    const before = await fetchTaskOfMine(page, instanceId, taskId);
+    expect(before.status, `前置失败：新建任务应为 pending，实际 ${before.status}`).toBe('pending');
+
+    // 三个越界样本分别命中：词表外动作、大小写变体、尾空格变体。
+    // 后端校验点：backend/src/services/bpm_ops/task.rs:51-60 validate_approve_action。
+    for (const bad of ['delegate', 'APPROVE', 'approve ']) {
+      const fail = await apiCallExpectFail(page, 'POST', '/bpm/tasks/approve', {
+        task_id: taskId,
+        handler_id: myId,
+        handler_name: `e2e_user_${myId}`,
+        action: bad,
+        approval_opinion: `E2E-04-06 非法动作 ${bad}`,
+      });
+      expect(
+        fail.status,
+        `期望 400（validation_displayable 的状态映射，backend/src/utils/error.rs）；实际 ${fail.status}`
+      ).toBe(400);
+      expect(
+        failureCode(fail),
+        `期望机器码 ${APP_ERROR_CODES.VALIDATION_ERROR}；实际 ${JSON.stringify(fail.code)}`
+      ).toBe(APP_ERROR_CODES.VALIDATION_ERROR);
+      expect(
+        fail.message,
+        `期望逐字符外显原文「审批动作非法：${bad}，允许取值为 approve / reject」；实际「${fail.message}」`
+      ).toBe(`审批动作非法：${bad}，允许取值为 approve / reject`);
+    }
+
+    // 回查零变化：三次被拒的审批不得推进任务/实例，也不得写入意见或处理人
+    const after = await fetchTaskOfMine(page, instanceId, taskId);
+    expect(after.status, `非法 action 被拒后任务应仍为 pending，实际 ${after.status}`).toBe(
+      'pending'
+    );
+    expect(
+      after.actual_handler_id,
+      `非法 action 被拒后处理人应仍为 ${myId}，实际 ${after.actual_handler_id}`
+    ).toBe(myId);
+    expect(
+      after.approval_opinion,
+      `非法 action 被拒后 approval_opinion 应保持 null，实际 ${after.approval_opinion}`
+    ).toBeNull();
+    const instStatus = await fetchInstanceStatus(page, instanceId);
+    expect(instStatus, `非法 action 被拒后实例应仍为 PROCESSING，实际 ${instStatus}`).toBe(
+      'PROCESSING'
+    );
   });
 });
