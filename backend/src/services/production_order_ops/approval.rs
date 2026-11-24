@@ -12,7 +12,7 @@
 //!
 //! 业务规则：
 //! - 事务包裹"查询 + 状态校验 + update"，加 lock_exclusive 防止并发审批同一订单
-//! - BPM 启动/任务审批保留事务外（失败 warn 不阻断已提交状态），避免 BPM 调用持有数据库锁
+//! - 提交审批时订单状态、审计与 BPM 实例/首任务共用事务，通知在提交后派发
 //! - approve_order_via_bpm / reject_order_via_bpm 不回调 BPM（避免 BPM → 事件 → approve_order → BPM 死循环）
 //! - BPM 回写方法走 update_with_audit 保留审计追溯
 //! - validate_status_transition 跨 impl 块调用（定义在 crud 子模块，pub(crate) 可见性）
@@ -32,10 +32,9 @@ use crate::services::bpm_ops::{bpm_start_failure_error, process_key};
 use crate::services::production_order_service::ProductionOrderService;
 
 impl ProductionOrderService {
-    /// 提交生产订单审批：事务内加行锁校验状态后置为待审批，提交后再在事务外启动 BPM 工单。
+    /// 提交生产订单审批：订单状态、审计与 BPM 实例/首任务在同一事务内提交。
     ///
-    /// BPM 启动失败向上传播并补偿回滚到提交前状态，避免订单停在待审批却系统里没有工单可审；
-    /// 启动放在事务外，是为了不让外部流程引擎持有数据库行锁。
+    /// BPM 启动失败时事务整体回滚，订单保持提交前状态；工单通知在提交后派发。
     pub async fn submit_for_approval(
         &self,
         id: i32,
@@ -57,7 +56,6 @@ impl ProductionOrderService {
         )?;
 
         // 更新状态为审批中
-        let previous_status = model.status.clone();
         let mut active_model: ActiveModel = model.into();
         active_model.status =
             Set(crate::models::status::production::PRODUCTION_PENDING_APPROVAL.to_string());
@@ -71,9 +69,6 @@ impl ProductionOrderService {
         )
         .await?;
 
-        txn.commit().await?;
-
-        // 启动BPM审批流程（事务外，失败不阻断已提交状态）
         let bpm_service = crate::services::bpm_service::BpmService::new(self.db.clone());
         let req = crate::models::dto::bpm_dto::StartProcessRequest {
             process_key: process_key::PRODUCTION_ORDER_APPROVAL.to_string(),
@@ -93,80 +88,29 @@ impl ProductionOrderService {
             variables: None,
         };
 
-        // BPM 启动失败必须向上传播并补偿回滚：只记 warn 会让工单停在"审批中"而系统里
-        // 根本没有待办任务，单据与流程进入分裂态且再提交被状态门拒，只能人工改库修数。
-        if let Err(e) = bpm_service.start_process(req).await {
-            // 补偿回滚失败不得顶替 BPM 启动失败的出参文案（回滚冲突/脱敏错误直接
-            // 上抛会让用户看不到根因指引与单据真实状态）；两条根因分别全量落
-            // error 日志，出参只陈述可确认的事实。
-            let document_state = match self.rollback_status_to(id, &previous_status, user_id).await
-            {
-                Ok(()) => "生产订单已退回提交前状态",
-                Err(rb_err) => {
-                    tracing::error!(
-                        error = %rb_err,
-                        order_id = id,
-                        user_id = user_id,
-                        process_key = process_key::PRODUCTION_ORDER_APPROVAL,
-                        business_type = "production_order",
-                        business_id = id,
-                        "BPM 启动失败后的补偿回滚未完成，生产订单状态需人工核对"
-                    );
-                    "生产订单状态回退未完成，请按订单当前状态核对处理"
-                }
-            };
-            // 引擎失败原文可能含流程定义/SQL 细节，按 utils/error.rs 安全边界只进日志不外显
-            tracing::error!(
-                error = %e,
-                order_id = id,
-                user_id = user_id,
-                process_key = process_key::PRODUCTION_ORDER_APPROVAL,
-                business_type = "production_order",
-                business_id = id,
-                "BPM 启动生产订单审批流程失败，根因如上"
-            );
-            return Err(bpm_start_failure_error(
-                process_key::PRODUCTION_ORDER_APPROVAL,
-                document_state,
-                &e,
-            ));
-        }
+        let started = match bpm_service.start_process_in_txn(&txn, req).await {
+            Ok(started) => started,
+            Err(e) => {
+                tracing::error!(
+                    error = %e,
+                    order_id = id,
+                    user_id,
+                    process_key = process_key::PRODUCTION_ORDER_APPROVAL,
+                    business_type = "production_order",
+                    business_id = id,
+                    "BPM 启动生产订单审批流程失败，提交事务回滚，根因如上"
+                );
+                Err(bpm_start_failure_error(
+                    process_key::PRODUCTION_ORDER_APPROVAL,
+                    "生产订单未提交",
+                    &e,
+                ))
+            }
+        };
 
-        Ok(updated)
-    }
-
-    /// 补偿回滚：把生产订单状态写回提交前的取值。只回滚本路径刚写入的待审批态——
-    /// 窗口内若已被并发审批改走，覆盖会静默抹掉已生效的审批，此时报冲突交调用方处理。
-    async fn rollback_status_to(
-        &self,
-        id: i32,
-        previous_status: &str,
-        user_id: i32,
-    ) -> Result<(), AppError> {
-        let txn = (*self.db).begin().await?;
-        let model = ProductionOrderEntity::find_by_id(id)
-            .lock_exclusive()
-            .one(&txn)
-            .await?
-            .ok_or_else(|| AppError::not_found(format!("补偿回滚时生产订单 {} 不存在", id)))?;
-        if model.status != crate::models::status::production::PRODUCTION_PENDING_APPROVAL {
-            return Err(AppError::business_displayable(format!(
-                "生产订单 {} 的状态已被其他操作改为 {}，本次提交不再回退状态，请按当前状态处理",
-                id, model.status
-            )));
-        }
-        let mut active: ActiveModel = model.into();
-        active.status = Set(previous_status.to_string());
-        active.updated_at = Set(Utc::now());
-        crate::services::audit_log_service::AuditLogService::update_with_audit(
-            &txn,
-            "production_order",
-            active,
-            Some(user_id),
-        )
-        .await?;
         txn.commit().await?;
-        Ok(())
+        bpm_service.notify_started_process(&started).await;
+        Ok(updated)
     }
 
     /// 审批生产订单

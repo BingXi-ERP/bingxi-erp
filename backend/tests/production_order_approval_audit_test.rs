@@ -3,8 +3,11 @@ mod test_common;
 use std::sync::Arc;
 
 use bingxi_backend::models::audit_log;
+use bingxi_backend::models::bpm_process_definition;
+use bingxi_backend::models::bpm_process_instance;
 use bingxi_backend::models::production_order::Model as ProductionOrderModel;
 use bingxi_backend::models::status::{common, production};
+use bingxi_backend::models::{bpm_task, notification, production_order};
 use bingxi_backend::services::production_order_service::{
     CreateProductionOrderRequest, ProductionOrderService, UpdateProductionOrderRequest,
 };
@@ -455,4 +458,67 @@ async fn production_order_update_writes_audit_snapshot() {
             Some("编辑审计验证")
         );
     }
+}
+
+#[tokio::test]
+async fn production_order_bpm_start_failure_leaves_no_status_audit_or_process() {
+    let db = Arc::new(setup_test_db().await);
+    seed_fixture(&db).await;
+    let service = ProductionOrderService::new(Arc::clone(&db));
+    let order = service
+        .create(create_request(), OPERATOR_ID)
+        .await
+        .expect("创建生产订单失败");
+    let baseline = audit_rows(&db, order.id).await.len();
+
+    let definition = bpm_process_definition::Entity::find()
+        .filter(bpm_process_definition::Column::Code.eq("production_order_approval"))
+        .one(db.as_ref())
+        .await
+        .expect("回读生产审批定义失败")
+        .expect("生产审批定义必须存在");
+    bpm_process_definition::Entity::delete_by_id(definition.id)
+        .exec(db.as_ref())
+        .await
+        .expect("删除生产审批定义失败");
+
+    let err = service
+        .submit_for_approval(order.id, OPERATOR_ID, "生产审批审计测试人")
+        .await
+        .expect_err("缺少 BPM 定义时提交必须失败");
+    assert_eq!(err.error_code(), "BUSINESS_ERROR");
+
+    let reloaded = production_order::Entity::find_by_id(order.id)
+        .one(db.as_ref())
+        .await
+        .expect("回读生产订单失败")
+        .expect("生产订单必须仍存在");
+    assert_eq!(reloaded.status, common::STATUS_DRAFT);
+    assert_eq!(
+        audit_rows(&db, order.id).await.len(),
+        baseline,
+        "BPM 启动失败不得留下提交与补偿两条审计"
+    );
+    assert!(
+        bpm_process_instance::Entity::find()
+            .filter(bpm_process_instance::Column::BusinessType.eq("production_order"))
+            .all(db.as_ref())
+            .await
+            .expect("回读生产审批实例失败")
+            .is_empty()
+    );
+    assert!(
+        bpm_task::Entity::find()
+            .all(db.as_ref())
+            .await
+            .expect("回读生产审批任务失败")
+            .is_empty()
+    );
+    assert!(
+        notification::Entity::find()
+            .all(db.as_ref())
+            .await
+            .expect("回读生产审批通知失败")
+            .is_empty()
+    );
 }
