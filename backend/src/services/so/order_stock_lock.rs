@@ -18,7 +18,7 @@ use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::sea_query::{BinOper, Expr};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, ExprTrait, QueryFilter, Set,
     UpdateResult,
 };
 

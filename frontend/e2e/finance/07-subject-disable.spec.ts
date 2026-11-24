@@ -112,46 +112,6 @@ function amountAtScale(value: unknown, label: string): string {
   return n.toFixed(2);
 }
 
-/**
- * 统计当日凭证中引用指定科目 id 的凭证号列表（零变化回查用）。
- * 列表端点 GET /vouchers 的 data 为裸数组；列表行不含分录科目，
- * 故逐候选取 GET /vouchers/{id} 详情后检查 entries 的 subject_id。
- * 本例科目 id 由 genCode 唯一前缀生成，其他用例的当日凭证引用各自科目，不污染计数。
- */
-async function voucherNosReferencingSubjects(
-  page: import('@playwright/test').Page,
-  subjectIds: number[],
-  date: string
-): Promise<string[]> {
-  const list = await apiCallRaw<unknown>(
-    page,
-    'GET',
-    `/vouchers?start_date=${date}&end_date=${date}&page=1&page_size=100`
-  );
-  if (!Array.isArray(list)) {
-    throw new Error(
-      `GET /vouchers 未返回数组（列表契约漂移）：${JSON.stringify(list).slice(0, 200)}`
-    );
-  }
-  const hits: string[] = [];
-  for (const row of list) {
-    const id = (row as { id?: unknown }).id;
-    if (typeof id !== 'number') {
-      throw new Error(`凭证列表行缺少数值 id：${JSON.stringify(row).slice(0, 200)}`);
-    }
-    const detail = await apiCallRaw<VoucherDetailLite>(page, 'GET', `/vouchers/${id}`);
-    if (!Array.isArray(detail.entries)) {
-      throw new Error(
-        `GET /vouchers/${id} 未返回 entries 数组（详情契约漂移）：${JSON.stringify(detail).slice(0, 200)}`
-      );
-    }
-    if (detail.entries.some(e => e.subject_id !== null && subjectIds.includes(e.subject_id))) {
-      hits.push(String(id));
-    }
-  }
-  return hits;
-}
-
 test.describe('07 科目停用持久化与引用防护', () => {
   test.beforeEach(async ({ page }) => {
     await loginViaUI(page);
@@ -180,10 +140,12 @@ test.describe('07 科目停用持久化与引用防护', () => {
     expect(await getSubjectStatus(page, disabledId), '前置：该科目已停用').toBe('inactive');
 
     const today = new Date().toISOString().slice(0, 10);
+    const batchNo = genCode('E2E-V07');
     // 借贷相等（100/100）以越过平衡校验，命中"停用科目"前置状态门预检。
     const fail = await apiCallExpectFail(page, 'POST', '/vouchers', {
       voucher_type: '记',
       voucher_date: today,
+      batch_no: batchNo,
       items: [
         { subject_id: disabledId, debit: 100, credit: 0, summary: 'E2E 停用科目借方' },
         { subject_id: activeId, debit: 0, credit: 100, summary: 'E2E 贷方' },
@@ -198,12 +160,20 @@ test.describe('07 科目停用持久化与引用防护', () => {
     // 文案含科目编码 → 脱敏出参，锁后端常量（不是"停用"字样）。
     expect(fail.message, '脱敏站点 message 应为固定业务失败常量').toBe(SANITIZED_BUSINESS);
 
-    // 零变化回查：被拒的建单绝不能留下引用本例两枚科目的凭证（含半截分录）。
-    const leaked = await voucherNosReferencingSubjects(page, [disabledId, activeId], today);
-    expect(
-      leaked,
-      `停用科目建单被拒后不应存在引用本例科目的凭证，实际命中凭证 id：${leaked.join(',')}`
-    ).toHaveLength(0);
+    // 用本次请求唯一批次号回查，避免并行 worker 清理彼此临时凭证造成列表到详情的竞态。
+    const leaked = await apiCallRaw<unknown>(
+      page,
+      'GET',
+      `/vouchers?batch_no=${encodeURIComponent(batchNo)}&page=1&page_size=100`
+    );
+    if (!Array.isArray(leaked)) {
+      throw new Error(
+        `GET /vouchers 未返回数组（列表契约漂移）：${JSON.stringify(leaked).slice(0, 200)}`
+      );
+    }
+    expect(leaked, `停用科目建单被拒后不应留下批次 ${batchNo} 的凭证（含半截分录）`).toHaveLength(
+      0
+    );
   });
 
   test('07-03 对照：同一科目启用后同一凭证可建（证明 07-02 拒绝确由停用触发）', async ({

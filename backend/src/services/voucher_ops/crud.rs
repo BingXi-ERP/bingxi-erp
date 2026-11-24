@@ -399,6 +399,18 @@ impl VoucherService {
             query = query.filter(voucher::Column::Status.eq(status));
         }
 
+        if let Some(batch_no) = &params.batch_no {
+            if !batch_no.is_empty() {
+                query = query.filter(voucher::Column::BatchNo.eq(batch_no.clone()));
+            }
+        }
+
+        if let Some(color_no) = &params.color_no {
+            if !color_no.is_empty() {
+                query = query.filter(voucher::Column::ColorNo.eq(color_no.clone()));
+            }
+        }
+
         if let Some(start_date) = params.start_date {
             query = query.filter(voucher::Column::VoucherDate.gte(start_date));
         }
@@ -442,6 +454,18 @@ impl VoucherService {
 
         if let Some(status) = params.status {
             query = query.filter(voucher::Column::Status.eq(status));
+        }
+
+        if let Some(batch_no) = &params.batch_no {
+            if !batch_no.is_empty() {
+                query = query.filter(voucher::Column::BatchNo.eq(batch_no.clone()));
+            }
+        }
+
+        if let Some(color_no) = &params.color_no {
+            if !color_no.is_empty() {
+                query = query.filter(voucher::Column::ColorNo.eq(color_no.clone()));
+            }
         }
 
         if let Some(start_date) = params.start_date {

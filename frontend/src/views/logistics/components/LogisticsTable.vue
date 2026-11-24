@@ -8,7 +8,11 @@
   <el-card class="table-card">
     <!-- 手机卡片（<768 与采购域表格同断点同范式） -->
     <section v-if="isPhone" v-loading="loading" class="logistics-mobile">
-      <ul class="order-list" :aria-label="t('logistics.table.mobileCardAria')">
+      <ul
+        v-if="data.length > 0"
+        class="order-list"
+        :aria-label="t('logistics.table.mobileCardAria')"
+      >
         <li v-for="row in data" :key="row.id" class="order-card">
           <dl class="order-fields">
             <div>
@@ -87,6 +91,7 @@
           </div>
         </li>
       </ul>
+      <el-empty v-else :description="t('logistics.table.mobileEmpty')" />
     </section>
 
     <V2Table
