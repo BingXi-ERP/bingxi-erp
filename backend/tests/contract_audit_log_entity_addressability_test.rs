@@ -359,6 +359,53 @@ async fn int_pk_placeholder_stamps_table_and_explicit_type_is_kept() {
 }
 
 #[tokio::test]
+async fn update_audit_rejects_missing_old_row_without_creating_audit() {
+    let db = Arc::new(setup_test_db().await);
+    seed_operator(&db).await;
+    let period_id = seed_period(&db, "missing-old").await;
+    let loaded = accounting_period::Entity::find_by_id(period_id)
+        .one(db.as_ref())
+        .await
+        .unwrap()
+        .expect("种子会计期间必须可回读");
+    let mut active: accounting_period::ActiveModel = loaded.into();
+    active.status = Set("CLOSED".to_string());
+    accounting_period::Entity::delete_by_id(period_id)
+        .exec(db.as_ref())
+        .await
+        .expect("删除种子会计期间失败");
+
+    let error = AuditLogService::update_with_audit::<
+        accounting_period::Entity,
+        accounting_period::ActiveModel,
+        _,
+    >(&*db, "accounting_period", active, Some(OPERATOR_ID))
+    .await
+    .expect_err("旧行不存在时 update_with_audit 必须拒绝更新，不得生成缺 before 快照的审计");
+
+    assert!(
+        error.to_string().contains("记录不存在"),
+        "缺旧行必须返回明确的记录不存在错误，实际 {error}"
+    );
+    assert!(
+        accounting_period::Entity::find_by_id(period_id)
+            .one(db.as_ref())
+            .await
+            .unwrap()
+            .is_none(),
+        "失败的审计更新不得重新插入业务行"
+    );
+    assert!(
+        audit_log::Entity::find()
+            .one(db.as_ref())
+            .await
+            .unwrap()
+            .is_none(),
+        "旧行不存在时不得落任何审计行"
+    );
+}
+
+#[tokio::test]
 async fn list_filter_entity_and_resource_id_exact_semantics() {
     let db = Arc::new(setup_test_db().await);
     let role_id = seed_auditor_role(&db).await;
