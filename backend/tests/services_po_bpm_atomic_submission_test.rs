@@ -24,7 +24,7 @@ async fn seed_user(db: &DatabaseConnection) {
         id: Set(OPERATOR_ID),
         username: Set("po_bpm_atomic_operator".to_string()),
         password_hash: Set("test-only-not-a-real-hash".to_string()),
-        real_name: Set("采购审批原子性测试人".to_string()),
+        real_name: Set(Some("采购审批原子性测试人".to_string())),
         is_active: Set(true),
         is_totp_enabled: Set(false),
         created_at: Set(now),

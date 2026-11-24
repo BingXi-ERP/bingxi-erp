@@ -37,8 +37,8 @@ use sea_orm::{
 };
 
 const OPERATOR_ID: i32 = 22101;
-const ORDER_QUANTITY: Decimal = Decimal::from_parts(10, 0, 0, 0, 0);
-const ORDER_AMOUNT: Decimal = Decimal::from_parts(1_000, 0, 0, 0, 0);
+const ORDER_QUANTITY: Decimal = Decimal::from_parts(10, 0, 0, false, 0);
+const ORDER_AMOUNT: Decimal = Decimal::from_parts(1_000, 0, 0, false, 0);
 
 fn now() -> chrono::DateTime<chrono::Utc> {
     Utc::now()
