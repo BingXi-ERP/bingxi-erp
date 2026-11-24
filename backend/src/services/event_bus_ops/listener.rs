@@ -523,6 +523,7 @@ async fn dispatch_bpm_finished(
     event: BusinessEvent,
 ) {
     if let BusinessEvent::BpmProcessFinished {
+        instance_id,
         business_type,
         business_id,
         approved,
@@ -532,6 +533,7 @@ async fn dispatch_bpm_finished(
         handle_bpm_process_finished(
             db,
             search_client,
+            instance_id,
             business_type,
             business_id,
             approved,
@@ -1330,17 +1332,19 @@ async fn handle_purchase_receipt_completed(
     }
 }
 
-/// 处理 BPM 流程结束事件：幂等校验后按 business_type 分发到对应 service 的 approve/reject 方法
-async fn handle_bpm_process_finished(
+/// 处理 BPM 流程结束事件：按流程实例幂等校验后按 business_type 分发到对应 service 的 approve/reject 方法
+pub async fn handle_bpm_process_finished(
     db: Arc<DatabaseConnection>,
     search_client: Arc<dyn SearchClient>,
+    instance_id: i32,
     business_type: String,
     business_id: i64,
     approved: bool,
     approver_id: i32,
 ) {
     tracing::info!(
-        "处理BPM流程结束事件: type={}, id={}, approved={}, approver_id={}",
+        "处理BPM流程结束事件: instance_id={}, type={}, id={}, approved={}, approver_id={}",
+        instance_id,
         business_type,
         business_id,
         approved,
@@ -1349,7 +1353,7 @@ async fn handle_bpm_process_finished(
     // B-P1-8 修复（批次 366 v13 复审）：事件幂等处理
     let idempotency_service =
         crate::services::event_idempotency_service::EventIdempotencyService::new(db.clone());
-    let event_key = format!("bpm:{}:{}:{}", business_type, business_id, approved);
+    let event_key = format!("bpm:instance:{instance_id}:finished");
     let should_process = match idempotency_service
         .try_mark_processed("event_bus_main", &event_key, "BpmProcessFinished")
         .await

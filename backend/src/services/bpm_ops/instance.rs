@@ -371,6 +371,7 @@ impl BpmService {
         let pending_event = match (business_id, user_id) {
             (Some(bid), Some(uid)) => Some(
                 crate::services::event_bus::BusinessEvent::BpmProcessFinished {
+                    instance_id,
                     business_type,
                     business_id: bid,
                     approved: false,

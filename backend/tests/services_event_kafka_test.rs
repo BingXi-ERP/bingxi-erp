@@ -77,6 +77,7 @@ fn test_payload_all_variants_round_trip() {
             variance_count: 3,
         },
         BusinessEvent::BpmProcessFinished {
+            instance_id: 1,
             business_type: "purchase_order".to_string(),
             business_id: 1,
             approved: true,
@@ -126,5 +127,18 @@ fn test_payload_all_variants_round_trip() {
         let event_type = event_type_name(event);
         let restored_type = event_type_name(&restored);
         assert_eq!(event_type, restored_type, "事件类型不匹配: {}", event_type);
+        if let (
+            BusinessEvent::BpmProcessFinished { instance_id, .. },
+            BusinessEvent::BpmProcessFinished {
+                instance_id: restored_instance_id,
+                ..
+            },
+        ) = (event, &restored)
+        {
+            assert_eq!(
+                instance_id, restored_instance_id,
+                "Kafka 载荷往返必须保留 BPM 流程实例 ID"
+            );
+        }
     }
 }
