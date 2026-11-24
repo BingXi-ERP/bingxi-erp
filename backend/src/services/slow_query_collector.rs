@@ -47,6 +47,15 @@ pub fn build_query_sql(_threshold_ms: f64, _limit_rows: i64) -> String {
         .to_string()
 }
 
+pub fn build_capability_sql() -> &'static str {
+    "SELECT to_regclass('pg_stat_statements') IS NOT NULL AS available, \
+            EXISTS ( \
+                SELECT 1 \
+                FROM unnest(string_to_array(current_setting('shared_preload_libraries', true), ',')) AS preload(library) \
+                WHERE btrim(preload.library) = 'pg_stat_statements' \
+            ) AS preloaded"
+}
+
 impl SlowQueryCollector {
     /// 创建采集服务实例
     /// 参数：`db`：数据库连接（Arc 包装）；`threshold_ms`：慢查询阈值（毫秒），默认 100ms（与 plan 一致）；`limit_rows`：单次采集最大行数，默认 100（与 plan 一致）
@@ -135,16 +144,24 @@ impl SlowQueryCollector {
             .as_ref()
             .query_one_raw(Statement::from_string(
                 sea_orm::DatabaseBackend::Postgres,
-                "SELECT to_regclass('pg_stat_statements') IS NOT NULL AS available".to_string(),
+                build_capability_sql().to_string(),
             ))
             .await
             .map_err(|e| AppError::database(format!("检查慢查询采集能力失败: {}", e)))?;
+        let capability =
+            capability.ok_or_else(|| AppError::database("检查慢查询采集能力未返回结果"))?;
         let available = capability
-            .ok_or_else(|| AppError::database("检查慢查询采集能力未返回结果"))?
             .try_get::<bool>("", "available")
             .map_err(AppError::from)?;
-        if !available {
-            tracing::warn!("慢查询采集能力不可用：数据库未安装 pg_stat_statements 扩展");
+        let preloaded = capability
+            .try_get::<bool>("", "preloaded")
+            .map_err(AppError::from)?;
+        if !available || !preloaded {
+            tracing::warn!(
+                extension_available = available,
+                preloaded,
+                "慢查询采集能力不可用：数据库未安装 pg_stat_statements 扩展或未配置 shared_preload_libraries"
+            );
             return Ok(None);
         }
 
