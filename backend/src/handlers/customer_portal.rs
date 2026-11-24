@@ -34,17 +34,20 @@ use sea_orm::{
     QuerySelect, RelationTrait, sea_query::Expr,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use utoipa::ToSchema;
 
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use crate::models::ar_collection;
+use crate::models::ar_invoice;
 use crate::models::ar_reconciliation;
 use crate::models::color_card;
 use crate::models::color_card_issue;
 use crate::models::dto::PageRequest;
 use crate::models::product;
 use crate::models::sales_order;
+use crate::models::status::common;
 use crate::models::status::sales::sales_order as so_status;
 use crate::services::ar::ArReconciliationService;
 use crate::services::color_card_issue_service::IssueStatus;
@@ -130,8 +133,14 @@ pub struct PortalOrderView {
     pub grade: Option<String>,
 }
 
-impl From<SalesOrderDetail> for PortalOrderView {
-    fn from(order: SalesOrderDetail) -> Self {
+#[derive(Debug, Clone, Copy, Default)]
+struct PortalReceivableTotals {
+    received_amount: Decimal,
+    unpaid_amount: Decimal,
+}
+
+impl PortalOrderView {
+    fn from_detail(order: SalesOrderDetail, receivable: PortalReceivableTotals) -> Self {
         Self {
             id: order.id,
             customer_id: order.customer_id,
@@ -145,8 +154,31 @@ impl From<SalesOrderDetail> for PortalOrderView {
             discount_amount: order.discount_amount,
             shipping_cost: order.shipping_cost,
             total_amount: order.total_amount,
-            paid_amount: order.paid_amount,
-            balance_amount: order.balance_amount,
+            paid_amount: receivable.received_amount,
+            balance_amount: receivable.unpaid_amount,
+            batch_no: order.batch_no,
+            color_no: order.color_no,
+            dye_lot_no: order.dye_lot_no,
+            grade: order.grade,
+        }
+    }
+
+    fn from_model(order: sales_order::Model, receivable: PortalReceivableTotals) -> Self {
+        Self {
+            id: order.id,
+            customer_id: order.customer_id,
+            order_no: order.order_no,
+            order_date: order.order_date,
+            required_date: order.required_date,
+            ship_date: order.ship_date,
+            status: order.status,
+            subtotal: order.subtotal,
+            tax_amount: order.tax_amount,
+            discount_amount: order.discount_amount,
+            shipping_cost: order.shipping_cost,
+            total_amount: order.total_amount,
+            paid_amount: receivable.received_amount,
+            balance_amount: receivable.unpaid_amount,
             batch_no: order.batch_no,
             color_no: order.color_no,
             dye_lot_no: order.dye_lot_no,
@@ -155,29 +187,53 @@ impl From<SalesOrderDetail> for PortalOrderView {
     }
 }
 
-impl From<sales_order::Model> for PortalOrderView {
-    fn from(order: sales_order::Model) -> Self {
-        Self {
-            id: order.id,
-            customer_id: order.customer_id,
-            order_no: order.order_no,
-            order_date: order.order_date,
-            required_date: order.required_date,
-            ship_date: order.ship_date,
-            status: order.status,
-            subtotal: order.subtotal,
-            tax_amount: order.tax_amount,
-            discount_amount: order.discount_amount,
-            shipping_cost: order.shipping_cost,
-            total_amount: order.total_amount,
-            paid_amount: order.paid_amount,
-            balance_amount: order.balance_amount,
-            batch_no: order.batch_no,
-            color_no: order.color_no,
-            dye_lot_no: order.dye_lot_no,
-            grade: order.grade,
-        }
+async fn load_portal_receivable_totals(
+    db: &sea_orm::DatabaseConnection,
+    customer_id: i32,
+    order_nos: &[String],
+) -> Result<HashMap<String, PortalReceivableTotals>, AppError> {
+    if order_nos.is_empty() {
+        return Ok(HashMap::new());
     }
+
+    let rows = ar_invoice::Entity::find()
+        .select_only()
+        .column(ar_invoice::Column::SalesOrderNo)
+        .column_as(
+            Expr::col(ar_invoice::Column::ReceivedAmount).sum(),
+            "received_amount",
+        )
+        .column_as(
+            Expr::col(ar_invoice::Column::UnpaidAmount).sum(),
+            "unpaid_amount",
+        )
+        .filter(ar_invoice::Column::CustomerId.eq(customer_id))
+        .filter(ar_invoice::Column::SalesOrderNo.is_in(order_nos.to_vec()))
+        .filter(
+            ar_invoice::Column::Status.is_not_in([common::STATUS_DRAFT, common::STATUS_CANCELLED]),
+        )
+        .group_by(ar_invoice::Column::SalesOrderNo)
+        .into_tuple::<(Option<String>, Option<Decimal>, Option<Decimal>)>()
+        .all(db)
+        .await?;
+
+    let mut totals = HashMap::with_capacity(rows.len());
+    for (order_no, received_amount, unpaid_amount) in rows {
+        let order_no = order_no
+            .ok_or_else(|| AppError::internal("门户应收聚合返回空销售订单号".to_string()))?;
+        let received_amount = received_amount
+            .ok_or_else(|| AppError::internal("门户应收聚合返回空已收金额".to_string()))?;
+        let unpaid_amount = unpaid_amount
+            .ok_or_else(|| AppError::internal("门户应收聚合返回空未收金额".to_string()))?;
+        totals.insert(
+            order_no,
+            PortalReceivableTotals {
+                received_amount,
+                unpaid_amount,
+            },
+        );
+    }
+    Ok(totals)
 }
 
 /// 门户退货单白名单：单据头业务字段 + 关联客户/来源单名，审批与仓库内部字段不出现。
@@ -415,10 +471,23 @@ pub async fn list_portal_orders(
             None,
         )
         .await?;
+    let order_nos: Vec<String> = orders
+        .items
+        .iter()
+        .map(|order| order.order_no.clone())
+        .collect();
+    let receivable_totals =
+        load_portal_receivable_totals(db.as_ref(), customer.id, &order_nos).await?;
     let items: Vec<PortalOrderView> = orders
         .items
         .into_iter()
-        .map(PortalOrderView::from)
+        .map(|order| {
+            let receivable = receivable_totals
+                .get(&order.order_no)
+                .copied()
+                .unwrap_or_default();
+            PortalOrderView::from_detail(order, receivable)
+        })
         .collect();
 
     Ok(Json(ApiResponse::success(PaginatedResponse::new(
@@ -611,14 +680,22 @@ pub async fn get_portal_order(
         .await?
         .ok_or_else(|| AppError::not_found("订单不存在或不属于当前绑定客户"))?;
 
-    Ok(Json(ApiResponse::success(PortalOrderView::from(model))))
+    let receivable_totals =
+        load_portal_receivable_totals(db.as_ref(), customer.id, &[model.order_no.clone()]).await?;
+    let receivable = receivable_totals
+        .get(&model.order_no)
+        .copied()
+        .unwrap_or_default();
+
+    Ok(Json(ApiResponse::success(PortalOrderView::from_model(
+        model, receivable,
+    ))))
 }
 
 /// GET /api/v1/erp/customer-portal/dashboard - 客户视角汇总
 ///
-/// 三个指标共用同一行级门（绑定客户）与同一张 sales_orders 集合：
-/// 订单数=该客户全部单据，在途数=状态 partial_shipped/shipped（写入方词表见
-/// models/status/sales.rs::sales_order），应收余额=balance_amount 之和。
+/// 订单数与在途数取自该客户 sales_orders；应收余额取自非草稿、非取消的
+/// ar_invoices.unpaid_amount 净额，红字应收以负额参与轧差。
 pub async fn get_portal_dashboard(
     State(state): State<AppState>,
     auth: AuthContext,
@@ -633,9 +710,13 @@ pub async fn get_portal_dashboard(
         .filter(sales_order::Column::Status.is_in([so_status::PARTIAL_SHIPPED, so_status::SHIPPED]))
         .count(db.as_ref())
         .await?;
-    let receivable_balance = owned
+    let receivable_balance = ar_invoice::Entity::find()
+        .filter(ar_invoice::Column::CustomerId.eq(customer.id))
+        .filter(
+            ar_invoice::Column::Status.is_not_in([common::STATUS_DRAFT, common::STATUS_CANCELLED]),
+        )
         .select_only()
-        .column_as(Expr::col(sales_order::Column::BalanceAmount).sum(), "total")
+        .column_as(Expr::col(ar_invoice::Column::UnpaidAmount).sum(), "total")
         .into_tuple::<Option<Decimal>>()
         .one(db.as_ref())
         .await?
