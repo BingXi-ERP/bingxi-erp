@@ -3,13 +3,12 @@
 // 「UI 布局紧凑化、超长内容自动换行、保留合理行列间距」在全局层与高频列表组件落地。
 // 调用方 Playwright；读取 frontend/../miniprogram 源文件；不请求后端、不落库。
 // 存什么：读到的 WXSS 文本断言结果；存哪里：测试报告与 Actions 日志。
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../diagnose-fixture';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
 
-const ROOT = resolve(process.cwd(), '..');
+const ROOT = `${process.cwd()}/..`;
 const readWxss = (relative: string): string =>
-  readFileSync(resolve(ROOT, 'miniprogram', relative), 'utf8');
+  readFileSync(`${ROOT}/miniprogram/${relative}`, 'utf8');
 
 const rule = (css: string, selector: string): string => {
   const blocks = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
