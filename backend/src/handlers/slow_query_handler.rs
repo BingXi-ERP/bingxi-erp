@@ -151,8 +151,8 @@ pub async fn get_slow_query_stats(
     // B03-P2-5 修复：SQL 为静态常量，无用户输入拼接，from_string 安全（无注入风险）
     let sql = "SELECT query_text, \
                       MAX(execution_time_ms) as max_exec_time_ms, \
-                      SUM(calls) as total_calls, \
-                      AVG(rows_examined) as avg_rows, \
+                      COALESCE(SUM(calls), 0)::bigint as total_calls, \
+                      COALESCE(AVG(rows_examined), 0)::double precision as avg_rows, \
                       COUNT(*) as sample_count \
                FROM slow_query_log \
                WHERE captured_at >= NOW() - INTERVAL '7 days' \
