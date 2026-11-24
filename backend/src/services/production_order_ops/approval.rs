@@ -100,11 +100,11 @@ impl ProductionOrderService {
                     business_id = id,
                     "BPM 启动生产订单审批流程失败，提交事务回滚，根因如上"
                 );
-                Err(bpm_start_failure_error(
+                return Err(bpm_start_failure_error(
                     process_key::PRODUCTION_ORDER_APPROVAL,
                     "生产订单未提交",
                     &e,
-                ))
+                ));
             }
         };
 
