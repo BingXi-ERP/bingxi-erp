@@ -812,8 +812,19 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
     }
   }
 
-  // 生成缸号
-  if (!ctx.dyeLotNo) ctx.dyeLotNo = genDyeLotNo();
+  // 缸号兜底：新建批次分支已按提交值写入；命中既有批次时必须回读该批次行的
+  // 真实缸号——genDyeLotNo 新造的号不在 batch_dye_lot 表中，下游打卷门会拒。
+  if (!ctx.dyeLotNo) {
+    if (ctx.dyeBatchId) {
+      const batchRow = await apiCall<{ dye_lot_no?: string }>(
+        page,
+        'GET',
+        `/production/dye-batches/${ctx.dyeBatchId}`
+      );
+      ctx.dyeLotNo = batchRow.data?.dye_lot_no;
+    }
+    if (!ctx.dyeLotNo) ctx.dyeLotNo = genDyeLotNo();
+  }
 
   // ---- 12. 染色配方（UI 创建）----
   try {

@@ -234,7 +234,7 @@ impl QuotationService {
         page_size: u64,
         status: Option<String>,
         customer_id: Option<i32>,
-        sales_user_id: Option<i64>,
+        sales_user_id: Option<i32>,
         keyword: Option<String>,
         data_scope: Option<&DataScopeContext>,
     ) -> Result<(Vec<QuotationResponseDto>, u64), ServiceError> {

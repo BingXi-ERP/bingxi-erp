@@ -59,6 +59,11 @@ const PRINT_ROLES: &[&str] = &[
     "fabric_inspector",
 ];
 
+/// 黑名单对照持码例外：33b「持码仍 403」负例必须让低权账号真实持有打印键，
+/// 否则会退化成「无码 403」假绿。该码仅作负例靶子，不是业务受授面，
+/// 从三通道相等/最小授权判据中显式剔除并由下方的用途锁钉死，禁止扩散到其它角色。
+const PRINT_BLACKLIST_PROBE_ROLES: &[&str] = &["customer"];
+
 fn matrix_src() -> String {
     include_str!("../src/services/init_service_ops/permission.rs").replace('\r', "")
 }
@@ -300,10 +305,14 @@ fn role_matrix_grants_exactly_read_and_print_for_pieces() {
         7,
         "pieces:read 在角色矩阵中应恰为 7 处（库存经理/仓管/仓库经理/销售代表/生产经理/质检员/验布员）"
     );
+    let matrix_print = matrix_roles_with(&code_only(&matrix_src()), "print");
+    let print_count = matrix_print
+        .iter()
+        .filter(|r| !PRINT_BLACKLIST_PROBE_ROLES.contains(&r.as_str()))
+        .count();
     assert_eq!(
-        src.matches(r#"("pieces", "print")"#).count(),
-        5,
-        "pieces:print 在角色矩阵中应恰为 5 处（库存经理/仓管/仓库经理/质检员/验布员）"
+        print_count, 5,
+        "pieces:print 业务受授面在角色矩阵中应恰为 5 处（库存经理/仓管/仓库经理/质检员/验布员），黑名单对照靶子不计入"
     );
     // 最小授权：库里 pieces 只有 GET /pieces 与 GET /pieces/{id}/print 两个端点
     for banned in [
@@ -328,7 +337,10 @@ fn role_matrix_grants_exactly_read_and_print_for_pieces() {
 /// 新增一个角色 ⇒ ② 多一元素，本断言同样红。
 #[test]
 fn matrix_and_migration_print_role_sets_are_equal() {
-    let matrix = matrix_roles_with(&code_only(&matrix_src()), "print");
+    let matrix = matrix_roles_with(&code_only(&matrix_src()), "print")
+        .into_iter()
+        .filter(|r| !PRINT_BLACKLIST_PROBE_ROLES.contains(&r.as_str()))
+        .collect::<Vec<_>>();
     let mig = migration_role_codes(&code_only(&migration_src()), "PRINT_ROLE_CODES");
     assert_eq!(
         sorted_refs(&matrix),
@@ -549,6 +561,9 @@ fn e2e_seed_pieces_roles_are_subset_of_backend_channels() {
              要么 SEED_ROLE_EXTRA_PERMISSIONS 分组签名变了导致解析空转；空集会令子集断言恒真，拒绝放行"
         );
         for role in &seeded {
+            if action == "print" && PRINT_BLACKLIST_PROBE_ROLES.contains(&role.as_str()) {
+                continue;
+            }
             assert!(
                 allowed.contains(role),
                 "通道③ e2e SEED 给 {role} 授 'pieces:{action}'，但该码不在通道①② 的规范受授面\
@@ -561,5 +576,38 @@ fn e2e_seed_pieces_roles_are_subset_of_backend_channels() {
     assert!(
         !seed_src.contains("'pieces:*'") && !seed_src.contains("'pieces:update'"),
         "e2e 侧同样禁止超范围授 pieces 键"
+    );
+}
+
+/// 黑名单对照靶子用途锁：例外的存在必须同时被 init 矩阵、e2e SEED 与 33b 用例三方消费，
+/// 且不得扩散到其它角色——防"以例外为名把越权面放大"或"例外单方面消失导致 33b 假绿"。
+#[test]
+fn blacklist_print_probe_is_scoped_and_consumed() {
+    let spec_src =
+        include_str!("../../frontend/e2e/flow/33b-role-blacklist.spec.ts").replace('\r', "");
+    let matrix_print = matrix_roles_with(&code_only(&matrix_src()), "print");
+    let seed_print = e2e_seed_roles_with("'pieces:print'");
+    for role in PRINT_BLACKLIST_PROBE_ROLES {
+        assert!(
+            matrix_print.iter().any(|r| r == role),
+            "黑名单对照靶子 {role} 不在 init 矩阵中：33b 持码负例会退化成无码 403 假绿"
+        );
+        assert!(
+            seed_print.iter().any(|r| r == role),
+            "黑名单对照靶子 {role} 不在 e2e SEED 补授映射中：CI 库不会真实持有打印键"
+        );
+    }
+    assert!(
+        spec_src.contains("黑名单") && spec_src.contains("pieces"),
+        "33b 用例不再消费打印黑名单靶子：例外失去用途，必须从三通道判据中移除"
+    );
+    let extras = matrix_print
+        .iter()
+        .filter(|r| !PRINT_BLACKLIST_PROBE_ROLES.contains(&r.as_str()))
+        .filter(|r| !PRINT_ROLES.contains(&r.as_str()))
+        .collect::<Vec<_>>();
+    assert!(
+        extras.is_empty(),
+        "pieces:print 出现裁定口径与黑名单靶子之外的受授角色：{extras:?}"
     );
 }

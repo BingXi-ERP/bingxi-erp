@@ -731,9 +731,6 @@ frontend/e2e/enhanced/446-ap-invoice-date-range-boundary.spec.ts::services/ap_in
 frontend/e2e/enhanced/446-ap-invoice-date-range-boundary.spec.ts::services/ap_invoice_ops/types.rs
 frontend/e2e/enhanced/447-webhook-retry-ceiling.spec.ts::handlers/webhook_handler.rs
 frontend/e2e/enhanced/447-webhook-retry-ceiling.spec.ts::services/webhook_service.rs
-frontend/e2e/enhanced/448-attachment-size-exact-boundary.spec.ts::constants.rs
-frontend/e2e/enhanced/448-attachment-size-exact-boundary.spec.ts::handlers/supplier_handler.rs
-frontend/e2e/enhanced/448-attachment-size-exact-boundary.spec.ts::models/supplier_qualification.rs
 frontend/e2e/enhanced/449-product-name-length-boundary.spec.ts::handlers/product_handler.rs
 frontend/e2e/enhanced/449-product-name-length-boundary.spec.ts::models/product.rs
 frontend/e2e/enhanced/449-product-name-length-boundary.spec.ts::utils/error.rs
@@ -882,6 +879,7 @@ frontend/e2e/enhanced/511-quality-grade-boundary.spec.ts::models/status/quality_
 frontend/e2e/enhanced/511-quality-grade-boundary.spec.ts::services/quality_inspection_service.rs
 frontend/e2e/enhanced/512-quality-b-downgrade-linkage.spec.ts::services/quality_inspection_service.rs
 frontend/e2e/enhanced/513-purchase-delivery-date-calculator.spec.ts::handlers/purchase_order_handler.rs
+frontend/e2e/enhanced/513-purchase-delivery-date-calculator.spec.ts::purchase_delivery_calculator.rs
 frontend/e2e/enhanced/513-purchase-delivery-date-calculator.spec.ts::services/purchase_delivery_calculator.rs
 frontend/e2e/enhanced/514-custom-order-process-nodes.spec.ts::handlers/custom_order_handler.rs
 frontend/e2e/enhanced/514-custom-order-process-nodes.spec.ts::models/status/production.rs
@@ -1287,6 +1285,10 @@ frontend/e2e/flow/53-approval-depth-full.spec.ts::user_handler.rs
 frontend/e2e/flow/54-new-domains-lifecycle.spec.ts::fabric_inspection_service.rs
 frontend/e2e/flow/54-new-domains-lifecycle.spec.ts::models/quality_issue_dto.rs
 frontend/e2e/flow/54-new-domains-lifecycle.spec.ts::social_insurance_service.rs
+frontend/e2e/flow/571-customer-soft-delete-recovery.spec.ts::types.rs
+frontend/e2e/flow/572-sales-order-price-revert-audit-snapshot.spec.ts::order_crud.rs
+frontend/e2e/flow/573-customer-charset-and-length.spec.ts::customer_handler.rs
+frontend/e2e/flow/574-soft-delete-visibility-and-delete-confirm.spec.ts::crud.rs
 frontend/e2e/flow/60-environmental-compliance-full.spec.ts::backend/utils/error.rs
 frontend/e2e/flow/60-environmental-compliance-full.spec.ts::environmental-compliance/index.vue
 frontend/e2e/flow/60-environmental-compliance-full.spec.ts::error.rs
