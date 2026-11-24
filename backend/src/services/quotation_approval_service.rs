@@ -17,18 +17,20 @@
 use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QuerySelect, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
 };
 use std::sync::Arc;
 
 use crate::container::AppState;
+use crate::models::bpm_process_instance;
 use crate::models::bpm_task;
 use crate::models::dto::bpm_dto::StartProcessRequest;
 use crate::models::event_dead_letter;
 use crate::models::sales_quotation::{
     self, ActiveModel as QuotationActive, Entity as QuotationEntity,
 };
+use crate::models::status::bpm_instance as instance_status;
 use crate::models::status::bpm_task as task_status;
 use crate::models::status::quotation as quotation_status;
 use crate::models::status::quotation_ext as quotation_ext_status;
@@ -440,6 +442,129 @@ impl QuotationApprovalService {
         active.approval_reason = Set(Some(approval_reason));
         active.updated_at = Set(Utc::now());
         active
+    }
+
+    /// 回写 BPM 终审通过结果，不反向推进已完成的审批任务。
+    pub async fn on_bpm_approved(
+        &self,
+        quotation_id: i64,
+        approver_id: i32,
+    ) -> Result<sales_quotation::Model, AppError> {
+        self.apply_bpm_terminal_decision(quotation_id, approver_id, true)
+            .await
+    }
+
+    /// 回写 BPM 终审拒绝结果，不反向推进已终止的审批任务。
+    pub async fn on_bpm_rejected(
+        &self,
+        quotation_id: i64,
+        approver_id: i32,
+    ) -> Result<sales_quotation::Model, AppError> {
+        self.apply_bpm_terminal_decision(quotation_id, approver_id, false)
+            .await
+    }
+
+    async fn apply_bpm_terminal_decision(
+        &self,
+        quotation_id: i64,
+        approver_id: i32,
+        approved: bool,
+    ) -> Result<sales_quotation::Model, AppError> {
+        let txn = (*self.db).begin().await?;
+        let quotation = QuotationEntity::find_by_id(quotation_id)
+            .lock_exclusive()
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::not_found("报价单不存在"))?;
+
+        if (approved && quotation.status == quotation_status::APPROVED)
+            || (!approved
+                && [quotation_status::REJECTED, quotation_status::DRAFT]
+                    .contains(&quotation.status.as_str()))
+        {
+            return Ok(quotation);
+        }
+        if quotation.status != quotation_ext_status::PENDING_APPROVAL {
+            return Err(AppError::business_displayable(format!(
+                "报价单不在待审批状态，无法回写 BPM 终审结果：{}",
+                quotation.status
+            )));
+        }
+
+        let instance_id = quotation
+            .approval_instance_id
+            .ok_or_else(|| AppError::internal("待审批报价缺少 BPM 实例关联，无法回写终审结果"))?;
+        let instance_id = i32::try_from(instance_id).map_err(|_| {
+            AppError::internal(format!("报价 BPM 实例 ID 超出 INTEGER 范围：{instance_id}"))
+        })?;
+        let instance = bpm_process_instance::Entity::find_by_id(instance_id)
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::not_found("报价审批流程实例不存在"))?;
+        let withdrawn = !approved && instance.status.as_deref() == Some(instance_status::CANCELLED);
+        let expected_instance_status = if approved {
+            instance_status::COMPLETED
+        } else if withdrawn {
+            instance_status::CANCELLED
+        } else {
+            instance_status::TERMINATED
+        };
+        if instance.status.as_deref() != Some(expected_instance_status) {
+            return Err(AppError::business_displayable(format!(
+                "报价审批实例当前状态为 {:?}，与终审结果 {:?} 不一致",
+                instance.status, expected_instance_status
+            )));
+        }
+
+        let expected_task_status = if approved {
+            task_status::COMPLETED
+        } else if withdrawn {
+            task_status::CANCELLED
+        } else {
+            task_status::REJECTED
+        };
+        let terminal_task_query = bpm_task::Entity::find()
+            .filter(bpm_task::Column::InstanceId.eq(instance_id))
+            .filter(bpm_task::Column::Status.eq(expected_task_status));
+        let terminal_task_query = if withdrawn {
+            terminal_task_query
+        } else {
+            terminal_task_query.filter(bpm_task::Column::ActualHandlerId.eq(approver_id))
+        };
+        let terminal_task = terminal_task_query
+            .order_by_desc(bpm_task::Column::HandledAt)
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::internal("报价终审事件未找到对应的已处理审批任务"))?;
+
+        let mut active: QuotationActive = quotation.into();
+        active.updated_at = Set(Utc::now());
+        if withdrawn {
+            active.status = Set(quotation_status::DRAFT.to_string());
+            active.approval_instance_id = Set(None);
+            active.submitted_by = Set(None);
+            active.rejection_reason = Set(terminal_task.approval_opinion);
+        } else {
+            active.approved_by = Set(Some(approver_id as i64));
+            active.approved_at = Set(Some(Utc::now()));
+            if approved {
+                active.status = Set(quotation_status::APPROVED.to_string());
+                active.approval_reason = Set(terminal_task.approval_opinion);
+            } else {
+                active.status = Set(quotation_status::REJECTED.to_string());
+                active.rejection_reason = Set(terminal_task.approval_opinion);
+            }
+        }
+
+        let updated = crate::services::audit_log_service::AuditLogService::update_with_audit(
+            &txn,
+            "auto_audit",
+            active,
+            Some(approver_id),
+        )
+        .await?;
+        txn.commit().await?;
+        Ok(updated)
     }
 
     /// 提交事务后完成 BPM 审批任务（容错：失败只记日志，不回滚业务侧已提交的审批结果）

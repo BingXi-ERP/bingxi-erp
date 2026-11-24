@@ -1385,7 +1385,43 @@ pub async fn handle_bpm_process_finished(
         "export_approval" => {
             handle_bpm_export_approval(db, business_id, approved, approver_id).await;
         }
+        "quotation" => {
+            handle_bpm_quotation(db, business_id, approved, approver_id).await;
+        }
         other => tracing::warn!("未识别的 BPM business_type: {}", other),
+    }
+}
+
+/// 处理报价 BPM 终审结果回写，撤回事件由实例状态门显式拒绝。
+async fn handle_bpm_quotation(
+    db: Arc<DatabaseConnection>,
+    business_id: i64,
+    approved: bool,
+    approver_id: i32,
+) {
+    let svc =
+        crate::services::quotation_approval_service::QuotationApprovalService::new(db.clone());
+    let result = if approved {
+        svc.on_bpm_approved(business_id, approver_id).await
+    } else {
+        svc.on_bpm_rejected(business_id, approver_id).await
+    };
+    match result {
+        Ok(model) => tracing::info!(
+            quotation_id = business_id,
+            status = %model.status,
+            "报价 BPM 终审回写完成"
+        ),
+        Err(e) => {
+            tracing::error!(
+                quotation_id = business_id,
+                approved,
+                error = %e,
+                "报价 BPM 终审回写失败，已落死信补偿记录等待重放"
+            );
+            record_bpm_writeback_failure(&db, "quotation", business_id, approved, approver_id, &e)
+                .await;
+        }
     }
 }
 
