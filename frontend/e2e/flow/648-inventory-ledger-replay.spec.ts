@@ -181,7 +181,9 @@ test.describe('648 库存流水 before/after 台账回放', () => {
       notes: `E2E-648-RECEIPT-${tag}`,
       items: [
         {
+          line_no: 1,
           order_item_id: poLine.id,
+          material_id: productId,
           material_code: product.code,
           material_name: product.name,
           batch_no: batchNo,

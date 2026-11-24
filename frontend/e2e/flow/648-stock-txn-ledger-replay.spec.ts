@@ -42,6 +42,11 @@ interface WarehouseRow {
   warehouse_code?: string;
 }
 
+interface ProductRow {
+  code?: string;
+  name?: string;
+}
+
 function toScaled(v: unknown, label: string): bigint {
   const raw = typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '';
   const m = /^(-?)(\d+)(?:\.(\d{1,3}))?$/.exec(raw);
@@ -69,6 +74,11 @@ test.describe.serial('648 库存流水 before/after 逐行回放台账', () => {
 
     const batchNo = genCode('B648');
     const product = ctx.productIds[0];
+    const productDetail = await apiCallRaw<ProductRow>(page, 'GET', `/products/${product}`);
+    const materialCode = String(productDetail.code ?? '');
+    const materialName = String(productDetail.name ?? '');
+    expect(materialCode, '[648-1] 产品详情必须回读 code').not.toBe('');
+    expect(materialName, '[648-1] 产品详情必须回读 name').not.toBe('');
     const warehouse = ctx.warehouseIds[0];
     const warehouseDetail = await apiCallRaw<WarehouseRow>(page, 'GET', `/warehouses/${warehouse}`);
     const warehouseCode = String(warehouseDetail?.warehouse_code ?? '');
@@ -111,6 +121,8 @@ test.describe.serial('648 库存流水 before/after 逐行回放台账', () => {
           {
             line_no: 1,
             material_id: product,
+            material_code: materialCode,
+            material_name: materialName,
             unit_master: 'm',
             quantity: 40,
             quantity_alt: 0,

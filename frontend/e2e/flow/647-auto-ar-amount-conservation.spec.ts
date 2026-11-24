@@ -128,7 +128,7 @@ test.describe.serial('647 订单→全额发货→自动应收三额差额归零
 
     const created = await apiCallRaw<OrderRow>(page, 'POST', '/sales/orders', {
       customer_id: customerId,
-      order_date: new Date().toISOString().slice(0, 10),
+      order_date: new Date().toISOString(),
       items: [
         {
           product_id: ctx.quotationProductId,
