@@ -27,6 +27,7 @@ use sea_orm::{
 };
 
 const SNAPSHOT_APP_NAME: &str = "custom-order-gate-snapshot";
+static GATE_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 struct GateFixture {
     db: DatabaseConnection,
@@ -130,7 +131,7 @@ async fn seed_fixture(status: &str, approved_sample_id: Option<i32>) -> GateFixt
 
     let current_node = process_node::ActiveModel {
         custom_order_id: Set(order.id),
-        node_type: Set(co_status::DYEING.to_string()),
+        node_type: Set(status.to_string()),
         node_name: Set("当前染色".to_string()),
         sequence: Set(1),
         status: Set(node_status::IN_PROGRESS.to_string()),
@@ -300,6 +301,7 @@ async fn wait_for_snapshot_reader_blocked(txn: &sea_orm::DatabaseTransaction) {
 
 #[tokio::test]
 async fn unconfirmed_lab_dip_rejects_without_partial_writes() {
+    let _guard = GATE_TEST_LOCK.lock().await;
     let fixture = seed_fixture(co_status::LAB_DIP, None).await;
     let service = CustomOrderStateService::new(Arc::new(fixture.db.clone()));
 
@@ -318,7 +320,63 @@ async fn unconfirmed_lab_dip_rejects_without_partial_writes() {
 }
 
 #[tokio::test]
+async fn approved_quotation_advances_and_syncs_amount_with_node_and_log_writes() {
+    let _guard = GATE_TEST_LOCK.lock().await;
+    let mut fixture = seed_fixture(co_status::QUOTATION, Some(1)).await;
+    let quotation = seed_quotation(&fixture.db, fixture.customer_id, fixture.actor_id).await;
+    attach_quotation(&mut fixture, quotation.id).await;
+    let service = CustomOrderStateService::new(Arc::new(fixture.db.clone()));
+
+    let updated = service
+        .advance(
+            fixture.order.id,
+            fixture.actor_id,
+            Some("已审批报价允许推进生产".to_string()),
+            Some(co_status::YARN_PURCHASING),
+        )
+        .await
+        .expect("已审批报价应成功推进生产");
+
+    assert_eq!(updated.status, co_status::YARN_PURCHASING);
+    assert_eq!(updated.total_amount, Some(quotation.total_amount));
+
+    let current = process_node::Entity::find_by_id(fixture.current_node.id)
+        .one(&fixture.db)
+        .await
+        .expect("回读当前节点失败")
+        .expect("当前节点必须存在");
+    assert_eq!(current.status, node_status::COMPLETED);
+    assert!(current.actual_end_date.is_some());
+
+    let next = process_node::Entity::find_by_id(fixture.next_node.id)
+        .one(&fixture.db)
+        .await
+        .expect("回读下一节点失败")
+        .expect("下一节点必须存在");
+    assert_eq!(next.status, node_status::IN_PROGRESS);
+    assert!(next.actual_start_date.is_some());
+    assert_eq!(next.operator_id, Some(fixture.actor_id));
+
+    let logs = process_log::Entity::find()
+        .filter(process_log::Column::ProcessNodeId.eq(fixture.current_node.id))
+        .all(&fixture.db)
+        .await
+        .expect("回读工艺日志失败");
+    assert_eq!(logs.len(), 1, "成功推进应且仅应写入一条完成日志");
+    assert_eq!(logs[0].action, "complete");
+    assert_eq!(
+        logs[0].before_status.as_deref(),
+        Some(node_status::IN_PROGRESS)
+    );
+    assert_eq!(
+        logs[0].after_status.as_deref(),
+        Some(node_status::COMPLETED)
+    );
+}
+
+#[tokio::test]
 async fn quotation_missing_after_gate_rolls_back_order_nodes_and_logs() {
+    let _guard = GATE_TEST_LOCK.lock().await;
     let mut fixture = seed_fixture(co_status::QUOTATION, Some(1)).await;
     let quotation = seed_quotation(&fixture.db, fixture.customer_id, fixture.actor_id).await;
     attach_quotation(&mut fixture, quotation.id).await;
@@ -372,6 +430,7 @@ async fn quotation_missing_after_gate_rolls_back_order_nodes_and_logs() {
 
 #[tokio::test]
 async fn quotation_amount_read_failure_rolls_back_order_nodes_and_logs() {
+    let _guard = GATE_TEST_LOCK.lock().await;
     let mut fixture = seed_fixture(co_status::QUOTATION, Some(1)).await;
     let quotation = seed_quotation(&fixture.db, fixture.customer_id, fixture.actor_id).await;
     attach_quotation(&mut fixture, quotation.id).await;
