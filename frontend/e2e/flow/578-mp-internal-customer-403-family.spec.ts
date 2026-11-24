@@ -119,14 +119,12 @@ test.describe.serial('578 小程序内部面 customer 403 家族回归', () => {
       expectDenied(denied, `customer 打内部面 ${item.path}（${item.why}）`);
     }
 
-    for (const path of [
-      '/dashboard/overview',
-      '/dashboard/sales-stats',
-      '/notifications/unread-count',
-    ]) {
+    for (const path of ['/dashboard/overview', '/dashboard/sales-stats']) {
       const overview = await apiCallRaw<Row>(session.page, 'GET', path);
       expect(Object.keys(overview).length, `应用外壳 ${path} 应返回非空对象`).toBeGreaterThan(0);
     }
+    const unread = await apiCallRaw<number>(session.page, 'GET', '/notifications/unread-count');
+    expect(Number.isSafeInteger(unread) && unread >= 0, '通知未读数应为非负整数').toBe(true);
   });
 
   test.afterAll(async () => {
