@@ -135,8 +135,7 @@ test.describe.serial('579 BI 利润面脱敏钉子', () => {
     const keys = new Set<string>();
     collectKeys(payload, keys);
     // 字段级脱敏钉子：成本/利润键对授权角色也不可下发。
-    // ⚠️ 静态实锤（handlers/bi_handler.rs:163-176 + bi_analysis_ops/types.rs:93-98）：
-    //   ProfitAnalysis 序列化恒含这三键、无字段级门 —— 本断言在 CI 将红，
+    // ⚠️ 静态实锤：利润分析响应恒含这三键且无字段级门，本断言在 CI 将红，
     //   红面即缺陷证据（登记功能缺失），后端补字段级门后转绿。
     for (const key of ['total_cost', 'total_profit', 'gross_margin']) {
       expect(keys.has(key), `/bi/sales/profit 响应体不得含成本利润键 ${key}`).toBe(false);
