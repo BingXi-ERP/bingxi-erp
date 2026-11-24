@@ -265,6 +265,9 @@ impl Default for SlowQuerySettings {
 pub struct BackgroundJobsConfig {
     /// 财务预警扫描调度（定时调用财务预警服务全量扫描，生成应收逾期/库存积压/现金缺口/预算超支四类预警）
     pub finance_alert_scan: FinanceAlertScanJob,
+    /// 脏数据定期巡检（孤立明细/重复单据/负库存/金额为空四类存量扫描；
+    /// 自动修复默认关闭，开启后也仅限有确定口径的两类并留审计痕迹）
+    pub data_integrity_scan: DataIntegrityScanJob,
     /// 催收任务自动生成调度（按应收账龄定时扫描逾期发票并幂等生成催收任务）
     pub collection_task_auto_generate: CollectionTaskAutoGenerateJob,
     /// 劳动合同到期扫描调度（定时执行到期档位扫描，并把已到期合同自动流转为过期态）
@@ -292,6 +295,41 @@ impl Default for FinanceAlertScanJob {
             enabled: true,
             interval_secs: 21_600,
             initial_delay_secs: 180,
+        }
+    }
+}
+
+/// 脏数据巡检 job 配置（`background_jobs.data_integrity_scan`）。
+///
+/// 默认只扫不改：repair_enabled=false 时整条链路零写入；开启后每轮最多修复
+/// repair_batch_size 条，避免大事务长锁。sample_limit 上限 20，与巡检 SQL
+/// 常量 LIMIT 对齐，防止配置值虚高误导报告消费者。
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct DataIntegrityScanJob {
+    /// 是否启用脏数据巡检调度
+    pub enabled: bool,
+    /// 扫描间隔（秒），默认 6 小时
+    pub interval_secs: u64,
+    /// 首轮延迟（秒），错开启动初始化
+    pub initial_delay_secs: u64,
+    /// 每类回传样本上限
+    pub sample_limit: usize,
+    /// 是否执行确定性自动修复（默认关闭）
+    pub repair_enabled: bool,
+    /// 单轮单类修复条数上限
+    pub repair_batch_size: usize,
+}
+
+impl Default for DataIntegrityScanJob {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            interval_secs: 21_600,
+            initial_delay_secs: 240,
+            sample_limit: 20,
+            repair_enabled: false,
+            repair_batch_size: 200,
         }
     }
 }

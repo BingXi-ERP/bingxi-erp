@@ -971,6 +971,17 @@ async fn start_registered_schedulers(
             settings.background_jobs.es_reconcile.clone(),
         ),
     ) as std::sync::Arc<dyn Scheduler>);
+    // 脏数据巡检：四类存量异常定期扫描；自动修复默认关闭，
+    // 手动报告端点与定时执行共用同一个 DataIntegrityScanService。
+    let data_integrity_scan = std::sync::Arc::new(
+        crate::services::data_integrity_scan_service::DataIntegrityScanService::new(
+            app_state.db.clone(),
+            app_state.audit_log.clone(),
+            settings.background_jobs.data_integrity_scan.clone(),
+        ),
+    );
+    crate::services::data_integrity_scan_service::install_global(data_integrity_scan.clone());
+    registry.register(data_integrity_scan as std::sync::Arc<dyn Scheduler>);
 
     info!(
         scheduler_count = registry.count(),

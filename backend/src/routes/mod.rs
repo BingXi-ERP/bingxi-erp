@@ -488,6 +488,10 @@ fn scheduler_routes() -> Router<AppState> {
             "/scheduler/jobs/{name}/trigger",
             post(crate::handlers::scheduler_handler::trigger_job),
         )
+        .route(
+            "/scheduler/data-integrity/report",
+            get(crate::handlers::scheduler_handler::data_integrity_report),
+        )
 }
 
 /// 构建基础设施路由（静态资源 + 指标 + API 文档）；与业务域不同，这三类基础设施不挂在 `/api/v1/erp` 之下，而是顶层独立路径： -
