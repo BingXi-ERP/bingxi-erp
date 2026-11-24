@@ -184,6 +184,16 @@ impl ProductionOrderService {
             tracing::error!(error = %e, "生产订单取号或插入失败");
             AppError::business_displayable("生产订单号生成失败，请稍后重试")
         })?;
+        let snapshot = serde_json::to_value(&model)
+            .map_err(|error| AppError::internal(format!("生产订单建单快照序列化失败: {error}")))?;
+        crate::services::audit_log_service::AuditLogService::insert_create_audit(
+            &txn,
+            super::types::AUDIT_RESOURCE_TYPE,
+            model.id,
+            user_id,
+            snapshot,
+        )
+        .await?;
         txn.commit().await?;
 
         Ok(model)
@@ -297,6 +307,17 @@ impl ProductionOrderService {
             tracing::error!(error = %e, "返工订单取号或插入失败");
             AppError::business_displayable("返工订单号生成失败，请稍后重试")
         })?;
+        let snapshot = serde_json::to_value(&model).map_err(|error| {
+            AppError::internal(format!("返工生产订单建单快照序列化失败: {error}"))
+        })?;
+        crate::services::audit_log_service::AuditLogService::insert_create_audit(
+            &txn,
+            super::types::AUDIT_RESOURCE_TYPE,
+            model.id,
+            created_by,
+            snapshot,
+        )
+        .await?;
         txn.commit().await?;
 
         Ok(model)

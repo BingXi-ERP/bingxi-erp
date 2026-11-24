@@ -3,6 +3,7 @@ mod test_common;
 use std::sync::Arc;
 
 use bingxi_backend::models::audit_log;
+use bingxi_backend::models::production_order::Model as ProductionOrderModel;
 use bingxi_backend::models::status::{common, production};
 use bingxi_backend::services::production_order_service::{
     CreateProductionOrderRequest, ProductionOrderService, UpdateProductionOrderRequest,
@@ -17,6 +18,7 @@ use test_common::setup_test_db;
 const OPERATOR_ID: i32 = 9871;
 const PRODUCT_ID: i32 = 987_101;
 const WORK_CENTER_ID: i32 = 987_201;
+const ORIGINAL_BATCH_ID: i32 = 987_301;
 
 async fn seed_fixture(db: &sea_orm::DatabaseConnection) {
     let now = Utc::now();
@@ -229,6 +231,106 @@ fn snapshot_field<'a>(
     key: &str,
 ) -> Option<&'a serde_json::Value> {
     snapshot.as_ref().and_then(|value| value.0.get(key))
+}
+
+fn assert_create_audit(row: &audit_log::Model, order: &ProductionOrderModel) {
+    assert_eq!(row.user_id, Some(OPERATOR_ID));
+    assert_eq!(row.username.as_deref(), Some("production_approval_auditor"));
+    assert_eq!(row.action, "CREATE");
+    assert_eq!(row.operation_type.as_deref(), Some("CREATE"));
+    assert_eq!(row.severity.as_deref(), Some("INFO"));
+    assert_eq!(row.resource_type.as_deref(), Some("production_order"));
+    assert_eq!(
+        row.resource_id.as_deref(),
+        Some(order.id.to_string().as_str())
+    );
+    assert!(row.before_snapshot.is_none(), "创建不存在变更前快照");
+    assert!(row.old_value.is_none(), "创建不存在变更前旧字段");
+
+    for after in [&row.after_snapshot, &row.new_value] {
+        assert_eq!(snapshot_status(after), Some(common::STATUS_DRAFT));
+        assert_eq!(
+            snapshot_field(after, "order_no").and_then(|value| value.as_str()),
+            Some(order.order_no.as_str())
+        );
+        assert_eq!(
+            snapshot_field(after, "product_id").and_then(|value| value.as_i64()),
+            Some(i64::from(order.product_id))
+        );
+        assert_eq!(
+            snapshot_field(after, "planned_quantity").and_then(|value| value.as_str()),
+            Some(order.planned_quantity.to_string().as_str())
+        );
+        assert_eq!(
+            snapshot_field(after, "created_by").and_then(|value| value.as_i64()),
+            Some(i64::from(order.created_by))
+        );
+        assert_eq!(
+            snapshot_field(after, "order_type").and_then(|value| value.as_str()),
+            Some(order.order_type.as_str())
+        );
+        assert_eq!(
+            snapshot_field(after, "original_batch_id").and_then(|value| value.as_i64()),
+            order.original_batch_id.map(i64::from)
+        );
+    }
+}
+
+#[tokio::test]
+async fn production_order_create_writes_create_audit_snapshot() {
+    let db = Arc::new(setup_test_db().await);
+    seed_fixture(&db).await;
+    let service = ProductionOrderService::new(Arc::clone(&db));
+
+    let order = service
+        .create(create_request(), OPERATOR_ID)
+        .await
+        .expect("创建生产订单失败");
+    let rows = audit_rows(&db, order.id).await;
+    assert_eq!(rows.len(), 1, "建单必须恰好新增一条创建审计");
+    assert_create_audit(rows.first().expect("建单后必须存在创建审计"), &order);
+}
+
+#[tokio::test]
+async fn production_order_rework_create_writes_create_audit_snapshot() {
+    let db = Arc::new(setup_test_db().await);
+    seed_fixture(&db).await;
+    db.execute_raw(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "INSERT INTO dye_batch (id, batch_no, color_code, color_name, created_by) \
+         VALUES ($1, 'BATCH-PO-AUDIT', 'C-PO-AUDIT', '生产订单返工审计测试缸号', $2)",
+        vec![ORIGINAL_BATCH_ID.into(), OPERATOR_ID.into()],
+    ))
+    .await
+    .expect("种子返工来源缸号插入失败");
+    let service = ProductionOrderService::new(Arc::clone(&db));
+
+    let order = service
+        .create_rework_order(
+            PRODUCT_ID,
+            ORIGINAL_BATCH_ID,
+            None,
+            OPERATOR_ID,
+            Some("返工建单审计验证".to_string()),
+        )
+        .await
+        .expect("创建返工生产订单失败");
+    assert_eq!(order.order_type, "rework");
+    assert_eq!(order.original_batch_id, Some(ORIGINAL_BATCH_ID));
+    assert!(order.order_no.starts_with("RW"));
+
+    let rows = audit_rows(&db, order.id).await;
+    assert_eq!(rows.len(), 1, "返工建单必须恰好新增一条创建审计");
+    assert_create_audit(rows.first().expect("返工建单后必须存在创建审计"), &order);
+    let row = rows.first().expect("返工建单后必须存在创建审计");
+    assert_eq!(
+        snapshot_field(&row.after_snapshot, "remarks").and_then(|value| value.as_str()),
+        Some("返工建单审计验证")
+    );
+    assert_eq!(
+        snapshot_field(&row.new_value, "remarks").and_then(|value| value.as_str()),
+        Some("返工建单审计验证")
+    );
 }
 
 #[tokio::test]

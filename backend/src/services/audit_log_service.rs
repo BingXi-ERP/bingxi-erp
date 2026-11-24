@@ -411,6 +411,24 @@ impl AuditLogService {
         Ok(new_model)
     }
 
+    /// 在业务创建事务内同步写入创建审计，失败随业务事务整体回滚。
+    pub async fn insert_create_audit<C: ConnectionTrait>(
+        db: &C,
+        resource_type: &str,
+        record_id: i32,
+        user_id: i32,
+        after_snapshot: Value,
+    ) -> Result<(), AppError> {
+        let mut event = AuditEvent::new(OperationType::Create, resource_type);
+        event.user_id = Some(user_id);
+        event.username = Self::fetch_username(db, Some(user_id)).await?;
+        event.resource_id = Some(record_id.to_string());
+        event.after_snapshot = Some(after_snapshot);
+        let ctx = current_audit_request_ctx();
+        build_active_model(&event, ctx.as_ref()).insert(db).await?;
+        Ok(())
+    }
+
     /// 查询用户名（用于审计日志），无 user_id 返回 None
     async fn fetch_username<C: ConnectionTrait>(
         db: &C,
