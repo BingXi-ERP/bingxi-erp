@@ -177,7 +177,7 @@ test.describe('566 现货订单提交锁缸与改量差量联动', () => {
     );
     expectStock(await stockRow(page, productId, colorNo, batchNo), 10, 0, '[566-02] 整单拒绝后');
     const detail = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${orderId}`);
-    expect(detail.status, '[566-02] 提交失败主单不能推进状态').toBe('DRAFT');
+    expect(detail.status, '[566-02] 提交失败主单不能推进状态').toBe('draft');
   });
 
   test('566-03 改量差量同步与作废释放', async ({ page }) => {

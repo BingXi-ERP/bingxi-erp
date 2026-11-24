@@ -35,20 +35,18 @@ pub struct Model {
     /// 业务单据 ID（与 bpm_process_instance.business_id 同源同值）
     pub business_id: Option<i64>,
 
-    // ===== 以下四列生效 DDL 为 JSONB（migration system/mod.rs:96-100）=====
-    // 无 column_type 属性时 SeaORM 按 Vec<T> 推断为 PG 数组类型，读 JSONB 列即
-    // ColumnDecode、写整链带病；范本见 models/lab_dip_sample.rs formula_detail。
+    // JSONB 数组必须用 Json；裸 Vec<i32>/Vec<String> 会被 SeaORM 编码为 PG 数组。
     #[sea_orm(column_type = "JsonBinary", nullable)]
-    pub assignee_ids: Option<Vec<i32>>,
+    pub assignee_ids: Option<Json>,
 
     #[sea_orm(column_type = "JsonBinary", nullable)]
-    pub assignee_names: Option<Vec<String>>,
+    pub assignee_names: Option<Json>,
 
     #[sea_orm(column_type = "JsonBinary", nullable)]
-    pub candidate_role_ids: Option<Vec<i32>>,
+    pub candidate_role_ids: Option<Json>,
 
     #[sea_orm(column_type = "JsonBinary", nullable)]
-    pub candidate_user_ids: Option<Vec<i32>>,
+    pub candidate_user_ids: Option<Json>,
 
     pub actual_handler_id: Option<i32>,
 

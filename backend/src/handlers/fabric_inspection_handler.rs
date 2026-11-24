@@ -288,6 +288,9 @@ pub async fn list_physical_tests_by_inspection(
     let service = crate::services::fabric_inspection_service::FabricPhysicalTestService::new(
         state.db.clone(),
     );
+    let inspection_service =
+        crate::services::fabric_inspection_service::FabricInspectionService::new(state.db.clone());
+    inspection_service.get_by_id(inspection_id).await?;
     let tests = service.list_by_inspection(inspection_id).await?;
     Ok(Json(ApiResponse::success(tests)))
 }

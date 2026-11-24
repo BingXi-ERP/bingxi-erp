@@ -623,8 +623,8 @@ impl ProductService {
     /// products(id) 的外键列；label=该表的业务可读名称（对照表见调用方注释）；
     /// id=待删产品主键。
     /// 传给谁：结果只写进 blockers 累加器，由 find_product_references 统一返回。
-    /// 存什么：不落库，只按外键列等值计数；等值比较用整型，不引入字符串隐式
-    /// 转换而让索引失效。
+    /// 存什么：不落库，只按外键列等值计数；等值比较按列类型选择 INT4/INT8，
+    /// 避免同一条计数 SQL 在不同连接上准备出不同参数宽度。
     /// 存哪里：不写存储位置；行数取自入参 column 所属的表。
     /// 约束：`Select<E>` 的 `count` 来自 SeaORM 对 `PaginatorTrait` 的实现，该实现
     /// 额外要求 `E::Model` 满足 `FromQueryResult + Send + Sync + 'db`；缺这三条时
@@ -641,7 +641,13 @@ impl ProductService {
         E::Model: FromQueryResult + Send + Sync + 'db,
         C: ConnectionTrait,
     {
-        let count = E::find().filter(column.eq(id)).count(db).await?;
+        let value = match column.def().get_column_type() {
+            sea_orm::sea_query::ColumnType::BigInteger => {
+                sea_orm::sea_query::Value::BigInt(Some(i64::from(id)))
+            }
+            _ => sea_orm::sea_query::Value::Int(Some(id)),
+        };
+        let count = E::find().filter(column.eq(value)).count(db).await?;
         if count > 0 {
             blockers.push((label, count));
         }

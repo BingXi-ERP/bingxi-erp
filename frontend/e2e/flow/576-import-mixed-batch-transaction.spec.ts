@@ -103,12 +103,11 @@ test('576-01 百行混合批导入计数守恒且重复码失败行不落库', a
   }
 
   // 任务行计数与端点返回一致（122/126 只覆盖任务生命周期，这里只核对混合批计数面）。
-  const tasks = await apiCallRaw<{ items: TaskRow[] }>(
-    page,
-    'GET',
-    '/data-import/tasks?page=1&page_size=100'
-  );
-  const task = (tasks.items ?? []).find(
+  // 出参形状以 handler 为准：list_import_tasks 返回 ApiResponse<Vec<ImportTaskItem>>
+  // （裸数组、按 created_at 倒序最近 100 行），不是分页信封；用分页键读会恒 undefined 假红。
+  const tasks = await apiCallRaw<TaskRow[]>(page, 'GET', '/data-import/tasks?page=1&page_size=100');
+  expect(Array.isArray(tasks), '任务列表出参须为裸数组').toBe(true);
+  const task = (Array.isArray(tasks) ? tasks : []).find(
     t => t.import_type === 'customers' && Number(t.total_rows) === total
   );
   expect(task, '应存在本次 100 行导入任务行').toBeDefined();

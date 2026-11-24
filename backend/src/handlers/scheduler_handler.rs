@@ -7,6 +7,9 @@
 //! - POST /scheduler/jobs/{name}/trigger  手动触发一轮执行（走与定时循环
 //!   同一包装层，trigger=manual 落历史；任务不存在 404）
 //!
+//! - GET /scheduler/data-integrity/report  脏数据巡检报告（四类存量异常，
+//!   同步扫描，返回计数+有限样本+修复建议；只读不改业务数据）
+//!
 //! 权限口径：与全仓"权限键由 URL 段推导"一致，admin 段由
 //! middleware/permission.rs 按段名推导，此处不再自设角色门。
 
@@ -88,4 +91,25 @@ pub async fn trigger_job(
             )))
         }
     }
+}
+
+/// GET /scheduler/data-integrity/report：按需同步执行脏数据巡检并返回报告。
+///
+/// 与定时/手动触发共用 DataIntegrityScanService::scan 的同一份口径；本端点只读，
+/// 不触发修复（自动修复只在任务配置显式开启时由调度链执行）。
+pub async fn data_integrity_report(
+    State(state): State<crate::container::AppState>,
+) -> Result<
+    Json<ApiResponse<crate::services::data_integrity_scan_service::DataIntegrityReport>>,
+    AppError,
+> {
+    let service = crate::services::data_integrity_scan_service::global_or_default(
+        state.db.clone(),
+        state.audit_log.clone(),
+    );
+    let report = service
+        .scan()
+        .await
+        .map_err(|e| AppError::internal(format!("脏数据巡检失败: {e}")))?;
+    Ok(Json(ApiResponse::success(report)))
 }
