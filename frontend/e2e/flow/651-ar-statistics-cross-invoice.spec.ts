@@ -8,7 +8,7 @@
  *   到期日一张取昨日（逾期）、其余取 30 天后。
  * - 传给谁：POST /crm/customers、/ar/invoices、/ar/invoices/{id}/approve|cancel；
  *   GET /ar/reports/statistics?customer_id=、/ar/invoices?customer_id= 逐页。
- * - 存什么：统计由 ar_ops/report.rs 参数化 SQL 聚合——排除 status IN (CANCELLED,DRAFT)、
+ * - 存什么：统计由应收统计服务参数化 SQL 聚合——排除 status IN (CANCELLED,DRAFT)、
  *   按 invoice_date 界定期间、逾期口径为 due_date<今天且 unpaid>0；响应键
  *   total_invoices/total_amount/paid_amount/unpaid_amount/overdue_count/overdue_amount/collection_rate。
  * - 断言什么：逐页明细累加（排除 DRAFT/CANCELLED，与 SQL 排除集合逐字同源）与统计六口逐分相等；

@@ -80,12 +80,12 @@ async function orderReservations(
   orderId: number,
   status: 'locked' | 'pending' | 'released'
 ): Promise<Row[]> {
-  const res = await apiCallRaw<{ items?: Row[] }>(
+  const res = await apiCallRaw<{ list?: Row[] }>(
     page,
     'GET',
     `/inventory/reservations?product_id=${productId}&status=${status}&page=1&page_size=100`
   );
-  const rows = pickListArray({ items: res.items }, 'items', `[650] 预留行 status=${status}`);
+  const rows = pickListArray({ list: res.list }, 'list', `[650] 预留行 status=${status}`);
   return rows.filter(r => num(r.order_id, '预留行 order_id') === orderId);
 }
 
