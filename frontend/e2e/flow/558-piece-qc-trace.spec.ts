@@ -16,6 +16,7 @@ import {
   genCode,
   getCtx,
   loginViaUI,
+  seedDyedPieceChain,
 } from './helpers';
 
 interface InspectionRow {
@@ -62,6 +63,21 @@ async function startInspection(page: Page, tag: string): Promise<number> {
   const productId = Number(ctx.productIds[0]);
   expect(productId, '前置：追溯用例需真实产品').toBeGreaterThan(0);
 
+  // 打卷入库要求缸号在 batch_dye_lot 表中真实在册；该档案的产生链路是染色委外回仓
+  // （委外单→发料→回仓→确认，find_or_create 建缸号档案），dye-batches 列表读的是
+  // dye_batch 表、与打卷门不同源。先走完整染色链种子（拿到回仓建档的缸号）再建验布单。
+  const dyedWh = ctx.warehouseIds.find((wid: number) => wid) ?? ctx.warehouseIds[0];
+  const dyed = await seedDyedPieceChain(page, {
+    productId,
+    warehouseId: dyedWh,
+    colorNo: genCode('CLR'),
+    dyeLotNo: genCode('DL'),
+    pieceCount: 1,
+    context: `558-${tag}`,
+  });
+  const realDyeLotNo = dyed[0]?.dye_lot_no;
+  expect(realDyeLotNo, '前置：染色链种子须回读在册缸号').toBeTruthy();
+
   const created = await apiCallRaw<Record<string, unknown>>(
     page,
     'POST',
@@ -69,7 +85,7 @@ async function startInspection(page: Page, tag: string): Promise<number> {
     {
       product_id: productId,
       product_name: `E2E-558-${tag}`,
-      dye_lot_no: genCode('DYE'),
+      dye_lot_no: realDyeLotNo,
       color_no: genCode('CLR'),
       inspection_date: new Date().toISOString().slice(0, 10),
       scoring_system: 'ten_point',
@@ -136,7 +152,9 @@ async function rollInspection(page: Page, inspectionId: number): Promise<void> {
       roll_gram_weight: '200',
     }
   );
-  expect(String(rolled.status), '打卷后验布单状态').toBe('graded');
+  expect(String(rolled.status), '打卷后验布单状态（状态机 graded→rolled，写入方 ROLLED）').toBe(
+    'rolled'
+  );
 }
 
 async function findPieceByInspection(page: Page, inspectionId: number): Promise<PieceRow> {

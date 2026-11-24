@@ -7,7 +7,11 @@
   <el-card shadow="hover" class="table-card">
     <!-- 手机卡片（<768 与采购管理表格同断点同范式） -->
     <section v-if="isPhone" v-loading="loading" class="price-mobile">
-      <ul class="order-list" :aria-label="t('purchasePrice.table.mobileCardAria')">
+      <ul
+        v-if="priceList.length > 0"
+        class="order-list"
+        :aria-label="t('purchasePrice.table.mobileCardAria')"
+      >
         <li v-for="row in priceList" :key="row.id" class="order-card">
           <dl class="order-fields">
             <div class="order-number">

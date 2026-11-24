@@ -324,6 +324,9 @@ async fn seeded_db() -> Arc<sea_orm::DatabaseConnection> {
         total_roll_length: Set(rust_decimal::Decimal::ZERO),
         total_roll_weight: Set(rust_decimal::Decimal::ZERO),
         status: Set(inspection_status::GRADED.to_string()),
+        // 匹质检状态由验布 A/B/C 等级联动，打卷门要求评级行必须带合法等级；
+        // 这里显式给 A 等，避免 Default 留空让三值齐全的正例被等级门误拒。
+        abc_grade: Set(Some("A".to_string())),
         is_deleted: Set(false),
         // 本模型时间列为 DateTimeWithTimeZone(FixedOffset)（models/fabric_inspection_record.rs:92-93）
         created_at: Set(now().into()),

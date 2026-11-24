@@ -13,8 +13,15 @@
 //   后端判据：production.rs 注册 PUT /production/business-modes/{id}；UpdateBusinessModeConfigRequest
 //   description 为 Option，局部提交只改提供列；trace_id 由链路中间件写入响应头 X-Trace-Id 与审计行。
 import { test, expect } from '../diagnose-fixture';
-import type { Page } from '@playwright/test';
-import { apiCallRaw, API_BASE, API_PREFIX, genCode } from './helpers';
+import type { Page, APIResponse } from '@playwright/test';
+import {
+  apiCallRaw,
+  API_BASE,
+  API_PREFIX,
+  genCode,
+  isCsrfRejection,
+  type ApiFailureBody,
+} from './helpers';
 
 interface ModeRow {
   id?: number;
@@ -30,31 +37,60 @@ interface RawResponse {
 
 /**
  * 取响应头 X-Trace-Id 的原始 PUT：审计行 trace_id 须与响应头逐字符同源，helper 的 apiCall 不回响应头。
+ * CSRF token 一次性消费（csrf.rs consume + Set-Cookie 轮换），页面后台写（/ws/ticket 心跳建票）
+ * 会与本次写竞态消费同一 token，故沿用 helpers.apiCall 同款有界重放：拒绝响应头
+ * x-new-csrf-token 即后端下发的新活 token，回写 cookie 后重放；重放耗尽仍 CSRF 拒绝属会话面失败，判红不放过。
  */
 async function putWithTrace(
   page: Page,
   path: string,
   body: Record<string, unknown>
 ): Promise<RawResponse> {
-  const csrf = (await page.context().cookies()).find(c => c.name === 'csrf_token')?.value;
-  if (!csrf) {
-    throw new Error(`577 原始 PUT ${path} 缺少 csrf_token cookie，前置未登录`);
+  const url = `${API_BASE}${API_PREFIX}${path}`;
+  const csrfCookie = async (): Promise<string> => {
+    const csrf = (await page.context().cookies()).find(c => c.name === 'csrf_token')?.value;
+    if (!csrf) {
+      throw new Error(`577 原始 PUT ${path} 缺少 csrf_token cookie，前置未登录`);
+    }
+    return csrf;
+  };
+  const doFetch = (token: string): Promise<APIResponse> =>
+    page.request.fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': token,
+      },
+      data: JSON.stringify(body),
+    });
+  const parseBody = async (res: APIResponse): Promise<Record<string, unknown>> => {
+    const text = await res.text();
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      throw new Error(`577 PUT ${path} 非 JSON HTTP ${res.status()}: ${text.slice(0, 200)}`);
+    }
+  };
+
+  let response = await doFetch(await csrfCookie());
+  let json = await parseBody(response);
+  for (
+    let attempt = 1;
+    attempt <= 2 && isCsrfRejection(response.status(), json as ApiFailureBody);
+    attempt++
+  ) {
+    const recovery = response.headers()['x-new-csrf-token'];
+    if (!recovery) break;
+    await page.context().addCookies([{ name: 'csrf_token', value: recovery, url }]);
+    response = await doFetch(recovery);
+    json = await parseBody(response);
   }
-  const response = await page.request.fetch(`${API_BASE}${API_PREFIX}${path}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest',
-      'X-CSRF-Token': csrf,
-    },
-    data: JSON.stringify(body),
-  });
-  const text = await response.text();
-  let json: Record<string, unknown>;
-  try {
-    json = JSON.parse(text) as Record<string, unknown>;
-  } catch {
-    throw new Error(`577 PUT ${path} 非 JSON HTTP ${response.status()}: ${text.slice(0, 200)}`);
+  if (isCsrfRejection(response.status(), json as ApiFailureBody)) {
+    throw new Error(
+      `577 PUT ${path} 被 CSRF 中间件拒绝且重放耗尽（status=${response.status()} code=${String(json.code)}）` +
+        `——属会话面失败非业务拒绝，判红不放过`
+    );
   }
   const traceId = response.headers()['x-trace-id'];
   if (typeof traceId !== 'string') {
