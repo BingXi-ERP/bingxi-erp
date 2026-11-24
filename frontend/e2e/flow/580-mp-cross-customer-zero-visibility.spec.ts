@@ -257,8 +257,8 @@ test.describe.serial('580 跨客户行级零可见防回退', () => {
       '/customer-portal/reconciliations?start_date=2000-01-01&end_date=2999-12-31'
     );
     const wideNos = hisPeriod.items.map(item => String(item.reconciliation_no ?? ''));
-    expect(wideNos).not.toContain(reconNoB, '全期窗过滤亦不得出现他户对账单');
-    expect(wideNos).toContain(reconNoA, '全期窗过滤必须保留本户行（过滤链路活性哨兵）');
+    expect(wideNos, '全期窗过滤亦不得出现他户对账单').not.toContain(reconNoB);
+    expect(wideNos, '全期窗过滤必须保留本户行（过滤链路活性哨兵）').toContain(reconNoA);
   });
 
   test('色卡面：本户发放卡可见，他户卡全量与按关键字过滤均零可见', async () => {

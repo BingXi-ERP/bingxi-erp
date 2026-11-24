@@ -1,13 +1,11 @@
 // 小程序 BI 利润面脱敏钉子 — /bi/sales/profit 两腿断言
 // 功能腿 1：customer 会话打 /bi/sales/profit（不属客户门户路径族）必须被 RBAC 权限门拒绝
 //           （403 + FORBIDDEN 机器码，expectDenied 假绿拦截）。
-// 功能腿 2：普通授权角色（授予 bi-analysis:read，utils/path_utils.rs:148 ("bi","sales")
-//           →"bi-analysis" 派生键）读取同一端点，断言响应聚合行不含成本/利润键
+// 功能腿 2：普通授权角色（授予 bi-analysis:read）读取同一端点，断言响应聚合行不含成本/利润键
 //           （total_cost/total_profit/gross_margin）。
-//           ⚠️ 钉子语义：handlers/bi_handler.rs:163-176 对任何过 RBAC 的角色直出
-//           ProfitAnalysis 全量字段（services/bi_analysis_ops/types.rs:93-98 静态可证含
-//           上述键），本腿红面即"字段级脱敏门缺失"缺陷的运行时证据，后端加字段级门后
-//           转绿；本支只钉红不改源码。
+//           ⚠️ 钉子语义：利润分析端点对任何过 RBAC 的角色直出全量字段，
+//           响应类型静态包含上述键，本腿红面即"字段级脱敏门缺失"缺陷的运行时证据，
+//           后端加字段级门后转绿；本支只钉红不改源码。
 // 调用方：Playwright 分片（frontend/playwright.config.ts），与 flow 其它用例共享后端账号池。
 // 入参：无测试参数；前置由管理员会话造 customer 绑定账号与授权 scratch 角色/用户。
 // 传给谁：apiCallExpectFail/apiCallRaw 走统一信封与 CSRF 恢复 helper。
