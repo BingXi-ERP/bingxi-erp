@@ -120,9 +120,9 @@ export interface CategoryStat {
 /** 利润分析 */
 export interface ProfitAnalysis {
   total_revenue: number;
-  total_cost: number;
-  total_profit: number;
-  gross_margin: number;
+  total_cost?: number;
+  total_profit?: number;
+  gross_margin?: number;
   order_count: number;
   avg_order_value: number;
 }

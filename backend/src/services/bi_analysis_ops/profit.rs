@@ -86,9 +86,9 @@ impl BiAnalysisService {
 
         let result = ProfitAnalysis {
             total_revenue,
-            total_cost,
-            total_profit,
-            gross_margin,
+            total_cost: Some(total_cost),
+            total_profit: Some(total_profit),
+            gross_margin: Some(gross_margin),
             order_count,
             avg_order_value,
         };

@@ -284,7 +284,7 @@ async fn test_profit_analysis() {
     let service = make_seeded_service().await;
     let p = service.profit_analysis().await.unwrap();
     assert!(p.total_revenue > 0.0);
-    assert!(p.gross_margin > 0.0);
+    assert!(p.gross_margin.is_some_and(|margin| margin > 0.0));
 }
 
 /// 单元测试：sales_trend（需要真实 DB，标记 ignore）
