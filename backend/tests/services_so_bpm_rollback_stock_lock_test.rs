@@ -23,15 +23,17 @@ use bingxi_backend::services::so::{CreateSalesOrderRequest, SalesOrderItemReques
 use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, DbBackend, EntityTrait, Set, Statement,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, DbBackend, EntityTrait,
+    QueryFilter, Set, Statement,
 };
 use std::sync::Arc;
 use test_common::setup_test_db;
 
 const OPERATOR_ID: i32 = 9861;
 const PRODUCT_ID: i32 = 986_101;
-const CREDIT_LIMIT: Decimal = Decimal::from_parts(1000, 0, 0, 0, 0);
-const ORDER_AMOUNT: Decimal = Decimal::from_parts(300, 0, 0, 0, 0);
+const STOCK_ID: i32 = 986_102;
+const CREDIT_LIMIT: Decimal = Decimal::from_parts(1000, 0, 0, false, 0);
+const ORDER_AMOUNT: Decimal = Decimal::from_parts(300, 0, 0, false, 0);
 
 async fn seed_operator(db: &DatabaseConnection) {
     let now = Utc::now();
@@ -39,7 +41,7 @@ async fn seed_operator(db: &DatabaseConnection) {
         id: Set(OPERATOR_ID),
         username: Set("so_bpm_rollback_operator".to_string()),
         password_hash: Set("test-only-not-a-real-hash".to_string()),
-        real_name: Set("销售审批回滚夹具操作人".to_string()),
+        real_name: Set(Some("销售审批回滚夹具操作人".to_string())),
         is_active: Set(true),
         is_totp_enabled: Set(false),
         created_at: Set(now),
@@ -123,6 +125,7 @@ async fn seed_product_and_stock(db: &DatabaseConnection, warehouse_id: i32) {
 
     let now = Utc::now();
     inventory_stock::ActiveModel {
+        id: Set(STOCK_ID),
         warehouse_id: Set(warehouse_id),
         product_id: Set(PRODUCT_ID),
         quantity_on_hand: Set(Decimal::from(100)),
