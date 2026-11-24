@@ -71,13 +71,11 @@ test.describe.serial('579 BI 利润面脱敏钉子', () => {
   const biRoleCode = `mp579bi${stamp}`;
   const sessions: Awaited<ReturnType<typeof loginInIsolatedContext>>[] = [];
   const fieldPermissionIds = new Set<number>();
-  let adminPage: Page | undefined;
   let customerId = 0;
   let biRoleId = 0;
   let totalCostPermissionId = 0;
 
   test('造数：customer 绑定账号 + bi-analysis 授权角色账号', async ({ page, browser }) => {
-    adminPage = page;
     const customer = await apiCallRaw<Row>(page, 'POST', '/crm/customers', {
       customer_name: `BI 脱敏回归客户${customerTag}`,
       customer_type: 'wholesale',
@@ -85,7 +83,6 @@ test.describe.serial('579 BI 利润面脱敏钉子', () => {
       credit_limit: '1000',
     });
     customerId = positiveId(customer.id, 'BI 脱敏回归客户建档');
-
     const customerRoleId = await findRoleId(page, 'customer');
     const bound = await apiCallRaw<Row>(page, 'POST', '/users', {
       username: boundUsername,
@@ -226,12 +223,13 @@ test.describe.serial('579 BI 利润面脱敏钉子', () => {
     }
   });
 
-  test.afterAll(async () => {
-    if (adminPage) {
-      for (const permissionId of fieldPermissionIds) {
-        await apiCallRaw(adminPage, 'DELETE', `/field-permissions/${permissionId}`);
-      }
+  test.afterEach(async ({ page }) => {
+    for (const permissionId of fieldPermissionIds) {
+      await apiCallRaw(page, 'DELETE', `/field-permissions/${permissionId}`);
     }
+  });
+
+  test.afterAll(async () => {
     for (const session of sessions) {
       await session.close();
     }
