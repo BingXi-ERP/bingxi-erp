@@ -221,6 +221,23 @@ test('577-01 配置改错后留痕可关联且回放旧值恢复配置与行为'
     '审计请求体须保留误改值 B'
   ).toBe(changed);
 
+  const nonSensitive = await apiCallRaw<AuditSearchData>(
+    page,
+    'GET',
+    auditQueryPath(day, reqPath, putA.traceId)
+  );
+  expect(Array.isArray(nonSensitive.items), '默认审计检索必须返回 items').toBe(true);
+  if (!Array.isArray(nonSensitive.items)) {
+    throw new Error('577 默认审计检索缺少 items，无法验证敏感字段省略');
+  }
+  expect(nonSensitive.total, '默认检索与敏感检索须命中同一审计行').toBe(1);
+  expect(nonSensitive.items).toHaveLength(1);
+  for (const item of nonSensitive.items) {
+    expect('request_body' in item, '默认检索不得返回 request_body').toBe(false);
+    expect('user_agent' in item, '默认检索不得返回 user_agent').toBe(false);
+    expect('ip_address' in item, '默认检索不得返回 ip_address').toBe(false);
+  }
+
   // 回放：把 description 改回原值 A（无专用回滚端点，按写入方旧值回放口径）。
   const putB = await putWithTrace(page, path, { description: original });
   expect(putB.status, '回放 PUT 须成功').toBe(200);
