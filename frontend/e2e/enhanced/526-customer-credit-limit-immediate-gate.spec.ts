@@ -13,9 +13,11 @@
  *    且拒绝腿零落库。
  * 3. 金额恰好等于新额度的订单放行；建单只校验不占用，草稿不推进 used_credit，
  *    所以放行后回读信用行仍是额度 400、可用 400、已用 0。
+ * 4. 金额可见域（amount_visibility 单源）：无 data_permissions 配置行的非 admin 会话
+ *    读订单，金额列整键剔除——sales_rep 出参断言不含 total_amount，总额精确值由 admin 棒回读。
  *
- * 前置全部自建：admin 建客户与初始额度，finance_manager 降额，sales_rep 建单；
- * 三棒身份互异由 relay 守卫。收尾按各自会话逆序删除订单、信用行与客户。
+ * 前置全部自建：admin 建客户与初始额度，finance_manager 降额，sales_rep 建单，
+ * admin 复棒回读金额；收尾按各自会话逆序删除订单、信用行与客户。
  */
 import { test, expect } from '../diagnose-fixture';
 import { createRelay } from '../fixtures/relay';
@@ -233,13 +235,35 @@ test.describe('526 客户信用额度调整即时生效面', () => {
 
             const back = await apiCallRaw<Row>(session.page, 'GET', `/sales/orders/${orderId}`);
             expect(
-              String(back.total_amount),
-              `订单总额应精确为 ${ACCEPT_AMOUNT}，实际 ${JSON.stringify(back)}`
-            ).toBe(ACCEPT_AMOUNT);
+              Number(back.id),
+              `sales_rep 回读须命中自建订单 ${orderId}，实际 ${JSON.stringify(back).slice(0, 200)}`
+            ).toBe(orderId);
             expect(
               Number(back.customer_id),
-              `订单客户应为自建客户 ${customerId}，实际 ${JSON.stringify(back)}`
+              `订单客户应为自建客户 ${customerId}，实际 ${JSON.stringify(back).slice(0, 200)}`
             ).toBe(customerId);
+            // 金额可见域设计口径（services/amount_visibility.rs::hide_default_amount_columns）：
+            // 无 data_permissions 配置行的非 admin 账号读订单，金额列整键剔除（键缺失而非 null），
+            // sales_rep 棒不得断言 total_amount；总额精确值由下一棒 admin 回读证明。
+            // 信用额度行读取需财务/管理权限，sales_rep 越权即 403，故「草稿不占额」回读移到 admin 棒。
+
+            return { artifacts: [{ key: 'orderId', value: orderId }] };
+          },
+        },
+        {
+          role: 'admin',
+          label: 'admin 回读放行单总额精确 400.00 且草稿未占额',
+          // 与第 1 棒同为 admin：金额可见域下只有 admin 出口不剔金额键，
+          // 总额精确值与信用额度回读都必须由有权身份执行，业务规则要求同身份，显式豁免重复身份守卫。
+          allowRepeatIdentity: true,
+          run: async ({ session, require }) => {
+            const orderId = Number(require('orderId'));
+            const customerId = Number(require('customerId'));
+            const back = await apiCallRaw<Row>(session.page, 'GET', `/sales/orders/${orderId}`);
+            expect(
+              String(back.total_amount),
+              `订单总额应精确为 ${ACCEPT_AMOUNT}，实际 ${JSON.stringify(back).slice(0, 200)}`
+            ).toBe(ACCEPT_AMOUNT);
 
             const creditAfter = await apiCallRaw<Row>(
               session.page,
@@ -250,8 +274,11 @@ test.describe('526 客户信用额度调整即时生效面', () => {
               Number(creditAfter.available_credit),
               `草稿单只校验不占额，可用额度应仍为 400，实际 ${JSON.stringify(creditAfter)}`
             ).toBe(400);
-
-            return { artifacts: [{ key: 'orderId', value: orderId }] };
+            expect(
+              Number(creditAfter.used_credit),
+              `草稿单不得推进已用额度，应为 0，实际 ${JSON.stringify(creditAfter)}`
+            ).toBe(0);
+            return { artifacts: [{ key: 'verifiedOrderId', value: orderId }] };
           },
         },
       ]);

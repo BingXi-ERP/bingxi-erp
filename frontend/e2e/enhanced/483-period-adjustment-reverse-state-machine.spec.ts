@@ -33,7 +33,7 @@ const base = {
   period: '2026-11',
   debit_subject_code: '5001',
   debit_subject_name: '生产成本',
-  credit_subject_code: '2001',
+  credit_subject_code: '2202',
   credit_subject_name: '应付账款',
   amount: '100.00',
 };
