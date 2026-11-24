@@ -778,15 +778,14 @@
   display: none;
 }
 .weui-media-box__title {
-  word-wrap: normal;
   word-wrap: break-word;
   font-size: 17px;
   font-weight: 400;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
   width: auto;
-  word-break: break-all;
+  word-break: break-word;
 }
 .weui-media-box__desc {
   -webkit-box-orient: vertical;
@@ -2587,4 +2586,36 @@ view.dialog-modal-hd {
 }
 .iphone_bottom {
   padding-bottom: env(safe-area-inset-bottom) !important;
+}
+
+/* 全局紧凑密度与内容换行：调用方 小程序全部页面，保留基础行列间距，超长文本折行不裁切。 */
+.weui-cells {
+  margin-top: 0.88em;
+}
+.weui-cell {
+  line-height: 1.4;
+  padding: 8px 12px;
+}
+.weui-cell__bd,
+.weui-cell__ft {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
+}
+.weui-cells__title {
+  margin-bottom: 0.2em;
+  margin-top: 0.55em;
+}
+.weui-panel__hd {
+  line-height: 1.4;
+  padding: 10px 12px 8px;
+}
+.weui-media-box {
+  padding: 12px;
+}
+.weui-media-box__desc {
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }

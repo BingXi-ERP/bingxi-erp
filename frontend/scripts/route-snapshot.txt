@@ -939,6 +939,7 @@ GET	/api/v1/erp/scanner/history	barcode_scanner_handler::scan_history	analytics
 GET	/api/v1/erp/scanner/scan-inventory	barcode_scanner_handler::scan_inventory	analytics
 GET	/api/v1/erp/scanner/scan-statistics	barcode_scanner_handler::scan_statistics	analytics
 GET	/api/v1/erp/scanner/scan-to-ship	barcode_scanner_handler::scan_to_ship_get	analytics
+GET	/api/v1/erp/scheduler/data-integrity/report	crate::handlers::scheduler_handler::data_integrity_report	mod
 GET	/api/v1/erp/scheduler/jobs	crate::handlers::scheduler_handler::list_jobs	mod
 GET	/api/v1/erp/scheduler/jobs/runs	crate::handlers::scheduler_handler::list_job_runs	mod
 GET	/api/v1/erp/scheduling/conflicts	scheduling_handler::detect_conflicts	mod
