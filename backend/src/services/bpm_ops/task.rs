@@ -602,7 +602,17 @@ impl BpmService {
         } else {
             node_assignee_ids(next_node)?
         };
-        let single_assignee = super::resolve_node_assignee(next_node, &ctx.instance, txn).await?;
+        if mode != sign_mode::SINGLE && multi_ids.is_empty() {
+            return Err(AppError::validation_displayable(format!(
+                "流程定义 {} 的多人签署节点未配置处理人，无法推进流程",
+                ctx.definition.code
+            )));
+        }
+        let single_assignee = if mode == sign_mode::SINGLE {
+            super::resolve_node_assignee(next_node, &ctx.instance, txn).await?
+        } else {
+            None
+        };
         let multi_assignees = if multi_ids.is_empty() {
             Vec::new()
         } else {

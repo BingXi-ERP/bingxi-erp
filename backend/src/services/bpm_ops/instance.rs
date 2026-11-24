@@ -106,11 +106,6 @@ impl BpmService {
             .unwrap_or("unknown")
             .to_string();
 
-        // 审批人解析失败属定义配置缺陷：拒绝发起、事务回滚，绝不建无人可审的孤儿工单。
-        let assignee_id = super::resolve_node_assignee(first_task_node, instance, txn).await?;
-
-        // 发起期链干跑（裁定口径：条件分支全部不匹配的分支语义缺陷必须在发起时给结论，
-        // 不允许"实例已创建却在首个批准后自动完成"的形态存在）。
         validate_forward_path(
             &definition.code,
             first_task_node,
@@ -124,6 +119,17 @@ impl BpmService {
         } else {
             node_assignee_ids(first_task_node)?
         };
+        if mode != sign_mode::SINGLE && multi_ids.is_empty() {
+            return Err(AppError::validation_displayable(format!(
+                "流程定义 {} 的多人签署节点未配置处理人，无法发起审批",
+                definition.code
+            )));
+        }
+        let single_assignee = if mode == sign_mode::SINGLE {
+            super::resolve_node_assignee(first_task_node, instance, txn).await?
+        } else {
+            None
+        };
         let multi_assignees = if multi_ids.is_empty() {
             Vec::new()
         } else {
@@ -131,11 +137,11 @@ impl BpmService {
         };
 
         // 创建首个用户任务：单人走原解析；会签/或签每位处理人各一枚同节点工单，
-        // 工单实际处理人逐人落列，待办按人过滤时每人都可见（判定口径 F:/tmp 拍板书）。
+        // 工单实际处理人逐人落列，待办按人过滤时每人都可见。
         let mut created = Vec::new();
         let assignees: Vec<(Option<i32>, Option<String>, serde_json::Value)> =
             if multi_assignees.is_empty() {
-                vec![(assignee_id, None, serde_json::Value::Null)]
+                vec![(single_assignee, None, serde_json::Value::Null)]
             } else {
                 multi_assignees
                     .iter()
