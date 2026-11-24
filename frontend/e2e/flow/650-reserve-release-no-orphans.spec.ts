@@ -9,7 +9,7 @@
  * - 传给谁：POST /products、/inventory/stock/fabric（seedFourDimStockIn）、/sales/orders、
  *   /sales/orders/{id}/submit|approve|cancel、PUT /sales/orders/{id}；
  *   GET /inventory/stock、/inventory/reservations（status=locked/pending 过滤）。
- * - 存什么：提交锁缸由 order_workflow.rs:149 lock_on_submit 写 inventory_reservations
+ * - 存什么：提交锁缸由 order_workflow.rs 的 lock_on_submit 写 inventory_reservations
  *   （notes 前缀 STOCKLOCK|，status 小写 locked），改量走 sync_on_items_replaced 先 release_all
  *   再按新行量重锁，取消走 release_on_cancel 置 released 并回缸。
  * - 断言什么：draft 无 locked/pending 预留行；submit 后出现本单 locked 行且数量 30、

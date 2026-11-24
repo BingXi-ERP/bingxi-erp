@@ -13,14 +13,15 @@
  *   unpaid_amount=invoice_amount、received_amount=0、同 source_bill_no 仅一张应收。
  * - 存哪里：customers/sales_orders/sales_deliveries/ar_invoices；收尾逆序尽力清理订单与客户。
  *
- * 源码判据：services/so/delivery_ops/ship.rs:638-655 全额发货同事务调 create_receivable；
- *   services/ar/inv.rs:189-222 应收 source_type=SALES_ORDER、source_module=SO、source_bill_no=订单号、
+ * 源码判据：services/so/delivery_ops/ship.rs 全额发货同事务调 create_receivable；
+ *   services/ar/inv.rs 应收 source_type=SALES_ORDER、source_module=SO、source_bill_no=订单号、
  *   invoice_amount=ctx.order.total_amount、received_amount=0、unpaid_amount=invoice_amount；
- *   inv.rs:170-179 同订单幂等门；handlers/ar_invoice_handler.rs:35-40 列表无 source_bill_no 过滤，
+ *   inv.rs 同订单幂等门；handlers/ar_invoice_handler.rs 列表无 source_bill_no 过滤，
  *   故按 customer_id 分页扫描 items 精确锚定。发货信封键为 {list,total}
- *   （handlers/sales_order_handler.rs:830-853）。
+ *   （handlers/sales_order_handler.rs）。
  */
 import { test, expect } from '../diagnose-fixture';
+import type { Page } from '@playwright/test';
 import {
   apiCall,
   apiCallRaw,

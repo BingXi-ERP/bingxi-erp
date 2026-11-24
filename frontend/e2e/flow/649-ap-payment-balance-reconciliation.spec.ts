@@ -12,12 +12,13 @@
  *   balance 四键等于逐页有效票累加，且草稿票被排除门挡在余额外。
  * - 存哪里：suppliers/ap_invoices/ap_payment_requests/ap_payments；收尾逆序尽力清理付款申请与供应商。
  *
- * 源码判据：models/ap_invoice.rs:58-66 amount/paid_amount/unpaid_amount 三列同源；
- *   ap_payment_service.rs:298-427 confirm 时按申请明细分摊回写 paid_amount；
- *   models/status/general.rs:40 PAYMENT_CONFIRMED='CONFIRMED'；
- *   ap_invoice_ops/report.rs:107-125 balance 排除 DRAFT/CANCELLED 后累加四键。
+ * 源码判据：models/ap_invoice.rs amount/paid_amount/unpaid_amount 三列同源；
+ *   ap_payment_service.rs confirm 时按申请明细分摊回写 paid_amount；
+ *   models/status/general.rs PAYMENT_CONFIRMED='CONFIRMED'；
+ *   ap_invoice_ops/report.rs balance 排除 DRAFT/CANCELLED 后累加四键。
  */
 import { test, expect } from '../diagnose-fixture';
+import type { Page } from '@playwright/test';
 import { apiCall, apiCallRaw, genCode, genName, tryCleanup } from './helpers';
 
 interface ApInvoiceRow {

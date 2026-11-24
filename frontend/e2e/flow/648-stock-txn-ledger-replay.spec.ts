@@ -14,11 +14,11 @@
  * - 存哪里：purchase_orders/purchase_receipts/inventory_transactions/sales_orders 各一行；
  *   收尾尽力撤采购单；销售订单与流水由唯一批次天然隔离，不清库以免破坏回放证据。
  *
- * 源码判据：services/purchase_receipt_private.rs:423-446 入库腿写
+ * 源码判据：services/purchase_receipt_private.rs 入库腿写
  *   transaction_type=PURCHASE_RECEIPT、source_bill_type=PURCHASE_RECEIPT、source_bill_no=入库单号；
- *   services/so/delivery_ops/ship.rs:476-509 出库腿写 transaction_type=SALES_DELIVERY、
+ *   services/so/delivery_ops/ship.rs 出库腿写 transaction_type=SALES_DELIVERY、
  *   source_bill_type=sales_order、source_bill_no=订单号（写入方原词，不按报告口径改写）；
- *   services/inventory_stock_query.rs:169-170 交易查询固定 created_at ASC。
+ *   services/inventory_stock_query.rs 交易查询固定 created_at ASC。
  */
 import { test, expect } from '../diagnose-fixture';
 import { apiCall, apiCallRaw, ensureTestEntities, genCode, getCtx, tryCleanup } from './helpers';

@@ -9,8 +9,8 @@
  * - 传给谁：POST /products、/purchase/orders、/purchase/receipts、/purchase/inspections、
  *   /purchase/receipts/{id}/confirm、/sales/orders、/sales/orders/{id}/submit|approve|ship；
  *   GET /inventory/stock/transactions、/inventory/stock。
- * - 存什么：入库腿由 purchase_receipt_private.rs:423-438 写 PURCHASE_RECEIPT / before/after 米数，
- *   出库腿由 delivery_ops/ship.rs:485-503 写 SALES_DELIVERY / 同维度 before/after；
+ * - 存什么：入库腿由 purchase_receipt_private.rs 写 PURCHASE_RECEIPT / before/after 米数，
+ *   出库腿由 delivery_ops/ship.rs 写 SALES_DELIVERY / 同维度 before/after；
  *   流水出参键为 snake_case（models/inventory_transaction.rs），Decimal 为字符串。
  * - 断言什么：逐行 after == 同行 before + quantity_meters == 下一行 before；首行 before=0；
  *   入库腿 source_bill_no 回指收货单号，出库腿回指销售订单号；末行 after == 库存行 quantity_meters。

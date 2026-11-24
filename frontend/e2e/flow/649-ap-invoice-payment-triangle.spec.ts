@@ -10,7 +10,7 @@
  *   /ap/payment-requests（submit/approve）、/ap/payments、PUT /ap/payments/{id}、
  *   /ap/payments/{id}/confirm；GET /ap/invoices?supplier_id= 分页、/ap/invoices/balance?supplier_id=、
  *   /ap/payments?supplier_id= 分页。
- * - 存什么：余额汇总由 ap_invoice_ops/report.rs:95-130 应用层求和并排除 DRAFT/CANCELLED，
+ * - 存什么：余额汇总由 ap_invoice_ops/report.rs 应用层求和并排除 DRAFT/CANCELLED，
  *   返回 BalanceSummary{total_invoice_amount,total_paid_amount,total_unpaid_amount,invoice_count}；
  *   付款确认由 ap_payment_service.rs 按明细分摊回写 paid/unpaid。
  * - 断言什么：逐页发票累加（排除 invoice_status 为 DRAFT/CANCELLED）与汇总三额逐分相等且
@@ -184,7 +184,7 @@ test.describe('649 应付发票→付款→未付三角守恒', () => {
     const paymentHead = await dwbGet<Row>(page, `/ap/payments/${paymentId}`);
     expect(paymentHead.payment_status, '[649] 确认后付款单态').toBe('CONFIRMED');
 
-    // 口一：逐页明细累加（排除 DRAFT/CANCELLED，与写入方 report.rs:107-110 同集合）。
+    // 口一：逐页明细累加（排除 DRAFT/CANCELLED，与写入方 report.rs 同集合）。
     const invoices = await readAllInvoices(page, supplierId);
     const counted = invoices.filter(
       r => String(r.invoice_status) !== 'DRAFT' && String(r.invoice_status) !== 'CANCELLED'

@@ -11,13 +11,14 @@
  *   cancel 后无 pending/locked 行、released_at 非空、库存回基线。
  * - 存哪里：inventory_stocks/inventory_reservations/sales_orders；唯一四维天然隔离，不留清理动作。
  *
- * 源码判据：services/so/order_workflow.rs:149 submit 后调 lock_on_submit、:66 cancel 时
- *   release_on_cancel；services/so/order_stock_lock.rs:188/245-280 按 STOCK 行 FIFO 锁缸与释放；
- *   models/inventory_reservation.rs:11-27 status/released_at 字段；models/status/purchase_inventory.rs
- *   :56-68 预留词表 pending/locked/released；handlers/inventory_reservation_handler.rs:54-89
+ * 源码判据：services/so/order_workflow.rs submit 后调 lock_on_submit、cancel 时
+ *   release_on_cancel；services/so/order_stock_lock.rs 按 STOCK 行 FIFO 锁缸与释放；
+ *   models/inventory_reservation.rs status/released_at 字段；models/status/purchase_inventory.rs
+ *   预留词表 pending/locked/released；handlers/inventory_reservation_handler.rs
  *   查询返回 {list,total} 且仅支持 product/warehouse/status 过滤。
  */
 import { test, expect } from '../diagnose-fixture';
+import type { Page } from '@playwright/test';
 import {
   apiCall,
   apiCallRaw,
@@ -28,6 +29,7 @@ import {
 } from './helpers';
 
 interface StockRow {
+  batch_no?: string;
   quantity_available: number;
   quantity_reserved: number;
 }
