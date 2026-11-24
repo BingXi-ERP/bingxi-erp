@@ -1,5 +1,7 @@
 mod test_common;
 
+use bingxi_backend::models::audit_log;
+use bingxi_backend::models::bpm_process_instance;
 use bingxi_backend::models::customer;
 use bingxi_backend::models::customer_credit;
 use bingxi_backend::models::inventory_reservation;
@@ -14,6 +16,7 @@ use bingxi_backend::models::status::sales::fulfillment_source;
 use bingxi_backend::models::status::sales_order as so_status;
 use bingxi_backend::models::user;
 use bingxi_backend::models::warehouse;
+use bingxi_backend::models::{bpm_task, notification};
 use bingxi_backend::search::{ElasticClient, SearchClient};
 use bingxi_backend::services::so::order::SalesService;
 use bingxi_backend::services::so::{CreateSalesOrderRequest, SalesOrderItemRequest};
@@ -237,7 +240,7 @@ async fn reservations_for_order(
 }
 
 #[tokio::test]
-async fn bpm_start_failure_rolls_back_stock_lock_and_credit_before_clean_resubmit() {
+async fn bpm_start_failure_leaves_no_stock_credit_or_process_before_clean_resubmit() {
     let db = setup_test_db().await;
     seed_operator(&db).await;
     let customer_id = seed_customer_and_credit(&db).await;
@@ -250,6 +253,13 @@ async fn bpm_start_failure_rolls_back_stock_lock_and_credit_before_clean_resubmi
         .create_order(create_request(customer_id), OPERATOR_ID)
         .await
         .expect("销售订单建单失败");
+    let audit_baseline = audit_log::Entity::find()
+        .filter(audit_log::Column::ResourceType.eq("sales_orders"))
+        .filter(audit_log::Column::ResourceId.eq(order.id.to_string()))
+        .all(&db)
+        .await
+        .expect("回读销售订单建单审计失败")
+        .len();
 
     let err = service
         .submit_order(order.id, OPERATOR_ID)
@@ -257,8 +267,8 @@ async fn bpm_start_failure_rolls_back_stock_lock_and_credit_before_clean_resubmi
         .expect_err("缺少销售订单审批定义时提交必须失败");
     assert_eq!(err.error_code(), "BUSINESS_ERROR");
     assert!(
-        err.to_string().contains("订单已退回草稿状态"),
-        "BPM 启动失败必须明确告知补偿回滚已完成，实际: {err}"
+        err.to_string().contains("订单未提交"),
+        "BPM 启动失败必须明确告知订单未提交，实际: {err}"
     );
 
     let rolled_back = sales_order::Entity::find_by_id(order.id)
@@ -288,17 +298,42 @@ async fn bpm_start_failure_rolls_back_stock_lock_and_credit_before_clean_resubmi
     assert_eq!(credit.available_credit, CREDIT_LIMIT);
 
     let rolled_back_reservations = reservations_for_order(&db, order.id).await;
-    assert_eq!(rolled_back_reservations.len(), 1);
-    let ledger = &rolled_back_reservations[0];
-    assert_eq!(ledger.status, reservation_status::RELEASED);
-    assert_eq!(ledger.quantity, Decimal::from(30));
-    assert!(ledger.released_at.is_some());
     assert!(
-        ledger
-            .notes
-            .as_deref()
-            .is_some_and(|notes| notes.starts_with("STOCKLOCK|")),
-        "补偿回滚必须保留原锁缸台账用于追溯"
+        rolled_back_reservations.is_empty(),
+        "提交事务回滚后不得留下已释放的锁缸台账"
+    );
+    assert_eq!(
+        audit_log::Entity::find()
+            .filter(audit_log::Column::ResourceType.eq("sales_orders"))
+            .filter(audit_log::Column::ResourceId.eq(order.id.to_string()))
+            .all(&db)
+            .await
+            .expect("回读销售订单提交审计失败")
+            .len(),
+        audit_baseline,
+        "BPM 启动失败不得留下提交与补偿两条审计"
+    );
+    assert!(
+        bpm_process_instance::Entity::find()
+            .filter(bpm_process_instance::Column::BusinessType.eq("sales_order"))
+            .all(&db)
+            .await
+            .expect("回读销售审批实例失败")
+            .is_empty()
+    );
+    assert!(
+        bpm_task::Entity::find()
+            .all(&db)
+            .await
+            .expect("回读销售审批任务失败")
+            .is_empty()
+    );
+    assert!(
+        notification::Entity::find()
+            .all(&db)
+            .await
+            .expect("回读销售审批通知失败")
+            .is_empty()
     );
 
     seed_sales_order_approval(&db).await;
@@ -335,14 +370,14 @@ async fn bpm_start_failure_rolls_back_stock_lock_and_credit_before_clean_resubmi
     );
 
     let resubmitted_reservations = reservations_for_order(&db, order.id).await;
-    assert_eq!(resubmitted_reservations.len(), 2);
+    assert_eq!(resubmitted_reservations.len(), 1);
     assert_eq!(
         resubmitted_reservations
             .iter()
             .filter(|row| row.status == reservation_status::RELEASED)
             .count(),
-        1,
-        "重提不得改变上一轮已释放台账"
+        0,
+        "失败提交不得留下释放台账"
     );
     assert_eq!(
         resubmitted_reservations
