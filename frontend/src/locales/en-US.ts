@@ -10046,6 +10046,7 @@ export default {
         delete: 'Delete',
       },
       mobileCardAria: 'Logistics waybill mobile card list',
+      mobileEmpty: 'No waybills yet',
     },
     stat: {
       label: {
@@ -11326,6 +11327,7 @@ export default {
       buttonCancel: 'Cancel',
       buttonConfirm: 'Confirm',
       ariaTable: 'Data Permission Table',
+      mobileEmpty: 'No data permission entries yet',
       ariaCreateDialog: 'Add Data Permission Dialog',
       ariaEditDialog: 'Edit Data Permission Dialog',
       ariaForm: 'Data Permission Form',
@@ -12803,6 +12805,7 @@ export default {
       delete: 'Delete',
       paginationAriaLabel: 'Data Import Template Pagination',
       mobileCardAria: 'Data import template mobile card list',
+      mobileEmpty: 'No import templates yet',
     },
     taskTable: {
       statusPlaceholder: 'Status',
@@ -12828,6 +12831,7 @@ export default {
       errorLog: 'Error Log',
       paginationAriaLabel: 'Data Import Task Pagination',
       mobileCardAria: 'Data import task mobile card list',
+      mobileEmpty: 'No import tasks yet',
     },
     templateForm: {
       editTitle: 'Edit Template',

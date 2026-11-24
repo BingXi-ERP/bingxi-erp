@@ -111,6 +111,7 @@ test('574-02 物理删除二次确认点取消后记录零删除', async ({ page
   await safeGoto(page, '/product');
   const row = await findTableRow(page, name);
   expect(row, `产品列表须找到自建产品 ${name}`).toBeTruthy();
+  if (!row) throw new Error(`产品列表未找到自建产品 ${name}`);
   const delBtn = row.locator('button.el-button--danger, button:has-text("删除")').first();
   await delBtn.click();
 

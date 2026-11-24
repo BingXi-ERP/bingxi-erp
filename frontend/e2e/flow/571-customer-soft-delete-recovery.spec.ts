@@ -64,13 +64,12 @@ test('571-01 客户软删置 inactive 且审计快照可复原删除前关键字
     label: `571 恢复腿客户 ${id}`,
   });
 
-  // 软删：DELETE 走 delete_customer，状态置 inactive，不物理删行。
+  // 软删：DELETE 走 delete_customer，服务层置 status=inactive，不物理删行。
+  // 全仓 delete handler 一致返回空 data 的删除信封（`ApiResponse::success_with_message(())`），
+  // 故删除态不外显于 DELETE 出参，软删是否落库由下方按 id 详情回读证明。
   const del = await apiCall<CustomerRow>(page, 'DELETE', `/crm/customers/${id}`);
   // apiCall 成功即返回 code=200 的业务信封，业务失败会显式抛错，故无需再断言 HTTP status。
   expect(del.code, 'DELETE 客户须成功信封').toBe(200);
-  expect(String(del.data?.status).toLowerCase(), 'DELETE 回读 status 须为 inactive').toBe(
-    'inactive'
-  );
 
   // 软删行不再出现在 active 列表，但按 id 详情仍可查（未硬删）。
   const activeList = await apiCallRaw<{ items: CustomerRow[] }>(
