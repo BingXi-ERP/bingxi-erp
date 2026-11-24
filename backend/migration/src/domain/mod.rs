@@ -230,3 +230,5 @@ pub mod fabric_inspection_edge_trim;
 // 质量标准允差配置域：quality_standards 补允差来源/检测方法与三项允差列，链尾独立域
 // （存量复用库上属 pending 必然执行）。
 pub mod quality_standard_tolerance;
+// BI 利润字段读权限存量补授域：成本、利润、毛利率仅主管、财务与数据分析岗默认可读。
+pub mod bi_profit_field_grant;

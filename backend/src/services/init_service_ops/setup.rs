@@ -122,6 +122,7 @@ impl InitService {
 
         // V15 P0-S03 修复：为 manager/operator 创建基本 role_permission 记录
         self.create_default_role_permissions().await?;
+        self.create_default_bi_profit_field_permissions().await?;
 
         self.create_admin_user(admin_username, &password_hash, admin_role.id, department_id)
             .await?;

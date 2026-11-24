@@ -31,7 +31,7 @@
 
 mod test_common;
 
-use bingxi_backend::models::{role, role_permission};
+use bingxi_backend::models::{field_permission, role, role_permission};
 use bingxi_backend::services::init_service::{InitError, InitService, PERMISSION_RESOURCES};
 use bingxi_backend::services::init_service_ops::permission::{
     RoleResourceGroup, UnregisteredResource, find_unregistered_matrix_resources,
@@ -81,6 +81,24 @@ async fn reset_to_migrated_state(db: &DatabaseConnection) {
             "DELETE FROM role_permissions WHERE role_id IN \
              (SELECT id FROM roles WHERE code NOT IN ({seeds}))"
         ),
+    )
+    .await;
+    exec(
+        db,
+        &format!(
+            "DELETE FROM field_permissions WHERE role_id IN \
+             (SELECT id FROM roles WHERE code NOT IN ({seeds}))"
+        ),
+    )
+    .await;
+    exec(
+        db,
+        "DELETE FROM field_permissions WHERE resource_type = 'bi-analysis'",
+    )
+    .await;
+    exec(
+        db,
+        "DELETE FROM role_permissions WHERE resource_type = 'bi-analysis'",
     )
     .await;
     exec(
@@ -195,6 +213,43 @@ async fn test_initialize_lands_production_order_grants() {
             dash.iter().any(|a| a == "*" || a == "read"),
             "角色 {rid} 必须有 dashboard 读权限（外壳码），实得 {dash:?}"
         );
+    }
+
+    for code in [
+        "gm",
+        "deputy_gm",
+        "manager",
+        "sales_manager",
+        "sales_director",
+        "finance_manager",
+        "accountant",
+        "data_analyst",
+    ] {
+        let rid = role_id_of(&db, code).await;
+        let bi_actions = role_level_actions(&db, rid, "bi-analysis").await;
+        assert!(
+            bi_actions.iter().any(|a| a == "*" || a == "read"),
+            "{code} 必须有 BI 面读权限，否则字段授权仍不可达，实得 {bi_actions:?}"
+        );
+        let fields = field_permission::Entity::find()
+            .filter(field_permission::Column::RoleId.eq(rid))
+            .filter(field_permission::Column::ResourceType.eq("bi-analysis"))
+            .all(&db)
+            .await
+            .unwrap_or_else(|e| panic!("回读 {code} BI 字段权限失败: {e}"));
+        assert_eq!(
+            fields.len(),
+            3,
+            "{code} 必须恰好获得三枚 BI 利润字段默认权限"
+        );
+        for field in ["total_cost", "total_profit", "gross_margin"] {
+            let permission = fields
+                .iter()
+                .find(|item| item.field_name == field)
+                .unwrap_or_else(|| panic!("{code} 缺少 BI 字段权限 {field}"));
+            assert!(permission.can_read, "{code} 的 {field} 必须默认可读");
+            assert!(permission.is_enabled, "{code} 的 {field} 必须默认启用");
+        }
     }
 
     reset_to_migrated_state(&db).await;
