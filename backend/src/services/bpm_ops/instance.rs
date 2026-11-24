@@ -134,7 +134,9 @@ impl BpmService {
         // 工单实际处理人逐人落列，待办按人过滤时每人都可见（判定口径 F:/tmp 拍板书）。
         let mut created = Vec::new();
         let assignees: Vec<(Option<i32>, Option<String>, serde_json::Value)> =
-            if let Some(assignees) = multi_assignees.first() {
+            if multi_assignees.is_empty() {
+                vec![(assignee_id, None, serde_json::Value::Null)]
+            } else {
                 multi_assignees
                     .iter()
                     .map(|(id, name)| {
@@ -145,10 +147,8 @@ impl BpmService {
                         )
                     })
                     .collect()
-            } else {
-                vec![(assignee_id, None, serde_json::Value::Null)]
             };
-        for (handler_id, handler_name, variables) in assignees {
+        for (handler_id, _handler_name, variables) in assignees {
             let task_model = bpm_task::ActiveModel {
                 instance_id: Set(instance.id),
                 process_definition_id: Set(definition.id),
@@ -176,7 +176,16 @@ impl BpmService {
                 } else {
                     Some(multi_ids.clone())
                 }),
-                assignee_names: Set(handler_name),
+                assignee_names: Set(if multi_ids.is_empty() {
+                    None
+                } else {
+                    Some(
+                        multi_assignees
+                            .iter()
+                            .map(|(_, name)| name.clone())
+                            .collect(),
+                    )
+                }),
                 task_variables: Set(if variables.is_null() {
                     None
                 } else {

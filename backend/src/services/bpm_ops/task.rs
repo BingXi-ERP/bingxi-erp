@@ -81,13 +81,21 @@ impl BpmService {
 
         let ctx = self.load_approve_context(&req, &txn).await?;
         let mode = sign_mode::node_sign_mode(ctx.definition.config.as_ref(), &ctx.task.node_id)?;
-        if mode == sign_mode::SINGLE {
-            return self
-                .approve_single(&req, &ctx, actor_id, &actor_name, &txn)
-                .await;
+        let (pending_event, advanced_task_ids) = if mode == sign_mode::SINGLE {
+            self.approve_single(&req, &ctx, actor_id, &actor_name, &txn)
+                .await?
+        } else {
+            self.approve_multi(&req, &ctx, &mode, actor_id, &actor_name, &txn)
+                .await?
+        };
+        txn.commit().await?;
+        if let Some(ev) = pending_event {
+            crate::services::event_bus::EVENT_BUS.publish(ev);
         }
-        self.approve_multi(&req, &ctx, &mode, actor_id, &actor_name, &txn)
-            .await
+        for task_id in advanced_task_ids {
+            self.notify_created_task(task_id, &ctx.instance).await;
+        }
+        Ok(())
     }
 
     /// 默认单人：完全保持历史路径（状态写入 → 拒绝终止 / 同意推进）。
@@ -98,7 +106,7 @@ impl BpmService {
         actor_id: i32,
         actor_name: &str,
         txn: &sea_orm::DatabaseTransaction,
-    ) -> Result<(), AppError> {
+    ) -> Result<(Option<crate::services::event_bus::BusinessEvent>, Vec<i32>), AppError> {
         self.update_task_status(req, &ctx.task, actor_id, actor_name, txn)
             .await?;
         let mut pending_event = None;
@@ -116,14 +124,7 @@ impl BpmService {
             )
             .await?;
         }
-        txn.commit().await?;
-        if let Some(ev) = pending_event {
-            crate::services::event_bus::EVENT_BUS.publish(ev);
-        }
-        for task_id in advanced_task_ids {
-            self.notify_created_task(task_id, &ctx.instance).await;
-        }
-        Ok(())
+        Ok((pending_event, advanced_task_ids))
     }
 
     /// 多人签署（会签/或签）：处理人只能签自己那枚工单；签名写 task_variables 并审计。
@@ -135,7 +136,7 @@ impl BpmService {
         actor_id: i32,
         actor_name: &str,
         txn: &sea_orm::DatabaseTransaction,
-    ) -> Result<(), AppError> {
+    ) -> Result<(Option<crate::services::event_bus::BusinessEvent>, Vec<i32>), AppError> {
         if ctx.task.actual_handler_id != Some(actor_id) {
             return Err(AppError::business_displayable(
                 "该工单不是分配给当前操作人的签署任务，不能代为签署",
@@ -266,14 +267,7 @@ impl BpmService {
             .await?;
         }
 
-        txn.commit().await?;
-        if let Some(ev) = pending_event {
-            crate::services::event_bus::EVENT_BUS.publish(ev);
-        }
-        for id in advanced_task_ids {
-            self.notify_created_task(id, &ctx.instance).await;
-        }
-        Ok(())
+        Ok((pending_event, advanced_task_ids))
     }
 
     /// 新推进工单的登录后通知（commit 后），按真实工单行发送。
@@ -613,7 +607,9 @@ impl BpmService {
 
         // 会签/或签节点每位处理人各建一枚工单；单人节点保持原有行为
         let assignees: Vec<(Option<i32>, Option<String>, serde_json::Value)> =
-            if let Some(first) = multi_assignees.first() {
+            if multi_assignees.is_empty() {
+                vec![(single_assignee, None, serde_json::Value::Null)]
+            } else {
                 multi_assignees
                     .iter()
                     .map(|(id, name)| {
@@ -624,11 +620,8 @@ impl BpmService {
                         )
                     })
                     .collect()
-            } else {
-                let _ = first;
-                vec![(single_assignee, None, serde_json::Value::Null)]
             };
-        for (handler_id, handler_name, variables) in assignees {
+        for (handler_id, _handler_name, variables) in assignees {
             let new_task = bpm_task::ActiveModel {
                 instance_id: Set(ctx.instance.id),
                 process_definition_id: Set(ctx.definition.id),
@@ -656,7 +649,16 @@ impl BpmService {
                 } else {
                     Some(multi_ids.clone())
                 }),
-                assignee_names: Set(handler_name),
+                assignee_names: Set(if multi_ids.is_empty() {
+                    None
+                } else {
+                    Some(
+                        multi_assignees
+                            .iter()
+                            .map(|(_, name)| name.clone())
+                            .collect(),
+                    )
+                }),
                 task_variables: Set(if variables.is_null() {
                     None
                 } else {
@@ -786,7 +788,8 @@ impl BpmService {
                 "加签用户已在当前处理人清单中，没有新增处理人",
             ));
         }
-        let resolved = sign_mode::resolve_assignees(&txn, &fresh).await?;
+        let resolved = sign_mode::resolve_assignees(&txn, &merged).await?;
+        let merged_names: Vec<String> = resolved.iter().map(|(_, name)| name.clone()).collect();
         let trace = sign_mode::append_add_sign(
             task.task_variables.as_ref(),
             actor_id,
@@ -802,6 +805,7 @@ impl BpmService {
         for sibling in &siblings {
             let mut active: bpm_task::ActiveModel = sibling.clone().into();
             active.assignee_ids = Set(Some(merged.clone()));
+            active.assignee_names = Set(Some(merged_names.clone()));
             active.task_variables = Set(Some(trace.clone()));
             active.updated_at = Set(Some(chrono::Utc::now()));
             crate::services::audit_log_service::AuditLogService::update_with_audit(
@@ -812,7 +816,7 @@ impl BpmService {
             )
             .await?;
         }
-        for (new_id, name) in resolved {
+        for (new_id, _name) in resolved.into_iter().filter(|(id, _)| fresh.contains(id)) {
             let active = bpm_task::ActiveModel {
                 instance_id: Set(task.instance_id),
                 process_definition_id: Set(task.process_definition_id),
@@ -831,7 +835,7 @@ impl BpmService {
                 task_type: Set(task.task_type.clone()),
                 actual_handler_id: Set(Some(new_id)),
                 assignee_ids: Set(Some(merged.clone())),
-                assignee_names: Set(Some(name)),
+                assignee_names: Set(Some(merged_names.clone())),
                 task_variables: Set(Some(trace.clone())),
                 status: Set(Some(task_status::PENDING.to_string())),
                 created_at: Set(Some(chrono::Utc::now())),
