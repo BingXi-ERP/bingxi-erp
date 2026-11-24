@@ -12,7 +12,8 @@
 use chrono::{Duration, Utc};
 use rust_decimal::Decimal;
 use sea_orm::{
-    ColumnTrait, DatabaseTransaction, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
+    ColumnTrait, DatabaseTransaction, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set,
 };
 
 use crate::models::ar_invoice::{
