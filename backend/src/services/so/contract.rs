@@ -15,11 +15,12 @@ use sea_orm::{EntityTrait, QuerySelect, Set, TransactionTrait};
 impl SalesService {
     /// 拒绝销售订单（PENDING→REJECTED），事务内释放已占用的信用额度。
     ///
-    /// 功能：行锁读单→状态门（仅 PENDING）→释放库存预留→释放信用→写 REJECTED→commit→发事件。
+    /// 功能：行锁读单→状态门（仅 PENDING）→释放锁缸台账→释放普通库存预留→释放信用→写 REJECTED→commit→发事件。
     /// 调用方：handlers/sales_order_handler.rs reject 端点。
     /// 入参：order_id——待拒绝订单；reason——拒绝理由；user_id——操作人。
     /// 传给谁：失败经 AppError 透传给出参；成功后发布 SalesOrderRejected 事件。
-    /// 存什么·存哪里：sales_orders.status→rejected + rejected_reason；customer_credit_ratings 归还占用。
+    /// 存什么·存哪里：sales_orders.status→rejected + rejected_reason；锁缸台账转 released 并回缸；
+    /// 普通预留转 cancelled 并回加可用量；customer_credit_ratings 归还占用。
     pub async fn reject_order(
         &self,
         order_id: i32,
@@ -46,6 +47,9 @@ impl SalesService {
             .await?
             .ok_or_else(|| AppError::not_found("客户不存在"))?;
 
+        // 锁缸台账也复用 inventory_reservations，但通用释放只回加 available，
+        // 且会把行标成 cancelled，导致专用释放函数无法再回减 reserved。必须先释放锁缸。
+        crate::services::so::order_stock_lock::release_on_cancel(&txn, order_id).await?;
         self.release_reservations(order_id, &txn).await?;
 
         let total_amount = order
