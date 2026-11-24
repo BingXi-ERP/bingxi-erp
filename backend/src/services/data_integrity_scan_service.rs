@@ -38,7 +38,6 @@ pub const SCHEDULER_NAME: &str = "data-integrity-scan";
 
 /// 单次巡检每类最多回传的样本条数上限（与 CHECKS 的 LIMIT 20 常量对齐）
 pub const MAX_SAMPLE_LIMIT: usize = 20;
-pub const DEFAULT_SAMPLE_LIMIT: usize = 20;
 
 #[derive(Debug, Clone, Copy)]
 struct CheckDef {
