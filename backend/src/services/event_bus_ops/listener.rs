@@ -1332,16 +1332,88 @@ async fn handle_purchase_receipt_completed(
     }
 }
 
+/// 历史 BPM 终审载荷缺少实例号时，只接受唯一匹配的终态实例。
+/// 无匹配或多个匹配均显式失败，避免把旧事件回写到错误审批轮次。
+async fn resolve_legacy_bpm_instance_id(
+    db: &DatabaseConnection,
+    business_type: &str,
+    business_id: i64,
+    approved: bool,
+) -> Result<i32, String> {
+    let statuses = if approved {
+        vec![crate::models::status::bpm_instance::COMPLETED]
+    } else {
+        vec![
+            crate::models::status::bpm_instance::TERMINATED,
+            crate::models::status::bpm_instance::CANCELLED,
+        ]
+    };
+    let instances = crate::models::bpm_process_instance::Entity::find()
+        .filter(crate::models::bpm_process_instance::Column::BusinessType.eq(business_type))
+        .filter(crate::models::bpm_process_instance::Column::BusinessId.eq(business_id))
+        .filter(crate::models::bpm_process_instance::Column::Status.is_in(statuses))
+        .all(db)
+        .await
+        .map_err(|e| format!("查询历史 BPM 终态实例失败: {e}"))?;
+
+    match instances.as_slice() {
+        [instance] => Ok(instance.id),
+        [] => Err(format!(
+            "未找到匹配的终态 BPM 实例（business_type={business_type}, business_id={business_id}, approved={approved}）"
+        )),
+        _ => Err(format!(
+            "历史 BPM 终审事件匹配到多个终态实例，无法唯一解析（business_type={business_type}, business_id={business_id}, approved={approved}, count={}）",
+            instances.len()
+        )),
+    }
+}
+
 /// 处理 BPM 流程结束事件：按流程实例幂等校验后按 business_type 分发到对应 service 的 approve/reject 方法
 pub async fn handle_bpm_process_finished(
     db: Arc<DatabaseConnection>,
     search_client: Arc<dyn SearchClient>,
-    instance_id: i32,
+    instance_id: Option<i32>,
     business_type: String,
     business_id: i64,
     approved: bool,
     approver_id: i32,
 ) {
+    let instance_id = match instance_id {
+        Some(instance_id) => instance_id,
+        None => {
+            match resolve_legacy_bpm_instance_id(&db, &business_type, business_id, approved).await {
+                Ok(instance_id) => {
+                    tracing::warn!(
+                        business_type,
+                        business_id,
+                        approved,
+                        instance_id,
+                        "历史 BPM 终审载荷缺少 instance_id，已按唯一终态实例解析"
+                    );
+                    instance_id
+                }
+                Err(err) => {
+                    tracing::error!(
+                        business_type,
+                        business_id,
+                        approved,
+                        error = %err,
+                        "历史 BPM 终审载荷无法唯一解析实例，已拒绝回写并登记死信"
+                    );
+                    record_bpm_writeback_failure(
+                        &db,
+                        &business_type,
+                        business_id,
+                        approved,
+                        approver_id,
+                        err,
+                    )
+                    .await;
+                    return;
+                }
+            }
+        }
+    };
     tracing::info!(
         "处理BPM流程结束事件: instance_id={}, type={}, id={}, approved={}, approver_id={}",
         instance_id,

@@ -74,7 +74,9 @@ pub mod payload_serde {
         },
         BpmProcessFinished {
             /// 流程实例 ID，用于跨消息传递实例级幂等键。
-            instance_id: i32,
+            /// 历史载荷缺失时保留 `None`，由监听器按唯一终态实例显式解析。
+            #[serde(default)]
+            instance_id: Option<i32>,
             business_type: String,
             business_id: i64,
             approved: bool,

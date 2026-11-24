@@ -77,7 +77,7 @@ fn test_payload_all_variants_round_trip() {
             variance_count: 3,
         },
         BusinessEvent::BpmProcessFinished {
-            instance_id: 1,
+            instance_id: Some(1),
             business_type: "purchase_order".to_string(),
             business_id: 1,
             approved: true,
@@ -141,4 +141,38 @@ fn test_payload_all_variants_round_trip() {
             );
         }
     }
+}
+
+#[test]
+fn test_legacy_bpm_finished_payload_preserves_missing_instance_id() {
+    let legacy = br#"{"kind":"bpm_process_finished","business_type":"quotation","business_id":42,"approved":true,"approver_id":7}"#;
+    let payload: EventPayload =
+        serde_json::from_slice(legacy).expect("历史 BPM 载荷必须可反序列化");
+    let EventPayload::BpmProcessFinished { instance_id, .. } = payload else {
+        panic!("历史载荷必须解析为 BPM 终审事件");
+    };
+    assert_eq!(
+        instance_id, None,
+        "历史载荷缺失实例号时不得伪造为 0 或其他值"
+    );
+
+    let event = BusinessEvent::try_from(
+        serde_json::from_slice::<EventPayload>(legacy).expect("历史 BPM 载荷必须可反序列化"),
+    )
+    .expect("历史 BPM 载荷必须进入显式实例解析路径");
+    let BusinessEvent::BpmProcessFinished {
+        instance_id,
+        business_type,
+        business_id,
+        approved,
+        approver_id,
+    } = event
+    else {
+        panic!("历史载荷必须转换为 BPM 终审事件");
+    };
+    assert_eq!(instance_id, None);
+    assert_eq!(business_type, "quotation");
+    assert_eq!(business_id, 42);
+    assert!(approved);
+    assert_eq!(approver_id, 7);
 }
