@@ -186,7 +186,7 @@ async fn apply_profit_field_permissions(
             "total_profit",
             "gross_margin",
         ]))
-        .all(&state.db)
+        .all(state.db.as_ref())
         .await?;
     let readable: HashSet<&str> = permissions
         .iter()
