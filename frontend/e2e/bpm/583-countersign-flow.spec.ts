@@ -167,7 +167,7 @@ async function ensureSecondApprover(
   page: import('@playwright/test').Page,
   browser: import('@playwright/test').Browser
 ): Promise<{ userId: number; session: IsolatedAuthedSession }> {
-  // 角色编码仅允许小写字母、数字与下划线（role_permission_service.rs:280），不能用 genCode 的连字符格式
+  // 角色编码仅允许小写字母、数字与下划线，不能用 genCode 的连字符格式
   const roleCode = `e2e_cs_role_${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000)
     .toString()
     .padStart(3, '0')}`;
