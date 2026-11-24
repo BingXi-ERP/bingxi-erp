@@ -165,7 +165,11 @@ impl BpmService {
         let siblings = self
             .node_tasks(txn, ctx.instance.id, &ctx.task.node_id)
             .await?;
-        let assignees = ctx.task.assignee_ids.clone().unwrap_or_default();
+        let assignees = match &ctx.task.assignee_ids {
+            None => Vec::new(),
+            Some(value) => serde_json::from_value::<Vec<i32>>(value.clone())
+                .map_err(|error| sea_orm::DbErr::Json(error.to_string()))?,
+        };
         let mut pending_event = None;
         let mut advanced_task_ids = Vec::new();
 
@@ -647,17 +651,22 @@ impl BpmService {
                 assignee_ids: Set(if multi_ids.is_empty() {
                     None
                 } else {
-                    Some(multi_ids.clone())
+                    Some(serde_json::Value::Array(
+                        multi_ids
+                            .iter()
+                            .map(|id| serde_json::Value::from(*id))
+                            .collect(),
+                    ))
                 }),
                 assignee_names: Set(if multi_ids.is_empty() {
                     None
                 } else {
-                    Some(
+                    Some(serde_json::Value::Array(
                         multi_assignees
                             .iter()
-                            .map(|(_, name)| name.clone())
+                            .map(|(_, name)| serde_json::Value::String(name.clone()))
                             .collect(),
-                    )
+                    ))
                 }),
                 task_variables: Set(if variables.is_null() {
                     None
@@ -771,7 +780,11 @@ impl BpmService {
             ));
         }
         let actor_name = self.resolve_actor_name(&txn, actor_id).await?;
-        let existing = task.assignee_ids.clone().unwrap_or_default();
+        let existing = match &task.assignee_ids {
+            None => Vec::new(),
+            Some(value) => serde_json::from_value::<Vec<i32>>(value.clone())
+                .map_err(|error| sea_orm::DbErr::Json(error.to_string()))?,
+        };
         if !existing.contains(&actor_id) {
             return Err(AppError::business_displayable(
                 "只有当前工单的处理人可以加签",
@@ -790,6 +803,18 @@ impl BpmService {
         }
         let resolved = sign_mode::resolve_assignees(&txn, &merged).await?;
         let merged_names: Vec<String> = resolved.iter().map(|(_, name)| name.clone()).collect();
+        let merged_ids_json = serde_json::Value::Array(
+            merged
+                .iter()
+                .map(|id| serde_json::Value::from(*id))
+                .collect(),
+        );
+        let merged_names_json = serde_json::Value::Array(
+            merged_names
+                .iter()
+                .map(|name| serde_json::Value::String(name.clone()))
+                .collect(),
+        );
         let trace = sign_mode::append_add_sign(
             task.task_variables.as_ref(),
             actor_id,
@@ -804,8 +829,8 @@ impl BpmService {
             .await?;
         for sibling in &siblings {
             let mut active: bpm_task::ActiveModel = sibling.clone().into();
-            active.assignee_ids = Set(Some(merged.clone()));
-            active.assignee_names = Set(Some(merged_names.clone()));
+            active.assignee_ids = Set(Some(merged_ids_json.clone()));
+            active.assignee_names = Set(Some(merged_names_json.clone()));
             active.task_variables = Set(Some(trace.clone()));
             active.updated_at = Set(Some(chrono::Utc::now()));
             crate::services::audit_log_service::AuditLogService::update_with_audit(
@@ -834,8 +859,8 @@ impl BpmService {
                 node_type: Set(task.node_type.clone()),
                 task_type: Set(task.task_type.clone()),
                 actual_handler_id: Set(Some(new_id)),
-                assignee_ids: Set(Some(merged.clone())),
-                assignee_names: Set(Some(merged_names.clone())),
+                assignee_ids: Set(Some(merged_ids_json.clone())),
+                assignee_names: Set(Some(merged_names_json.clone())),
                 task_variables: Set(Some(trace.clone())),
                 status: Set(Some(task_status::PENDING.to_string())),
                 created_at: Set(Some(chrono::Utc::now())),

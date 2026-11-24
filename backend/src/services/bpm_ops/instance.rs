@@ -174,17 +174,22 @@ impl BpmService {
                 assignee_ids: Set(if multi_ids.is_empty() {
                     None
                 } else {
-                    Some(multi_ids.clone())
+                    Some(serde_json::Value::Array(
+                        multi_ids
+                            .iter()
+                            .map(|id| serde_json::Value::from(*id))
+                            .collect(),
+                    ))
                 }),
                 assignee_names: Set(if multi_ids.is_empty() {
                     None
                 } else {
-                    Some(
+                    Some(serde_json::Value::Array(
                         multi_assignees
                             .iter()
-                            .map(|(_, name)| name.clone())
+                            .map(|(_, name)| serde_json::Value::String(name.clone()))
                             .collect(),
-                    )
+                    ))
                 }),
                 task_variables: Set(if variables.is_null() {
                     None
