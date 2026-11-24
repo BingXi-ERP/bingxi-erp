@@ -11,12 +11,10 @@ export interface TrackEventRequest {
 }
 
 export interface AuditStats {
-  total_events: number;
-  today_events: number;
-  error_count: number;
-  avg_duration_ms: number;
-  top_resources: Array<{ name: string; count: number }>;
-  top_users: Array<{ name: string; count: number }>;
+  total_events_today: number;
+  ui_clicks_today: number;
+  api_calls_today: number;
+  security_alerts_today: number;
 }
 
 // GET /finance/audit/search 出参行（唯一真相：omni_audit_handler.rs row_to_json 的键集，
