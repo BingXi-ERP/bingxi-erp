@@ -23,7 +23,7 @@ use std::sync::OnceLock;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement};
+use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement, TransactionTrait};
 use serde::Serialize;
 use serde_json::json;
 use tracing::{info, warn};
@@ -278,8 +278,7 @@ impl DataIntegrityScanService {
             return Ok(0);
         }
         let id_list = ids.join(", ");
-        let txn = self
-            .db
+        let txn = (*self.db)
             .begin()
             .await
             .map_err(|e| format!("孤儿明细修复开事务失败: {e}"))?;
@@ -346,8 +345,7 @@ impl DataIntegrityScanService {
              quantity_reserved = GREATEST(quantity_reserved, 0), updated_at = NOW() \
              WHERE id IN ({id_list})"
         );
-        let txn = self
-            .db
+        let txn = (*self.db)
             .begin()
             .await
             .map_err(|e| format!("负库存修复开事务失败: {e}"))?;
