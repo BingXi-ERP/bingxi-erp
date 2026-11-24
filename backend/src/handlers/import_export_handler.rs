@@ -13,7 +13,7 @@ use axum::{
     extract::{Multipart, Path, Query, State},
 };
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use tracing::info;
 use validator::Validate;
@@ -37,6 +37,14 @@ pub struct ExcelImportRequest {
     pub import_type: String,
     #[validate(length(max = 10_000, message = "Excel 数据超过 1 万行上限"))]
     pub data: Vec<Vec<String>>, // 二维数组
+}
+
+/// Excel 导入结果携带本次任务主键，调用方可按 ID 回读任务，不必按类型或行数猜历史任务。
+#[derive(Debug, Serialize)]
+struct ImportTaskResult {
+    task_id: i32,
+    #[serde(flatten)]
+    result: ImportResult,
 }
 
 /// POST /api/v1/erp/import/excel - Excel导入
@@ -85,7 +93,7 @@ pub async fn import_excel(
     }
 
     Ok(Json(ApiResponse::success_with_message(
-        serde_json::to_value(result)?,
+        serde_json::to_value(ImportTaskResult { task_id, result })?,
         "导入完成",
     )))
 }
@@ -138,7 +146,10 @@ async fn finish_import_validation_failure(
         tracing::warn!(error = %e, task_id, "更新导入任务记录为 failed 状态失败");
     }
     Ok(Json(ApiResponse::success(serde_json::to_value(
-        fail_result,
+        ImportTaskResult {
+            task_id,
+            result: fail_result,
+        },
     )?)))
 }
 
