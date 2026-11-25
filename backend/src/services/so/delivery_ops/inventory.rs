@@ -309,8 +309,18 @@ impl SalesService {
                 .filter(inventory_stock::Column::Id.eq(stock.id))
                 .filter(inventory_stock::Column::QuantityAvailable.gte(alloc.quantity))
                 .col_expr(
+                    inventory_stock::Column::QuantityOnHand,
+                    sea_orm::sea_query::Expr::col(inventory_stock::Column::QuantityOnHand)
+                        .sub(alloc.quantity),
+                )
+                .col_expr(
                     inventory_stock::Column::QuantityAvailable,
                     sea_orm::sea_query::Expr::col(inventory_stock::Column::QuantityAvailable)
+                        .sub(alloc.quantity),
+                )
+                .col_expr(
+                    inventory_stock::Column::QuantityMeters,
+                    sea_orm::sea_query::Expr::col(inventory_stock::Column::QuantityMeters)
                         .sub(alloc.quantity),
                 )
                 .col_expr(
