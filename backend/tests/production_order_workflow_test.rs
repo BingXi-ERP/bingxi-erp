@@ -62,6 +62,14 @@ fn snapshot_field<'a>(
     snapshot.as_ref().and_then(|value| value.0.get(key))
 }
 
+fn snapshot_decimal(snapshot: &Option<audit_log::AuditValue>, key: &str) -> Decimal {
+    snapshot_field(snapshot, key)
+        .and_then(|value| value.as_str())
+        .unwrap_or_else(|| panic!("审计快照字段 {key} 必须存在且为字符串"))
+        .parse()
+        .unwrap_or_else(|_| panic!("审计快照字段 {key} 必须为合法 Decimal"))
+}
+
 // ===== 状态常量值正确性 =====
 
 /// 验证生产订单相关的状态常量值符合预期（大写风格）。
@@ -479,8 +487,8 @@ async fn test_scddqlc_cjdwc() {
         );
         assert!(snapshot_field(before, "actual_quantity").is_none_or(serde_json::Value::is_null));
         assert_eq!(
-            snapshot_field(after, "actual_quantity").and_then(|value| value.as_str()),
-            Some("1000")
+            snapshot_decimal(after, "actual_quantity"),
+            Decimal::from(1000)
         );
         assert!(snapshot_field(before, "actual_end_date").is_none_or(serde_json::Value::is_null));
         assert!(snapshot_field(after, "actual_end_date").is_some_and(|value| !value.is_null()));

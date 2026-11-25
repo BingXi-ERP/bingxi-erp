@@ -237,6 +237,14 @@ fn snapshot_field<'a>(
     snapshot.as_ref().and_then(|value| value.0.get(key))
 }
 
+fn snapshot_decimal(snapshot: &Option<audit_log::AuditValue>, key: &str) -> Decimal {
+    snapshot_field(snapshot, key)
+        .and_then(|value| value.as_str())
+        .unwrap_or_else(|| panic!("审计快照字段 {key} 必须存在且为字符串"))
+        .parse()
+        .unwrap_or_else(|_| panic!("审计快照字段 {key} 必须为合法 Decimal"))
+}
+
 fn assert_create_audit(row: &audit_log::Model, order: &ProductionOrderModel) {
     assert_eq!(row.user_id, Some(OPERATOR_ID));
     assert_eq!(row.username.as_deref(), Some("production_approval_auditor"));
@@ -437,12 +445,12 @@ async fn production_order_update_writes_audit_snapshot() {
         (&row.old_value, &row.new_value),
     ] {
         assert_eq!(
-            snapshot_field(before, "planned_quantity").and_then(|v| v.as_str()),
-            Some("1000")
+            snapshot_decimal(before, "planned_quantity"),
+            Decimal::from(1000)
         );
         assert_eq!(
-            snapshot_field(after, "planned_quantity").and_then(|v| v.as_str()),
-            Some("1200")
+            snapshot_decimal(after, "planned_quantity"),
+            Decimal::from(1200)
         );
         assert_eq!(
             snapshot_field(before, "priority").and_then(|v| v.as_u64()),
