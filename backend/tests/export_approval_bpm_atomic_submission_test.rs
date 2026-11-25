@@ -180,8 +180,8 @@ async fn install_link_failure_trigger(db: &DatabaseConnection) {
              $$"#
         ),
         format!(
-            "CREATE TRIGGER {LINK_FAILURE_TRIGGER}\
-             BEFORE UPDATE OF bpm_instance_id ON export_approval_request\
+            "CREATE TRIGGER {LINK_FAILURE_TRIGGER} \
+             BEFORE UPDATE OF bpm_instance_id ON export_approval_request \
              FOR EACH ROW EXECUTE FUNCTION {LINK_FAILURE_FUNCTION}()"
         ),
     ] {
