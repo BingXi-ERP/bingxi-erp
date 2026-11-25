@@ -490,8 +490,8 @@ impl SalesService {
             color_no: reduction.color_no.clone(),
             dye_lot_no: reduction.dye_lot_no.clone(),
             grade: String::new(),
-            quantity_meters: reduction.quantity,
-            quantity_kg,
+            quantity_meters: -reduction.quantity,
+            quantity_kg: -quantity_kg,
             source_bill_type: Some("sales_order".to_string()),
             source_bill_no: Some(ctx.order.order_no.clone()),
             // 来源主键 sales_order.id 为 i32，流水 source_bill_id 已拓宽为 i64，无损加宽
