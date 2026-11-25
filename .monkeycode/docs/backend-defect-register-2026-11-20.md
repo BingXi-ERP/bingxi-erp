@@ -1,6 +1,10 @@
 # 后端缺陷台账 2026-11-20 分册
 
-## D-67 Web Cookie-only 登出未吊销 JTI，旧 token 在有效期内仍可重放（P1，会话安全，假闭环重开）
+## D-67 Web Cookie-only 登出未吊销 JTI，旧 token 在有效期内仍可重放（P1，会话安全，已闭环）
+
+闭环证据（2026-11-25）：主干提交 `122c6d90d2cf3bcce10c7ee59b2be246c72b5113`（`fix(auth): 登出 Cookie 路径吊销 JTI 并加固旧令牌重放验证 (#1365)`）已在 `backend/src/handlers/auth_handler_session.rs` 增加 Cookie 路径验证与吊销，并在 `frontend/e2e/flow/19-token-connection.spec.ts` 使用独立 bare context 重放旧 token 断言 401。当前 PR #1397 相对主干无该文件差异，不重复修复。
+
+以下为缺陷发现与修复前取证记录，保留用于追溯。
 
 级别 P1 会话安全，可升级 P0。后端设计意图与实际行为不符，且现有 E2E 断言为假闭环，按 8.5 重新打开并标记回归失效。
 
