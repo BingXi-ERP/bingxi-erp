@@ -11189,10 +11189,10 @@ export default {
     index: {
       tabDashboard: '仪表盘',
       tabLogs: '日志',
-      statTotalEvents: '今日事件总数',
-      statUiClicks: '今日界面操作',
-      statApiCalls: '今日接口调用',
-      statSecurityAlerts: '今日安全告警',
+      statTotalEvents: '近24小时事件总数',
+      statUiClicks: '近24小时界面操作',
+      statApiCalls: '近24小时接口调用',
+      statSecurityAlerts: '近24小时安全告警',
 
       placeholderUserId: '用户ID',
 

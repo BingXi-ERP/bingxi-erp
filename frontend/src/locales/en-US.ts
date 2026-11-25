@@ -11264,10 +11264,10 @@ export default {
     index: {
       tabDashboard: 'Dashboard',
       tabLogs: 'Logs',
-      statTotalEvents: 'Total Events Today',
-      statUiClicks: 'UI Actions Today',
-      statApiCalls: 'API Calls Today',
-      statSecurityAlerts: 'Security Alerts Today',
+      statTotalEvents: 'Total Events in Last 24 Hours',
+      statUiClicks: 'UI Actions in Last 24 Hours',
+      statApiCalls: 'API Calls in Last 24 Hours',
+      statSecurityAlerts: 'Security Alerts in Last 24 Hours',
 
       placeholderUserId: 'User ID',
 
