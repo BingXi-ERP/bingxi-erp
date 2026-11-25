@@ -680,8 +680,12 @@ pub async fn get_portal_order(
         .await?
         .ok_or_else(|| AppError::not_found("订单不存在或不属于当前绑定客户"))?;
 
-    let receivable_totals =
-        load_portal_receivable_totals(db.as_ref(), customer.id, &[model.order_no.clone()]).await?;
+    let receivable_totals = load_portal_receivable_totals(
+        db.as_ref(),
+        customer.id,
+        std::slice::from_ref(&model.order_no),
+    )
+    .await?;
     let receivable = receivable_totals
         .get(&model.order_no)
         .copied()
