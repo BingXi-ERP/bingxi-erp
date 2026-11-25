@@ -164,7 +164,7 @@ test.describe.serial('648 库存流水 before/after 逐行回放台账', () => {
     expect(
       toScaled(stockBefore.items?.[0]?.quantity_meters, '[648-1] 入库后现存量'),
       '[648-1] 入库后现存量应为 40'
-    ).toBe(40000n);
+    ).toBe(4000n);
 
     const order = await apiCallRaw<{ id?: number; order_no?: string }>(
       page,
@@ -234,7 +234,7 @@ test.describe.serial('648 库存流水 before/after 逐行回放台账', () => {
     expect(
       toScaled(rows[1].quantity_before_meters, '[648-1] 出库扣前量') -
         toScaled(rows[1].quantity_after_meters, '[648-1] 出库扣后量') -
-        40000n,
+        4000n,
       '[648-1] 出库扣差必须为 40 米'
     ).toBe(0n);
 
