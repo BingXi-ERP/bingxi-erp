@@ -235,10 +235,6 @@ async fn seeded_case() -> SeededCase {
 }
 
 impl SeededCase {
-    fn ship_request(&self) -> ShipOrderRequest {
-        self.ship_request_with_quantity(ORDER_QUANTITY)
-    }
-
     fn ship_request_with_quantity(&self, quantity: Decimal) -> ShipOrderRequest {
         ShipOrderRequest {
             order_id: self.order.id,
