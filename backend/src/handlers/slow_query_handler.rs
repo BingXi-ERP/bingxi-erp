@@ -45,6 +45,16 @@ pub struct SlowQueryListParams {
     pub page_size: Option<u64>,
 }
 
+fn parse_time_param(raw: &str, field: &str) -> Result<DateTime<Utc>, AppError> {
+    DateTime::parse_from_rfc3339(raw)
+        .map(|dt| dt.with_timezone(&Utc))
+        .map_err(|e| {
+            AppError::bad_request(format!(
+                "{field} 时间格式非法（应为 RFC 3339，如 2026-11-25T00:00:00Z）：{e}"
+            ))
+        })
+}
+
 /// 列表返回包装
 // P1-14 修复（2026-06-25）：路由已挂载，字段经 serde Serialize 派生使用。
 #[allow(dead_code, reason = "序列化输出字段")]
@@ -90,18 +100,29 @@ pub async fn list_slow_queries(
     let page = std::cmp::Ord::max(params.page.unwrap_or(1), 1);
     let page_size = params.page_size.unwrap_or(20).clamp(1, 100);
 
-    let mut q = slow_query::Entity::find();
-
-    // 时间范围筛选
-    if let Some(start) = &params.start_time {
-        if let Ok(ts) = start.parse::<DateTime<Utc>>() {
-            q = q.filter(slow_query::Column::CapturedAt.gte(ts.naive_utc()));
+    let start_time = params
+        .start_time
+        .as_deref()
+        .map(|raw| parse_time_param(raw, "start_time"))
+        .transpose()?;
+    let end_time = params
+        .end_time
+        .as_deref()
+        .map(|raw| parse_time_param(raw, "end_time"))
+        .transpose()?;
+    if let (Some(start), Some(end)) = (start_time, end_time) {
+        if start > end {
+            return Err(AppError::bad_request("起始时间不能晚于截止时间"));
         }
     }
-    if let Some(end) = &params.end_time {
-        if let Ok(ts) = end.parse::<DateTime<Utc>>() {
-            q = q.filter(slow_query::Column::CapturedAt.lte(ts.naive_utc()));
-        }
+
+    let mut q = slow_query::Entity::find();
+
+    if let Some(start) = start_time {
+        q = q.filter(slow_query::Column::CapturedAt.gte(start.naive_utc()));
+    }
+    if let Some(end) = end_time {
+        q = q.filter(slow_query::Column::CapturedAt.lte(end.naive_utc()));
     }
 
     // 最小执行时间

@@ -1,20 +1,22 @@
 // 4.39 索引与慢查询 E2E（端点级）— flow/575-slow-queries-endpoint-contract
-// 功能：慢查询采集端点可触发刷新、列表返回合规分页结构；不做数据库索引内部断言。
+// 功能：慢查询采集端点可触发刷新、列表返回合规分页结构；日期筛选用专用 PostgreSQL 样本验证边界。
 // 调用方：Playwright flow 分片；管理员会话态由 diagnose-fixture 按 worker 注入。
-// 入参：无外部入参；只读端点，不改业务主档。
+// 入参：无外部入参；日期筛选样本仅写 slow_query_log，不改业务主档。
 // 传给谁：POST /slow-queries/refresh 触发采集 → GET /slow-queries?page=1&page_size= 读列表 →
 //   GET /slow-queries/stats 读统计结构（若路由存在）。
-// 存什么：不自建数据；仅触发采集任务向 slow_query 表写入（数据来自 pg_stat_statements）。
-// 存哪里：slow_query 表（由采集任务落库）。
+// 存什么：采集任务写入的慢查询，以及日期筛选专用样本（用例结束即删除）。
+// 存哪里：slow_query_log 表（由采集任务落库）。
 // 口径说明：报告明确"索引命中无覆盖但只端点级可立、不做数据库索引内部断言"；数据库编码与索引
 //   由外部 PG 集群设定，仓库无 encoding 配置可验。CI 若未装 pg_stat_statements，列表与统计允许空集，
 //   但分页信封与字段结构必须存在，不得空断言假绿。
 //   后端判据：system.rs 注册 GET /slow-queries、POST /slow-queries/refresh、GET /slow-queries/stats
 //   （无 /system 前缀）；SlowQueryListResponse{items,total,page,page_size}；
 //   SlowQueryDto 含 query_text/execution_time_ms/calls/rows_examined/captured_at。
+import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { test, expect } from '../diagnose-fixture';
 import type { Page } from '@playwright/test';
-import { apiCallRaw } from './helpers';
+import { apiCallExpectFail, apiCallRaw } from './helpers';
 
 interface SlowQueryItem {
   id?: unknown;
@@ -41,6 +43,36 @@ function expectNonNegativeInteger(value: unknown, label: string): void {
 
 function expectFiniteNumber(value: unknown, label: string): void {
   expect(typeof value === 'number' && Number.isFinite(value), `${label} 必须为有限数值`).toBe(true);
+}
+
+function psqlExec(sql: string, variables: Record<string, string>): void {
+  const rawUrl = process.env.DATABASE_URL;
+  if (!rawUrl) {
+    throw new Error('[575] DATABASE_URL 未设置，无法创建日期筛选专用样本');
+  }
+  const dbUrl = new URL(rawUrl);
+  const args = ['-X', '-v', 'ON_ERROR_STOP=1', '-q', '-f', '-'];
+  for (const [key, value] of Object.entries(variables)) {
+    args.push('-v', `${key}=${value}`);
+  }
+  const env = {
+    ...process.env,
+    PGHOST: dbUrl.hostname,
+    PGPORT: dbUrl.port || '5432',
+    PGUSER: decodeURIComponent(dbUrl.username),
+    PGPASSWORD: decodeURIComponent(dbUrl.password),
+    PGDATABASE: decodeURIComponent(dbUrl.pathname.slice(1)),
+    PGCONNECT_TIMEOUT: '5',
+  };
+  const sslMode = dbUrl.searchParams.get('sslmode');
+  if (sslMode) {
+    env.PGSSLMODE = sslMode;
+  }
+  execFileSync('psql', args, {
+    input: sql,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env,
+  });
 }
 
 test('575-01 慢查询刷新、列表与统计端点返回完整契约', async ({ page }: { page: Page }) => {
@@ -122,5 +154,85 @@ test('575-01 慢查询刷新、列表与统计端点返回完整契约', async (
     expectFiniteNumber(item.avg_rows, '聚合平均扫描行数');
     expectNonNegativeInteger(item.sample_count, '聚合样本数');
     expect(Number(item.sample_count), '采样行必须至少有一个样本').toBeGreaterThan(0);
+  }
+});
+
+test('575-02 日期筛选接受 RFC 3339 并显式拒绝非法与倒置区间', async ({ page }: { page: Page }) => {
+  const now = Date.now();
+  const start = new Date(now - 60 * 60 * 1000).toISOString();
+  const end = new Date(now + 60 * 60 * 1000).toISOString();
+  const capturedIn = new Date(now).toISOString();
+  const capturedOut = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+  const marker = `575-date-filter-${randomUUID()}`;
+  const variables = {
+    marker,
+    captured_in: capturedIn,
+    captured_out: capturedOut,
+  };
+  try {
+    psqlExec(
+      `INSERT INTO slow_query_log
+         (query_text, execution_time_ms, calls, rows_examined, database_name, captured_at)
+       VALUES
+         (:'marker' || '-in', 575001, 1, 1, current_database(), :'captured_in'::timestamptz),
+         (:'marker' || '-out', 575002, 1, 1, current_database(), :'captured_out'::timestamptz);`,
+      variables
+    );
+
+    const filtered = await apiCallRaw<Record<string, unknown>>(
+      page,
+      'GET',
+      `/slow-queries?start_time=${encodeURIComponent(start)}&end_time=${encodeURIComponent(end)}` +
+        `&keyword=${encodeURIComponent(marker)}&page=1&page_size=10`
+    );
+    expect(Array.isArray(filtered.items), '日期筛选响应必须返回 items').toBe(true);
+    if (!Array.isArray(filtered.items)) {
+      throw new Error('575 日期筛选缺少 items，无法验证时间边界');
+    }
+    expectNonNegativeInteger(filtered.total, '日期筛选 total');
+    expect(filtered.total, '区间内专用样本必须命中且区间外样本必须排除').toBe(1);
+    const filteredItems = filtered.items as SlowQueryItem[];
+    expect(
+      filteredItems.map(item => item.query_text),
+      '日期筛选只能返回区间内专用样本'
+    ).toEqual([`${marker}-in`]);
+    const startMs = Date.parse(start);
+    const endMs = Date.parse(end);
+    for (const item of filteredItems) {
+      const capturedMs = Date.parse(String(item.captured_at));
+      expect(Number.isFinite(capturedMs), '日期筛选行采集时间须可解析').toBe(true);
+      expect(capturedMs, '采集时间不得早于起始边界').toBeGreaterThanOrEqual(startMs);
+      expect(capturedMs, '采集时间不得晚于截止边界').toBeLessThanOrEqual(endMs);
+    }
+
+    const invalidCases = [
+      {
+        query: 'start_time=2026-11-25',
+        field: 'start_time',
+        message: 'start_time 时间格式非法',
+      },
+      {
+        query: 'end_time=not-a-time',
+        field: 'end_time',
+        message: 'end_time 时间格式非法',
+      },
+      {
+        query: `start_time=${encodeURIComponent(end)}&end_time=${encodeURIComponent(start)}`,
+        field: 'start_time',
+        message: '起始时间不能晚于截止时间',
+      },
+    ];
+    for (const item of invalidCases) {
+      const failure = await apiCallExpectFail(page, 'GET', `/slow-queries?${item.query}`);
+      expect(failure.status, `${item.field} 非法输入必须返回 HTTP 400`).toBe(400);
+      expect(failure.code, `${item.field} 非法输入必须返回统一字符串错误码`).toBe('BadRequest');
+      expect(failure.message, `${item.field} 错误消息必须点名真实原因`).toContain(item.message);
+    }
+  } finally {
+    psqlExec(
+      `DELETE FROM slow_query_log
+       WHERE query_text IN (:'marker' || '-in', :'marker' || '-out');`,
+      variables
+    );
   }
 });

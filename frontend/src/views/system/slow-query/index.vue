@@ -281,8 +281,8 @@ const syncQueryParams = () => {
   setQueryParam('keyword', undefined);
 
   if (filterForm.dateRange && filterForm.dateRange.length === 2) {
-    setQueryParam('start_time', filterForm.dateRange[0]);
-    setQueryParam('end_time', filterForm.dateRange[1]);
+    setQueryParam('start_time', new Date(`${filterForm.dateRange[0]}T00:00:00`).toISOString());
+    setQueryParam('end_time', new Date(`${filterForm.dateRange[1]}T23:59:59.999`).toISOString());
   }
   if (filterForm.min_duration !== undefined && filterForm.min_duration !== null) {
     setQueryParam('min_duration', filterForm.min_duration);
@@ -314,7 +314,7 @@ const handleRefresh = async () => {
     ElMessage.success(res.message);
     // 刷新完成后重新加载列表（useTableApi.refresh）+ 统计
     await Promise.all([refresh(), loadStats()]);
-  } catch (err) {
+  } catch {
     ElMessage.error(t('system.slowQuery.message.refreshFailed'));
   } finally {
     refreshing.value = false;
