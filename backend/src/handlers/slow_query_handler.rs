@@ -12,7 +12,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set, Statement,
+    QueryOrder, Set, Statement,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
