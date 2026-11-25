@@ -281,8 +281,17 @@ const syncQueryParams = () => {
   setQueryParam('keyword', undefined);
 
   if (filterForm.dateRange && filterForm.dateRange.length === 2) {
-    setQueryParam('start_time', new Date(`${filterForm.dateRange[0]}T00:00:00`).toISOString());
-    setQueryParam('end_time', new Date(`${filterForm.dateRange[1]}T23:59:59.999`).toISOString());
+    const startValue = filterForm.dateRange[0];
+    const endValue = filterForm.dateRange[1];
+    const start = new Date(
+      /^d{4}-d{2}-d{2}$/.test(startValue) ? startValue + 'T00:00:00' : startValue
+    );
+    const end = new Date(/^d{4}-d{2}-d{2}$/.test(endValue) ? endValue + 'T23:59:59.999' : endValue);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new Error('慢查询时间范围无法解析');
+    }
+    setQueryParam('start_time', start.toISOString());
+    setQueryParam('end_time', end.toISOString());
   }
   if (filterForm.min_duration !== undefined && filterForm.min_duration !== null) {
     setQueryParam('min_duration', filterForm.min_duration);

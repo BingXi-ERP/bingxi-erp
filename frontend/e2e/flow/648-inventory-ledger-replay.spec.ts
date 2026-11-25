@@ -266,7 +266,7 @@ test.describe('648 库存流水 before/after 台账回放', () => {
     }
     const stock = await stockRow(page, productId, ctx.warehouseIds[0], batchNo);
     expect(
-      toCents(stock.quantity_meters, '[648] 库存行米数'),
+      toCents(stock.quantity_available, '[648] 库存行可用米数'),
       '[648] 末条流水 after == 库存详情'
     ).toBe(previousAfter);
     expect(previousAfter, '[648] 60 入库减 25 出库终值').toBe(3500n);

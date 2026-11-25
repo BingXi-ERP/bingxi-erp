@@ -250,8 +250,7 @@ impl SalesService {
     }
 
     /// 恢复库存（取消发货时使用，对称反向于 reduce_inventory_four_dim）
-    /// （quantity_on_hand += qty，quantity_available += qty，quantity_meters += qty，
-    /// quantity_shipped -= qty）
+    /// （quantity_available += qty，quantity_shipped -= qty）
     ///
     /// 出库按"款号+色号+缸号+批次"四维扣减，回位必须回到**实际被扣的那一行**：
     /// - 明细带 stock_id（四维扣减上线后的新数据）→ 精确回位到该行；
@@ -323,23 +322,13 @@ impl SalesService {
             )));
         }
 
-        // 对称反向更新：物理米数与可用量回加，已发货量扣回
+        // 对称反向更新：quantity_available += qty，quantity_shipped -= qty
         let restore_result = inventory_stock::Entity::update_many()
             .filter(inventory_stock::Column::Id.eq(stock.id))
             .filter(inventory_stock::Column::QuantityShipped.gte(quantity))
             .col_expr(
-                inventory_stock::Column::QuantityOnHand,
-                sea_orm::sea_query::Expr::col(inventory_stock::Column::QuantityOnHand)
-                    .add(quantity),
-            )
-            .col_expr(
                 inventory_stock::Column::QuantityAvailable,
                 sea_orm::sea_query::Expr::col(inventory_stock::Column::QuantityAvailable)
-                    .add(quantity),
-            )
-            .col_expr(
-                inventory_stock::Column::QuantityMeters,
-                sea_orm::sea_query::Expr::col(inventory_stock::Column::QuantityMeters)
                     .add(quantity),
             )
             .col_expr(

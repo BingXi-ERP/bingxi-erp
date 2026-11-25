@@ -12,8 +12,24 @@
 //   后端判据：system.rs 注册 GET /slow-queries、POST /slow-queries/refresh、GET /slow-queries/stats
 //   （无 /system 前缀）；SlowQueryListResponse{items,total,page,page_size}；
 //   SlowQueryDto 含 query_text/execution_time_ms/calls/rows_examined/captured_at。
-import { execFileSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+type PsqlExecOptions = {
+  input: string;
+  stdio: ['pipe', 'pipe', 'pipe'];
+  env: Record<string, string | undefined>;
+};
+type NodeRuntime = {
+  process: {
+    mainModule: {
+      require: (moduleName: string) => {
+        execFileSync: (command: string, args: string[], options: PsqlExecOptions) => void;
+        randomUUID: () => string;
+      };
+    } | null;
+  };
+};
+const nodeRuntime = globalThis as unknown as NodeRuntime;
+const { execFileSync } = nodeRuntime.process.mainModule!.require('node:child_process');
+const { randomUUID } = nodeRuntime.process.mainModule!.require('node:crypto');
 import { test, expect } from '../diagnose-fixture';
 import type { Page } from '@playwright/test';
 import { apiCallExpectFail, apiCallRaw } from './helpers';
@@ -85,11 +101,8 @@ function psqlExec(sql: string, variables: Record<string, string>): void {
     PGPASSWORD: decodeURIComponent(dbUrl.password),
     PGDATABASE: decodeURIComponent(dbUrl.pathname.slice(1)),
     PGCONNECT_TIMEOUT: '5',
+    PGSSLMODE: dbUrl.searchParams.get('sslmode') ?? undefined,
   };
-  const sslMode = dbUrl.searchParams.get('sslmode');
-  if (sslMode) {
-    env.PGSSLMODE = sslMode;
-  }
   execFileSync('psql', args, {
     input: sql,
     stdio: ['pipe', 'pipe', 'pipe'],
