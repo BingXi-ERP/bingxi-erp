@@ -1,7 +1,7 @@
-//! 审计看板“今日”统计的数据库自然日边界回归。
+//! 审计看板“今日”指标的滚动二十四小时边界回归。
 //!
 //! 调用方：CI backend job 的真实 PostgreSQL 集成测试。
-//! 入参：数据库时区下今日零点、当前时刻、昨日近 24 小时及明日零点的审计探针行。
+//! 入参：滚动窗口下界、下界前一微秒、当前时刻、未来一微秒及窗口外告警探针。
 //! 传给谁：omni_audit_query_service::query_dashboard_stats 的生产统计查询。
 //! 存什么/存哪里：探针只写在不提交的事务内，断言后整体回滚，不污染共享库。
 
@@ -36,8 +36,25 @@ async fn insert_probe<C: ConnectionTrait>(
     .unwrap_or_else(|e| panic!("插入审计看板探针 {marker} 失败：{e}"));
 }
 
+async fn assert_rolling_window<C: ConnectionTrait>(conn: &C) {
+    let stats = query_dashboard_stats(conn)
+        .await
+        .expect("审计看板滚动二十四小时统计查询失败");
+
+    assert_eq!(stats.total_events_today, 4, "只统计滚动窗口内四条探针");
+    assert_eq!(stats.ui_clicks_today, 1, "滚动窗口下界界面操作必须计入");
+    assert_eq!(
+        stats.api_calls_today, 3,
+        "当前时刻普通接口与两类告警接口均计入"
+    );
+    assert_eq!(
+        stats.security_alerts_today, 2,
+        "滚动窗口内 403 与 500 告警均计入"
+    );
+}
+
 #[tokio::test]
-async fn dashboard_today_metrics_use_database_calendar_day_boundaries() {
+async fn dashboard_today_metrics_use_rolling_twenty_four_hour_boundaries() {
     let db = setup_test_db().await;
     let txn = db.begin().await.expect("开启审计看板探针事务失败");
     txn.execute_unprepared("SET LOCAL TIME ZONE 'Asia/Shanghai'")
@@ -46,47 +63,46 @@ async fn dashboard_today_metrics_use_database_calendar_day_boundaries() {
 
     insert_probe(
         &txn,
-        "today-start-ui",
-        "date_trunc('day', CURRENT_TIMESTAMP)",
-        None,
-        200,
-    )
-    .await;
-    insert_probe(&txn, "today-api", "CURRENT_TIMESTAMP", Some("GET"), 200).await;
-    insert_probe(&txn, "today-alert", "CURRENT_TIMESTAMP", Some("POST"), 403).await;
-    insert_probe(
-        &txn,
-        "yesterday-recent-ui",
-        "date_trunc('day', CURRENT_TIMESTAMP) - INTERVAL '1 second'",
+        "rolling-lower-ui",
+        "NOW() - INTERVAL '24 hours'",
         None,
         200,
     )
     .await;
     insert_probe(
         &txn,
-        "yesterday-recent-api-alert",
-        "date_trunc('day', CURRENT_TIMESTAMP) - INTERVAL '1 second'",
+        "before-lower-ui",
+        "NOW() - INTERVAL '24 hours' - INTERVAL '1 microsecond'",
+        None,
+        200,
+    )
+    .await;
+    insert_probe(&txn, "rolling-now-api", "NOW()", Some("GET"), 200).await;
+    insert_probe(&txn, "rolling-now-alert", "NOW()", Some("POST"), 403).await;
+    insert_probe(&txn, "rolling-now-server-error", "NOW()", Some("GET"), 500).await;
+    insert_probe(
+        &txn,
+        "before-lower-alert",
+        "NOW() - INTERVAL '24 hours' - INTERVAL '1 microsecond'",
         Some("GET"),
         500,
     )
     .await;
     insert_probe(
         &txn,
-        "tomorrow-start-api",
-        "date_trunc('day', CURRENT_TIMESTAMP) + INTERVAL '1 day'",
+        "future-api",
+        "NOW() + INTERVAL '1 microsecond'",
         Some("GET"),
         200,
     )
     .await;
 
-    let stats = query_dashboard_stats(&txn)
-        .await
-        .expect("审计看板自然日统计查询失败");
+    assert_rolling_window(&txn).await;
 
-    assert_eq!(stats.total_events_today, 3, "只统计今日零点至明日零点");
-    assert_eq!(stats.ui_clicks_today, 1, "今日零点界面操作必须计入");
-    assert_eq!(stats.api_calls_today, 2, "今日普通接口与告警接口均计入");
-    assert_eq!(stats.security_alerts_today, 1, "只统计今日 403/5xx 告警");
+    txn.execute_unprepared("SET LOCAL TIME ZONE 'UTC'")
+        .await
+        .expect("切换数据库会话时区失败");
+    assert_rolling_window(&txn).await;
 
     txn.rollback().await.expect("回滚审计看板探针事务失败");
 }

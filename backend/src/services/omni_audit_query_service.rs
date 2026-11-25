@@ -28,21 +28,16 @@ pub struct AuditStats {
     pub security_alerts_today: i64,
 }
 
-/// 按数据库会话时区的自然日统计审计看板指标。
+/// 按绝对时间统计最近二十四小时的审计看板指标。
 pub async fn query_dashboard_stats<C: ConnectionTrait>(db: &C) -> Result<AuditStats, DbErr> {
-    let sql = "WITH today AS (
-        SELECT
-            date_trunc('day', CURRENT_TIMESTAMP) AS day_start,
-            date_trunc('day', CURRENT_TIMESTAMP) + INTERVAL '1 day' AS day_end
-    )
-    SELECT
+    let sql = "SELECT
         COUNT(*) AS total_events_today,
         COUNT(*) FILTER (WHERE request_method IS NULL) AS ui_clicks_today,
         COUNT(*) FILTER (WHERE request_method IS NOT NULL) AS api_calls_today,
         COUNT(*) FILTER (WHERE response_status = 403 OR response_status >= 500) AS security_alerts_today
     FROM omni_audit_logs
-    CROSS JOIN today
-    WHERE created_at >= today.day_start AND created_at < today.day_end";
+    WHERE created_at >= NOW() - INTERVAL '24 hours'
+      AND created_at <= NOW()";
 
     let row = db
         .query_one_raw(Statement::from_string(
