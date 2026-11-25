@@ -453,6 +453,11 @@ pub async fn get_weekly_report(
     tracing::debug!(user_id = auth.user_id, "慢查询周报查询");
 
     let weeks = query.weeks.unwrap_or(1);
+    if !(1..=5200).contains(&weeks) {
+        return Err(AppError::bad_request(
+            "weeks 必须在 1 到 5200 之间".to_string(),
+        ));
+    }
     let now = chrono::Utc::now();
     let week_start = now
         .checked_sub_signed(chrono::Duration::weeks(weeks as i64))
