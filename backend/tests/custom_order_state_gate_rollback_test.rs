@@ -131,7 +131,7 @@ async fn seed_fixture(status: &str, approved_sample_id: Option<i32>) -> GateFixt
 
     let current_node = process_node::ActiveModel {
         custom_order_id: Set(order.id),
-        node_type: Set(status.to_string()),
+        node_type: Set(co_status::DYEING.to_string()),
         node_name: Set("当前染色".to_string()),
         sequence: Set(1),
         status: Set(node_status::IN_PROGRESS.to_string()),
