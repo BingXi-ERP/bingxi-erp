@@ -155,9 +155,42 @@ describe('SlowQueryView（P13 批 1 B-慢查询审计）', () => {
     const params = mockRequestGet.mock.calls[0][1].params;
     expect(params.min_duration).toBe(200);
     expect(params.keyword).toBe('users');
-    expect(params.start_time).toBe('2026-06-18T00:00:00Z');
-    expect(params.end_time).toBe('2026-06-18T23:59:59Z');
+    expect(params.start_time).toBe('2026-06-18T00:00:00.000Z');
+    expect(params.end_time).toBe('2026-06-18T23:59:59.000Z');
     expect(params.page).toBe(1);
+  });
+
+  /** 日期-only 输入必须按浏览器本地时区补齐起止边界，不能退化成 UTC 零点。 */
+  it('日期-only 输入按本地时区转换为 RFC 3339 起止边界', async () => {
+    const originalTz = process.env.TZ;
+    process.env.TZ = 'Asia/Shanghai';
+    const wrapper = mount(SlowQueryView, {
+      global: {},
+    });
+
+    try {
+      await flushPromises();
+      mockRequestGet.mockClear();
+
+      const vm = wrapper.vm as any;
+      vm.filterForm.dateRange = ['2026-06-18', '2026-06-18'];
+      await nextTick();
+
+      await vm.handleQuery();
+      await flushPromises();
+
+      expect(mockRequestGet).toHaveBeenCalledTimes(1);
+      const params = mockRequestGet.mock.calls[0][1].params;
+      expect(params.start_time).toBe('2026-06-17T16:00:00.000Z');
+      expect(params.end_time).toBe('2026-06-18T15:59:59.999Z');
+    } finally {
+      wrapper.unmount();
+      if (originalTz === undefined) {
+        delete process.env.TZ;
+      } else {
+        process.env.TZ = originalTz;
+      }
+    }
   });
 
   /** 点击手动刷新按钮：调用 refreshSlowQueries 并重新加载 */

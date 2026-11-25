@@ -284,9 +284,11 @@ const syncQueryParams = () => {
     const startValue = filterForm.dateRange[0];
     const endValue = filterForm.dateRange[1];
     const start = new Date(
-      /^d{4}-d{2}-d{2}$/.test(startValue) ? startValue + 'T00:00:00' : startValue
+      /^\d{4}-\d{2}-\d{2}$/.test(startValue) ? startValue + 'T00:00:00' : startValue
     );
-    const end = new Date(/^d{4}-d{2}-d{2}$/.test(endValue) ? endValue + 'T23:59:59.999' : endValue);
+    const end = new Date(
+      /^\d{4}-\d{2}-\d{2}$/.test(endValue) ? endValue + 'T23:59:59.999' : endValue
+    );
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       throw new Error('慢查询时间范围无法解析');
     }
