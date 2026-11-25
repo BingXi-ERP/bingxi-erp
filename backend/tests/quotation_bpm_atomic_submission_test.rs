@@ -207,7 +207,7 @@ async fn wait_for_cancel_commit_or_quotation_lock_wait(
         let waiting_locks = scalar_i64(
             db,
             "SELECT COUNT(*) FROM pg_locks waiter \
-             WHERE waiter.relation = 'sales_quotations'::regclass \
+             WHERE waiter.locktype = 'transactionid' \
              AND NOT waiter.granted \
              AND $1 = ANY(pg_blocking_pids(waiter.pid))",
             vec![submit_pid.into()],
