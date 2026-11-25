@@ -246,7 +246,7 @@ async fn assert_no_partial_writes(fixture: &GateFixture) {
 
 fn repeatable_read_url(url: &str) -> String {
     let separator = if url.contains('?') { '&' } else { '?' };
-    format!("{url}{separator}options=-c%20default_transaction_isolation%3Drepeatable%20read")
+    format!("{url}{separator}options[default_transaction_isolation]=repeatable%20read")
 }
 
 async fn snapshot_service_db() -> Arc<DatabaseConnection> {
