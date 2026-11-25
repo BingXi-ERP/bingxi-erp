@@ -205,11 +205,11 @@ test('544-01 指定缸不足时跨缸回退 两笔流水留痕与两缸库存守
   expect(String(exactTxn.transaction_type), '精确缸流水类型').toBe('SALES_DELIVERY');
   expect(String(crossTxn.transaction_type), '跨缸流水类型').toBe('SALES_DELIVERY');
   expect(dec(exactTxn.quantity_meters, '精确缸流水扣减米数'), '先扣满指定缸可用量').toBeCloseTo(
-    requestedAvailableBefore,
+    -requestedAvailableBefore,
     2
   );
   expect(dec(crossTxn.quantity_meters, '跨缸流水扣减米数'), '跨缸承担剩余发货量').toBeCloseTo(
-    SHIP_QTY - requestedAvailableBefore,
+    -(SHIP_QTY - requestedAvailableBefore),
     2
   );
   // 流水出参键以 TransactionResponse DTO 为准：notes 字段序列化为 remarks

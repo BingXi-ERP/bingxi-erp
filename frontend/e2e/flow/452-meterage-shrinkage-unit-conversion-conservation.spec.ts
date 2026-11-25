@@ -506,7 +506,7 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
    * 服务端 validate_split_consistency 恒等式「母卷剩余 + Σ子卷 = 原始长度」不满足即 400；
    * cut_weight 留 null ⇒ 母卷实测重量保持原值（服务端不猜、不塞 0）。
    * 出库量语义：ShipOrderItemRequest 的 quantity 即主单位米（无单位字段），
-   * 流水行 quantity_before_meters − quantity_after_meters = quantity_meters，
+   * 流水行 quantity_meters 保留负向扣减，quantity_after_meters − quantity_before_meters = quantity_meters，
    * 订单行 shipped_quantity 由 update_order_item_shipped_qty 逐行按 id 升序分配回写。
    * 词表：匹状态大写（AVAILABLE/SHIPPED，models/status/purchase_inventory.rs::inventory_piece）。
    *
@@ -626,7 +626,7 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       '452-03 订单行已发量 vs 出库录入量'
     );
 
-    // 6) 库存流水回读：出库量 = 录入量，且 扣前 − 扣后 = 出库量（全为后端出参）
+    // 6) 库存流水回读：出库增量保留负方向，且 扣后 − 扣前 = 流水增量（全为后端出参）
     const txnRaw = await apiCallRaw<unknown>(
       page,
       'GET',
@@ -644,12 +644,18 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
     ).toBe(1);
     const txn = txns[0];
     const txnQty = decField(txn, 'quantity_meters', '452-03 出库流水主单位量');
-    sameDec(txnQty, shipQty, '452-03 流水出库量 vs 出库录入量');
+    sameDec(txnQty, `-${shipQty}`, '452-03 出库流水必须保留负向扣减');
+    sameDecDiff(
+      decField(txn, 'quantity_after_meters', '452-03 流水扣后量'),
+      decField(txn, 'quantity_before_meters', '452-03 流水扣前量'),
+      txnQty,
+      '452-03 流水扣后减扣前 vs 负向出库增量'
+    );
     sameDecDiff(
       decField(txn, 'quantity_before_meters', '452-03 流水扣前量'),
       decField(txn, 'quantity_after_meters', '452-03 流水扣后量'),
-      txnQty,
-      '452-03 流水前后差 vs 出库量'
+      shipQty,
+      '452-03 流水扣前减扣后 vs 出库录入量'
     );
 
     // 7) 四维库存行回读：扣后量 = 流水扣后量，扣前量 = 出库前行读数（账实同一刻度零差）
@@ -726,7 +732,7 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
    * 契约真相。报价行 unit 必须逐字符等于产品交易单位（validate_item_units_against_products），
    * 转订单按 UnitStrategy 换算：单位「米」⇒ 订单行 quantity_meters 即报价行 quantity 原值，
    * quantity_kg 由 meters_to_kg(克重×幅宽) 折出，产品缺克重或幅宽即 VALIDATION 拒绝（不兜底 0）；
-   * 出库流水 quantity_meters 是被扣库存行的实际米数（跨缸回退时如实记实际缸号）。
+   * 出库流水 quantity_meters 是被扣库存行的实际米数且保留负方向（跨缸回退时如实记实际缸号）。
    * 三段合计一律用补零对齐的整数求和比较，用例内不出现任何舍入调用。
    *
    * 假绿防线。合计期望值全部来自三段后端出参本身（报价行 quantity、订单行 quantity_meters、
@@ -937,11 +943,16 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       shipMeterLines.length,
       `段三：出库流水必须恰 1 行（多行即重复扣减），实际 ${JSON.stringify(shipMeterLines)}`
     ).toBe(1);
-    sameDecSum(orderMeterLines, shipMeterLines, '452-04 订单行主计量合计 vs 出库流水主单位合计');
+    sameDec(shipMeterLines[0], `-${shipQty}`, '452-04 出库流水必须保留负向扣减');
+    sameDecSum(
+      orderMeterLines,
+      shipMeterLines.map(v => `-${v}`),
+      '452-04 订单行主计量合计 vs 出库流水业务幅度'
+    );
     sameDecSum(
       quoteMeterLines,
-      shipMeterLines,
-      '452-04 报价明细（按米）合计 vs 出库折回主单位合计'
+      shipMeterLines.map(v => `-${v}`),
+      '452-04 报价明细（按米）合计 vs 出库折回主单位业务幅度'
     );
     console.log(
       `[452-04] 三段折回主单位合计守恒通过 报价标记=${noteTag} 订单=${orderNo} 出库录入量=${shipQty}`
