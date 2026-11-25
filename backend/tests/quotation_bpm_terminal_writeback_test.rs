@@ -206,8 +206,7 @@ async fn bpm_terminal_decision_writes_back_quotation_status_and_opinion() {
     let withdrawn_quotation = seed_pending_quotation(&db, customer_id, initiator).await;
     let approved_task = start_quotation_process(&db, &code, &approved_quotation, initiator).await;
     let rejected_task = start_quotation_process(&db, &code, &rejected_quotation, initiator).await;
-    let _withdrawn_task =
-        start_quotation_process(&db, &code, &withdrawn_quotation, initiator).await;
+    let withdrawn_task = start_quotation_process(&db, &code, &withdrawn_quotation, initiator).await;
 
     let search_client: Arc<dyn SearchClient> = Arc::new(ElasticClient::mock());
     start_event_listener(Arc::clone(&db), search_client).await;
@@ -240,11 +239,15 @@ async fn bpm_terminal_decision_writes_back_quotation_status_and_opinion() {
     assert!(rejected.approved_at.is_some(), "拒绝时间必须落库");
     assert_eq!(rejected.rejection_reason.as_deref(), Some("价格需调整"));
 
+    let withdrawn_instance_id = bpm_task::Entity::find_by_id(withdrawn_task)
+        .one(&*db)
+        .await
+        .expect("回读待撤回报价任务失败")
+        .expect("待撤回报价任务必须存在")
+        .instance_id;
     BpmService::new(Arc::clone(&db))
         .cancel_instance(
-            approved
-                .approval_instance_id
-                .expect("撤回报价必须保留实例关联") as i32,
+            withdrawn_instance_id,
             Some(initiator),
             Some("报价内容需调整".to_string()),
         )
