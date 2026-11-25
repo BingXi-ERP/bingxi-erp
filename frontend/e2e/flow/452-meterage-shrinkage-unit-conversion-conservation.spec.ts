@@ -944,14 +944,15 @@ test.describe.serial('452 多计量换算与缩率守恒链', () => {
       `段三：出库流水必须恰 1 行（多行即重复扣减），实际 ${JSON.stringify(shipMeterLines)}`
     ).toBe(1);
     sameDec(shipMeterLines[0], `-${shipQty}`, '452-04 出库流水必须保留负向扣减');
+    const shipBusinessMeterLines = shipMeterLines.map(v => v.replace(/^-/, ''));
     sameDecSum(
       orderMeterLines,
-      shipMeterLines.map(v => `-${v}`),
+      shipBusinessMeterLines,
       '452-04 订单行主计量合计 vs 出库流水业务幅度'
     );
     sameDecSum(
       quoteMeterLines,
-      shipMeterLines.map(v => `-${v}`),
+      shipBusinessMeterLines,
       '452-04 报价明细（按米）合计 vs 出库折回主单位业务幅度'
     );
     console.log(
