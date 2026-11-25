@@ -271,115 +271,55 @@ pub async fn get_slow_query_summary(
     State(state): State<AppState>,
     _auth: AuthContext,
 ) -> Result<Json<ApiResponse<SlowQuerySummary>>, AppError> {
-    // 查询总数
-    let total_sql = "SELECT COUNT(*) as total FROM slow_queries";
-    let total_result = state
+    let summary_sql = "SELECT \
+        COUNT(*) AS total, \
+        COUNT(*) FILTER (WHERE captured_at >= CURRENT_DATE) AS today, \
+        COALESCE(AVG(execution_time_ms), 0)::double precision AS avg_time, \
+        COALESCE(MAX(execution_time_ms), 0)::double precision AS max_time, \
+        (SELECT query_text FROM slow_query_log GROUP BY query_text ORDER BY COUNT(*) DESC, query_text ASC LIMIT 1) AS most_frequent_query, \
+        COUNT(*) FILTER (WHERE optimization_status IS NULL OR optimization_status = 'pending') AS pending, \
+        COUNT(*) FILTER (WHERE optimization_status = 'in_progress') AS in_progress, \
+        COUNT(*) FILTER (WHERE optimization_status = 'resolved') AS optimized, \
+        COUNT(*) FILTER (WHERE optimization_status = 'wont_fix') AS ignored \
+        FROM slow_query_log";
+    let row = state
         .db
         .as_ref()
         .query_one_raw(Statement::from_string(
             sea_orm::DatabaseBackend::Postgres,
-            total_sql.to_string(),
+            summary_sql.to_string(),
         ))
         .await
-        .map_err(|e| AppError::database(format!("查询慢查询总数失败: {}", e)))?;
-    let total_queries = total_result
-        .and_then(|r| r.try_get::<i64>("", "total").ok())
-        .unwrap_or(0);
-
-    // 查询今日新增
-    let today_sql = "SELECT COUNT(*) as today FROM slow_queries WHERE captured_at >= CURRENT_DATE";
-    let today_result = state
-        .db
-        .as_ref()
-        .query_one_raw(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            today_sql.to_string(),
-        ))
-        .await
-        .map_err(|e| AppError::database(format!("查询今日慢查询失败: {}", e)))?;
-    let queries_today = today_result
-        .and_then(|r| r.try_get::<i64>("", "today").ok())
-        .unwrap_or(0);
-
-    // 查询平均执行时间
-    let avg_sql = "SELECT COALESCE(AVG(mean_exec_time), 0) as avg_time FROM slow_queries";
-    let avg_result = state
-        .db
-        .as_ref()
-        .query_one_raw(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            avg_sql.to_string(),
-        ))
-        .await
-        .map_err(|e| AppError::database(format!("查询平均执行时间失败: {}", e)))?;
-    let avg_execution_time = avg_result
-        .and_then(|r| r.try_get::<f64>("", "avg_time").ok())
-        .unwrap_or(0.0);
-
-    // 查询最大执行时间
-    let max_sql = "SELECT COALESCE(MAX(max_exec_time), 0) as max_time FROM slow_queries";
-    let max_result = state
-        .db
-        .as_ref()
-        .query_one_raw(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            max_sql.to_string(),
-        ))
-        .await
-        .map_err(|e| AppError::database(format!("查询最大执行时间失败: {}", e)))?;
-    let max_execution_time = max_result
-        .and_then(|r| r.try_get::<f64>("", "max_time").ok())
-        .unwrap_or(0.0);
-
-    // 查询最频繁的查询
-    let frequent_sql =
-        "SELECT query_text FROM slow_queries GROUP BY query_text ORDER BY COUNT(*) DESC LIMIT 1";
-    let frequent_result = state
-        .db
-        .as_ref()
-        .query_one_raw(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            frequent_sql.to_string(),
-        ))
-        .await
-        .map_err(|e| AppError::database(format!("查询最频繁查询失败: {}", e)))?;
-    let most_frequent_query =
-        frequent_result.and_then(|r| r.try_get::<String>("", "query_text").ok());
-
-    // 查询优化状态统计
-    let status_sql = "SELECT \
-        COUNT(CASE WHEN optimization_status IS NULL OR optimization_status = 'pending' THEN 1 END) as pending, \
-        COUNT(CASE WHEN optimization_status = 'in_progress' THEN 1 END) as in_progress, \
-        COUNT(CASE WHEN optimization_status = 'optimized' THEN 1 END) as optimized, \
-        COUNT(CASE WHEN optimization_status = 'ignored' THEN 1 END) as ignored \
-        FROM slow_queries";
-    let status_result = state
-        .db
-        .as_ref()
-        .query_one_raw(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            status_sql.to_string(),
-        ))
-        .await
-        .map_err(|e| AppError::database(format!("查询优化状态失败: {}", e)))?;
-
+        .map_err(|e| AppError::database(format!("查询慢查询摘要失败: {}", e)))?
+        .ok_or_else(|| AppError::database("慢查询摘要查询未返回聚合行".to_string()))?;
+    let total_queries = row
+        .try_get::<i64>("", "total")
+        .map_err(|e| AppError::database(format!("读取慢查询总数失败: {}", e)))?;
+    let queries_today = row
+        .try_get::<i64>("", "today")
+        .map_err(|e| AppError::database(format!("读取今日慢查询数失败: {}", e)))?;
+    let avg_execution_time = row
+        .try_get::<f64>("", "avg_time")
+        .map_err(|e| AppError::database(format!("读取平均执行时间失败: {}", e)))?;
+    let max_execution_time = row
+        .try_get::<f64>("", "max_time")
+        .map_err(|e| AppError::database(format!("读取最大执行时间失败: {}", e)))?;
+    let most_frequent_query = row
+        .try_get::<Option<String>>("", "most_frequent_query")
+        .map_err(|e| AppError::database(format!("读取最频繁查询失败: {}", e)))?;
     let optimization_status = OptimizationStatusSummary {
-        pending: status_result
-            .as_ref()
-            .and_then(|r| r.try_get::<i64>("", "pending").ok())
-            .unwrap_or(0),
-        in_progress: status_result
-            .as_ref()
-            .and_then(|r| r.try_get::<i64>("", "in_progress").ok())
-            .unwrap_or(0),
-        optimized: status_result
-            .as_ref()
-            .and_then(|r| r.try_get::<i64>("", "optimized").ok())
-            .unwrap_or(0),
-        ignored: status_result
-            .as_ref()
-            .and_then(|r| r.try_get::<i64>("", "ignored").ok())
-            .unwrap_or(0),
+        pending: row
+            .try_get::<i64>("", "pending")
+            .map_err(|e| AppError::database(format!("读取待处理统计失败: {}", e)))?,
+        in_progress: row
+            .try_get::<i64>("", "in_progress")
+            .map_err(|e| AppError::database(format!("读取处理中统计失败: {}", e)))?,
+        optimized: row
+            .try_get::<i64>("", "optimized")
+            .map_err(|e| AppError::database(format!("读取已优化统计失败: {}", e)))?,
+        ignored: row
+            .try_get::<i64>("", "ignored")
+            .map_err(|e| AppError::database(format!("读取不修复统计失败: {}", e)))?,
     };
 
     let summary = SlowQuerySummary {
@@ -534,48 +474,67 @@ pub async fn get_weekly_report(
     // 查询已优化的慢查询
     let optimized_queries = slow_query::Entity::find()
         .filter(slow_query::Column::CapturedAt.gte(week_start))
-        .filter(slow_query::Column::OptimizationStatus.eq("optimized"))
+        .filter(slow_query::Column::OptimizationStatus.eq("resolved"))
         .count(state.db.as_ref())
         .await
         .map_err(|e| AppError::database(format!("查询已优化慢查询失败: {}", e)))?;
 
     // 查询平均执行时间
-    let avg_sql = format!(
-        "SELECT COALESCE(AVG(mean_exec_time), 0) as avg_time FROM slow_queries WHERE captured_at >= '{}'",
-        week_start.format("%Y-%m-%d %H:%M:%S")
-    );
+    let avg_sql = "SELECT COALESCE(AVG(execution_time_ms), 0)::double precision AS avg_time \
+        FROM slow_query_log WHERE captured_at >= $1";
     let avg_result = state
         .db
         .as_ref()
-        .query_one_raw(Statement::from_string(
+        .query_one_raw(Statement::from_sql_and_values(
             sea_orm::DatabaseBackend::Postgres,
-            avg_sql,
+            avg_sql.to_string(),
+            [sea_orm::Value::ChronoDateTimeUtc(Some(week_start))],
         ))
         .await
-        .map_err(|e| AppError::database(format!("查询平均执行时间失败: {}", e)))?;
+        .map_err(|e| AppError::database(format!("查询平均执行时间失败: {}", e)))?
+        .ok_or_else(|| AppError::database("慢查询周报平均执行时间查询未返回聚合行".to_string()))?;
     let avg_execution_time = avg_result
-        .map(|r| r.try_get::<f64>("", "avg_time").unwrap_or(0.0))
-        .unwrap_or(0.0);
+        .try_get::<f64>("", "avg_time")
+        .map_err(|e| AppError::database(format!("读取平均执行时间失败: {}", e)))?;
 
     // 查询 TOP 10 慢查询
-    let top_queries_raw = slow_query::Entity::find()
-        .filter(slow_query::Column::CapturedAt.gte(week_start))
-        .order_by_desc(slow_query::Column::ExecutionTimeMs)
-        .limit(10)
-        .all(state.db.as_ref())
+    let top_sql = "SELECT query_text, \
+        MAX(execution_time_ms)::double precision AS max_exec_time_ms, \
+        COALESCE(SUM(calls), 0)::bigint AS total_calls, \
+        COALESCE(AVG(rows_examined), 0)::double precision AS avg_rows, \
+        COUNT(*)::bigint AS sample_count \
+        FROM slow_query_log WHERE captured_at >= $1 \
+        GROUP BY query_text ORDER BY max_exec_time_ms DESC, query_text ASC LIMIT 10";
+    let top_rows = state
+        .db
+        .as_ref()
+        .query_all_raw(Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Postgres,
+            top_sql.to_string(),
+            [sea_orm::Value::ChronoDateTimeUtc(Some(week_start))],
+        ))
         .await
         .map_err(|e| AppError::database(format!("查询 TOP 慢查询失败: {}", e)))?;
-
-    let top_queries: Vec<SlowQueryStatDto> = top_queries_raw
-        .into_iter()
-        .map(|q| SlowQueryStatDto {
-            query_text: q.query_text,
-            max_exec_time_ms: q.execution_time_ms,
-            total_calls: q.calls,
-            avg_rows: q.rows_examined as f64,
-            sample_count: 1,
-        })
-        .collect();
+    let mut top_queries = Vec::with_capacity(top_rows.len());
+    for row in top_rows {
+        top_queries.push(SlowQueryStatDto {
+            query_text: row
+                .try_get::<String>("", "query_text")
+                .map_err(|e| AppError::database(format!("读取 TOP 查询文本失败: {}", e)))?,
+            max_exec_time_ms: row
+                .try_get::<f64>("", "max_exec_time_ms")
+                .map_err(|e| AppError::database(format!("读取 TOP 最大执行时间失败: {}", e)))?,
+            total_calls: row
+                .try_get::<i64>("", "total_calls")
+                .map_err(|e| AppError::database(format!("读取 TOP 累计调用数失败: {}", e)))?,
+            avg_rows: row
+                .try_get::<f64>("", "avg_rows")
+                .map_err(|e| AppError::database(format!("读取 TOP 平均扫描行数失败: {}", e)))?,
+            sample_count: row
+                .try_get::<i64>("", "sample_count")
+                .map_err(|e| AppError::database(format!("读取 TOP 样本数失败: {}", e)))?,
+        });
+    }
 
     let report = SlowQueryWeeklyReport {
         week_start: week_start.format("%Y-%m-%d").to_string(),

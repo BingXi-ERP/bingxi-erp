@@ -33,6 +33,28 @@ interface SlowQueryStat {
   avg_rows?: unknown;
   sample_count?: unknown;
 }
+interface SlowQuerySummaryResponse {
+  total_queries?: unknown;
+  queries_today?: unknown;
+  avg_execution_time?: unknown;
+  max_execution_time?: unknown;
+  most_frequent_query?: unknown;
+  optimization_status?: {
+    pending?: unknown;
+    in_progress?: unknown;
+    optimized?: unknown;
+    ignored?: unknown;
+  };
+}
+interface SlowQueryWeeklyReportResponse {
+  week_start?: unknown;
+  week_end?: unknown;
+  total_queries?: unknown;
+  new_queries?: unknown;
+  optimized_queries?: unknown;
+  avg_execution_time?: unknown;
+  top_queries?: SlowQueryStat[];
+}
 
 function expectNonNegativeInteger(value: unknown, label: string): void {
   expect(
@@ -234,5 +256,90 @@ test('575-02 日期筛选接受 RFC 3339 并显式拒绝非法与倒置区间', 
        WHERE query_text IN (:'marker' || '-in', :'marker' || '-out');`,
       variables
     );
+  }
+});
+
+test('575-03 摘要与周报按真实日志列聚合且优化状态匹配写入词表', async ({
+  page,
+}: {
+  page: Page;
+}) => {
+  const marker = `575-summary-${randomUUID()}`;
+  const variables = { marker };
+  try {
+    psqlExec(
+      `INSERT INTO slow_query_log
+         (query_text, execution_time_ms, calls, rows_examined, database_name, captured_at, optimization_status)
+       VALUES
+         (:'marker', 9000000000, 2, 10, current_database(), NOW(), NULL),
+         (:'marker', 8000000000, 3, 20, current_database(), NOW(), 'resolved');`,
+      variables
+    );
+
+    const summary = await apiCallRaw<SlowQuerySummaryResponse>(
+      page,
+      'GET',
+      '/slow-queries/summary'
+    );
+    expectNonNegativeInteger(summary.total_queries, '摘要总条数');
+    expectNonNegativeInteger(summary.queries_today, '摘要今日条数');
+    expect(Number(summary.total_queries), '摘要总条数必须包含专用样本').toBeGreaterThanOrEqual(2);
+    expect(Number(summary.queries_today), '摘要今日条数必须包含专用样本').toBeGreaterThanOrEqual(2);
+    expectFiniteNumber(summary.avg_execution_time, '摘要平均执行时间');
+    expectFiniteNumber(summary.max_execution_time, '摘要最大执行时间');
+    expect(Number(summary.max_execution_time), '摘要最大值必须包含专用样本').toBeGreaterThanOrEqual(
+      9000000000
+    );
+    expect(
+      summary.most_frequent_query === null || typeof summary.most_frequent_query === 'string',
+      '摘要最频繁查询须为字符串或空值'
+    ).toBe(true);
+    expect(summary.optimization_status, '摘要须返回优化状态统计').toBeTruthy();
+    expectNonNegativeInteger(summary.optimization_status?.pending, '摘要待处理数');
+    expectNonNegativeInteger(summary.optimization_status?.in_progress, '摘要处理中数');
+    expectNonNegativeInteger(summary.optimization_status?.optimized, '摘要已优化数');
+    expectNonNegativeInteger(summary.optimization_status?.ignored, '摘要不修复数');
+    expect(
+      Number(summary.optimization_status?.optimized),
+      'resolved 专用样本必须计入已优化'
+    ).toBeGreaterThanOrEqual(1);
+
+    const weekly = await apiCallRaw<SlowQueryWeeklyReportResponse>(
+      page,
+      'GET',
+      '/slow-queries/report/weekly?weeks=1'
+    );
+    expect(
+      typeof weekly.week_start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(weekly.week_start)
+    ).toBe(true);
+    expect(typeof weekly.week_end === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(weekly.week_end)).toBe(
+      true
+    );
+    expectNonNegativeInteger(weekly.total_queries, '周报总条数');
+    expectNonNegativeInteger(weekly.new_queries, '周报新增条数');
+    expectNonNegativeInteger(weekly.optimized_queries, '周报已优化条数');
+    expect(Number(weekly.total_queries), '周报总条数必须包含专用样本').toBeGreaterThanOrEqual(2);
+    expect(Number(weekly.new_queries), '周报新增须包含空状态样本').toBeGreaterThanOrEqual(1);
+    expect(
+      Number(weekly.optimized_queries),
+      '周报已优化须包含 resolved 样本'
+    ).toBeGreaterThanOrEqual(1);
+    expectFiniteNumber(weekly.avg_execution_time, '周报平均执行时间');
+    expect(Array.isArray(weekly.top_queries), '周报须返回 TOP 查询数组').toBe(true);
+    if (!Array.isArray(weekly.top_queries)) {
+      throw new Error('575 周报缺少 top_queries 数组，无法验证聚合');
+    }
+    const grouped = weekly.top_queries.find(item => item.query_text === marker);
+    expect(grouped, '专用样本须进入周报 TOP 查询').toBeTruthy();
+    expectFiniteNumber(grouped?.max_exec_time_ms, '周报 TOP 最大执行时间');
+    expect(grouped?.max_exec_time_ms, '周报 TOP 取样本最大执行时间').toBe(9000000000);
+    expectNonNegativeInteger(grouped?.total_calls, '周报 TOP 累计调用数');
+    expect(grouped?.total_calls, '周报 TOP 累计调用数须聚合两条样本').toBe(5);
+    expectFiniteNumber(grouped?.avg_rows, '周报 TOP 平均扫描行数');
+    expect(grouped?.avg_rows, '周报 TOP 平均扫描行数须聚合两条样本').toBe(15);
+    expectNonNegativeInteger(grouped?.sample_count, '周报 TOP 样本数');
+    expect(grouped?.sample_count, '周报 TOP 样本数须为两条').toBe(2);
+  } finally {
+    psqlExec("DELETE FROM slow_query_log WHERE query_text = :'marker';", variables);
   }
 });
