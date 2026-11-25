@@ -770,7 +770,7 @@ mod tests {
     struct UnserializableSnapshot;
 
     impl Serialize for UnserializableSnapshot {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
