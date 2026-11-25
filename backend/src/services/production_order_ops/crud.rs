@@ -20,8 +20,8 @@
 use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, EntityTrait, JoinType, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
+    ActiveValue::NotSet, ColumnTrait, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
 };
 
 use crate::models::production_order::{
