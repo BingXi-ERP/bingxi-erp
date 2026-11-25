@@ -230,7 +230,6 @@ async fn bpm_terminal_decision_writes_back_quotation_status_and_opinion() {
         wait_for_quotation_status(&db, approved_quotation.id, quotation_status::APPROVED).await;
     let rejected =
         wait_for_quotation_status(&db, rejected_quotation.id, quotation_status::REJECTED).await;
-    shutdown_event_bus();
 
     assert_eq!(approved.approved_by, Some(approver as i64));
     assert!(approved.approved_at.is_some(), "批准时间必须落库");
@@ -307,4 +306,5 @@ async fn bpm_terminal_decision_writes_back_quotation_status_and_opinion() {
             && task.status.as_deref() == Some("rejected")
             && task.approval_opinion.as_deref() == Some("价格需调整")
     }));
+    shutdown_event_bus();
 }
