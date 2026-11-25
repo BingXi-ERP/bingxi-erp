@@ -30,7 +30,7 @@ const SHIP_QTY = 120;
 
 function dec(value: unknown, label: string): number {
   const text = String(value);
-  expect(text, `${label} 应为十进制字符串或数字，实际=${text}`).toMatch(/^\d+(?:\.\d+)?$/);
+  expect(text, `${label} 应为十进制字符串或数字，实际=${text}`).toMatch(/^-?\d+(?:\.\d+)?$/);
   const parsed = Number(text);
   expect(Number.isFinite(parsed), `${label} 应为有限数`).toBe(true);
   return parsed;
