@@ -352,32 +352,40 @@ impl ArReconciliationService {
             .lock_exclusive()
             .all(txn)
             .await?;
-        let has_matched_items = reconciliation_items.iter().any(|item| {
-            [
-                ar_status::MATCH_MATCHED,
-                ar_status::MATCH_PARTIAL,
-                "DISPUTED",
-            ]
-            .contains(&item.match_status.as_str())
-        });
         let reconciliation_ids: Vec<i32> = reconciliation_items
             .iter()
             .map(|item| item.reconciliation_id)
             .collect();
-        let has_closed_reconciliations = if reconciliation_ids.is_empty() {
-            false
+        let reconciliations = if reconciliation_ids.is_empty() {
+            Vec::new()
         } else {
             ReconciliationEntity::find()
                 .filter(crate::models::ar_reconciliation::Column::Id.is_in(reconciliation_ids))
                 .lock_exclusive()
                 .all(txn)
                 .await?
-                .iter()
-                .any(|reconciliation| {
-                    reconciliation.reconciliation_status.as_deref()
-                        == Some(ar_status::RECONCILIATION_CLOSED)
-                })
         };
+        let active_reconciliation_ids: std::collections::HashSet<i32> = reconciliations
+            .iter()
+            .filter(|reconciliation| {
+                reconciliation.reconciliation_status.as_deref()
+                    != Some(ar_status::RECONCILIATION_CANCELLED)
+            })
+            .map(|reconciliation| reconciliation.id)
+            .collect();
+        let has_matched_items = reconciliation_items.iter().any(|item| {
+            active_reconciliation_ids.contains(&item.reconciliation_id)
+                && [
+                    ar_status::MATCH_MATCHED,
+                    ar_status::MATCH_PARTIAL,
+                    "DISPUTED",
+                ]
+                .contains(&item.match_status.as_str())
+        });
+        let has_closed_reconciliations = reconciliations.iter().any(|reconciliation| {
+            reconciliation.reconciliation_status.as_deref()
+                == Some(ar_status::RECONCILIATION_CLOSED)
+        });
         if has_matched_items || has_closed_reconciliations {
             return Err(AppError::business(format!(
                 "应收单 {} 已核销，禁止取消送货单",

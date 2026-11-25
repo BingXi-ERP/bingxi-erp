@@ -534,6 +534,30 @@ test.describe.serial('653 小程序门户应收与真实 AR 净额一致', () =>
         orderCId,
         60000n
       );
+
+      await apiCall(page, 'POST', `/ar/payments/${paymentId}/cancel`);
+      const cancelledPayment = await apiCallRaw<Row>(page, 'GET', `/ar/payments/${paymentId}`);
+      expect(cancelledPayment.status, '收款单取消后必须回读 cancelled').toBe('cancelled');
+      paymentId = 0;
+      const invoiceA = await findArByOrderNo(page, customerId, orderANo);
+      expect(invoiceA.length, '取消收款后订单 A 原应收必须仍可回读').toBe(1);
+      expect(toCents(invoiceA[0].received_amount, '取消收款后已收金额')).toBe(0n);
+      expect(toCents(invoiceA[0].unpaid_amount, '取消收款后未收金额')).toBe(100000n);
+
+      await apiCall(
+        page,
+        'POST',
+        `/sales/orders/${orderAId}/deliveries/${positiveId(deliveryA.id, '订单 A 发货单')}/cancel`,
+        { reason: 'E2E-653 取消收款后释放核销守卫' }
+      );
+      const afterPaymentCancel = await findArByOrderNo(page, customerId, orderANo);
+      expect(afterPaymentCancel.length, '取消收款后取消发货只能新增一张红字应收').toBe(2);
+      expect(
+        afterPaymentCancel.some(item => toCents(item.invoice_amount, '取消收款后红字金额') < 0n),
+        '取消收款后取消发货必须生成红字应收'
+      ).toBe(true);
+      await expectPortalReceivable(portal.page, orderAId, 0n, 100000n);
+      await expectDashboardReceivable(portal.page, 100000n);
     } finally {
       await portal?.close();
       if (paymentId > 0) {
