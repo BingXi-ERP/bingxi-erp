@@ -106,9 +106,8 @@ impl InventoryFinanceBridgeService {
             let voucher_args = VoucherCreateArgs {
                 product_id,
                 warehouse_id,
-                // 流水保留方向，财务桥接按业务幅度计额，避免出库负增量生成负金额凭证
-                quantity_meters: quantity_meters.abs(),
-                quantity_kg: quantity_kg.abs(),
+                quantity_meters,
+                quantity_kg,
                 source_bill_type: source_bill_type.as_deref(),
                 source_bill_no: source_bill_no.as_deref(),
                 source_bill_id,

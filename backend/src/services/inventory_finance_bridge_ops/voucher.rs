@@ -109,6 +109,12 @@ impl InventoryFinanceBridgeService {
         &self,
         args: VoucherCreateArgs<'_>,
     ) -> Result<(), AppError> {
+        // 流水保留出库方向，凭证按业务幅度计额；盘盈盘亏仍必须保留原方向。
+        let args = VoucherCreateArgs {
+            quantity_meters: args.quantity_meters.abs(),
+            quantity_kg: args.quantity_kg.abs(),
+            ..args
+        };
         // P0 5-4 修复：除零保护，quantity_meters 为 0 时拒绝生成凭证
         if args.quantity_meters.is_zero() {
             return Err(AppError::validation_displayable(
