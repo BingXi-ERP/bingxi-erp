@@ -49,7 +49,7 @@ fn parse_time_param(raw: &str, field: &str) -> Result<DateTime<Utc>, AppError> {
     DateTime::parse_from_rfc3339(raw)
         .map(|dt| dt.with_timezone(&Utc))
         .map_err(|e| {
-            AppError::bad_request(format!(
+            AppError::validation_displayable(format!(
                 "{field} 时间格式非法（应为 RFC 3339，如 2026-11-25T00:00:00Z）：{e}"
             ))
         })
@@ -112,7 +112,9 @@ pub async fn list_slow_queries(
         .transpose()?;
     if let (Some(start), Some(end)) = (start_time, end_time) {
         if start > end {
-            return Err(AppError::bad_request("起始时间不能晚于截止时间"));
+            return Err(AppError::validation_displayable(
+                "起始时间不能晚于截止时间".to_string(),
+            ));
         }
     }
 
@@ -244,6 +246,13 @@ pub async fn get_slow_query_stats(
     })))
 }
 
+/// 慢查询摘要查询参数
+#[allow(dead_code, reason = "反序列化输入字段")]
+#[derive(Debug, Deserialize)]
+pub struct SlowQuerySummaryQuery {
+    pub keyword: Option<String>,
+}
+
 /// batch-17 P3: 慢查询摘要数据
 #[allow(dead_code, reason = "序列化输出字段")]
 #[derive(Debug, Serialize)]
@@ -270,24 +279,32 @@ pub struct OptimizationStatusSummary {
 pub async fn get_slow_query_summary(
     State(state): State<AppState>,
     _auth: AuthContext,
+    Query(query): Query<SlowQuerySummaryQuery>,
 ) -> Result<Json<ApiResponse<SlowQuerySummary>>, AppError> {
+    let keyword_pattern = query
+        .keyword
+        .as_deref()
+        .map(str::trim)
+        .filter(|keyword| !keyword.is_empty())
+        .map(safe_like_pattern);
     let summary_sql = "SELECT \
         COUNT(*) AS total, \
         COUNT(*) FILTER (WHERE captured_at >= CURRENT_DATE) AS today, \
         COALESCE(AVG(execution_time_ms), 0)::double precision AS avg_time, \
         COALESCE(MAX(execution_time_ms), 0)::double precision AS max_time, \
-        (SELECT query_text FROM slow_query_log GROUP BY query_text ORDER BY COUNT(*) DESC, query_text ASC LIMIT 1) AS most_frequent_query, \
+        (SELECT query_text FROM slow_query_log WHERE ($1::text IS NULL OR query_text LIKE $1) GROUP BY query_text ORDER BY COUNT(*) DESC, query_text ASC LIMIT 1) AS most_frequent_query, \
         COUNT(*) FILTER (WHERE optimization_status IS NULL OR optimization_status = 'pending') AS pending, \
         COUNT(*) FILTER (WHERE optimization_status = 'in_progress') AS in_progress, \
         COUNT(*) FILTER (WHERE optimization_status = 'resolved') AS optimized, \
         COUNT(*) FILTER (WHERE optimization_status = 'wont_fix') AS ignored \
-        FROM slow_query_log";
+        FROM slow_query_log WHERE ($1::text IS NULL OR query_text LIKE $1)";
     let row = state
         .db
         .as_ref()
-        .query_one_raw(Statement::from_string(
+        .query_one_raw(Statement::from_sql_and_values(
             sea_orm::DatabaseBackend::Postgres,
             summary_sql.to_string(),
+            [sea_orm::Value::String(keyword_pattern)],
         ))
         .await
         .map_err(|e| AppError::database(format!("查询慢查询摘要失败: {}", e)))?
@@ -429,6 +446,7 @@ pub async fn update_slow_query_optimization(
 #[derive(Debug, Deserialize)]
 pub struct WeeklyReportQuery {
     pub weeks: Option<u32>,
+    pub keyword: Option<String>,
 }
 
 /// batch-17 P3: 慢查询周报数据
@@ -454,48 +472,70 @@ pub async fn get_weekly_report(
 
     let weeks = query.weeks.unwrap_or(1);
     if !(1..=5200).contains(&weeks) {
-        return Err(AppError::bad_request(
+        return Err(AppError::validation_displayable(
             "weeks 必须在 1 到 5200 之间".to_string(),
         ));
     }
+    let keyword_pattern = query
+        .keyword
+        .as_deref()
+        .map(str::trim)
+        .filter(|keyword| !keyword.is_empty())
+        .map(safe_like_pattern);
     let now = chrono::Utc::now();
     let week_start = now
         .checked_sub_signed(chrono::Duration::weeks(weeks as i64))
-        .ok_or_else(|| AppError::bad_request("weeks 超出支持的时间范围".to_string()))?;
+        .ok_or_else(|| AppError::validation_displayable("weeks 超出支持的时间范围".to_string()))?;
 
     // 查询本周慢查询统计
-    let total_queries = slow_query::Entity::find()
-        .filter(slow_query::Column::CapturedAt.gte(week_start))
+    let mut total_query =
+        slow_query::Entity::find().filter(slow_query::Column::CapturedAt.gte(week_start));
+    if let Some(pattern) = &keyword_pattern {
+        total_query = total_query.filter(slow_query::Column::QueryText.like(pattern.clone()));
+    }
+    let total_queries = total_query
         .count(state.db.as_ref())
         .await
         .map_err(|e| AppError::database(format!("查询慢查询总数失败: {}", e)))?;
 
     // 查询新增慢查询（本周首次出现的）
-    let new_queries = slow_query::Entity::find()
+    let mut new_query = slow_query::Entity::find()
         .filter(slow_query::Column::CapturedAt.gte(week_start))
-        .filter(slow_query::Column::OptimizationStatus.is_null())
+        .filter(slow_query::Column::OptimizationStatus.is_null());
+    if let Some(pattern) = &keyword_pattern {
+        new_query = new_query.filter(slow_query::Column::QueryText.like(pattern.clone()));
+    }
+    let new_queries = new_query
         .count(state.db.as_ref())
         .await
         .map_err(|e| AppError::database(format!("查询新增慢查询失败: {}", e)))?;
 
     // 查询已优化的慢查询
-    let optimized_queries = slow_query::Entity::find()
+    let mut optimized_query = slow_query::Entity::find()
         .filter(slow_query::Column::CapturedAt.gte(week_start))
-        .filter(slow_query::Column::OptimizationStatus.eq("resolved"))
+        .filter(slow_query::Column::OptimizationStatus.eq("resolved"));
+    if let Some(pattern) = &keyword_pattern {
+        optimized_query =
+            optimized_query.filter(slow_query::Column::QueryText.like(pattern.clone()));
+    }
+    let optimized_queries = optimized_query
         .count(state.db.as_ref())
         .await
         .map_err(|e| AppError::database(format!("查询已优化慢查询失败: {}", e)))?;
 
     // 查询平均执行时间
     let avg_sql = "SELECT COALESCE(AVG(execution_time_ms), 0)::double precision AS avg_time \
-        FROM slow_query_log WHERE captured_at >= $1";
+        FROM slow_query_log WHERE captured_at >= $1 AND ($2::text IS NULL OR query_text LIKE $2)";
     let avg_result = state
         .db
         .as_ref()
         .query_one_raw(Statement::from_sql_and_values(
             sea_orm::DatabaseBackend::Postgres,
             avg_sql.to_string(),
-            [sea_orm::Value::ChronoDateTimeUtc(Some(week_start))],
+            [
+                sea_orm::Value::ChronoDateTimeUtc(Some(week_start)),
+                sea_orm::Value::String(keyword_pattern.clone()),
+            ],
         ))
         .await
         .map_err(|e| AppError::database(format!("查询平均执行时间失败: {}", e)))?
@@ -510,7 +550,7 @@ pub async fn get_weekly_report(
         COALESCE(SUM(calls), 0)::bigint AS total_calls, \
         COALESCE(AVG(rows_examined), 0)::double precision AS avg_rows, \
         COUNT(*)::bigint AS sample_count \
-        FROM slow_query_log WHERE captured_at >= $1 \
+        FROM slow_query_log WHERE captured_at >= $1 AND ($2::text IS NULL OR query_text LIKE $2) \
         GROUP BY query_text ORDER BY max_exec_time_ms DESC, query_text ASC LIMIT 10";
     let top_rows = state
         .db
@@ -518,7 +558,10 @@ pub async fn get_weekly_report(
         .query_all_raw(Statement::from_sql_and_values(
             sea_orm::DatabaseBackend::Postgres,
             top_sql.to_string(),
-            [sea_orm::Value::ChronoDateTimeUtc(Some(week_start))],
+            [
+                sea_orm::Value::ChronoDateTimeUtc(Some(week_start)),
+                sea_orm::Value::String(keyword_pattern.clone()),
+            ],
         ))
         .await
         .map_err(|e| AppError::database(format!("查询 TOP 慢查询失败: {}", e)))?;

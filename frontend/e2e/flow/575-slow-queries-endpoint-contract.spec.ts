@@ -247,7 +247,9 @@ test('575-02 日期筛选接受 RFC 3339 并显式拒绝非法与倒置区间', 
     for (const item of invalidCases) {
       const failure = await apiCallExpectFail(page, 'GET', `/slow-queries?${item.query}`);
       expect(failure.status, `${item.field} 非法输入必须返回 HTTP 400`).toBe(400);
-      expect(failure.code, `${item.field} 非法输入必须返回统一字符串错误码`).toBe('BadRequest');
+      expect(failure.code, `${item.field} 非法输入必须返回统一字符串错误码`).toBe(
+        'VALIDATION_ERROR'
+      );
       expect(failure.message, `${item.field} 错误消息必须点名真实原因`).toContain(item.message);
     }
   } finally {
@@ -267,74 +269,44 @@ test('575-03 摘要与周报按真实日志列聚合且优化状态匹配写入�
   const marker = `575-summary-${randomUUID()}`;
   const variables = { marker };
   try {
-    const summaryBefore = await apiCallRaw<SlowQuerySummaryResponse>(
-      page,
-      'GET',
-      '/slow-queries/summary'
-    );
-    const weeklyBefore = await apiCallRaw<SlowQueryWeeklyReportResponse>(
-      page,
-      'GET',
-      '/slow-queries/report/weekly?weeks=1'
-    );
-    expectNonNegativeInteger(summaryBefore.total_queries, '插入前摘要总条数');
-    expectNonNegativeInteger(weeklyBefore.total_queries, '插入前周报总条数');
-    expectNonNegativeInteger(weeklyBefore.new_queries, '插入前周报新增条数');
-    expectNonNegativeInteger(weeklyBefore.optimized_queries, '插入前周报已优化条数');
-    expect(summaryBefore.optimization_status, '插入前摘要须返回优化状态统计').toBeTruthy();
-    expectNonNegativeInteger(summaryBefore.optimization_status?.optimized, '插入前摘要已优化数');
-    expectNonNegativeInteger(summaryBefore.optimization_status?.ignored, '插入前摘要不修复数');
-
     psqlExec(
       `INSERT INTO slow_query_log
          (query_text, execution_time_ms, calls, rows_examined, database_name, captured_at, optimization_status)
        VALUES
-         (:'marker', 9000000000, 2, 10, current_database(), NOW(), NULL),
-         (:'marker', 8000000000, 3, 20, current_database(), NOW(), 'resolved'),
-         (:'marker', 7000000000, 4, 30, current_database(), NOW(), 'wont_fix');`,
+         (:'marker', 9000000000, 2, 10, current_database(), CURRENT_DATE + INTERVAL '12 hours', NULL),
+         (:'marker', 8000000000, 3, 20, current_database(), CURRENT_DATE + INTERVAL '12 hours', 'resolved'),
+         (:'marker', 7000000000, 4, 30, current_database(), CURRENT_DATE + INTERVAL '12 hours', 'wont_fix');`,
       variables
     );
 
     const summary = await apiCallRaw<SlowQuerySummaryResponse>(
       page,
       'GET',
-      '/slow-queries/summary'
+      `/slow-queries/summary?keyword=${encodeURIComponent(marker)}`
     );
     expectNonNegativeInteger(summary.total_queries, '摘要总条数');
     expectNonNegativeInteger(summary.queries_today, '摘要今日条数');
-    expect(
-      Number(summary.total_queries) - Number(summaryBefore.total_queries),
-      '摘要总条数差分须恰好包含三条专用样本'
-    ).toBe(3);
+    expect(summary.total_queries, '关键词摘要须只返回三条专用样本').toBe(3);
+    expect(summary.queries_today, '三条专用样本须落在今日').toBe(3);
     expectFiniteNumber(summary.avg_execution_time, '摘要平均执行时间');
+    expect(summary.avg_execution_time, '摘要平均执行时间须聚合三条样本').toBe(8000000000);
     expectFiniteNumber(summary.max_execution_time, '摘要最大执行时间');
-    expect(Number(summary.max_execution_time), '摘要最大值必须包含专用样本').toBeGreaterThanOrEqual(
-      9000000000
-    );
-    expect(
-      summary.most_frequent_query === null || typeof summary.most_frequent_query === 'string',
-      '摘要最频繁查询须为字符串或空值'
-    ).toBe(true);
+    expect(summary.max_execution_time, '摘要最大执行时间须取三条样本最大值').toBe(9000000000);
+    expect(summary.most_frequent_query, '关键词摘要最频繁查询须为专用样本').toBe(marker);
     expect(summary.optimization_status, '摘要须返回优化状态统计').toBeTruthy();
     expectNonNegativeInteger(summary.optimization_status?.pending, '摘要待处理数');
     expectNonNegativeInteger(summary.optimization_status?.in_progress, '摘要处理中数');
     expectNonNegativeInteger(summary.optimization_status?.optimized, '摘要已优化数');
     expectNonNegativeInteger(summary.optimization_status?.ignored, '摘要不修复数');
-    expect(
-      Number(summary.optimization_status?.optimized) -
-        Number(summaryBefore.optimization_status?.optimized),
-      'resolved 专用样本必须计入已优化'
-    ).toBe(1);
-    expect(
-      Number(summary.optimization_status?.ignored) -
-        Number(summaryBefore.optimization_status?.ignored),
-      'wont_fix 专用样本必须计入不修复'
-    ).toBe(1);
+    expect(summary.optimization_status?.pending, '空状态样本须计入待处理').toBe(1);
+    expect(summary.optimization_status?.in_progress, '无处理中样本时须为零').toBe(0);
+    expect(summary.optimization_status?.optimized, 'resolved 样本须计入已优化').toBe(1);
+    expect(summary.optimization_status?.ignored, 'wont_fix 样本须计入不修复').toBe(1);
 
     const weekly = await apiCallRaw<SlowQueryWeeklyReportResponse>(
       page,
       'GET',
-      '/slow-queries/report/weekly?weeks=1'
+      `/slow-queries/report/weekly?weeks=1&keyword=${encodeURIComponent(marker)}`
     );
     expect(
       typeof weekly.week_start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(weekly.week_start)
@@ -345,25 +317,18 @@ test('575-03 摘要与周报按真实日志列聚合且优化状态匹配写入�
     expectNonNegativeInteger(weekly.total_queries, '周报总条数');
     expectNonNegativeInteger(weekly.new_queries, '周报新增条数');
     expectNonNegativeInteger(weekly.optimized_queries, '周报已优化条数');
-    expect(
-      Number(weekly.total_queries) - Number(weeklyBefore.total_queries),
-      '周报总条数差分须恰好包含三条专用样本'
-    ).toBe(3);
-    expect(
-      Number(weekly.new_queries) - Number(weeklyBefore.new_queries),
-      '周报新增差分须包含空状态样本'
-    ).toBe(1);
-    expect(
-      Number(weekly.optimized_queries) - Number(weeklyBefore.optimized_queries),
-      '周报已优化差分须包含 resolved 样本'
-    ).toBe(1);
+    expect(weekly.total_queries, '关键词周报须只返回三条专用样本').toBe(3);
+    expect(weekly.new_queries, '周报新增须包含空状态样本').toBe(1);
+    expect(weekly.optimized_queries, '周报已优化须包含 resolved 样本').toBe(1);
     expectFiniteNumber(weekly.avg_execution_time, '周报平均执行时间');
+    expect(weekly.avg_execution_time, '周报平均执行时间须聚合三条样本').toBe(8000000000);
     expect(Array.isArray(weekly.top_queries), '周报须返回 TOP 查询数组').toBe(true);
     if (!Array.isArray(weekly.top_queries)) {
       throw new Error('575 周报缺少 top_queries 数组，无法验证聚合');
     }
-    const grouped = weekly.top_queries.find(item => item.query_text === marker);
-    expect(grouped, '专用样本须进入周报 TOP 查询').toBeTruthy();
+    expect(weekly.top_queries, '关键词周报 TOP 须只包含专用样本').toHaveLength(1);
+    const grouped = weekly.top_queries[0];
+    expect(grouped?.query_text, '周报 TOP 查询文本须为专用样本').toBe(marker);
     expectFiniteNumber(grouped?.max_exec_time_ms, '周报 TOP 最大执行时间');
     expect(grouped?.max_exec_time_ms, '周报 TOP 取样本最大执行时间').toBe(9000000000);
     expectNonNegativeInteger(grouped?.total_calls, '周报 TOP 累计调用数');
@@ -380,7 +345,7 @@ test('575-03 摘要与周报按真实日志列聚合且优化状态匹配写入�
         `/slow-queries/report/weekly?weeks=${weeks}`
       );
       expect(invalidWeeks.status, `周数 ${weeks} 必须显式返回 HTTP 400`).toBe(400);
-      expect(invalidWeeks.code, `周数 ${weeks} 必须返回统一字符串错误码`).toBe('BadRequest');
+      expect(invalidWeeks.code, `周数 ${weeks} 必须返回统一字符串错误码`).toBe('VALIDATION_ERROR');
       expect(invalidWeeks.message, `周数 ${weeks} 错误消息须点名真实原因`).toContain(
         'weeks 必须在 1 到 5200 之间'
       );
