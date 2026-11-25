@@ -10,7 +10,7 @@
  *   POST /sales/orders、POST /sales/orders/{id}/submit、POST /sales/orders/{id}/approve、
  *   POST /sales/orders/{id}/ship、GET /inventory/stock/transactions。
  * - 存什么：按 created_at 升序回放流水，首行 before=0、逐行 next.before==prev.after、
- *   末行 after==现存库存；入库腿 source_bill_type/no 回指入库单，出库腿回指销售订单。
+ *   末行 after==可用库存；入库腿 source_bill_type/no 回指入库单，出库腿回指销售订单。
  * - 存哪里：purchase_orders/purchase_receipts/inventory_transactions/sales_orders 各一行；
  *   收尾尽力撤采购单；销售订单与流水由唯一批次天然隔离，不清库以免破坏回放证据。
  *
@@ -41,7 +41,7 @@ interface TxnRow {
 }
 
 interface StockRow {
-  quantity_meters: number | string;
+  quantity_available: number | string;
   batch_no?: string;
 }
 
@@ -162,8 +162,8 @@ test.describe.serial('648 库存流水 before/after 逐行回放台账', () => {
     );
     expect(stockBefore.total, '[648-1] 入库后唯一批次库存应恰有 1 行').toBe(1);
     expect(
-      toScaled(stockBefore.items?.[0]?.quantity_meters, '[648-1] 入库后现存量'),
-      '[648-1] 入库后现存量应为 40'
+      toScaled(stockBefore.items?.[0]?.quantity_available, '[648-1] 入库后可用量'),
+      '[648-1] 入库后可用量应为 40'
     ).toBe(4000n);
 
     const order = await apiCallRaw<{ id?: number; order_no?: string }>(
@@ -251,9 +251,9 @@ test.describe.serial('648 库存流水 before/after 逐行回放台账', () => {
     } else {
       expect(Number(stockAfter.total), '[648-1] 出库后唯一批次库存应至多 1 行').toBe(1);
       expect(
-        toScaled(stockAfter.items?.[0]?.quantity_meters, '[648-1] 出库后现存量') -
+        toScaled(stockAfter.items?.[0]?.quantity_available, '[648-1] 出库后可用量') -
           toScaled(rows[1].quantity_after_meters, '[648-1] 出库扣后量'),
-        '[648-1] 末行 after 与现存库存差额必须为 0'
+        '[648-1] 末行 after 与可用库存差额必须为 0'
       ).toBe(0n);
     }
   });
