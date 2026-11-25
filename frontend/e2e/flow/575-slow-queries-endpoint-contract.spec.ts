@@ -339,6 +339,17 @@ test('575-03 摘要与周报按真实日志列聚合且优化状态匹配写入�
     expect(grouped?.avg_rows, '周报 TOP 平均扫描行数须聚合两条样本').toBe(15);
     expectNonNegativeInteger(grouped?.sample_count, '周报 TOP 样本数');
     expect(grouped?.sample_count, '周报 TOP 样本数须为两条').toBe(2);
+
+    const invalidWeeks = await apiCallExpectFail(
+      page,
+      'GET',
+      '/slow-queries/report/weekly?weeks=4294967295'
+    );
+    expect(invalidWeeks.status, '超大周数必须显式返回 HTTP 400').toBe(400);
+    expect(invalidWeeks.code, '超大周数必须返回统一字符串错误码').toBe('BadRequest');
+    expect(invalidWeeks.message, '超大周数错误消息须点名真实原因').toContain(
+      'weeks 超出支持的时间范围'
+    );
   } finally {
     psqlExec("DELETE FROM slow_query_log WHERE query_text = :'marker';", variables);
   }

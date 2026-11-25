@@ -454,7 +454,9 @@ pub async fn get_weekly_report(
 
     let weeks = query.weeks.unwrap_or(1);
     let now = chrono::Utc::now();
-    let week_start = now - chrono::Duration::weeks(weeks as i64);
+    let week_start = now
+        .checked_sub_signed(chrono::Duration::weeks(weeks as i64))
+        .ok_or_else(|| AppError::bad_request("weeks 超出支持的时间范围".to_string()))?;
 
     // 查询本周慢查询统计
     let total_queries = slow_query::Entity::find()
