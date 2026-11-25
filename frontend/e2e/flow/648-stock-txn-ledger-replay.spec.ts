@@ -172,7 +172,7 @@ test.describe.serial('648 库存流水 before/after 逐行回放台账', () => {
       '/sales/orders',
       {
         customer_id: ctx.customerId,
-        order_date: new Date().toISOString().slice(0, 10),
+        order_date: new Date().toISOString(),
         items: [
           {
             product_id: product,
