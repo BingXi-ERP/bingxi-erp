@@ -178,8 +178,9 @@ export const useCp = () => {
   };
 
   // 趋势天数变化 → 重新拉取趋势
-  const handleTrendDaysChange = () => {
-    fetchTrendData();
+  const handleTrendDaysChange = (days: number) => {
+    trendDays.value = days;
+    void fetchTrendData();
   };
 
   // 初始化挂载：工作中心列表由 useTableApi setup 自动加载，此处仅拉取辅助数据

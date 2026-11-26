@@ -6,6 +6,8 @@ use sea_orm_migration::prelude::*;
 
 mod sql;
 
+pub use sql::{DOWN_SQL, UP_SCHEMA_SQL, UP_SEED_SQL, UP_TRIGGER_SQL};
+
 pub struct Migration;
 
 impl MigrationName for Migration {

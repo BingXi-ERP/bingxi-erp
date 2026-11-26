@@ -1,14 +1,12 @@
 //! 编码规则表、版本快照与 append-only 触发器的真实 PostgreSQL 回归。
 //!
-//! SQL 常量直引迁移同源文件，避免测试侧另抄 DDL；本用例显式 `#[ignore]`，由
+//! SQL 常量从 migration crate 同源导出，避免测试侧另抄 DDL；本用例显式 `#[ignore]`，由
 //! `ci-test-rust-ignored` 在已迁移 PostgreSQL 上执行。所有 DDL 与写入均包在
 //! 外层事务中，结束统一回滚，不污染共用测试库。
 
-mod migration_sql {
-    include!("../migration/src/domain/system_number_rules/sql.rs");
-}
-
 mod test_common;
+
+use migration::domain::system_number_rules::{UP_SCHEMA_SQL, UP_SEED_SQL, UP_TRIGGER_SQL};
 
 use sea_orm::{
     ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, QueryResult, Statement,
@@ -57,12 +55,12 @@ async fn system_number_rule_schema_constraints_and_replay_are_enforced() {
     require_postgres(&db).await;
     let txn = db.begin().await.expect("开启编码规则 schema 回归事务失败");
 
-    exec(&txn, migration_sql::UP_SCHEMA_SQL).await;
-    exec(&txn, migration_sql::UP_TRIGGER_SQL).await;
-    exec(&txn, migration_sql::UP_SEED_SQL).await;
-    exec(&txn, migration_sql::UP_SCHEMA_SQL).await;
-    exec(&txn, migration_sql::UP_TRIGGER_SQL).await;
-    exec(&txn, migration_sql::UP_SEED_SQL).await;
+    exec(&txn, UP_SCHEMA_SQL).await;
+    exec(&txn, UP_TRIGGER_SQL).await;
+    exec(&txn, UP_SEED_SQL).await;
+    exec(&txn, UP_SCHEMA_SQL).await;
+    exec(&txn, UP_TRIGGER_SQL).await;
+    exec(&txn, UP_SEED_SQL).await;
 
     for key in ["SO", "PO", "QT", "PR", "DN", "LD"] {
         assert_eq!(

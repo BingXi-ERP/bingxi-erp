@@ -163,7 +163,7 @@ async function fillEditForm(
   changeReason: string
 ): Promise<void> {
   await page.getByTestId('number-rule-prefix-input').fill(config.prefix);
-  await page.getByTestId('number-rule-width-input').locator('input').fill(String(config.seq_width));
+  await page.getByTestId('number-rule-width-input').fill(String(config.seq_width));
   await pickSelectIn(page, page, '重置周期', { optionText: resetModeText(config.reset_mode) });
   await page.getByTestId('number-rule-change-reason-input').fill(changeReason);
 }
