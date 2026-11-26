@@ -54,6 +54,11 @@ export type BpmAssigneeType = 'user' | 'dept_superior';
  * （resolve_node_assignee 判定是否取再上一级，缺省即非敏感，存量定义无需迁移）。
  * 节点级 condition / next_nodes 引擎从不读取，仍不声明。
  */
+export interface ProcessNodeTimeout {
+  after_seconds: number;
+  transfer_to_user_id: number;
+}
+
 export interface ProcessNode {
   id: string;
   type: BpmNodeType;
@@ -61,6 +66,7 @@ export interface ProcessNode {
   assignee_type?: BpmAssigneeType;
   assignee_value?: number;
   sensitive?: boolean;
+  timeout?: ProcessNodeTimeout;
 }
 
 /**

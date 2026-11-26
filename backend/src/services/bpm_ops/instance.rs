@@ -140,6 +140,11 @@ impl BpmService {
         } else {
             sign_mode::resolve_assignees(txn, &multi_ids).await?
         };
+        let timeout_policy = super::timeout::node_timeout_policy(first_task_node)?;
+        if let Some(policy) = timeout_policy.as_ref() {
+            super::timeout::validate_timeout_target(txn, policy).await?;
+        }
+        let now = chrono::Utc::now();
 
         // 创建首个用户任务：单人走原解析；会签/或签每位处理人各一枚同节点工单，
         // 工单实际处理人逐人落列，待办按人过滤时每人都可见。
@@ -160,6 +165,8 @@ impl BpmService {
                     .collect()
             };
         for (handler_id, _handler_name, variables) in assignees {
+            let (variables, due_date) =
+                super::timeout::apply_timeout_snapshot(variables, timeout_policy.as_ref(), now)?;
             let task_model = bpm_task::ActiveModel {
                 instance_id: Set(instance.id),
                 process_definition_id: Set(definition.id),
@@ -208,8 +215,9 @@ impl BpmService {
                     Some(variables)
                 }),
                 status: Set(Some(task_status::PENDING.to_string())),
-                created_at: Set(Some(chrono::Utc::now())),
-                updated_at: Set(Some(chrono::Utc::now())),
+                due_date: Set(due_date),
+                created_at: Set(Some(now)),
+                updated_at: Set(Some(now)),
                 ..Default::default()
             };
             created.push(task_model.insert(txn).await?);
