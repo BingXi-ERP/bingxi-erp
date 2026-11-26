@@ -67,7 +67,8 @@ async fn system_number_rule_schema_constraints_and_replay_are_enforced() {
             scalar(
                 &txn,
                 &format!("SELECT COUNT(*) FROM system_number_rules WHERE rule_key = '{key}'"),
-            ),
+            )
+            .await,
             1,
             "迁移重放不得重复播种 {key}"
         );
@@ -85,7 +86,8 @@ async fn system_number_rule_schema_constraints_and_replay_are_enforced() {
         scalar(
             &txn,
             "SELECT COUNT(*) FROM system_number_rules WHERE rule_key LIKE 'SCHEMA_%'"
-        ),
+        )
+        .await,
         3,
         "三种 reset_mode 必须均可写入"
     );
@@ -122,7 +124,8 @@ async fn system_number_rule_schema_constraints_and_replay_are_enforced() {
     let rule_id = scalar(
         &txn,
         "SELECT id FROM system_number_rules WHERE rule_key = 'SO'",
-    );
+    )
+    .await;
     expect_rejected(
         &txn,
         &format!(
@@ -141,7 +144,8 @@ async fn system_number_rule_schema_constraints_and_replay_are_enforced() {
         scalar(
             &txn,
             "SELECT last_seq FROM system_number_sequences WHERE rule_key = 'SO' AND entity_table = 'sales_orders' AND output_prefix = 'SO202611'"
-        ),
+        )
+        .await,
         7,
         "号段计数必须持久化并可回读"
     );
@@ -179,7 +183,8 @@ async fn system_number_rule_schema_constraints_and_replay_are_enforced() {
     let cascade_rule_id = scalar(
         &txn,
         "SELECT id FROM system_number_rules WHERE rule_key = 'SCHEMA_DAY'",
-    );
+    )
+    .await;
     exec(
         &txn,
         &format!(
@@ -199,7 +204,8 @@ async fn system_number_rule_schema_constraints_and_replay_are_enforced() {
             &format!(
                 "SELECT COUNT(*) FROM system_number_rule_revisions WHERE rule_id = {cascade_rule_id}"
             ),
-        ),
+        )
+        .await,
         0,
         "父规则删除必须允许 ON DELETE CASCADE 清理快照"
     );
