@@ -49,12 +49,12 @@ normalize_empty_query_params → timeout → security_headers → rate_limiting
   字段级替代方案是 `empty_str_as_none` / `empty_str_vec_as_none`（`query_params.rs:85,99`，
   目前仅 `purchase_order_handler.rs:515,522` 使用）。前端对应的一半是 `request.ts:95 serializeParams`。
 - 权限是**按 URL 段推导**的，不是按 handler 声明：`middleware/permission.rs:85 permission_middleware`
-  → `:259 extract_resource_info`（取 `/api/v1/erp/{seg3}/{seg4}` 作 resource_type，
+  → `:343 extract_resource_info`（取 `/api/v1/erp/{seg3}/{seg4}` 作 resource_type，
   经 `utils/path_utils.rs:12 is_module_prefix` / `:102 resolve_module_prefixed_resource` 白名单）
-  → `:72 extract_route_info` 决定 action（`?action=` 白名单 print/export/download → 路径末段关键词
-  → `:317 method_to_action`：GET=read / POST=create / PUT,PATCH=update / DELETE=delete）
-  → `:524 check_permission` 查 `role_permission` 表（模型 `models/role_permission.rs:8`，
-  `resource_type`/`action` 支持 `"*"`，缓存 `:354 PERMISSION_CACHE`，管理员短路 `:524`）。
+  → `:76 extract_route_info` 决定 action（path > query > method；路径写操作不能被 `?action=` 降级）
+  → `:414 method_to_action`：GET=read / POST=create / PUT,PATCH=update / DELETE=delete）
+  → `:647 check_permission` 查 `role_permission` 表（模型 `models/role_permission.rs:8`，
+  `resource_type`/`action` 支持 `"*"`，缓存 `:477 PERMISSION_CACHE`，管理员在查询前短路）。
   **推论：路由挂载形状直接决定鉴权键。路径写法不统一 = 权限键不统一 = 可能静默放行或静默 403。**
   这就是"路由挂载唯一约定"（`.monkeycode/MEMORY.md:98`）的安全依据。
 - 认证：httpOnly Cookie 方案，`AuthContext`（`middleware/auth_context.rs:47`）由 `FromRequestParts`（`:159`）
@@ -156,7 +156,7 @@ init_token 的数字码 `40101`+`detail` 也并入同一构造器。
 
 | 能力 | 入口 | 备注 |
 |---|---|---|
-| 单据号生成 | `utils/number_generator.rs:13,29,78,94 DocumentNumberGenerator::generate_no{,_with_width,_with_txn,_with_width_txn}` | 格式 `{PREFIX}{YYYYMMDD}{seq}`，`pg_advisory_xact_lock` 防并发重号（`:50-57`）；服务侧用 `impl_generate_no!` 宏 |
+| 单据号生成 | `utils/number_generator.rs:33,53,136,152,204,220 DocumentNumberGenerator::resolve_rule/generate_no{,_with_width,_with_txn,_with_width_txn}` | 配置规则格式 `{prefix}{period}{seq}`（day/month/never），legacy 保留 `{PREFIX}{YYYYMMDD}{seq}`；实际输出前缀与周期共同进入 `pg_advisory_xact_lock`（`:360`），配置在取号事务内即时读取；服务侧用 `impl_generate_no!` 宏 |
 | 单据号查重 | `GET /document-no/check` → `handlers/document_no_handler.rs:19`，返回 `ApiResponse<bool>`（true=已占用） | 7 类 doc_type 的 `exists` 匹配在 `:39-78` |
 | 分页 | `utils/pagination.rs:10 paginate_with_total` | 与 `Query<T>` 的 `page.unwrap_or(1).clamp(1,1000)`、`page_size.unwrap_or(10).clamp(1,100)` 配合（例 `warehouse_handler.rs:145`） |
 | CRUD 骨架 | `utils/crud_macro.rs:4 define_service!` / `:21 impl_generate_no!` / `:47 define_crud_handlers!` / `:182 define_tuple_crud_handlers!` | 宏**不注册路由**，路由仍在 `routes/*.rs`；`Service` 必须实现 `list/get/create/update/delete`（tuple 版是 `list→(Vec,u64)`、`get_by_id→Option`）；出参 `ApiResponse<serde_json::Value>` |
