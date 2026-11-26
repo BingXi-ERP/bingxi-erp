@@ -307,7 +307,6 @@ function packageSource(root, version, output) {
 function main(argv) {
   const args = parseArgs(argv);
   const root = path.resolve(args.root || path.resolve(__dirname, '..', '..'));
-  if (args.command !== 'package') throw new Error('仅支持 package 命令');
   const manifest = packageSource(root, args.version, path.resolve(args.output));
   console.log(
     `MP_SOURCE_PACKAGE_OK version=${manifest.version} commit=${manifest.commit} files=${manifest.fileCount} bytes=${manifest.archive.bytes} legacyEndpoints=${manifest.legacyEndpoints.count} uploadAllowed=${manifest.releaseReadiness.uploadAllowed}`

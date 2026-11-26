@@ -151,7 +151,7 @@ jobs:
 
       - name: 生成净化源码 ZIP 与 release manifest
         run: |
-          node scripts/ci/miniprogram-release.cjs package \
+          node scripts/ci/miniprogram-release.cjs \
             --version "${{ steps.prepare.outputs.version }}" \
             --output miniprogram-release-output
 

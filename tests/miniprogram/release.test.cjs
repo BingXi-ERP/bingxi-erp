@@ -57,6 +57,29 @@ test('源码包排除本地主机、构建目录、环境文件、密钥与报�
   }
 });
 
+test('源码包 CLI 按工作流参数生成 ZIP 与 manifest', t => {
+  const { root } = fixture(t);
+  const output = path.join(root, 'dist');
+  const stdout = execFileSync(
+    process.execPath,
+    [
+      path.join(REPO_ROOT, 'scripts', 'ci', 'miniprogram-release.cjs'),
+      '--root',
+      root,
+      '--version',
+      '3.13.10',
+      '--output',
+      output,
+    ],
+    { encoding: 'utf8' }
+  );
+  assert.match(stdout, /MP_SOURCE_PACKAGE_OK version=3\.13\.10/);
+  const manifest = JSON.parse(fs.readFileSync(path.join(output, 'release-manifest.json'), 'utf8'));
+  assert.equal(manifest.artifactType, 'wechat-miniprogram-source-project');
+  assert.equal(manifest.compiledPackage, false);
+  assert.equal(fs.existsSync(path.join(output, manifest.archive.name)), true);
+});
+
 test('版本必须显式 semver 且与 package.json 单一事实源一致', () => {
   assert.equal(releaseScript().VERSION_PATTERN.test('3.13.10'), true);
   assert.equal(releaseScript().VERSION_PATTERN.test('3.13.10-rc.1'), true);
@@ -395,6 +418,8 @@ test('CI 强制小程序运行时依赖审计与源码产物', () => {
   );
   assert.match(workflow, /npm --prefix miniprogram audit --omit=dev --audit-level=high/);
   assert.match(workflow, /npm --prefix miniprogram test/);
+  assert.match(workflow, /node scripts\/ci\/miniprogram-release\.cjs \\\n\s+--version/);
+  assert.doesNotMatch(workflow, /miniprogram-release\.cjs package/);
   assert.match(workflow, /if-no-files-found: error/);
 });
 
