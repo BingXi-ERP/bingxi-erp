@@ -2106,7 +2106,6 @@ export default {
       endPlaceholder: '结束日期',
     },
     workCenterPlaceholder: '选择工作中心',
-    allWorkCenters: '全部工作中心',
     stat: {
       totalWorkCenters: '工作中心总数',
       normal: '正常',
@@ -2114,13 +2113,13 @@ export default {
       overload: '超负荷',
     },
     trend: {
-      title: '产能负荷趋势',
+      title: '产能数量趋势',
       last7Days: '近 7 天',
       last30Days: '近 30 天',
-      plannedHours: '计划工时',
-      actualHours: '实际工时',
-      capacityHours: '产能工时',
-      hoursUnit: '工时',
+      plannedQuantity: '计划开工量',
+      actualQuantity: '实际完工量',
+      capacityQuantity: '日产能',
+      quantityUnit: '数量',
     },
     table: {
       title: '工作中心列表',

@@ -79,6 +79,16 @@ pub struct CapacityLoadItem {
     pub suggestions: Vec<BottleneckSuggestion>,
 }
 
+/// 产能趋势日点：按选定工作中心的真实数量口径聚合，不把负荷数组伪装为工时趋势。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CapacityTrendPoint {
+    pub date: NaiveDate,
+    pub planned_quantity: Decimal,
+    pub actual_quantity: Decimal,
+    pub capacity_quantity: Decimal,
+    pub capacity_unit: Option<String>,
+}
+
 /// batch-18 P2-4：扩产/外包建议类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -119,6 +129,14 @@ pub struct LoadAnalysisQuery {
     pub date_from: Option<NaiveDate>,
     pub date_to: Option<NaiveDate>,
     // v11 批次 149 P2-A：接入 work_center_id filter（load_analysis 方法中使用）
+    pub work_center_id: Option<i32>,
+}
+
+/// 产能趋势查询参数。必须指定工作中心，避免把不同计量单位的数量相加。
+#[derive(Debug, Clone, Deserialize)]
+pub struct CapacityTrendQuery {
+    pub date_from: Option<NaiveDate>,
+    pub date_to: Option<NaiveDate>,
     pub work_center_id: Option<i32>,
 }
 

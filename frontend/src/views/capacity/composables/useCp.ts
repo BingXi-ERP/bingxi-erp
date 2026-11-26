@@ -1,9 +1,8 @@
 // capacity 主业务 composable
 // 拆分自 capacity/index.vue（P14 批 2 I-3 第 6 批）
 // 业务领域：产能管理（summary/trend/workCenters/bottlenecks + 分页 + 过滤）
-// 行为完全保持一致（仅结构重构）
 // 批次 288：workCenters 接入 useTableApi，移除手写分页逻辑
-import { reactive, ref, computed } from 'vue';
+import { reactive, ref, computed, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { msg } from '@/utils/message';
 import {
@@ -95,19 +94,41 @@ export const useCp = () => {
 
   // 获取趋势数据
   const fetchTrendData = async () => {
+    const workCenterId = selectedWorkCenter.value;
+    if (workCenterId === undefined) {
+      trendData.value = [];
+      return;
+    }
     try {
+      const rangeParams = dateRange.value
+        ? {
+            date_from: toDateInput(dateRange.value[0]),
+            date_to: toDateInput(dateRange.value[1]),
+          }
+        : { days: trendDays.value };
       const res = await getCapacityTrend({
-        days: trendDays.value,
-        work_center_id: selectedWorkCenter.value,
+        ...rangeParams,
+        work_center_id: workCenterId,
       });
-      // 安全检查：防止后端返回 data 为 null 时崩溃
-      if (res.data) trendData.value = res.data;
+      trendData.value = res.data ?? [];
     } catch (error: unknown) {
       ElMessage.error(
         (error instanceof Error ? error.message : '') || msg.translate('loadCapacityTrendFailed')
       );
+      trendData.value = [];
     }
   };
+
+  watch(
+    workCenters,
+    list => {
+      if (selectedWorkCenter.value === undefined && list.length > 0) {
+        selectedWorkCenter.value = list[0].id;
+        void fetchTrendData();
+      }
+    },
+    { immediate: true }
+  );
 
   // 获取瓶颈分析
   const fetchBottlenecks = async () => {

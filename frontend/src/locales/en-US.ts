@@ -2125,7 +2125,6 @@ export default {
       endPlaceholder: 'End date',
     },
     workCenterPlaceholder: 'Select work center',
-    allWorkCenters: 'All work centers',
     stat: {
       totalWorkCenters: 'Total Work Centers',
       normal: 'Normal',
@@ -2133,13 +2132,13 @@ export default {
       overload: 'Overload',
     },
     trend: {
-      title: 'Capacity Load Trend',
+      title: 'Capacity Quantity Trend',
       last7Days: 'Last 7 Days',
       last30Days: 'Last 30 Days',
-      plannedHours: 'Planned Hours',
-      actualHours: 'Actual Hours',
-      capacityHours: 'Capacity Hours',
-      hoursUnit: 'hours',
+      plannedQuantity: 'Planned Start Quantity',
+      actualQuantity: 'Actual Completion Quantity',
+      capacityQuantity: 'Daily Capacity',
+      quantityUnit: 'Quantity',
     },
     table: {
       title: 'Work Center List',

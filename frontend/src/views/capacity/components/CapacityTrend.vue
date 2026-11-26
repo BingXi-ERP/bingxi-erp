@@ -1,7 +1,7 @@
 <!--
-  CapacityTrend.vue - 产能负荷趋势 ECharts 图（含 ECharts 实例生命周期管理）
+  CapacityTrend.vue - 产能数量趋势 ECharts 图（含 ECharts 实例生命周期管理）
   拆分自 capacity/index.vue（P14 批 2 I-3 第 6 批）
-  行为完全保持一致（仅结构重构）
+  当前按工作中心真实数量口径渲染计划量、实际量与日产能
 -->
 <template>
   <el-row :gutter="20" class="chart-row">
@@ -49,17 +49,22 @@ let resizeHandler: (() => void) | null = null;
 // 渲染 ECharts 选项
 const renderChart = (data: CapacityTrend[]) => {
   if (!chartRef.value) return;
+  if (data.length === 0) {
+    capacityChart?.clear();
+    return;
+  }
   if (!capacityChart) {
     capacityChart = echarts.init(chartRef.value);
     resizeHandler = () => capacityChart?.resize();
     window.addEventListener('resize', resizeHandler);
   }
-  const plannedHoursLabel = t('capacityModule.trend.plannedHours');
-  const actualHoursLabel = t('capacityModule.trend.actualHours');
-  const capacityHoursLabel = t('capacityModule.trend.capacityHours');
+  const plannedQuantityLabel = t('capacityModule.trend.plannedQuantity');
+  const actualQuantityLabel = t('capacityModule.trend.actualQuantity');
+  const capacityQuantityLabel = t('capacityModule.trend.capacityQuantity');
+  const capacityUnit = data[0]?.capacity_unit || t('capacityModule.trend.quantityUnit');
   const option = {
     tooltip: { trigger: 'axis' },
-    legend: { data: [plannedHoursLabel, actualHoursLabel, capacityHoursLabel], bottom: 0 },
+    legend: { data: [plannedQuantityLabel, actualQuantityLabel, capacityQuantityLabel], bottom: 0 },
     grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
     xAxis: {
       type: 'category',
@@ -68,30 +73,30 @@ const renderChart = (data: CapacityTrend[]) => {
     },
     yAxis: {
       type: 'value',
-      name: t('capacityModule.trend.hoursUnit'),
+      name: capacityUnit,
       axisLine: { lineStyle: { color: '#909399' } },
       splitLine: { lineStyle: { color: '#ebeef5' } },
     },
     series: [
       {
-        name: plannedHoursLabel,
+        name: plannedQuantityLabel,
         type: 'line',
-        data: data.map(d => d.planned_hours),
+        data: data.map(d => Number(d.planned_quantity)),
         smooth: true,
         itemStyle: { color: '#409eff' },
         areaStyle: { color: 'rgba(64, 158, 255, 0.1)' },
       },
       {
-        name: actualHoursLabel,
+        name: actualQuantityLabel,
         type: 'line',
-        data: data.map(d => d.actual_hours),
+        data: data.map(d => Number(d.actual_quantity)),
         smooth: true,
         itemStyle: { color: '#67c23a' },
       },
       {
-        name: capacityHoursLabel,
+        name: capacityQuantityLabel,
         type: 'line',
-        data: data.map(d => d.capacity_hours),
+        data: data.map(d => Number(d.capacity_quantity)),
         smooth: true,
         itemStyle: { color: '#e6a23c' },
         lineStyle: { type: 'dashed' },
@@ -101,13 +106,11 @@ const renderChart = (data: CapacityTrend[]) => {
   capacityChart.setOption(option);
 };
 
-// 监听 data 变化 → 重新渲染 ECharts
+// 监听 data 变化 → 重新渲染 ECharts（空数组清空旧图，避免展示上一个筛选条件的数据）
 watch(
   () => props.data,
   newData => {
-    if (newData && newData.length > 0) {
-      renderChart(newData);
-    }
+    renderChart(newData);
   },
   { immediate: true, deep: true }
 );
@@ -116,17 +119,13 @@ watch(
 watch(
   () => t('capacityModule.trend.title'),
   () => {
-    if (props.data && props.data.length > 0) {
-      renderChart(props.data);
-    }
+    renderChart(props.data);
   }
 );
 
 // 挂载后初始化 ECharts
 onMounted(() => {
-  if (props.data && props.data.length > 0) {
-    renderChart(props.data);
-  }
+  renderChart(props.data);
 });
 
 // 卸载前清理 ECharts
