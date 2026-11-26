@@ -10,6 +10,7 @@ use migration::domain::system_number_rules::{UP_SCHEMA_SQL, UP_SEED_SQL, UP_TRIG
 
 use sea_orm::{
     ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, QueryResult, Statement,
+    TransactionTrait,
 };
 
 async fn require_postgres(db: &DatabaseConnection) {
