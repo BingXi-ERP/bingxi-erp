@@ -24,7 +24,7 @@ import {
   readFirstEntityId,
   readEntityIds,
 } from './ui-helpers';
-import { withNumberRuleConfigLock } from './number-rule-config-lock';
+import { withNumberRuleConfigLock } from './number-rule-config-lock.mjs';
 // 产品类型单源常量（与后端 models/status/general.rs::product_type 同源）：
 // 补建产品的 product_type 取值必须经 PRODUCT_TYPE.<键> 引用，禁止散落中文面值。
 import { PRODUCT_TYPE } from '../../src/constants/product-type';

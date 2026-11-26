@@ -4,8 +4,9 @@
 //! `ci-test-rust-ignored` 在已迁移 PostgreSQL 上执行。所有 DDL 与写入均包在
 //! 外层事务中，结束统一回滚，不污染共用测试库。
 
-#[path = "../migration/src/domain/system_number_rules/sql.rs"]
-mod migration_sql;
+mod migration_sql {
+    include!("../migration/src/domain/system_number_rules/sql.rs");
+}
 
 mod test_common;
 

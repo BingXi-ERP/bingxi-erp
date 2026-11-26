@@ -13,11 +13,11 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
-import { withNumberRuleConfigLock } from '../e2e/flow/number-rule-config-lock.ts';
+import { withNumberRuleConfigLock } from '../e2e/flow/number-rule-config-lock.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const LOCK_MODULE_URL = pathToFileURL(
-  path.resolve(HERE, '../e2e/flow/number-rule-config-lock.ts')
+  path.resolve(HERE, '../e2e/flow/number-rule-config-lock.mjs')
 ).href;
 const TEMP_ROOT =
   process.env.BINGXI_TEST_TMP || (process.platform === 'win32' ? 'F:/tmp' : os.tmpdir());

@@ -15,7 +15,7 @@ import {
   tryCleanup,
   type ApiFailureBody,
 } from '../flow/helpers';
-import { withNumberRuleConfigLock } from '../flow/number-rule-config-lock';
+import { withNumberRuleConfigLock } from '../flow/number-rule-config-lock.mjs';
 import type {
   NumberRule,
   NumberRuleConfig,
@@ -24,7 +24,6 @@ import type {
 } from '../../src/api/system-number-rule';
 import type { PaginatedResponse } from '../../src/types/api-response';
 
-const LIST_PATH = '/system/number-rules';
 const RULE_KEY = 'SO';
 const SEED_RULE_KEYS = ['SO', 'PO', 'QT', 'PR', 'DN', 'LD'];
 const CREATED_ORDER_IDS: number[] = [];
@@ -66,13 +65,13 @@ async function readDetail(page: Parameters<typeof apiCall>[0]): Promise<NumberRu
   const list = await apiCall<PaginatedResponse<NumberRule>>(
     page,
     'GET',
-    `${LIST_PATH}?page=1&page_size=20`
+    `/system/number-rules?page=1&page_size=20`
   );
   expect(list.code, '编码规则列表应返回成功信封').toBe(200);
   const rule = list.data.items.find(item => item.rule_key === RULE_KEY);
   expect(rule, '种子规则 SO 必须存在').toBeTruthy();
   if (!rule) throw new Error('种子规则 SO 不存在');
-  const detail = await apiCall<NumberRuleDetail>(page, 'GET', `${LIST_PATH}/${rule.id}`);
+  const detail = await apiCall<NumberRuleDetail>(page, 'GET', `/system/number-rules/${rule.id}`);
   expect(detail.code, '编码规则详情应返回成功信封').toBe(200);
   return detail.data;
 }
@@ -88,7 +87,7 @@ async function restoreSnapshot(
       const restored = await apiCall<NumberRuleDetail>(
         page,
         'PUT',
-        `${LIST_PATH}/${snapshot.rule.id}`,
+        `/system/number-rules/${snapshot.rule.id}`,
         {
           ...configOf(snapshot.rule),
           version: current.rule.version,
@@ -216,7 +215,7 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
     const response = await apiCall<PaginatedResponse<NumberRule>>(
       page,
       'GET',
-      `${LIST_PATH}?page=1&page_size=20`
+      `/system/number-rules?page=1&page_size=20`
     );
     expect(response.code).toBe(200);
     expect(response.data.total, '种子规则总数必须为六').toBe(6);
@@ -290,7 +289,7 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
       const first = await apiCall<NumberRuleDetail>(
         page,
         'PUT',
-        `${LIST_PATH}/${snapshot.rule.id}`,
+        `/system/number-rules/${snapshot.rule.id}`,
         {
           ...firstChange,
           version: snapshot.rule.version,
@@ -300,11 +299,16 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
       expect(first.code).toBe(200);
       expect(first.data.rule.version).toBe(snapshot.rule.version + 1);
 
-      const conflict = await apiCallExpectFail(page, 'PUT', `${LIST_PATH}/${snapshot.rule.id}`, {
-        ...staleChange,
-        version: snapshot.rule.version,
-        change_reason: 'E2E：过期版本不得覆盖新配置',
-      });
+      const conflict = await apiCallExpectFail(
+        page,
+        'PUT',
+        `/system/number-rules/${snapshot.rule.id}`,
+        {
+          ...staleChange,
+          version: snapshot.rule.version,
+          change_reason: 'E2E：过期版本不得覆盖新配置',
+        }
+      );
       expect(conflict.status, '过期版本必须返回 HTTP 400').toBe(400);
       expect(failureCode(conflict as ApiFailureBody)).toBe(APP_ERROR_CODES.BUSINESS_ERROR);
       expect(typeof conflict.message === 'string' && conflict.message.includes('刷新')).toBe(true);
@@ -331,7 +335,7 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
       const first = await apiCall<NumberRuleDetail>(
         page,
         'PUT',
-        `${LIST_PATH}/${snapshot.rule.id}`,
+        `/system/number-rules/${snapshot.rule.id}`,
         {
           ...firstChange,
           version: snapshot.rule.version,
@@ -378,7 +382,7 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
       const updated = await apiCall<NumberRuleDetail>(
         page,
         'PUT',
-        `${LIST_PATH}/${snapshot.rule.id}`,
+        `/system/number-rules/${snapshot.rule.id}`,
         {
           ...changed,
           version: snapshot.rule.version,
@@ -391,7 +395,7 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
       const rolledBack = await apiCall<NumberRuleDetail>(
         page,
         'POST',
-        `${LIST_PATH}/${snapshot.rule.id}/rollback`,
+        `/system/number-rules/${snapshot.rule.id}/rollback`,
         {
           revision_id: target.id,
           version: updated.data.rule.version,
@@ -441,7 +445,7 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
         const updated = await apiCall<NumberRuleDetail>(
           page,
           'PUT',
-          `${LIST_PATH}/${snapshot.rule.id}`,
+          `/system/number-rules/${snapshot.rule.id}`,
           {
             ...changed,
             version: snapshot.rule.version,
@@ -467,7 +471,7 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
         const rolledBack = await apiCall<NumberRuleDetail>(
           page,
           'POST',
-          `${LIST_PATH}/${snapshot.rule.id}/rollback`,
+          `/system/number-rules/${snapshot.rule.id}/rollback`,
           {
             revision_id: rollbackTarget.id,
             version: updated.data.rule.version,
@@ -527,14 +531,14 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
       const listDenied = await apiCallExpectFail(
         session.page,
         'GET',
-        `${LIST_PATH}?page=1&page_size=20`
+        `/system/number-rules?page=1&page_size=20`
       );
       expectDenied(listDenied, 'salesperson 读取编码规则列表');
 
       const updateDenied = await apiCallExpectFail(
         session.page,
         'PUT',
-        `${LIST_PATH}/${snapshot.rule.id}`,
+        `/system/number-rules/${snapshot.rule.id}`,
         {
           ...configOf(snapshot.rule),
           version: snapshot.rule.version,
@@ -546,7 +550,7 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
       const rollbackDenied = await apiCallExpectFail(
         session.page,
         'POST',
-        `${LIST_PATH}/${snapshot.rule.id}/rollback`,
+        `/system/number-rules/${snapshot.rule.id}/rollback`,
         {
           revision_id: target.id,
           version: snapshot.rule.version,

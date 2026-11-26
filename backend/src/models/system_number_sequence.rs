@@ -1,7 +1,7 @@
 //! 可配置单据号的持久化号段计数；同一实际输出前缀与周期内单调递增。
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, PartialEq, DeriveEntityModel)]
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
 #[sea_orm(table_name = "system_number_sequences")]
 pub struct Model {
     #[sea_orm(primary_key)]

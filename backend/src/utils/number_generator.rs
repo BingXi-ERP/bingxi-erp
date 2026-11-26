@@ -424,7 +424,7 @@ impl DocumentNumberGenerator {
         let width = std::cmp::Ord::max(rule.seq_width, 1);
         let historical_max = existing_numbers
             .iter()
-            .filter_map(|(no)| no.strip_prefix(rule.output_prefix.as_str()))
+            .filter_map(|(no,)| no.strip_prefix(rule.output_prefix.as_str()))
             .filter_map(|suffix| Self::base_seq_from_suffix(suffix, width))
             .max();
 
@@ -435,11 +435,11 @@ impl DocumentNumberGenerator {
                  WHERE \"rule_key\" = $1 AND \"entity_table\" = $2 AND \"column_name\" = $3 \
                    AND \"output_prefix\" = $4 AND \"period\" = $5",
                 [
-                    rule.rule_key.clone().into(),
-                    entity_table.clone().into(),
-                    column_name.clone().into(),
-                    rule.output_prefix.clone().into(),
-                    rule.period.clone().into(),
+                    sea_orm::Value::from(rule.rule_key.clone()),
+                    sea_orm::Value::from(entity_table.clone()),
+                    sea_orm::Value::from(column_name.clone()),
+                    sea_orm::Value::from(rule.output_prefix.clone()),
+                    sea_orm::Value::from(rule.period.clone()),
                 ],
             ))
             .await?;
@@ -478,12 +478,12 @@ impl DocumentNumberGenerator {
                      ON CONFLICT (\"rule_key\", \"entity_table\", \"column_name\", \"output_prefix\", \"period\") \
                      DO UPDATE SET \"last_seq\" = EXCLUDED.\"last_seq\", \"updated_at\" = CURRENT_TIMESTAMP",
                     [
-                        rule.rule_key.clone().into(),
-                        entity_table,
-                        column_name,
-                        rule.output_prefix.clone(),
-                        rule.period.clone(),
-                        persisted.into(),
+                        sea_orm::Value::from(rule.rule_key.clone()),
+                        sea_orm::Value::from(entity_table),
+                        sea_orm::Value::from(column_name),
+                        sea_orm::Value::from(rule.output_prefix.clone()),
+                        sea_orm::Value::from(rule.period.clone()),
+                        sea_orm::Value::from(persisted),
                     ],
                 ))
                 .await?;

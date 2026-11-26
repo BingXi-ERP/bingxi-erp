@@ -39,7 +39,7 @@ import {
   APP_ERROR_CODES,
   BASE_URL,
 } from '../flow/helpers';
-import { withNumberRuleConfigLock } from '../flow/number-rule-config-lock';
+import { withNumberRuleConfigLock } from '../flow/number-rule-config-lock.mjs';
 import { pickListArray } from '../flow/ui-helpers';
 import { cellInputByColumn } from '../flow/table-column';
 

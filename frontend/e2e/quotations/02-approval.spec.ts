@@ -23,7 +23,7 @@ import {
   APP_ERROR_CODES,
   BASE_URL,
 } from '../flow/helpers';
-import { withNumberRuleConfigLock } from '../flow/number-rule-config-lock';
+import { withNumberRuleConfigLock } from '../flow/number-rule-config-lock.mjs';
 
 /** 创建一张草稿报价单；amount 作为明细数量、单价固定 1，控制 submit 落点：<10 万自批→approved，≥10 万→pending_approval */
 async function createDraftQuotation(page: Page, amount: number): Promise<number> {
