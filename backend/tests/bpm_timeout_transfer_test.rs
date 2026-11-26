@@ -251,7 +251,7 @@ async fn due_tasks_transfer_once_with_audit_notification_and_signature_preservat
         .await
         .unwrap();
     assert_eq!(notices.len(), 1, "转交必须且只能通知新处理人一次");
-    assert!(notices[0].content.contains("超时转交"));
+    assert!(notices[0].content.contains("审批超时自动转交"));
 
     let audit_before = audit_count(&db, due_task_id).await;
     let transferred_again = scheduler
