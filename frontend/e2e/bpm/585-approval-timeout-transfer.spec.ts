@@ -1,7 +1,7 @@
 // BPM 审批超时自动转交端到端 E2E — 585
 //
 // 真实链路：创建带 timeout 的会签流程定义 → 发起实例 → 等待统一 Scheduler
-// 扫描到期任务并转交 → 代理人计入原签署席位 → 另一签署人同意后实例完成。
+// 扫描同节点全部到期任务并转交 → 代理人分别继承原签署席位 → 所有席位签署后实例完成。
 // 禁止 mock、网络拦截和假响应；所有账号、角色、流程与任务均落真实 PostgreSQL。
 import { test, expect } from '../diagnose-fixture';
 import {
@@ -118,7 +118,10 @@ async function approveAs(
   });
 }
 
-test('585-01 超时会签转交后代理人可继承原席位并完成审批', async ({ page, browser }) => {
+test('585-01 超时会签同节点任务全部转交并由代理人继承各原席位完成审批', async ({
+  page,
+  browser,
+}) => {
   test.setTimeout(180_000);
   const me = await apiCall<{ id?: number }>(page, 'GET', '/auth/me');
   if (!me.data?.id) {
@@ -206,15 +209,15 @@ test('585-01 超时会签转交后代理人可继承原席位并完成审批', a
       .poll(
         async () => {
           const detail = await fetchDetail(page, instanceId);
-          return detail.tasks.find(task => task.id === originalTaskId)?.actual_handler_id;
+          return detail.tasks.map(task => task.actual_handler_id);
         },
         {
           timeout: 120_000,
           intervals: [1000, 2000, 5000],
-          message: '统一调度器应在两轮内转交到期待办',
+          message: '统一调度器应在两轮内转交同节点的全部到期待办',
         }
       )
-      .toBe(fallback.userId);
+      .toEqual([fallback.userId, fallback.userId]);
 
     const transferred = await fetchDetail(page, instanceId);
     const transferredTask = transferred.tasks.find(task => task.id === originalTaskId);
@@ -226,6 +229,10 @@ test('585-01 超时会签转交后代理人可继承原席位并完成审批', a
     expect(transferredTask.task_variables?.timeout?.transfer_count).toBe(1);
     expect(transferredTask.task_variables?.delegated_from_user_id).toBe(initiatorId);
     expect(transferredTask.assignee_ids).toEqual([initiatorId, second.userId]);
+    const transferredSecondTask = transferred.tasks.find(task => task.id === secondTask.id);
+    expect(transferredSecondTask?.actual_handler_id).toBe(fallback.userId);
+    expect(transferredSecondTask?.due_date).toBeNull();
+    expect(transferredSecondTask?.task_variables?.delegated_from_user_id).toBe(second.userId);
 
     await fallback.session.page.goto('/bpm');
     await expect(
@@ -244,10 +251,18 @@ test('585-01 超时会签转交后代理人可继承原席位并完成审批', a
       detail.tasks.find(task => task.id === originalTaskId)?.task_variables?.signatures
     ).toContainEqual(expect.objectContaining({ user_id: fallback.userId, action: 'approve' }));
 
-    await approveAs(second.session.page, secondTask.id, second.userId, '另一签署人同意');
+    await approveAs(
+      fallback.session.page,
+      secondTask.id,
+      fallback.userId,
+      '代理人继承第二签署席位同意'
+    );
     detail = await fetchDetail(page, instanceId);
     expect(detail.instance.status).toBe('COMPLETED');
     expect(detail.tasks.map(task => task.status).sort()).toEqual(['completed', 'completed']);
+    expect(
+      detail.tasks.find(task => task.id === secondTask.id)?.task_variables?.signatures
+    ).toContainEqual(expect.objectContaining({ user_id: fallback.userId, action: 'approve' }));
   } finally {
     await fallback.session.close();
     await second.session.close();

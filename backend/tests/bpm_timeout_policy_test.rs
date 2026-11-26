@@ -18,9 +18,7 @@ use bingxi_backend::utils::error::AppError;
 use sea_orm::DatabaseConnection;
 
 fn unique_tag() -> i64 {
-    Utc::now()
-        .timestamp_millis()
-        .expect("测试造数取当前时刻毫秒：Utc::now 必落在 chrono 毫秒可表示区间")
+    Utc::now().timestamp_millis()
 }
 
 async fn seed_user(db: &DatabaseConnection, active: bool) -> i32 {

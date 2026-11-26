@@ -10,7 +10,9 @@ use chrono::{Duration, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use serde_json::{Value, json};
 
-use bingxi_backend::models::dto::bpm_dto::{AddSignRequest, StartProcessRequest};
+use bingxi_backend::models::dto::bpm_dto::{
+    AddSignRequest, ApproveTaskRequest, StartProcessRequest,
+};
 use bingxi_backend::models::status::bpm_instance as instance_status;
 use bingxi_backend::models::status::bpm_task as task_status;
 use bingxi_backend::models::{
@@ -21,9 +23,7 @@ use bingxi_backend::services::bpm_timeout_scheduler::ApprovalTimeoutScheduler;
 use sea_orm::DatabaseConnection;
 
 fn unique_tag() -> i64 {
-    Utc::now()
-        .timestamp_millis()
-        .expect("测试造数取当前时刻毫秒：Utc::now 必落在 chrono 毫秒可表示区间")
+    Utc::now().timestamp_millis()
 }
 
 async fn seed_user(db: &DatabaseConnection, label: &str) -> i32 {
