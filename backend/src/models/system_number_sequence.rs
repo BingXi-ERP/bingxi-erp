@@ -1,4 +1,5 @@
 //! 可配置单据号的持久化号段计数；同一实际输出前缀与周期内单调递增。
+use chrono::{DateTime, Utc};
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
@@ -12,8 +13,8 @@ pub struct Model {
     pub output_prefix: String,
     pub period: String,
     pub last_seq: i64,
-    pub created_at: DateTimeWithTimeZone,
-    pub updated_at: DateTimeWithTimeZone,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

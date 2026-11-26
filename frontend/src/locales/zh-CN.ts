@@ -8731,6 +8731,11 @@ export default {
     numberRules: {
       title: '编码规则管理',
       description: '配置单据号前缀、流水位数与重置周期；所有变更均保留历史版本。',
+      validation: {
+        prefixRequired: '请输入编码规则前缀',
+        seqWidthInvalid: '流水位数必须为 1 到 12 的整数',
+        changeReasonRequired: '请填写变更原因',
+      },
       readonly: '当前角色仅可查看编码规则。',
       loadFailed: '编码规则列表加载失败',
       tableAria: '编码规则列表',

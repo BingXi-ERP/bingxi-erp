@@ -1,4 +1,5 @@
 //! 可配置单据号规则；rule_key 保持调用方传入的历史前缀语义。
+use chrono::{DateTime, Utc};
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -14,8 +15,8 @@ pub struct Model {
     pub seq_width: i32,
     pub reset_mode: String,
     pub version: i32,
-    pub created_at: DateTimeWithTimeZone,
-    pub updated_at: DateTimeWithTimeZone,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

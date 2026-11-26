@@ -10,6 +10,7 @@ import {
   getCtx,
   loginViaUI,
 } from '../flow/helpers';
+import { dropdownItems, openScopedDropdown } from '../flow/ui-helpers';
 
 interface WorkCenterModel {
   id: number;
@@ -120,8 +121,11 @@ test.describe.serial('产能趋势真实契约', () => {
       }
 
       await page.goto('/capacity');
-      await page.locator('.header-actions .el-select').click();
-      await page.locator('.el-select-dropdown__item').filter({ hasText: name }).click();
+      const workCenterSelect = page.locator('.header-actions .el-select');
+      const workCenterPanel = await openScopedDropdown(workCenterSelect, page);
+      const workCenterOption = dropdownItems(workCenterPanel).filter({ hasText: name });
+      await expect(workCenterOption, '工作中心选项必须存在').toBeVisible();
+      await workCenterOption.click();
       const chartTrendResponse = page.waitForResponse(
         response =>
           response.url().includes('/production/capacity/trend') &&

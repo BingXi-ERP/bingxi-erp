@@ -8793,6 +8793,11 @@ export default {
       title: 'Number Rule Management',
       description:
         'Configure document prefixes, sequence widths, and reset cycles. Every change keeps a history snapshot.',
+      validation: {
+        prefixRequired: 'Enter a document number prefix',
+        seqWidthInvalid: 'Sequence width must be an integer from 1 to 12',
+        changeReasonRequired: 'Enter a reason for this change',
+      },
       readonly: 'Your current role can only view number rules.',
       loadFailed: 'Failed to load number rules',
       tableAria: 'Number rule list',

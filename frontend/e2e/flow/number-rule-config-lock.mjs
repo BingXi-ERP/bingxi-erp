@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
+import { setTimeout } from 'node:timers';
 
 const localLocks = new AsyncLocalStorage();
 const DEFAULT_TIMEOUT_MS = 300_000;

@@ -260,6 +260,7 @@
       v-if="editingRule"
       ref="editFormRef"
       :model="editForm"
+      :rules="editRules"
       :disabled="!canUpdate || submitting"
       label-position="top"
       :aria-label="t('system.numberRules.editFormAria')"
@@ -280,13 +281,10 @@
         />
       </el-form-item>
       <el-form-item :label="t('system.numberRules.columns.seqWidth')" prop="seq_width">
-        <el-input-number
+        <el-input
           v-model="editForm.seq_width"
-          :min="1"
-          :max="12"
-          :step="1"
-          :precision="0"
-          controls-position="right"
+          inputmode="numeric"
+          maxlength="2"
           data-testid="number-rule-width-input"
         />
       </el-form-item>
@@ -411,7 +409,7 @@ import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { isAxiosError } from 'axios';
-import type { FormInstance } from 'element-plus';
+import type { FormInstance, FormRules } from 'element-plus';
 import {
   getNumberRule,
   getNumberRules,
@@ -432,7 +430,7 @@ import { isDialogDismissal } from '@/utils/monitor';
 
 interface EditForm {
   prefix: string;
-  seq_width: number;
+  seq_width: number | string;
   reset_mode: NumberRuleResetMode;
   change_reason: string;
 }
@@ -459,6 +457,31 @@ const editingRule = ref<NumberRule | null>(null);
 const editBaseVersion = ref(0);
 const editForm = ref<EditForm>({ prefix: '', seq_width: 3, reset_mode: 'day', change_reason: '' });
 const editFormRef = ref<FormInstance>();
+const editRules = computed<FormRules>(() => ({
+  prefix: [
+    { required: true, message: t('system.numberRules.validation.prefixRequired'), trigger: 'blur' },
+  ],
+  seq_width: [
+    {
+      validator: (_rule, value, callback) => {
+        const width = Number(value);
+        if (!Number.isInteger(width) || width < 1 || width > 12) {
+          callback(new Error(t('system.numberRules.validation.seqWidthInvalid')));
+          return;
+        }
+        callback();
+      },
+      trigger: 'blur',
+    },
+  ],
+  change_reason: [
+    {
+      required: true,
+      message: t('system.numberRules.validation.changeReasonRequired'),
+      trigger: 'blur',
+    },
+  ],
+}));
 const submitting = ref(false);
 const editFailed = ref(false);
 const versionConflict = ref(false);
@@ -485,7 +508,8 @@ const detailTitle = computed(() => {
     : t('system.numberRules.historyTitle');
 });
 const numberExample = computed(() => {
-  const { prefix, seq_width: width, reset_mode: resetMode } = editForm.value;
+  const { prefix, seq_width: seqWidth, reset_mode: resetMode } = editForm.value;
+  const width = Number(seqWidth);
   if (prefix.length === 0 || !Number.isInteger(width) || width < 1 || width > 12) {
     return null;
   }
@@ -616,7 +640,7 @@ async function saveEdit(): Promise<void> {
     }
     const response = await updateNumberRule(rule.id, {
       prefix: editForm.value.prefix.trim(),
-      seq_width: editForm.value.seq_width,
+      seq_width: Number(editForm.value.seq_width),
       reset_mode: editForm.value.reset_mode,
       version: editBaseVersion.value,
       change_reason: editForm.value.change_reason.trim(),

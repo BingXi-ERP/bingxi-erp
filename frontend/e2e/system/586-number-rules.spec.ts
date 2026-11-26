@@ -16,6 +16,7 @@ import {
   type ApiFailureBody,
 } from '../flow/helpers';
 import { withNumberRuleConfigLock } from '../flow/number-rule-config-lock.mjs';
+import { pickSelectIn } from '../flow/ui-helpers';
 import type {
   NumberRule,
   NumberRuleConfig,
@@ -163,13 +164,7 @@ async function fillEditForm(
 ): Promise<void> {
   await page.getByTestId('number-rule-prefix-input').fill(config.prefix);
   await page.getByTestId('number-rule-width-input').locator('input').fill(String(config.seq_width));
-  await page.getByTestId('number-rule-reset-mode-select').click();
-  const option = page
-    .locator('.el-select-dropdown__item:visible')
-    .filter({ hasText: resetModeText(config.reset_mode) })
-    .first();
-  await expect(option, `重置周期选项 ${config.reset_mode} 必须存在`).toBeVisible();
-  await option.click();
+  await pickSelectIn(page, page, '重置周期', { optionText: resetModeText(config.reset_mode) });
   await page.getByTestId('number-rule-change-reason-input').fill(changeReason);
 }
 

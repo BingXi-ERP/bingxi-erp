@@ -1,4 +1,5 @@
 //! 编码规则追加版本快照；数据库触发器禁止修改与删除。
+use chrono::{DateTime, Utc};
 use sea_orm::entity::prelude::*;
 use serde::Serialize;
 
@@ -12,7 +13,7 @@ pub struct Model {
     pub config: Json,
     pub change_reason: String,
     pub changed_by: i32,
-    pub created_at: DateTimeWithTimeZone,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
