@@ -1,82 +1,250 @@
-# ==============================================================================
-# .github/workflows/miniprogram-checks.yml
-#
-# 功能：微信小程序面的静态门禁——语法、代码包体积、页面声明对账、后端端点对账、
-#       依赖声明对账、入库面凭据与主机暴露、跳转路由字面量对账七道，判据全部住在
-#       scripts/ci/miniprogram-checks.sh 一处，
-#       本地与云端跑同一份脚本，杜绝"本地能过、CI 红"与"CI 过、本地红"的口径分叉。
-# 调用方：改动 miniprogram/ 下任何页面的 js/wxml/wxss/json、改动 app.json 的页面与
-#       分包声明、改动任何 /api/v1/erp 调用点、改动门禁脚本自身的工作流定义时触发；
-#       也可 workflow_dispatch 手动跑一次（用于体积整改中途看数）。
-# 入参：无（工作流把仓库检出后直接调脚本；阈值见脚本 env 段，
-#       MP_SUBPACKAGE_LIMIT_KB=2048 与 MP_TOTAL_LIMIT_KB=20480 取微信官方上限）
-# 传给谁：scripts/ci/miniprogram-checks.sh 内部跑七道，页面对账调 scripts/ci/mp-check-pages.cjs，
-#       端点对账调 scripts/ci/mp-endpoint-check.cjs，其余五道（语法逐文件 node --check、体积计量、
-#       依赖声明、暴露面、跳转路由）内联在本脚本里，路由对账的声明集取自 app.json
-# 存什么：不写仓、不写凭据；只把门禁的逐行结论写进 $GITHUB_STEP_SUMMARY 供人读，
-#       以及把体积明细落工作流日志供分片比对
-# 存哪里：仅 Actions 运行摘要与日志
-#
-# 为什么先跑 --self-test：判定器必须先证明"能抓到已知违规"才允许它的绿被采信。
-#   本项目已多次出现"扫描面自己变窄导致零命中被当成通过"的假绿，反向夹具是唯一
-#   能在 CI 侧长期防住的机制，因此自证失败按 9 退出（TOOL_BUG），不判绿也不判红。
-#
-# 为什么没有"源码还没入库就跳过"的保护：本文件必须与 miniprogram/ 源码同一次变更
-#   入库。若在这里加 job 级 if 做适用性判定，会出现"作业绿但一道都没跑"的假绿；
-#   而 actionlint 实测 hashFiles() 只在 steps 的 if 等位置可用（jobs.<job_id>.if 非法），
-#   把它挪到步骤级同样会造成"全步骤 skipped 而 job success"。宁可不写这层判断，
-#   也不要一个会假装验证过的守卫。paths 过滤本身已保证只有动到小程序面或门禁脚本
-#   自身时本工作流才触发。
-# ==============================================================================
-
-name: 小程序静态门
+name: 小程序测试与受控发布
 
 on:
   pull_request:
     paths:
-      - "miniprogram/**"
-      - "scripts/ci/miniprogram-checks.sh"
-      - "scripts/ci/mp-check-pages.cjs"
-      - "scripts/ci/mp-endpoint-check.cjs"
-      - "frontend/scripts/route-snapshot.txt"
-      - ".github/workflows/miniprogram-checks.yml"
+      - 'miniprogram/**'
+      - 'tests/miniprogram/**'
+      - 'scripts/ci/miniprogram-checks.sh'
+      - 'scripts/ci/miniprogram-release.cjs'
+      - 'scripts/ci/miniprogram-ci-release.cjs'
+      - 'scripts/ci/mp-check-pages.cjs'
+      - 'scripts/ci/mp-endpoint-check.cjs'
+      - 'frontend/scripts/route-snapshot.txt'
+      - '.github/workflows/miniprogram-checks.yml'
   push:
     branches:
       - main
     paths:
-      - "miniprogram/**"
-      - "scripts/ci/miniprogram-checks.sh"
-      - "scripts/ci/mp-check-pages.cjs"
-      - "scripts/ci/mp-endpoint-check.cjs"
-      - "frontend/scripts/route-snapshot.txt"
-      - ".github/workflows/miniprogram-checks.yml"
+      - 'miniprogram/**'
+      - 'tests/miniprogram/**'
+      - 'scripts/ci/miniprogram-checks.sh'
+      - 'scripts/ci/miniprogram-release.cjs'
+      - 'scripts/ci/miniprogram-ci-release.cjs'
+      - 'scripts/ci/mp-check-pages.cjs'
+      - 'scripts/ci/mp-endpoint-check.cjs'
+      - 'frontend/scripts/route-snapshot.txt'
+      - '.github/workflows/miniprogram-checks.yml'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号，必须与 miniprogram/package.json 一致'
+        required: true
+        type: string
+      mode:
+        description: 'preview 只生成预览码；upload 上传开发版，均不执行线上发布'
+        required: true
+        type: choice
+        options:
+          - preview
+          - upload
+        default: preview
+      robot:
+        description: '微信 CI 机器人编号（1-30）'
+        required: true
+        type: number
+        default: 1
+      desc:
+        description: '开发版备注（1-200 字符）'
+        required: true
+        type: string
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  NODE_VERSION: "22"
+  NODE_VERSION: '22'
+  NPM_CONFIG_AUDIT: false
+  NPM_CONFIG_FUND: false
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  miniprogram-checks:
-    name: 语法与体积与页面与端点与依赖
+  quality:
+    name: 七道静态门与 Node 单测
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: 检出代码
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - name: 装配 Node
+      - name: 装配 Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: miniprogram/package-lock.json
+
+      - name: 安装锁定依赖（不执行生命周期脚本）
+        working-directory: miniprogram
+        run: npm ci --ignore-scripts
+
+      - name: 运行时依赖高危审计
+        run: npm --prefix miniprogram audit --omit=dev --audit-level=high
+
+      - name: 判定器反向自证
+        run: bash scripts/ci/miniprogram-checks.sh --self-test
+
+      - name: 七道静态门与 Node 单测
+        run: |
+          set -o pipefail
+          bash scripts/ci/miniprogram-checks.sh | tee -a "$GITHUB_STEP_SUMMARY"
+          npm --prefix miniprogram test
+
+      - name: 校验 Babel 运行时可复现引用
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const pkg = require('./miniprogram/package.json');
+          const lock = require('./miniprogram/package-lock.json');
+          if (!pkg.dependencies['@babel/runtime']) throw new Error('缺少 @babel/runtime 声明');
+          if (lock.packages['node_modules/@babel/runtime'].version !== pkg.dependencies['@babel/runtime']) {
+            throw new Error('@babel/runtime lockfile 版本漂移');
+          }
+          let references = 0;
+          function walk(dir) {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              if (['node_modules', 'miniprogram_npm', '@babel'].includes(entry.name)) continue;
+              const full = path.join(dir, entry.name);
+              if (entry.isDirectory()) walk(full);
+              else if (entry.name.endsWith('.js')) {
+                const text = fs.readFileSync(full, 'utf8');
+                references += (text.match(/@babel\/runtime\//g) || []).length;
+              }
+            }
+          }
+          walk('miniprogram');
+          if (references === 0) throw new Error('Babel 扫描面为空');
+          console.log(`MP_BABEL_OK references=${references} version=${pkg.dependencies['@babel/runtime']}`);
+          NODE
+
+  source-package:
+    name: 版本化源码工程包
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.prepare.outputs.version }}
+      short_sha: ${{ steps.prepare.outputs.short_sha }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: 装配 Node 22
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: 判定器反向自证（抓不到已知违规就判 TOOL_BUG）
-        shell: bash
-        run: bash scripts/ci/miniprogram-checks.sh --self-test
+      - name: 读取单一版本来源
+        id: prepare
+        run: |
+          VERSION="$(node -p "require('./miniprogram/package.json').version")"
+          printf 'version=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+          printf 'short_sha=%s\n' "$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: 七道静态门（语法/体积/页面对账/端点对账/依赖对账/暴露面/路由对账）
-        shell: bash
-        run: bash scripts/ci/miniprogram-checks.sh | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: 生成净化源码 ZIP 与 release manifest
+        run: |
+          node scripts/ci/miniprogram-release.cjs package \
+            --version "${{ steps.prepare.outputs.version }}" \
+            --output miniprogram-release-output
+
+      - name: 上传可下载源码工程包
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: miniprogram-source-${{ steps.prepare.outputs.version }}-${{ steps.prepare.outputs.short_sha }}
+          path: |
+            miniprogram-release-output/miniprogram-source-*.zip
+            miniprogram-release-output/release-manifest.json
+          if-no-files-found: error
+          retention-days: 30
+
+  controlled-release:
+    name: 受控预览或上传开发版
+    needs: [quality, source-package]
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    environment: miniprogram-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: 装配 Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: miniprogram/package-lock.json
+
+      - name: 下载同提交源码工程包与 manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: miniprogram-source-${{ needs.source-package.outputs.version }}-${{ needs.source-package.outputs.short_sha }}
+          path: miniprogram-release-output
+
+      - name: 发布前强制检查秘密与版本
+        env:
+          WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
+          BINGXI_HOST: ${{ secrets.BINGXI_HOST }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -z "$WECHAT_MINIPROGRAM_PRIVATE_KEY" ]; then
+            echo "MP_RELEASE_RED 缺少 WECHAT_MINIPROGRAM_PRIVATE_KEY" >&2
+            exit 1
+          fi
+          if [ -z "$BINGXI_HOST" ]; then
+            echo "MP_RELEASE_RED 缺少 BINGXI_HOST" >&2
+            exit 1
+          fi
+          EXPECTED="$(node -p "require('./miniprogram/package.json').version")"
+          if [ "$RELEASE_VERSION" != "$EXPECTED" ]; then
+            echo "MP_RELEASE_RED version=$RELEASE_VERSION 与 package.json=$EXPECTED 不一致" >&2
+            exit 1
+          fi
+
+      - name: 安装锁定依赖（不执行生命周期脚本）
+        working-directory: miniprogram
+        run: npm ci --ignore-scripts
+
+      - name: 构建 npm 并执行 preview 或 upload
+        env:
+          WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
+          BINGXI_HOST: ${{ secrets.BINGXI_HOST }}
+          RELEASE_MODE: ${{ inputs.mode }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_ROBOT: ${{ inputs.robot }}
+          RELEASE_DESC: ${{ inputs.desc }}
+        run: |
+          node scripts/ci/miniprogram-ci-release.cjs \
+            --mode "$RELEASE_MODE" \
+            --version "$RELEASE_VERSION" \
+            --robot "$RELEASE_ROBOT" \
+            --desc "$RELEASE_DESC" \
+            --output miniprogram-release-output
+
+      - name: 清理发布临时秘密与本地主机文件
+        id: cleanup
+        if: ${{ always() }}
+        run: |
+          rm -f "$RUNNER_TEMP/wechat-miniprogram-private.key"
+          rm -f miniprogram/mpHost.local.js
+
+      - name: 上传预览码或上传结果与源码包
+        if: ${{ always() && steps.cleanup.outcome != 'cancelled' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: miniprogram-${{ inputs.mode }}-${{ needs.source-package.outputs.version }}-${{ needs.source-package.outputs.short_sha }}
+          path: |
+            miniprogram-release-output/preview-qrcode.png
+            miniprogram-release-output/wechat-ci-result.json
+            miniprogram-release-output/release-manifest.json
+            miniprogram-release-output/miniprogram-source-*.zip
+          if-no-files-found: error
+          retention-days: 30
