@@ -11,14 +11,28 @@ import {
   tryCleanup,
   testPassword,
   loginInIsolatedContext,
+  type ApiRequestBody,
   type IsolatedAuthedSession,
 } from '../flow/helpers';
 
-const CLEANUP: Array<{ method: 'DELETE' | 'POST'; path: string; label: string }> = [];
+const CLEANUP: Array<{
+  method: 'DELETE' | 'POST' | 'PUT';
+  path: string;
+  label: string;
+  body?: ApiRequestBody;
+}> = [];
 
 test.afterEach(async ({ page }) => {
   for (const cleanup of CLEANUP.reverse()) {
-    await tryCleanup(page, cleanup.method, cleanup.path, cleanup.label);
+    if (cleanup.body === undefined) {
+      await tryCleanup(page, cleanup.method, cleanup.path, cleanup.label);
+      continue;
+    }
+    try {
+      await apiCall(page, cleanup.method, cleanup.path, cleanup.body);
+    } catch (error) {
+      console.warn(`[cleanup] ${cleanup.label} 失败: ${(error as Error).message}`);
+    }
   }
   CLEANUP.length = 0;
 });
@@ -61,7 +75,8 @@ async function fetchDetail(
 async function createApprover(
   page: import('@playwright/test').Page,
   browser: import('@playwright/test').Browser,
-  label: string
+  label: string,
+  cleanupRoleId: number
 ): Promise<{ userId: number; session: IsolatedAuthedSession }> {
   const suffix = `${Date.now().toString().slice(-7)}${Math.floor(Math.random() * 1000)
     .toString()
@@ -97,7 +112,14 @@ async function createApprover(
     throw new Error(`创建审批用户失败：${JSON.stringify(user)}`);
   }
   const userId = user.data.id;
+  // 用户删除是软删，role_id 仍占用角色；清理时先改绑管理员角色，再软删用户，最后删专用角色。
   CLEANUP.push({ method: 'DELETE', path: `/users/${userId}`, label: 'bpm_timeout_user' });
+  CLEANUP.push({
+    method: 'PUT',
+    path: `/users/${userId}`,
+    label: 'bpm_timeout_user_role_release',
+    body: { role_id: cleanupRoleId },
+  });
 
   const session = await loginInIsolatedContext(browser, username, testPassword());
   return { userId, session };
@@ -123,13 +145,14 @@ test('585-01 超时会签同节点任务全部转交并由代理人继承各原�
   browser,
 }) => {
   test.setTimeout(180_000);
-  const me = await apiCall<{ id?: number }>(page, 'GET', '/auth/me');
-  if (!me.data?.id) {
-    throw new Error(`GET /auth/me 未返回 id：${JSON.stringify(me)}`);
+  const me = await apiCall<{ id?: number; role_id?: number }>(page, 'GET', '/auth/me');
+  if (!me.data?.id || !me.data.role_id) {
+    throw new Error(`GET /auth/me 未返回 id/role_id：${JSON.stringify(me)}`);
   }
   const initiatorId = me.data.id;
-  const second = await createApprover(page, browser, 'second');
-  const fallback = await createApprover(page, browser, 'fallback');
+  const cleanupRoleId = me.data.role_id;
+  const second = await createApprover(page, browser, 'second', cleanupRoleId);
+  const fallback = await createApprover(page, browser, 'fallback', cleanupRoleId);
 
   try {
     const processKey = genCode('e2e-timeout');
