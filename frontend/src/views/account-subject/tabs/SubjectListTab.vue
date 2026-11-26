@@ -229,6 +229,7 @@ import {
   type UpdateSubjectPayload,
 } from '@/api/account-subject';
 import { logger } from '@/utils/logger';
+import { readAccountSubjectList } from '@/utils/account-subject-list';
 import { exportFromBackend } from '@/utils/export';
 import { PERMISSIONS } from '@/constants/permissions';
 import { useBreakpoint } from '@/composables/useBreakpoint';
@@ -315,18 +316,7 @@ const fetchSubjects = async () => {
   loading.value = true;
   try {
     const res = await getAccountSubjectList();
-    const d = (res as { data?: unknown }).data as
-      | AccountSubjectEntity[]
-      | {
-          items?: AccountSubjectEntity[];
-          data?: AccountSubjectEntity[];
-          list?: AccountSubjectEntity[];
-        };
-    if (Array.isArray(d)) {
-      subjectList.value = d;
-    } else {
-      subjectList.value = d?.items || d?.data || d?.list || [];
-    }
+    subjectList.value = readAccountSubjectList(res);
   } catch (e) {
     const err = e as Error;
     ElMessage.error(err.message || t('accountSubject.message.fetchListFailed'));

@@ -1,4 +1,5 @@
 import { request } from './request';
+import type { ApiResponse } from '@/types/api';
 
 /**
  * 会计科目实体：与后端 `models/account_subject.rs` 的 `account_subject` Model 逐字段对齐
@@ -84,7 +85,7 @@ export interface UpdateSubjectPayload {
 }
 
 export function getAccountSubjectList(params?: Record<string, unknown>) {
-  return request.get('/subjects', { params });
+  return request.get<ApiResponse<AccountSubjectEntity[]>>('/subjects', { params });
 }
 
 export function getAccountSubject(id: number) {
