@@ -13,9 +13,9 @@ Page({
     typeId: "",
     categoryList: [],
     icon: {
-      checked: "".concat(app.config.imgHost, "/img/v2.7.4/Control_Choiced@2x.png"),
-      noCheck: "".concat(app.config.imgHost, "/img/v2.7.4/Control_NotChoice@2x.png"),
-      noAllChecked: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Not_Select@2x.png"),
+      checked: "/assets/icons/select_s@2x.png",
+      noCheck: "/assets/icons/select_s@2x.png",
+      noAllChecked: "/assets/icons/no_img.png",
     },
     hideDel: !1,
     inputValue: "",
@@ -253,7 +253,7 @@ Page({
           return "" === t.name
             ? {
                 name: "下架",
-                icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Off_Shelves_Dark@2x.png"),
+                icon: "/assets/icons/no_img.png",
                 action: "off",
               }
             : t;
@@ -263,7 +263,7 @@ Page({
           return "" === t.name
             ? {
                 name: "上架",
-                icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Shelves_Dark@2x.png"),
+                icon: "/assets/icons/no_img.png",
                 action: "on",
               }
             : t;

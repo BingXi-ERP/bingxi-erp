@@ -108,8 +108,8 @@
         <view class="weui-uploader__bd" wx:if="{{viewDisplay=='edit'&&isShowTwo}}">
             <view class="weui-uploader__files">
                 <view>
-                    <view class="weui-uploader__file" wx:for="{{duibuImageFiles}}" wx:for-item="image" wx:key="index">
-                        <image catchtap="detailImgDuibuTap" class="weui-uploader__img item normal" data-index="{{index}}" data-src="{{image.value}}" id="{{index}}" lazyLoad="true" mode="aspectFill" src="{{image.value}}?x-oss-process=image/rotate,0"></image>
+                    <view class="weui-uploader__file" wx:for="{{detailImageFiles}}" wx:for-item="image" wx:key="index">
+                        <image catchtap="detailImgTap" class="weui-uploader__img item normal" data-index="{{index}}" data-src="{{image.value}}" id="{{index}}" lazyLoad="true" mode="aspectFill" src="{{image.value}}?x-oss-process=image/rotate,0"></image>
                     </view>
                 </view>
             </view>

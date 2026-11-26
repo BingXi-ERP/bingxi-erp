@@ -9,7 +9,7 @@
         <view class="fl title" wx:if="{{!isAllChange}}">报价方式</view>
         <view class="price-list price-type" wx:if="{{!isAllChange}}">
             <radio-group bindchange="statusChange" class="fr-between-center radio-group" data-radio="price">
-                <label class="bdd-radio radio" wx:for="{{priceTypes}}" wx:key="index">
+                <label class="bingxi-radio radio" wx:for="{{priceTypes}}" wx:key="index">
                     <radio checked="{{item.checked}}" name="priceType" value="{{item.name}}"></radio>
                     <view class="checkBtn {{priceType==item.name?'btnChecked':''}}">{{item.value}}</view>
                 </label>

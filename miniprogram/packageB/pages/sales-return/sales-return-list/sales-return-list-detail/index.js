@@ -22,11 +22,11 @@ Page({
     closeOrAbolish: 1,
     modalExplain: "请输入关闭订单的理由",
     icon: {
-      header: "".concat(app.config.imgHost, "/img/customer/duibuIcon/header@2x.png"),
-      okgray: "".concat(app.config.imgHost, "/img/customer/duibuIcon/ok_gray@2x.png"),
-      tdetail: "".concat(app.config.imgHost, "/img/customer/duibuIcon/detail_tuihuo@2x.png"),
-      down: "".concat(app.config.imgHost, "/img/customer/duibuIcon/color_down@2x.png"),
-      up: "".concat(app.config.imgHost, "/img/customer/duibuIcon/color_up@2x.png"),
+      header: "/assets/icons/header@2x.png",
+      okgray: "/assets/icons/ok_gray@2x.png",
+      tdetail: "/packageB/assets/icons/detail_tuihuo@2x.png",
+      down: "/assets/icons/color_down@2x.png",
+      up: "/assets/icons/color_up@2x.png",
     },
   },
   onLoad: function (e) {

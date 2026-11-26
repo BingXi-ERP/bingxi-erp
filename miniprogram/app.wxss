@@ -1622,7 +1622,7 @@ text.validate::before {
   width: 690rpx;
 }
 .save-btn .icon {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/select_s@2x.png);
+  background-image: url(/assets/icons/select_s@2x.png);
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: cover;
@@ -1635,22 +1635,22 @@ text.validate::before {
   font-size: 32rpx;
 }
 .icon-suoyouren-gray {
-  background-image: url(https://img.duibu.cn/duibu/shop/ic_suoyourenfenlei@2x.png);
+  background-image: url(/assets/icons/ic_suoyourenfenlei@2x.png);
   height: 28rpx;
   width: 28rpx;
 }
 .icon-zhidingyonghu-gray {
-  background-image: url(https://img.duibu.cn/duibu/shop/zhidingkehufenlei@2x.png);
+  background-image: url(/assets/icons/zhidingkehufenlei@2x.png);
   height: 28rpx;
   width: 28rpx;
 }
 .icon-more {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/ic_jinru.png);
+  background-image: url(/assets/icons/ic_jinru.png);
   height: 22rpx;
   width: 12rpx;
 }
 .icon-arrow-white {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/Arrow_Right_White.png);
+  background-image: url(/assets/icons/Arrow_Right_White.png);
   height: 48rpx;
   width: 48rpx;
 }
@@ -2262,10 +2262,10 @@ view.dialog-modal-hd {
 .post-extra {
   margin-top: 15rpx;
 }
-.bdd-radio radio {
+.bingxi-radio radio {
   display: none;
 }
-.bdd-radio .radio {
+.bingxi-radio .radio {
   border: 2rpx solid #999;
   border-radius: 100%;
   display: inline-block;
@@ -2276,10 +2276,10 @@ view.dialog-modal-hd {
   vertical-align: middle;
   width: 24rpx;
 }
-.bdd-radio .radio-checked {
+.bingxi-radio .radio-checked {
   border-color: #2f7bfd;
 }
-.bdd-radio .radio-checked::after {
+.bingxi-radio .radio-checked::after {
   background-color: #2f7bfd;
   border-radius: 16rpx;
   content: "";
@@ -2569,7 +2569,7 @@ view.dialog-modal-hd {
   transform: translate(-50%, -35%);
 }
 .noResult .noPage {
-  background: url(https://img.duibu.cn/duibu/shop/img/customer/Defaultpage_NoRecord_Color.png)
+  background: url(/assets/icons/Defaultpage_NoRecord_Color.png)
     no-repeat;
   background-position: 50%;
   background-size: 320rpx 320rpx;

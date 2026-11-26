@@ -16,14 +16,11 @@ Page({
     disabled: !1,
     showPop: !1,
     icon: {
-      stopHeader: "".concat(
-        app.config.imgHost,
-        "/img/v2.7.9/Popup_header@2x.png?imageView2/2/w/800",
-      ),
-      logo: "".concat(app.config.imgHost, "/img/customer/login-logo.png"),
-      tips: "".concat(app.config.imgHost, "/img/customer/Popup_Announcement20190415@2x.png"),
-      weChat: "".concat(app.config.imgHost, "/img/customer/Icon_Wechat.png"),
-      delImage: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
+      stopHeader: "/assets/icons/bg.png",
+      logo: "/assets/icons/bg.png",
+      tips: "/assets/icons/news@2x.png",
+      weChat: "/assets/icons/zhifubao@2x.png",
+      delImage: "/assets/icons/icon/del@2x.png",
     },
   },
   contact: function () {

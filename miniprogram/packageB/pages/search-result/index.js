@@ -43,7 +43,7 @@ Page({
     isRefresher: !0,
     userAuthList: {},
     icon: {
-      colorCard: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/img-color-card.png"),
+      colorCard: "/packageB/assets/icons/icon/img-color-card.png",
     },
     hasColorCard: !1,
     swiper: {
@@ -129,52 +129,15 @@ Page({
       r = ServicesSearch.searchFilterVal,
       i = ServicesSearch.isAllStation,
       s = ServicesSearch.searchData;
-    if (
-      ((e = {
-        mode: i ? 1 : 0,
-        page: 1,
-        size: 10,
-        totalPage: 0,
-        searchField: r,
-        searchId: app.searchId,
-        deltaInterval: "0,3",
-      }),
-      i)
-    ) {
-      var l,
-        o,
-        n,
-        c,
-        h = s.records;
-      util.duiBuCodeOrSpuNumbers = {
-        duiBuCodes:
-          null !==
-            (l =
-              null ===
-                (o = h.filter(function (t) {
-                  return t.duiBuCode;
-                })) || void 0 === o
-                ? void 0
-                : o.map(function (t) {
-                    return t.duiBuCode;
-                  })) && void 0 !== l
-            ? l
-            : [],
-        spuNumbers:
-          null !==
-            (n =
-              null ===
-                (c = h.filter(function (t) {
-                  return !t.duiBuCode;
-                })) || void 0 === c
-                ? void 0
-                : c.map(function (t) {
-                    return t.spuNumber;
-                  })) && void 0 !== n
-            ? n
-            : [],
-      };
-    }
+    e = {
+      mode: i ? 1 : 0,
+      page: 1,
+      size: 10,
+      totalPage: 0,
+      searchField: r,
+      searchId: app.searchId,
+      deltaInterval: "0,3",
+    };
     (this.setData({
       lastFilterQuery: util,
     }),

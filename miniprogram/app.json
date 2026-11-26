@@ -72,7 +72,6 @@
         "pages/new-data-center/customer-balance-due/customer-search/index",
         "pages/banner/intro/index",
         "pages/web/index",
-        "pages/bddintro/index",
         "pages/restockPage/index",
         "pages/new-data-center/marketing/marketing",
         "pages/new-data-center/marketingDetail/index",
@@ -147,7 +146,6 @@
         "pages/personal-center/apply-account-error/apply-account-error",
         "pages/search-family/index",
         "pages/search-supplier/index",
-        "pages/duibu-product/index",
         "pages/release-cargo-pass/index",
         "pages/release-cargo-pass/new-cargo-pass/new-cargo-pass",
         "pages/release-cargo-pass/cargo-tip/cargo-tip",
@@ -202,6 +200,7 @@
     "navigationBarTextStyle": "black"
   },
   "pages": [
+    "pages/server-config/index",
     "pages/index/index",
     "pages/customer-portal/index",
     "pages/customer-portal/orders",
@@ -224,6 +223,7 @@
     "pages/register/login/login",
     "pages/register/open-shop/open-shop",
     "pages/register/agreement/agreement",
+    "pages/register/terms/index",
     "pages/register/authorize/authorize",
     "pages/register/submission/submission",
     "pages/register/registering/registering",

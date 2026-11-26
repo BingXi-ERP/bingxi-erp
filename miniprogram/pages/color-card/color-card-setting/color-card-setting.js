@@ -2,7 +2,6 @@ var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   e = require("../../../@babel/runtime/helpers/regeneratorRuntime"),
   a = require("../../../@babel/runtime/helpers/asyncToGenerator"),
   o = require("../../../@babel/runtime/helpers/defineProperty");
-require("../../../@babel/runtime/helpers/Arrayincludes");
 var toConsumableArray = require("../../../@babel/runtime/helpers/toConsumableArray"),
   mta_analysis = t(require("../../../utils/mta_analysis.js")),
   util = require("../../../libs/utils/util"),
@@ -14,21 +13,21 @@ var toConsumableArray = require("../../../@babel/runtime/helpers/toConsumableArr
 Page({
   data: {
     icon: {
-      search: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Nav_Search_Dark@2x.png"),
-      pringRecode: "".concat(app.config.imgHost, "/img/v2.14.0/Icon_Print_Record@2x.png"),
-      tips: "".concat(app.config.imgHost, "/img/v2.14.0/Tips_Close@2x.png"),
-      def_img: "".concat(app.config.imgHost, "/img/customer/img_def.png"),
-      color_def: "".concat(app.config.imgHost, "/img/customer/color_def.png"),
-      color_def2: "".concat(app.config.imgHost, "/img/customer/color_def2.png"),
-      color_icon: "".concat(app.config.imgHost, "/img/customer/color_icon.png"),
-      save: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/color_save.png"),
-      set: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/color_set.png"),
+      search: "/assets/icons/search@2x.png",
+      pringRecode: "/packageB/assets/icons/print@2x.png",
+      tips: "/assets/icons/Icon_Delete.png",
+      def_img: "/assets/icons/no_img.png",
+      color_def: "/assets/icons/color_add@2x.png",
+      color_def2: "/assets/icons/color_add@2x.png",
+      color_icon: "/assets/icons/color_add@2x.png",
+      save: "/assets/icons/icon/color_save.png",
+      set: "/assets/icons/icon/color_set.png",
     },
     settingAllHide: !1,
     hasDetailImage: !0,
     image: {
-      topStaff: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/chi2@2x.png"),
-      leftStaff: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/chi1@2x.png"),
+      topStaff: "/assets/icons/icon/chi2@2x.png",
+      leftStaff: "/assets/icons/icon/chi1@2x.png",
       unSelect: "/assets/images/icon2nd/symbols-no-select.png",
       select: "/assets/images/icon2nd/symbols-select.png",
     },
@@ -50,7 +49,7 @@ Page({
     showCreateColorCard: !1,
     dateLayTime: 0,
     delaySetInterval: null,
-    delImgIcon: "".concat(app.config.imgHost, "/img/customer/Icon_Delete.png?imageView2/2/w/50"),
+    delImgIcon: "/assets/icons/Icon_Delete.png",
     colorCardInfo: {
       imageTwo0: "",
       imageTwoBack0: "",

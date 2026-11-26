@@ -25,12 +25,9 @@ Page({
     },
     initImgApp: i,
     icon: {
-      gantan: "".concat(i.config.imgHost, "/img/customer/duibuIcon/icon/ic_gantan@2x.png"),
-      noDataBg: "".concat(i.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
-      sales: "".concat(
-        i.config.imgHost,
-        "/img/customer/duibuIcon/icon/Icon_DataCenter_Sales@2x.png",
-      ),
+      gantan: "/packageA/assets/icons/icon/ic_gantan@2x.png",
+      noDataBg: "/assets/icons/img_wuxinx@3x.png",
+      sales: "/packageA/assets/icons/icon/Icon_DataCenter_Sales@2x.png",
     },
     tabActive: 1,
     startDate: "",

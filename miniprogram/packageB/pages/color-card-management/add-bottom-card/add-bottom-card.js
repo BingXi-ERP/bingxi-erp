@@ -13,9 +13,9 @@ Page(
     data:
       ((a = {
         icon: {
-          edit: "".concat(app.config.imgHost, "/img/customer/ic_bianjidika.svg"),
-          add: "".concat(app.config.imgHost, "/img/customer/ic_tianjia@4.5x.png"),
-          phone: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/phone.png"),
+          edit: "/assets/icons/no_img.png",
+          add: "/assets/icons/color_add@2x.png",
+          phone: "/packageB/assets/icons/icon/phone.png",
         },
         uploadPiece: 6,
         priceUnitChange: {
@@ -95,7 +95,7 @@ Page(
           ),
           "icon",
           {
-            add: "".concat(app.config.imgHost, "/img/customer/ic_tianjia@4.5x.png"),
+            add: "/assets/icons/color_add@2x.png",
           },
         ),
         "colorLength",
@@ -164,7 +164,7 @@ Page(
             "gbcId",
             "",
           ),
-          "duibuImageFiles",
+          "detailImageFiles",
           [
             {
               label: "2倍正面",
@@ -395,13 +395,13 @@ Page(
             : t.setData({
                 isShowTwo: !1,
               }),
-            e.data.duibuImageFiles.forEach(function (e) {
+            e.data.detailImageFiles.forEach(function (e) {
               e.value = util.utils.replImage(a.data.detailImage[e.prop]);
             }),
             t.setData({
               cardDetailsInfo: t.data.cardDetailsInfo,
               imageList: mta_analysis,
-              duibuImageFiles: e.data.duibuImageFiles,
+              detailImageFiles: e.data.detailImageFiles,
             }));
         } else
           wx.showToast({
@@ -695,11 +695,11 @@ Page(
                 });
               },
             ),
-            "detailImgDuibuTap",
+            "detailImgTap",
             function (a) {
               var e = a.currentTarget.dataset.index,
                 t = [];
-              (this.data.duibuImageFiles.forEach(function (a) {
+              (this.data.detailImageFiles.forEach(function (a) {
                 t.push(a.value + "?imageView2/2/w/1000");
               }),
                 wx.previewImage({

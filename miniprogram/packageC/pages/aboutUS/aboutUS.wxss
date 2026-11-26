@@ -10,10 +10,11 @@ page {
   text-align: center;
   width: calc(100vw - 68rpx);
 }
-.about-us image {
-  height: 106rpx;
+.brand-name {
+  color: #0b0b0b;
+  font-size: 40rpx;
+  font-weight: 700;
   margin-top: 80rpx;
-  width: 106rpx;
 }
 .version {
   color: #5d5d5d;

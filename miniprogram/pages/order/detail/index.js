@@ -31,18 +31,18 @@ Page({
     modalExplain: "请输入关闭订单的理由",
     deviationList: ["", "X", "+", "-"],
     icon: {
-      header: "".concat(app.config.imgHost, "/img/customer/duibuIcon/header@2x.png"),
-      editorOk: "".concat(app.config.imgHost, "/img/customer/duibuIcon/editor_ok@2x.png"),
-      editorGray: "".concat(app.config.imgHost, "/img/customer/duibuIcon/ok_gray@2x.png"),
-      informations: "".concat(app.config.imgHost, "/img/v2.15.0/Icon_Informations_Blue@2x.png"),
-      timeball: "".concat(app.config.imgHost, "/img/customer/time_ball.png"),
-      order_close: "".concat(app.config.imgHost, "/img/customer/order_close.png"),
-      order_ban: "".concat(app.config.imgHost, "/img/customer/order_ban.png"),
-      order_complete: "".concat(app.config.imgHost, "/img/customer/order_complete.png"),
-      order_await: "".concat(app.config.imgHost, "/img/customer/order_await.png"),
-      down: "".concat(app.config.imgHost, "/img/customer/duibuIcon/color_down@2x.png"),
-      up: "".concat(app.config.imgHost, "/img/customer/duibuIcon/color_up@2x.png"),
-      copy: "".concat(app.config.imgHost, "/img/customer/duibuIcon/order_copy@2x.png"),
+      header: "/assets/icons/header@2x.png",
+      editorOk: "/assets/icons/editor_ok@2x.png",
+      editorGray: "/assets/icons/ok_gray@2x.png",
+      informations: "/assets/icons/news@2x.png",
+      timeball: "/assets/icons/no_img.png",
+      order_close: "/assets/icons/Icon_Delete.png",
+      order_ban: "/assets/icons/order_copy@2x.png",
+      order_complete: "/assets/icons/order_copy@2x.png",
+      order_await: "/assets/icons/order_copy@2x.png",
+      down: "/assets/icons/color_down@2x.png",
+      up: "/assets/icons/color_up@2x.png",
+      copy: "/assets/icons/order_copy@2x.png",
     },
     saleOrderLifeCycleOption: [
       {
@@ -352,7 +352,7 @@ Page({
               toast.billingGoodsDetailModelList.forEach(function (e, o) {
                 ((e.goodsImgPath = e.goodsImgPath
                   ? util.replImage(e.goodsImgPath, 90)
-                  : "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/symbols-edit.png")),
+                  : "/assets/icons/icon/symbols-edit.png"),
                   (toast.billingGoodsDetailModelList[o].display = !1),
                   (toast.billingGoodsDetailModelList[o].choosedDetailModelList = []),
                   toast.billingGoodsDetailModelList[o].billingGoodsColorModels.forEach(

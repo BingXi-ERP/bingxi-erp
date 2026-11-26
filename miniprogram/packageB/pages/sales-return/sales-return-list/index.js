@@ -9,8 +9,8 @@ Page({
     orderId: "",
     isAll: !1,
     icon: {
-      noImg: "".concat(app.config.imgHost, "/img/v2.8.0/Defaultpage_NoMessages@2x.png"),
-      cancelIcon: "".concat(app.config.imgHost, "/img/v2.8.0/Icon_Yzf@2x.png"),
+      noImg: "/assets/icons/news@2x.png",
+      cancelIcon: "/assets/icons/no_img.png",
     },
     salesReturnList: [],
   },

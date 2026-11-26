@@ -25,7 +25,7 @@ Page({
       matchStatusName: "",
     },
     icon: {
-      phone: "".concat(app.config.imgHost, "/img/v2.7.5/dianhua@2x.png"),
+      phone: "/assets/icons/phone@2x.png",
     },
   },
   showService: function () {

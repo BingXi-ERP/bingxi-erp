@@ -37,7 +37,7 @@ Page({
           title: "黑名单",
           explain: "系统会自动将你停用的客户添加到此分类下",
           subTitle: "所有被停用的客户",
-          icon: "".concat(app.config.imgHost, "/img/customer/ic_tingyong@3x.png"),
+          icon: "/assets/icons/no_img.png",
           message: "被停用",
           tag: "黑名单",
         };
@@ -50,7 +50,7 @@ Page({
           title: "重点跟进客户",
           explain: "实时追踪订单动态积极维护好客户关系能提高客户的复购率！",
           subTitle: "30天内开单的客户",
-          icon: "".concat(app.config.imgHost, "/img/customer/ic_goumai@2x.png"),
+          icon: "/assets/icons/color_add@2x.png",
           message: "购买了【金貂绒】，共计：2米，合计：30元",
           tag: "重点跟进",
         };
@@ -59,7 +59,7 @@ Page({
           title: "潜在客户",
           explain: "以下是最近领取了色卡的客户，掌握客户动态让客户不再流失",
           subTitle: "所有领取色卡未交易的客户",
-          icon: "".concat(app.config.imgHost, "/img/customer/ic_chakanseka@3x.png"),
+          icon: "/assets/icons/color_add@2x.png",
           message: "领取了品名：005的色卡",
           tag: "潜在客户",
         };
@@ -68,7 +68,7 @@ Page({
           title: "访客",
           explain: "以下是浏览访问了店铺的客户，经常更新色卡能获取更多的关注",
           subTitle: "仅线上浏览店铺或商品的客户",
-          icon: "".concat(app.config.imgHost, "/img/customer/ic_fangke@3x%20%283%29.png"),
+          icon: "/assets/icons/no_img.png",
           message: "访问了您的店铺",
           tag: "访客",
         };

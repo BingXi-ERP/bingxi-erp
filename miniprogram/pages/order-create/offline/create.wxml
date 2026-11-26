@@ -59,13 +59,13 @@
           bindchange="handleChangeProductType"
           class="fr-between-center radio-group"
         >
-          <label class="bdd-radio radio">
+          <label class="bingxi-radio radio">
             <radio value="full"></radio>
             <view class="checkBtn {{productType==='full'?'chooseBtn':''}}"
               >大货</view
             >
           </label>
-          <label class="bdd-radio radio">
+          <label class="bingxi-radio radio">
             <radio value="cut"></radio>
             <view class="checkBtn {{productType==='cut'?'chooseBtn':''}}"
               >剪样</view

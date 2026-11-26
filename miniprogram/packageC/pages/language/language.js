@@ -1,4 +1,3 @@
-require("../../../@babel/runtime/helpers/Arrayincludes");
 getApp();
 Page({
   data: {

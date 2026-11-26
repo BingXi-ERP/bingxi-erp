@@ -1,4 +1,3 @@
-require("../../@babel/runtime/helpers/Arrayincludes");
 var classCallCheck = require("../../@babel/runtime/helpers/classCallCheck"),
   createClass = require("../../@babel/runtime/helpers/createClass"),
   app = getApp(),
@@ -89,7 +88,7 @@ var classCallCheck = require("../../@babel/runtime/helpers/classCallCheck"),
             return e;
           }),
           (this.addDefaultAvatar = function (e) {
-            var createClass = "".concat(app.config.imgHost, "/Face_User_Face_Man_Default@3x.png");
+            var createClass = "/assets/icons/account@2x.png";
             return "" == e || null == e ? createClass : e;
           }),
           (this.replImage = function (e, t) {

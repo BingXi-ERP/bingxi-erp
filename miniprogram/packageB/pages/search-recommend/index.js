@@ -2,7 +2,7 @@ var ServicesSearch = require("../../libs/services/ServicesSearch"),
   app = getApp();
 Page({
   data: {
-    noDataBg: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
+    noDataBg: "/assets/icons/img_wuxinx@3x.png",
     searchBotData: [],
     formInline: {
       page: 1,

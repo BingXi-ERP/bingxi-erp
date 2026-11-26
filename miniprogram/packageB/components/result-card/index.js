@@ -103,16 +103,6 @@ Component({
         url: o,
       });
     },
-    handleRouterToFamily: function (a) {
-      var e = a.currentTarget.dataset.item;
-      (wx.setStorageSync("moreRecommendParent", this.data.sampleData),
-        wx.navigateTo({
-          url: "../search-family/index?id="
-            .concat(this.data.searchId, "&duiBuCode=")
-            .concat(e.duiBuCode, "&clusterName=")
-            .concat(e.clusterName),
-        }));
-    },
     handleGetSupplierMsg: function (a) {
       var e = a.currentTarget.dataset.item;
       wx.navigateTo({

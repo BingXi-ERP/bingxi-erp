@@ -19,6 +19,15 @@
   height: 100%;
   width: 100%;
 }
+.app-name-text {
+  align-items: center;
+  display: flex;
+  font-size: 40rpx;
+  font-weight: 700;
+  height: 104rpx;
+  justify-content: center;
+  width: 240rpx;
+}
 .app-title {
   font-size: 48rpx;
   font-weight: 700;

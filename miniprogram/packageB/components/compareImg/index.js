@@ -76,8 +76,8 @@ Component({
     popupHeight: "95%",
     icon: {
       noImageBg: "../../../assets/images/icon2nd/noPicture@2x.png",
-      noColorBg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon2nd/emptyColor@2x.png"),
-      delete: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
+      noColorBg: "/packageB/assets/icons/icon2nd/emptyColor@2x.png",
+      delete: "/assets/icons/icon/del@2x.png",
     },
   },
   methods: {

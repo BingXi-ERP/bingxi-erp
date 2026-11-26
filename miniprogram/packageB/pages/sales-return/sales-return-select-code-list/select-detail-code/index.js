@@ -1,4 +1,3 @@
-require("../../../../../@babel/runtime/helpers/Arrayincludes");
 var objectSpread2 = require("../../../../../@babel/runtime/helpers/objectSpread2"),
   util = require("../../../../libs/utils/util"),
   app = getApp();
@@ -9,14 +8,14 @@ Page({
     deviationList: ["", "X", "+", "-"],
     setUp: !1,
     icon: {
-      checked: "".concat(app.config.imgHost, "/img/customer/duibuIcon/phone_check@2x.png"),
-      noCheck: "".concat(app.config.imgHost, "/img/customer/duibuIcon/phone_uncheck@2x.png"),
-      down: "".concat(app.config.imgHost, "/img/customer/duibuIcon/color_down@2x.png"),
-      up: "".concat(app.config.imgHost, "/img/customer/duibuIcon/color_up@2x.png"),
+      checked: "/assets/icons/phone_check@2x.png",
+      noCheck: "/packageB/assets/icons/phone_uncheck@2x.png",
+      down: "/assets/icons/color_down@2x.png",
+      up: "/assets/icons/color_up@2x.png",
     },
     codeInfo: {
       id: "123",
-      goodsImgPath: "".concat(app.config.imgHost, "/HD_PIC_1dg6zmmv2bmga144.png"),
+      goodsImgPath: "/assets/icons/no_img.png",
       title: "123123123ask两地分居阿瓦隆看得见啊",
     },
     totalReturnNum: null,

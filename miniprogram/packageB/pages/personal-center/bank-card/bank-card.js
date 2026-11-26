@@ -7,8 +7,8 @@ Page({
   data: {
     type: "",
     icon: {
-      delete: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon2nd/deltel@2x.png"),
-      bank: "".concat(app.config.imgHost, "/img/customer/bank/"),
+      delete: "/assets/icons/icon2nd/deltel@2x.png",
+      bank: "/assets/icons/no_img.png",
     },
     bankAccountInfo: {
       accountList: [],

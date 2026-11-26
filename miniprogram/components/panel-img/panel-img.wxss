@@ -27,7 +27,7 @@
   margin-top: 10rpx;
 }
 .right1 {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/ic_jinru.png?imageView2/2/w/750);
+  background-image: url(/assets/icons/ic_jinru.png);
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: cover;

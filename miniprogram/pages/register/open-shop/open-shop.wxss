@@ -11,9 +11,13 @@ page {
   background-repeat: no-repeat;
   background-size: 100% 100%;
 }
+.img-wrapper {
+  padding-top: 160rpx;
+  text-align: center;
+}
 .img-wrapper image {
-  height: 1000rpx;
-  width: 750rpx;
+  height: 320rpx;
+  width: 320rpx;
 }
 .share-btn-null {
   background-color: #2f7bfd;

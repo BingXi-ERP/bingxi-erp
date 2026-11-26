@@ -14,8 +14,8 @@ Page({
     result: null,
     setTimeOpen: !1,
     icon: {
-      checked: "".concat(app.config.imgHost, "/img/v2.7.4/Control_Choiced@2x.png"),
-      noCheck: "".concat(app.config.imgHost, "/img/v2.7.4/Control_NotChoice@2x.png"),
+      checked: "/assets/icons/select_s@2x.png",
+      noCheck: "/assets/icons/select_s@2x.png",
     },
   },
   onLoad: function (t) {

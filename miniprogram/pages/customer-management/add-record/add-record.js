@@ -8,7 +8,7 @@ Page({
   data: {
     showImgList: [],
     panel: {
-      img: "".concat(app.config.imgHost, "/img/customer/ic_chakanseka@3x.png"),
+      img: "/assets/icons/color_add@2x.png",
       title: "选择领取的色卡",
       subTitle: " ",
     },

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="375px" height="100px" viewBox="0 0 375 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 52.2 (67145) - http://www.bohemiancoding.com/sketch -->
+    <title>img_yiguanbi@4.5x</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <rect id="path-1" x="0" y="0" width="375" height="100"></rect>
+        <linearGradient x1="0%" y1="68.1812425%" x2="100%" y2="100%" id="linearGradient-3">
+            <stop stop-color="#2D74EE" offset="0%"></stop>
+            <stop stop-color="#1A36A8" offset="100%"></stop>
+        </linearGradient>
+        <filter x="-26.7%" y="-18.9%" width="153.4%" height="137.7%" filterUnits="objectBoundingBox" id="filter-4">
+            <feGaussianBlur stdDeviation="2" in="SourceGraphic"></feGaussianBlur>
+        </filter>
+        <linearGradient x1="50%" y1="100%" x2="50%" y2="2.58535043%" id="linearGradient-5">
+            <stop stop-color="#B9D3FF" offset="0%"></stop>
+            <stop stop-color="#6EA4FF" offset="100%"></stop>
+        </linearGradient>
+        <polygon id="path-6" points="46.6855369 0.105263158 28.4954449 5.34070237 61.6465599 24.3494722 79.1262564 18.1323128"></polygon>
+        <filter x="-1.0%" y="-2.1%" width="102.0%" height="104.1%" filterUnits="objectBoundingBox" id="filter-7">
+            <feOffset dx="0" dy="-1" in="SourceAlpha" result="shadowOffsetInner1"></feOffset>
+            <feComposite in="shadowOffsetInner1" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowInnerInner1"></feComposite>
+            <feColorMatrix values="0 0 0 0 0.741339173   0 0 0 0 0.838336983   0 0 0 0 1  0 0 0 1 0" type="matrix" in="shadowInnerInner1" result="shadowMatrixInner1"></feColorMatrix>
+            <feOffset dx="0" dy="-0.5" in="SourceAlpha" result="shadowOffsetInner2"></feOffset>
+            <feComposite in="shadowOffsetInner2" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowInnerInner2"></feComposite>
+            <feColorMatrix values="0 0 0 0 0.293932886   0 0 0 0 0.538477036   0 0 0 0 0.957695578  0 0 0 1 0" type="matrix" in="shadowInnerInner2" result="shadowMatrixInner2"></feColorMatrix>
+            <feMerge>
+                <feMergeNode in="shadowMatrixInner1"></feMergeNode>
+                <feMergeNode in="shadowMatrixInner2"></feMergeNode>
+            </feMerge>
+        </filter>
+        <linearGradient x1="100%" y1="50%" x2="2.98049133%" y2="50%" id="linearGradient-8">
+            <stop stop-color="#B4D0FF" offset="0%"></stop>
+            <stop stop-color="#6EA4FF" offset="100%"></stop>
+        </linearGradient>
+        <polygon id="path-9" points="29.5592806 9.97295038 12.0817486 18.4950614 45.8863328 38.105549 62 28"></polygon>
+        <filter x="-0.5%" y="-0.9%" width="101.0%" height="101.8%" filterUnits="objectBoundingBox" id="filter-10">
+            <feOffset dx="-0.5" dy="-0.2" in="SourceAlpha" result="shadowOffsetInner1"></feOffset>
+            <feComposite in="shadowOffsetInner1" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowInnerInner1"></feComposite>
+            <feColorMatrix values="0 0 0 0 0.739129577   0 0 0 0 0.836262181   0 0 0 0 1  0 0 0 1 0" type="matrix" in="shadowInnerInner1"></feColorMatrix>
+        </filter>
+        <linearGradient x1="100%" y1="33.326202%" x2="6.52749634%" y2="61.0485113%" id="linearGradient-11">
+            <stop stop-color="#99BFFF" offset="0%"></stop>
+            <stop stop-color="#5791F4" offset="100%"></stop>
+        </linearGradient>
+        <polygon id="path-12" points="45.8730962 38.115649 45.6295942 78.6610368 79.2027816 59.0353316 79.4462836 18.489485"></polygon>
+        <filter x="-0.4%" y="-0.2%" width="100.9%" height="100.5%" filterUnits="objectBoundingBox" id="filter-13">
+            <feOffset dx="0" dy="0.3" in="SourceAlpha" result="shadowOffsetInner1"></feOffset>
+            <feComposite in="shadowOffsetInner1" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowInnerInner1"></feComposite>
+            <feColorMatrix values="0 0 0 0 0.487669665   0 0 0 0 0.591475158   0 0 0 0 1  0 0 0 1 0" type="matrix" in="shadowInnerInner1"></feColorMatrix>
+        </filter>
+        <linearGradient x1="6.66133815e-14%" y1="50%" x2="100%" y2="50%" id="linearGradient-14">
+            <stop stop-color="#0F61ED" offset="0%"></stop>
+            <stop stop-color="#2C7AFF" offset="100%"></stop>
+        </linearGradient>
+        <polygon id="path-15" points="11.8376653 59.0359279 45.628819 78.6611744 45.629731 78.6611744 45.873233 38.1157866 12.0811674 18.49054"></polygon>
+        <filter x="-0.7%" y="-0.4%" width="101.5%" height="100.8%" filterUnits="objectBoundingBox" id="filter-16">
+            <feOffset dx="0" dy="0.5" in="SourceAlpha" result="shadowOffsetInner1"></feOffset>
+            <feComposite in="shadowOffsetInner1" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowInnerInner1"></feComposite>
+            <feColorMatrix values="0 0 0 0 0.571989426   0 0 0 0 0.731386467   0 0 0 0 1  0 0 0 1 0" type="matrix" in="shadowInnerInner1"></feColorMatrix>
+        </filter>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="linearGradient-17">
+            <stop stop-color="#1162DD" offset="0%"></stop>
+            <stop stop-color="#0F61ED" offset="100%"></stop>
+        </linearGradient>
+    </defs>
+    <g id="订单管理" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="卖家端/待开单已关闭详情" transform="translate(0.000000, -64.000000)">
+            <g id="img_yiguanbi" transform="translate(0.000000, 64.000000)">
+                <mask id="mask-2" fill="white">
+                    <use xlink:href="#path-1"></use>
+                </mask>
+                <use id="Mask" fill="#2D74EE" xlink:href="#path-1"></use>
+                <g id="分组-2" mask="url(#mask-2)">
+                    <g transform="translate(235.000000, 11.000000)" id="分组">
+                        <g>
+                            <polygon id="矩形" fill="url(#linearGradient-3)" style="mix-blend-mode: multiply;" filter="url(#filter-4)" points="18.3696909 41.4679723 23.255814 28.4447164 13.8551753 60.2363007 0.803650189 52.630763"></polygon>
+                            <polygon id="Fill-1" fill="#6AA0FF" points="45.6543548 1.15771126 12.0811674 18.4904024 45.873233 38.115649 79.4464204 18.489485"></polygon>
+                            <polygon id="Fill-1" fill="#5493FF" points="45.6543548 1.15771126 45.6543548 18.4904024 45.873233 38.115649 79.4464204 18.489485"></polygon>
+                            <g id="Fill-1">
+                                <use fill="url(#linearGradient-5)" fill-rule="evenodd" xlink:href="#path-6"></use>
+                                <use fill="black" fill-opacity="1" filter="url(#filter-7)" xlink:href="#path-6"></use>
+                            </g>
+                            <g id="Fill-1-Copy">
+                                <use fill="url(#linearGradient-8)" fill-rule="evenodd" xlink:href="#path-9"></use>
+                                <use fill="black" fill-opacity="1" filter="url(#filter-10)" xlink:href="#path-9"></use>
+                            </g>
+                            <g id="Fill-2">
+                                <use fill="url(#linearGradient-11)" fill-rule="evenodd" xlink:href="#path-12"></use>
+                                <use fill="black" fill-opacity="1" filter="url(#filter-13)" xlink:href="#path-12"></use>
+                            </g>
+                            <polygon id="Fill-2" fill="url(#linearGradient-14)" opacity="0.578613281" points="45.5813953 54.9904072 45.5813953 70.9418496 79.2689413 51.5828803 79.2689413 35.7781746"></polygon>
+                            <g id="Fill-3">
+                                <use fill="#4C89F2" fill-rule="evenodd" xlink:href="#path-15"></use>
+                                <use fill="black" fill-opacity="1" filter="url(#filter-16)" xlink:href="#path-15"></use>
+                            </g>
+                            <polygon id="Fill-2" fill="url(#linearGradient-17)" transform="translate(28.917460, 53.411003) scale(-1, 1) translate(-28.917460, -53.411003) " points="11.9983877 54.9904072 11.9335063 70.7629685 45.9014137 51.7005304 45.9014137 36.0590378"></polygon>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

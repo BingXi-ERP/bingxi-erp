@@ -3,10 +3,10 @@ var e = 0,
 Page({
   data: {
     imgNo: "/assets/images/icon2nd/select_s_no@2x.png",
-    imgS: "".concat(app.config.imgHost, "/img/customer/select_s@2x.png"),
+    imgS: "/assets/icons/select_s@2x.png",
     image: {
       search: "/assets/images/icon2nd/symbols-search.png",
-      clearicon: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
+      clearicon: "/assets/icons/icon/del@2x.png",
     },
     search_name: "",
     searchList: [],

@@ -7,17 +7,17 @@ var t = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").
   );
 Page({
   data: {
-    servicePhone: envConfig.default.contacts.servicePhone,
+    servicePhone: envConfig.contacts.servicePhone,
     // 打印机无线热点名，取自 envConfig.printer.hotspotSsid 单点，改热点只改那一枚
-    hotspotSsid: envConfig.default.printer.hotspotSsid,
+    hotspotSsid: envConfig.printer.hotspotSsid,
     spname: "打印机",
     printList: [],
     storageList: [],
     icon: {
-      imageSm: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/sm@2x.png"),
-      imagePrint: "".concat(app.config.imgHost, "/img/customer/duibuIcon/print@2x.png"),
-      imagePrint2: "".concat(app.config.imgHost, "/img/customer/duibuIcon/print2@2x.png"),
-      imageScanPrint: "".concat(app.config.imgHost, "/img/customer/duibuIcon/scan@2x.png"),
+      imageSm: "/packageB/assets/icons/icon/sm@2x.png",
+      imagePrint: "/packageB/assets/icons/print@2x.png",
+      imagePrint2: "/packageB/assets/icons/print2@2x.png",
+      imageScanPrint: "/packageB/assets/icons/scan@2x.png",
     },
     contentStatus: !1,
     platform: "",

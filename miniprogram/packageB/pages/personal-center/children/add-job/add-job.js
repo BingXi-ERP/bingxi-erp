@@ -1,4 +1,3 @@
-require("../../../../../@babel/runtime/helpers/Arrayincludes");
 var app = getApp(),
   ServicesCenter = require("../../../../libs/services/ServicesCenter.js").servicesCenter;
 Page({
@@ -14,8 +13,8 @@ Page({
     pageType: "add",
     roleId: "",
     icon: {
-      del: "".concat(app.config.imgHost, "/img/customer/ic_del_red.svg"),
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
+      del: "/assets/icons/Icon_Delete.png",
+      rightArrow: "/assets/icons/ic_jinru.png",
     },
   },
   onLoad: function (e) {
@@ -102,7 +101,7 @@ Page({
           (n.length &&
             i.push({
               id: "999999",
-              name: "对布仪",
+              name: "测色仪器",
               terminalType: 3,
               permission: "",
               children: n

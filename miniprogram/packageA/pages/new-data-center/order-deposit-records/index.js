@@ -14,15 +14,15 @@ Page({
     total: 0,
     moreIcon: !0,
     icon: [
-      "".concat(n.config.imgHost, "/img/customer/Icon_WePay@2x.png"),
-      "".concat(n.config.imgHost, "/img/customer/Icon_AliPay@2x.png"),
-      "".concat(n.config.imgHost, "/img/customer/Icon_Cash@2x.png"),
-      "".concat(n.config.imgHost, "/img/customer/Icon_CreditCard@2x.png"),
-      "".concat(n.config.imgHost, "/img/customer/Icon_hh@2x.png"),
+      "/assets/icons/zhifubao@2x.png",
+      "/assets/icons/zhifubao@2x.png",
+      "/assets/icons/xianjin@2x.png",
+      "/assets/icons/xianjin@2x.png",
+      "/assets/icons/no_img.png",
     ],
     listData: [],
-    noDataBg: "".concat(n.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
-    iconInvalid: "".concat(n.config.imgHost, "/img/v2.8.0/Icon_Yzf@2x.png"),
+    noDataBg: "/assets/icons/img_wuxinx@3x.png",
+    iconInvalid: "/assets/icons/Icon_Delete.png",
   },
   onLoad: function (t) {
     (this.setData({

@@ -22,7 +22,7 @@ Component({
   data: {
     list: [],
     total: "",
-    delBg: "".concat(app.config.imgHost, "/ic_quxiaoseka@3x.png"),
+    delBg: "/assets/icons/color_add@2x.png",
   },
   methods: {
     countTotal: function (e) {

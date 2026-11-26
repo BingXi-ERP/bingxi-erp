@@ -23,11 +23,8 @@ Page({
     },
     icon: {
       avatar: "",
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
-      search: "".concat(
-        app.config.imgHost,
-        "/img/customer/duibuIcon/icon/Icon_Nav_Search_White@2x.png",
-      ),
+      rightArrow: "/assets/icons/ic_jinru.png",
+      search: "/assets/icons/icon/Icon_Nav_Search_White@2x.png",
     },
     myJionTab: ["全部", "待审核", "审核通过", "审核失败"],
     myJoin: [],

@@ -13,8 +13,8 @@ Page({
     selectedStatusArr: [],
     selectedArr: [],
     icon: {
-      checked: "".concat(app.config.imgHost, "/img/customer/ic_dagou@3x.png"),
-      noCheck: "".concat(app.config.imgHost, "/img/customer/ic_weixuan@3x.png"),
+      checked: "/assets/icons/select_s@2x.png",
+      noCheck: "/assets/icons/no_img.png",
     },
     popupStepper: {
       show: !1,

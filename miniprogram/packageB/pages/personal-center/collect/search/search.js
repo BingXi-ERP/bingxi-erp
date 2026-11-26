@@ -3,7 +3,7 @@ Page({
   data: {
     image: {
       search: "../../../../../assets/images/icon2nd/symbols-search.png",
-      clearicon: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
+      clearicon: "/assets/icons/icon/del@2x.png",
     },
     sercherStorage: [],
     StorageFlag: !1,

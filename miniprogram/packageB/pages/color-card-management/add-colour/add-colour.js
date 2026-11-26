@@ -14,13 +14,13 @@ Page({
     hideType: 0,
     clearPrice: !1,
     icon: {
-      add: "".concat(app.config.imgHost, "/img/customer/duibuIcon/add3@2x.png"),
-      del: "".concat(app.config.imgHost, "/img/customer/duibuIcon/del@2x.png"),
-      moreAdd: "".concat(app.config.imgHost, "/img/customer/duibuIcon/batch-add@2x.png"),
-      noDataBg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/dz@2x.png"),
-      delete: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon2nd/deltel@2x.png"),
+      add: "/packageB/assets/icons/add3@2x.png",
+      del: "/packageB/assets/icons/del@2x.png",
+      moreAdd: "/packageB/assets/icons/batch-add@2x.png",
+      noDataBg: "/assets/icons/dz@2x.png",
+      delete: "/assets/icons/icon2nd/deltel@2x.png",
     },
-    noColorBg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon2nd/emptyColor@2x.png"),
+    noColorBg: "/packageB/assets/icons/icon2nd/emptyColor@2x.png",
     pageColorList: [],
     page: 1,
     size: 20,
@@ -30,8 +30,8 @@ Page({
     flag: 1,
     colorValue: "",
     colorName: "",
-    duibuColorValue: "",
-    duibuColorName: "",
+    instrumentColorValue: "",
+    instrumentColorName: "",
     lab: "",
     skuId: "",
   },
@@ -52,8 +52,6 @@ Page({
           (app.setData({
             colorName: ServicesCard.colorName,
             colorValue: e.colorVal,
-            duibuColorName: ServicesCard.colorName,
-            duibuColorValue: e.duibuColorValue || "#",
             skuId: e.id,
             flag: -1 == app.data.currentActiveIndex ? 1 : 2,
           }),
@@ -217,8 +215,8 @@ Page({
       e.setData({
         colorName: this.data.colorName,
         colorValue: n,
-        duibuColorName: "",
-        duibuColorValue: "#".concat(i),
+        instrumentColorName: "",
+        instrumentColorValue: "#".concat(i),
         lab: c.join(","),
         flag: -1 == this.data.currentActiveIndex ? 1 : 2,
       }),
@@ -412,16 +410,15 @@ Page({
       title: "提示",
       content: "要清空所有色号？",
       success: function (e) {
-        var a = this;
         e.confirm &&
           (app.data.colorcolorList.some(function (o) {
             return o.id;
           })
-            ? ServicesCard.clearAllColor(app.data.goodsId).then(function (t) {
-                (app.getColorList(),
-                  a.setData({
-                    currentActiveIndex: -1,
-                  }));
+            ? ServicesCard.clearAllColor(app.data.goodsId).then(function () {
+                app.getColorList();
+                app.setData({
+                  currentActiveIndex: -1,
+                });
               })
             : app.setData({
                 colorcolorList: [],
@@ -478,11 +475,20 @@ Page({
             .concat(o.currentTarget.dataset.a, ",")
             .concat(o.currentTarget.dataset.b)
         : "";
+    var colorId = o.currentTarget.dataset.id;
+    var original = this.data.colorcolorList[Number(o.currentTarget.dataset.index)];
+    if (colorId && original && ServicesCard !== original.colorVal) {
+      wx.showToast({
+        title: "已保存色号的编码不能直接修改，请删除后重建",
+        icon: "none",
+      });
+      return;
+    }
     (this.setData({
       colorName: e,
       colorValue: ServicesCard,
-      duibuColorName: "",
-      duibuColorValue: "".concat(a),
+      instrumentColorName: "",
+      instrumentColorValue: "".concat(a),
       skuId: o.currentTarget.dataset.id,
       lab: r,
       flag: "" == o.currentTarget.dataset.id ? 1 : 2,
@@ -490,17 +496,36 @@ Page({
       this.saveColorList());
   },
   getColorList: function () {
-    var app = this,
-      e = {
-        page: 1,
-        size: 1e3,
-        id: this.data.goodsId,
-      };
-    ServicesCard.getColorList(e).then(function (t) {
-      var e = t.data.content ? t.data.content : [];
-      app.setData({
-        colorcolorList: e,
+    var app = this;
+    return ServicesCard.getColorList({
+      page: 1,
+      size: 1e3,
+      id: this.data.goodsId,
+    }).then(function (t) {
+      if (!t || t.code !== 0 || !Array.isArray(t.data)) {
+        throw new Error("读取产品色号失败，响应缺少 data 数组");
+      }
+      var items = t.data.map(function (item) {
+        if (!item || !Number.isInteger(Number(item.id)) || Number(item.id) <= 0) {
+          throw new Error("产品色号响应缺少有效 id");
+        }
+        if (typeof item.color_no !== "string" || typeof item.color_name !== "string") {
+          throw new Error("产品色号响应缺少 color_no 或 color_name");
+        }
+        return {
+          id: item.id,
+          colorVal: item.color_no,
+          colorName: item.color_name,
+          engColorName: "",
+          priceType: "2",
+        };
       });
+      app.setData({
+        colorcolorList: items,
+        pageColorList: items.slice(0, app.data.size),
+        totalPage: Math.ceil(items.length / app.data.size),
+      });
+      return items;
     });
   },
   saveColorList: function () {
@@ -508,10 +533,7 @@ Page({
       e = {
         colorName: this.data.colorName,
         colorVal: this.data.colorValue,
-        duibuColorName: "",
-        duibuColorValue: this.data.duibuColorValue,
         flag: this.data.flag,
-        lab: this.data.lab,
       };
     (2 != this.data.flag && 3 != this.data.flag) ||
       Object.assign(e, {
@@ -521,8 +543,10 @@ Page({
       itemList: [e],
       productId: this.data.goodsId,
     };
-    ServicesCard.saveColor(a).then(function (t) {
-      if ((app.getColorList(), 1 == app.data.flag))
+    return ServicesCard.saveColor(a).then(function (t) {
+      if (!t || t.code !== 0) throw new Error("保存产品色号失败");
+      app.getColorList();
+      if (1 == app.data.flag)
         app.setData({
           colorName: "",
           colorValue: "",
@@ -542,6 +566,7 @@ Page({
           colorValue: "",
           currentActiveIndex: -1,
         });
+      return t;
     });
   },
 });

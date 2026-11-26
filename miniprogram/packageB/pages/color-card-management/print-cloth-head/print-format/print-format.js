@@ -14,9 +14,9 @@ Page({
     labelType: 0,
     array: ["60*80mm", "80*100mm"],
     icon: {
-      checked: "".concat(app.config.imgHost, "/img/customer/duibuIcon/phone_check@2x.png"),
-      noCheck: "".concat(app.config.imgHost, "/img/customer/duibuIcon/phone_uncheck@2x.png"),
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
+      checked: "/assets/icons/phone_check@2x.png",
+      noCheck: "/packageB/assets/icons/phone_uncheck@2x.png",
+      rightArrow: "/assets/icons/ic_jinru.png",
     },
     remarks: "如发现产品质量问题，请于三天内通知本行，逾期裁剪或在产品上附加工艺，本行概不负责！",
     customMobile: "",
@@ -46,7 +46,7 @@ Page({
     },
     autoFocus: !0,
     remaskareaDispaly: !0,
-    backImg: "".concat(app.config.imgHost, "/img/customer/model@2x.png"),
+    backImg: "/assets/icons/account@2x.png",
   },
   inputgetName: function (t) {
     var objectSpread2 = t.detail.value.replace(/[\n]/g, "");

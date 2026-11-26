@@ -1,10 +1,12 @@
 var t = require("@babel/runtime/helpers/interopRequireDefault").default,
-  envConfig = t(require("./envConfig")),
-  apiGateway = require("./libs/utils/apiGateway.js");
+  envConfig = require("./envConfig"),
+  deployment = require("./deploymentConfig.js"),
+  apiGateway = require("./libs/utils/apiGateway.js"),
+  releaseVersion = require("./version.js");
 App({
   environment: "",
   envVersion: "release",
-  appVersion: "2.6.1.20190824",
+  appVersion: releaseVersion,
   config: {},
   tabBarActice: 0,
   type: "",
@@ -13,7 +15,7 @@ App({
   contentData: [],
   chooseId: [],
   chooseName: "",
-  customsPhoneNum: envConfig.default.contacts.customsPhoneNum,
+  customsPhoneNum: envConfig.contacts.customsPhoneNum,
   showStopPop: !1,
   userAuthList: {},
   statisticsCount: 0,
@@ -87,28 +89,39 @@ App({
     this.AppUserAgent = mta_analysis;
   },
   initEnv: function () {
-    var envPage =
-      wx.getStorageSync("envPage") || envConfig.default.envPage;
-    var target =
-      envConfig.default.envList[envPage] ||
-      envConfig.default.envList[envConfig.default.envPage];
-    ((this.config = target),
-      (this.appVersion = envConfig.default.appVersion),
-      this.judgeConfig());
+    var envPage = wx.getStorageSync("envPage") || envConfig.envPage;
+    if (!envConfig.envList[envPage]) {
+      throw new Error("未知小程序环境：" + envPage);
+    }
+    var host = deployment.readHost(wx);
+    this.config = host ? deployment.configForHost(host) : deployment.emptyConfig();
+    this.envPage = envPage;
+    this.appVersion = envConfig.appVersion;
+    this.judgeConfig();
   },
-  judgeConfig: function (t) {
-    switch (this.config.rootHost) {
-      case "https://tshop.duibu.cn":
-        ((this.environment = "dev"), (this.envVersion = "trial"));
+  applyDeploymentHost: function (host) {
+    this.config = deployment.configForHost(host);
+  },
+  clearDeploymentSession: function () {
+    ["bingxiSession", "bingxiCsrf", "id", "myShopId", "nickName", "mobile", "avatar", "fullName", "resCodeList"].forEach(function (key) {
+      wx.removeStorageSync(key);
+    });
+    this.globalData.loginState = "invalid";
+    this.globalData.userInfo = {};
+    this.userAuthList = {};
+  },
+  judgeConfig: function () {
+    switch (this.envPage) {
+      case "dev":
+      case "test":
+      case "uat":
+        ((this.environment = this.envPage), (this.envVersion = "trial"));
         break;
-      case "https://tshop.duibu.cn":
-        ((this.environment = "test"), (this.envVersion = "trial"));
-        break;
-      case "https://ushop.duibu.cn":
-        ((this.environment = "uat"), (this.envVersion = "trial"));
-        break;
-      case "https://shop.duibu.cn":
+      case "production":
         ((this.environment = "production"), (this.envVersion = "release"));
+        break;
+      default:
+        throw new Error("未知小程序环境：" + this.envPage);
     }
   },
   onHide: function () {
@@ -125,7 +138,7 @@ App({
     // 由 onShow 自检经 auth/me 回读改写为 valid 或 invalid（apiGateway 的两处写入）
     loginState: apiGateway.isLoggedIn() ? "unverified" : "none",
     logoutFlag: wx.getStorageSync("logoutFlag"),
-    mpVersion: "3.2.8",
+    mpVersion: releaseVersion,
     categoriesList: [],
     mobileInfo: {},
     formIds: [],

@@ -52,10 +52,7 @@ Page({
           (wx.showToast({
             title: "提交成功",
             icon: "success",
-            image: "".concat(
-              app.config.imgHost,
-              "/img/customer/duibuIcon/icon/icon_successful.png",
-            ),
+            image: "/packageB/assets/icons/icon/icon_successful.png",
           }),
             wx.removeStorageSync("inviteUserId"),
             (app.globalData.wxId = ""));

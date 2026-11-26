@@ -26,24 +26,24 @@ Component({
     shareList2: [
       {
         name: "分享产品",
-        icon: "".concat(app.config.imgHost, "/img/customer/share_prod.png"),
+        icon: "/assets/icons/img_fenxiangdingdan@2x.png",
         action: "moment",
       },
       {
         name: "分享电子色卡",
-        icon: "".concat(app.config.imgHost, "/img/customer/share_color.png"),
+        icon: "/assets/icons/color_add@2x.png",
         action: "colorCard",
       },
     ],
     shareList: [
       {
         name: "分享给好友",
-        icon: "".concat(app.config.imgHost, "/img/customer/symbols-share-f.png"),
+        icon: "/assets/icons/img_fenxiangdingdan@2x.png",
         action: "friend",
       },
       {
         name: "分享到朋友圈",
-        icon: "".concat(app.config.imgHost, "/img/customer/symbols-share-fs.png"),
+        icon: "/assets/icons/img_fenxiangdingdan@2x.png",
         action: "moment",
       },
     ],

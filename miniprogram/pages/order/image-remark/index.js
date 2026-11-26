@@ -7,7 +7,7 @@ Page({
     inputValue: "",
     id: "",
     icon: {
-      upload: "".concat(app.config.imgHost, "/img/customer/upload@2x.png"),
+      upload: "/packageB/assets/icons/upload@2x.png",
     },
     iconSize: {
       width: 50,

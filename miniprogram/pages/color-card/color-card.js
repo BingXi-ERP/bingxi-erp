@@ -173,10 +173,7 @@ Page({
               checked: !0,
               icon: t.onOrDown
                 ? "/assets/images/icon2nd/Icon_Sorting_Up_Gray@2x.png"
-                : "".concat(
-                    app.config.imgHost,
-                    "/img/customer/duibuIcon/icon/Icon_Sorting_Down_Gray@2x.png",
-                  ),
+                : "/assets/icons/icon/Icon_Sorting_Down_Gray@2x.png",
               onOrDown: !t.onOrDown,
             },
           )

@@ -1,4 +1,3 @@
-require("../../../../@babel/runtime/helpers/Arrayincludes");
 var t = require("../../../../@babel/runtime/helpers/defineProperty"),
   services_demand = require("../../../services/services-demand"),
   app = getApp();
@@ -9,9 +8,9 @@ Page({
     shopId: null,
     inputValue: "",
     icon: {
-      noData: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
-      del: "".concat(app.config.imgHost, "/img/customer/icon_trash.png"),
-      delete: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
+      noData: "/assets/icons/img_wuxinx@3x.png",
+      del: "/assets/images/icon2nd/icon_trash.png",
+      delete: "/assets/icons/icon/del@2x.png",
     },
     noData: !1,
     searchType: "",

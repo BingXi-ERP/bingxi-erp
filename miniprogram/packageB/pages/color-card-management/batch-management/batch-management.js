@@ -14,12 +14,12 @@ Page({
     footerBar: [
       {
         name: "移除",
-        icon: "".concat(app.config.imgHost, "/img/v2.17.0/Icon_Delete_Color@3x.png"),
+        icon: "/assets/icons/Icon_Delete.png",
         action: "del",
       },
       {
         name: "修改价格",
-        icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Change_Price@2x.png"),
+        icon: "/assets/icons/no_img.png",
         action: "changePrice",
       },
       {
@@ -29,19 +29,19 @@ Page({
       },
       {
         name: "分类至",
-        icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Classification@2x.png"),
+        icon: "/assets/icons/no_img.png",
         action: "category",
       },
       {
         name: "转为底卡",
-        icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Classification@2x.png"),
+        icon: "/assets/icons/no_img.png",
         action: "toBottomCard",
       },
     ],
     icon: {
-      checked: "".concat(app.config.imgHost, "/img/v2.7.4/Control_Choiced@2x.png"),
-      noCheck: "".concat(app.config.imgHost, "/img/v2.7.4/Control_NotChoice@2x.png"),
-      noAllChecked: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Not_Select@2x.png"),
+      checked: "/assets/icons/select_s@2x.png",
+      noCheck: "/assets/icons/select_s@2x.png",
+      noAllChecked: "/assets/icons/no_img.png",
     },
     showPopup: !1,
     hideDel: !1,
@@ -428,7 +428,7 @@ Page({
           return "" === t.name
             ? {
                 name: "下架",
-                icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Off_Shelves_Dark@2x.png"),
+                icon: "/assets/icons/no_img.png",
                 action: "off",
               }
             : t;
@@ -438,7 +438,7 @@ Page({
           return "" === t.name
             ? {
                 name: "上架",
-                icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Shelves_Dark@2x.png"),
+                icon: "/assets/icons/no_img.png",
                 action: "on",
               }
             : t;

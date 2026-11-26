@@ -5,10 +5,10 @@ var e = require("../../../@babel/runtime/helpers/regeneratorRuntime"),
 Page({
   data: {
     icon: {
-      message: "".concat(app.config.imgHost, "/img/v2.7.8/Icon_Sys_Messages@2x.png"),
-      order: "".concat(app.config.imgHost, "/img/v2.7.8/Icon_Order_Messages@2x.png"),
-      right: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
-      feedback: "".concat(app.config.imgHost, "/img/v2.7.8/Icon_Order_Feedback@2x.png"),
+      message: "/assets/icons/news@2x.png",
+      order: "/assets/icons/news@2x.png",
+      right: "/assets/icons/ic_jinru.png",
+      feedback: "/assets/icons/order_copy@2x.png",
     },
     unReadCount: {},
     userAuthList: {},

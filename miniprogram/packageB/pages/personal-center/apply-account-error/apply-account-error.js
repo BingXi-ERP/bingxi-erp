@@ -1,8 +1,8 @@
 var app = getApp();
 Page({
   data: {
-    successBg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/success.png"),
-    errorBg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/error.png"),
+    successBg: "/packageB/assets/icons/success.png",
+    errorBg: "/packageB/assets/icons/error.png",
     reasonsed: "",
     phone: "",
   },

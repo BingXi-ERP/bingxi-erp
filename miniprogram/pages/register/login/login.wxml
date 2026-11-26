@@ -1,7 +1,7 @@
 <view class="page-container">
     <view class="top-area">
         <view class="app-name">
-            <image src="{{icon.duibuLogo}}"></image>
+            <text class="app-name-text">秉羲 ERP</text>
         </view>
         <view class="app-title">秉羲工作台</view>
         <view class="app-slogan">登录账号以使用更多服务</view>

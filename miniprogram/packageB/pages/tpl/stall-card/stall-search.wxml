@@ -23,7 +23,7 @@
             </view>
         </block>
         <view class="color-data-list-null" wx:else>
-            <image mode="aspectFit" src="{{app.config.imgHost}}/img/customer/duibuIcon/icon/symbols-stall-null.png"></image>
+            <image mode="aspectFit" src="/packageB/assets/icons/icon/symbols-stall-null.png"></image>
             <text class="f14">没有找到你要的档口~</text>
         </view>
     </view>

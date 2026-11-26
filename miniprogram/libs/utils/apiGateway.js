@@ -27,7 +27,8 @@
  *      所以失败判定以状态码为准，业务码只作细分。
  */
 
-var CSRF_KEY = "bingxiCsrf";
+var releaseVersion = require("../../version.js"),
+  CSRF_KEY = "bingxiCsrf";
 var SESSION_KEY = "bingxiSession";
 var BINGXI_PREFIX = "/api/v1/erp";
 /** 会话回读端点：仅需 JWT 认证、免 RBAC 与 CSRF 消费的自服务身份端点（backend/src/middleware/public_routes.rs） */
@@ -37,7 +38,10 @@ var AUTH_ME_PATH = BINGXI_PREFIX + "/auth/me";
 var SAFE_METHODS = { GET: !0, HEAD: !0, OPTIONS: !0 };
 
 /** 匿名公开路径：非安全方法只做自定义头检查，不消费一次性令牌（PUBLIC_PATHS 中本客户端会命中的两条） */
-var PUBLIC_PATHS = [BINGXI_PREFIX + "/auth/login", BINGXI_PREFIX + "/auth/refresh"];
+var PUBLIC_PATHS = [
+  BINGXI_PREFIX + "/auth/login",
+  BINGXI_PREFIX + "/auth/refresh",
+];
 
 /** 仅需认证、跳过 CSRF 消费与 RBAC 的路径（AUTH_ONLY_PATHS 同源） */
 var AUTH_ONLY_PATHS = [
@@ -78,7 +82,9 @@ function bingxiBase() {
 }
 
 function normMethod(method) {
-  return String(method || "GET").replace("_", "").toUpperCase();
+  return String(method || "GET")
+    .replace("_", "")
+    .toUpperCase();
 }
 
 /** 取 URL 的路径段（去掉协议、域名、query 与 hash），供路径白名单比对 */
@@ -97,7 +103,7 @@ function inList(list, path) {
 function isBingxiUrl(url) {
   if (!url || typeof url !== "string") return !1;
   var base = bingxiBase();
-  return !!base && url.indexOf(base) === 0;
+  return !!base && (url === base || url.indexOf(base + "/") === 0);
 }
 
 // ---------- CSRF 令牌仓库（一次性语义，取用即作废） ----------
@@ -130,11 +136,18 @@ function adapt(url, method, data) {
   var m = normMethod(method);
   var isBingxi = isBingxiUrl(url);
   var d = data;
-  if (isBingxi && m === "GET" && d && typeof d === "object" && !Array.isArray(d)) {
+  if (
+    isBingxi &&
+    m === "GET" &&
+    d &&
+    typeof d === "object" &&
+    !Array.isArray(d)
+  ) {
     if (d.pageNum !== undefined || d.pageSize !== undefined) {
       d = Object.assign({}, d);
       if (d.page === undefined && d.pageNum !== undefined) d.page = d.pageNum;
-      if (d.page_size === undefined && d.pageSize !== undefined) d.page_size = d.pageSize;
+      if (d.page_size === undefined && d.pageSize !== undefined)
+        d.page_size = d.pageSize;
       delete d.pageNum;
       delete d.pageSize;
     }
@@ -256,7 +269,9 @@ function isCsrfFailure(res) {
   if (!res || typeof res !== "object") return !1;
   var st = res.__httpStatus !== undefined ? res.__httpStatus : res.code;
   if (st !== 403 && res.code !== 403) return !1;
-  return typeof res.errCode === "string" && res.errCode.indexOf("CSRF_TOKEN") === 0;
+  return (
+    typeof res.errCode === "string" && res.errCode.indexOf("CSRF_TOKEN") === 0
+  );
 }
 
 /**
@@ -303,17 +318,20 @@ function requestContract(spec) {
 
   var attempt = function (replayed) {
     var token = consume ? takeCsrf() : "";
-    return spec.send(authHeaders(isBingxi, method, consume ? token : "")).then(function (res) {
-      if (!consume) return res;
-      var neu = csrfFromResponse(res);
-      // 中间件层序是 auth -> omni_audit -> csrf -> permission（bootstrap/middleware_bootstrap.rs）：
-      // 只带 401 而没有下发新令牌，说明请求根本没走到 csrf 消费那步，这枚令牌在服务端仍然有效，
-      // 本地不能把它当已消费丢掉，否则下一次写请求要白吃一次 403
-      if (token && !neu && (res.__httpStatus === 401 || res.code === 401)) putCsrf(token);
-      if (neu) putCsrf(neu);
-      if (!replayed && isCsrfFailure(res) && neu) return attempt(!0);
-      return res;
-    });
+    return spec
+      .send(authHeaders(isBingxi, method, consume ? token : ""))
+      .then(function (res) {
+        if (!consume) return res;
+        var neu = csrfFromResponse(res);
+        // 中间件层序是 auth -> omni_audit -> csrf -> permission（bootstrap/middleware_bootstrap.rs）：
+        // 只带 401 而没有下发新令牌，说明请求根本没走到 csrf 消费那步，这枚令牌在服务端仍然有效，
+        // 本地不能把它当已消费丢掉，否则下一次写请求要白吃一次 403
+        if (token && !neu && (res.__httpStatus === 401 || res.code === 401))
+          putCsrf(token);
+        if (neu) putCsrf(neu);
+        if (!replayed && isCsrfFailure(res) && neu) return attempt(!0);
+        return res;
+      });
   };
 
   if (!consume) return attempt(!1);
@@ -402,7 +420,7 @@ function clearLoginState() {
     userInfo: {},
     loginState: "invalid",
     logoutFlag: 1,
-    mpVersion: "3.2.8",
+    mpVersion: releaseVersion,
     categoriesList: [],
     mobileInfo: {},
     formIds: [],
@@ -451,9 +469,22 @@ function verifySession() {
         tagResponse(res);
         var data = normalize(res.data, !0);
         var status =
-          data && data.__httpStatus !== undefined ? data.__httpStatus : res.statusCode;
-        if (status === 200 && data && data.code === 0 && data.data && data.data.id) {
-          resolve({ state: "valid", status: status, user: markSession(data.data), msg: data.msg });
+          data && data.__httpStatus !== undefined
+            ? data.__httpStatus
+            : res.statusCode;
+        if (
+          status === 200 &&
+          data &&
+          data.code === 0 &&
+          data.data &&
+          data.data.id
+        ) {
+          resolve({
+            state: "valid",
+            status: status,
+            user: markSession(data.data),
+            msg: data.msg,
+          });
           return;
         }
         if (status === 401 || status === 403) {
@@ -465,10 +496,18 @@ function verifySession() {
           });
           return;
         }
-        resolve({ state: "error", status: status, msg: (data && data.msg) || "" });
+        resolve({
+          state: "error",
+          status: status,
+          msg: (data && data.msg) || "",
+        });
       },
       fail: function (err) {
-        resolve({ state: "error", status: 0, msg: (err && err.errMsg) || "网络异常" });
+        resolve({
+          state: "error",
+          status: 0,
+          msg: (err && err.errMsg) || "网络异常",
+        });
       },
     });
   });
@@ -519,11 +558,16 @@ function adaptLogin(raw, isBingxi) {
   wx.setStorageSync("fullName", user.fullName);
   wx.setStorageSync("resCodeList", user.perms);
   var a = app_();
-  if (a.globalData) a.globalData.userInfo = Object.assign({}, a.globalData.userInfo, user);
+  if (a.globalData)
+    a.globalData.userInfo = Object.assign({}, a.globalData.userInfo, user);
   return {
     code: 0,
     msg: res.msg || "登录成功",
-    data: { user: user, permissions: user.perms, password_expired: !!d.password_expired },
+    data: {
+      user: user,
+      permissions: user.perms,
+      password_expired: !!d.password_expired,
+    },
     __normalized: !0,
   };
 }

@@ -16,7 +16,7 @@ Page({
     customerInfo: null,
     customerId: "",
     icon: {
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
+      rightArrow: "/assets/icons/ic_jinru.png",
     },
     dialog: {
       show: !1,

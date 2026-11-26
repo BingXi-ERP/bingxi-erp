@@ -7,7 +7,7 @@
   right: 0;
 }
 .add-btn-icon {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/ic_tianjia.png?imageView2/2/w/750);
+  background-image: url(/packageB/assets/icons/ic_tianjia.png);
   height: 38rpx;
   margin-right: 16rpx;
   width: 38rpx;

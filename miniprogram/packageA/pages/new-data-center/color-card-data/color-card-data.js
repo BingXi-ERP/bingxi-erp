@@ -12,9 +12,9 @@ var interopRequireWildcard =
 Page({
   data: {
     icon: {
-      paihan: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/ic_paihan@2x.png"),
-      noDataBg: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
+      paihan: "/packageA/assets/icons/icon/ic_paihan@2x.png",
+      noDataBg: "/assets/icons/img_wuxinx@3x.png",
+      rightArrow: "/assets/icons/ic_jinru.png",
     },
     tabActive: 1,
     startDate: "",

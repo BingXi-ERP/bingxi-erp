@@ -6,7 +6,7 @@ Page({
     customerId: "",
     initImgApp: app,
     icon: {
-      noImg: "".concat(app.config.imgHost, "/img/v2.8.0/Defaultpage_NoMessages@2x.png"),
+      noImg: "/assets/icons/news@2x.png",
     },
     pageNum: 0,
     pageSize: 10,

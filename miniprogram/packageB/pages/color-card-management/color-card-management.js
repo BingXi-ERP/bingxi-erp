@@ -1,6 +1,5 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   toConsumableArray = require("../../../@babel/runtime/helpers/toConsumableArray");
-require("../../../@babel/runtime/helpers/Arrayincludes");
 var a = require("../../../@babel/runtime/helpers/regeneratorRuntime"),
   o = require("../../../@babel/runtime/helpers/asyncToGenerator"),
   r = require("../../../@babel/runtime/helpers/defineProperty"),
@@ -32,21 +31,21 @@ Page({
     footerBar: [
       {
         name: "新增面料",
-        icon: "".concat(app.config.imgHost, "/img/customer/ic_tianjia@2x.png"),
+        icon: "/assets/icons/color_add@2x.png",
         action: "add",
       },
       {
         name: "批量管理",
-        icon: "".concat(app.config.imgHost, "/img/customer/ic_piliangguanli@2x.png"),
+        icon: "/assets/icons/no_img.png",
         action: "more",
       },
       {
         name: "分类管理",
-        icon: "".concat(app.config.imgHost, "/img/customer/ic_fenleiguanli@4.5x.png"),
+        icon: "/assets/icons/no_img.png",
         action: "type",
       },
     ],
-    noColorCardBg: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
+    noColorCardBg: "/assets/icons/img_wuxinx@3x.png",
     shopId: "",
     isLoad: !1,
     colorCardList: [],
@@ -80,15 +79,15 @@ Page({
     allowUpdate: !0,
     color_icon: "",
     icon: {
-      search: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Nav_Search_Dark@2x.png"),
-      pringRecode: "".concat(app.config.imgHost, "/img/v2.14.0/Icon_Print_Record@2x.png"),
-      tips: "".concat(app.config.imgHost, "/img/v2.14.0/Tips_Close@2x.png"),
-      def_img: "".concat(app.config.imgHost, "/img/customer/img_def.png"),
-      color_def: "".concat(app.config.imgHost, "/img/customer/color_def.png"),
-      color_def2: "".concat(app.config.imgHost, "/img/customer/color_def2.png"),
-      color_icon: "".concat(app.config.imgHost, "/img/customer/color_icon.png"),
-      save: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/color_save.png"),
-      set: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/color_set.png"),
+      search: "/assets/icons/search@2x.png",
+      pringRecode: "/packageB/assets/icons/print@2x.png",
+      tips: "/assets/icons/Icon_Delete.png",
+      def_img: "/assets/icons/no_img.png",
+      color_def: "/assets/icons/color_add@2x.png",
+      color_def2: "/assets/icons/color_add@2x.png",
+      color_icon: "/assets/icons/color_add@2x.png",
+      save: "/assets/icons/icon/color_save.png",
+      set: "/assets/icons/icon/color_set.png",
     },
     printType: null,
     shareColorList: [],
@@ -187,12 +186,12 @@ Page({
                   (1 == ServicesCard.onSale
                     ? (ServicesCard.onOrOff = {
                         name: "下架",
-                        icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Off_Shelves@2x.png"),
+                        icon: "/assets/icons/no_img.png",
                       })
                     : 0 == ServicesCard.onSale &&
                       (ServicesCard.onOrOff = {
                         name: "上架",
-                        icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Shelves@2x.png"),
+                        icon: "/assets/icons/no_img.png",
                       }),
                     e.data.totalPage >= ServicesUserLog && f.push(ServicesCard));
                 }
@@ -475,7 +474,7 @@ Page({
               e())
             : (e(
                 t.getImageInfo(
-                  "".concat(app.config.imgHost, "/img/customer/share-product-bg-n.png"),
+                  "/assets/icons/bg.png",
                 ),
               ),
               wx.hideLoading());

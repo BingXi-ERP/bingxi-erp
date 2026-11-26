@@ -23,7 +23,7 @@ var app = getApp(),
 Page({
   data: {
     showBtn: !0,
-    headerimg: "".concat(app.config.imgHost, "/html/static/img/shop-registered-bg.png"),
+    headerimg: "/assets/icons/account@2x.png",
   },
   onLoad: function (a) {
     (wx.hideShareMenu(), this.getUserInfo());

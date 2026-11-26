@@ -1,7 +1,7 @@
 {
   "description": "秉羲工作台小程序（AppID wx9fc2137059cd96d0）去混淆还原源码 —— 可在微信开发者工具直接打开运行",
   "packOptions": {
-    "ignore": [],
+    "ignore": ["package-lock.json", "README*.md", "mpHost.local.example.js"],
     "include": []
   },
   "setting": {

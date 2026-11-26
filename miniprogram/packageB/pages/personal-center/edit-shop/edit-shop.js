@@ -42,9 +42,9 @@ Page({
     bannerImg: "",
     icon: {
       avatar: "",
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
-      buleAdd: "".concat(app.config.imgHost, "/img/shareFile/Icon_Add_Blue@2x.png"),
-      delete: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon2nd/deltel@2x.png"),
+      rightArrow: "/assets/icons/ic_jinru.png",
+      buleAdd: "/assets/icons/color_add@2x.png",
+      delete: "/assets/icons/icon2nd/deltel@2x.png",
     },
     formParams: {
       logo: "",
