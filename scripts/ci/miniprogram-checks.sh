@@ -11,8 +11,9 @@
 #   1 语法：对 miniprogram 下全部 .js（排除 miniprogram_npm 与 node_modules）逐文件
 #     node --check，任一失败即判红；文件数必须大于阈值 MIN_JS_FLOOR，否则判"扫空"
 #     —— 扫描面自己变窄是假绿的首要来源，报 0 不算过。
-#   2 体积：按微信规则量主包与每个分包的源码体积（去注释与空行前原始字节），主包与
-#     单个分包上限 MP_SUBPACKAGE_LIMIT_KB，全部包合计上限 MP_TOTAL_LIMIT_KB。
+#   2 体积：按微信规则量主包与每个分包的源码体积（去注释与空行前原始字节，并排除
+#     project.config.json 的 packOptions.ignore），主包与单个分包上限 MP_SUBPACKAGE_LIMIT_KB，
+#     全部包合计上限 MP_TOTAL_LIMIT_KB。
 #     超限判红。图片与字体类资源计入所在包，这是布行小程序最常见的超限来源。
 #   3 页面对账：app.json 声明的每条页面与组件路径必须在磁盘存在（缺即判红），
 #     磁盘存在但未声明的页面判红（写了进不去的页等于死代码）。
@@ -74,7 +75,7 @@ mp_syntax() {
       bad=$((bad + 1))
       say "  SYNTAX_FAIL $f"
     fi
-  done < <(find "$root" -name '*.js' -not -path '*/miniprogram_npm/*' -not -path '*/node_modules/*' | sort)
+  done < <(find "$root" -name '*.js' -not -path '*/miniprogram_npm/*' -not -path '*/node_modules/*' -not -path '*/@babel/*' -not -path '*/report/*' -not -path '*/reports/*' | sort)
   say "SYNTAX checked=$total fail=$bad"
   if [ "$total" -lt "$MP_JS_FLOOR" ]; then
     tool_bug "语法面扫到 $total 个文件，低于地板 $MP_JS_FLOOR，判扫描面失效"
@@ -95,20 +96,32 @@ const fs = require('fs');
 const path = require('path');
 const [root, subLimitKb, totalLimitKb] = [process.argv[2], Number(process.argv[3]), Number(process.argv[4])];
 const appJson = JSON.parse(fs.readFileSync(path.join(root, 'app.json'), 'utf8'));
-const skip = new Set(['miniprogram_npm', 'node_modules', '.git']);
+const projectConfigPath = path.join(root, 'project.config.json');
+const projectConfig = fs.existsSync(projectConfigPath)
+  ? JSON.parse(fs.readFileSync(projectConfigPath, 'utf8'))
+  : {};
+const skip = new Set(['miniprogram_npm', 'node_modules', '@babel', 'report', 'reports', '.git']);
+const ignore = (projectConfig.packOptions && projectConfig.packOptions.ignore) || [];
+const ignoreMatchers = ignore.map((pattern) => {
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '\u0000').replace(/\*/g, '[^/]*').replace(/\u0000/g, '.*');
+  return new RegExp('^' + escaped + '$');
+});
+const ignored = (relativePath) => ignoreMatchers.some((matcher) => matcher.test(relativePath));
 const acc = { bytes: 0 };
-function dirKbCollect(dir) {
+function dirKbCollect(dir, prefix) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
     if (skip.has(e.name)) continue;
+    const relativePath = prefix + e.name;
+    if (ignored(relativePath)) continue;
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) dirKbCollect(full);
+    if (e.isDirectory()) dirKbCollect(full, relativePath + '/');
     else acc.bytes += fs.statSync(full).size;
   }
 }
-function sizeKb(dir) {
+function sizeKb(dir, prefix) {
   acc.bytes = 0;
   if (!fs.existsSync(dir)) return 0;
-  dirKbCollect(dir);
+  dirKbCollect(dir, prefix);
   return Math.ceil(acc.bytes / 1024);
 }
 const subPkgs = appJson.subPackages || appJson.subpackages || [];
@@ -119,11 +132,11 @@ let total = 0;
 const mainBytes = (() => {
   let bytes = 0;
   for (const e of fs.readdirSync(root, { withFileTypes: true })) {
-    if (skip.has(e.name) || subRoots.has(e.name)) continue;
+    if (skip.has(e.name) || subRoots.has(e.name) || ignored(e.name)) continue;
     const full = path.join(root, e.name);
     if (e.isDirectory()) {
       acc.bytes = 0;
-      dirKbCollect(full);
+      dirKbCollect(full, e.name + '/');
       bytes += acc.bytes;
     } else bytes += fs.statSync(full).size;
   }
@@ -135,7 +148,7 @@ console.log(`  SIZE 主包 ${mainKb}KB 上限 ${subLimitKb}KB`);
 if (mainKb > subLimitKb) { console.log(`MP_CHECK_RED 主包体积 ${mainKb}KB 超上限 ${subLimitKb}KB`); fail = 1; }
 for (const s of subPkgs) {
   const dir = path.join(root, s.root.replace(/\/$/, ''));
-  const kb = sizeKb(dir);
+  const kb = sizeKb(dir, s.root.replace(/\/$/, '') + '/');
   total += kb;
   console.log(`  SIZE 分包 ${s.root} ${kb}KB 上限 ${subLimitKb}KB 页面数=${(s.pages || []).length}`);
   if (kb > subLimitKb) { console.log(`MP_CHECK_RED 分包 ${s.root} 体积 ${kb}KB 超上限`); fail = 1; }
@@ -392,7 +405,7 @@ const fs = require('fs');
 const path = require('path');
 const root = process.argv[2];
 const floor = Number(process.argv[3]);
-const skip = new Set(['miniprogram_npm', 'node_modules', '.git']);
+const skip = new Set(['miniprogram_npm', 'node_modules', '@babel', 'report', 'reports', '.git']);
 const exts = new Set(['.js', '.wxs', '.json', '.wxml', '.wxss', '.md', '.html']);
 // 私网与保留段不算泄露：10/127/0/169.254/192.0.0/192.168/172.16-31 与全 0
 const PRIV = /^(?:10\.|127\.|0\.|169\.254\.|192\.0\.0\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/;
@@ -530,7 +543,7 @@ for (const s of appJson.subPackages || appJson.subpackages || []) {
   for (const p of s.pages || []) declared.add('/' + (r ? r + '/' + norm(p) : norm(p)));
 }
 const declaredList = [...declared];
-const skip = new Set(['miniprogram_npm', 'node_modules', '.git']);
+const skip = new Set(['miniprogram_npm', 'node_modules', '@babel', 'report', 'reports', '.git']);
 const files = [];
 (function walk(dir) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

@@ -13,8 +13,8 @@ Page({
     pageSize: 5,
     isDone: !1,
     icon: {
-      bg: "".concat(app.config.imgHost, "/img/customer/shop-news-bg.png?imageView2/2/w/750"),
-      noData: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png?imageView2/2/w/750"),
+      bg: "/assets/icons/bg.png",
+      noData: "/assets/icons/img_wuxinx@3x.png",
     },
   },
   getShopNews: function () {
@@ -38,10 +38,7 @@ Page({
                 for (r.s(); !(o = r.n()).done;) {
                   var u = ServicesCustomer.value;
                   ((4 != u.msgType && 6 != u.msgType) ||
-                    (u.goodsImgPath = "".concat(
-                      app.config.imgHost,
-                      "/img/customer/ic_chakanseka@3x.png",
-                    )),
+                    (u.goodsImgPath = "/assets/icons/color_add@2x.png"),
                     (2 != u.msgType && 3 != u.msgType) || (u.importantImg = !0),
                     (u.tag = "未查看的信息"),
                     (u.defaultHeadImg = util.addDefaultAvatar(u.headImg)),

@@ -36,7 +36,7 @@ var AVATAR_PATH = "/api/v1/erp/user/avatar";
 
 Page({
   data: {
-    cameraImg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/camera@2x.png"),
+    cameraImg: "/packageB/assets/icons/camera@2x.png",
     avatar: "",
     nickName: "",
     mobile: "",

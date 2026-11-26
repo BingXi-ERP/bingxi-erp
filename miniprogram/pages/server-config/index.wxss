@@ -1,0 +1,96 @@
+page {
+  background: #f4f6fa;
+}
+
+.server-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 96rpx 48rpx 64rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  color: #ff6065;
+  font-size: 32rpx;
+  font-weight: 600;
+  letter-spacing: 4rpx;
+}
+
+.title {
+  margin-top: 24rpx;
+  color: #1f2937;
+  font-size: 52rpx;
+  font-weight: 700;
+}
+
+.hint {
+  margin-top: 24rpx;
+  color: #6b7280;
+  font-size: 28rpx;
+  line-height: 1.7;
+}
+
+.form,
+.saved {
+  margin-top: 72rpx;
+}
+
+.host-input {
+  height: 96rpx;
+  padding: 0 28rpx;
+  border: 2rpx solid #d1d5db;
+  border-radius: 16rpx;
+  background: #ffffff;
+  color: #111827;
+  font-size: 30rpx;
+}
+
+.placeholder {
+  color: #9ca3af;
+}
+
+.error {
+  margin-top: 20rpx;
+  color: #dc2626;
+  font-size: 26rpx;
+  line-height: 1.6;
+}
+
+.submit,
+.change {
+  width: 100%;
+  margin-top: 32rpx;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+}
+
+.submit {
+  background: #ff6065;
+  color: #ffffff;
+}
+
+.submit::after,
+.change::after {
+  border: 0;
+}
+
+.change {
+  background: transparent;
+  color: #4b5563;
+}
+
+.saved-label {
+  color: #6b7280;
+  font-size: 26rpx;
+}
+
+.saved-host {
+  margin-top: 16rpx;
+  padding: 28rpx;
+  border-radius: 16rpx;
+  background: #ffffff;
+  color: #111827;
+  font-size: 30rpx;
+  word-break: break-all;
+}

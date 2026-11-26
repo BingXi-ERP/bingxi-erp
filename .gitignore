@@ -6,6 +6,7 @@ backend/logs/
 # 忽略前端构建产物
 frontend/dist/
 frontend/node_modules/
+miniprogram/node_modules/
 
 # 忽略发布包（压缩包文件）
 releases/*.zip

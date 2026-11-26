@@ -23,12 +23,12 @@ Page({
     choosedItemId: "",
     paymentRecord: [],
     icon: {
-      nodata: "".concat(app.config.imgHost, "/img/customer/duibuIcon/no-data2@2x.png"),
-      weixin: "".concat(app.config.imgHost, "/img/customer/duibuIcon/weixin@2x.png"),
-      zhifubao: "".concat(app.config.imgHost, "/img/customer/duibuIcon/zhifubao@2x.png"),
-      xianjin: "".concat(app.config.imgHost, "/img/customer/duibuIcon/xianjin@2x.png"),
-      shuaka: "".concat(app.config.imgHost, "/img/customer/duibuIcon/shuaka@2x.png"),
-      huikuan: "".concat(app.config.imgHost, "/img/customer/duibuIcon/huikuan@2x.png"),
+      nodata: "/assets/icons/no-data2@2x.png",
+      weixin: "/assets/icons/weixin@2x.png",
+      zhifubao: "/assets/icons/zhifubao@2x.png",
+      xianjin: "/assets/icons/xianjin@2x.png",
+      shuaka: "/assets/icons/shuaka@2x.png",
+      huikuan: "/assets/icons/huikuan@2x.png",
     },
   },
   onLoad: function (t) {

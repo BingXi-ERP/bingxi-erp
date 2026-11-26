@@ -13,16 +13,10 @@ Page({
     total: 0,
     moreIcon: !0,
     icon: {
-      search: "".concat(
-        app.config.imgHost,
-        "/img/customer/duibuIcon/icon/Icon_Nav_Search_White@2x.png",
-      ),
-      defaultAvator: "".concat(
-        app.config.imgHost,
-        "/img/customer/Face_User_Face_Man_Default@3x.png",
-      ),
-      noDataBg: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
+      search: "/assets/icons/icon/Icon_Nav_Search_White@2x.png",
+      defaultAvator: "/assets/icons/account@2x.png",
+      noDataBg: "/assets/icons/img_wuxinx@3x.png",
+      rightArrow: "/assets/icons/ic_jinru.png",
     },
     showDesc: !1,
     listData: [],

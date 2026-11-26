@@ -16,7 +16,7 @@ Page({
     region: [],
     regionCode: [],
     icon: {
-      hi: "".concat(app.config.imgHost, "/img/customer/bg_hi.svg"),
+      hi: "/assets/icons/no_img.png",
     },
     shopName: "",
     contacts: "",

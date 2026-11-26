@@ -2,7 +2,8 @@
 // 入口：个人中心 -> toDebug（reLaunch 到此页）
 // 功能：列出 envConfig 中的全部环境，点击切换写入本地覆盖（storage.key = "envPage"），
 //       重启小程序后由 app.js initEnv 优先读取生效。
-var envConfig = require("../../../envConfig");
+var envConfig = require("../../../envConfig"),
+  app = getApp();
 
 function nameOf(key) {
   var list = envConfig.envList || {};
@@ -23,7 +24,7 @@ Page({
       return {
         key: k,
         name: item.name || k,
-        rootHost: item.rootHost || "",
+        rootHost: app.config.bingxiHost,
       };
     });
     var override = wx.getStorageSync("envPage") || "";

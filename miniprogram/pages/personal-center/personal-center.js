@@ -11,10 +11,7 @@ var e = require("../../@babel/runtime/helpers/interopRequireDefault").default,
 Page({
   data: {
     comboData: null,
-    iconDebug: "".concat(
-      app.config.imgHost,
-      "/img/customer/duibuIcon/icon/icon_debug.png",
-    ),
+    iconDebug: "/assets/icons/icon/icon_debug.png",
     isShowDebugBtn: !1,
     openShopStatus: "",
     openShopPopup: !1,
@@ -36,19 +33,10 @@ Page({
     userAuthList: {},
     userInfoList: {},
     icon: {
-      invite: "".concat(app.config.imgHost, "/img/shareFile/invite.png"),
-      contact: "".concat(
-        app.config.imgHost,
-        "/img/customer/duibuIcon/phone@2x.png",
-      ),
-      boss: "".concat(
-        app.config.imgHost,
-        "/img/customer/duibuIcon/门店店长@2x.png",
-      ),
-      worker: "".concat(
-        app.config.imgHost,
-        "/img/customer/duibuIcon/worker@2x.png",
-      ),
+      invite: "/assets/icons/img_fenxiangdingdan@2x.png",
+      contact: "/assets/icons/phone@2x.png",
+      boss: "/assets/icons/门店店长@2x.png",
+      worker: "/assets/icons/worker@2x.png",
     },
   },
   onLoad: function () {
@@ -138,19 +126,19 @@ Page({
       isVisitor = [
         {
           name: "待审核",
-          icon: "".concat(app.config.imgHost, "/img/customer/Icon_Dsh@2x.png"),
+          icon: "/assets/icons/no_img.png",
           action: "waitAudit",
           isNew: !1,
         },
         {
           name: "审核通过",
-          icon: "".concat(app.config.imgHost, "/img/customer/Icon_Shtg@2x.png"),
+          icon: "/assets/icons/no_img.png",
           action: "audit",
           isNew: 1 == mta_analysis.passType,
         },
         {
           name: "审核失败",
-          icon: "".concat(app.config.imgHost, "/img/customer/Icon_Shsb@2x.png"),
+          icon: "/assets/icons/no_img.png",
           action: "failAudit",
           isNew: 1 == mta_analysis.rejectType,
         },
@@ -160,10 +148,7 @@ Page({
     });
     var ServicesCenter = [
         {
-          img: "".concat(
-            app.config.imgHost,
-            "/img/customer/duibuIcon/equipment@2x.png",
-          ),
+          img: "/assets/icons/equipment@2x.png",
           title: "客户门户",
           showBorder: !0,
           action: "customerPortal",
@@ -172,10 +157,7 @@ Page({
           bgcolor: "linear-gradient( 180deg, #3E84F8 0%, #78ACFE 100%)",
         },
         {
-          img: "".concat(
-            app.config.imgHost,
-            "/img/customer/duibuIcon/equipment@2x.png",
-          ),
+          img: "/assets/icons/equipment@2x.png",
           title: "设备连接",
           showBorder: !0,
           action: "link",
@@ -183,10 +165,7 @@ Page({
           bgcolor: "linear-gradient( 180deg, #3E84F8 0%, #78ACFE 100%)",
         },
         {
-          img: "".concat(
-            app.config.imgHost,
-            "/img/customer/duibuIcon/address@2x.png",
-          ),
+          img: "/assets/icons/address@2x.png",
           title: "地址管理",
           showBorder: !0,
           action: "myAddress",
@@ -195,10 +174,7 @@ Page({
         },
         {
           title: "员工管理",
-          img: "".concat(
-            app.config.imgHost,
-            "/img/customer/duibuIcon/account@2x.png",
-          ),
+          img: "/assets/icons/account@2x.png",
           action: "children",
           noAuth: !1,
           perm: "basic:user:subAccount",
@@ -207,30 +183,21 @@ Page({
       ],
       login = [
         {
-          img: "".concat(
-            app.config.imgHost,
-            "/img/customer/duibuIcon/teach@2x.png",
-          ),
+          img: "/assets/icons/teach@2x.png",
           title: "教学视频",
           showBorder: !0,
           action: "teach",
           noAuth: !0,
         },
         {
-          img: "".concat(
-            app.config.imgHost,
-            "/img/customer/duibuIcon/setting@2x.png",
-          ),
+          img: "/assets/icons/setting@2x.png",
           title: "设置",
           showBorder: !0,
           action: "option",
           noAuth: !1,
         },
         {
-          img: "".concat(
-            app.config.imgHost,
-            "/img/customer/duibuIcon/service@2x.png",
-          ),
+          img: "/assets/icons/service@2x.png",
           title: "联系客服",
           showBorder: !0,
           action: "service",
@@ -254,7 +221,7 @@ Page({
     });
     var util = wx.getStorageSync("mobile");
     // 演示账号特判，本地缓存手机号等于演示号时隐藏登录入口，演示号取自 envConfig.account.demoMobileNum 单点，改号只改那一枚
-    ((envConfig.default.account.demoMobileNum != util && util) ||
+    ((envConfig.account.demoMobileNum != util && util) ||
       login.splice(0, 1),
       this.setData({
         panel: o,

@@ -7,10 +7,10 @@ require("../../libs/utils/util.js").utils;
 Page({
   data: {
     icon: {
-      bg: "".concat(app.config.imgHost, "/img/customer/search-img-bg2.jpg"),
-      photo: "".concat(app.config.imgHost, "/img/customer/ic_paizhao.svg"),
-      notice: "".concat(app.config.imgHost, "/img/customer/ic_gantan.svg"),
-      noPower: "".concat(app.config.imgHost, "/img/customer/icon_404_8x8.png"),
+      bg: "/assets/icons/bg.png",
+      photo: "/packageB/assets/icons/camera@2x.png",
+      notice: "/assets/icons/no_img.png",
+      noPower: "/assets/icons/Defaultpage_NoRecord_Color.png",
     },
   },
   getUserInfo: function () {

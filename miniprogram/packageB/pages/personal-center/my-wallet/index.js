@@ -6,9 +6,9 @@ Page({
   data: {
     ChooseType: !1,
     icon: {
-      recode: "".concat(app.config.imgHost, "/img/customer/Icon_DataCenter_Sales.png"),
-      info: "".concat(app.config.imgHost, "/img/customer/Informations_Blue.png"),
-      noImg: "".concat(app.config.imgHost, "/img/customer/Defaultpage_NoRecord_Color.png"),
+      recode: "/assets/icons/Arrow_Right_White.png",
+      info: "/assets/icons/news@2x.png",
+      noImg: "/assets/icons/Defaultpage_NoRecord_Color.png",
     },
     moneyInfoList: {
       accountId: "",

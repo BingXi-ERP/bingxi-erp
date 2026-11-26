@@ -25,8 +25,8 @@ Page({
     passwordShow: !0,
     passwordShow2: !0,
     icon: {
-      shape: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/CombinedShape@2x.png"),
-      eye: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/Icon_eyes@3x.png"),
+      shape: "/packageB/assets/icons/icon/CombinedShape@2x.png",
+      eye: "/packageB/assets/icons/icon/Icon_eyes@3x.png",
     },
   },
   handleInputVal: function (o) {

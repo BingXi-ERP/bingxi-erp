@@ -6,10 +6,10 @@ Page({
   data: {
     app: app,
     icon: {
-      checked: "".concat(app.config.imgHost, "/img/v2.7.4/Control_Choiced@2x.png"),
-      noCheck: "".concat(app.config.imgHost, "/img/v2.7.4/Control_NotChoice@2x.png"),
-      noAllChecked: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Not_Select@2x.png"),
-      success: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/succss.png"),
+      checked: "/assets/icons/select_s@2x.png",
+      noCheck: "/assets/icons/select_s@2x.png",
+      noAllChecked: "/assets/icons/no_img.png",
+      success: "/packageB/assets/icons/icon/succss.png",
     },
   },
   onLoad: function (o) {

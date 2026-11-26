@@ -10,7 +10,7 @@ Page({
     total: 0,
     moreIcon: !0,
     hasNextPage: !1,
-    noDataBg: "".concat(a.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
+    noDataBg: "/assets/icons/img_wuxinx@3x.png",
   },
   onLoad: function (t) {
     var e = JSON.parse(t.item);

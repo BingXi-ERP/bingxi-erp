@@ -1,9 +1,16 @@
 {
   "name": "bingxi-erp-miniprogram",
-  "version": "1.0.0",
+  "version": "3.13.10",
   "private": true,
-  "description": "布行小程序 npm 依赖声明面，构建产物由开发者工具构建 npm 再生，miniprogram_npm 内容以此处声明为准再生。",
+  "description": "布行小程序版本与 npm 依赖声明面，构建产物由开发者工具构建 npm 再生，miniprogram_npm 内容以此处声明为准再生。",
+  "scripts": {
+    "test": "node --test ../tests/miniprogram/*.test.cjs"
+  },
   "dependencies": {
-    "@vant/weapp": "^1.11.7"
+    "@babel/runtime": "7.28.4",
+    "@vant/weapp": "1.11.7"
+  },
+  "devDependencies": {
+    "miniprogram-ci": "2.1.31"
   }
 }

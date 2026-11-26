@@ -8,7 +8,7 @@ Page({
     totalPage: 12,
     list: [],
     cacheList: [],
-    icon: "".concat(app.config.imgHost, "/img/customer/duibuIcon/flags/"),
+    icon: "/assets/icons/flags/",
   },
   onLoad: function () {
     this.getData();

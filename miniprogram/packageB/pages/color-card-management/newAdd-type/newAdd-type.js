@@ -31,10 +31,10 @@ Page({
       },
     ],
     icon: {
-      comfirm: "".concat(app.config.imgHost, "/img/customer/select_s@2x.png"),
-      checked: "".concat(app.config.imgHost, "/img/customer/ic_dagou@3x.png"),
-      noCheck: "".concat(app.config.imgHost, "/img/customer/ic_weixuan@3x.png"),
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
+      comfirm: "/assets/icons/select_s@2x.png",
+      checked: "/assets/icons/select_s@2x.png",
+      noCheck: "/assets/icons/no_img.png",
+      rightArrow: "/assets/icons/ic_jinru.png",
     },
   },
   onLoad: function (a) {

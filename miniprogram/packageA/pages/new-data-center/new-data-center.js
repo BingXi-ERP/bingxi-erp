@@ -7,13 +7,10 @@ Page({
   data: {
     userAuthList: {},
     shopId: null,
-    backImg: "".concat(app.config.imgHost, "/img/customer/index-block-bg3.png"),
+    backImg: "/assets/icons/bg.png",
     panel: [
       {
-        img: "".concat(
-          app.config.imgHost,
-          "/img/customer/duibuIcon/icon/Icon_DataCenter_Sales@2x.png",
-        ),
+        img: "/packageA/assets/icons/icon/Icon_DataCenter_Sales@2x.png",
         title: "销售报表",
         subTitle: "最近销售业绩统计",
         showBorder: !0,
@@ -21,7 +18,7 @@ Page({
         auth: app.userAuthList["stat:summary"] || app.userAuthList["stat:summary:person"],
       },
       {
-        img: "".concat(app.config.imgHost, "/img/customer/Icon_DataCenter_Color_Card@2x.png"),
+        img: "/assets/icons/color_add@2x.png",
         title: "色卡数据",
         subTitle: "最近色卡领取统计",
         showBorder: !0,
@@ -29,7 +26,7 @@ Page({
         auth: app.userAuthList["stat:goods:data"],
       },
       {
-        img: "".concat(app.config.imgHost, "/img/customer/Icon_DataCenter_PV@2x.png"),
+        img: "/assets/icons/Arrow_Right_White.png",
         title: "访问分析",
         subTitle: "线上店铺和商品访问量统计",
         showBorder: !0,
@@ -37,7 +34,7 @@ Page({
         auth: app.userAuthList["stat:customer:data"],
       },
       {
-        img: "".concat(app.config.imgHost, "/img/customer/Icon_DataCenter_Color_Card@2x.png"),
+        img: "/assets/icons/color_add@2x.png",
         title: "放货数据",
         subTitle: "店铺放货搜索数统计",
         showBorder: !0,
@@ -45,7 +42,7 @@ Page({
         auth: app.userAuthList["release:cargo:pass:data"],
       },
       {
-        img: "".concat(app.config.imgHost, "/img/customer/Icon_DataCenter_PV@2x.png"),
+        img: "/assets/icons/Arrow_Right_White.png",
         title: "产品销售",
         subTitle: "店铺各产品销售销售情况统计",
         showBorder: !0,

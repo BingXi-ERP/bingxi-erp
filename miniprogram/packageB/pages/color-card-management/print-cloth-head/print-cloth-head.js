@@ -6,7 +6,7 @@ getApp();
 Page({
   data: {
     icon: {
-      banAdd: "${app.config.imgHost}/img/customer/duibuIcon/icon/banAdd.png",
+      banAdd: "/packageB/assets/icons/icon/banAdd.png",
     },
     isFocus: !1,
     isEdit: !1,

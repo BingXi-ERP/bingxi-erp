@@ -9,7 +9,6 @@ Page({
     formInline: {
       searchField: "",
       searchId: "",
-      duiBuCode: "",
       mode: 1,
       page: 1,
       size: 10,
@@ -22,7 +21,7 @@ Page({
     scrollTop: 0,
     userAuthList: {},
     icon: {
-      colorCard: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/img-color-card.png"),
+      colorCard: "/packageB/assets/icons/icon/img-color-card.png",
     },
     hasColorCard: !1,
     swiper: {
@@ -136,13 +135,7 @@ Page({
     (this.data.formInline.searchField && this.onClearSearchInput(),
       this.setData({
         "formInline.searchField": "",
-        lastFilterQuery: objectSpread2(
-          objectSpread2({}, e.detail),
-          {},
-          {
-            duiBuCode: this.data.formInline.duiBuCode,
-          },
-        ),
+        lastFilterQuery: e.detail,
         scrollTop: 0,
       }),
       this.getFilterSearchResult());
@@ -185,16 +178,14 @@ Page({
   },
   onLoad: function (t) {
     var ServicesSearch = t.id,
-      util = t.duiBuCode,
       app = t.clusterName,
       i = wx.getStorageSync("moreRecommendParent");
     (wx.setNavigationBarTitle({
-      title: util + "".concat(app ? "/" + app : ""),
+      title: app || ServicesSearch,
     }),
       this.setData({
         moreRecommendParent: i,
         "formInline.searchId": ServicesSearch,
-        "formInline.duiBuCode": util,
       }),
       this.getPermissions(),
       this.getSearchFamilyResult());

@@ -1,0 +1,27 @@
+<view class="server-page">
+  <view class="brand">秉羲 ERP</view>
+  <view class="title">连接部署服务器</view>
+  <view class="hint">首次使用请填写已部署系统的 HTTPS 源站地址。地址只保存在本机，后续启动自动连接。</view>
+
+  <view wx:if="{{formVisible}}" class="form">
+    <input
+      class="host-input"
+      value="{{host}}"
+      bindinput="onHostInput"
+      placeholder="https://erp.example.com"
+      placeholder-class="placeholder"
+      type="text"
+      confirm-type="go"
+      bindconfirm="onSubmit"
+    />
+    <view wx:if="{{error}}" class="error">{{error}}</view>
+    <button class="submit" bindtap="onSubmit" loading="{{submitting}}">保存并进入</button>
+  </view>
+
+  <view wx:else class="saved">
+    <view class="saved-label">已配置服务器</view>
+    <view class="saved-host">{{savedHost}}</view>
+    <button class="submit" bindtap="onEnterSaved">进入系统</button>
+    <button class="change" bindtap="onChange">更改服务器地址</button>
+  </view>
+</view>

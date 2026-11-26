@@ -1,0 +1,9 @@
+<view class="terms-page">
+  <view class="terms-header">
+    <text class="terms-title">{{title}}</text>
+    <text class="terms-updated">{{updated}}</text>
+  </view>
+  <view class="terms-content">
+    <text wx:for="{{paragraphs}}" wx:key="index" class="terms-paragraph {{index % 2 === 0 ? 'terms-section' : ''}}">{{item}}</text>
+  </view>
+</view>

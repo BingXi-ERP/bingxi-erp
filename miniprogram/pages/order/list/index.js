@@ -54,11 +54,9 @@ Page({
     noworderRecordSearchState: "",
     chooseStatus: 0,
     globalApp: app,
-    searchIconUrl: "".concat(
-      app.config.imgHost,
-      "/img/customer/duibuIcon/icon/Icon_Nav_Search_White@2x.png",
-    ),
-    testFace: "".concat(app.config.imgHost, "/img/customer/duibuIcon/test_face.png"),
+    searchIconUrl:
+      "/assets/icons/icon/Icon_Nav_Search_White@2x.png",
+    testFace: "/assets/icons/test_face.png",
     beforeCloses: !0,
     startDate: "",
     endDate: "",
@@ -312,7 +310,7 @@ Page({
                 getWxInfo[e].orderGoods.forEach(function (t, e) {
                   t.goodsImgPath = t.goodsImgPath
                     ? util.replImage(t.goodsImgPath, 88)
-                    : "".concat(app.config.imgHost, "/img/customer/duibuIcon/no_img.png");
+                    : "/assets/icons/no_img.png";
                 }));
             }),
               e

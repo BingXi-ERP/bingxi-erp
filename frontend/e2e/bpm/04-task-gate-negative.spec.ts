@@ -180,19 +180,21 @@ async function resolveOtherUserId(
   page: import('@playwright/test').Page,
   myId: number
 ): Promise<number> {
-  const list = await apiCallRaw<{ users: Array<{ id: number; username: string }>; total: number }>(
-    page,
-    'GET',
-    '/users?page=1&page_size=100'
-  );
+  const list = await apiCallRaw<{
+    users: Array<{ id: number; username: string; is_active: boolean }>;
+    total: number;
+  }>(page, 'GET', '/users?page=1&page_size=100');
   if (!Array.isArray(list?.users)) {
     throw new Error(
       `GET /users 未返回 users 数组（UserListResponse 契约漂移？）：${JSON.stringify(list).slice(0, 300)}`
     );
   }
-  const other = list.users.find(u => Number(u.id) !== myId);
+  const other = list.users.find(u => Number(u.id) !== myId && u.is_active === true);
   if (!other) {
-    throw new Error(`用户列表中找不到与当前用户(${myId})不同的第二用户，无法构造转办正向对照`);
+    throw new Error(
+      `用户列表中找不到与当前用户(${myId})不同的启用用户，无法构造转办正向对照；` +
+        `当前返回 ${list.users.length} 个用户，停用账号不得作为合法受让人`
+    );
   }
   return Number(other.id);
 }

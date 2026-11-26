@@ -7,8 +7,7 @@ var e = (0, require("../../../@babel/runtime/helpers/interopRequireDefault").def
 Page({
   data: {
     icon: {
-      duibuLogo: "".concat(app.config.imgHost, "/img/customer/duibuIcon/logo@2x.png"),
-      weChat: "".concat(app.config.imgHost, "/img/customer/duibuIcon/weixin@2x.png"),
+      weChat: "/assets/icons/weixin@2x.png",
     },
     isAgreed: !1,
     checked: !0,

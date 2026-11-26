@@ -1,5 +1,5 @@
 <view class="about-us">
-  <image src="{{icon.duibuLogo}}"></image>
+  <view class="brand-name">秉羲 ERP</view>
   <view class="version">版本 {{appVersion}}</view>
   <view bindtap="goToAgreementPage" class="about-item">
     <text>用户协议</text>

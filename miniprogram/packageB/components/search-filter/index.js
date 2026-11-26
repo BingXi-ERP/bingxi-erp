@@ -133,7 +133,7 @@ Component({
     },
     platStation: !0,
     icon: {
-      delete: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
+      delete: "/assets/icons/icon/del@2x.png",
     },
   },
   methods: {
@@ -154,7 +154,6 @@ Component({
         deltaInterval: "0,3",
         gramWeight: "",
         gramWeightDeviation: "",
-        duiBuCode: "",
         gramWeightOther: !1,
         material: [],
         baiBuMaterial: [],

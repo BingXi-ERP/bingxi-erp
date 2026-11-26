@@ -7,13 +7,13 @@ var toConsumableArray = require("../../../@babel/runtime/helpers/toConsumableArr
 Page({
   data: {
     open: !1,
-    useImg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/use_empty.png"),
+    useImg: "/packageA/assets/icons/use_empty.png",
     customsPhoneNum: "",
     canPurchase: !1,
     curRow: null,
     comboList: [],
     pageNum: 1,
-    noDataBg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/dz@2x.png"),
+    noDataBg: "/assets/icons/dz@2x.png",
   },
   onLoad: function (o) {
     this.setData({
@@ -34,19 +34,7 @@ Page({
     });
   },
   agreeHandle: function () {
-    wx.downloadFile({
-      url: "".concat(app.config.imgHost, "/product/ffxy.docx"),
-      success: function (o) {
-        var objectSpread2 = o.tempFilePath;
-        wx.openDocument({
-          filePath: objectSpread2,
-          showMenu: !0,
-          success: function (o) {
-            console.log("打开文档成功");
-          },
-        });
-      },
-    });
+    wx.navigateTo({ url: "/pages/register/terms/index" });
   },
   comboList: function () {
     var app = this,

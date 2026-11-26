@@ -13,6 +13,7 @@
 pub mod instance;
 pub mod monitor;
 pub mod sign_mode;
+pub(crate) mod timeout;
 pub mod task;
 
 use sea_orm::{ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait, QueryFilter};
@@ -447,6 +448,12 @@ pub(crate) async fn notify_task_pending(
         return;
     };
     let business_id = instance.business_id.unwrap_or(0);
+    let transfer_count = timeout::transfer_count(task.task_variables.as_ref());
+    let dedup_key = if transfer_count > 0 {
+        format!("bpm_task:{}:pending:transfer:{}", task.id, transfer_count)
+    } else {
+        format!("bpm_task:{}:pending", task.id)
+    };
     let service = NotificationService::new(db.clone());
     if let Err(e) = service
         .create_notification(CreateNotificationRequest {
@@ -463,7 +470,7 @@ pub(crate) async fn notify_task_pending(
             action_url: Some(BPM_APPROVAL_PATH.to_string()),
             sender_id: None,
             sender_name: Some("系统".to_string()),
-            dedup_key: Some(format!("bpm_task:{}:pending", task.id)),
+            dedup_key: Some(dedup_key),
         })
         .await
     {

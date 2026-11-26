@@ -47,7 +47,7 @@
   margin: 0 !important;
 }
 .del-icon {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/Icon_Delete.png);
+  background-image: url(/assets/icons/Icon_Delete.png);
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: cover;

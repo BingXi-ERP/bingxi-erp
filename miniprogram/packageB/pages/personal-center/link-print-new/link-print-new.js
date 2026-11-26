@@ -7,17 +7,14 @@ var t = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").
   );
 Page({
   data: {
-    servicePhone: envConfig.default.contacts.servicePhone,
+    servicePhone: envConfig.contacts.servicePhone,
     totalList: [],
     printList: [],
     storageList: [],
     icon: {
-      printquest: "".concat(
-        app.config.imgHost,
-        "/img/customer/duibuIcon/icon/ic_printquest@2x.png",
-      ),
-      imageSm: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/sm@2x.png"),
-      delete: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
+      printquest: "/packageB/assets/icons/icon/ic_printquest@2x.png",
+      imageSm: "/packageB/assets/icons/icon/sm@2x.png",
+      delete: "/assets/icons/icon/del@2x.png",
     },
     contentStatus: !1,
     platform: "",

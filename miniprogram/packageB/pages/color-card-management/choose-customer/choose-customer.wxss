@@ -29,7 +29,7 @@ page {
   right: 0;
 }
 .add-btn-icon {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/select_s@2x.png?imageView2/2/w/750);
+  background-image: url(/assets/icons/select_s@2x.png);
   height: 38rpx;
   margin-right: 16rpx;
   width: 38rpx;

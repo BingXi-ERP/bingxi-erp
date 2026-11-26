@@ -23,7 +23,7 @@ var app = getApp(),
   login = require("../../libs/utils/login.js").login;
 Page({
   data: {
-    headerimg: "".concat(app.config.imgHost, "/html/static/img/shop-registered-bg.png"),
+    headerimg: "/assets/icons/account@2x.png",
   },
   toIndex: function () {
     (wx.setStorageSync("newShop", "yes"),

@@ -12,34 +12,10 @@ Component({
       this.triggerEvent("change", !this.data.isAgreed);
     },
     goToAgreementPage: function () {
-      wx.downloadFile({
-        url: "".concat(app.config.imgHost, "/product/syxy_new.docx"),
-        success: function (o) {
-          var e = o.tempFilePath;
-          wx.openDocument({
-            filePath: e,
-            showMenu: !0,
-            success: function (o) {
-              console.log("打开文档成功");
-            },
-          });
-        },
-      });
+      wx.navigateTo({ url: "/pages/register/terms/index" });
     },
     goToPrivacyPolicyPage: function () {
-      wx.downloadFile({
-        url: "".concat(app.config.imgHost, "/product/yszc_new.docx"),
-        success: function (o) {
-          var e = o.tempFilePath;
-          wx.openDocument({
-            filePath: e,
-            showMenu: !0,
-            success: function (o) {
-              console.log("打开文档成功");
-            },
-          });
-        },
-      });
+      wx.navigateTo({ url: "/pages/register/agreement/agreement" });
     },
   },
 });

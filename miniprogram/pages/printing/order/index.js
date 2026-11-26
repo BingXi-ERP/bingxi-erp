@@ -32,7 +32,7 @@ Page({
     curCreator: "",
     showTipsText: "您还没有添加银行卡",
     icon: {
-      checked: "".concat(app.config.imgHost, "/img/customer/duibuIcon/phone_check@2x.png"),
+      checked: "/assets/icons/phone_check@2x.png",
       noCheck: "./../../assets/imaphone_uncheck@2x.png",
     },
     printSelectArr: [

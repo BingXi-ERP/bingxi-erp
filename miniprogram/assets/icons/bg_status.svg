@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="375px" height="100px" viewBox="0 0 375 100" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 52.2 (67145) - http://www.bohemiancoding.com/sketch -->
+    <title>img_kaidanchengg@4.5x</title>
+    <desc>Created with Sketch.</desc>
+    <defs>
+        <rect id="path-1" x="0" y="0" width="375" height="100"></rect>
+        <linearGradient x1="0%" y1="68.1812425%" x2="100%" y2="100%" id="linearGradient-3">
+            <stop stop-color="#2D74EE" offset="0%"></stop>
+            <stop stop-color="#1A36A8" offset="100%"></stop>
+        </linearGradient>
+        <filter x="-26.7%" y="-18.9%" width="153.4%" height="137.7%" filterUnits="objectBoundingBox" id="filter-4">
+            <feGaussianBlur stdDeviation="2" in="SourceGraphic"></feGaussianBlur>
+        </filter>
+        <linearGradient x1="100%" y1="50%" x2="2.98049133%" y2="50%" id="linearGradient-5">
+            <stop stop-color="#B4D0FF" offset="0%"></stop>
+            <stop stop-color="#6EA4FF" offset="100%"></stop>
+        </linearGradient>
+        <polygon id="path-6" points="45.722742 1.42108547e-14 19.6780564 13.7781746 52.8673486 32.9904072 79.4454839 17.522111"></polygon>
+        <filter x="-0.4%" y="-0.8%" width="100.8%" height="101.5%" filterUnits="objectBoundingBox" id="filter-7">
+            <feOffset dx="-0.5" dy="-0.2" in="SourceAlpha" result="shadowOffsetInner1"></feOffset>
+            <feComposite in="shadowOffsetInner1" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowInnerInner1"></feComposite>
+            <feColorMatrix values="0 0 0 0 0.739129577   0 0 0 0 0.836262181   0 0 0 0 1  0 0 0 1 0" type="matrix" in="shadowInnerInner1"></feColorMatrix>
+        </filter>
+        <linearGradient x1="100%" y1="33.326202%" x2="6.52749634%" y2="61.0485113%" id="linearGradient-8">
+            <stop stop-color="#99BFFF" offset="0%"></stop>
+            <stop stop-color="#5791F4" offset="100%"></stop>
+        </linearGradient>
+        <polygon id="path-9" points="45.8730962 37.115649 45.6295942 56.6610368 79.2027816 37.0353316 79.4462836 17.489485"></polygon>
+        <filter x="-0.4%" y="-0.4%" width="100.9%" height="100.8%" filterUnits="objectBoundingBox" id="filter-10">
+            <feOffset dx="0" dy="0.3" in="SourceAlpha" result="shadowOffsetInner1"></feOffset>
+            <feComposite in="shadowOffsetInner1" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowInnerInner1"></feComposite>
+            <feColorMatrix values="0 0 0 0 0.770438763   0 0 0 0 0.855961577   0 0 0 0 1  0 0 0 1 0" type="matrix" in="shadowInnerInner1"></feColorMatrix>
+        </filter>
+        <polygon id="path-11" points="11.8376653 37.0359279 45.628819 56.6611744 45.873233 37.1157866 12.0811674 17.49054"></polygon>
+        <filter x="-0.7%" y="-0.6%" width="101.5%" height="101.3%" filterUnits="objectBoundingBox" id="filter-12">
+            <feOffset dx="0" dy="0.5" in="SourceAlpha" result="shadowOffsetInner1"></feOffset>
+            <feComposite in="shadowOffsetInner1" in2="SourceAlpha" operator="arithmetic" k2="-1" k3="1" result="shadowInnerInner1"></feComposite>
+            <feColorMatrix values="0 0 0 0 0.571989426   0 0 0 0 0.731386467   0 0 0 0 1  0 0 0 1 0" type="matrix" in="shadowInnerInner1"></feColorMatrix>
+        </filter>
+    </defs>
+    <g id="开单" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="卖家端/开单收款成功" transform="translate(0.000000, -64.000000)">
+            <g id="img_kaidanchengg" transform="translate(0.000000, 64.000000)">
+                <mask id="mask-2" fill="white">
+                    <use xlink:href="#path-1"></use>
+                </mask>
+                <use id="Mask" fill="#2D74EE" xlink:href="#path-1"></use>
+                <g id="分组-5" mask="url(#mask-2)">
+                    <g transform="translate(235.000000, 3.000000)">
+                        <g id="分组-2" stroke-width="1" fill="none" transform="translate(0.000000, 28.000000)">
+                            <g id="分组">
+                                <polygon id="矩形" fill="url(#linearGradient-3)" style="mix-blend-mode: multiply;" filter="url(#filter-4)" points="18.3696909 19.4679723 23.255814 6.44471644 13.8551753 38.2363007 0.803650189 30.630763"></polygon>
+                                <polygon id="Fill-1" fill="#6AA0FF" points="45.5731874 0 12 17.3326912 45.7920657 36.9579377 79.4241922 17.546567"></polygon>
+                                <polygon id="Fill-1" fill="#5493FF" points="46 0 12.2005001 17.4 29.083729 27.266941 62.4361113 8.70577744"></polygon>
+                                <g id="Fill-1-Copy">
+                                    <use fill="url(#linearGradient-5)" fill-rule="evenodd" xlink:href="#path-6"></use>
+                                    <use fill="black" fill-opacity="1" filter="url(#filter-7)" xlink:href="#path-6"></use>
+                                </g>
+                                <g id="Fill-2">
+                                    <use fill="url(#linearGradient-8)" fill-rule="evenodd" xlink:href="#path-9"></use>
+                                    <use fill="black" fill-opacity="1" filter="url(#filter-10)" xlink:href="#path-9"></use>
+                                </g>
+                                <g id="Fill-3">
+                                    <use fill="#4C89F2" fill-rule="evenodd" xlink:href="#path-11"></use>
+                                    <use fill="black" fill-opacity="1" filter="url(#filter-12)" xlink:href="#path-11"></use>
+                                </g>
+                            </g>
+                        </g>
+                        <path d="M22.4919357,0.129368467 L65.1687165,24.2431654 C65.4826537,24.4205504 65.6767808,24.7532114 65.6767808,25.113797 L65.6767808,57.9614133 C65.6767808,58.513698 65.2290655,58.9614133 64.6767808,58.9614133 C64.5016746,58.9614133 64.3296381,58.9154332 64.1778807,58.8280728 L21.5010999,34.2608108 C21.1910791,34.0823447 21,33.7518705 21,33.3941513 L21,1 C21,0.44771525 21.4477153,1.2822119e-13 22,1.28119737e-13 C22.1723883,1.2808807e-13 22.341849,0.044564523 22.4919357,0.129368467 Z" id="路径-3-copy" fill-opacity="0.234063632" fill="#FFFFFF"></path>
+                        <path d="M24.4810872,7.12332723 L41.3321796,16.3706136 C41.6521925,16.5462254 41.8510924,16.8822552 41.8510924,17.2472864 L41.8510924,18.5738085 C41.8510924,19.1260933 41.4033772,19.5738085 40.8510924,19.5738085 C40.6800105,19.5738085 40.5117895,19.5299165 40.3625168,19.4463301 L23.5114244,10.0104228 C23.1956021,9.83357548 23,9.49986622 23,9.13790119 L23,8 C23,7.44771525 23.4477153,7 24,7 C24.1681817,7 24.3336469,7.0424172 24.4810872,7.12332723 Z" id="路径-3-copy" fill="#DBE8FF"></path>
+                        <path d="M44.4824185,18.1240591 L48.4824185,20.327032 C48.8016874,20.5028672 49,20.838486 49,21.2029728 L49,22.4916661 C49,23.0439509 48.5522847,23.4916661 48,23.4916661 C47.8222936,23.4916661 47.6477971,23.4443112 47.4944704,23.3544754 L43.4944704,21.0108307 C43.1881894,20.8313772 43,20.5030026 43,20.1480214 L43,19 C43,18.4477153 43.4477153,18 44,18 C44.1686962,18 44.3346506,18.042677 44.4824185,18.1240591 Z" id="路径-3-copy-3" fill="#DBE8FF"></path>
+                        <path d="M24.4850754,14.1255277 L45.4850754,25.774362 C45.8028583,25.9506382 46,26.2854348 46,26.6488343 L46,27.9725838 C46,28.5248686 45.5522847,28.9725838 45,28.9725838 C44.8279079,28.9725838 44.6587282,28.9281723 44.5088255,28.843645 L23.5088255,17.0021514 C23.194461,16.8248874 23,16.4919885 23,16.1310902 L23,15 C23,14.4477153 23.4477153,14 24,14 C24.1697244,14 24.3366561,14.0431986 24.4850754,14.1255277 Z" id="路径-3-copy-2" fill="#DBE8FF" opacity="0.504255022"></path>
+                        <path d="M24.4850754,20.1255277 L45.4850754,31.774362 C45.8028583,31.9506382 46,32.2854348 46,32.6488343 L46,33.9725838 C46,34.5248686 45.5522847,34.9725838 45,34.9725838 C44.8279079,34.9725838 44.6587282,34.9281723 44.5088255,34.843645 L23.5088255,23.0021514 C23.194461,22.8248874 23,22.4919885 23,22.1310902 L23,21 C23,20.4477153 23.4477153,20 24,20 C24.1697244,20 24.3366561,20.0431986 24.4850754,20.1255277 Z" id="路径-3-copy-4" fill="#DBE8FF" opacity="0.504255022"></path>
+                        <path d="M24.4850754,26.1255277 L45.4850754,37.774362 C45.8028583,37.9506382 46,38.2854348 46,38.6488343 L46,39.9725838 C46,40.5248686 45.5522847,40.9725838 45,40.9725838 C44.8279079,40.9725838 44.6587282,40.9281723 44.5088255,40.843645 L23.5088255,29.0021514 C23.194461,28.8248874 23,28.4919885 23,28.1310902 L23,27 C23,26.4477153 23.4477153,26 24,26 C24.1697244,26 24.3366561,26.0431986 24.4850754,26.1255277 Z" id="路径-3-copy-5" fill="#DBE8FF" opacity="0.504255022"></path>
+                        <g id="分组" stroke-width="1" fill="none" transform="translate(47.000000, 30.000000)">
+                            <polygon id="Fill-2" fill="#3696AB" points="6.60959079 7.67263427e-05 3.0044757 2.09496164 8.97455243 12.4353708 12.5794118 10.3404859"></polygon>
+                            <polygon id="Fill-3" fill="#4EBAD2" points="0 3.80723785 8.95498721 19.3177238 26.4900315 9.45860534 23.5048653 4.28852862 8.97442455 12.4353708 3.00460358 2.09496164"></polygon>
+                            <polygon id="Fill-4" fill="#3696AB" points="22.4698006 4.85109059 25.4549668 10.0214231 29.0600819 7.92628241 26.0749156 2.75594992"></polygon>
+                        </g>
+                    </g>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

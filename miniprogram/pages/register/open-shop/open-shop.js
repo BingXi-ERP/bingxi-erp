@@ -3,7 +3,7 @@ require("../../../libs/services/ServicesUser.js").servicesUser;
 Page({
   data: {
     image: {
-      bg: "".concat(app.config.imgHost, "/img/customer/img_budadang01@3x.png"),
+      bg: "/assets/images/icon2nd/img_users@2x.png",
       bglogo: "/assets/images/icon/symbols-bg2-logo.png",
       bgbtn: "/assets/images/icon/symbols-bg2-btn.png",
     },

@@ -15,12 +15,12 @@ Page({
     footerBar: [
       {
         name: "增加商品",
-        icon: "".concat(app.config.imgHost, "/img/customer/ic_tianjiaseka@2x.png"),
+        icon: "/assets/icons/color_add@2x.png",
         action: "add",
       },
       {
         name: "批量管理",
-        icon: "".concat(app.config.imgHost, "/img/customer/ic_piliangguanli@2x.png"),
+        icon: "/assets/icons/no_img.png",
         action: "more",
       },
     ],
@@ -29,7 +29,7 @@ Page({
       on: "",
       off: "",
     },
-    noColorCardBg: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
+    noColorCardBg: "/assets/icons/img_wuxinx@3x.png",
     hideFilter: !1,
     pageNum: 1,
     pageSize: 10,
@@ -186,12 +186,12 @@ Page({
               (0 == r.onSale
                 ? (r.onOrOff = {
                     name: "下架",
-                    icon: "".concat(app.config.imgHost, "/img/customer/ic_xiajiaseka@4.5x.png"),
+                    icon: "/assets/icons/color_add@2x.png",
                   })
                 : 1 == r.onSale &&
                   (r.onOrOff = {
                     name: "上架",
-                    icon: "".concat(app.config.imgHost, "/img/customer/ic_shangjiazhong@4.5x.png"),
+                    icon: "/assets/icons/no_img.png",
                   }),
                 h.push(r));
             }

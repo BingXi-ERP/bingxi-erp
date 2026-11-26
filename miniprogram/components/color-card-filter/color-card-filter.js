@@ -45,41 +45,41 @@ Component({
       },
     ],
     filter: {
-      icon: "".concat(app.config.imgHost, "/img/customer/ic_shuaixuan@3x.png"),
+      icon: "/assets/icons/search@2x.png",
       list: [
         {
           name: "时间由近到远",
-          activeIcon: "".concat(app.config.imgHost, "/img/customer/ic_xzsx@3x.png"),
+          activeIcon: "/assets/icons/no_img.png",
           filterKey: 2,
           filterId: 0,
         },
         {
           name: "时间由远到近",
-          activeIcon: "".concat(app.config.imgHost, "/img/customer/ic_xzsx@3x.png"),
+          activeIcon: "/assets/icons/no_img.png",
           filterKey: 1,
           filterId: 1,
         },
         {
           name: "浏览量由低到高",
-          activeIcon: "".concat(app.config.imgHost, "/img/customer/ic_xzsx@3x.png"),
+          activeIcon: "/assets/icons/no_img.png",
           filterKey: 3,
           filterId: 2,
         },
         {
           name: "浏览量由高到低",
-          activeIcon: "".concat(app.config.imgHost, "/img/customer/ic_xzsx@3x.png"),
+          activeIcon: "/assets/icons/no_img.png",
           filterKey: 4,
           filterId: 3,
         },
         {
           name: "收藏量由低到高",
-          activeIcon: "".concat(app.config.imgHost, "/img/customer/ic_xzsx@3x.png"),
+          activeIcon: "/assets/icons/no_img.png",
           filterKey: 5,
           filterId: 4,
         },
         {
           name: "收藏量由高到低",
-          activeIcon: "".concat(app.config.imgHost, "/img/customer/ic_xzsx@3x.png"),
+          activeIcon: "/assets/icons/no_img.png",
           filterKey: 6,
           filterId: 5,
         },
@@ -150,10 +150,7 @@ Component({
                 checked: !0,
                 icon: n.onOrDown
                   ? "/assets/images/icon2nd/Icon_Sorting_Up_Gray@2x.png"
-                  : "".concat(
-                      app.config.imgHost,
-                      "/img/customer/duibuIcon/icon/Icon_Sorting_Down_Gray@2x.png",
-                    ),
+                  : "/assets/icons/icon/Icon_Sorting_Down_Gray@2x.png",
                 onOrDown: !n.onOrDown,
               },
             )

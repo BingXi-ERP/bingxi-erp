@@ -19,7 +19,7 @@ Page({
     result: null,
     setTimeOpen: !1,
     curIndex: -1,
-    noDataBg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/dz@2x.png"),
+    noDataBg: "/assets/icons/dz@2x.png",
   },
   onLoad: function (t) {
     mta_analysis.default.Page.init();

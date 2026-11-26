@@ -2818,10 +2818,9 @@ jobs:
     with:
       # PR 轮只做 debug 构建与 E2E，不接触签名 secret；签名仅限发布轮。
       build_release: ${{ github.event_name != 'pull_request' }}
-      # run_e2e 为字符串输入（false 字符串即跳过模拟器，直接触发判空不等于 false 恒跑）。
-      # 写成表达式形式是因为静态检查把裸的 'false' 字面量推成布尔型，与 string 型输入不符；
-      # 运行期取值仍是字符串 false，判据不变。
-      run_e2e: ${{ 'false' }}
+      # PR 与发布轮都必须跑模拟器 E2E；false 曾让 android-e2e 整 job 跳过，
+      # 只留下构建与静态冒烟，不能把这种形态当作 APK 运行期验证。
+      run_e2e: ${{ 'true' }}
       app_version: ${{ needs.ci-build-rust.outputs.app_version }}
       cargo_version: ${{ needs.ci-build-rust.outputs.cargo_version }}
     secrets:

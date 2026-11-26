@@ -5,7 +5,7 @@ Page({
   data: {
     moneyInfoList: {},
     icon: {
-      info: "".concat(app.config.imgHost, "/img/customer/Informations_Blue.png"),
+      info: "/assets/icons/news@2x.png",
     },
     moneyNum: "",
     wxAccount: "",

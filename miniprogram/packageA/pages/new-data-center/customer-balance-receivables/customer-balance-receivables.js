@@ -15,33 +15,33 @@ Page({
     billingId: "",
     billingIdList: [],
     icon: {
-      checked: "".concat(app.config.imgHost, "/img/customer/duibuIcon/ok_yellow.png"),
+      checked: "/packageA/assets/icons/ok_yellow.png",
       noCheck: "../../../../assets/images/ok_gray.png",
     },
     payWay: 0,
     wayArray: [
       {
-        icon: "".concat(app.config.imgHost, "/img/customer/duibuIcon/weixin@2x.png"),
+        icon: "/assets/icons/weixin@2x.png",
         value: "1",
         label: "微信",
       },
       {
-        icon: "".concat(app.config.imgHost, "/img/customer/duibuIcon/zhifubao@2x.png"),
+        icon: "/assets/icons/zhifubao@2x.png",
         value: "2",
         label: "支付宝",
       },
       {
-        icon: "".concat(app.config.imgHost, "/img/customer/duibuIcon/xianjin@2x.png"),
+        icon: "/assets/icons/xianjin@2x.png",
         value: "3",
         label: "现金",
       },
       {
-        icon: "".concat(app.config.imgHost, "/img/customer/duibuIcon/shuaka@2x.png"),
+        icon: "/assets/icons/shuaka@2x.png",
         value: "4",
         label: "刷卡",
       },
       {
-        icon: "".concat(app.config.imgHost, "/img/customer/duibuIcon/huikuan@2x.png"),
+        icon: "/assets/icons/huikuan@2x.png",
         value: "5",
         label: "汇款",
       },

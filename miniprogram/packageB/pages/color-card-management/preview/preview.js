@@ -13,14 +13,11 @@ Page({
     goodsId: "",
     goodsInfo: {},
     icon: {
-      noColorBg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon2nd/emptyColor@2x.png"),
-      share: "".concat(app.config.imgHost, "/img/customer/share.png"),
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
-      baozhuang: "".concat(
-        app.config.imgHost,
-        "/img/customer/duibuIcon/icon/ic_baozhuang@4.5x.png",
-      ),
-      delete: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
+      noColorBg: "/packageB/assets/icons/icon2nd/emptyColor@2x.png",
+      share: "/assets/icons/img_fenxiangdingdan@2x.png",
+      rightArrow: "/assets/icons/ic_jinru.png",
+      baozhuang: "/packageB/assets/icons/icon/ic_baozhuang@4.5x.png",
+      delete: "/assets/icons/icon/del@2x.png",
     },
     swiper: {
       indicatorDots: !1,
@@ -52,7 +49,7 @@ Page({
     showPropoty: !1,
     showChooseAttr: !1,
     showOther: !1,
-    duibuImgFields: ["imageTwo0", "imageTwoBack0", "imageFive0", "imageFiveBack0"],
+    detailImageFields: ["imageTwo0", "imageTwoBack0", "imageFive0", "imageFiveBack0"],
     topShowImage: [],
     botShowImage: [],
     detailTypeImage: [
@@ -70,7 +67,7 @@ Page({
       },
       {
         title: "盒子图",
-        field: "duibuImages",
+        field: "boxImages",
         type: 3,
         images: [],
       },
@@ -91,7 +88,7 @@ Page({
       ServicesUserLog = this.data,
       mta_analysis = ServicesUserLog.goodsId,
       dialog = ServicesUserLog.goodsInfo,
-      app = ServicesUserLog.duibuImgFields,
+      app = ServicesUserLog.detailImageFields,
       ServicesShop = ServicesUserLog.detailTypeImage;
     ServicesCard.ColorCardDetail({}, mta_analysis).then(function (a) {
       if (0 === a.code) {

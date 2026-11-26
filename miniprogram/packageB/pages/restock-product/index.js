@@ -1,4 +1,3 @@
-require("../../../@babel/runtime/helpers/Arrayincludes");
 var t = require("../../../@babel/runtime/helpers/regeneratorRuntime"),
   e = require("../../../@babel/runtime/helpers/asyncToGenerator"),
   app = getApp(),
@@ -12,13 +11,13 @@ var t = require("../../../@babel/runtime/helpers/regeneratorRuntime"),
   c = "purchasing:model:company:detail",
   s = {
     LIST: ["imageInfoList", "imageSampleList", "imageDetailList"],
-    DUIBU: ["imageTwo0", "imageTwoBack0", "imageFive0", "imageFiveBack0"],
+    DETAIL_IMAGES: ["imageTwo0", "imageTwoBack0", "imageFive0", "imageFiveBack0"],
   };
 Page({
   data: {
     domain: "",
     // 咨询下单弹窗展示的客服电话，取自 envConfig.contacts.servicePhone 单点，改号只改那一枚
-    servicePhone: envConfig.default.contacts.servicePhone,
+    servicePhone: envConfig.contacts.servicePhone,
     orderBtn: !1,
     supplierShow: !0,
     showPhone: !1,
@@ -66,20 +65,14 @@ Page({
     ],
     showColor: !1,
     iconList: {
-      jthViewIcon: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/jht_view.png"),
-      jhtTimeIcon: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/jht_time.png"),
+      jthViewIcon: "/packageB/assets/icons/icon/jht_view.png",
+      jhtTimeIcon: "/packageB/assets/icons/icon/jht_time.png",
       jhtNoneIcon: "",
-      iconGramWeight: "".concat(
-        app.config.imgHost,
-        "/img/customer/duibuIcon/icon/icon_gramweight.png",
-      ),
-      iconMaterial: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/icon_material.png"),
-      iconEngeith: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/icon_engeith.png"),
-      iconClothwidth: "".concat(
-        app.config.imgHost,
-        "/img/customer/duibuIcon/icon/icon_clothwidth.png",
-      ),
-      defaultAvatar: "".concat(app.config.imgHost, "/img/customer/default_shop.png"),
+      iconGramWeight: "/packageB/assets/icons/icon/icon_gramweight.png",
+      iconMaterial: "/packageB/assets/icons/icon/icon_material.png",
+      iconEngeith: "/packageB/assets/icons/icon/icon_engeith.png",
+      iconClothwidth: "/packageB/assets/icons/icon/icon_clothwidth.png",
+      defaultAvatar: "/assets/icons/account@2x.png",
     },
     stayTimeSetInter: null,
     stayTimeMinute: 0,
@@ -160,7 +153,7 @@ Page({
         });
     }),
       t.detailImage &&
-        s.DUIBU.forEach(function (a) {
+        s.DETAIL_IMAGES.forEach(function (a) {
           t.detailImage[a] && e.push(util.replImage(t.detailImage[a], 750));
         }),
       t.imageInfoList &&

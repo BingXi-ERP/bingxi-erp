@@ -71,11 +71,140 @@ function queryProductSaleCount(o) {
   });
 }
 
+/**
+ * 功能 把色卡页本地表单映射为产品色号创建契约
+ * 调用方 saveColor 的新增分支
+ * 入参 item 包含 colorVal 与 colorName 的本地色号对象
+ * 传给谁 本仓 POST /products/{product_id}/colors
+ * 存什么 color_no、color_name、pantone_code、color_type、dye_formula、extra_cost、color_fastness_grade
+ * 存哪里 不写本地缓存，载荷只交给请求层
+ */
+function createProductColorPayload(item) {
+  var colorNo = String(item.colorVal || "").trim();
+  var colorName = String(item.colorName || "").trim();
+  if (!colorNo) throw new Error("色号不能为空");
+  if (!colorName) throw new Error("颜色名称不能为空");
+  return {
+    color_no: colorNo,
+    color_name: colorName,
+    pantone_code: null,
+    color_type: "STANDARD",
+    dye_formula: null,
+    extra_cost: 0,
+    color_fastness_grade: null,
+  };
+}
+
 var r =
   createClass(function o(r) {
     (classCallCheck(this, o),
       (this.colorCardList = function (o) {
         return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/products"), o);
+      }),
+      /**
+       * 功能 读取产品色号并保留后端契约原貌
+       * 调用方 add-colour 页 getColorList
+       * 入参 o.id 或 o.goodsId 为产品标识，o.page/o.size 为分页，o.keyword 为可选搜索词
+       * 传给谁 GET /products/{product_id}/colors，查询键转 page/page_size/keyword
+       * 存什么 不转换响应键，data 保持 product_color::Model 数组
+       * 存哪里 不写本地缓存，结果只回调用页
+       */
+      (this.getColorList = function (o) {
+        var query = {
+          page: Number(o.page) || 1,
+          page_size: Number(o.size) || 20,
+        };
+        if (o.keyword !== undefined && o.keyword !== "") query.keyword = o.keyword;
+        return request.GET(
+          "".concat(app.config.bingxiHost, "/api/v1/erp/products/", o.id || o.goodsId, "/colors"),
+          query
+        );
+      }),
+      /**
+       * 功能 新增、更新或删除单个产品色号
+       * 调用方 add-colour 页 saveColorList 与 removeIndex
+       * 入参 o.productId 产品标识，o.itemList 仅允许一项；flag 1 新增、2 更新、3 删除
+       * 传给谁 POST、PUT 或 DELETE /products/{product_id}/colors，更新与删除再带 color_id
+       * 存什么 只发送后端 DTO 明确声明的键，不发送仪器测量或旧第三方线协议字段
+       * 存哪里 不写本地缓存，结果只回调用页
+       */
+      (this.saveColor = function (o) {
+        if (!o || !Array.isArray(o.itemList) || o.itemList.length !== 1) {
+          throw new Error("产品色号保存要求且仅允许一项 itemList");
+        }
+        var item = o.itemList[0];
+        var base = "".concat(
+          app.config.bingxiHost,
+          "/api/v1/erp/products/",
+          o.productId,
+          "/colors"
+        );
+        if (Number(item.flag) === 1) {
+          return request.POST(base, createProductColorPayload(item));
+        }
+        var colorId = Number(item.skuId);
+        if (!Number.isInteger(colorId) || colorId <= 0) throw new Error("产品色号标识必须是正整数");
+        var url = "".concat(base, "/").concat(colorId);
+        if (Number(item.flag) === 2) {
+          var colorName = String(item.colorName || "").trim();
+          if (!colorName) throw new Error("颜色名称不能为空");
+          return request.PUT(url, { color_name: colorName });
+        }
+        if (Number(item.flag) === 3) return request.DELETE(url, {});
+        throw new Error("产品色号操作 flag 只能是 1、2 或 3");
+      }),
+      /**
+       * 功能 分页读取并逐条删除产品下的全部色号
+       * 调用方 add-colour 页 removeColorList 的清空确认分支
+       * 入参 productId 产品标识
+       * 传给谁 GET 与 DELETE /products/{product_id}/colors
+       * 存什么 不落本地缓存，返回删除成功条数
+       * 存哪里 不适用
+       */
+      (this.clearAllColor = function (productId) {
+        var page = 1;
+        var all = [];
+        var readPage = function () {
+          return request.GET(
+            "".concat(
+              app.config.bingxiHost,
+              "/api/v1/erp/products/",
+              productId,
+              "/colors"
+            ),
+            { page: page, page_size: 500 }
+          ).then(function (res) {
+            if (!res || res.code !== 0 || !Array.isArray(res.data)) {
+              throw new Error("读取产品色号失败，无法执行清空");
+            }
+            all = all.concat(res.data);
+            if (res.data.length < 500) return all;
+            page += 1;
+            return readPage();
+          });
+        };
+        return readPage().then(function (items) {
+          return items.reduce(function (promise, item) {
+            return promise.then(function () {
+              var id = Number(item.id);
+              if (!Number.isInteger(id) || id <= 0) throw new Error("产品色号响应缺少有效 id");
+              return request.DELETE(
+                "".concat(
+                  app.config.bingxiHost,
+                  "/api/v1/erp/products/",
+                  productId,
+                  "/colors/",
+                  id
+                ),
+                {}
+              ).then(function (res) {
+                if (!res || res.code !== 0) throw new Error("删除产品色号失败");
+              });
+            });
+          }, Promise.resolve()).then(function () {
+            return items.length;
+          });
+        });
       }),
       (this.onOrOffShelves = function (o) {
         return request.POST("".concat(app.config.bingxiHost, "/api/v1/erp/products/batch/update"),
