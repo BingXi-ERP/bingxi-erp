@@ -1,4 +1,3 @@
-require("../../../../../@babel/runtime/helpers/Arrayincludes");
 var app = getApp(),
   ServicesCenter = require("../../../../libs/services/ServicesCenter.js").servicesCenter;
 Page({

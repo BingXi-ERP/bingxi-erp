@@ -1,5 +1,4 @@
 var objectSpread2 = require("../../@babel/runtime/helpers/objectSpread2");
-require("../../@babel/runtime/helpers/Arrayincludes");
 getApp();
 Component({
   properties: {

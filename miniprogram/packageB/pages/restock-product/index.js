@@ -1,4 +1,3 @@
-require("../../../@babel/runtime/helpers/Arrayincludes");
 var t = require("../../../@babel/runtime/helpers/regeneratorRuntime"),
   e = require("../../../@babel/runtime/helpers/asyncToGenerator"),
   app = getApp(),

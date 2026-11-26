@@ -1,4 +1,3 @@
-require("../../@babel/runtime/helpers/Arrayincludes");
 var classCallCheck = require("../../@babel/runtime/helpers/classCallCheck"),
   createClass = require("../../@babel/runtime/helpers/createClass"),
   app = getApp(),

@@ -1,7 +1,8 @@
 // bingxiHost 是本仓后端主机的单点配置，四环境共用同一值，真值不进仓库。
 // 调用方：本文件。读取面：同目录的 mpHost.local.js（本地真值文件）。传给谁：app.js 的 initEnv 写入 app.config.bingxiHost。
 // 缺文件时直接抛错点名，不静默回退。补法：复制 mpHost.local.example.js 为 mpHost.local.js 并填入真实主机。
-var mpHost;
+var releaseVersion = require("./version.js"),
+  mpHost;
 try {
   mpHost = require("./mpHost.local.js");
 } catch (err) {
@@ -20,7 +21,7 @@ if (
 }
 module.exports = {
   envPage: "production",
-  appVersion: "1.0.0",
+  appVersion: releaseVersion,
   // contacts 存对外客服号码，单点一份，改号只改这里。读取面：app.js 的 customsPhoneNum、
   // packageB 打印帮助页与 restock-product 咨询下单弹窗展示的客服电话；
   // 传给谁：页面 data 与 wx.makePhoneCall 的号码入参。
@@ -42,39 +43,39 @@ module.exports = {
     hotspotSsid: "gc13800000000",
   },
   envList: {
-      dev: {
-        rootHost: "https://dshop.duibu.cn",
-        bingxiHost: mpHost.bingxiHost,
-        imgHost: "https://oss.duibu.cn/duibu/shop",
-        imgHostFile: "https://tfile.duibu.cn/luoxuan",
-        imgOssHost: "https://oss.duibu.cn/",
-        name: "开发 dev",
-      },
-      test: {
-        rootHost: "https://tshop.duibu.cn",
-        bingxiHost: mpHost.bingxiHost,
-        imgHost: "https://oss.duibu.cn/duibu/shop",
-        imgHostFile: "https://tfile.duibu.cn/luoxuan",
-        imgOssHost: "https://oss.duibu.cn/",
-        name: "测试 test",
-      },
-      uat: {
-        rootHost: "https://ushop.duibu.cn",
-        bingxiHost: mpHost.bingxiHost,
-        imgHost: "https://img.duibu.cn/duibu/shop",
-        imgHostFile: "https://ufile.duibu.cn/ushop",
-        imgOssHost: "https://img.duibu.cn/",
-        name: "产品 uat",
-      },
-      production: {
-        rootHost: "https://shop.duibu.cn",
-        bingxiHost: mpHost.bingxiHost,
-        imgHostFile: "https://img.duibu.cn/shop",
-        imgHost: "https://img.duibu.cn/duibu/shop",
-        imgOssHost: "https://img.duibu.cn/",
-        name: "生产 product",
-      },
+    dev: {
+      rootHost: "https://dshop.duibu.cn",
+      bingxiHost: mpHost.bingxiHost,
+      imgHost: "https://oss.duibu.cn/duibu/shop",
+      imgHostFile: "https://tfile.duibu.cn/luoxuan",
+      imgOssHost: "https://oss.duibu.cn/",
+      name: "开发 dev",
+    },
+    test: {
+      rootHost: "https://tshop.duibu.cn",
+      bingxiHost: mpHost.bingxiHost,
+      imgHost: "https://oss.duibu.cn/duibu/shop",
+      imgHostFile: "https://tfile.duibu.cn/luoxuan",
+      imgOssHost: "https://oss.duibu.cn/",
+      name: "测试 test",
+    },
+    uat: {
+      rootHost: "https://ushop.duibu.cn",
+      bingxiHost: mpHost.bingxiHost,
+      imgHost: "https://img.duibu.cn/duibu/shop",
+      imgHostFile: "https://ufile.duibu.cn/ushop",
+      imgOssHost: "https://img.duibu.cn/",
+      name: "产品 uat",
+    },
+    production: {
+      rootHost: "https://shop.duibu.cn",
+      bingxiHost: mpHost.bingxiHost,
+      imgHostFile: "https://img.duibu.cn/shop",
+      imgHost: "https://img.duibu.cn/duibu/shop",
+      imgOssHost: "https://img.duibu.cn/",
+      name: "生产 product",
+    },
   },
-  version: "3.13.10",
-  versionDesc: "3.13.10",
+  version: releaseVersion,
+  versionDesc: releaseVersion,
 };

@@ -1,4 +1,3 @@
-require("../../../../@babel/runtime/helpers/Arrayincludes");
 var t = require("../../../../@babel/runtime/helpers/defineProperty"),
   services_demand = require("../../../services/services-demand"),
   app = getApp();

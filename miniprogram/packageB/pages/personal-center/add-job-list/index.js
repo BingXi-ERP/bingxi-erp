@@ -1,4 +1,3 @@
-require("../../../../@babel/runtime/helpers/Arrayincludes");
 var objectSpread2 = require("../../../../@babel/runtime/helpers/objectSpread2"),
   app = getApp();
 Page({

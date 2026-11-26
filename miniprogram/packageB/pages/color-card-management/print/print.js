@@ -1,6 +1,5 @@
 var t = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   e = require("../../../../@babel/runtime/helpers/defineProperty");
-require("../../../../@babel/runtime/helpers/Arrayincludes");
 var objectSpread2 = require("../../../../@babel/runtime/helpers/objectSpread2"),
   a =
     (t(require("../../../../miniprogram_npm/@vant/weapp/toast/toast.js")),

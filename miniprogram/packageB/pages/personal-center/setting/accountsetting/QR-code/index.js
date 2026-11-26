@@ -1,6 +1,5 @@
 var e = require("../../../../../../@babel/runtime/helpers/interopRequireDefault").default,
   objectSpread2 = require("../../../../../../@babel/runtime/helpers/objectSpread2");
-require("../../../../../../@babel/runtime/helpers/Arrayincludes");
 var ServicesQRCode = require("../../../../../libs/services/ServicesQRCode.js"),
   uploadGateway = require("../../../../../libs/utils/uploadGateway.js"),
   dialog = e(require("../../../../../../miniprogram_npm/@vant/weapp/dialog/dialog")),
