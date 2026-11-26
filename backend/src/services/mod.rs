@@ -149,6 +149,7 @@ pub mod voucher_ops;
 pub mod audit_log_service;
 pub mod bpm_service;
 pub mod bpm_service_dto;
+pub mod bpm_timeout_scheduler;
 // 批次 D10 拆分：bpm_service.rs facade 的业务实现子模块（instance/task/monitor）
 pub mod bpm_ops;
 // 批次 95 P3-15：bpm_service_stub.rs 重命名为 bpm_process_definition_service.rs（消除 stub 误导）
