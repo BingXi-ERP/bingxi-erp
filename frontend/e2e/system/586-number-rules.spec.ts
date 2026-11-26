@@ -418,95 +418,97 @@ test.describe('系统管理 - 586 编码规则参数化', () => {
     await ensureTestEntities(page);
   };
 
-  const runRealOrderScenario = async ({ page }: { page: Page }) => {
-    test.setTimeout(420_000);
-    const snapshot = await readDetail(page);
-    const rollbackTarget = snapshot.revisions.find(
-      revision => revision.version === snapshot.rule.version
-    );
-    expect(rollbackTarget, '真实取号回滚需要当前版本快照').toBeTruthy();
-    if (!rollbackTarget) throw new Error('当前编码规则版本缺少历史快照');
-    const changed = changedConfig(snapshot, `NR${Date.now().toString().slice(-8)}`);
+  numberRuleConfigTest(
+    'SO 规则变更与回滚立即生效',
+    async ({ page }) => {
+      test.setTimeout(420_000);
+      const snapshot = await readDetail(page);
+      const rollbackTarget = snapshot.revisions.find(
+        revision => revision.version === snapshot.rule.version
+      );
+      expect(rollbackTarget, '真实取号回滚需要当前版本快照').toBeTruthy();
+      if (!rollbackTarget) throw new Error('当前编码规则版本缺少历史快照');
+      const changed = changedConfig(snapshot, `NR${Date.now().toString().slice(-8)}`);
 
-    try {
-      console.warn(`[586] SO 初始配置=${JSON.stringify(configOf(snapshot.rule))}`);
-      const baseline = await createSalesOrder(page);
-      expect(baseline.order_no, '初始订单号必须符合初始 SO 规则').toMatch(
-        numberPattern(configOf(snapshot.rule), baseline.created_at)
-      );
+      try {
+        console.warn(`[586] SO 初始配置=${JSON.stringify(configOf(snapshot.rule))}`);
+        const baseline = await createSalesOrder(page);
+        expect(baseline.order_no, '初始订单号必须符合初始 SO 规则').toMatch(
+          numberPattern(configOf(snapshot.rule), baseline.created_at)
+        );
 
-      console.warn(`[586] PUT SO 新配置=${JSON.stringify(changed)}`);
-      const updated = await apiCall<NumberRuleDetail>(
-        page,
-        'PUT',
-        `${LIST_PATH}/${snapshot.rule.id}`,
-        {
-          ...changed,
-          version: snapshot.rule.version,
-          change_reason: 'E2E：验证真实销售订单立即使用新编码规则',
-        }
-      );
-      expect(updated.code).toBe(200);
-      expect(sameConfig(configOf(updated.data.rule), changed)).toBe(true);
+        console.warn(`[586] PUT SO 新配置=${JSON.stringify(changed)}`);
+        const updated = await apiCall<NumberRuleDetail>(
+          page,
+          'PUT',
+          `${LIST_PATH}/${snapshot.rule.id}`,
+          {
+            ...changed,
+            version: snapshot.rule.version,
+            change_reason: 'E2E：验证真实销售订单立即使用新编码规则',
+          }
+        );
+        expect(updated.code).toBe(200);
+        expect(sameConfig(configOf(updated.data.rule), changed)).toBe(true);
 
-      const modified = await createSalesOrder(page);
-      expect(modified.order_no, '新订单号必须立即使用新前缀、宽度与周期').toMatch(
-        numberPattern(changed, modified.created_at)
-      );
-      expect(modified.order_no, '不同配置下新旧订单号不得相同').not.toBe(baseline.order_no);
-      const baselineAfterChange = await apiCallRaw<SalesOrderIdentity>(
-        page,
-        'GET',
-        `/sales/orders/${baseline.id}`
-      );
-      expect(baselineAfterChange.order_no, '修改规则不得改写旧订单号').toBe(baseline.order_no);
+        const modified = await createSalesOrder(page);
+        expect(modified.order_no, '新订单号必须立即使用新前缀、宽度与周期').toMatch(
+          numberPattern(changed, modified.created_at)
+        );
+        expect(modified.order_no, '不同配置下新旧订单号不得相同').not.toBe(baseline.order_no);
+        const baselineAfterChange = await apiCallRaw<SalesOrderIdentity>(
+          page,
+          'GET',
+          `/sales/orders/${baseline.id}`
+        );
+        expect(baselineAfterChange.order_no, '修改规则不得改写旧订单号').toBe(baseline.order_no);
 
-      console.warn(`[586] POST SO 回滚 revision=${rollbackTarget.id}`);
-      const rolledBack = await apiCall<NumberRuleDetail>(
-        page,
-        'POST',
-        `${LIST_PATH}/${snapshot.rule.id}/rollback`,
-        {
-          revision_id: rollbackTarget.id,
-          version: updated.data.rule.version,
-          change_reason: 'E2E：验证回滚后真实销售订单恢复取号',
-        }
-      );
-      expect(rolledBack.code).toBe(200);
-      expect(sameConfig(configOf(rolledBack.data.rule), configOf(snapshot.rule))).toBe(true);
+        console.warn(`[586] POST SO 回滚 revision=${rollbackTarget.id}`);
+        const rolledBack = await apiCall<NumberRuleDetail>(
+          page,
+          'POST',
+          `${LIST_PATH}/${snapshot.rule.id}/rollback`,
+          {
+            revision_id: rollbackTarget.id,
+            version: updated.data.rule.version,
+            change_reason: 'E2E：验证回滚后真实销售订单恢复取号',
+          }
+        );
+        expect(rolledBack.code).toBe(200);
+        expect(sameConfig(configOf(rolledBack.data.rule), configOf(snapshot.rule))).toBe(true);
 
-      const restored = await createSalesOrder(page);
-      expect(restored.order_no, '回滚后新订单号必须立即恢复初始 SO 规则').toMatch(
-        numberPattern(configOf(snapshot.rule), restored.created_at)
-      );
-      expect(restored.order_no).not.toBe(baseline.order_no);
-      expect(restored.order_no).not.toBe(modified.order_no);
-      const baselineAfterRollback = await apiCallRaw<SalesOrderIdentity>(
-        page,
-        'GET',
-        `/sales/orders/${baseline.id}`
-      );
-      const modifiedAfterRollback = await apiCallRaw<SalesOrderIdentity>(
-        page,
-        'GET',
-        `/sales/orders/${modified.id}`
-      );
-      expect(baselineAfterRollback.order_no, '回滚不得改写初始订单号').toBe(baseline.order_no);
-      expect(modifiedAfterRollback.order_no, '回滚不得改写新规则下的历史订单号').toBe(
-        modified.order_no
-      );
-      console.warn(
-        `[586] 真实取号闭环 baseline=${baseline.order_no} modified=${modified.order_no} restored=${restored.order_no}`
-      );
-    } finally {
-      await restoreSnapshot(page, snapshot);
-      const verified = await readDetail(page);
-      expect(sameConfig(configOf(verified.rule), configOf(snapshot.rule))).toBe(true);
-      console.warn('[586] finally 已恢复并回读验证 SO 配置');
-    }
-  };
-
-  numberRuleConfigTest('SO 规则变更与回滚立即生效', runRealOrderScenario, setupRealOrder);
+        const restored = await createSalesOrder(page);
+        expect(restored.order_no, '回滚后新订单号必须立即恢复初始 SO 规则').toMatch(
+          numberPattern(configOf(snapshot.rule), restored.created_at)
+        );
+        expect(restored.order_no).not.toBe(baseline.order_no);
+        expect(restored.order_no).not.toBe(modified.order_no);
+        const baselineAfterRollback = await apiCallRaw<SalesOrderIdentity>(
+          page,
+          'GET',
+          `/sales/orders/${baseline.id}`
+        );
+        const modifiedAfterRollback = await apiCallRaw<SalesOrderIdentity>(
+          page,
+          'GET',
+          `/sales/orders/${modified.id}`
+        );
+        expect(baselineAfterRollback.order_no, '回滚不得改写初始订单号').toBe(baseline.order_no);
+        expect(modifiedAfterRollback.order_no, '回滚不得改写新规则下的历史订单号').toBe(
+          modified.order_no
+        );
+        console.warn(
+          `[586] 真实取号闭环 baseline=${baseline.order_no} modified=${modified.order_no} restored=${restored.order_no}`
+        );
+      } finally {
+        await restoreSnapshot(page, snapshot);
+        const verified = await readDetail(page);
+        expect(sameConfig(configOf(verified.rule), configOf(snapshot.rule))).toBe(true);
+        console.warn('[586] finally 已恢复并回读验证 SO 配置');
+      }
+    },
+    setupRealOrder
+  );
 
   test('无 number-rules 权限角色访问列表、更新与 POST 回滚均返回 403 FORBIDDEN', async ({
     page,
