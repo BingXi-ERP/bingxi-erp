@@ -146,7 +146,8 @@ impl ApprovalTimeoutScheduler {
             .as_deref()
             .map(str::trim)
             .filter(|name| !name.is_empty())
-            .unwrap_or("原审批人");
+            .unwrap_or("原审批人")
+            .to_string();
 
         let mut active: bpm_task::ActiveModel = task.into();
         active.actual_handler_id = Set(Some(target.id));
