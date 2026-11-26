@@ -462,6 +462,7 @@ impl BpmService {
             // P2 5-18 修复：携带 approver_id（拒绝操作的实际审批人）
             *pending_event = Some(
                 crate::services::event_bus::BusinessEvent::BpmProcessFinished {
+                    instance_id: Some(instance.id),
                     business_type: b_type,
                     business_id: b_id,
                     approved: false,
@@ -724,6 +725,7 @@ impl BpmService {
             // P2 5-18 修复：携带 approver_id（最后节点审批通过的实际审批人）
             *pending_event = Some(
                 crate::services::event_bus::BusinessEvent::BpmProcessFinished {
+                    instance_id: Some(instance.id),
                     business_type: b_type,
                     business_id: b_id,
                     approved: true,

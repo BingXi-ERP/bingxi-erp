@@ -1,5 +1,5 @@
 {
-  "total": 98,
+  "total": 93,
   "files": {
     "frontend/src/api/ai-extend.ts": {
       "count": 2,
@@ -158,16 +158,6 @@
       "count": 1,
       "keys": [
         "OaAnnouncement.notified_count"
-      ]
-    },
-    "frontend/src/api/omni-audit.ts": {
-      "count": 5,
-      "keys": [
-        "AuditStats.avg_duration_ms",
-        "AuditStats.today_events",
-        "AuditStats.top_resources",
-        "AuditStats.top_users",
-        "AuditStats.total_events"
       ]
     },
     "frontend/src/api/purchase-contract.ts": {

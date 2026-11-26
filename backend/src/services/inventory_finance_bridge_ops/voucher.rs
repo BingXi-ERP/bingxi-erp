@@ -109,6 +109,12 @@ impl InventoryFinanceBridgeService {
         &self,
         args: VoucherCreateArgs<'_>,
     ) -> Result<(), AppError> {
+        // 销售出库凭证按业务幅度计额；库存调整凭证保留库存流水方向。
+        let args = VoucherCreateArgs {
+            quantity_meters: args.quantity_meters.abs(),
+            quantity_kg: args.quantity_kg.abs(),
+            ..args
+        };
         // P0 5-4 修复：除零保护，quantity_meters 为 0 时拒绝生成凭证
         if args.quantity_meters.is_zero() {
             return Err(AppError::validation_displayable(
@@ -369,8 +375,8 @@ impl InventoryFinanceBridgeService {
                     debit: Decimal::ZERO,
                     credit: args.amount,
                     summary: Some(args.summary.to_string()),
-                    quantity_meters: Some(-args.quantity_meters),
-                    quantity_kg: Some(-args.quantity_kg),
+                    quantity_meters: Some(args.quantity_meters),
+                    quantity_kg: Some(args.quantity_kg),
                     unit_price: Some((args.amount / (-args.quantity_meters)).round_dp(2)),
                 }),
             ],

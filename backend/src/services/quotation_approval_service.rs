@@ -17,18 +17,20 @@
 use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QuerySelect, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Set, TransactionTrait,
 };
 use std::sync::Arc;
 
 use crate::container::AppState;
+use crate::models::bpm_process_instance;
 use crate::models::bpm_task;
 use crate::models::dto::bpm_dto::StartProcessRequest;
 use crate::models::event_dead_letter;
 use crate::models::sales_quotation::{
     self, ActiveModel as QuotationActive, Entity as QuotationEntity,
 };
+use crate::models::status::bpm_instance as instance_status;
 use crate::models::status::bpm_task as task_status;
 use crate::models::status::quotation as quotation_status;
 use crate::models::status::quotation_ext as quotation_ext_status;
@@ -243,7 +245,7 @@ impl QuotationApprovalService {
             self.self_approve(quotation_id, user_id).await
         } else {
             // 中大额，或折扣超阈：提交 BPM 走主管审批
-            self.submit_to_bpm(quotation, user_id, role).await
+            self.submit_to_bpm(quotation.id, user_id).await
         }
     }
 
@@ -316,54 +318,56 @@ impl QuotationApprovalService {
         Ok(updated)
     }
 
-    /// 提交至 BPM 流程：状态写 pending_approval，并把当前操作人写进 `submitted_by`
-    /// 作为提交留痕（审批腿判定"谁提交的"的唯一依据）。
+    /// 提交至 BPM 流程：报价状态、审批实例关联与提交留痕在同一事务内提交。
     async fn submit_to_bpm(
         &self,
-        quotation: sales_quotation::Model,
+        quotation_id: i64,
         user_id: i32,
-        _role: ApproverRole,
     ) -> Result<sales_quotation::Model, AppError> {
-        // 批次 12（2026-06-28）：BPM 启动在事务外（容错），状态更新在事务内。
-        // 先 BPM start_process 获取 instance_id，再事务包裹"查询 + 状态检查 + update_with_audit"，
-        // 加 lock_exclusive 防止并发提交同一报价单导致状态不一致；
-        // 若事务回滚，BPM 实例成为孤儿（容错设计，BPM 失败也不阻断主流程）。
+        let txn = (*self.db).begin().await?;
+        let latest = QuotationEntity::find_by_id(quotation_id)
+            .lock_exclusive()
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::not_found("报价单不存在"))?;
+
+        if ![quotation_status::DRAFT, quotation_status::REJECTED].contains(&latest.status.as_str())
+        {
+            return Err(AppError::business_displayable(format!(
+                "报价单当前状态不允许提交：{}",
+                latest.status
+            )));
+        }
+
         let bpm_service = BpmService::new(self.db.clone());
         let req = StartProcessRequest {
             process_key: process_key::QUOTATION_APPROVAL.to_string(),
             business_type: "quotation".to_string(),
-            business_id: quotation.id,
-            title: format!("报价单审批 - {}", quotation.quotation_no),
+            business_id: latest.id,
+            title: format!("报价单审批 - {}", latest.quotation_no),
             initiator_id: user_id,
             initiator_name: format!("user_{}", user_id),
             initiator_department_id: None,
             priority: Some("NORMAL".to_string()),
             form_data: Some(serde_json::json!({
-                "quotation_no": quotation.quotation_no,
-                "total_amount": quotation.total_amount.to_string(),
-                "currency": quotation.currency,
+                "quotation_no": latest.quotation_no,
+                "total_amount": latest.total_amount.to_string(),
+                "currency": latest.currency,
             })),
             variables: None,
         };
 
-        // 1. 启动 BPM 流程（状态更新之前，失败即拒绝提交，报价单不落"审批中"）
-        // 原先失败只 warn 并降级为 instance_id=None 继续提交：报价单从此脱离 BPM 审批轨道，
-        // 待办里没有它、业务侧审批也无实例可回写，只能人工对账。现把原因如实返回给提交人。
-        let bpm_instance_id: Option<i32> = match bpm_service.start_process(req).await {
-            Ok(resp) => Some(resp.instance_id),
+        // BPM 与报价行共用事务，任一写入失败都回滚，避免审批实例脱离报价单独存在。
+        let started = match bpm_service.start_process_in_txn(&txn, req).await {
+            Ok(started) => started,
             Err(e) => {
-                // 引擎失败原文可能含流程定义/SQL 细节，按 utils/error.rs 安全边界只进日志不外显；
-                // 全量根因字段（process_key/business_type/business_id）逐条落齐，便于按 trace 定位。
                 tracing::error!(
                     error = %e,
                     process_key = process_key::QUOTATION_APPROVAL,
                     business_type = "quotation",
-                    business_id = quotation.id,
+                    business_id = quotation_id,
                     "报价提交启动 BPM 流程失败，已拒绝提交（未改动报价单状态），根因如上"
                 );
-                // 文案单源按内层族别如实分支（缺定义时点名流程标识；已可外显时转发
-                // 真实原因；系统族给固定引导）。本发起点 BPM 启动先于状态更新、失败
-                // 即拒绝提交，报价单从未被改动，"报价单未提交"是已确认的真实处置结果。
                 return Err(bpm_start_failure_error(
                     process_key::QUOTATION_APPROVAL,
                     "报价单未提交",
@@ -372,28 +376,9 @@ impl QuotationApprovalService {
             }
         };
 
-        // 2. 事务包裹状态更新（重新查询并加锁，防止 quotation 已过期）
-        let txn = (*self.db).begin().await?;
-
-        let latest = QuotationEntity::find_by_id(quotation.id)
-            .lock_exclusive()
-            .one(&txn)
-            .await?
-            .ok_or_else(|| AppError::not_found("报价单不存在"))?;
-
-        if ![quotation_status::DRAFT, quotation_status::REJECTED].contains(&latest.status.as_str())
-        {
-            // 提交腿事务内状态门（并发提交串行化后的终判）：拒绝点名行自身当前态；
-            // 公开规则、不含标识，走可外显通道，机器码仍是 BUSINESS_ERROR
-            return Err(AppError::business_displayable(format!(
-                "报价单当前状态不允许提交：{}",
-                latest.status
-            )));
-        }
-
         let mut active: QuotationActive = latest.into();
         active.status = Set(quotation_ext_status::PENDING_APPROVAL.to_string());
-        active.approval_instance_id = Set(bpm_instance_id.map(|i| i as i64));
+        active.approval_instance_id = Set(Some(started.response.instance_id as i64));
         // 提交留痕：状态跃迁到待审批时记录提交人，与状态写入同一条 update_with_audit，
         // 审计行的 before/after 快照同时覆盖状态与提交人两列。
         active.submitted_by = Set(Some(user_id as i64));
@@ -408,11 +393,12 @@ impl QuotationApprovalService {
         .await?;
 
         txn.commit().await?;
+        bpm_service.notify_started_process(&started).await;
         tracing::info!(
             quotation_id = updated.id,
             submitted_by = ?updated.submitted_by,
             approval_instance_id = ?updated.approval_instance_id,
-            "报价单已提交审批：状态写 pending_approval、提交人已留痕并经审计单点落快照"
+            "报价单已提交审批：状态、审批实例关联与提交人留痕已同事务提交"
         );
         Ok(updated)
     }
@@ -456,6 +442,129 @@ impl QuotationApprovalService {
         active.approval_reason = Set(Some(approval_reason));
         active.updated_at = Set(Utc::now());
         active
+    }
+
+    /// 回写 BPM 终审通过结果，不反向推进已完成的审批任务。
+    pub async fn on_bpm_approved(
+        &self,
+        quotation_id: i64,
+        approver_id: i32,
+    ) -> Result<sales_quotation::Model, AppError> {
+        self.apply_bpm_terminal_decision(quotation_id, approver_id, true)
+            .await
+    }
+
+    /// 回写 BPM 终审拒绝结果，不反向推进已终止的审批任务。
+    pub async fn on_bpm_rejected(
+        &self,
+        quotation_id: i64,
+        approver_id: i32,
+    ) -> Result<sales_quotation::Model, AppError> {
+        self.apply_bpm_terminal_decision(quotation_id, approver_id, false)
+            .await
+    }
+
+    async fn apply_bpm_terminal_decision(
+        &self,
+        quotation_id: i64,
+        approver_id: i32,
+        approved: bool,
+    ) -> Result<sales_quotation::Model, AppError> {
+        let txn = (*self.db).begin().await?;
+        let quotation = QuotationEntity::find_by_id(quotation_id)
+            .lock_exclusive()
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::not_found("报价单不存在"))?;
+
+        if (approved && quotation.status == quotation_status::APPROVED)
+            || (!approved
+                && [quotation_status::REJECTED, quotation_status::DRAFT]
+                    .contains(&quotation.status.as_str()))
+        {
+            return Ok(quotation);
+        }
+        if quotation.status != quotation_ext_status::PENDING_APPROVAL {
+            return Err(AppError::business_displayable(format!(
+                "报价单不在待审批状态，无法回写 BPM 终审结果：{}",
+                quotation.status
+            )));
+        }
+
+        let instance_id = quotation
+            .approval_instance_id
+            .ok_or_else(|| AppError::internal("待审批报价缺少 BPM 实例关联，无法回写终审结果"))?;
+        let instance_id = i32::try_from(instance_id).map_err(|_| {
+            AppError::internal(format!("报价 BPM 实例 ID 超出 INTEGER 范围：{instance_id}"))
+        })?;
+        let instance = bpm_process_instance::Entity::find_by_id(instance_id)
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::not_found("报价审批流程实例不存在"))?;
+        let withdrawn = !approved && instance.status.as_deref() == Some(instance_status::CANCELLED);
+        let expected_instance_status = if approved {
+            instance_status::COMPLETED
+        } else if withdrawn {
+            instance_status::CANCELLED
+        } else {
+            instance_status::TERMINATED
+        };
+        if instance.status.as_deref() != Some(expected_instance_status) {
+            return Err(AppError::business_displayable(format!(
+                "报价审批实例当前状态为 {:?}，与终审结果 {:?} 不一致",
+                instance.status, expected_instance_status
+            )));
+        }
+
+        let expected_task_status = if approved {
+            task_status::COMPLETED
+        } else if withdrawn {
+            task_status::CANCELLED
+        } else {
+            task_status::REJECTED
+        };
+        let terminal_task_query = bpm_task::Entity::find()
+            .filter(bpm_task::Column::InstanceId.eq(instance_id))
+            .filter(bpm_task::Column::Status.eq(expected_task_status));
+        let terminal_task_query = if withdrawn {
+            terminal_task_query
+        } else {
+            terminal_task_query.filter(bpm_task::Column::ActualHandlerId.eq(approver_id))
+        };
+        let terminal_task = terminal_task_query
+            .order_by_desc(bpm_task::Column::HandledAt)
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::internal("报价终审事件未找到对应的已处理审批任务"))?;
+
+        let mut active: QuotationActive = quotation.into();
+        active.updated_at = Set(Utc::now());
+        if withdrawn {
+            active.status = Set(quotation_status::DRAFT.to_string());
+            active.approval_instance_id = Set(None);
+            active.submitted_by = Set(None);
+            active.rejection_reason = Set(terminal_task.approval_opinion);
+        } else {
+            active.approved_by = Set(Some(approver_id as i64));
+            active.approved_at = Set(Some(Utc::now()));
+            if approved {
+                active.status = Set(quotation_status::APPROVED.to_string());
+                active.approval_reason = Set(terminal_task.approval_opinion);
+            } else {
+                active.status = Set(quotation_status::REJECTED.to_string());
+                active.rejection_reason = Set(terminal_task.approval_opinion);
+            }
+        }
+
+        let updated = crate::services::audit_log_service::AuditLogService::update_with_audit(
+            &txn,
+            "auto_audit",
+            active,
+            Some(approver_id),
+        )
+        .await?;
+        txn.commit().await?;
+        Ok(updated)
     }
 
     /// 提交事务后完成 BPM 审批任务（容错：失败只记日志，不回滚业务侧已提交的审批结果）

@@ -19,7 +19,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
-    PaginatorTrait, QueryFilter, QueryOrder, Set, TransactionTrait,
+    PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, Set, TransactionTrait,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -474,9 +474,35 @@ impl BadDebtService {
 
         // 校验 ar_invoice
         let invoice = ar_invoice::Entity::find_by_id(req.ar_invoice_id)
+            .lock_exclusive()
             .one(&txn)
             .await?
             .ok_or(BadDebtError::ArInvoiceNotFound)?;
+
+        if invoice.source_type.as_deref() == Some("SALES_ORDER") {
+            let order_no = invoice
+                .sales_order_no
+                .as_ref()
+                .or(invoice.source_bill_no.as_ref())
+                .ok_or_else(|| BadDebtError::InvalidState {
+                    current: "missing_sales_order_no".to_string(),
+                    expected: "sales invoice with order number",
+                })?;
+            let cancellation_credits = ar_invoice::Entity::find()
+                .filter(ar_invoice::Column::SourceType.eq("SALES_DELIVERY_CANCEL"))
+                .filter(ar_invoice::Column::CustomerId.eq(invoice.customer_id))
+                .filter(ar_invoice::Column::SalesOrderNo.eq(order_no))
+                .filter(ar_invoice::Column::Status.ne(common::STATUS_CANCELLED))
+                .lock_exclusive()
+                .all(&txn)
+                .await?;
+            if !cancellation_credits.is_empty() {
+                return Err(BadDebtError::InvalidState {
+                    current: "delivery_cancelled".to_string(),
+                    expected: "receivable without cancellation credit",
+                });
+            }
+        }
 
         if invoice.approval_status != common::STATUS_APPROVED {
             // 状态门：应收单当前审批状态未达「审核通过」这一前置，归业务族（InvalidState）；

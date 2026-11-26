@@ -333,6 +333,11 @@ fn integer_pk_value(value: &sea_orm::Value) -> Option<i64> {
     }
 }
 
+fn serialize_audit_snapshot<T: Serialize>(model: &T, stage: &str) -> Result<Value, AppError> {
+    serde_json::to_value(model)
+        .map_err(|error| AppError::internal(format!("审计{stage}快照序列化失败: {error}")))
+}
+
 impl AuditLogService {
     /// 作为 SeaORM 中间件，自动拦截并生成 Update 审计日志
     /// update 前先查 old_model 序列化为 before_snapshot，update 后用 new_model 序列化为 after_snapshot，
@@ -386,10 +391,19 @@ impl AuditLogService {
         })?;
         let record_id = pk_integer.to_string();
         // update 前查询 old_model 序列化为 before_snapshot（按主键列等值查询，i32 与 i64 主键同权）
-        let old_model = E::find().filter(pk_col.eq(pk_val)).one(db).await?;
-        let before_snapshot = old_model.and_then(|m| serde_json::to_value(&m).ok());
+        let old_model = E::find()
+            .filter(pk_col.eq(pk_val))
+            .one(db)
+            .await?
+            .ok_or_else(|| {
+                AppError::not_found(format!(
+                    "{} ID {} 记录不存在，无法生成更新前审计快照",
+                    resource_type, record_id
+                ))
+            })?;
+        let before_snapshot = serialize_audit_snapshot(&old_model, "更新前")?;
         let new_model = active_model.update(db).await?;
-        let after_snapshot = serde_json::to_value(&new_model).ok();
+        let after_snapshot = serialize_audit_snapshot(&new_model, "更新后")?;
         // P3 8-20 修复：如果有 user_id，查询 users 表填充 username
         let username = Self::fetch_username(db, user_id).await?;
         // 占位符换真，真实体名原样保留
@@ -409,6 +423,24 @@ impl AuditLogService {
         );
         log.insert(db).await?;
         Ok(new_model)
+    }
+
+    /// 在业务创建事务内同步写入创建审计，失败随业务事务整体回滚。
+    pub async fn insert_create_audit<C: ConnectionTrait>(
+        db: &C,
+        resource_type: &str,
+        record_id: i32,
+        user_id: i32,
+        after_snapshot: Value,
+    ) -> Result<(), AppError> {
+        let mut event = AuditEvent::new(OperationType::Create, resource_type);
+        event.user_id = Some(user_id);
+        event.username = Self::fetch_username(db, Some(user_id)).await?;
+        event.resource_id = Some(record_id.to_string());
+        event.after_snapshot = Some(after_snapshot);
+        let ctx = current_audit_request_ctx();
+        build_active_model(&event, ctx.as_ref()).insert(db).await?;
+        Ok(())
     }
 
     /// 查询用户名（用于审计日志），无 user_id 返回 None
@@ -450,8 +482,8 @@ impl AuditLogService {
         record_id: &str,
         user_id: Option<i32>,
         username: Option<String>,
-        before_snapshot: Option<Value>,
-        after_snapshot: Option<Value>,
+        before_snapshot: Value,
+        after_snapshot: Value,
     ) -> audit_log::ActiveModel {
         // 定位维度（终端与页面与单号与原因与风险与角色）在单点从请求作用域取，不在各 service 逐点塞
         let req_ctx = audit_ctx_for_sync_write();
@@ -472,15 +504,15 @@ impl AuditLogService {
             response_status: ActiveValue::Set(None),
             duration_ms: ActiveValue::Set(None),
             // P2 8-8 修复：填充 old_value/new_value（旧字段兼容）
-            old_value: ActiveValue::Set(before_snapshot.clone().map(audit_log::AuditValue)),
-            new_value: ActiveValue::Set(after_snapshot.clone().map(audit_log::AuditValue)),
+            old_value: ActiveValue::Set(Some(audit_log::AuditValue(before_snapshot.clone()))),
+            new_value: ActiveValue::Set(Some(audit_log::AuditValue(after_snapshot.clone()))),
             created_at: ActiveValue::Set(Some(Utc::now())),
             operation_type: ActiveValue::Set(Some(OperationType::Update.as_str().to_string())),
             severity: ActiveValue::Set(Some(Severity::Info.as_str().to_string())),
             request_id: ActiveValue::Set(None),
             // P2 8-8 修复：填充 before_snapshot/after_snapshot（推荐字段）
-            before_snapshot: ActiveValue::Set(before_snapshot.map(audit_log::AuditValue)),
-            after_snapshot: ActiveValue::Set(after_snapshot.map(audit_log::AuditValue)),
+            before_snapshot: ActiveValue::Set(Some(audit_log::AuditValue(before_snapshot))),
+            after_snapshot: ActiveValue::Set(Some(audit_log::AuditValue(after_snapshot))),
             // V15 P0-S19 补齐：update_with_audit 无 query string，condition 为 None
             condition: ActiveValue::Set(None),
             // 审计定位维度（单点写入）
@@ -514,7 +546,7 @@ impl AuditLogService {
             .await?
             .ok_or_else(|| AppError::not_found(format!("{} 记录不存在", resource_type)))?;
 
-        let before_snapshot = serde_json::to_value(&old_model).ok();
+        let before_snapshot = serialize_audit_snapshot(&old_model, "删除前")?;
         let record_id_str = record_id.to_string();
 
         // 2. 删除记录
@@ -550,7 +582,7 @@ impl AuditLogService {
             .await?
             .ok_or_else(|| AppError::not_found(format!("{} 记录不存在", resource_type)))?;
 
-        let before_snapshot = serde_json::to_value(&old_model).ok();
+        let before_snapshot = serialize_audit_snapshot(&old_model, "删除前")?;
         let record_id_str = record_id.to_string();
 
         // 2. 删除记录
@@ -573,7 +605,7 @@ impl AuditLogService {
         resource_type: &str,
         record_id_str: &str,
         user_id: Option<i32>,
-        before_snapshot: Option<Value>,
+        before_snapshot: Value,
     ) -> Result<(), AppError>
     where
         C: ConnectionTrait,
@@ -599,13 +631,13 @@ impl AuditLogService {
             request_body: ActiveValue::Set(None),
             response_status: ActiveValue::Set(None),
             duration_ms: ActiveValue::Set(None),
-            old_value: ActiveValue::Set(before_snapshot.clone().map(audit_log::AuditValue)),
+            old_value: ActiveValue::Set(Some(audit_log::AuditValue(before_snapshot.clone()))),
             new_value: ActiveValue::Set(None),
             created_at: ActiveValue::Set(Some(Utc::now())),
             operation_type: ActiveValue::Set(Some(OperationType::Delete.as_str().to_string())),
             severity: ActiveValue::Set(Some(Severity::Info.as_str().to_string())),
             request_id: ActiveValue::Set(None),
-            before_snapshot: ActiveValue::Set(before_snapshot.map(audit_log::AuditValue)),
+            before_snapshot: ActiveValue::Set(Some(audit_log::AuditValue(before_snapshot))),
             after_snapshot: ActiveValue::Set(None),
             // V15 P0-S19 补齐：delete_with_audit 无 query string，condition 为 None
             condition: ActiveValue::Set(None),
@@ -728,4 +760,43 @@ pub fn build_active_model(
 /// 不在请求作用域（后台维护任务）时返回 UNKNOWN 终端与空维度的兜底上下文，绝不默认 PC。
 fn audit_ctx_for_sync_write() -> AuditContext {
     AuditContext::current_for_sync_write()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Serializer;
+
+    struct UnserializableSnapshot;
+
+    impl Serialize for UnserializableSnapshot {
+        fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(<S::Error as serde::ser::Error>::custom(
+                "审计快照夹具主动拒绝序列化",
+            ))
+        }
+    }
+
+    #[test]
+    fn audit_snapshot_serialization_failure_is_returned_with_stage() {
+        let error = serialize_audit_snapshot(&UnserializableSnapshot, "更新前")
+            .expect_err("序列化失败必须返回错误，不得降级成空快照");
+
+        match error {
+            AppError::InternalError(message) => {
+                assert!(
+                    message.contains("审计更新前快照序列化失败"),
+                    "实际 {message}"
+                );
+                assert!(
+                    message.contains("审计快照夹具主动拒绝序列化"),
+                    "实际 {message}"
+                );
+            }
+            other => panic!("序列化失败应归为内部错误，实际 {other:?}"),
+        }
+    }
 }

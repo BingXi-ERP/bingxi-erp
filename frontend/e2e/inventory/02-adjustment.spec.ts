@@ -89,7 +89,7 @@ async function expectAdjustmentReadback(
   beforeIds: Set<number>,
   expectedType: 'increase' | 'decrease',
   expectedDelta: number
-): Promise<void> {
+): Promise<number> {
   const list = await apiCallRaw<{ adjustments?: unknown }>(
     page,
     'GET',
@@ -136,6 +136,7 @@ async function expectAdjustmentReadback(
     adjDecimal(created, 'total_quantity', '新建调整单总数量'),
     `调整单总数量应回读为 ${absDelta}`
   ).toBe(absDelta);
+  return Number(created.id);
 }
 
 test.describe('库存管理 - 02 库存调整', () => {
@@ -240,7 +241,60 @@ test.describe('库存管理 - 02 库存调整', () => {
     await dialog.getByRole('button', { name: '确定' }).click();
     await expect(page.getByText('库存调整成功')).toBeVisible({ timeout: 30000 });
     // 成功提示只证明请求被接受；逐列回读明细调整前/调整后数量并钉住守恒与方向
-    await expectAdjustmentReadback(page, beforeIds, 'decrease', -30);
+    const adjustmentId = await expectAdjustmentReadback(page, beforeIds, 'decrease', -30);
+
+    // 审核后事件仍带负向库存增量；财务桥接必须据此生成盘亏凭证，而不是把盘亏记成盘盈。
+    await apiCall(page, 'POST', `/inventory/adjustments/${adjustmentId}/approve`);
+    let adjustmentVoucherId: number | undefined;
+    await expect
+      .poll(
+        async () => {
+          const rows = await apiCallRaw<
+            Array<{ id: number; source_type: string | null; source_bill_id: number | null }>
+          >(page, 'GET', '/vouchers?page=1&page_size=100');
+          if (!Array.isArray(rows)) {
+            throw new Error('凭证列表应返回数组，无法定位库存调整凭证');
+          }
+          const matches = rows.filter(
+            row => row.source_type === 'inventory_adjustment' && row.source_bill_id === adjustmentId
+          );
+          adjustmentVoucherId = matches[0]?.id;
+          return matches.length;
+        },
+        { timeout: 20000 }
+      )
+      .toBe(1);
+    if (adjustmentVoucherId === undefined) {
+      throw new Error('盘亏审核后未生成可回读的库存调整凭证');
+    }
+    const voucher = await apiCallRaw<{
+      entries: Array<{
+        subject_code: string;
+        debit: unknown;
+        credit: unknown;
+        quantity_meters: unknown;
+      }>;
+    }>(page, 'GET', `/vouchers/${adjustmentVoucherId}`);
+    expect(Array.isArray(voucher.entries), '盘亏凭证详情应返回 entries 数组').toBe(true);
+    expect(voucher.entries, '盘亏凭证应包含两条分录').toHaveLength(2);
+    const shortageEntry = voucher.entries.find(entry => entry.subject_code === '1901');
+    const inventoryEntry = voucher.entries.find(entry => entry.subject_code === '1405');
+    if (!shortageEntry || !inventoryEntry) {
+      throw new Error('盘亏凭证缺少待处理财产损溢或库存商品分录');
+    }
+    expect(
+      adjDecimal(shortageEntry, 'debit', '盘亏待处理财产损溢借方'),
+      '盘亏应借记待处理财产损溢'
+    ).toBe(adjDecimal(inventoryEntry, 'credit', '盘亏库存商品贷方'));
+    expect(
+      adjDecimal(shortageEntry, 'credit', '盘亏待处理财产损溢贷方'),
+      '盘亏待处理财产损溢不应贷记'
+    ).toBe(0);
+    expect(adjDecimal(inventoryEntry, 'debit', '盘亏库存商品借方'), '盘亏库存商品不应借记').toBe(0);
+    expect(
+      adjDecimal(inventoryEntry, 'quantity_meters', '盘亏库存商品数量'),
+      '盘亏凭证数量必须保留负向库存增量'
+    ).toBe(-30);
   });
 
   // ============================================================

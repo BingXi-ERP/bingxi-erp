@@ -306,6 +306,7 @@ async fn run_consumer_loop(
     tx: mpsc::Sender<BusinessEvent>,
 ) -> Result<(), KafkaError> {
     let partitions = config.partitions.max(1);
+    // 消费位点仅保存在当前进程内，不向 broker 提交；重启后从 earliest 重放。
     let mut last_offsets: Vec<i64> = vec![0; partitions as usize];
     let mut initialised = false;
     let mut consecutive_failures: u32 = 0;
@@ -345,7 +346,7 @@ async fn run_consumer_loop(
             match fetch_result {
                 Ok((records, _)) => {
                     consecutive_failures = 0;
-                    if process_fetched_records(records, &tx, &mut last_offsets, partition).await {
+                    if process_fetched_records(records, &tx, &mut last_offsets, partition).await? {
                         return Ok(());
                     }
                 }
@@ -385,37 +386,37 @@ async fn init_partition_offset(
     Ok(())
 }
 
-/// 处理拉取到的记录：更新 last_offset 并逐条转发到通道。
-/// 返回 true 表示消费通道已关闭，调用方应停止消费循环。
+/// 逐条转发记录；只有成功转发后才推进该分区内存位点。
+/// 返回 `Ok(true)` 表示消费通道已关闭；载荷错误返回 `Err` 并中止消费，失败位点不推进。
 async fn process_fetched_records(
     records: Vec<RecordAndOffset>,
     tx: &mpsc::Sender<BusinessEvent>,
     last_offsets: &mut [i64],
     partition: i32,
-) -> bool {
-    if let Some(last) = records.last() {
-        last_offsets[partition as usize] = last.offset + 1;
-    }
+) -> Result<bool, KafkaError> {
     for record_and_off in records {
-        if process_kafka_record(record_and_off, tx).await {
-            return true;
+        let next_offset = record_and_off.offset + 1;
+        if process_kafka_record(record_and_off, tx).await? {
+            return Ok(true);
         }
+        last_offsets[partition as usize] = next_offset;
     }
-    false
+    Ok(false)
 }
 
-/// 处理单条 Kafka 记录：反序列化为 EventPayload 并转换为 BusinessEvent 后转发
-/// 返回 true 表示消费通道已关闭，调用方应停止消费循环。；V15 P1 20.1-B 修复：从消息头解析 traceparent 并记录 trace 关联日志。
+/// 处理单条 Kafka 记录：反序列化为 EventPayload 并转换为 BusinessEvent 后转发。
+/// 返回 `Ok(true)` 表示消费通道已关闭；缺失 value、畸形载荷或转换失败均返回 `Err`，不得静默跳过。
 async fn process_kafka_record(
     record_and_off: RecordAndOffset,
     tx: &mpsc::Sender<BusinessEvent>,
-) -> bool {
-    let bytes = match record_and_off.record.value {
-        Some(b) => b,
-        None => return false,
-    };
+) -> Result<bool, KafkaError> {
+    let offset = record_and_off.offset;
+    let bytes = record_and_off.record.value.ok_or_else(|| {
+        KafkaError(format!(
+            "Kafka 记录 offset {offset} 缺少 value，消费已中止，拒绝跳过该记录"
+        ))
+    })?;
 
-    // V15 P1 20.1-B 修复：从 Kafka 消息头提取 traceparent，关联生产方 trace 链路
     let trace_id = record_and_off
         .record
         .headers
@@ -430,24 +431,180 @@ async fn process_kafka_record(
         );
     }
 
-    let payload: EventPayload = match serde_json::from_slice(&bytes) {
-        Ok(p) => p,
-        Err(e) => {
-            tracing::error!("Kafka 事件反序列化为 EventPayload 失败: {}", e);
-            return false;
+    let payload: EventPayload = serde_json::from_slice(&bytes).map_err(|e| {
+        KafkaError(format!(
+            "Kafka 事件反序列化失败，消费已中止（offset {offset}）: {e}"
+        ))
+    })?;
+    let event = BusinessEvent::try_from(payload).map_err(|e| {
+        KafkaError(format!(
+            "Kafka 事件转换 BusinessEvent 失败，消费已中止（offset {offset}）: {e}"
+        ))
+    })?;
+    if tx.send(event).await.is_err() {
+        tracing::warn!("Kafka 消费通道已关闭，停止消费");
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use tokio::sync::mpsc::error::TryRecvError;
+
+    fn record(value: serde_json::Value, offset: i64) -> RecordAndOffset {
+        RecordAndOffset {
+            record: Record {
+                key: None,
+                value: Some(serde_json::to_vec(&value).expect("测试事件序列化失败")),
+                headers: BTreeMap::new(),
+                timestamp: chrono::Utc::now(),
+            },
+            offset,
         }
-    };
-    match BusinessEvent::try_from(payload) {
-        Ok(event) => {
-            if tx.send(event).await.is_err() {
-                tracing::warn!("Kafka 消费通道已关闭，停止消费");
-                return true;
+    }
+
+    #[tokio::test]
+    async fn legacy_bpm_payload_is_forwarded_for_explicit_instance_resolution() {
+        let (tx, mut rx) = mpsc::channel(4);
+        let mut last_offsets = vec![10];
+        let records = vec![
+            record(
+                json!({
+                    "kind": "inventory_count_completed",
+                    "count_id": 1,
+                    "variance_count": 0
+                }),
+                10,
+            ),
+            record(
+                json!({
+                    "kind": "bpm_process_finished",
+                    "business_type": "purchase_order",
+                    "business_id": 42,
+                    "approved": false,
+                    "approver_id": 7
+                }),
+                11,
+            ),
+            record(
+                json!({
+                    "kind": "inventory_count_completed",
+                    "count_id": 3,
+                    "variance_count": 0
+                }),
+                12,
+            ),
+        ];
+
+        let channel_closed = process_fetched_records(records, &tx, &mut last_offsets, 0)
+            .await
+            .expect("旧 BPM 载荷必须进入业务监听器的显式实例解析路径");
+        assert!(!channel_closed, "测试消费通道保持打开");
+        assert_eq!(last_offsets, vec![13], "成功转发的旧载荷不得被跳过");
+
+        match rx.try_recv().expect("首条合法事件必须已转发") {
+            BusinessEvent::InventoryCountCompleted { count_id, .. } => assert_eq!(count_id, 1),
+            other => panic!("转发事件类型不符: {other:?}"),
+        }
+        match rx.try_recv().expect("旧 BPM 载荷必须已转发") {
+            BusinessEvent::BpmProcessFinished {
+                instance_id,
+                business_id,
+                approved,
+                ..
+            } => {
+                assert_eq!(instance_id, None, "旧载荷缺失实例号时不得伪造");
+                assert_eq!(business_id, 42);
+                assert!(!approved);
             }
-            false
+            other => panic!("转发事件类型不符: {other:?}"),
         }
-        Err(e) => {
-            tracing::error!("Kafka 事件转换 BusinessEvent 失败: {}", e);
-            false
+        match rx.try_recv().expect("旧载荷后的合法事件必须继续转发") {
+            BusinessEvent::InventoryCountCompleted { count_id, .. } => assert_eq!(count_id, 3),
+            other => panic!("转发事件类型不符: {other:?}"),
         }
+        assert_eq!(rx.try_recv().unwrap_err(), TryRecvError::Empty);
+    }
+
+    #[tokio::test]
+    async fn malformed_payload_aborts_batch_without_skipping_offset() {
+        let (tx, mut rx) = mpsc::channel(1);
+        let mut last_offsets = vec![30];
+        let records = vec![record(
+            json!({
+                "kind": "bpm_process_finished",
+                "instance_id": 101,
+                "business_type": "purchase_order",
+                "approved": false,
+                "approver_id": 7
+            }),
+            30,
+        )];
+
+        let err = process_fetched_records(records, &tx, &mut last_offsets, 0)
+            .await
+            .expect_err("真正畸形的载荷必须显式中止消费，不得静默跳过");
+        let message = err.to_string();
+        assert!(
+            message.contains("offset 30") && message.contains("消费已中止"),
+            "错误必须显式中止消费并定位失败 offset，实得 {message}"
+        );
+        assert_eq!(last_offsets, vec![30], "失败记录不得推进内存 offset");
+        assert_eq!(rx.try_recv().unwrap_err(), TryRecvError::Empty);
+    }
+
+    #[tokio::test]
+    async fn current_bpm_payload_advances_offset_after_forwarding() {
+        let (tx, mut rx) = mpsc::channel(2);
+        let mut last_offsets = vec![20];
+        let records = vec![
+            record(
+                json!({
+                    "kind": "inventory_count_completed",
+                    "count_id": 1,
+                    "variance_count": 0
+                }),
+                20,
+            ),
+            record(
+                json!({
+                    "kind": "bpm_process_finished",
+                    "instance_id": 101,
+                    "business_type": "purchase_order",
+                    "business_id": 42,
+                    "approved": false,
+                    "approver_id": 7
+                }),
+                21,
+            ),
+        ];
+
+        let channel_closed = process_fetched_records(records, &tx, &mut last_offsets, 0)
+            .await
+            .expect("合法 Kafka 记录必须成功转发");
+        assert!(!channel_closed, "测试消费通道保持打开");
+        assert_eq!(last_offsets, vec![22], "成功转发后才能推进内存 offset");
+
+        match rx.try_recv().expect("首条合法事件必须已转发") {
+            BusinessEvent::InventoryCountCompleted { count_id, .. } => assert_eq!(count_id, 1),
+            other => panic!("转发事件类型不符: {other:?}"),
+        }
+        match rx.try_recv().expect("BPM 事件必须已转发") {
+            BusinessEvent::BpmProcessFinished {
+                instance_id,
+                business_id,
+                approved,
+                ..
+            } => {
+                assert_eq!(instance_id, Some(101));
+                assert_eq!(business_id, 42);
+                assert!(!approved);
+            }
+            other => panic!("转发事件类型不符: {other:?}"),
+        }
+        assert_eq!(rx.try_recv().unwrap_err(), TryRecvError::Empty);
     }
 }

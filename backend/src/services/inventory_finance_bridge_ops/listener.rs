@@ -161,7 +161,7 @@ impl InventoryFinanceBridgeService {
                 self.db.clone(),
             );
         let consumer_id = "inventory_finance_bridge";
-        let event_key = format!("inventory_txn:{}", transaction_id);
+        let event_key = format!("inventory_txn:{}:{}", transaction_type, transaction_id);
         let event_type = "InventoryTransactionCreated";
 
         // 阶段 1：幂等查重（自身独立事务，命中即跳过）

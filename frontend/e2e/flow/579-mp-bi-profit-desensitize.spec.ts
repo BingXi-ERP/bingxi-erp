@@ -1,11 +1,8 @@
 // 小程序 BI 利润面脱敏钉子 — /bi/sales/profit 两腿断言
 // 功能腿 1：customer 会话打 /bi/sales/profit（不属客户门户路径族）必须被 RBAC 权限门拒绝
 //           （403 + FORBIDDEN 机器码，expectDenied 假绿拦截）。
-// 功能腿 2：普通授权角色（授予 bi-analysis:read）读取同一端点，断言响应聚合行不含成本/利润键
-//           （total_cost/total_profit/gross_margin）。
-//           ⚠️ 钉子语义：利润分析端点对任何过 RBAC 的角色直出全量字段，
-//           响应类型静态包含上述键，本腿红面即"字段级脱敏门缺失"缺陷的运行时证据，
-//           后端加字段级门后转绿；本支只钉红不改源码。
+// 功能腿 2：普通授权角色（授予 bi-analysis:read）读取同一端点，默认不含成本/利润键；
+//           逐字段授予可读权限后对应键出现，撤销单字段权限后仅该键消失。
 // 调用方：Playwright 分片（frontend/playwright.config.ts），与 flow 其它用例共享后端账号池。
 // 入参：无测试参数；前置由管理员会话造 customer 绑定账号与授权 scratch 角色/用户。
 // 传给谁：apiCallExpectFail/apiCallRaw 走统一信封与 CSRF 恢复 helper。
@@ -23,18 +20,24 @@ import {
 
 type Row = Record<string, unknown>;
 type Page = Parameters<typeof apiCallRaw>[0];
+type FieldPermissionRow = Row & {
+  id?: number;
+  role_id?: number;
+  resource_type?: string;
+  field_name?: string;
+  can_read?: boolean;
+  is_enabled?: boolean;
+};
 
-function collectKeys(value: unknown, out: Set<string>): void {
-  if (Array.isArray(value)) {
-    for (const item of value) collectKeys(item, out);
-    return;
-  }
-  if (value !== null && typeof value === 'object') {
-    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-      out.add(key);
-      collectKeys(child, out);
-    }
-  }
+const sensitiveFields = ['total_cost', 'total_profit', 'gross_margin'] as const;
+
+function analysisFrom(payload: Row): Row {
+  const analysis = payload.data;
+  expect(
+    analysis && typeof analysis === 'object' && !Array.isArray(analysis),
+    '利润接口必须返回 BiResponse.data 聚合对象'
+  ).toBe(true);
+  return analysis as Row;
 }
 
 function positiveId(id: unknown, subject: string): number {
@@ -67,7 +70,10 @@ test.describe.serial('579 BI 利润面脱敏钉子', () => {
       .padStart(3, '0');
   const biRoleCode = `mp579bi${stamp}`;
   const sessions: Awaited<ReturnType<typeof loginInIsolatedContext>>[] = [];
+  const fieldPermissionIds = new Set<number>();
   let customerId = 0;
+  let biRoleId = 0;
+  let totalCostPermissionId = 0;
 
   test('造数：customer 绑定账号 + bi-analysis 授权角色账号', async ({ page, browser }) => {
     const customer = await apiCallRaw<Row>(page, 'POST', '/crm/customers', {
@@ -77,7 +83,6 @@ test.describe.serial('579 BI 利润面脱敏钉子', () => {
       credit_limit: '1000',
     });
     customerId = positiveId(customer.id, 'BI 脱敏回归客户建档');
-
     const customerRoleId = await findRoleId(page, 'customer');
     const bound = await apiCallRaw<Row>(page, 'POST', '/users', {
       username: boundUsername,
@@ -93,6 +98,7 @@ test.describe.serial('579 BI 利润面脱敏钉子', () => {
       code: biRoleCode,
     });
     const roleId = positiveId(role.id, 'scratch 授权角色建档');
+    biRoleId = roleId;
     await apiCallRaw(page, 'POST', `/roles/${roleId}/permissions`, {
       resource_type: 'bi-analysis',
       action: 'read',
@@ -117,28 +123,109 @@ test.describe.serial('579 BI 利润面脱敏钉子', () => {
     expectDenied(denied, 'customer 打 /bi/sales/profit（BI 利润面非门户路径族，RBAC fail-closed）');
   });
 
-  test('腿2：bi-analysis 授权角色读 /bi/sales/profit 不得含成本利润键', async () => {
-    // 已知字段级脱敏缺口：当前必须失败；后端补字段门后移除 test.fail，
-    // 届时若断言意外通过，Playwright 会以 unexpected pass 判红提醒移除标记。
-    test.fail();
+  test('腿2：利润字段默认脱敏，逐字段授权与撤销只影响对应键', async ({ page }) => {
     const biSession = sessions[1];
     expect(biSession, '前置造数应已建立授权会话').toBeTruthy();
-    const payload = await apiCallRaw<Row>(biSession.page, 'GET', '/bi/sales/profit');
-    // BiResponse 聚合行必须真实可达（面级授权生效），否则腿2退化为恒真空转
-    const analysis = (payload as { data?: Row }).data as Row | undefined;
-    expect(analysis, '授权角色读 /bi/sales/profit 应返回聚合行（BiResponse.data）').toBeTruthy();
-    expect(
-      Array.isArray(Object.keys(analysis!)) && Object.keys(analysis!).length > 0,
-      '聚合行不得为空对象（面级可达哨兵）'
-    ).toBe(true);
 
-    const keys = new Set<string>();
-    collectKeys(payload, keys);
-    // 字段级脱敏钉子：成本/利润键对授权角色也不可下发。
-    // ⚠️ 静态实锤：利润分析响应恒含这三键且无字段级门，本断言在 CI 将红，
-    //   红面即缺陷证据（登记功能缺失），后端补字段级门后转绿。
-    for (const key of ['total_cost', 'total_profit', 'gross_margin']) {
-      expect(keys.has(key), `/bi/sales/profit 响应体不得含成本利润键 ${key}`).toBe(false);
+    const defaultPayload = await apiCallRaw<Row>(biSession.page, 'GET', '/bi/sales/profit');
+    const defaultAnalysis = analysisFrom(defaultPayload);
+    expect(
+      Object.keys(defaultAnalysis).length,
+      '面级授权必须返回非空聚合行，不能恒空假绿'
+    ).toBeGreaterThan(0);
+    const revenue = defaultAnalysis.total_revenue;
+    expect(
+      typeof revenue === 'number' && Number.isFinite(revenue),
+      '非敏感收入字段必须可达且为有限数值'
+    ).toBe(true);
+    for (const field of sensitiveFields) {
+      expect(Object.hasOwn(defaultAnalysis, field), `未授权字段 ${field} 不得出现在响应中`).toBe(
+        false
+      );
+    }
+
+    for (const field of sensitiveFields) {
+      const permission = await apiCallRaw<FieldPermissionRow>(page, 'POST', '/field-permissions', {
+        role_id: biRoleId,
+        resource_type: 'bi-analysis',
+        field_name: field,
+        can_read: true,
+        can_write: false,
+        mask_strategy: 'NONE',
+      });
+      const permissionId = positiveId(permission.id, `${field} 字段权限建档`);
+      fieldPermissionIds.add(permissionId);
+      expect(permission.role_id, `${field} 字段权限必须绑定 scratch 角色`).toBe(biRoleId);
+      expect(permission.resource_type, `${field} 字段权限资源类型必须为 bi-analysis`).toBe(
+        'bi-analysis'
+      );
+      expect(permission.field_name, `${field} 字段权限字段名必须逐字回读`).toBe(field);
+      expect(permission.can_read, `${field} 字段权限必须可读`).toBe(true);
+      expect(permission.is_enabled, `${field} 字段权限建档后必须启用`).toBe(true);
+      if (field === 'total_cost') totalCostPermissionId = permissionId;
+    }
+
+    const permissions = await apiCallRaw<FieldPermissionRow[]>(
+      page,
+      'GET',
+      `/field-permissions?role_id=${biRoleId}&resource_type=bi-analysis`
+    );
+    expect(Array.isArray(permissions), '字段权限列表必须返回裸数组').toBe(true);
+    for (const field of sensitiveFields) {
+      const matches = permissions.filter(
+        item => item.role_id === biRoleId && item.field_name === field
+      );
+      expect(matches, `${field} 字段权限必须可从列表回读`).toHaveLength(1);
+      expect(matches[0].can_read, `${field} 字段权限回读必须可读`).toBe(true);
+    }
+
+    const grantedAnalysis = analysisFrom(
+      await apiCallRaw<Row>(biSession.page, 'GET', '/bi/sales/profit')
+    );
+    for (const field of sensitiveFields) {
+      expect(Object.hasOwn(grantedAnalysis, field), `授权字段 ${field} 必须出现在响应中`).toBe(
+        true
+      );
+      const value = grantedAnalysis[field];
+      expect(
+        typeof value === 'number' && Number.isFinite(value),
+        `授权字段 ${field} 必须是有限数值`
+      ).toBe(true);
+    }
+
+    expect(totalCostPermissionId, '成本字段权限 id 必须已记录').toBeGreaterThan(0);
+    await apiCallRaw(page, 'DELETE', `/field-permissions/${totalCostPermissionId}`);
+    fieldPermissionIds.delete(totalCostPermissionId);
+
+    const afterRevoke = await apiCallRaw<FieldPermissionRow[]>(
+      page,
+      'GET',
+      `/field-permissions?role_id=${biRoleId}&resource_type=bi-analysis`
+    );
+    expect(
+      afterRevoke.find(item => item.id === totalCostPermissionId)?.is_enabled,
+      '撤销后的成本字段权限必须保留记录但处于禁用状态'
+    ).toBe(false);
+
+    const revokedAnalysis = analysisFrom(
+      await apiCallRaw<Row>(biSession.page, 'GET', '/bi/sales/profit')
+    );
+    expect(Object.hasOwn(revokedAnalysis, 'total_cost'), '撤销成本字段权限后仅成本键必须消失').toBe(
+      false
+    );
+    for (const field of ['total_profit', 'gross_margin'] as const) {
+      expect(Object.hasOwn(revokedAnalysis, field), `撤销成本权限不得误伤 ${field}`).toBe(true);
+      const value = revokedAnalysis[field];
+      expect(
+        typeof value === 'number' && Number.isFinite(value),
+        `保留授权字段 ${field} 必须仍为有限数值`
+      ).toBe(true);
+    }
+  });
+
+  test.afterEach(async ({ page }) => {
+    for (const permissionId of fieldPermissionIds) {
+      await apiCallRaw(page, 'DELETE', `/field-permissions/${permissionId}`);
     }
   });
 

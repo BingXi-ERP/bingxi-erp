@@ -21,7 +21,9 @@ use std::collections::{HashMap, HashSet};
 
 use crate::models::{role, role_permission};
 use crate::services::init_service::{InitError, InitService, PERMISSION_RESOURCES};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, Set};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, Set,
+};
 use tracing::warn;
 
 // ===== 类型别名（避免 clippy `type_complexity` 警告：嵌套引用切片类型过深）=====
@@ -199,6 +201,33 @@ impl InitService {
             written,
             explicit_denied_kept.len()
         );
+        Ok(())
+    }
+
+    pub async fn create_default_bi_profit_field_permissions(&self) -> Result<(), InitError> {
+        self.db
+            .as_ref()
+            .execute_unprepared(
+                r#"
+INSERT INTO field_permissions
+    (role_id, resource_type, field_name, can_read, can_write, mask_strategy, is_enabled)
+SELECT r.id, 'bi-analysis', f.field_name, TRUE, FALSE, 'NONE', TRUE
+FROM roles r
+CROSS JOIN (
+    VALUES ('total_cost'), ('total_profit'), ('gross_margin')
+) AS f(field_name)
+WHERE r.code IN ('gm', 'deputy_gm', 'manager', 'sales_manager', 'sales_director',
+                 'finance_manager', 'accountant', 'data_analyst')
+  AND NOT EXISTS (
+      SELECT 1 FROM field_permissions fp
+       WHERE fp.role_id = r.id
+         AND fp.resource_type = 'bi-analysis'
+         AND fp.field_name = f.field_name
+  );
+"#,
+            )
+            .await
+            .map_err(|e| InitError::DatabaseError(format!("BI 利润字段默认授权建立失败: {e}")))?;
         Ok(())
     }
 
@@ -450,6 +479,7 @@ impl InitService {
                     ("quality-inspections", "read"),
                     ("vouchers", "read"),
                     ("reports", "read"),
+                    ("bi-analysis", "read"),
                     ("dashboard", "read"),
                     ("export-approvals", "create"),
                     ("export-approvals", "read"),
@@ -615,6 +645,7 @@ impl InitService {
                     // （裁定六面之一"能被报价与订单侧读到"；送检与报告明细不给销售）
                     ("textile-export-requirements", "read"),
                     ("reports", "read"),
+                    ("bi-analysis", "read"),
                     ("sales-analysis", "read"),
                     // BPM 审批面：键由 `/api/v1/erp/bpm/{第四段}` 经消歧派生。审批提交端点是
                     // POST /bpm/tasks/approve（末段 approve 属路径动作关键字）；审批中心执行入口是
@@ -709,6 +740,7 @@ impl InitService {
                 &[
                     ("transfer-approvals", "read"),
                     ("transfer-approvals", "directorapprove"),
+                    ("bi-analysis", "read"),
                 ],
             ),
         ]
@@ -1225,6 +1257,7 @@ impl InitService {
                     ("accounting-periods", "*"),
                     ("wages", "read"),
                     ("reports", "read"),
+                    ("bi-analysis", "read"),
                     // 客户信用面（资源段 customer-credits 由 /api/v1/erp/crm/customer-credits
                     // 的第四段派生，已在 init_service.rs 的 PERMISSION_RESOURCES 在册）：
                     // 授信、调整、占用释放与停用都归财务审核处置岗，故五枚动作全授。
@@ -1260,6 +1293,7 @@ impl InitService {
                     ("exchange-rates", "read"),
                     ("ar-reconciliations", "read"),
                     ("ar-reconciliations", "create"),
+                    ("bi-analysis", "read"),
                     // ===== 应付族（AP）·制单与记账面 =====
                     // 口径为“会计有 AP 读，出纳不要”，故五枚业务面全给读，报表四本不给本岗
                     // （ap-aging、ap-daily、ap-monthly、ap-statistics 归 finance_manager）。
@@ -1351,6 +1385,7 @@ impl InitService {
                     ("five-dimension", "*"),
                     ("sales-analysis", "*"),
                     ("reports", "read"),
+                    ("bi-analysis", "read"),
                 ],
             ),
             (

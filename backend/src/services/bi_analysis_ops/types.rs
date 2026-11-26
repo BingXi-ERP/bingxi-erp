@@ -92,9 +92,12 @@ pub struct CategoryStat {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProfitAnalysis {
     pub total_revenue: f64,
-    pub total_cost: f64,
-    pub total_profit: f64,
-    pub gross_margin: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_cost: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total_profit: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gross_margin: Option<f64>,
     pub order_count: i64,
     pub avg_order_value: f64,
 }

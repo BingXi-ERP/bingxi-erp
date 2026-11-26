@@ -341,18 +341,18 @@ test.describe('90 销售订单→出库 逐行账实链', () => {
     expectCents(stockB1.quantity_available, '180', 'B 库存行可用量=200-20');
     expectCents(stockB1.quantity_shipped, '20', 'B 库存行已发量+=20');
 
-    // 出库库存流水：本订单名下每产品恰 1 行，前后差必须逐分等于本次出库量（流水即出库行的可读账本）
+    // 出库库存流水：本订单名下每产品恰 1 行，增量保留负方向，扣前加负增量等于扣后
     const txA1 = await readSalesDeliveryTxns(page, pA, bundleA.dyeLotNo, order.order_no);
     expect(txA1.length, '第一笔后 A 出库流水应恰 1 行（本订单名下）').toBe(1);
-    expectQty(txA1[0].quantity_meters, '60', 'A 出库流水行出库量');
+    expectQty(txA1[0].quantity_meters, '-60', 'A 出库流水行负向扣减量');
     expectQty(txA1[0].quantity_before_meters, '200', 'A 出库流水行扣前量');
-    expect(toScaled(txA1[0].quantity_after_meters, 4, 'A 流水扣后量'), '流水前后差=出库量').toBe(
-      toScaled(txA1[0].quantity_before_meters, 4, 'before') -
+    expect(toScaled(txA1[0].quantity_after_meters, 4, 'A 流水扣后量'), '扣前加负增量=扣后').toBe(
+      toScaled(txA1[0].quantity_before_meters, 4, 'before') +
         toScaled(txA1[0].quantity_meters, 4, 'qty')
     );
     const txB1 = await readSalesDeliveryTxns(page, pB, bundleB.dyeLotNo, order.order_no);
     expect(txB1.length, '第一笔后 B 出库流水应恰 1 行').toBe(1);
-    expectQty(txB1[0].quantity_meters, '20', 'B 出库流水行出库量');
+    expectQty(txB1[0].quantity_meters, '-20', 'B 出库流水行负向扣减量');
 
     // 发货单回读：信封键 {list,total}（缺键即红，不得 ?? [] 吞掉）
     const dlv1 = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${order.id}/deliveries`);

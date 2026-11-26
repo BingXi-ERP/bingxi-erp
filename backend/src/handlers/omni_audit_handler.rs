@@ -1,6 +1,8 @@
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
-use crate::services::omni_audit_query_service::{AuditQueryFilter, AuditStats};
+use crate::services::omni_audit_query_service::{
+    AuditQueryFilter, AuditStats, query_dashboard_stats,
+};
 use crate::services::omni_audit_service::OmniAuditMessage;
 use crate::utils::admin_checker::is_admin_role;
 use crate::utils::error::{AppError, current_trace_id};
@@ -113,35 +115,7 @@ pub async fn get_dashboard_stats(
     // P0 8-5 修复：审计大屏数据含全系统操作统计，仅限 admin
     require_admin_role(&state, &auth).await?;
 
-    use sea_orm::ConnectionTrait;
-
-    // P2 8-11 修复：单条 SQL 一次性统计 4 个指标，避免 4 次往返
-    let sql = "SELECT
-        (SELECT COUNT(*) FROM omni_audit_logs WHERE created_at > NOW() - INTERVAL '24 hours') AS total_events_today,
-        (SELECT COUNT(*) FROM omni_audit_logs WHERE created_at > NOW() - INTERVAL '24 hours' AND request_method IS NULL) AS ui_clicks_today,
-        (SELECT COUNT(*) FROM omni_audit_logs WHERE created_at > NOW() - INTERVAL '24 hours' AND request_method IS NOT NULL) AS api_calls_today,
-        (SELECT COUNT(*) FROM omni_audit_logs WHERE created_at > NOW() - INTERVAL '24 hours' AND (response_status = 403 OR response_status >= 500)) AS security_alerts_today";
-    let result = (*state.db)
-        .query_one_raw(sea_orm::Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            sql,
-        ))
-        .await?;
-
-    let stats = match result {
-        Some(r) => AuditStats {
-            total_events_today: r.try_get::<i64>("", "total_events_today")?,
-            ui_clicks_today: r.try_get::<i64>("", "ui_clicks_today")?,
-            api_calls_today: r.try_get::<i64>("", "api_calls_today")?,
-            security_alerts_today: r.try_get::<i64>("", "security_alerts_today")?,
-        },
-        None => AuditStats {
-            total_events_today: 0,
-            ui_clicks_today: 0,
-            api_calls_today: 0,
-            security_alerts_today: 0,
-        },
-    };
+    let stats = query_dashboard_stats(&*state.db).await?;
 
     Ok(Json(ApiResponse::success(stats)))
 }
@@ -238,6 +212,20 @@ fn build_where_clause(
         clause.push_str(&param_placeholder(param_idx));
         where_clauses.push(clause);
         where_params.push(event_type.clone().into());
+        param_idx += 1;
+    }
+    if let Some(ref request_path) = filter.request_path {
+        let mut clause = String::from("request_path = ");
+        clause.push_str(&param_placeholder(param_idx));
+        where_clauses.push(clause);
+        where_params.push(request_path.clone().into());
+        param_idx += 1;
+    }
+    if let Some(ref trace_id) = filter.trace_id {
+        let mut clause = String::from("trace_id = ");
+        clause.push_str(&param_placeholder(param_idx));
+        where_clauses.push(clause);
+        where_params.push(trace_id.clone().into());
         param_idx += 1;
     }
     let mut clause = String::from("created_at >= ");

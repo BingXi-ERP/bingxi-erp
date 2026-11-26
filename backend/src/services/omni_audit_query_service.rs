@@ -1,3 +1,4 @@
+use sea_orm::{ConnectionTrait, DatabaseBackend, DbErr, Statement};
 use serde::{Deserialize, Serialize};
 
 /// 审计查询过滤条件（供 Handler 使用）
@@ -6,6 +7,8 @@ use serde::{Deserialize, Serialize};
 pub struct AuditQueryFilter {
     pub user_id: Option<i32>,
     pub event_type: Option<String>,
+    pub request_path: Option<String>,
+    pub trace_id: Option<String>,
     pub start_date: Option<chrono::NaiveDate>,
     pub end_date: Option<chrono::NaiveDate>,
     pub keyword: Option<String>,
@@ -23,4 +26,30 @@ pub struct AuditStats {
     pub ui_clicks_today: i64,
     pub api_calls_today: i64,
     pub security_alerts_today: i64,
+}
+
+/// 按绝对时间统计最近二十四小时的审计看板指标。
+pub async fn query_dashboard_stats<C: ConnectionTrait>(db: &C) -> Result<AuditStats, DbErr> {
+    let sql = "SELECT
+        COUNT(*) AS total_events_today,
+        COUNT(*) FILTER (WHERE request_method IS NULL) AS ui_clicks_today,
+        COUNT(*) FILTER (WHERE request_method IS NOT NULL) AS api_calls_today,
+        COUNT(*) FILTER (WHERE response_status = 403 OR response_status >= 500) AS security_alerts_today
+    FROM omni_audit_logs
+    WHERE created_at >= NOW() - INTERVAL '24 hours'
+      AND created_at <= NOW()";
+
+    let row = db
+        .query_one_raw(Statement::from_string(
+            DatabaseBackend::Postgres,
+            sql.to_string(),
+        ))
+        .await?
+        .ok_or_else(|| DbErr::Custom("审计看板统计查询未返回聚合行".to_string()))?;
+    Ok(AuditStats {
+        total_events_today: row.try_get("", "total_events_today")?,
+        ui_clicks_today: row.try_get("", "ui_clicks_today")?,
+        api_calls_today: row.try_get("", "api_calls_today")?,
+        security_alerts_today: row.try_get("", "security_alerts_today")?,
+    })
 }

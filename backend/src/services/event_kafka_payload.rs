@@ -73,6 +73,10 @@ pub mod payload_serde {
             variance_count: i32,
         },
         BpmProcessFinished {
+            /// 流程实例 ID，用于跨消息传递实例级幂等键。
+            /// 历史载荷缺失时保留 `None`，由监听器按唯一终态实例显式解析。
+            #[serde(default)]
+            instance_id: Option<i32>,
             business_type: String,
             business_id: i64,
             approved: bool,
@@ -479,11 +483,13 @@ pub mod payload_serde {
     fn from_process_events(event: &BusinessEvent) -> EventPayload {
         match event {
             BusinessEvent::BpmProcessFinished {
+                instance_id,
                 business_type,
                 business_id,
                 approved,
                 approver_id,
             } => EventPayload::BpmProcessFinished {
+                instance_id: *instance_id,
                 business_type: business_type.clone(),
                 business_id: *business_id,
                 approved: *approved,
@@ -1042,11 +1048,13 @@ pub mod payload_serde {
     fn to_process_events(p: EventPayload) -> Result<BusinessEvent, String> {
         Ok(match p {
             EventPayload::BpmProcessFinished {
+                instance_id,
                 business_type,
                 business_id,
                 approved,
                 approver_id,
             } => BusinessEvent::BpmProcessFinished {
+                instance_id,
                 business_type,
                 business_id,
                 approved,

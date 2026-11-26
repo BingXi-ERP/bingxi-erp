@@ -13,8 +13,8 @@
 //! - create_first_task 调用 facade 的 BpmService::resolve_first_task_node（pub(crate)）
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseTransaction,
+    EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set, Statement, TransactionTrait,
 };
 
 use crate::models::department;
@@ -31,6 +31,11 @@ use crate::services::bpm_service_dto::{
     ApprovalChainNode, BpmBusinessRelation, ProcessInstanceDetail,
 };
 use crate::utils::error::AppError;
+
+pub(crate) struct StartProcessOutcome {
+    pub response: StartProcessResponse,
+    pub pending_notifications: Vec<(bpm_task::Model, bpm_process_instance::Model)>,
+}
 
 impl BpmService {
     /// 创建首个任务：发起流程必须解析出可执行的审批节点并落到真实审批人。
@@ -216,19 +221,46 @@ impl BpmService {
         &self,
         req: StartProcessRequest,
     ) -> Result<StartProcessResponse, AppError> {
-        // 幂等预检：同一 (business_type, business_id) 已有在途实例时复用之，不再叠第二张工单。
-        // 历史缺陷：无此检查，重复提交会产生并行实例，各实例独立审批 → 单据与工单进入分裂态。
+        let txn = self.db.begin().await?;
+        let started = self.start_process_in_txn(&txn, req).await?;
+        txn.commit().await?;
+        self.notify_started_process(&started).await;
+        Ok(started.response)
+    }
+
+    pub(crate) async fn notify_started_process(&self, started: &StartProcessOutcome) {
+        for (task, instance) in &started.pending_notifications {
+            super::notify_task_pending(&self.db, task, instance, "新工单已生成").await;
+        }
+    }
+
+    pub(crate) async fn start_process_in_txn(
+        &self,
+        txn: &DatabaseTransaction,
+        req: StartProcessRequest,
+    ) -> Result<StartProcessOutcome, AppError> {
+        // 同一业务单据的发起临界区必须互斥：仅靠事务外预检无法挡住并发请求。
+        // 锁键含业务类型与主键，持锁到实例和首任务提交；后到请求复查后复用既有实例。
+        let business_lock_key = format!("bpm:start:{}:{}", req.business_type, req.business_id);
+        txn.execute_raw(Statement::from_sql_and_values(
+            DatabaseBackend::Postgres,
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            [business_lock_key.into()],
+        ))
+        .await?;
+
+        // 幂等复查：同一 (business_type, business_id) 已有在途实例时复用之，不再叠第二张工单。
         if let Some(existing) = bpm_process_instance::Entity::find()
             .filter(bpm_process_instance::Column::BusinessType.eq(&req.business_type))
             .filter(bpm_process_instance::Column::BusinessId.eq(req.business_id))
             .filter(bpm_process_instance::Column::Status.eq(instance_status::PROCESSING))
             .order_by_desc(bpm_process_instance::Column::Id)
-            .one(&*self.db)
+            .one(txn)
             .await?
         {
             let task_ids = bpm_task::Entity::find()
                 .filter(bpm_task::Column::InstanceId.eq(existing.id))
-                .all(&*self.db)
+                .all(txn)
                 .await?
                 .into_iter()
                 .map(|t| t.id)
@@ -239,19 +271,20 @@ impl BpmService {
                 business_id = req.business_id,
                 "该单据已有在途审批实例，复用既有实例而不重复建单"
             );
-            return Ok(StartProcessResponse {
-                instance_id: existing.id,
-                instance_no: existing.instance_no,
-                task_ids,
+            return Ok(StartProcessOutcome {
+                response: StartProcessResponse {
+                    instance_id: existing.id,
+                    instance_no: existing.instance_no,
+                    task_ids,
+                },
+                pending_notifications: Vec::new(),
             });
         }
-
-        let txn = self.db.begin().await?;
 
         let definition = bpm_process_definition::Entity::find()
             .filter(bpm_process_definition::Column::Code.eq(&req.process_key))
             .filter(bpm_process_definition::Column::Status.eq("ACTIVE"))
-            .one(&txn)
+            .one(txn)
             .await?
             .ok_or_else(|| {
                 // 缺定义是"无法发起审批"的根因，点名 process_key 供管理员直接行动
@@ -269,7 +302,7 @@ impl BpmService {
         // 原实现基于时间戳 + business_id，同秒并发 + 同 business_id 会产生重复单号
         let instance_no =
             crate::utils::number_generator::DocumentNumberGenerator::generate_no_with_txn(
-                &txn,
+                txn,
                 "BPM",
                 bpm_process_instance::Entity,
                 bpm_process_instance::Column::InstanceNo,
@@ -283,7 +316,7 @@ impl BpmService {
         // 由 dept_superior 节点解析时按各自形状 fail-closed 并点名该配置什么。
         let initiator_department_id = match req.initiator_department_id {
             Some(d) => {
-                if department::Entity::find_by_id(d).one(&txn).await?.is_none() {
+                if department::Entity::find_by_id(d).one(txn).await?.is_none() {
                     tracing::warn!(
                         initiator_id = req.initiator_id,
                         declared_department_id = d,
@@ -295,7 +328,7 @@ impl BpmService {
                 }
                 Some(d)
             }
-            None => match applicant_department(&txn, req.initiator_id).await? {
+            None => match applicant_department(txn, req.initiator_id).await? {
                 ApplicantDept::Unique(d) => Some(d),
                 ApplicantDept::Ambiguous | ApplicantDept::Unresolvable => None,
             },
@@ -317,24 +350,24 @@ impl BpmService {
             ..Default::default()
         };
 
-        let instance = instance_model.insert(&txn).await?;
+        let instance = instance_model.insert(txn).await?;
 
         // 创建首个任务：解析/落库失败在此直接返回错误，事务整体回滚，
         // 实例与任务都不落库，也不会产生任何流程结束事件。
-        let first_tasks = self.create_first_task(&txn, &definition, &instance).await?;
+        let first_tasks = self.create_first_task(txn, &definition, &instance).await?;
+        let task_ids = first_tasks.iter().map(|task| task.id).collect();
+        let pending_notifications = first_tasks
+            .into_iter()
+            .map(|task| (task, instance.clone()))
+            .collect();
 
-        txn.commit().await?;
-
-        // 工单已真实落库才通知处理人：会签/或签每位处理人各一枚工单，逐人通知
-        let task_ids = first_tasks.iter().map(|t| t.id).collect();
-        for task in &first_tasks {
-            super::notify_task_pending(&self.db, task, &instance, "新工单已生成").await;
-        }
-
-        Ok(StartProcessResponse {
-            instance_id: instance.id,
-            instance_no,
-            task_ids,
+        Ok(StartProcessOutcome {
+            response: StartProcessResponse {
+                instance_id: instance.id,
+                instance_no,
+                task_ids,
+            },
+            pending_notifications,
         })
     }
 
@@ -410,6 +443,7 @@ impl BpmService {
         let pending_event = match (business_id, user_id) {
             (Some(bid), Some(uid)) => Some(
                 crate::services::event_bus::BusinessEvent::BpmProcessFinished {
+                    instance_id: Some(instance_id),
                     business_type,
                     business_id: bid,
                     approved: false,

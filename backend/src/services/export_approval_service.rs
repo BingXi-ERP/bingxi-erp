@@ -1,9 +1,9 @@
 // 敏感数据导出审批 Service（生命周期改造版）
 //
 // 实现：
-//   1. 创建审批请求：落库后立即发起 BPM 流程（process_key=export_approval），
-//      审批办理与多级推进全部由 BPM 引擎承担，本表状态只由 BPM 结束事件与令牌生命周期驱动，
-//      不再是游离的独立状态机。
+//   1. 创建审批请求：申请、BPM 实例/首任务与实例关联在同一事务内提交，
+//      工单通知在事务提交后派发；审批办理与多级推进全部由 BPM 引擎承担，
+//      本表状态只由 BPM 结束事件与令牌生命周期驱动，不再是游离的独立状态机。
 //   2. BPM 终审通过（BpmProcessFinished approved=true）→ 生成一次性令牌：
 //      明文只在签发瞬间与 token-once 首次查看时出现，库里只留 SHA256 哈希与前缀指纹。
 //   3. 凭令牌下载：受理侧集中校验（哈希比对、归属人、资源类型、批准范围、重试窗口与次数）。
@@ -143,8 +143,8 @@ impl ExportApprovalService {
     /// （双节点审批）。流程分支（一级直结束或进二级）由 BPM 按流程定义中的
     /// `${risk_level}` 条件边决定，本表不再自维护 current_approval_step 推进。
     ///
-    /// 补偿口径：BPM 发起失败时删除刚落库的申请行并透传真实错误，
-    /// 绝不留下无流程关联的孤儿 pending 申请（用户看不到审批入口、审批人也无从办理）。
+    /// 申请插入、BPM 实例/首任务创建与 bpm_instance_id 回写共用同一事务；
+    /// 任一写入失败整体回滚，BPM 通知仅在事务提交后派发。
     pub async fn create_request(
         &self,
         applicant_user_id: i32,
@@ -168,7 +168,8 @@ impl ExportApprovalService {
             approval_level,
             now,
         );
-        let model = active.insert(&*self.db).await?;
+        let txn = (*self.db).begin().await?;
+        let model = active.insert(&txn).await?;
 
         let bpm = BpmService::new(self.db.clone());
         let start_req = StartProcessRequest {
@@ -187,25 +188,14 @@ impl ExportApprovalService {
                 "resource_type": req.resource_type,
             })),
         };
-        let started = match bpm.start_process(start_req).await {
-            Ok(resp) => resp,
-            Err(e) => {
-                // 补偿：真实失败即回滚申请行，失败本身如实外抛（不吞、不重试造号）
-                if let Err(del_err) = Entity::delete_by_id(model.id).exec(&*self.db).await {
-                    tracing::error!(
-                        approval_id = model.id,
-                        error = %del_err,
-                        "导出审批 BPM 发起失败的补偿删除未生效，申请行成为孤儿，需人工处置"
-                    );
-                }
-                return Err(e);
-            }
-        };
+        let started = bpm.start_process_in_txn(&txn, start_req).await?;
 
         let mut active: ExportApprovalActiveModel = model.into();
-        active.bpm_instance_id = Set(Some(started.instance_id));
+        active.bpm_instance_id = Set(Some(started.response.instance_id));
         active.updated_at = Set(Utc::now().into());
-        let saved = active.update(&*self.db).await?;
+        let saved = active.update(&txn).await?;
+        txn.commit().await?;
+        bpm.notify_started_process(&started).await;
         Ok(saved)
     }
 

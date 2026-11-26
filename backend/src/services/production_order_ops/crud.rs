@@ -20,8 +20,8 @@
 use chrono::Utc;
 use rust_decimal::Decimal;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, EntityTrait, JoinType, PaginatorTrait,
-    QueryFilter, QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
+    ActiveValue::NotSet, ColumnTrait, EntityTrait, JoinType, PaginatorTrait, QueryFilter,
+    QueryOrder, QuerySelect, RelationTrait, Set, TransactionTrait,
 };
 
 use crate::models::production_order::{
@@ -184,6 +184,16 @@ impl ProductionOrderService {
             tracing::error!(error = %e, "生产订单取号或插入失败");
             AppError::business_displayable("生产订单号生成失败，请稍后重试")
         })?;
+        let snapshot = serde_json::to_value(&model)
+            .map_err(|error| AppError::internal(format!("生产订单建单快照序列化失败: {error}")))?;
+        crate::services::audit_log_service::AuditLogService::insert_create_audit(
+            &txn,
+            super::types::AUDIT_RESOURCE_TYPE,
+            model.id,
+            user_id,
+            snapshot,
+        )
+        .await?;
         txn.commit().await?;
 
         Ok(model)
@@ -297,6 +307,17 @@ impl ProductionOrderService {
             tracing::error!(error = %e, "返工订单取号或插入失败");
             AppError::business_displayable("返工订单号生成失败，请稍后重试")
         })?;
+        let snapshot = serde_json::to_value(&model).map_err(|error| {
+            AppError::internal(format!("返工生产订单建单快照序列化失败: {error}"))
+        })?;
+        crate::services::audit_log_service::AuditLogService::insert_create_audit(
+            &txn,
+            super::types::AUDIT_RESOURCE_TYPE,
+            model.id,
+            created_by,
+            snapshot,
+        )
+        .await?;
         txn.commit().await?;
 
         Ok(model)
@@ -417,6 +438,7 @@ impl ProductionOrderService {
         &self,
         id: i32,
         req: UpdateProductionOrderRequest,
+        user_id: i32,
     ) -> Result<ProductionOrderModel, AppError> {
         // NOT NULL 列门控（planned_quantity NOT NULL m0007:78、priority NOT NULL m0007:84）：
         if matches!(req.planned_quantity, Some(None)) {
@@ -430,8 +452,10 @@ impl ProductionOrderService {
             ));
         }
 
+        let txn = (*self.db).begin().await?;
         let model = ProductionOrderEntity::find_by_id(id)
-            .one(&*self.db)
+            .lock_exclusive()
+            .one(&txn)
             .await?
             .ok_or_else(|| AppError::not_found("生产订单不存在"))?;
 
@@ -472,7 +496,14 @@ impl ProductionOrderService {
 
         active_model.updated_at = Set(Utc::now());
 
-        let updated = active_model.update(&*self.db).await?;
+        let updated = crate::services::audit_log_service::AuditLogService::update_with_audit(
+            &txn,
+            super::types::AUDIT_RESOURCE_TYPE,
+            active_model,
+            Some(user_id),
+        )
+        .await?;
+        txn.commit().await?;
 
         Ok(updated)
     }
@@ -519,10 +550,13 @@ impl ProductionOrderService {
         id: i32,
         status: String,
         actual_quantity: Option<Decimal>,
+        user_id: i32,
     ) -> Result<ProductionOrderModel, AppError> {
         // COMPLETED 走事务包裹的专用路径
         if status == crate::models::status::common::STATUS_COMPLETED {
-            return self.complete_production_order(id, actual_quantity).await;
+            return self
+                .complete_production_order(id, actual_quantity, user_id)
+                .await;
         }
         // 批次 22（2026-06-28 v5 P0-3）：非 COMPLETED 路径补全事务 + lock_exclusive + update_with_audit
         let txn = (*self.db).begin().await?;
@@ -537,9 +571,7 @@ impl ProductionOrderService {
         // B-P2-5 修复（批次 386 v13 复审）：排产状态变更时进行产能负荷校验
         self.check_capacity_for_scheduling(&model, id, &status)
             .await?;
-        let audit_user_id = model.created_by;
-        let updated =
-            Self::apply_status_update_with_audit(&txn, model, status, audit_user_id).await?;
+        let updated = Self::apply_status_update_with_audit(&txn, model, status, user_id).await?;
         txn.commit().await?;
         Ok(updated)
     }

@@ -32,8 +32,9 @@ const stats = ref<AuditStats | null>(null);
 // stats 独立加载状态（与 logs 的 useTableApi.loading 分离，避免双 tab 切换时互相干扰）
 const statsLoading = ref(false);
 
-// 筛选键唯一真相：omni_audit_query_service::AuditQueryFilter{user_id,event_type,start_date,end_date,keyword,page,page_size,include_sensitive}。
+// 筛选键唯一真相：omni_audit_query_service::AuditQueryFilter{user_id,event_type,request_path,trace_id,start_date,end_date,keyword,page,page_size,include_sensitive}。
 // 原 resource/action/status/start_time/end_time 后端不读（被 Axum 静默丢弃=假筛选），已移除；
+// 页面仅暴露用户、事件、日期三项；request_path 与 trace_id 供精确追溯调用方使用。
 // start_date/end_date 为 chrono NaiveDate → 'YYYY-MM-DD'。
 // （资源/动作/状态维度过滤属后端缺口，已登记串行清单）
 const searchForm = ref({
@@ -138,7 +139,7 @@ loadStats();
             </div>
             <ElStatistic
               :title="t('omniAudit.index.statTotalEvents')"
-              :value="stats?.total_events || 0"
+              :value="stats?.total_events_today || 0"
             />
           </ElCard>
           <ElCard class="stat-card">
@@ -146,8 +147,8 @@ loadStats();
               <Clock />
             </div>
             <ElStatistic
-              :title="t('omniAudit.index.statTodayEvents')"
-              :value="stats?.today_events || 0"
+              :title="t('omniAudit.index.statUiClicks')"
+              :value="stats?.ui_clicks_today || 0"
             />
           </ElCard>
           <ElCard class="stat-card">
@@ -155,8 +156,8 @@ loadStats();
               <AlarmClock />
             </div>
             <ElStatistic
-              :title="t('omniAudit.index.statErrorCount')"
-              :value="stats?.error_count || 0"
+              :title="t('omniAudit.index.statApiCalls')"
+              :value="stats?.api_calls_today || 0"
             />
           </ElCard>
           <ElCard class="stat-card">
@@ -164,48 +165,11 @@ loadStats();
               <Clock />
             </div>
             <ElStatistic
-              :title="t('omniAudit.index.statAvgDuration')"
-              :value="stats?.avg_duration_ms || 0"
+              :title="t('omniAudit.index.statSecurityAlerts')"
+              :value="stats?.security_alerts_today || 0"
             />
           </ElCard>
         </div>
-
-        <ElRow :gutter="20">
-          <ElCol :span="12">
-            <ElCard :title="t('omniAudit.index.cardTopResources')" class="chart-card">
-              <ElTable
-                :data="stats?.top_resources || []"
-                border
-                style="width: 100%"
-                :aria-label="t('omniAudit.index.ariaTopResources')"
-              >
-                <ElTableColumn prop="name" :label="t('omniAudit.index.colResourceName')" />
-                <ElTableColumn
-                  prop="count"
-                  :label="t('omniAudit.index.colAccessCount')"
-                  align="right"
-                />
-              </ElTable>
-            </ElCard>
-          </ElCol>
-          <ElCol :span="12">
-            <ElCard :title="t('omniAudit.index.cardTopUsers')" class="chart-card">
-              <ElTable
-                :data="stats?.top_users || []"
-                border
-                style="width: 100%"
-                :aria-label="t('omniAudit.index.ariaTopUsers')"
-              >
-                <ElTableColumn prop="name" :label="t('omniAudit.index.colUserName')" />
-                <ElTableColumn
-                  prop="count"
-                  :label="t('omniAudit.index.colOperationCount')"
-                  align="right"
-                />
-              </ElTable>
-            </ElCard>
-          </ElCol>
-        </ElRow>
       </ElTabPane>
 
       <ElTabPane :label="t('omniAudit.index.tabLogs')" name="logs">

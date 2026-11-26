@@ -54,6 +54,23 @@ function expectStock(row: Row, available: number, reserved: number, label: strin
   expect(num(row.quantity_reserved, `${label} reserved`), `${label} 预留量`).toBe(reserved);
 }
 
+async function orderReservations(
+  page: Page,
+  productId: number,
+  orderId: number,
+  status: 'locked' | 'pending' | 'released' | 'cancelled'
+): Promise<Row[]> {
+  const listed = await apiCallRaw<{ list?: Row[]; total?: number }>(
+    page,
+    'GET',
+    `/inventory/reservations?product_id=${productId}&status=${status}&page=1&page_size=100`
+  );
+  if (!Array.isArray(listed.list)) {
+    throw new Error(`[566] 预留列表未返回 list 数组：status=${status}`);
+  }
+  return listed.list.filter(row => num(row.order_id, '[566] 预留行 order_id') === orderId);
+}
+
 async function createStockOrder(
   page: Page,
   tag: string,
@@ -265,5 +282,65 @@ test.describe('566 现货订单提交锁缸与改量差量联动', () => {
       5,
       '[566-04] FIFO 后批次'
     );
+  });
+
+  test('566-05 拒绝待审订单先释放锁缸台账，库存预留归零且二次拒绝不回加', async ({ page }) => {
+    const tag = genCode('566E');
+    const productId = getCtx().productIds[0];
+    const colorNo = `${tag}-C`;
+    const dyeLotNo = `${tag}-LOT`;
+    const batchNo = `${tag}-B`;
+    await seedFourDimStockIn(page, {
+      productId,
+      warehouseId: getCtx().warehouseIds[0],
+      colorNo,
+      dyeLotNo,
+      batchNo,
+      quantityMeters: '100',
+    });
+    const orderId = await createStockOrder(page, tag, 30, colorNo, batchNo, dyeLotNo);
+
+    await apiCallRaw(page, 'POST', `/sales/orders/${orderId}/submit`);
+    expectStock(await stockRow(page, productId, colorNo, batchNo), 70, 30, '[566-05] 提交后');
+    const lockedBefore = await orderReservations(page, productId, orderId, 'locked');
+    expect(lockedBefore, '[566-05] 提交后必须恰有一条锁缸台账').toHaveLength(1);
+    expect(num(lockedBefore[0].quantity, '[566-05] 锁缸数量')).toBe(30);
+    expect(String(lockedBefore[0].notes ?? ''), '[566-05] 锁缸台账标识').toMatch(/^STOCKLOCK\|/);
+
+    const reason = `${tag}-拒绝`;
+    await apiCallRaw(page, 'POST', `/sales/orders/${orderId}/reject`, { reason });
+    const rejectedOrder = await apiCallRaw<Row>(page, 'GET', `/sales/orders/${orderId}`);
+    expect(rejectedOrder.status, '[566-05] 拒绝后订单状态').toBe('rejected');
+    expect(rejectedOrder.rejected_reason, '[566-05] 拒绝理由应原样落库').toBe(reason);
+    expectStock(await stockRow(page, productId, colorNo, batchNo), 100, 0, '[566-05] 拒绝后');
+
+    const activeAfter = [
+      ...(await orderReservations(page, productId, orderId, 'locked')),
+      ...(await orderReservations(page, productId, orderId, 'pending')),
+    ];
+    expect(activeAfter, '[566-05] 拒绝后不得残留生效锁缸或普通预留').toHaveLength(0);
+    const releasedAfter = await orderReservations(page, productId, orderId, 'released');
+    expect(releasedAfter, '[566-05] 锁缸台账必须保留为 released 留痕').toHaveLength(1);
+    expect(releasedAfter[0].id, '[566-05] 释放必须是原锁缸行').toBe(lockedBefore[0].id);
+    expect(num(releasedAfter[0].quantity, '[566-05] 释放数量')).toBe(30);
+    expect(String(releasedAfter[0].released_at ?? ''), '[566-05] released_at 必须非空').not.toBe(
+      ''
+    );
+    expect(String(releasedAfter[0].notes ?? ''), '[566-05] 释放后仍保留锁缸标识').toMatch(
+      /^STOCKLOCK\|/
+    );
+
+    const secondReject = await apiCallExpectFail(page, 'POST', `/sales/orders/${orderId}/reject`, {
+      reason: `${tag}-二次拒绝`,
+    });
+    expect(secondReject.status, '[566-05] 二次拒绝 HTTP 状态').toBe(400);
+    expect(failureCode(secondReject), '[566-05] 二次拒绝机器码').toBe(
+      APP_ERROR_CODES.BUSINESS_ERROR
+    );
+    expectStock(await stockRow(page, productId, colorNo, batchNo), 100, 0, '[566-05] 二次拒绝后');
+    expect(
+      await orderReservations(page, productId, orderId, 'released'),
+      '[566-05] 二次拒绝不得新增或重复释放台账'
+    ).toHaveLength(1);
   });
 });

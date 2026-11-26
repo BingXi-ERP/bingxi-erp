@@ -324,7 +324,7 @@ pub async fn update_production_order(
         remarks: payload.remarks,
     };
 
-    let model = service.update(id, req).await?;
+    let model = service.update(id, req, auth.user_id).await?;
 
     let response = response_from_model(model);
 
@@ -522,7 +522,7 @@ pub async fn update_production_order_status(
         .and_then(|s| s.parse::<Decimal>().ok());
 
     let model = service
-        .update_status(id, payload.status, actual_quantity)
+        .update_status(id, payload.status, actual_quantity, auth.user_id)
         .await?;
 
     let response = response_from_model(model);

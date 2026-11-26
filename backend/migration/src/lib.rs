@@ -397,6 +397,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::quality_standard_tolerance::Migration),
             // 客户门户绑定列（users.customer_id），链尾独立域（存量复用库上属 pending 必然执行）
             Box::new(domain::customer_portal_binding::Migration),
+            // BI 利润字段读权限存量补授，链尾独立域（field_permissions 与 roles 均早于本域）
+            Box::new(domain::bi_profit_field_grant::Migration),
         ]
     }
 }

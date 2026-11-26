@@ -37,3 +37,12 @@ fn test_build_query_sql_extreme_values() {
     assert!(sql_zero.contains("> $1"));
     assert!(sql_zero.contains("LIMIT $2"));
 }
+
+#[test]
+fn test_build_capability_sql_requires_preloaded_extension() {
+    let sql = build_capability_sql();
+    assert!(sql.contains("to_regclass('pg_stat_statements') IS NOT NULL AS available"));
+    assert!(sql.contains("current_setting('shared_preload_libraries', true)"));
+    assert!(sql.contains("btrim(preload.library) = 'pg_stat_statements'"));
+    assert!(sql.contains("AS preloaded"));
+}

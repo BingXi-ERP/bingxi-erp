@@ -11,12 +11,10 @@ export interface TrackEventRequest {
 }
 
 export interface AuditStats {
-  total_events: number;
-  today_events: number;
-  error_count: number;
-  avg_duration_ms: number;
-  top_resources: Array<{ name: string; count: number }>;
-  top_users: Array<{ name: string; count: number }>;
+  total_events_today: number;
+  ui_clicks_today: number;
+  api_calls_today: number;
+  security_alerts_today: number;
 }
 
 // GET /finance/audit/search 出参行（唯一真相：omni_audit_handler.rs row_to_json 的键集，
@@ -45,13 +43,14 @@ export interface AuditLog {
 
 /**
  * 查询过滤（唯一真相：services/omni_audit_query_service.rs AuditQueryFilter）。
- * start_date/end_date 为 chrono NaiveDate → 'YYYY-MM-DD'；后端无
- * resource/action/status/start_time/end_time 键（传入即被静默丢弃，属后端缺口，
- * 已登记串行清单），故不再声明。
+ * start_date/end_date 为 chrono NaiveDate → 'YYYY-MM-DD'；request_path 与 trace_id
+ * 为精确匹配；后端无 resource/action/status/start_time/end_time 键，故不再声明。
  */
 export interface AuditQueryFilter {
   user_id?: number;
   event_type?: string;
+  request_path?: string;
+  trace_id?: string;
   start_date?: string;
   end_date?: string;
   keyword?: string;

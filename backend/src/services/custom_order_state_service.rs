@@ -19,6 +19,7 @@ use crate::models::process_log::{self, ActiveModel as LogActive, Entity as LogEn
 use crate::models::process_node::{self, Entity as NodeEntity};
 use crate::models::sales_quotation;
 use crate::models::status::process_node as node_status;
+use crate::models::status::sales::quotation as quotation_status;
 use crate::utils::process_state_machine::{
     CustomOrderStatus, StateMachineError, can_transition, next_status,
 };
@@ -93,13 +94,13 @@ impl CustomOrderStateService {
         let next = self.resolve_next_status(&order.status, to_status)?;
         let next_str = next.as_str().to_string();
 
-        // 门校验（沿用 self.db，避免破坏原实现语义）。
-        // 由于 validate_gate_* 都只读，这里借用事务读取保持一致视图。
-        self.validate_gate_before_advance_in_txn(&order, next, &txn)
+        // 状态门与后续写入共用同一事务，确保校验对象与落库数据处于一致视图。
+        let quotation = self
+            .validate_gate_before_advance_in_txn(&order, next, &txn)
             .await?;
 
         let updated = self
-            .update_order_status_in_txn(&order, next, next_str.clone(), &txn)
+            .update_order_status_in_txn(&order, next_str.clone(), quotation, &txn)
             .await?;
 
         self.complete_current_node_in_txn(order_id, operator_id, notes.clone(), &txn)
@@ -144,13 +145,18 @@ impl CustomOrderStateService {
         &self,
         order: &custom_order::Model,
         next: CustomOrderStatus,
-        _txn: &sea_orm::DatabaseTransaction,
-    ) -> Result<(), StateError> {
-        // 当前实现门校验只读，复用 self.db 即可；保留接口位置以便后续迁到 txn。
+        txn: &sea_orm::DatabaseTransaction,
+    ) -> Result<Option<sales_quotation::Model>, StateError> {
         match next {
-            CustomOrderStatus::Quotation => self.validate_quotation_gate(order).await,
-            CustomOrderStatus::YarnPurchasing => self.validate_yarn_purchasing_gate(order).await,
-            _ => Ok(()),
+            CustomOrderStatus::Quotation => {
+                self.validate_quotation_gate(order, txn).await?;
+                Ok(None)
+            }
+            CustomOrderStatus::YarnPurchasing => self
+                .validate_yarn_purchasing_gate(order, txn)
+                .await
+                .map(Some),
+            _ => Ok(None),
         }
     }
 
@@ -158,21 +164,16 @@ impl CustomOrderStateService {
     async fn update_order_status_in_txn(
         &self,
         order: &custom_order::Model,
-        next: CustomOrderStatus,
         next_str: String,
+        quotation: Option<sales_quotation::Model>,
         txn: &sea_orm::DatabaseTransaction,
     ) -> Result<custom_order::Model, StateError> {
         let mut active: ActiveModel = order.clone().into();
         active.status = Set(next_str);
         active.updated_at = Set(Utc::now());
 
-        if next == CustomOrderStatus::YarnPurchasing {
-            if let Some(qid) = order.quotation_id {
-                if let Ok(Some(quotation)) = sales_quotation::Entity::find_by_id(qid).one(txn).await
-                {
-                    active.total_amount = Set(Some(quotation.total_amount));
-                }
-            }
+        if let Some(quotation) = quotation {
+            active.total_amount = Set(Some(quotation.total_amount));
         }
 
         active.update(txn).await.map_err(StateError::Database)
@@ -242,14 +243,18 @@ impl CustomOrderStateService {
         Ok(())
     }
 
-    async fn validate_quotation_gate(&self, order: &custom_order::Model) -> Result<(), StateError> {
+    async fn validate_quotation_gate(
+        &self,
+        order: &custom_order::Model,
+        txn: &sea_orm::DatabaseTransaction,
+    ) -> Result<(), StateError> {
         let lab_dip_id = order.lab_dip_request_id.ok_or_else(|| {
             StateError::GateValidation(
                 "推进到报价阶段前必须关联打样通知单（lab_dip_request_id 不能为空）".to_string(),
             )
         })?;
         let lab_dip = lab_dip_request::Entity::find_by_id(lab_dip_id)
-            .one(&*self.db)
+            .one(txn)
             .await?
             .ok_or(StateError::LabDipRequestNotFound(lab_dip_id))?;
         if lab_dip.approved_sample_id.is_none() {
@@ -264,23 +269,24 @@ impl CustomOrderStateService {
     async fn validate_yarn_purchasing_gate(
         &self,
         order: &custom_order::Model,
-    ) -> Result<(), StateError> {
+        txn: &sea_orm::DatabaseTransaction,
+    ) -> Result<sales_quotation::Model, StateError> {
         let quotation_id = order.quotation_id.ok_or_else(|| {
             StateError::GateValidation(
                 "推进到生产阶段前必须关联报价单（quotation_id 不能为空）".to_string(),
             )
         })?;
         let quotation = sales_quotation::Entity::find_by_id(quotation_id)
-            .one(&*self.db)
+            .one(txn)
             .await?
             .ok_or(StateError::QuotationNotFound(quotation_id))?;
-        if !quotation.status.eq_ignore_ascii_case("approved") {
+        if quotation.status != quotation_status::APPROVED {
             return Err(StateError::GateValidation(format!(
                 "报价单 {} 状态为 {}，未审批通过（approved），禁止推进到生产阶段",
                 quotation_id, quotation.status
             )));
         }
-        Ok(())
+        Ok(quotation)
     }
 
     /// 直接设置状态（用于取消等场景）

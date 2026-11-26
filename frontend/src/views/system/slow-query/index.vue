@@ -281,8 +281,19 @@ const syncQueryParams = () => {
   setQueryParam('keyword', undefined);
 
   if (filterForm.dateRange && filterForm.dateRange.length === 2) {
-    setQueryParam('start_time', filterForm.dateRange[0]);
-    setQueryParam('end_time', filterForm.dateRange[1]);
+    const startValue = filterForm.dateRange[0];
+    const endValue = filterForm.dateRange[1];
+    const start = new Date(
+      /^\d{4}-\d{2}-\d{2}$/.test(startValue) ? startValue + 'T00:00:00' : startValue
+    );
+    const end = new Date(
+      /^\d{4}-\d{2}-\d{2}$/.test(endValue) ? endValue + 'T23:59:59.999' : endValue
+    );
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new Error('慢查询时间范围无法解析');
+    }
+    setQueryParam('start_time', start.toISOString());
+    setQueryParam('end_time', end.toISOString());
   }
   if (filterForm.min_duration !== undefined && filterForm.min_duration !== null) {
     setQueryParam('min_duration', filterForm.min_duration);
@@ -314,7 +325,7 @@ const handleRefresh = async () => {
     ElMessage.success(res.message);
     // 刷新完成后重新加载列表（useTableApi.refresh）+ 统计
     await Promise.all([refresh(), loadStats()]);
-  } catch (err) {
+  } catch {
     ElMessage.error(t('system.slowQuery.message.refreshFailed'));
   } finally {
     refreshing.value = false;

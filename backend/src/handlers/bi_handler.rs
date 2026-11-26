@@ -12,14 +12,18 @@ use axum::{
     Json,
     extract::{Path, Query, State},
 };
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
+use std::collections::HashSet;
 
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
+use crate::models::field_permission;
 use crate::services::bi_analysis_service::{
     BiAnalysisService, BiResponse, CategoryStat, CustomerRank, KpiSummary, ProductRank,
     ProfitAnalysis, RegionStat, TimeSeriesPoint,
 };
+use crate::utils::admin_checker;
 use crate::utils::error::AppError;
 use crate::utils::response::ApiResponse;
 
@@ -158,6 +162,50 @@ pub async fn sales_trend(
     Ok(Json(ApiResponse::success(BiResponse::success(data))))
 }
 
+async fn apply_profit_field_permissions(
+    state: &AppState,
+    auth: &AuthContext,
+    data: &mut ProfitAnalysis,
+) -> Result<(), AppError> {
+    let Some(role_id) = auth.role_id else {
+        data.total_cost = None;
+        data.total_profit = None;
+        data.gross_margin = None;
+        return Ok(());
+    };
+    if admin_checker::is_admin_role(&state.db, role_id).await {
+        return Ok(());
+    }
+
+    let permissions = field_permission::Entity::find()
+        .filter(field_permission::Column::RoleId.eq(role_id))
+        .filter(field_permission::Column::ResourceType.eq("bi-analysis"))
+        .filter(field_permission::Column::IsEnabled.eq(true))
+        .filter(field_permission::Column::FieldName.is_in([
+            "total_cost",
+            "total_profit",
+            "gross_margin",
+        ]))
+        .all(state.db.as_ref())
+        .await?;
+    let readable: HashSet<&str> = permissions
+        .iter()
+        .filter(|permission| permission.can_read)
+        .map(|permission| permission.field_name.as_str())
+        .collect();
+
+    if !readable.contains("total_cost") {
+        data.total_cost = None;
+    }
+    if !readable.contains("total_profit") {
+        data.total_profit = None;
+    }
+    if !readable.contains("gross_margin") {
+        data.gross_margin = None;
+    }
+    Ok(())
+}
+
 /// GET /api/v1/erp/bi/sales/profit
 /// 利润分析
 pub async fn profit_analysis(
@@ -171,7 +219,8 @@ pub async fn profit_analysis(
         auth.to_data_scope_context(),
         state.cache.clone(),
     );
-    let data = service.profit_analysis().await?;
+    let mut data = service.profit_analysis().await?;
+    apply_profit_field_permissions(&state, &auth, &mut data).await?;
     Ok(Json(ApiResponse::success(BiResponse::success(data))))
 }
 

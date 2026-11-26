@@ -34,6 +34,10 @@ interface RawResponse {
   json: Record<string, unknown>;
   traceId: string;
 }
+interface AuditSearchData {
+  items?: Array<Record<string, unknown>>;
+  total?: number;
+}
 
 /**
  * 取响应头 X-Trace-Id 的原始 PUT：审计行 trace_id 须与响应头逐字符同源，helper 的 apiCall 不回响应头。
@@ -99,12 +103,55 @@ async function putWithTrace(
   return { status: response.status(), json, traceId };
 }
 
-function auditQueryPath(day: string, requestPath: string): string {
+function auditQueryPath(day: string, requestPath: string, traceId: string): string {
   return (
     `/finance/audit/search?event_type=UPDATE&request_path=${encodeURIComponent(requestPath)}` +
-    `&start_date=${day}&end_date=${day}&page=1&page_size=100`
+    `&trace_id=${encodeURIComponent(traceId)}&start_date=${day}&end_date=${day}&page=1&page_size=100`
   );
 }
+
+function auditDescription(row: Record<string, unknown>): unknown {
+  if (typeof row.request_body !== 'string') return undefined;
+  try {
+    const parsed = JSON.parse(row.request_body) as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return (parsed as Record<string, unknown>).description;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function isExactAuditHit(
+  row: Record<string, unknown>,
+  requestPath: string,
+  traceId: string,
+  description: string
+): boolean {
+  return (
+    row.module === 'UPDATE' &&
+    row.request_path === requestPath &&
+    row.trace_id === traceId &&
+    auditDescription(row) === description
+  );
+}
+
+let restoreTarget: { page: Page; path: string; description: string } | undefined;
+
+test.afterEach(async () => {
+  if (!restoreTarget) return;
+  const target = restoreTarget;
+  restoreTarget = undefined;
+  const restored = await putWithTrace(target.page, target.path, {
+    description: target.description,
+  });
+  expect(restored.status, '失败收口仍须成功恢复业务模式原值').toBe(200);
+  const readback = await apiCallRaw<ModeRow>(target.page, 'GET', target.path);
+  expect(String(readback.description ?? ''), '失败收口后业务模式须恢复原值').toBe(
+    target.description
+  );
+});
 
 test('577-01 配置改错后留痕可关联且回放旧值恢复配置与行为', async ({ page }: { page: Page }) => {
   // 取现有模式作为被改对象（封闭词表，不新建）。选 first 即可，改 description 不影响其他列。
@@ -124,6 +171,7 @@ test('577-01 配置改错后留痕可关联且回放旧值恢复配置与行为'
   const tag = genCode('577A');
   const changed = `${original}｜误改${tag}`;
   expect(changed, '误改值须与原值不同，否则本例无可观察变化').not.toBe(original);
+  restoreTarget = { page, path, description: original };
 
   // 误改：用带 trace 的原始 PUT，便于后续把审计行与本次写操作逐字符关联。
   const putA = await putWithTrace(page, path, { description: changed });
@@ -139,35 +187,61 @@ test('577-01 配置改错后留痕可关联且回放旧值恢复配置与行为'
   const day = new Date().toISOString().slice(0, 10);
   const reqPath = `${API_PREFIX}${path}`;
   let hitSensitive: Record<string, unknown> | undefined;
+  let sensitiveTotal: number | undefined;
   await expect
     .poll(
       async () => {
-        const sensitive = await apiCallRaw<{ items: Array<Record<string, unknown>> }>(
+        const sensitive = await apiCallRaw<AuditSearchData>(
           page,
           'GET',
-          `${auditQueryPath(day, reqPath)}&include_sensitive=true`
+          `${auditQueryPath(day, reqPath, putA.traceId)}&include_sensitive=true`
         );
-        hitSensitive = (sensitive.items ?? []).find(
-          it =>
-            it.trace_id === putA.traceId &&
-            it.request_path === reqPath &&
-            JSON.stringify(it.request_body ?? '').includes(changed)
+        expect(Array.isArray(sensitive.items), '审计检索必须返回 items').toBe(true);
+        if (!Array.isArray(sensitive.items)) {
+          throw new Error('577 审计检索缺少 items，无法关联误改留痕');
+        }
+        for (const item of sensitive.items) {
+          expect(item.module, 'event_type=UPDATE 必须精确过滤模块').toBe('UPDATE');
+          expect(item.request_path, 'request_path 必须精确过滤请求路径').toBe(reqPath);
+          expect(item.trace_id, 'trace_id 必须精确过滤本次链路').toBe(putA.traceId);
+        }
+        sensitiveTotal = sensitive.total;
+        hitSensitive = sensitive.items.find(item =>
+          isExactAuditHit(item, reqPath, putA.traceId, changed)
         );
         return hitSensitive !== undefined;
       },
       { timeout: 30_000, intervals: [500, 1000, 2000] }
     )
     .toBe(true);
-  if (hitSensitive) {
-    expect(
-      JSON.stringify(hitSensitive.request_body ?? ''),
-      '审计请求体须含误改值 B，可追溯改成了什么'
-    ).toContain(changed);
+  expect(sensitiveTotal, '路径与 trace 精确过滤必须只命中一条').toBe(1);
+  expect(hitSensitive, '误改审计行必须落地').toBeDefined();
+  expect(
+    auditDescription(hitSensitive as Record<string, unknown>),
+    '审计请求体须保留误改值 B'
+  ).toBe(changed);
+
+  const nonSensitive = await apiCallRaw<AuditSearchData>(
+    page,
+    'GET',
+    auditQueryPath(day, reqPath, putA.traceId)
+  );
+  expect(Array.isArray(nonSensitive.items), '默认审计检索必须返回 items').toBe(true);
+  if (!Array.isArray(nonSensitive.items)) {
+    throw new Error('577 默认审计检索缺少 items，无法验证敏感字段省略');
+  }
+  expect(nonSensitive.total, '默认检索与敏感检索须命中同一审计行').toBe(1);
+  expect(nonSensitive.items).toHaveLength(1);
+  for (const item of nonSensitive.items) {
+    expect('request_body' in item, '默认检索不得返回 request_body').toBe(false);
+    expect('user_agent' in item, '默认检索不得返回 user_agent').toBe(false);
+    expect('ip_address' in item, '默认检索不得返回 ip_address').toBe(false);
   }
 
   // 回放：把 description 改回原值 A（无专用回滚端点，按写入方旧值回放口径）。
   const putB = await putWithTrace(page, path, { description: original });
   expect(putB.status, '回放 PUT 须成功').toBe(200);
+  expect(String(putB.json.code), '回放响应须 success 信封').toBe('200');
   expect(putB.traceId, '回滚腿也须拿到 trace 以关联回滚审计').toMatch(/^[0-9a-f]{32}$/);
 
   // 行为与配置恢复：description 回到 A；模式主数据（mode_code）未被误改腿动过。
@@ -176,19 +250,40 @@ test('577-01 配置改错后留痕可关联且回放旧值恢复配置与行为'
   expect(afterRevert.mode_code, '回滚后 mode_code 须与基线一致，行为标识未被改动').toBe(
     before.mode_code
   );
+  restoreTarget = undefined;
 
   // 回滚也须留痕：omni 审计可查到回滚腿的 trace（异步落库，poll 等待）。
+  let hitRevert: Record<string, unknown> | undefined;
+  let revertTotal: number | undefined;
   await expect
     .poll(
       async () => {
-        const audit2 = await apiCallRaw<{ items: Array<Record<string, unknown>> }>(
+        const audit2 = await apiCallRaw<AuditSearchData>(
           page,
           'GET',
-          auditQueryPath(day, reqPath)
+          `${auditQueryPath(day, reqPath, putB.traceId)}&include_sensitive=true`
         );
-        return (audit2.items ?? []).some(it => it.trace_id === putB.traceId);
+        expect(Array.isArray(audit2.items), '回滚审计检索必须返回 items').toBe(true);
+        if (!Array.isArray(audit2.items)) {
+          throw new Error('577 回滚审计检索缺少 items，无法关联回滚留痕');
+        }
+        for (const item of audit2.items) {
+          expect(item.module, '回滚 event_type=UPDATE 必须精确过滤模块').toBe('UPDATE');
+          expect(item.request_path, '回滚 request_path 必须精确过滤请求路径').toBe(reqPath);
+          expect(item.trace_id, '回滚 trace_id 必须精确过滤本次链路').toBe(putB.traceId);
+        }
+        revertTotal = audit2.total;
+        hitRevert = audit2.items.find(item =>
+          isExactAuditHit(item, reqPath, putB.traceId, original)
+        );
+        return hitRevert !== undefined;
       },
       { timeout: 30_000, intervals: [500, 1000, 2000] }
     )
     .toBe(true);
+  expect(revertTotal, '回滚路径与 trace 精确过滤必须只命中一条').toBe(1);
+  expect(hitRevert, '回滚审计行必须落地').toBeDefined();
+  expect(auditDescription(hitRevert as Record<string, unknown>), '回滚审计请求体须保留原值 A').toBe(
+    original
+  );
 });

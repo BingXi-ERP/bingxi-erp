@@ -115,6 +115,9 @@ pub enum BusinessEvent {
         variance_count: i32,
     },
     BpmProcessFinished {
+        /// 流程实例 ID，用于隔离同一业务单据不同审批轮次的幂等记录。
+        /// 历史 Kafka 载荷缺少该字段时保留为 `None`，由监听器显式解析。
+        instance_id: Option<i32>,
         business_type: String,
         business_id: i64,
         approved: bool,

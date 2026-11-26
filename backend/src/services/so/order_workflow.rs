@@ -20,9 +20,10 @@ use crate::models::sales_order::Entity as SalesOrderEntity;
 use crate::models::status::sales_order as so_status;
 // 批次 212 P2-5 修复（v12 复审）：硬编码 "active" 替换为 master_data 常量
 use crate::models::status::master_data;
+use crate::services::bpm_ops::instance::StartProcessOutcome;
 use crate::services::bpm_ops::{bpm_start_failure_error, process_key};
 use crate::utils::error::AppError;
-use sea_orm::{EntityTrait, QuerySelect, TransactionTrait};
+use sea_orm::{DatabaseTransaction, EntityTrait, QuerySelect, TransactionTrait};
 
 impl SalesService {
     // cancel_order / submit_order / approve_order / complete_order
@@ -116,9 +117,10 @@ impl SalesService {
         self.get_order_detail(order_id, None).await
     }
 
-    /// 提交销售订单（草稿→待审），信用额度校验与占用均在提交事务内完成。
+    /// 提交销售订单（草稿→待审），信用占用、锁缸、状态、审计与 BPM 在同一事务内提交。
     ///
-    /// 功能：行锁读单→状态门→信用门检查→事务内占用→客户启用门→写状态→commit。
+    /// 功能：行锁读单→状态门→信用门检查→事务内占用→客户启用门→锁缸→写状态与审计→
+    /// 创建 BPM 实例/首任务→commit；BPM 失败时整单回滚，通知与提交事件在 commit 后派发。
     /// 调用方：handlers/sales_order_handler.rs submit 端点。
     /// 入参：order_id——待提交订单；user_id——操作人。
     /// 传给谁：拒绝经 AppError 透传给出参；成功后触发 BPM 审批与提交事件。
@@ -155,11 +157,14 @@ impl SalesService {
             .await?;
 
         let order = self.update_order_to_pending(&txn, order, user_id).await?;
+        let bpm_service = crate::services::bpm_service::BpmService::new(self.db.clone());
+        let started = self
+            .start_bpm_process(&bpm_service, &txn, order_id, user_id, &order.order_no)
+            .await?;
         txn.commit().await?;
 
         self.check_credit_warning(order.customer_id).await;
-        self.start_bpm_process(order_id, user_id, &order.order_no)
-            .await?;
+        bpm_service.notify_started_process(&started).await;
         self.publish_submitted_event(order_id, order.customer_id, user_id);
 
         Ok(order)
@@ -276,107 +281,42 @@ impl SalesService {
 
     async fn start_bpm_process(
         &self,
+        bpm_service: &crate::services::bpm_service::BpmService,
+        txn: &DatabaseTransaction,
         order_id: i32,
         user_id: i32,
         order_no: &str,
-    ) -> Result<(), AppError> {
-        let bpm_service = crate::services::bpm_service::BpmService::new(self.db.clone());
-        if let Err(e) = bpm_service
-            .start_process(crate::models::dto::bpm_dto::StartProcessRequest {
-                process_key: process_key::SALES_ORDER_APPROVAL.to_string(),
-                business_type: "sales_order".to_string(),
-                // 来源主键 sales_order.id 为 i32，bpm business_id 已拓宽为 i64，无损加宽
-                business_id: i64::from(order_id),
-                title: format!("销售订单审批 - {}", order_no),
-                initiator_id: user_id,
-                initiator_name: String::new(),
-                initiator_department_id: None,
-                priority: None,
-                form_data: None,
-                variables: None,
-            })
+    ) -> Result<StartProcessOutcome, AppError> {
+        bpm_service
+            .start_process_in_txn(
+                txn,
+                crate::models::dto::bpm_dto::StartProcessRequest {
+                    process_key: process_key::SALES_ORDER_APPROVAL.to_string(),
+                    business_type: "sales_order".to_string(),
+                    // 来源主键 sales_order.id 为 i32，bpm business_id 已拓宽为 i64，无损加宽
+                    business_id: i64::from(order_id),
+                    title: format!("销售订单审批 - {}", order_no),
+                    initiator_id: user_id,
+                    initiator_name: String::new(),
+                    initiator_department_id: None,
+                    priority: None,
+                    form_data: None,
+                    variables: None,
+                },
+            )
             .await
-        {
-            // 补偿回滚失败不得顶替 BPM 启动失败的出参文案（回滚错误多为脱敏族，
-            // 直接上抛会让用户看不到根因指引、也看不到单据真实状态）；两条根因
-            // 分别全量落 error 日志，出参陈述已确认的处置结果。
-            let document_state = match self.rollback_order_to_draft(order_id, user_id).await {
-                Ok(()) => "订单已退回草稿状态",
-                Err(rb_err) => {
-                    tracing::error!(
-                        error = %rb_err,
-                        order_id = order_id,
-                        user_id = user_id,
-                        process_key = process_key::SALES_ORDER_APPROVAL,
-                        business_type = "sales_order",
-                        business_id = order_id,
-                        "销售订单审批 BPM 启动失败后的补偿回滚也失败，订单可能仍停留在待审批状态，需人工核对"
-                    );
-                    "订单状态回退失败，可能仍为待审批，请按订单当前状态核对处理"
-                }
-            };
-            // 审批流引擎的真实失败原文可能含流程定义/SQL/内部路径细节，按
-            // utils/error.rs 安全边界只进日志，不得拼进出参文案。
-            tracing::error!(
-                order_id = order_id,
-                user_id = user_id,
-                error = %e,
-                process_key = process_key::SALES_ORDER_APPROVAL,
-                business_type = "sales_order",
-                business_id = order_id,
-                "销售订单审批流程启动失败，根因如上，仅进日志不外显"
-            );
-            return Err(bpm_start_failure_error(
-                process_key::SALES_ORDER_APPROVAL,
-                document_state,
-                &e,
-            ));
-        }
-        Ok(())
-    }
-
-    async fn rollback_order_to_draft(&self, order_id: i32, user_id: i32) -> Result<(), AppError> {
-        tracing::error!(
-            order_id = order_id,
-            "BPM 启动销售订单审批流程失败，开始补偿回滚订单状态与信用占用"
-        );
-
-        let compensating_txn = (*self.db).begin().await?;
-        let order_for_rollback = SalesOrderEntity::find_by_id(order_id)
-            .lock_exclusive()
-            .one(&compensating_txn)
-            .await?
-            .ok_or_else(|| {
-                AppError::not_found(format!("补偿回滚时销售订单 {} 不存在", order_id))
-            })?;
-
-        let customer_id = order_for_rollback.customer_id;
-        let total_amount = order_for_rollback
-            .total_amount
-            .to_string()
-            .parse::<rust_decimal::Decimal>()
-            .unwrap_or_else(|_| rust_decimal::Decimal::from(0));
-
-        let mut rollback_model: sales_order::ActiveModel = order_for_rollback.into();
-        rollback_model.status = sea_orm::ActiveValue::Set(so_status::DRAFT.to_string());
-        rollback_model.updated_at = sea_orm::ActiveValue::Set(chrono::Utc::now());
-        crate::services::audit_log_service::AuditLogService::update_with_audit(
-            &compensating_txn,
-            "auto_audit",
-            rollback_model,
-            Some(user_id),
-        )
-        .await?;
-
-        let credit_service =
-            crate::services::customer_credit_service::CustomerCreditService::new(self.db.clone());
-        credit_service
-            .release_credit_txn(&compensating_txn, customer_id, total_amount, user_id)
-            .await?;
-
-        compensating_txn.commit().await?;
-
-        Ok(())
+            .map_err(|e| {
+                tracing::error!(
+                    order_id,
+                    user_id,
+                    error = %e,
+                    process_key = process_key::SALES_ORDER_APPROVAL,
+                    business_type = "sales_order",
+                    business_id = order_id,
+                    "销售订单审批流程启动失败，提交事务回滚，根因仅进日志不外显"
+                );
+                bpm_start_failure_error(process_key::SALES_ORDER_APPROVAL, "订单未提交", &e)
+            })
     }
 
     fn publish_submitted_event(&self, order_id: i32, customer_id: i32, user_id: i32) {
