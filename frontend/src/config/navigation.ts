@@ -267,6 +267,7 @@ export const NAV_TREE: NavNode[] = [
         L('/system-update', 'layout.menu.systemUpdate'),
         L('/admin/failover', 'layout.menu.failover'),
         L('/system/audit-log', 'layout.menu.auditLog'),
+        L('/system/number-rules', 'layout.menu.numberRules'),
         L('/system/slow-query', 'layout.menu.slowQuery'),
       ]),
     ],

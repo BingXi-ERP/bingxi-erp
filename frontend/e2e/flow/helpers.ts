@@ -24,6 +24,7 @@ import {
   readFirstEntityId,
   readEntityIds,
 } from './ui-helpers';
+import { withNumberRuleConfigLock } from './number-rule-config-lock';
 // 产品类型单源常量（与后端 models/status/general.rs::product_type 同源）：
 // 补建产品的 product_type 取值必须经 PRODUCT_TYPE.<键> 引用，禁止散落中文面值。
 import { PRODUCT_TYPE } from '../../src/constants/product-type';
@@ -650,11 +651,13 @@ async function ensureTestEntitiesInner(page: Page): Promise<void> {
       } else {
         console.error('[ensureTestEntities] 库存兜底创建未返回 id:', JSON.stringify(stock));
       }
-      const result = await apiCall<{ id?: number }>(page, 'POST', '/sales/orders', {
-        customer_id: ctx.customerId,
-        order_date: new Date().toISOString(),
-        items: [{ product_id: ctx.productIds[0], quantity: '1', unit_price: '1' }],
-      });
+      const result = await withNumberRuleConfigLock(() =>
+        apiCall<{ id?: number }>(page, 'POST', '/sales/orders', {
+          customer_id: ctx.customerId,
+          order_date: new Date().toISOString(),
+          items: [{ product_id: ctx.productIds[0], quantity: '1', unit_price: '1' }],
+        })
+      );
       ctx.salesOrderId = result.data?.id;
     } catch (e) {
       console.error('[ensureTestEntities] salesOrderId 创建失败:', (e as Error).message);

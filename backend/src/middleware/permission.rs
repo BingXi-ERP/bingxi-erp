@@ -71,15 +71,16 @@ fn validate_route_whitelist(path: &str) -> Result<(), Box<Response>> {
     Ok(())
 }
 
-/// 综合提取路由信息：resource_type + resource_id + action（query > path > method）
+/// 综合提取路由信息：resource_type + resource_id + action（path > query > method）。
+/// 路径末段已明确表达写操作时，查询参数不得把它降级为 print/export 等弱权限。
 fn extract_route_info(
     path: &str,
     uri: &axum::http::Uri,
     method: &Method,
 ) -> (String, Option<i32>, String) {
     let (resource_type, resource_id) = extract_resource_info(path);
-    let action = extract_action_from_query(uri)
-        .or_else(|| extract_action_from_path(path))
+    let action = extract_action_from_path(path)
+        .or_else(|| extract_action_from_query(uri))
         .unwrap_or_else(|| method_to_action(method));
     (resource_type, resource_id, action)
 }
@@ -286,6 +287,21 @@ fn is_path_action_segment(segment: &str) -> bool {
 pub fn extract_action_from_path(path: &str) -> Option<String> {
     // rfind 从后向前取第一个非空段，等价于 filter().next_back()
     let last_segment = path.split('/').rfind(|p| !p.is_empty())?;
+    // 编码规则回滚是更新当前配置的写操作，但只在该精确路由派生 update；
+    // 不恢复全局 rollback->update，避免污染 /system-update/rollback 的 create 权限。
+    if last_segment == "rollback" {
+        let parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
+        if parts.len() == 7
+            && parts[0] == "api"
+            && parts[1] == "v1"
+            && parts[2] == "erp"
+            && parts[3] == "system"
+            && parts[4] == "number-rules"
+            && parts[5].parse::<i32>().is_ok()
+        {
+            return Some(ACTION_UPDATE.to_string());
+        }
+    }
     if let Some((_, action)) = PATH_ACTION_SEGMENT_MAP
         .iter()
         .find(|(seg, _)| *seg == last_segment)
@@ -734,4 +750,27 @@ pub fn matches_permission(
             (Some(pid), Some(rid)) => pid == rid,
         };
     resource_match && (p.action == action || p.action == "*") && id_match
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::Uri;
+
+    #[test]
+    fn explicit_path_write_action_cannot_be_downgraded_by_query() {
+        let uri = Uri::from_static("/api/v1/erp/system/number-rules/42/rollback?action=print");
+        let info = extract_route_info(uri.path(), &uri, &Method::POST);
+        assert_eq!(
+            info,
+            ("number-rules".to_string(), Some(42), "update".to_string())
+        );
+    }
+
+    #[test]
+    fn resource_id_keeps_query_print_permission() {
+        let uri = Uri::from_static("/api/v1/erp/sales/orders/42?action=print");
+        let info = extract_route_info(uri.path(), &uri, &Method::GET);
+        assert_eq!(info.2, "print");
+    }
 }

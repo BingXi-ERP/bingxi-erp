@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::utils::error::AppError;
 use chrono::{DateTime, Utc};
 use sea_orm::{
@@ -30,6 +32,15 @@ use sea_orm::{
 ///   非唯一约束类 SQL 错误原样显式上抛，不吞不兜底。
 pub struct DocumentNumberGenerator;
 
+/// 一次取号使用的已解析规则；output_prefix 已含周期段，period 供咨询锁使用。
+pub struct ResolvedNumberRule {
+    pub rule_key: String,
+    pub output_prefix: String,
+    pub period: String,
+    pub seq_width: usize,
+    pub configured: bool,
+}
+
 /// 候选号连续被占用时的探测上限（防止病态存量数据导致无界循环；
 /// 超限显式报错，由数据侧排查，不静默跳过）
 const NO_PROBE_MAX: u64 = 100;
@@ -38,6 +49,89 @@ const NO_PROBE_MAX: u64 = 100;
 const NO_INSERT_MAX_RETRY: usize = 5;
 
 impl DocumentNumberGenerator {
+    /// 在取号连接内解析规则；未配置的历史前缀显式保持 legacy 日重置语义。
+    pub async fn resolve_rule(
+        conn: &impl ConnectionTrait,
+        rule_key: &str,
+        requested_width: usize,
+        now: DateTime<Utc>,
+    ) -> Result<ResolvedNumberRule, AppError> {
+        let rule = crate::models::system_number_rule::Entity::find()
+            .filter(crate::models::system_number_rule::Column::RuleKey.eq(rule_key))
+            .lock_exclusive()
+            .one(conn)
+            .await?;
+
+        match rule {
+            Some(rule) => {
+                let rule_key = rule.rule_key;
+                Self::resolve_rule_values(
+                    &rule_key,
+                    &rule.prefix,
+                    rule.seq_width,
+                    &rule.reset_mode,
+                    requested_width,
+                    now,
+                )
+            }
+            None => {
+                let period = now.format("%Y%m%d").to_string();
+                Ok(ResolvedNumberRule {
+                    rule_key: rule_key.to_string(),
+                    output_prefix: Self::full_date_prefix(rule_key, now),
+                    period,
+                    seq_width: std::cmp::Ord::max(requested_width, 1),
+                    configured: false,
+                })
+            }
+        }
+    }
+
+    fn resolve_rule_values(
+        rule_key: &str,
+        prefix: &str,
+        seq_width: i32,
+        reset_mode: &str,
+        requested_width: usize,
+        now: DateTime<Utc>,
+    ) -> Result<ResolvedNumberRule, AppError> {
+        let prefix = prefix.trim();
+        if prefix.is_empty() || prefix.chars().count() > 50 {
+            return Err(AppError::business_displayable(
+                "编码规则前缀必须为 1 至 50 个字符",
+            ));
+        }
+        if !(1..=12).contains(&seq_width) {
+            return Err(AppError::business_displayable(
+                "编码规则流水位数必须为 1 至 12",
+            ));
+        }
+
+        let period = match reset_mode {
+            "day" => now.format("%Y%m%d").to_string(),
+            "month" => now.format("%Y%m").to_string(),
+            "never" => String::new(),
+            _ => {
+                return Err(AppError::business_displayable(
+                    "编码规则重置周期仅支持 day、month 或 never",
+                ));
+            }
+        };
+        let width = if requested_width == Self::DEFAULT_SEQ_WIDTH {
+            seq_width as usize
+        } else {
+            std::cmp::Ord::max(requested_width, 1)
+        };
+
+        Ok(ResolvedNumberRule {
+            rule_key: rule_key.to_string(),
+            output_prefix: format!("{}{}", prefix, period),
+            period,
+            seq_width: width,
+            configured: true,
+        })
+    }
+
     /// 生成标准格式单号: {前缀}{YYYYMMDD}{3位流水号}
     pub async fn generate_no<'db, E, C>(
         db: &'db (impl ConnectionTrait + TransactionTrait),
@@ -69,8 +163,6 @@ impl DocumentNumberGenerator {
         C: ColumnTrait,
     {
         let now = Utc::now();
-        let today = now.format("%Y%m%d").to_string();
-        let date_prefix = Self::full_date_prefix(prefix, now);
 
         // 事务/保存点生命周期失败是真正的 DbErr：按语义归口 AppError::database
         // （分类与日志口径同 utils/error.rs 的 From<DbErr> 映射），不再降级成 internal；
@@ -81,11 +173,17 @@ impl DocumentNumberGenerator {
             .await
             .map_err(|e| AppError::database(format!("取号事务开启失败: {e}")))?;
 
-        Self::lock_prefix(&txn, prefix, &today).await?;
+        let rule = Self::resolve_rule(&txn, prefix, width, now).await?;
+        Self::lock_prefix(&txn, &rule.output_prefix, &rule.period).await?;
 
-        let result = Self::allocate_no::<E, C>(&txn, column, &date_prefix, width).await;
+        let result = if rule.configured {
+            Self::allocate_configured_no::<E, C>(&txn, column, &rule).await
+        } else {
+            Self::allocate_no::<E, C>(&txn, column, &rule.output_prefix, rule.seq_width).await
+        };
 
-        // 探测过程只有 SELECT；无论成败都显式结束内层事务，错误路径回滚后原样上抛
+        // 配置规则会写持久化号段计数，legacy 规则只读历史单号；两者都在同一内层事务收口。
+        // 成功提交、失败回滚，任何分配错误均显式上抛。
         match result {
             Ok(no) => {
                 txn.commit()
@@ -133,12 +231,15 @@ impl DocumentNumberGenerator {
         C: ColumnTrait,
     {
         let now = Utc::now();
-        let today = now.format("%Y%m%d").to_string();
-        let date_prefix = Self::full_date_prefix(prefix, now);
+        let rule = Self::resolve_rule(txn, prefix, width, now).await?;
 
-        Self::lock_prefix(txn, prefix, &today).await?;
+        Self::lock_prefix(txn, &rule.output_prefix, &rule.period).await?;
 
-        Self::allocate_no::<E, C>(txn, column, &date_prefix, width).await
+        if rule.configured {
+            Self::allocate_configured_no::<E, C>(txn, column, &rule).await
+        } else {
+            Self::allocate_no::<E, C>(txn, column, &rule.output_prefix, rule.seq_width).await
+        }
     }
 
     /// 在调用方事务内「取号 + 构建 ActiveModel + INSERT」并对唯一约束冲突(23505)
@@ -286,21 +387,131 @@ impl DocumentNumberGenerator {
     /// 旁路号误当基数导致无谓跳号。
     /// 本判据只影响基数取值（方向上只会抬高基数、不会压低），占用探测与
     /// 23505 保存点重试语义不变。
-    fn base_seq_from_suffix(suffix: &str) -> Option<u64> {
+    fn base_seq_from_suffix(suffix: &str, width: usize) -> Option<u64> {
+        if suffix.len() < width || !suffix.bytes().all(|byte| byte.is_ascii_digit()) {
+            return None;
+        }
         suffix.parse::<u64>().ok()
     }
 
-    /// 在持有咨询锁的同一连接/事务内分配一个未被占用的候选号。
+    /// 已配置规则按持久化号段计数分配；历史单号只参与占用探测，不反推跨周期基数。
     ///
-    /// 基数与真实号段同源：投影当日单号列（`select_only + into_tuple`，不读整行），
-    /// 从已有单号里解析后缀流水取 `max(seq) + 1` 起探测。
-    /// 刻意**不用** `count + 1`：行数把软删行/旁路写入的非常规行也计入，
-    /// 既会跳过实际空闲的号位，也可能从低于号段末尾处起探测。
-    /// 软删行**参与**基数是刻意为之：软删行仍占用该号，且单据号列带 UNIQUE
-    /// 索引（migration m0063），复用旧号会直接撞 23505——探测可见、索引兜底，
-    /// 二者口径一致才叫"与真实号段同源"。
-    /// 非纯数字流水的后缀（旁路/人工输入的单号）不参与 max，但逐条 warn 显式暴露。
-    /// 探测能看见本事务未提交的插入，因此事务内「取号→插入→取号」序列安全。
+    /// 入参为当前事务、单号列与已解析规则；调用方已持有实际输出前缀与周期的咨询锁。
+    /// 传给谁 PostgreSQL `system_number_sequences` 与目标实体单号列。
+    /// 存什么为该规则、实体、列、输出前缀和周期分配到的最大流水；同事务写入，
+    /// 保存点回滚或外层事务回滚会同步撤销，重试不会跳过未提交号位。
+    async fn allocate_configured_no<E, C>(
+        conn: &impl ConnectionTrait,
+        column: C,
+        rule: &ResolvedNumberRule,
+    ) -> Result<String, AppError>
+    where
+        E: EntityTrait,
+        <<E as EntityTrait>::Column as std::str::FromStr>::Err: std::fmt::Debug,
+        E::Model: Sync + Send + FromQueryResult,
+        C: ColumnTrait,
+    {
+        let entity_table = E::default().table_name().to_string();
+        let column_name = column.as_str().to_string();
+        let existing_numbers: Vec<(String,)> = E::find()
+            .select_only()
+            .column(column)
+            .filter(column.starts_with(rule.output_prefix.as_str()))
+            .into_tuple::<(String,)>()
+            .all(conn)
+            .await?;
+        let occupied: HashSet<String> = existing_numbers.iter().map(|(no,)| no.clone()).collect();
+        let width = std::cmp::Ord::max(rule.seq_width, 1);
+        let historical_max = existing_numbers
+            .iter()
+            .filter_map(|(no)| no.strip_prefix(rule.output_prefix.as_str()))
+            .filter_map(|suffix| Self::base_seq_from_suffix(suffix, width))
+            .max();
+
+        let row = conn
+            .query_one_raw(Statement::from_sql_and_values(
+                DatabaseBackend::Postgres,
+                "SELECT \"last_seq\" FROM \"system_number_sequences\" \
+                 WHERE \"rule_key\" = $1 AND \"entity_table\" = $2 AND \"column_name\" = $3 \
+                   AND \"output_prefix\" = $4 AND \"period\" = $5",
+                [
+                    rule.rule_key.clone().into(),
+                    entity_table.clone().into(),
+                    column_name.clone().into(),
+                    rule.output_prefix.clone().into(),
+                    rule.period.clone().into(),
+                ],
+            ))
+            .await?;
+        let last_seq = match row {
+            Some(row) => row.try_get_by_index::<i64>(0).map_err(|error| {
+                AppError::database(format!("编码规则号段计数解码失败: {error}"))
+            })?,
+            None => 0,
+        };
+        if last_seq < 0 {
+            return Err(AppError::database("编码规则号段计数为负数，拒绝继续取号"));
+        }
+        let last_seq = match historical_max {
+            Some(max) => i64::try_from(max)
+                .map_err(|_| {
+                    AppError::business_displayable("编码规则历史流水已达到数据库计数上限")
+                })?
+                .max(last_seq),
+            None => last_seq,
+        };
+        let mut seq = (last_seq as u64).saturating_add(1);
+
+        // 最多探测已有行数加一：候选从计数下一位开始，若全部被占用，数量上必有一个空闲位。
+        // 不使用固定 100 上限，避免大存量号段在 101 条时误报；u64 饱和时最终显式失败。
+        for probe in 0..=existing_numbers.len() as u64 {
+            let candidate = format!("{}{:0width$}", rule.output_prefix, seq, width = width);
+            if !occupied.contains(&candidate) {
+                let persisted = i64::try_from(seq).map_err(|_| {
+                    AppError::business_displayable("编码规则流水已达到数据库计数上限")
+                })?;
+                conn.execute_raw(Statement::from_sql_and_values(
+                    DatabaseBackend::Postgres,
+                    "INSERT INTO \"system_number_sequences\" \
+                     (\"rule_key\", \"entity_table\", \"column_name\", \"output_prefix\", \"period\", \"last_seq\") \
+                     VALUES ($1, $2, $3, $4, $5, $6) \
+                     ON CONFLICT (\"rule_key\", \"entity_table\", \"column_name\", \"output_prefix\", \"period\") \
+                     DO UPDATE SET \"last_seq\" = EXCLUDED.\"last_seq\", \"updated_at\" = CURRENT_TIMESTAMP",
+                    [
+                        rule.rule_key.clone().into(),
+                        entity_table,
+                        column_name,
+                        rule.output_prefix.clone(),
+                        rule.period.clone(),
+                        persisted.into(),
+                    ],
+                ))
+                .await?;
+                if probe > 0 {
+                    tracing::info!(
+                        rule_key = %rule.rule_key,
+                        output_prefix = %rule.output_prefix,
+                        skipped = probe,
+                        doc_no = %candidate,
+                        "配置规则取号跳过已占用号位"
+                    );
+                }
+                return Ok(candidate);
+            }
+            seq = seq.saturating_add(1);
+        }
+
+        Err(AppError::business_displayable(format!(
+            "编码规则号段 {} 的 {} 个候选位均被占用，请联系管理员检查存量编号",
+            rule.output_prefix,
+            existing_numbers.len() + 1
+        )))
+    }
+
+    /// 未配置规则保持 legacy 日重置语义；基数从真实历史单号的最大纯数字后缀推导。
+    ///
+    /// 在持有咨询锁的同一连接/事务内投影当日单号列，从已有单号解析后缀流水取
+    /// `max(seq) + 1` 起逐位探测；软删行继续占号，本事务未提交插入对自身可见。
     async fn allocate_no<E, C>(
         conn: &impl ConnectionTrait,
         column: C,
@@ -333,7 +544,7 @@ impl DocumentNumberGenerator {
                 );
                 continue;
             };
-            match Self::base_seq_from_suffix(suffix) {
+            match Self::base_seq_from_suffix(suffix, width) {
                 Some(seq) => max_seq = Some(max_seq.map_or(seq, |m| std::cmp::max(m, seq))),
                 None => tracing::warn!(
                     date_prefix,
@@ -681,18 +892,92 @@ mod tests {
     }
 
     /// 基数判据与横杠分隔形态的相容性：纯数字流水照常解析；横杠混排属于
-    /// 旁路形态，不参与基数（逐条 warn 的既有语义）。
+    /// 旁路形态，不参与基数（逐条 warn 的既有语义）。流水超过配置宽度时仍按
+    /// 真实数字计入 max，保证 legacy 号段跨过 999/9999 后继续递增而非重新撞号。
     #[test]
     fn base_seq_parses_plain_digits_only() {
         assert_eq!(
-            DocumentNumberGenerator::base_seq_from_suffix("1356"),
+            DocumentNumberGenerator::base_seq_from_suffix("1356", 4),
             Some(1356)
         );
         assert_eq!(
-            DocumentNumberGenerator::base_seq_from_suffix("001"),
+            DocumentNumberGenerator::base_seq_from_suffix("001", 3),
             Some(1)
         );
-        assert_eq!(DocumentNumberGenerator::base_seq_from_suffix("13-56"), None);
-        assert_eq!(DocumentNumberGenerator::base_seq_from_suffix("A7"), None);
+        assert_eq!(
+            DocumentNumberGenerator::base_seq_from_suffix("13-56", 5),
+            None
+        );
+        assert_eq!(DocumentNumberGenerator::base_seq_from_suffix("A7", 2), None);
+        assert_eq!(
+            DocumentNumberGenerator::base_seq_from_suffix("+17", 2),
+            None
+        );
+        assert_eq!(
+            DocumentNumberGenerator::base_seq_from_suffix("1000", 3),
+            Some(1000),
+            "legacy 三位流水跨到四位后必须续号"
+        );
+        assert_eq!(
+            DocumentNumberGenerator::base_seq_from_suffix("10000", 3),
+            Some(10000),
+            "legacy 超宽存量号必须参与基数"
+        );
+        assert_eq!(
+            DocumentNumberGenerator::base_seq_from_suffix("20261125001", 5),
+            Some(20261125001),
+            "超宽纯数字后缀不得因宽度不符退出号段"
+        );
+    }
+
+    #[test]
+    fn configured_rule_resolves_day_month_and_never_periods() {
+        let now = at(2026, 11, 26);
+        let day = DocumentNumberGenerator::resolve_rule_values("SALE", 4, "day", 3, now)
+            .expect("日重置规则必须可解析");
+        assert_eq!(day.output_prefix, "SALE20261126");
+        assert_eq!(day.period, "20261126");
+        assert_eq!(day.seq_width, 4);
+
+        let month = DocumentNumberGenerator::resolve_rule_values("SALE", 2, "month", 3, now)
+            .expect("月重置规则必须可解析");
+        assert_eq!(month.output_prefix, "SALE202611");
+        assert_eq!(month.period, "202611");
+        assert_eq!(month.seq_width, 2);
+
+        let never = DocumentNumberGenerator::resolve_rule_values("SALE", 6, "never", 3, now)
+            .expect("永久规则必须可解析");
+        assert_eq!(never.output_prefix, "SALE");
+        assert_eq!(never.period, "");
+        assert_eq!(never.seq_width, 6);
+    }
+
+    #[test]
+    fn explicit_non_default_width_overrides_rule_width() {
+        let resolved =
+            DocumentNumberGenerator::resolve_rule_values("SO", 4, "day", 5, at(2026, 7, 15))
+                .expect("显式宽度必须保留");
+        assert_eq!(resolved.output_prefix, "SO20260715");
+        assert_eq!(resolved.seq_width, 5);
+    }
+
+    #[test]
+    fn invalid_rule_values_fail_visibly() {
+        assert!(
+            DocumentNumberGenerator::resolve_rule_values(" ", 3, "day", 3, at(2026, 7, 15))
+                .is_err()
+        );
+        assert!(
+            DocumentNumberGenerator::resolve_rule_values("SO", 0, "day", 3, at(2026, 7, 15))
+                .is_err()
+        );
+        assert!(
+            DocumentNumberGenerator::resolve_rule_values("SO", 13, "day", 3, at(2026, 7, 15))
+                .is_err()
+        );
+        assert!(
+            DocumentNumberGenerator::resolve_rule_values("SO", 3, "year", 3, at(2026, 7, 15))
+                .is_err()
+        );
     }
 }

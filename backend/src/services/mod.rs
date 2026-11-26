@@ -208,6 +208,8 @@ pub mod quotation_convert_service;
 pub mod system_update_service;
 // D10 拆分：system_update_service.rs facade 的业务实现子模块（status/apply/backup/github）
 pub mod system_update_ops;
+pub mod system_number_rule_dto;
+pub mod system_number_rule_service;
 pub mod totp_service;
 // v11 批次 143 P1-2：用户行为追踪分析服务
 pub mod tracking_service;

@@ -23,6 +23,7 @@ import {
   APP_ERROR_CODES,
   BASE_URL,
 } from '../flow/helpers';
+import { withNumberRuleConfigLock } from '../flow/number-rule-config-lock';
 
 /** 创建一张草稿报价单；amount 作为明细数量、单价固定 1，控制 submit 落点：<10 万自批→approved，≥10 万→pending_approval */
 async function createDraftQuotation(page: Page, amount: number): Promise<number> {
@@ -140,9 +141,11 @@ test.describe('02 报价单审批与转订单', () => {
     await expect(convertBtn, 'approved 详情页应渲染「转销售订单」按钮').toBeVisible({
       timeout: 30000,
     });
-    await convertBtn.click();
-    await page.locator('.el-message-box__btns .el-button--primary').click();
-    await expect(page.getByText('转订单成功')).toBeVisible({ timeout: 30000 });
+    await withNumberRuleConfigLock(async () => {
+      await convertBtn.click();
+      await page.locator('.el-message-box__btns .el-button--primary').click();
+      await expect(page.getByText('转订单成功')).toBeVisible({ timeout: 30000 });
+    });
 
     const conv = await apiCallRaw<{ status: string; converted_sales_order_id?: number }>(
       page,

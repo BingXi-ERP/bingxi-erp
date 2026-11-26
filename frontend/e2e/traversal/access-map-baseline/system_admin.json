@@ -28,6 +28,7 @@
     "/security/two-factor-setup",
     "/system/audit-log",
     "/system/export-approvals",
+    "/system/number-rules",
     "/system/profile",
     "/system/slow-query",
     "/users",

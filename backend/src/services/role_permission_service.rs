@@ -740,7 +740,7 @@ impl RolePermissionService {
             "logistics" | "ship-orders" | "incoterms" => "logistics".to_string(),
             // 系统模块
             "audit-logs" | "slow-queries" | "system-config" | "print-templates" | "data-import"
-            | "dashboard" => "system".to_string(),
+            | "dashboard" | "number-rules" => "system".to_string(),
             // AI 模块
             "ai-forecast" | "ai-inventory-opt" | "ai-anomaly" | "ai-recommendation"
             | "ai-recipe-opt" | "ai-quality-pred" | "ai-process-opt" | "ai-summary" => {
