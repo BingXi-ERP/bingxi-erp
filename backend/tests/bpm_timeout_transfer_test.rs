@@ -16,7 +16,7 @@ use bingxi_backend::models::dto::bpm_dto::{
 use bingxi_backend::models::status::bpm_instance as instance_status;
 use bingxi_backend::models::status::bpm_task as task_status;
 use bingxi_backend::models::{
-    bpm_process_definition, bpm_process_instance, bpm_task, notification, omni_audit_log, user,
+    audit_log, bpm_process_definition, bpm_process_instance, bpm_task, notification, user,
 };
 use bingxi_backend::services::bpm_service::BpmService;
 use bingxi_backend::services::bpm_timeout_scheduler::ApprovalTimeoutScheduler;
@@ -158,9 +158,9 @@ async fn set_status(db: &DatabaseConnection, task_id: i32, status: &str) {
 }
 
 async fn audit_count(db: &DatabaseConnection, task_id: i32) -> u64 {
-    omni_audit_log::Entity::find()
-        .filter(omni_audit_log::Column::ResourceType.eq("bpm_task"))
-        .filter(omni_audit_log::Column::ResourceId.eq(task_id.to_string()))
+    audit_log::Entity::find()
+        .filter(audit_log::Column::ResourceType.eq("bpm_task"))
+        .filter(audit_log::Column::ResourceId.eq(task_id.to_string()))
         .count(db)
         .await
         .unwrap()
@@ -202,9 +202,9 @@ async fn due_tasks_transfer_once_with_audit_notification_and_signature_preservat
             .contains("超时转交")
     );
 
-    let audits = omni_audit_log::Entity::find()
-        .filter(omni_audit_log::Column::ResourceType.eq("bpm_task"))
-        .filter(omni_audit_log::Column::ResourceId.eq(due_task_id.to_string()))
+    let audits = audit_log::Entity::find()
+        .filter(audit_log::Column::ResourceType.eq("bpm_task"))
+        .filter(audit_log::Column::ResourceId.eq(due_task_id.to_string()))
         .all(&*db)
         .await
         .unwrap();
@@ -214,7 +214,7 @@ async fn due_tasks_transfer_once_with_audit_notification_and_signature_preservat
             audit
                 .new_value
                 .as_ref()
-                .and_then(|v| v.get("actual_handler_id"))
+                .and_then(|v| v.0.get("actual_handler_id"))
                 .and_then(Value::as_i64)
                 == Some(fallback as i64)
         })
@@ -223,7 +223,7 @@ async fn due_tasks_transfer_once_with_audit_notification_and_signature_preservat
         update_audit
             .old_value
             .as_ref()
-            .and_then(|v| v.get("actual_handler_id"))
+            .and_then(|v| v.0.get("actual_handler_id"))
             .and_then(Value::as_i64),
         Some(approver as i64)
     );
@@ -232,12 +232,13 @@ async fn due_tasks_transfer_once_with_audit_notification_and_signature_preservat
             .new_value
             .as_ref()
             .unwrap()
+            .0
             .get("due_date")
             .unwrap()
             .is_null()
     );
     assert_eq!(
-        update_audit.new_value.as_ref().unwrap()["task_variables"]["timeout"]["transfer_count"],
+        update_audit.new_value.as_ref().unwrap().0["task_variables"]["timeout"]["transfer_count"],
         1
     );
 
