@@ -11,18 +11,30 @@ use chrono::{Duration, Utc};
 use rust_decimal::Decimal;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 
-async fn seed_order(
-    db: &sea_orm::DatabaseConnection,
+struct OrderSeed {
     id: i32,
     product_id: i32,
     work_center_id: i32,
     created_by: i32,
-    status: &str,
+    status: &'static str,
     planned_quantity: i64,
     planned_start_date: Option<chrono::NaiveDate>,
     actual_quantity: Option<i64>,
     actual_end_date: Option<chrono::NaiveDate>,
-) {
+}
+
+async fn seed_order(db: &sea_orm::DatabaseConnection, seed: OrderSeed) {
+    let OrderSeed {
+        id,
+        product_id,
+        work_center_id,
+        created_by,
+        status,
+        planned_quantity,
+        planned_start_date,
+        actual_quantity,
+        actual_end_date,
+    } = seed;
     let now = Utc::now();
     production_order::ActiveModel {
         id: Set(id),
@@ -116,15 +128,17 @@ async fn capacity_trend_returns_real_daily_quantity_series_from_postgres() {
     ] {
         seed_order(
             &db,
-            id,
-            product_id,
-            work_center.id,
-            23101,
-            status,
-            planned,
-            start,
-            actual,
-            actual_end,
+            OrderSeed {
+                id,
+                product_id,
+                work_center_id: work_center.id,
+                created_by: 23101,
+                status,
+                planned_quantity: planned,
+                planned_start_date: start,
+                actual_quantity: actual,
+                actual_end_date: actual_end,
+            },
         )
         .await;
     }
