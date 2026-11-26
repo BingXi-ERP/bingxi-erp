@@ -28,6 +28,9 @@ function environment(options = {}) {
     config: { bingxiHost: 'https://erp.example.com' },
     globalData: { userInfo: {}, isLoginPage: false },
     AppUserAgent: 'test-agent',
+    applyDeploymentHost(host) {
+      this.config = require(path.join(MP_ROOT, 'deploymentConfig.js')).configForHost(host);
+    },
   };
   const calls = { requests: [], uploads: [], toasts: [], relaunches: [] };
   const wx = Object.assign(storageWx(options.storage), {
@@ -56,7 +59,7 @@ function environment(options = {}) {
     },
     hideLoading() {},
     reLaunch(spec) {
-      calls.relaunches.push(spec);
+      calls.relaunches.push(JSON.parse(JSON.stringify(spec)));
       if (spec.success) spec.success();
     },
   });
@@ -113,6 +116,9 @@ function loadAppDefinition(env, envConfig) {
     require(request) {
       if (request.startsWith('@babel/runtime/')) return mpRequire(request);
       if (request === './envConfig') return envConfig;
+      if (request === './deploymentConfig.js') {
+        return require(path.join(MP_ROOT, 'deploymentConfig.js'));
+      }
       if (request === './version.js') return require(path.join(MP_ROOT, 'version.js'));
       if (request === './libs/utils/apiGateway.js') {
         return { isLoggedIn: () => false };

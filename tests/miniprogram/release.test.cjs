@@ -169,6 +169,45 @@ test('真实 Git 跟踪面生成版本化 ZIP 与 manifest，排除敏感文件�
   });
 });
 
+test('源码包候选面包含未跟踪新增文件、排除已删除索引文件与忽略构建物', t => {
+  const { root, mp } = fixture(t);
+  fs.unlinkSync(path.join(mp, 'app.js'));
+  fs.writeFileSync(path.join(mp, 'new-page.js'), 'Page({});\n');
+  fs.writeFileSync(path.join(root, '.gitignore'), 'miniprogram/@babel/\nminiprogram/reports/\n');
+  fs.mkdirSync(path.join(mp, '@babel'), { recursive: true });
+  fs.writeFileSync(path.join(mp, '@babel', 'generated.js'), 'generated');
+  fs.mkdirSync(path.join(mp, 'reports'), { recursive: true });
+  fs.writeFileSync(path.join(mp, 'reports', 'result.json'), '{}');
+  const manifest = releaseScript().packageSource(root, '3.13.10', path.join(root, 'dist'));
+  const entries = execFileSync('unzip', ['-Z1', path.join(root, 'dist', manifest.archive.name)], {
+    encoding: 'utf8',
+  });
+  assert.match(entries, /miniprogram\/new-page\.js/);
+  assert.doesNotMatch(entries, /miniprogram\/app\.js|@babel|reports/);
+  assert.equal(manifest.source, 'working-tree-candidate-files');
+});
+
+test('源码包拒绝第三方品牌、域名、旧前缀及文件名残留', async t => {
+  const mutations = [
+    ['legacy.js', 'const host = "https://shop.duibu.cn";\n'],
+    ['brand.js', 'const brand = "对布管家";\n'],
+    ['domain.js', 'const host = "https://mini-dev.budadang.com/goods";\n'],
+    ['legacy-prefix.js', 'const className = ".bdd-radio";\n'],
+    ['budadang-help.js', 'module.exports = {};\n'],
+  ];
+  for (const [file, source] of mutations) {
+    await t.test(file, t => {
+      const { root, mp } = fixture(t);
+      fs.writeFileSync(path.join(mp, file), source);
+      execFileSync('git', ['add', 'miniprogram/' + file], { cwd: root });
+      assert.throws(
+        () => releaseScript().packageSource(root, '3.13.10', path.join(root, 'dist')),
+        /THIRD_PARTY_REFERENCE/
+      );
+    });
+  }
+});
+
 test('源码包拒绝 version 漂移与错误 AppID', t => {
   const { root, mp } = fixture(t);
   assert.throws(
@@ -204,8 +243,8 @@ function releaseOptions(t, overrides = {}) {
   fs.mkdirSync(projectPath, { recursive: true });
   fs.mkdirSync(output, { recursive: true });
   fs.writeFileSync(
-    path.join(projectPath, 'mpHost.local.js'),
-    'module.exports={bingxiHost:"https://erp.example.com"};\n'
+    path.join(projectPath, 'project.config.json'),
+    JSON.stringify({ appid: 'wx9fc2137059cd96d0' })
   );
   const privateKeyPath = path.join(dir, 'private.key');
   fs.writeFileSync(privateKeyPath, 'unit-test-key');
@@ -248,45 +287,12 @@ test('发布配置拒绝缺秘密、非 HTTPS、越界 robot、错误 AppID 与�
     desc: 'release',
     appid: 'wx9fc2137059cd96d0',
     privateKey: 'key',
-    host: 'https://erp.example.com',
   };
   assert.equal(ciRelease.validateReleaseConfig(valid).robot, 30);
   assert.throws(() => ciRelease.validateReleaseConfig({ ...valid, privateKey: '' }), /PRIVATE_KEY/);
-  assert.throws(() => ciRelease.validateReleaseConfig({ ...valid, host: '' }), /BINGXI_HOST/);
-  assert.throws(
-    () =>
-      ciRelease.validateReleaseConfig({
-        ...valid,
-        host: 'http://erp.example.com',
-      }),
-    /https/
-  );
-  assert.throws(
-    () =>
-      ciRelease.validateReleaseConfig({
-        ...valid,
-        host: 'https://u:p@erp.example.com',
-      }),
-    /用户名/
-  );
-  assert.throws(
-    () =>
-      ciRelease.validateReleaseConfig({
-        ...valid,
-        host: 'https://erp.example.com/base',
-      }),
-    /路径/
-  );
   assert.throws(() => ciRelease.validateReleaseConfig({ ...valid, robot: 31 }), /1-30/);
   assert.throws(() => ciRelease.validateReleaseConfig({ ...valid, appid: 'wxwrong' }), /AppID/);
   assert.throws(() => ciRelease.validateReleaseConfig({ ...valid, version: 'latest' }), /semver/);
-});
-
-test('主机渲染只输出规范化 https 源站，不输出秘密', () => {
-  assert.equal(
-    ciRelease.renderHostConfig('https://erp.example.com/'),
-    'module.exports = { bingxiHost: "https://erp.example.com" };\n'
-  );
 });
 
 test('preview 调 packNpm 与 preview，输出二维码和安全结果，不调 upload', async t => {
@@ -420,10 +426,11 @@ test('CI 强制小程序运行时依赖审计与源码产物', () => {
   assert.match(workflow, /npm --prefix miniprogram test/);
   assert.match(workflow, /node scripts\/ci\/miniprogram-release\.cjs \\\n\s+--version/);
   assert.doesNotMatch(workflow, /miniprogram-release\.cjs package/);
+  assert.doesNotMatch(workflow, /BINGXI_HOST|mpHost\.local\.js/);
   assert.match(workflow, /if-no-files-found: error/);
 });
 
-test('execute 在 finally 删除私钥并移除本次生成的本地主机文件', async t => {
+test('execute 不要求部署主机秘密，且不生成本地主机文件', async t => {
   const options = releaseOptions(t);
   fs.writeFileSync(
     path.join(options.projectPath, 'package.json'),
@@ -434,7 +441,6 @@ test('execute 在 finally 删除私钥并移除本次生成的本地主机文件
     JSON.stringify(manifest())
   );
   fs.writeFileSync(path.join(options.output, 'release-manifest.json'), JSON.stringify(manifest()));
-  fs.rmSync(path.join(options.projectPath, 'mpHost.local.js'));
   const runnerTemp = path.join(options.root, 'runner');
   fs.mkdirSync(runnerTemp);
   const result = await ciRelease.execute(
@@ -457,11 +463,61 @@ test('execute 在 finally 删除私钥并移除本次生成的本地主机文件
     {
       RUNNER_TEMP: runnerTemp,
       WECHAT_MINIPROGRAM_PRIVATE_KEY: 'unit-test-key',
-      BINGXI_HOST: 'https://erp.example.com',
     },
     { ci: options.ci, Project: options.Project }
   );
   assert.equal(result.mode, 'preview');
   assert.equal(fs.existsSync(path.join(runnerTemp, 'wechat-miniprogram-private.key')), false);
   assert.equal(fs.existsSync(path.join(options.projectPath, 'mpHost.local.js')), false);
+});
+
+test('私钥部分写入失败时 finally 仍删除残留文件', async t => {
+  const options = releaseOptions(t);
+  fs.writeFileSync(
+    path.join(options.projectPath, 'package.json'),
+    JSON.stringify({ version: '3.13.10' })
+  );
+  fs.writeFileSync(
+    path.join(options.projectPath, 'project.config.json'),
+    JSON.stringify(manifest())
+  );
+  fs.writeFileSync(path.join(options.output, 'release-manifest.json'), JSON.stringify(manifest()));
+  const runnerTemp = path.join(options.root, 'runner');
+  fs.mkdirSync(runnerTemp);
+  const keyPath = path.join(runnerTemp, 'wechat-miniprogram-private.key');
+  const originalWrite = fs.writeFileSync;
+  t.mock.method(fs, 'writeFileSync', function (file, data, ...args) {
+    if (file === keyPath) {
+      originalWrite.call(fs, file, 'partial-key', ...args);
+      throw new Error('模拟私钥写入中断');
+    }
+    return originalWrite.call(fs, file, data, ...args);
+  });
+  await assert.rejects(
+    ciRelease.execute(
+      [
+        '--root',
+        options.root,
+        '--project',
+        'miniprogram',
+        '--output',
+        'output',
+        '--mode',
+        'preview',
+        '--version',
+        '3.13.10',
+        '--robot',
+        '1',
+        '--desc',
+        'test',
+      ],
+      {
+        RUNNER_TEMP: runnerTemp,
+        WECHAT_MINIPROGRAM_PRIVATE_KEY: 'unit-test-key',
+      },
+      { ci: options.ci, Project: options.Project }
+    ),
+    /模拟私钥写入中断/
+  );
+  assert.equal(fs.existsSync(keyPath), false);
 });

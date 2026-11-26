@@ -8,7 +8,7 @@ Page({
     imageList: [],
     remoteImageFiles: [],
     icon: {
-      listen: "".concat(a.config.imgHost, "/img/customer/duibuIcon/icon/listen.png"),
+      listen: "/assets/icons/icon/listen.png",
     },
     imagePre: [
       "".concat(a.config.rootHost, "/html/static/img/eg_shop_front.jpg"),

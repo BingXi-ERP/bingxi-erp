@@ -45,12 +45,17 @@ function isExcluded(relativePath) {
 }
 
 function gitFiles(root) {
-  return execFileSync('git', ['-C', root, 'ls-files', '-z', '--', 'miniprogram'], {
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-  })
+  return execFileSync(
+    'git',
+    ['-C', root, 'ls-files', '--cached', '--others', '--exclude-standard', '--deduplicate', '-z', '--', 'miniprogram'],
+    {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    }
+  )
     .split('\0')
     .filter(Boolean)
+    .filter(relative => fs.existsSync(path.join(root, relative)))
     .sort();
 }
 
@@ -121,6 +126,25 @@ function scanLegacyEndpoints(sourceFiles) {
   return hits;
 }
 
+function scanThirdPartyReferences(sourceFiles) {
+  const hits = [];
+  const patterns = [/duibu|对布|budadang|jzcang/i, /(?:^|[^a-z0-9])bdd[-_]/i];
+  for (const file of sourceFiles) {
+    const publishedPath = 'miniprogram/' + file.relativePath;
+    if (patterns.some(pattern => pattern.test(publishedPath))) {
+      hits.push({ file: publishedPath, line: 0 });
+    }
+    const source = fs.readFileSync(file.fullPath).toString('utf8');
+    const lines = source.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      if (patterns.some(pattern => pattern.test(line))) {
+        hits.push({ file: publishedPath, line: index + 1 });
+      }
+    });
+  }
+  return hits;
+}
+
 function sha256(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }
@@ -134,11 +158,11 @@ function prepareSource(root, version, output) {
   const commit = execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], {
     encoding: 'utf8',
   }).trim();
-  const tracked = gitFiles(root);
-  assert.ok(tracked.length > 100, 'Git 跟踪的小程序源文件少于 100，拒绝生成空包');
+  const candidates = gitFiles(root);
+  assert.ok(candidates.length > 100, 'Git 可见的小程序源文件少于 100，拒绝生成空包');
   const included = [];
   const excluded = [];
-  for (const relative of tracked) {
+  for (const relative of candidates) {
     const inner = relative.slice('miniprogram/'.length);
     if (isExcluded(inner)) {
       excluded.push(relative);
@@ -153,6 +177,12 @@ function prepareSource(root, version, output) {
     });
   }
   const legacyEndpoints = scanLegacyEndpoints(included);
+  const thirdPartyReferences = scanThirdPartyReferences(included);
+  assert.equal(
+    thirdPartyReferences.length,
+    0,
+    'THIRD_PARTY_REFERENCE ' + JSON.stringify(thirdPartyReferences.slice(0, 10))
+  );
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'bingxi-miniprogram-source-'));
   const stageRoot = path.join(staging, 'miniprogram');
   fs.mkdirSync(stageRoot, { recursive: true });
@@ -174,7 +204,7 @@ function prepareSource(root, version, output) {
     commit,
     version,
     appid: project.appid,
-    source: 'git-tracked-files',
+    source: 'working-tree-candidate-files',
     dependencies,
     fileCount: included.length,
     sourceBytes: included.reduce((sum, file) => sum + file.bytes, 0),
@@ -184,6 +214,10 @@ function prepareSource(root, version, output) {
         'JavaScript string literals outside comments; static call sites, not runtime reachability',
       count: legacyEndpoints.length,
       samples: legacyEndpoints.slice(0, 20),
+    },
+    thirdPartyReferences: {
+      count: thirdPartyReferences.length,
+      samples: thirdPartyReferences.slice(0, 20),
     },
     releaseReadiness: {
       previewAllowed: true,
@@ -327,6 +361,7 @@ module.exports = {
   VERSION_PATTERN,
   isExcluded,
   scanLegacyEndpoints,
+  scanThirdPartyReferences,
   stripComments,
   validateVersion,
   prepareSource,

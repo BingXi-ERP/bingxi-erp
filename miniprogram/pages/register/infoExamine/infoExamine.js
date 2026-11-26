@@ -6,9 +6,9 @@ Page({
     codeDisplay: !1,
     inviteCode: "",
     icon: {
-      success: "".concat(t.config.imgHost, "/img/shareFile/Defaultpage.png"),
-      delImage: "".concat(t.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
-      audit: "".concat(t.config.imgHost, "/img/customer/duibuIcon/audit@2x.png"),
+      success: "/assets/icons/Defaultpage_NoRecord_Color.png",
+      delImage: "/assets/icons/icon/del@2x.png",
+      audit: "/assets/icons/audit@2x.png",
     },
   },
   codeDisplay: function () {

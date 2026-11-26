@@ -10,10 +10,10 @@ function config() {
     appVersion: '3.13.10',
     contacts: { customsPhoneNum: '13800000000' },
     envList: {
-      dev: { rootHost: 'https://tshop.duibu.cn' },
-      test: { rootHost: 'https://tshop.duibu.cn' },
-      uat: { rootHost: 'https://ushop.duibu.cn' },
-      production: { rootHost: 'https://shop.duibu.cn' },
+      dev: { name: '开发 dev' },
+      test: { name: '测试 test' },
+      uat: { name: '产品 uat' },
+      production: { name: '生产 product' },
     },
   };
 }
@@ -35,15 +35,17 @@ for (const [stored, expected, envVersion] of [
   });
 }
 
-test('dev/test 即使 rootHost 相同也保留不同 environment', () => {
-  const env = environment({ storage: { envPage: 'dev' } });
+test('dev/test 共用首访部署地址，environment 仍按 envPage 区分', () => {
+  const env = environment({
+    storage: { envPage: 'dev', bingxiDeploymentHost: 'https://erp.example.com' },
+  });
   const app = loadAppDefinition(env, config());
   app.initEnv();
-  assert.equal(app.config.rootHost, 'https://tshop.duibu.cn');
+  assert.equal(app.config.rootHost, 'https://erp.example.com');
   assert.equal(app.environment, 'dev');
   env.wx.setStorageSync('envPage', 'test');
   app.initEnv();
-  assert.equal(app.config.rootHost, 'https://tshop.duibu.cn');
+  assert.equal(app.config.rootHost, 'https://erp.example.com');
   assert.equal(app.environment, 'test');
 });
 
@@ -70,20 +72,17 @@ test('envConfig 所有版本字段统一来自 package.json', () => {
   assert.equal(moduleBox.exports.appVersion, pkg.version);
 });
 
-test('envConfig 缺本地主机与空主机都显式失败', () => {
+test('envConfig 不读取或声明本地主机文件', () => {
   const source = fs.readFileSync(path.join(MP_ROOT, 'envConfig.js'), 'utf8');
-  const run = host =>
-    vm.runInNewContext(source, {
-      module: { exports: {} },
-      require(request) {
-        if (request === './version.js') return '3.13.10';
-        if (request === './mpHost.local.js') {
-          if (host === undefined) throw new Error('not found');
-          return host;
-        }
-        throw new Error('unexpected require ' + request);
-      },
-    });
-  assert.throws(() => run(undefined), /缺少本地主机配置/);
-  assert.throws(() => run({ bingxiHost: '' }), /本地主机配置无效/);
+  const moduleBox = { exports: {} };
+  vm.runInNewContext(source, {
+    module: moduleBox,
+    require(request) {
+      if (request === './version.js') return require(path.join(MP_ROOT, 'version.js'));
+      throw new Error('unexpected require ' + request);
+    },
+  });
+  assert.doesNotMatch(source, /mpHost|bingxiHost|rootHost|imgHost/i);
+  assert.equal(moduleBox.exports.envList.production.name, '生产 product');
+  assert.deepEqual(Object.keys(moduleBox.exports.envList.production), ['name']);
 });

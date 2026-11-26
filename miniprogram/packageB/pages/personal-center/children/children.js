@@ -16,9 +16,9 @@ Page({
       border: !1,
     },
     icon: {
-      add: "".concat(app.config.imgHost, "/img/customer/ic_tianjia.svg"),
-      noData: "".concat(app.config.imgHost, "/img/customer/duibuIcon/dz@2x.png"),
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
+      add: "/assets/icons/color_add@2x.png",
+      noData: "/assets/icons/dz@2x.png",
+      rightArrow: "/assets/icons/ic_jinru.png",
     },
   },
   onLoad: function () {

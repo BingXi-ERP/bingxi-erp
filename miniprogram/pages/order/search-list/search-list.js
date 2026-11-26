@@ -46,8 +46,8 @@ Page({
     globalApp: {},
     historyList: {},
     icon: {
-      noData: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
-      del: "".concat(app.config.imgHost, "/img/customer/icon_trash.png"),
+      noData: "/assets/icons/img_wuxinx@3x.png",
+      del: "/assets/images/icon2nd/icon_trash.png",
     },
   },
   onLoad: function (t) {

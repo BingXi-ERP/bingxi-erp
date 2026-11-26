@@ -467,7 +467,7 @@ page {
   transform: translate(-50%, -25%);
 }
 .noResult .noPage {
-  background: url(https://img.duibu.cn/duibu/shop/img/customer/Defaultpage_NoRecord_Color.png)
+  background: url(/assets/icons/Defaultpage_NoRecord_Color.png)
     no-repeat;
   background-position: 50%;
   background-size: 320rpx 320rpx;

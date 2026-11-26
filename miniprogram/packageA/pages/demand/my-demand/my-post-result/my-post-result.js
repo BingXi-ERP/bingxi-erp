@@ -8,8 +8,8 @@ Page({
     showNoData: !1,
     icon: {
       avatar: "",
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
-      noImg: "".concat(app.config.imgHost, "/img/customer/Defaultpage_Noneed@2x.png"),
+      rightArrow: "/assets/icons/ic_jinru.png",
+      noImg: "/assets/icons/Defaultpage_NoRecord_Color.png",
     },
     itemId: "",
     pageNum: 1,

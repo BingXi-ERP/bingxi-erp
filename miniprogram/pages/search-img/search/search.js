@@ -10,7 +10,7 @@ Page({
     searchImgUrl: "",
     searchList: [],
     shareFriendData: {},
-    noColorCardBg: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
+    noColorCardBg: "/assets/icons/img_wuxinx@3x.png",
     noColorCardShow: !1,
     popupInit: {
       canvas: {
@@ -62,15 +62,12 @@ Page({
                 (1 == c.onSale
                   ? (c.onOrOff = {
                       name: "下架",
-                      icon: "".concat(app.config.imgHost, "/img/customer/ic_xiajiaseka@4.5x.png"),
+                      icon: "/assets/icons/color_add@2x.png",
                     })
                   : 0 == c.onSale &&
                     (c.onOrOff = {
                       name: "上架",
-                      icon: "".concat(
-                        app.config.imgHost,
-                        "/img/customer/ic_shangjiazhong@4.5x.png",
-                      ),
+                      icon: "/assets/icons/no_img.png",
                     }),
                   list.push(c));
               }

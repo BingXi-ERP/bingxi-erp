@@ -10,8 +10,8 @@ Page({
     recordList: [],
     nowPageNum: 1,
     searchKey: "",
-    noDataBg: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
-    rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
+    noDataBg: "/assets/icons/img_wuxinx@3x.png",
+    rightArrow: "/assets/icons/ic_jinru.png",
   },
   onLoad: function (t) {
     (mta_analysis.default.Page.init(),

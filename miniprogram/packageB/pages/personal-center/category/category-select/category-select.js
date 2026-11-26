@@ -4,7 +4,7 @@ Page({
   data: {
     allCheck: 0,
     imgNo: "/assets/images/icon2nd/select_s_no@2x.png",
-    imgS: "".concat(app.config.imgHost, "/img/customer/select_s@2x.png"),
+    imgS: "/assets/icons/select_s@2x.png",
     list: [],
     subChildList: [],
     listName: "",

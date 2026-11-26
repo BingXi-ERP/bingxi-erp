@@ -68,7 +68,7 @@ test('源码净化器对敏感路径漏排有检测力', () => {
   }
 });
 
-test('发布闸门对缺秘密、旧端点与 packNpm warning 的断言均不可软化', () => {
+test('发布闸门对缺秘密、非法模式与已移除主机参数的断言均不可软化', () => {
   const release = require('../../scripts/ci/miniprogram-ci-release.cjs');
   const valid = {
     mode: 'upload',
@@ -77,9 +77,9 @@ test('发布闸门对缺秘密、旧端点与 packNpm warning 的断言均不可
     desc: 'test',
     appid: 'wx9fc2137059cd96d0',
     privateKey: 'key',
-    host: 'https://erp.example.com',
   };
   provesAssertionDetects(() => release.validateReleaseConfig({ ...valid, privateKey: '' }));
-  provesAssertionDetects(() => release.validateReleaseConfig({ ...valid, host: '' }));
   provesAssertionDetects(() => release.validateReleaseConfig({ ...valid, mode: 'release' }));
+  assert.doesNotThrow(() => release.validateReleaseConfig(valid));
+  assert.doesNotMatch(JSON.stringify(valid), /host/i);
 });

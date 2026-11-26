@@ -5,10 +5,7 @@ Component({
   },
   data: {
     icon: {
-      up: "".concat(
-        app.config.imgHost,
-        "/img/customer/duibuIcon/icon/Icon_Sorting_Down_Gray@2x.png",
-      ),
+      up: "/assets/icons/icon/Icon_Sorting_Down_Gray@2x.png",
       down: "/assets/images/icon2nd/Icon_Sorting_Up_Gray@2x.png",
     },
     sort: "asc",

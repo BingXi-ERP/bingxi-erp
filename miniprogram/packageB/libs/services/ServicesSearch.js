@@ -52,11 +52,6 @@ var createClass = require("../../../@babel/runtime/helpers/createClass"),
           t,
         );
       }),
-      (this.getDuiBuDetail = function (t) {
-        return request.GET(
-          "".concat(app.config.bingxiHost, "/app-api/product/getDuibuProductDetail/").concat(t),
-        );
-      }),
       (this.getColorChartPicture = function (t) {
         return request.GET("".concat(app.config.bingxiHost, "/api/v1/erp/color-cards"), t);
       }));

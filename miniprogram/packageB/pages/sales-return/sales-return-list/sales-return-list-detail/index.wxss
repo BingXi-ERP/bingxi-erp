@@ -16,13 +16,13 @@ page {
   padding: 40rpx 0 60rpx;
 }
 .order-status-closed {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/img_yiguanbi.svg);
+  background-image: url(/assets/icons/img_yiguanbi.svg);
 }
 .order-status-unpay {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/img_weijiesuan.svg);
+  background-image: url(/assets/icons/img_weijiesuan.svg);
 }
 .order-status-payed {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/img_yijieus.svg);
+  background-image: url(/assets/icons/img_yijieus.svg);
 }
 .order-status-image {
   height: 32rpx;
@@ -504,7 +504,7 @@ page {
   width: 652rpx;
 }
 .image-preview .image-content {
-  background: url(https://img.duibu.cn/duibu/shop/img/customer/img_fenxiangdingdan@2x.png)
+  background: url(/assets/icons/img_fenxiangdingdan@2x.png)
     no-repeat 50%;
   background-size: cover;
   height: 534rpx;

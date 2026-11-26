@@ -7,7 +7,7 @@ var e = require("../../../../@babel/runtime/helpers/interopRequireDefault").defa
 Page({
   data: {
     userTab: ["已报单", "已取消"],
-    icon: "".concat(app.config.imgHost, "/img/pay/order-cancel.png"),
+    icon: "/assets/icons/order_copy@2x.png",
     demandOrderList: [],
     demandOrderStatus: 1,
     orderIndex: 0,

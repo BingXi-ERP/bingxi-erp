@@ -18,7 +18,7 @@ Page({
     maskDispaly: !1,
     successText: "返回",
     icon: {
-      print: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/Icon_Priint_Ok.png"),
+      print: "/packageB/assets/icons/icon/Icon_Priint_Ok.png",
     },
   },
   onLoad: function (e) {

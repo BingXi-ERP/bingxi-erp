@@ -1,5 +1,6 @@
 var t = require("@babel/runtime/helpers/interopRequireDefault").default,
-  envConfig = t(require("./envConfig")),
+  envConfig = require("./envConfig"),
+  deployment = require("./deploymentConfig.js"),
   apiGateway = require("./libs/utils/apiGateway.js"),
   releaseVersion = require("./version.js");
 App({
@@ -14,7 +15,7 @@ App({
   contentData: [],
   chooseId: [],
   chooseName: "",
-  customsPhoneNum: envConfig.default.contacts.customsPhoneNum,
+  customsPhoneNum: envConfig.contacts.customsPhoneNum,
   showStopPop: !1,
   userAuthList: {},
   statisticsCount: 0,
@@ -88,14 +89,26 @@ App({
     this.AppUserAgent = mta_analysis;
   },
   initEnv: function () {
-    var envPage = wx.getStorageSync("envPage") || envConfig.default.envPage;
-    var target =
-      envConfig.default.envList[envPage] ||
-      envConfig.default.envList[envConfig.default.envPage];
-    ((this.config = target),
-      (this.envPage = envPage),
-      (this.appVersion = envConfig.default.appVersion),
-      this.judgeConfig());
+    var envPage = wx.getStorageSync("envPage") || envConfig.envPage;
+    if (!envConfig.envList[envPage]) {
+      throw new Error("未知小程序环境：" + envPage);
+    }
+    var host = deployment.readHost(wx);
+    this.config = host ? deployment.configForHost(host) : deployment.emptyConfig();
+    this.envPage = envPage;
+    this.appVersion = envConfig.appVersion;
+    this.judgeConfig();
+  },
+  applyDeploymentHost: function (host) {
+    this.config = deployment.configForHost(host);
+  },
+  clearDeploymentSession: function () {
+    ["bingxiSession", "bingxiCsrf", "id", "myShopId", "nickName", "mobile", "avatar", "fullName", "resCodeList"].forEach(function (key) {
+      wx.removeStorageSync(key);
+    });
+    this.globalData.loginState = "invalid";
+    this.globalData.userInfo = {};
+    this.userAuthList = {};
   },
   judgeConfig: function () {
     switch (this.envPage) {

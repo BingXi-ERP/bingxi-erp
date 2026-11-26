@@ -26,7 +26,7 @@ Page({
     readId: "",
     notifyId: "",
     icon: {
-      print: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/Icon_Priint_Ok.png"),
+      print: "/packageB/assets/icons/icon/Icon_Priint_Ok.png",
     },
   },
   selectPackgeLength: function () {

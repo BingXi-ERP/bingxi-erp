@@ -28,7 +28,7 @@ Page({
     openShopStatus: "",
     userInfoList: {},
     img: {
-      info: "".concat(app.config.imgHost, "/img/v3.0.0/info.png"),
+      info: "/assets/icons/no_img.png",
     },
   },
   getUserInfo: function () {

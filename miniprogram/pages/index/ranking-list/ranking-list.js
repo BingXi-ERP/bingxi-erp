@@ -10,8 +10,8 @@ Page({
     userId: null,
     colorCardReceiveList: [],
     listUpDowm: 0,
-    defBg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/no_img.png"),
-    noDataBg: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
+    defBg: "/assets/icons/no_img.png",
+    noDataBg: "/assets/icons/img_wuxinx@3x.png",
     colorCardOrder: {
       up: "../../../assets/images/icon2nd/ic_shangxuan01@2x.png",
       dowm: "../../../assets/images/icon2nd/ic_xiaxuan01@2x.png",

@@ -33,9 +33,9 @@ Page({
     createDateTimestamp: new Date(),
     productType: "full",
     icon: {
-      cross: "".concat(app.config.imgHost, "/img/customer/Icon_Add_cross.png"),
-      del: "".concat(app.config.imgHost, "/img/customer/duibuIcon/color_delete@2x.png"),
-      edit: "".concat(app.config.imgHost, "/img/customer/duibuIcon/color_editor@2x.png"),
+      cross: "/assets/icons/color_add@2x.png",
+      del: "/assets/icons/color_delete@2x.png",
+      edit: "/assets/icons/color_editor@2x.png",
     },
     selectSalesBillId: "",
     salesList: {

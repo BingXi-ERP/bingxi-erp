@@ -18,10 +18,10 @@ Page({
       closeReason: "",
     },
     icon: {
-      hongBao: "".concat(app.config.imgHost, "/img/customer/Icon_HB.png"),
-      NO1: "".concat(app.config.imgHost, "/img/customer/Tag_NoOne.png"),
-      contact: "".concat(app.config.imgHost, "/img/customer/Icon_Phone@2x.png"),
-      service: "".concat(app.config.imgHost, "/img/customer/Icon_Contact@2x.png"),
+      hongBao: "/assets/icons/no_img.png",
+      NO1: "/assets/icons/Defaultpage_NoRecord_Color.png",
+      contact: "/assets/icons/phone@2x.png",
+      service: "/assets/icons/phone@2x.png",
     },
     popup: {
       showPopup: !1,

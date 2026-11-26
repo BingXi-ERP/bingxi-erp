@@ -1,5 +1,5 @@
 <view class="noList">
   <view class="noImg" style="background-image:url('{{noImg}}')"></view>
   <view class="text">请尝试更换关键字/筛选条件重新搜索</view>
-  <view class="text">或使用对布机器人进行图片精准搜索</view>
+  <view class="text">也可使用图片搜索功能查找相似面料</view>
 </view>

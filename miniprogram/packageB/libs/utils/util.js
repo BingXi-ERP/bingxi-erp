@@ -122,7 +122,7 @@ var createClass = require("../../../@babel/runtime/helpers/createClass"),
         );
       }),
       (this.addDefaultAvatar = function (e) {
-        var classCallCheck = "".concat(app.config.imgHost, "/Face_User_Face_Man_Default@3x.png");
+        var classCallCheck = "/assets/icons/account@2x.png";
         return "" == e || null == e ? classCallCheck : e;
       }),
       (this.inputIsNull = function (e) {

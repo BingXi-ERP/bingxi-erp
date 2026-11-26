@@ -26,7 +26,7 @@ Page({
     wxCode: "",
     currentTime: 61,
     codeName: "获取验证码",
-    delImage: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
+    delImage: "/assets/icons/icon/del@2x.png",
     params: {},
   },
   onLoad: function (e) {

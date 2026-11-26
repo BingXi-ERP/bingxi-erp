@@ -192,15 +192,10 @@ jobs:
       - name: 发布前强制检查秘密与版本
         env:
           WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
-          BINGXI_HOST: ${{ secrets.BINGXI_HOST }}
           RELEASE_VERSION: ${{ inputs.version }}
         run: |
           if [ -z "$WECHAT_MINIPROGRAM_PRIVATE_KEY" ]; then
             echo "MP_RELEASE_RED 缺少 WECHAT_MINIPROGRAM_PRIVATE_KEY" >&2
-            exit 1
-          fi
-          if [ -z "$BINGXI_HOST" ]; then
-            echo "MP_RELEASE_RED 缺少 BINGXI_HOST" >&2
             exit 1
           fi
           EXPECTED="$(node -p "require('./miniprogram/package.json').version")"
@@ -216,7 +211,6 @@ jobs:
       - name: 构建 npm 并执行 preview 或 upload
         env:
           WECHAT_MINIPROGRAM_PRIVATE_KEY: ${{ secrets.WECHAT_MINIPROGRAM_PRIVATE_KEY }}
-          BINGXI_HOST: ${{ secrets.BINGXI_HOST }}
           RELEASE_MODE: ${{ inputs.mode }}
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_ROBOT: ${{ inputs.robot }}
@@ -229,12 +223,11 @@ jobs:
             --desc "$RELEASE_DESC" \
             --output miniprogram-release-output
 
-      - name: 清理发布临时秘密与本地主机文件
+      - name: 清理发布临时秘密
         id: cleanup
         if: ${{ always() }}
         run: |
           rm -f "$RUNNER_TEMP/wechat-miniprogram-private.key"
-          rm -f miniprogram/mpHost.local.js
 
       - name: 上传预览码或上传结果与源码包
         if: ${{ always() && steps.cleanup.outcome != 'cancelled' }}

@@ -9,9 +9,9 @@ Page({
     check: !1,
     userHeadImg: "",
     icon: {
-      headerImg: "".concat(app.config.imgHost, "/img/shareFile/invite_header_img.png"),
-      textContent: "".concat(app.config.imgHost, "/img/shareFile/textContent.png"),
-      selected: "".concat(app.config.imgHost, "/img/shareFile/Icon_Selected@2x.png"),
+      headerImg: "/assets/icons/img_fenxiangdingdan@2x.png",
+      textContent: "/assets/icons/no_img.png",
+      selected: "/assets/icons/select_s@2x.png",
     },
     mobile: "",
     code: "",
@@ -26,34 +26,10 @@ Page({
     });
   },
   agreePage: function () {
-    wx.downloadFile({
-      url: "".concat(app.config.imgHost, "/product/syxy.docx"),
-      success: function (e) {
-        var t = e.tempFilePath;
-        wx.openDocument({
-          filePath: t,
-          showMenu: !0,
-          success: function (e) {
-            console.log("打开文档成功");
-          },
-        });
-      },
-    });
+    wx.navigateTo({ url: "/pages/register/terms/index" });
   },
   toPrivacy: function () {
-    wx.downloadFile({
-      url: "".concat(app.config.imgHost, "/product/yszc.docx"),
-      success: function (e) {
-        var t = e.tempFilePath;
-        wx.openDocument({
-          filePath: t,
-          showMenu: !0,
-          success: function (e) {
-            console.log("打开文档成功");
-          },
-        });
-      },
-    });
+    wx.navigateTo({ url: "/pages/register/agreement/agreement" });
   },
   toPath: function () {
     var e = this;

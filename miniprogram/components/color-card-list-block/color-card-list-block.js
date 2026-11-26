@@ -50,23 +50,23 @@ Component({
     mainImgPath: "",
     userAuthList: {},
     imgOssHost: app.config.imgOssHost,
-    imgBg: "".concat(app.config.imgHost, "/img/customer/headimg.jpg"),
+    imgBg: "/assets/icons/bg.png",
     icon: {
-      moveup: "".concat(app.config.imgHost, "/img/v2.14.0/Icon_Top_Up@2x.png"),
-      movedown: "".concat(app.config.imgHost, "/img/v2.14.0/Icon_Top_Down@2x.png"),
-      moveupDisable: "".concat(app.config.imgHost, "/img/v2.14.0/Icon_Top_Up_Disable@2x.png"),
-      movedownDisable: "".concat(app.config.imgHost, "/img/v2.14.0/Icon_Top_Down_Disable@2x.png"),
+      moveup: "/assets/icons/no_img.png",
+      movedown: "/assets/icons/no_img.png",
+      moveupDisable: "/assets/icons/no_img.png",
+      movedownDisable: "/assets/icons/no_img.png",
     },
     action: [
       {
         name: "预览",
-        icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Preview_Eyes@2x.png"),
+        icon: "/assets/icons/no_img.png",
         action: "preview",
         auth: "",
       },
       {
         name: "底卡",
-        icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Back_Card@2x.png"),
+        icon: "/assets/icons/color_add@2x.png",
         action: "bottom",
         auth: "goods:baseCard:manage",
       },
@@ -78,13 +78,13 @@ Component({
       },
       {
         name: "色号",
-        icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Back_Card@2x.png"),
+        icon: "/assets/icons/color_add@2x.png",
         action: "color",
         auth: "",
       },
       {
         name: "分享",
-        icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Share@2x.png"),
+        icon: "/assets/icons/img_fenxiangdingdan@2x.png",
         action: "share",
         auth: "",
       },
@@ -92,11 +92,11 @@ Component({
     permission: {
       all: {
         name: "所有人可见",
-        icon: "".concat(app.config.imgHost, "/img/customer/ic_suoyouren@2x.png"),
+        icon: "/assets/icons/no_img.png",
       },
       some: {
         name: "指定客户可见",
-        icon: "".concat(app.config.imgHost, "/img/customer/ic_zhidingyonghu@2x.png"),
+        icon: "/assets/icons/account@2x.png",
       },
     },
     popupShow: !1,

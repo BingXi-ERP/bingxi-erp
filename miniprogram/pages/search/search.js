@@ -22,14 +22,14 @@ Page({
     },
     color_icon: "",
     icon: {
-      noData: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
-      del: "".concat(app.config.imgHost, "/img/customer/icon_trash.png"),
-      def_img: "".concat(app.config.imgHost, "/img/customer/img_def.png"),
-      color_def: "".concat(app.config.imgHost, "/img/customer/color_def.png"),
-      color_def2: "".concat(app.config.imgHost, "/img/customer/color_def2.png"),
-      color_icon: "".concat(app.config.imgHost, "/img/customer/color_icon.png"),
-      save: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/color_save.png"),
-      set: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/color_set.png"),
+      noData: "/assets/icons/img_wuxinx@3x.png",
+      del: "/assets/images/icon2nd/icon_trash.png",
+      def_img: "/assets/icons/no_img.png",
+      color_def: "/assets/icons/color_add@2x.png",
+      color_def2: "/assets/icons/color_add@2x.png",
+      color_icon: "/assets/icons/color_add@2x.png",
+      save: "/assets/icons/icon/color_save.png",
+      set: "/assets/icons/icon/color_set.png",
     },
     noData: !1,
     searchType: "",
@@ -412,15 +412,12 @@ Page({
                     (1 == mta_analysis.onSale
                       ? (mta_analysis.onOrOff = {
                           name: "下架",
-                          icon: "".concat(
-                            app.config.imgHost,
-                            "/img/v2.7.4/Icon_Off_Shelves@2x.png",
-                          ),
+                          icon: "/assets/icons/Icon_Delete.png",
                         })
                       : 0 == mta_analysis.onSale &&
                         (mta_analysis.onOrOff = {
                           name: "上架",
-                          icon: "".concat(app.config.imgHost, "/img/v2.7.4/Icon_Shelves@2x.png"),
+                          icon: "/assets/icons/no_img.png",
                         }),
                       releaseCargoPass.push(mta_analysis));
                   }
@@ -555,7 +552,7 @@ Page({
               e())
             : (e(
                 t.getImageInfo(
-                  "".concat(app.config.imgHost, "/img/customer/share-product-bg-n.png"),
+                  "/assets/icons/bg.png",
                 ),
               ),
               wx.hideLoading());

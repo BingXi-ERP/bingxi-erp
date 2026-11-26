@@ -6,9 +6,9 @@ Page({
   data: {
     app: app,
     icon: {
-      noData: "".concat(app.config.imgHost, "/img/v2.15.0/DefaultPage.png"),
-      del: "".concat(app.config.imgHost, "/img/customer/icon_trash.png"),
-      delete: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/del@2x.png"),
+      noData: "/assets/icons/Defaultpage_NoRecord_Color.png",
+      del: "/assets/images/icon2nd/icon_trash.png",
+      delete: "/assets/icons/icon/del@2x.png",
     },
     searchData: [],
     showNoData: !1,

@@ -81,7 +81,7 @@ function s(t, a, n) {
 }
 Page({
   data: {
-    noDataBg: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
+    noDataBg: "/assets/icons/img_wuxinx@3x.png",
     startDate: "",
     endDate: "",
     confirmDate: 2,

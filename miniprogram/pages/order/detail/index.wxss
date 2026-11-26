@@ -44,16 +44,16 @@ page {
   padding: 40rpx 0;
 }
 .order-status-undeal {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/img_weijiesuan.png);
+  background-image: url(/assets/icons/img_weijiesuan.png);
 }
 .order-status-closed {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/img_yiguanbi.svg);
+  background-image: url(/assets/icons/img_yiguanbi.svg);
 }
 .order-status-unpay {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/img_weijiesuan.svg);
+  background-image: url(/assets/icons/img_weijiesuan.svg);
 }
 .order-status-payed {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/img_yijieus.svg);
+  background-image: url(/assets/icons/img_yijieus.svg);
 }
 .order-status-image {
   height: 32rpx;

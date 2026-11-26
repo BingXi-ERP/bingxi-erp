@@ -11,8 +11,8 @@ Page({
     pageSize: 5,
     isDone: !1,
     icon: {
-      bg: "".concat(app.config.imgHost, "/img/customer/shop-news-bg.png?imageView2/2/w/750"),
-      noData: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png?imageView2/2/w/750"),
+      bg: "/assets/icons/bg.png",
+      noData: "/assets/icons/img_wuxinx@3x.png",
     },
   },
   getShopNews: function () {

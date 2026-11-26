@@ -290,7 +290,7 @@ page {
   width: 652rpx;
 }
 .image-preview .image-content {
-  background: url(https://img.duibu.cn/duibu/shop/img/customer/img_fenxiangdingdan@2x.png)
+  background: url(/assets/icons/img_fenxiangdingdan@2x.png)
     no-repeat 50%;
   background-size: cover;
   height: 534rpx;

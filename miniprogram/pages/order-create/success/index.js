@@ -7,8 +7,8 @@ var e = require("../../../@babel/runtime/helpers/interopRequireDefault").default
 Page({
   data: {
     icon: {
-      editorOk: "".concat(app.config.imgHost, "/img/customer/duibuIcon/editor_ok@2x.png"),
-      weixin: "".concat(app.config.imgHost, "/img/customer/duibuIcon/weixin@2x.png"),
+      editorOk: "/assets/icons/editor_ok@2x.png",
+      weixin: "/assets/icons/weixin@2x.png",
     },
     isFromPin: "0",
     showShareImage: !1,
@@ -172,7 +172,7 @@ Page({
     });
   },
   drawShareImage: function () {
-    var e = "".concat(app.config.imgHost, "/img/customer/img_fenxiangdingdan@2x.png"),
+    var e = "/assets/icons/img_fenxiangdingdan@2x.png",
       toast = wx.createCanvasContext("orderCanvas");
     (toast.setFillStyle("red"),
       toast.fillRect(0, 0, 150, 75),

@@ -10,8 +10,8 @@ var e = require("../../../../@babel/runtime/helpers/interopRequireDefault").defa
 Page({
   data: {
     image: {
-      topStaff: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/chi2@2x.png"),
-      leftStaff: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/chi1@2x.png"),
+      topStaff: "/assets/icons/icon/chi2@2x.png",
+      leftStaff: "/assets/icons/icon/chi1@2x.png",
       unSelect: "/assets/images/icon2nd/symbols-no-select.png",
       select: "/assets/images/icon2nd/symbols-select.png",
     },
@@ -33,7 +33,7 @@ Page({
     showCreateColorCard: !1,
     dateLayTime: 0,
     delaySetInterval: null,
-    delImgIcon: "".concat(app.config.imgHost, "/img/customer/Icon_Delete.png?imageView2/2/w/50"),
+    delImgIcon: "/assets/icons/Icon_Delete.png",
   },
   onLoad: function (e) {
     mta_analysis.default.Page.init();

@@ -38,13 +38,13 @@ Page({
     initPrice: !1,
     backupEvent: "",
     icon: {
-      add: "".concat(app.config.imgHost, "/img/customer/ic_tianjia@4.5x.png"),
-      enter: "".concat(app.config.imgHost, "/img/customer/duibuIcon/enter.png"),
-      upload: "".concat(app.config.imgHost, "/img/customer/upload@2x.png"),
+      add: "/assets/icons/color_add@2x.png",
+      enter: "/packageB/assets/icons/enter.png",
+      upload: "/packageB/assets/icons/upload@2x.png",
     },
     typeFrom: "",
     typeId: "",
-    delImgIcon: "".concat(app.config.imgHost, "/img/customer/Icon_Delete.png?imageView2/2/w/50"),
+    delImgIcon: "/assets/icons/Icon_Delete.png",
     showClassification: 0,
     showAdd: 0,
     showType: "addclassify",
@@ -53,7 +53,7 @@ Page({
     imageList: [],
     remoteImageFiles: [],
     detailImageFiles: [],
-    duibuImageFiles: [
+    detailImageFiles: [
       {
         label: "2倍正面",
         value: "",
@@ -168,10 +168,10 @@ Page({
     isIphone6: !1,
     productNameError: "",
     shelvesNumberError: "",
-    Fabricdemo: ["".concat(app.config.imgHost, "/img/customer/Fabric.jpg?imageView2/2/w/800")],
-    SampleClothes: ["".concat(app.config.imgHost, "/SampleClothes.jpg?imageView2/2/w/800")],
-    detailDemo: ["".concat(app.config.imgHost, "/detail.jpg?imageView2/2/w/800")],
-    colorImgSample: ["".concat(app.config.imgHost, "/img/demo/colorImgSample.jpg")],
+    Fabricdemo: ["/assets/icons/bg.png"],
+    SampleClothes: ["/assets/icons/no_img.png"],
+    detailDemo: ["/assets/icons/no_img.png"],
+    colorImgSample: ["/assets/icons/color_add@2x.png"],
   },
   getDictData: function (t, e) {
     var a = this;
@@ -423,9 +423,9 @@ Page({
       urls: i,
     });
   },
-  detailImgDuibuTap: function (t) {
+  detailImgTap: function (t) {
     var e = t.currentTarget.dataset.index,
-      a = this.data.duibuImageFiles;
+      a = this.data.detailImageFiles;
     if (a[e].value) {
       var o,
         i = [],
@@ -1773,7 +1773,7 @@ Page({
                   ),
                 );
               }),
-            t.data.duibuImageFiles.forEach(function (t) {
+            t.data.detailImageFiles.forEach(function (t) {
               t.value = util.utils.replImage(ServicesBase.detailImage[t.prop], 300);
             }),
             t.setData({
@@ -1786,7 +1786,7 @@ Page({
               categoryGoodsList: t.data.categoryGoodsList,
               detailImageFiles: t.data.detailImageFiles,
               goodsSampleImgList: t.data.goodsSampleImgList,
-              duibuImageFiles: t.data.duibuImageFiles,
+              detailImageFiles: t.data.detailImageFiles,
               goodsColorImgList: t.data.goodsColorImgList,
               editSourceProductName: ServicesBase.businessProductName,
               editSourceSpuNumber: ServicesBase.spuNumber,

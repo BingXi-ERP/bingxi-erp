@@ -321,7 +321,7 @@
 .marketing-card {
   align-items: center;
   background: #fff;
-  background: url(https://oss.duibu.cn/duibu/shop/img/customer/cardbg.jpg)
+  background: url(/packageA/assets/icons/cardbg.jpg)
     no-repeat;
   background-size: cover;
   border-radius: 8px;

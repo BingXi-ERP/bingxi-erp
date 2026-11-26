@@ -8,7 +8,7 @@ var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default
 require("../../../libs/utils/time").parseTime;
 Page({
   data: {
-    noDataBg: "".concat(app.config.imgHost, "/img/customer/img_wuxinx@3x.png"),
+    noDataBg: "/assets/icons/img_wuxinx@3x.png",
     className: "",
     show: !1,
     closing: !1,

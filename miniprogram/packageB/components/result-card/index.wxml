@@ -44,9 +44,6 @@
       <text wx:if="{{data.mainProduct!==1}}"
         >货架：<text>{{data.goodsShelves||'-'}}</text>
       </text>
-      <text wx:if="{{data.duiBuCode&&data.familyQuantity>0}}"
-        >别称：<text class="val">{{data.duiBuCode||'-'}}</text>
-      </text>
     </view>
     <view class="item_recommand" wx:if="{{data.similarGroupNum>1}}">
       <view class="recommand_l"
@@ -63,21 +60,7 @@
         ></van-icon>
       </view>
     </view>
-    <view
-      class="item_recommand {{!data.duiBuCode||data.familyQuantity<=0?'flex-justify-end':''}}"
-      wx:if="{{plat}}"
-    >
-      <view
-        catchtap="handleRouterToFamily"
-        class="recommand_r"
-        data-item="{{data}}"
-        wx:if="{{data.duiBuCode&&data.familyQuantity>0}}"
-        >家族产品（{{data.familyQuantity}}）<van-icon
-          class="icon"
-          color="#909090"
-          name="arrow"
-        ></van-icon>
-      </view>
+    <view class="item_recommand" wx:if="{{plat}}">
       <slot></slot>
     </view>
   </view>

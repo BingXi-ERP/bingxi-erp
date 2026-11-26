@@ -8,7 +8,7 @@ Page({
       totalPage: 0,
       type: 2,
     },
-    noDataBg: "".concat(app.config.imgHost, "/img/customer/duibuIcon/dz@2x.png"),
+    noDataBg: "/assets/icons/dz@2x.png",
     touchList: [],
     showVideo: !1,
     viewVideoSrc: "",

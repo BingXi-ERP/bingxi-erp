@@ -18,7 +18,7 @@ function parseArgs(argv) {
   return args;
 }
 
-function validateReleaseConfig({ mode, version, robot, desc, appid, privateKey, host }) {
+function validateReleaseConfig({ mode, version, robot, desc, appid, privateKey }) {
   assert.ok(mode === 'preview' || mode === 'upload', 'mode 只能是 preview 或 upload');
   assert.ok(VERSION_PATTERN.test(version), 'version 必须是显式 semver');
   const robotNumber = Number(robot);
@@ -33,28 +33,7 @@ function validateReleaseConfig({ mode, version, robot, desc, appid, privateKey, 
     typeof privateKey === 'string' && privateKey.length > 0,
     '缺少 WECHAT_MINIPROGRAM_PRIVATE_KEY'
   );
-  assert.ok(typeof host === 'string' && host.length > 0, '缺少 BINGXI_HOST');
-  const url = new URL(host);
-  assert.equal(url.protocol, 'https:', 'BINGXI_HOST 必须是 https');
-  assert.equal(url.username, '', 'BINGXI_HOST 不得包含用户名');
-  assert.equal(url.password, '', 'BINGXI_HOST 不得包含密码');
-  assert.equal(url.pathname, '/', 'BINGXI_HOST 必须是主机源站，不得带路径');
-  assert.equal(url.search, '', 'BINGXI_HOST 不得带查询串');
-  assert.equal(url.hash, '', 'BINGXI_HOST 不得带片段');
-  return { robot: robotNumber, host: url.origin };
-}
-
-function renderHostConfig(host) {
-  const { host: normalized } = validateReleaseConfig({
-    mode: 'preview',
-    version: '1.0.0',
-    robot: 1,
-    desc: 'host-validation',
-    appid: EXPECTED_APPID,
-    privateKey: 'non-secret-validation-placeholder',
-    host,
-  });
-  return 'module.exports = { bingxiHost: ' + JSON.stringify(normalized) + ' };\n';
+  return { robot: robotNumber };
 }
 
 function sanitizedResult(mode, version, result) {
@@ -88,9 +67,6 @@ async function runRelease({
     desc,
     appid: manifest.appid,
     privateKey: fs.readFileSync(privateKeyPath, 'utf8'),
-    host: fs.readFileSync(path.join(projectPath, 'mpHost.local.js'), 'utf8').includes('bingxiHost')
-      ? require(path.join(projectPath, 'mpHost.local.js')).bingxiHost
-      : undefined,
   });
   assert.equal(manifest.version, version, 'manifest version 与发布入参不一致');
   assert.equal(manifest.compiledPackage, false, '源码包不得冒充编译包');
@@ -156,7 +132,6 @@ async function execute(argv, env, deps = {}) {
   const projectPath = path.resolve(root, args.project || 'miniprogram');
   const output = path.resolve(root, args.output || 'miniprogram-release-output');
   const privateKey = env.WECHAT_MINIPROGRAM_PRIVATE_KEY;
-  const host = env.BINGXI_HOST;
   const projectConfig = JSON.parse(
     fs.readFileSync(path.join(projectPath, 'project.config.json'), 'utf8')
   );
@@ -168,7 +143,6 @@ async function execute(argv, env, deps = {}) {
     desc: args.desc,
     appid: projectConfig.appid,
     privateKey,
-    host,
   });
   const manifest = JSON.parse(fs.readFileSync(path.join(output, 'release-manifest.json'), 'utf8'));
   assert.equal(args.version, packageConfig.version, '发布 version 与 package.json 不一致');
@@ -178,11 +152,8 @@ async function execute(argv, env, deps = {}) {
   );
   fs.mkdirSync(tempRoot, { recursive: true });
   const privateKeyPath = path.join(tempRoot, 'wechat-miniprogram-private.key');
-  const hostPath = path.join(projectPath, 'mpHost.local.js');
-  const previousHost = fs.existsSync(hostPath) ? fs.readFileSync(hostPath) : null;
-  fs.writeFileSync(privateKeyPath, privateKey, { mode: 0o600 });
   try {
-    fs.writeFileSync(hostPath, renderHostConfig(host), { mode: 0o600 });
+    fs.writeFileSync(privateKeyPath, privateKey, { mode: 0o600 });
     const ci = deps.ci || require(path.join(root, 'miniprogram', 'node_modules', 'miniprogram-ci'));
     const Project = deps.Project || ci.Project;
     return await runRelease({
@@ -200,8 +171,6 @@ async function execute(argv, env, deps = {}) {
     });
   } finally {
     fs.rmSync(privateKeyPath, { force: true });
-    if (previousHost === null) fs.rmSync(hostPath, { force: true });
-    else fs.writeFileSync(hostPath, previousHost, { mode: 0o600 });
   }
 }
 
@@ -217,7 +186,6 @@ if (require.main === module) {
 module.exports = {
   parseArgs,
   validateReleaseConfig,
-  renderHostConfig,
   runRelease,
   execute,
   sanitizedResult,

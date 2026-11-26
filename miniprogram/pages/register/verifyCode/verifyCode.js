@@ -3,9 +3,6 @@ var app = getApp(),
   login = require("../../../libs/utils/login.js").login;
 Page({
   data: {
-    icon: {
-      duibuLogo: "".concat(app.config.imgHost, "/img/customer/duibuIcon/logo@2x.png"),
-    },
     smsnumber: "",
     resendSeconds: 60,
     code: "",

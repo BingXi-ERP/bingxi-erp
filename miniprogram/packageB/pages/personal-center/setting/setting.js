@@ -92,35 +92,35 @@ Page({
       login = [
         {
           title: "店铺设置",
-          icon: "".concat(app.config.imgHost, "/img/customer/ic_dianpu@4.5x.png"),
+          icon: "/assets/icons/no_img.png",
           action: "shop",
         },
         {
-          img: "".concat(app.config.imgHost, "/img/customer/ic_yhcard@4.5x.png"),
+          img: "/assets/icons/xianjin@2x.png",
           title: "银行账户管理",
           showBorder: !0,
           action: "bankCard",
         },
         {
-          img: "".concat(app.config.imgHost, "/img/customer/ic_yhcard@4.5x.png"),
+          img: "/assets/icons/xianjin@2x.png",
           title: "收款码",
           showBorder: !0,
           action: "QRcode",
         },
         {
-          img: "".concat(app.config.imgHost, "/img/customer/ic_zhanghao_svg.svg"),
+          img: "/assets/icons/no_img.png",
           title: "账号与安全",
           showBorder: !1,
           action: "account",
         },
         {
-          img: "".concat(app.config.imgHost, "/img/customer/ic_zhanghao_svg.svg"),
+          img: "/assets/icons/no_img.png",
           title: "语言",
           showBorder: !1,
           action: "language",
         },
         {
-          img: "".concat(app.config.imgHost, "/img/customer/ic_zhanghao_svg.svg"),
+          img: "/assets/icons/no_img.png",
           title: "关于我们",
           showBorder: !1,
           action: "aboutUS",
@@ -146,13 +146,13 @@ Page({
   professorList: function () {
     var e = [
       {
-        img: "".concat(app.config.imgHost, "/img/customer/ic_zhanghao_svg.svg"),
+        img: "/assets/icons/no_img.png",
         title: "账号与安全",
         showBorder: !1,
         action: "account",
       },
       {
-        img: "".concat(app.config.imgHost, "/img/customer/ic_yijian_4X4.svg"),
+        img: "/assets/icons/no_img.png",
         title: "意见反馈",
         showBorder: !0,
         action: "advice",

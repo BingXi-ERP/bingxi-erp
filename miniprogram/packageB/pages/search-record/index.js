@@ -18,7 +18,7 @@ Page({
       end_time: "",
     },
     icon: {
-      settime: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/icon_SelTime@2x.png"),
+      settime: "/packageB/assets/icons/icon/icon_SelTime@2x.png",
     },
   },
   dateSubmit: function (t) {

@@ -19,7 +19,7 @@ Page({
       pictureCollectionAccountFlag: 0,
     },
     icon: {
-      del: "".concat(app.config.imgHost, "/img/customer/ic_del_red.svg"),
+      del: "/assets/icons/Icon_Delete.png",
     },
     showJobs: !1,
     checkGangWei: [],

@@ -5,11 +5,8 @@ Page({
     type: "add",
     list: [],
     imgNo: "/assets/images/icon2nd/select_s_no@2x.png",
-    imgS: "".concat(app.config.imgHost, "/img/customer/select_s@2x.png"),
-    imgDisable: "".concat(
-      app.config.imgHost,
-      "/img/customer/duibuIcon/icon/Icon_Selected_Disable@2x.png",
-    ),
+    imgS: "/assets/icons/select_s@2x.png",
+    imgDisable: "/packageB/assets/icons/icon/Icon_Selected_Disable@2x.png",
     activeId: [],
     checkStatus: [],
     chooseId: [],

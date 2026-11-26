@@ -35,7 +35,7 @@ Page({
         checked: "",
       },
     ],
-    contact: "".concat(app.config.imgHost, "/img/customer/duibuIcon/phone@2x.png"),
+    contact: "/assets/icons/phone@2x.png",
     unitStatus: 0,
     unitName: "米",
     priceTypes: [
@@ -66,7 +66,7 @@ Page({
     isAllChange: !1,
     selectedArr: [],
     icon: {
-      delete: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon2nd/deltel@2x.png"),
+      delete: "/assets/icons/icon2nd/deltel@2x.png",
     },
   },
   onLoad: function (t) {

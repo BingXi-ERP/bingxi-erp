@@ -75,7 +75,7 @@ mp_syntax() {
       bad=$((bad + 1))
       say "  SYNTAX_FAIL $f"
     fi
-  done < <(find "$root" -name '*.js' -not -path '*/miniprogram_npm/*' -not -path '*/node_modules/*' | sort)
+  done < <(find "$root" -name '*.js' -not -path '*/miniprogram_npm/*' -not -path '*/node_modules/*' -not -path '*/@babel/*' -not -path '*/report/*' -not -path '*/reports/*' | sort)
   say "SYNTAX checked=$total fail=$bad"
   if [ "$total" -lt "$MP_JS_FLOOR" ]; then
     tool_bug "语法面扫到 $total 个文件，低于地板 $MP_JS_FLOOR，判扫描面失效"
@@ -100,7 +100,7 @@ const projectConfigPath = path.join(root, 'project.config.json');
 const projectConfig = fs.existsSync(projectConfigPath)
   ? JSON.parse(fs.readFileSync(projectConfigPath, 'utf8'))
   : {};
-const skip = new Set(['miniprogram_npm', 'node_modules', '.git']);
+const skip = new Set(['miniprogram_npm', 'node_modules', '@babel', 'report', 'reports', '.git']);
 const ignore = (projectConfig.packOptions && projectConfig.packOptions.ignore) || [];
 const ignoreMatchers = ignore.map((pattern) => {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '\u0000').replace(/\*/g, '[^/]*').replace(/\u0000/g, '.*');
@@ -405,7 +405,7 @@ const fs = require('fs');
 const path = require('path');
 const root = process.argv[2];
 const floor = Number(process.argv[3]);
-const skip = new Set(['miniprogram_npm', 'node_modules', '.git']);
+const skip = new Set(['miniprogram_npm', 'node_modules', '@babel', 'report', 'reports', '.git']);
 const exts = new Set(['.js', '.wxs', '.json', '.wxml', '.wxss', '.md', '.html']);
 // 私网与保留段不算泄露：10/127/0/169.254/192.0.0/192.168/172.16-31 与全 0
 const PRIV = /^(?:10\.|127\.|0\.|169\.254\.|192\.0\.0\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.)/;
@@ -543,7 +543,7 @@ for (const s of appJson.subPackages || appJson.subpackages || []) {
   for (const p of s.pages || []) declared.add('/' + (r ? r + '/' + norm(p) : norm(p)));
 }
 const declaredList = [...declared];
-const skip = new Set(['miniprogram_npm', 'node_modules', '.git']);
+const skip = new Set(['miniprogram_npm', 'node_modules', '@babel', 'report', 'reports', '.git']);
 const files = [];
 (function walk(dir) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

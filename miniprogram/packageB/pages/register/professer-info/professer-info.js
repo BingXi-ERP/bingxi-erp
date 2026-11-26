@@ -7,7 +7,7 @@ Page({
     shopName: "",
     address: "",
     icon: {
-      rightArrow: "".concat(app.config.imgHost, "/img/customer/ic_jinru.png"),
+      rightArrow: "/assets/icons/ic_jinru.png",
     },
   },
   inputVal: function (a) {

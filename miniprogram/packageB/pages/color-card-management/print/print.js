@@ -58,8 +58,8 @@ Page({
     showBottom: !1,
     fileList: [],
     image: {
-      topStaff: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/chi2@2x.png"),
-      leftStaff: "".concat(app.config.imgHost, "/img/customer/duibuIcon/icon/chi1@2x.png"),
+      topStaff: "/assets/icons/icon/chi2@2x.png",
+      leftStaff: "/assets/icons/icon/chi1@2x.png",
       unSelect: "/assets/images/icon2nd/symbols-no-select.png",
       select: "/assets/images/icon2nd/symbols-select.png",
     },

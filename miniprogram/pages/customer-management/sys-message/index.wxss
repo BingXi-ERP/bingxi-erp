@@ -19,7 +19,7 @@ page {
   transform: translate(-50%, -35%);
 }
 .noResult .noPage {
-  background: url(https://img.duibu.cn/duibu/shop/img/customer/Defaultpage_NoRecord_Color.png)
+  background: url(/assets/icons/Defaultpage_NoRecord_Color.png)
     no-repeat;
   background-position: 50%;
   background-size: 320rpx 320rpx;
@@ -126,7 +126,7 @@ page {
   white-space: nowrap;
 }
 .noPage {
-  background: url(https://img.duibu.cn/duibu/shop/img/v2.7.8/Defaultpage_NoMessages@2x.png)
+  background: url(/assets/icons/Defaultpage_NoRecord_Color.png)
     no-repeat;
   background-position: 50%;
   background-size: 320rpx 320rpx;

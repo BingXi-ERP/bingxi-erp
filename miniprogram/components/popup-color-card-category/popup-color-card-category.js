@@ -21,10 +21,10 @@ Component({
   data: {
     list: [],
     icon: {
-      noCheckBg: "".concat(app.config.imgHost, "/img/customer/ic_weixuan@3x.png"),
-      checkedBg: "".concat(app.config.imgHost, "/img/customer/ic_dagou@3x.png"),
-      suoyouren: "".concat(app.config.imgHost, "/img/customer/ic_suoyouren@4.5x.png"),
-      zhidingkehu: "".concat(app.config.imgHost, "/img/customer/ic_zhidingren@4.5x.png"),
+      noCheckBg: "/assets/icons/no_img.png",
+      checkedBg: "/assets/icons/select_s@2x.png",
+      suoyouren: "/assets/icons/no_img.png",
+      zhidingkehu: "/assets/icons/account@2x.png",
     },
     selectStatusArr: [],
     selectedArr: [],

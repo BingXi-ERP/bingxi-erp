@@ -44,7 +44,7 @@
   padding-top: 12rpx;
 }
 .tools2 .icon {
-  background-image: url(https://img.duibu.cn/duibu/shop/img/customer/ic_saoyisao.png?imageView2/2/w/750);
+  background-image: url(/assets/icons/ic_saoyisao.png);
   background-position: 50%;
   background-repeat: no-repeat;
   background-size: cover;

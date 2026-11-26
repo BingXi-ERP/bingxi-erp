@@ -6,15 +6,15 @@ Page({
   data: {
     typeName: "",
     permissionFlag: null,
-    avatarUrl: "".concat(app.config.imgHost, "/Face_User_Face_Man_Default@3x.png"),
+    avatarUrl: "/assets/icons/account@2x.png",
     allCustomerList: [],
     customerList: [],
     allChecked: !1,
     allDisplay: !1,
     categoryId: "",
     icon: {
-      checked: "".concat(app.config.imgHost, "/img/customer/ic_dagou@3x.png"),
-      noCheck: "".concat(app.config.imgHost, "/img/customer/ic_weixuan@3x.png"),
+      checked: "/assets/icons/select_s@2x.png",
+      noCheck: "/assets/icons/no_img.png",
     },
     pageNum: 1,
     pageSize: 10,
