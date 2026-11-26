@@ -45,9 +45,9 @@ fn test_capacity_trend_query_defaults_to_inclusive_seven_days() {
 
     assert_eq!(
         query.date_from,
-        NaiveDate::from_ymd_opt(2026, 11, 21).unwrap()
+        Some(NaiveDate::from_ymd_opt(2026, 11, 21).unwrap())
     );
-    assert_eq!(query.date_to, today);
+    assert_eq!(query.date_to, Some(today));
     assert_eq!(query.work_center_id, Some(7));
 }
 
@@ -60,11 +60,11 @@ fn test_capacity_trend_query_explicit_range_overrides_days() {
 
     assert_eq!(
         query.date_from,
-        NaiveDate::from_ymd_opt(2026, 11, 20).unwrap()
+        Some(NaiveDate::from_ymd_opt(2026, 11, 20).unwrap())
     );
     assert_eq!(
         query.date_to,
-        NaiveDate::from_ymd_opt(2026, 11, 22).unwrap()
+        Some(NaiveDate::from_ymd_opt(2026, 11, 22).unwrap())
     );
     assert_eq!(query.work_center_id, Some(9));
 }
