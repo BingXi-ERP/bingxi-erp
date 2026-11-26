@@ -24,7 +24,7 @@ use sea_orm::{
 use crate::models::dto::bpm_dto::{AddSignRequest, ApproveTaskRequest, TaskQuery};
 use crate::models::status::bpm_instance as instance_status;
 use crate::models::status::bpm_task as task_status;
-use crate::models::{bpm_process_definition, bpm_process_instance, bpm_task};
+use crate::models::{bpm_process_definition, bpm_process_instance, bpm_task, user};
 use crate::services::bpm_ops::sign_mode::{self, node_assignee_ids, node_sign_mode};
 use crate::services::bpm_service::{BpmService, evaluate_bpm_condition};
 use crate::utils::error::AppError;
@@ -619,6 +619,11 @@ impl BpmService {
         } else {
             sign_mode::resolve_assignees(txn, &multi_ids).await?
         };
+        let timeout_policy = super::timeout::node_timeout_policy(next_node)?;
+        if let Some(policy) = timeout_policy.as_ref() {
+            super::timeout::validate_timeout_target(txn, policy).await?;
+        }
+        let now = chrono::Utc::now();
 
         // 会签/或签节点每位处理人各建一枚工单；单人节点保持原有行为
         let assignees: Vec<(Option<i32>, Option<String>, serde_json::Value)> =
@@ -637,6 +642,8 @@ impl BpmService {
                     .collect()
             };
         for (handler_id, _handler_name, variables) in assignees {
+            let (variables, due_date) =
+                super::timeout::apply_timeout_snapshot(variables, timeout_policy.as_ref(), now)?;
             let new_task = bpm_task::ActiveModel {
                 instance_id: Set(ctx.instance.id),
                 process_definition_id: Set(ctx.definition.id),
@@ -685,8 +692,9 @@ impl BpmService {
                     Some(variables)
                 }),
                 status: Set(Some(task_status::PENDING.to_string())),
-                created_at: Set(Some(chrono::Utc::now())),
-                updated_at: Set(Some(chrono::Utc::now())),
+                due_date: Set(due_date),
+                created_at: Set(Some(now)),
+                updated_at: Set(Some(now)),
                 ..Default::default()
             };
             let created = new_task.insert(txn).await?;
@@ -875,6 +883,7 @@ impl BpmService {
                 assignee_names: Set(Some(merged_names_json.clone())),
                 task_variables: Set(Some(trace.clone())),
                 status: Set(Some(task_status::PENDING.to_string())),
+                due_date: Set(task.due_date),
                 created_at: Set(Some(chrono::Utc::now())),
                 updated_at: Set(Some(chrono::Utc::now())),
                 ..Default::default()
@@ -917,6 +926,7 @@ impl BpmService {
         let txn = self.db.begin().await?;
 
         let task = bpm_task::Entity::find_by_id(task_id)
+            .lock_exclusive()
             .one(&txn)
             .await?
             .ok_or_else(|| AppError::not_found("任务不存在"))?;
@@ -925,11 +935,46 @@ impl BpmService {
             // 状态门：前置状态未满足（仅待处理可转办），归业务族
             return Err(AppError::business_displayable("只能转办待处理任务"));
         }
+        let target = user::Entity::find_by_id(new_assignee_id)
+            .one(&txn)
+            .await?
+            .ok_or_else(|| AppError::validation_displayable("转办目标用户不存在"))?;
+        if !target.is_active {
+            return Err(AppError::validation_displayable("转办目标用户已停用"));
+        }
+        let target_name = target
+            .real_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(str::to_string)
+            .unwrap_or(target.username.clone());
+        if target_name.is_empty() {
+            return Err(AppError::validation_displayable("转办目标用户没有有效姓名"));
+        }
+        let previous_handler_id = task.actual_handler_id.ok_or_else(|| {
+            AppError::business_displayable("待转办工单缺少原处理人，无法保留签署席位")
+        })?;
+        let variables = match task.task_variables.as_ref() {
+            Some(value) => {
+                let mut root = value.as_object().cloned().ok_or_else(|| {
+                    AppError::business_displayable("待转办工单变量不是对象，无法保留签署席位")
+                })?;
+                super::timeout::delegate_signature_seat(&mut root, previous_handler_id)?;
+                Some(serde_json::Value::Object(root))
+            }
+            None => None,
+        };
 
         let instance_id = task.instance_id;
         let mut task_active: bpm_task::ActiveModel = task.into();
         task_active.actual_handler_id = Set(Some(new_assignee_id));
+        task_active.actual_handler_name = Set(Some(target_name));
         task_active.approval_opinion = Set(Some(format!("[转办] {}", transfer_reason)));
+        task_active.due_date = Set(None);
+        task_active.is_overdue = Set(Some(false));
+        task_active.overdue_days = Set(Some(0));
+        task_active.task_variables = Set(variables);
         task_active.updated_at = Set(Some(chrono::Utc::now()));
         task_active.update(&txn).await?;
 

@@ -926,6 +926,9 @@ async fn start_registered_schedulers(
             app_state.db.clone(),
         ),
     ) as std::sync::Arc<dyn Scheduler>);
+    registry.register(std::sync::Arc::new(
+        crate::services::bpm_timeout_scheduler::ApprovalTimeoutScheduler::new(app_state.db.clone()),
+    ) as std::sync::Arc<dyn Scheduler>);
     // 审计日志分级保留清理（无门控，固定 24h）
     registry.register(std::sync::Arc::new(
         crate::services::audit_cleanup_service::AuditCleanupService::new(

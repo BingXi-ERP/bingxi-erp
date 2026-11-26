@@ -163,6 +163,8 @@ pub(crate) fn append_signature(
 }
 
 /// 统计某节点已完成指定动作的签署人集合（跨该节点各处理人任务合并去重）。
+/// 超时或人工转交后的代理人票按 `delegated_from_user_id` 计入原签署席位，
+/// 避免保留原 assignee_ids 后代理人永远无法满足会签/或签完成条件。
 pub(crate) fn signed_user_ids(
     variables: impl IntoIterator<Item = Option<serde_json::Value>>,
     action: &str,
@@ -173,14 +175,28 @@ pub(crate) fn signed_user_ids(
         let Some(signatures) = vars.get("signatures").and_then(|v| v.as_array()) else {
             continue;
         };
+        let delegated_from = vars
+            .get("delegated_from_user_id")
+            .and_then(serde_json::Value::as_i64)
+            .and_then(|id| i32::try_from(id).ok())
+            .filter(|id| *id > 0);
         for sig in signatures {
-            if sig.get("action").and_then(|v| v.as_str()) == Some(action) {
-                if let Some(id) = sig.get("user_id").and_then(|v| v.as_i64()) {
-                    let id = id as i32;
-                    if !ids.contains(&id) {
-                        ids.push(id);
-                    }
+            if sig.get("action").and_then(|v| v.as_str()) != Some(action) {
+                continue;
+            }
+            let Some(signer_id) = sig.get("user_id").and_then(|v| v.as_i64()) else {
+                continue;
+            };
+            let id = if let Some(original_id) = delegated_from {
+                original_id
+            } else {
+                match i32::try_from(signer_id) {
+                    Ok(id) if id > 0 => id,
+                    _ => continue,
                 }
+            };
+            if !ids.contains(&id) {
+                ids.push(id);
             }
         }
     }
