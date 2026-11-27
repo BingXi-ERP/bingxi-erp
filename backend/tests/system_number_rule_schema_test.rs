@@ -33,8 +33,12 @@ async fn scalar(txn: &DatabaseTransaction, sql: &str) -> i64 {
         .query_one_raw(Statement::from_string(DbBackend::Postgres, sql.to_string()))
         .await
         .expect("编码规则标量查询失败");
-    row.and_then(|row| row.try_get_by_index::<i64>(0).ok())
-        .unwrap_or_else(|| panic!("编码规则标量查询未返回 i64: {sql}"))
+    row.and_then(|row| {
+        row.try_get_by_index::<i64>(0)
+            .or_else(|_| row.try_get_by_index::<i32>(0).map(i64::from))
+            .ok()
+    })
+    .unwrap_or_else(|| panic!("编码规则标量查询未返回整数: {sql}"))
 }
 
 async fn expect_rejected(txn: &DatabaseTransaction, sql: &str, expected: &str) {
