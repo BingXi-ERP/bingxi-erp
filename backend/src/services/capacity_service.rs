@@ -2,7 +2,7 @@
 //!
 //! 提供产能负荷计算、产能瓶颈识别、工作中心管理等功能
 
-use chrono::{NaiveDate, Utc};
+use chrono::{Duration, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, PaginatorTrait,
@@ -144,6 +144,149 @@ impl CapacityService {
         }
 
         Ok(results)
+    }
+
+    /// 产能趋势：按选定工作中心返回连续日期的计划开工量、实际完工量与日产能。
+    /// 计划量按 `planned_start_date` 落日，实际量按 `actual_end_date` 落日；跨日订单不做
+    /// 臆造分摊，避免把不存在的工时数据画成趋势。
+    pub async fn trend(
+        &self,
+        query: CapacityTrendQuery,
+    ) -> Result<Vec<CapacityTrendPoint>, AppError> {
+        let date_from = query
+            .date_from
+            .ok_or_else(|| AppError::bad_request("产能趋势缺少 date_from"))?;
+        let date_to = query
+            .date_to
+            .ok_or_else(|| AppError::bad_request("产能趋势缺少 date_to"))?;
+        let work_center_id = query
+            .work_center_id
+            .ok_or_else(|| AppError::bad_request("查询产能趋势必须指定工作中心"))?;
+        let work_center = WorkCenterEntity::find_by_id(work_center_id)
+            .filter(WorkCenterColumn::Status.eq("ACTIVE"))
+            .one(&*self.db)
+            .await?
+            .ok_or_else(|| AppError::not_found("启用中的工作中心不存在"))?;
+
+        let planned_statuses = vec![
+            crate::models::status::production::PRODUCTION_APPROVED,
+            crate::models::status::production::PRODUCTION_SCHEDULED,
+            crate::models::status::production::PRODUCTION_IN_PROGRESS,
+            crate::models::status::production::PRODUCTION_COMPLETED,
+        ];
+        let planned_orders = ProductionOrderEntity::find()
+            .filter(ProductionOrderColumn::WorkCenterId.eq(work_center_id))
+            .filter(ProductionOrderColumn::Status.is_in(planned_statuses))
+            .filter(ProductionOrderColumn::PlannedStartDate.gte(date_from))
+            .filter(ProductionOrderColumn::PlannedStartDate.lte(date_to))
+            .all(&*self.db)
+            .await?;
+        let actual_orders = ProductionOrderEntity::find()
+            .filter(ProductionOrderColumn::WorkCenterId.eq(work_center_id))
+            .filter(
+                ProductionOrderColumn::Status
+                    .eq(crate::models::status::production::PRODUCTION_COMPLETED),
+            )
+            .filter(ProductionOrderColumn::ActualEndDate.gte(date_from))
+            .filter(ProductionOrderColumn::ActualEndDate.lte(date_to))
+            .filter(ProductionOrderColumn::ActualQuantity.is_not_null())
+            .all(&*self.db)
+            .await?;
+
+        Self::aggregate_capacity_trend(
+            &work_center,
+            &planned_orders,
+            &actual_orders,
+            date_from,
+            date_to,
+        )
+    }
+
+    /// 纯聚合函数：输入真实工作中心与订单模型，输出补零的连续日期序列。
+    /// 不访问数据库，便于对状态口径、日期边界与缺配置失败行为做确定性回归。
+    pub fn aggregate_capacity_trend(
+        work_center: &crate::models::work_center::Model,
+        planned_orders: &[crate::models::production_order::Model],
+        actual_orders: &[crate::models::production_order::Model],
+        date_from: NaiveDate,
+        date_to: NaiveDate,
+    ) -> Result<Vec<CapacityTrendPoint>, AppError> {
+        if date_from > date_to {
+            return Err(AppError::bad_request("date_from 不能晚于 date_to"));
+        }
+        if (date_to - date_from).num_days() + 1 > 366 {
+            return Err(AppError::bad_request("产能趋势日期区间不能超过 366 天"));
+        }
+        if work_center.status != "ACTIVE" {
+            return Err(AppError::not_found("启用中的工作中心不存在"));
+        }
+        let capacity_quantity = work_center.daily_capacity.ok_or_else(|| {
+            AppError::bad_request(format!(
+                "工作中心 {} 未配置日产能，无法生成真实趋势",
+                work_center.code
+            ))
+        })?;
+        if capacity_quantity < Decimal::ZERO {
+            return Err(AppError::bad_request(format!(
+                "工作中心 {} 的日产能不能为负数",
+                work_center.code
+            )));
+        }
+
+        let mut points = std::collections::BTreeMap::new();
+        let mut date = date_from;
+        loop {
+            points.insert(
+                date,
+                CapacityTrendPoint {
+                    date,
+                    planned_quantity: Decimal::ZERO,
+                    actual_quantity: Decimal::ZERO,
+                    capacity_quantity,
+                    capacity_unit: work_center.capacity_unit.clone(),
+                },
+            );
+            if date == date_to {
+                break;
+            }
+            date += Duration::days(1);
+        }
+
+        for order in planned_orders {
+            let planned_status = matches!(
+                order.status.as_str(),
+                crate::models::status::production::PRODUCTION_APPROVED
+                    | crate::models::status::production::PRODUCTION_SCHEDULED
+                    | crate::models::status::production::PRODUCTION_IN_PROGRESS
+                    | crate::models::status::production::PRODUCTION_COMPLETED
+            );
+            if !planned_status || order.work_center_id != Some(work_center.id) {
+                continue;
+            }
+            if let Some(date) = order.planned_start_date {
+                if let Some(point) = points.get_mut(&date) {
+                    point.planned_quantity += order.planned_quantity;
+                }
+            }
+        }
+
+        for order in actual_orders {
+            if order.status != crate::models::status::production::PRODUCTION_COMPLETED
+                || order.work_center_id != Some(work_center.id)
+            {
+                continue;
+            }
+            let (Some(date), Some(actual_quantity)) =
+                (order.actual_end_date, order.actual_quantity)
+            else {
+                continue;
+            };
+            if let Some(point) = points.get_mut(&date) {
+                point.actual_quantity += actual_quantity;
+            }
+        }
+
+        Ok(points.into_values().collect())
     }
 
     /// V15 P2 缺陷 10.2：负荷 > 80% 自动告警通知

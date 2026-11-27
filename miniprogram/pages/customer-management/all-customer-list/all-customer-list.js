@@ -1,6 +1,5 @@
 var a = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   createForOfIteratorHelper = require("../../../@babel/runtime/helpers/createForOfIteratorHelper"),
-  mta_analysis = a(require("../../../utils/mta_analysis.js")),
   ServicesCustomer = require("../../../libs/services/ServicesCustomer.js").servicesCustomer,
   util = require("../../../libs/utils/util.js").utils;
 getApp();
@@ -57,12 +56,12 @@ Page({
     scrollIntoView: "A",
   },
   onLoad: function (a) {
-    (mta_analysis.default.Page.init(), wx.hideShareMenu());
+    (wx.hideShareMenu());
   },
   onReady: function () {},
   handleClickCustom: function (a) {
     var createForOfIteratorHelper = a.currentTarget.dataset,
-      mta_analysis = createForOfIteratorHelper.id,
+      mpValue = createForOfIteratorHelper.id,
       ServicesCustomer = createForOfIteratorHelper.fullname,
       util = createForOfIteratorHelper.mobile,
       i = getCurrentPages(),
@@ -71,7 +70,7 @@ Page({
       });
     if (c)
       (c.updateCustomer({
-        id: mta_analysis,
+        id: mpValue,
         fullname: ServicesCustomer,
         mobile: util,
       }),
@@ -81,7 +80,7 @@ Page({
     else {
       var o =
         "/pages/customer-management/all-customer-detail/all-customer-detail?customerId=".concat(
-          mta_analysis,
+          mpValue,
         );
       wx.navigateTo({
         url: o,
@@ -100,13 +99,13 @@ Page({
   searchList: function () {
     var a = this;
     wx.showLoading();
-    var mta_analysis = this,
+    var mpValue = this,
       i = this.data.customerList,
       c = {
-        size: mta_analysis.data.searchParams.pageSize,
-        page: mta_analysis.data.searchParams.pageNum,
-        keyword: mta_analysis.data.searchParams.keyword,
-        isFirstLetterAsc: mta_analysis.data.searchParams.isFirstLetterAsc,
+        size: mpValue.data.searchParams.pageSize,
+        page: mpValue.data.searchParams.pageNum,
+        keyword: mpValue.data.searchParams.keyword,
+        isFirstLetterAsc: mpValue.data.searchParams.isFirstLetterAsc,
       };
     ServicesCustomer.allCustomerList(c).then(function (s) {
       if (0 === s.code) {
@@ -124,13 +123,13 @@ Page({
         } finally {
           u.f();
         }
-        (mta_analysis.setData({
+        (mpValue.setData({
           customerList: i,
         }),
           console.log(a.data.customerList),
           0 == n.length &&
-            mta_analysis.data.searchParams.pageNum > 1 &&
-            mta_analysis.setData({
+            mpValue.data.searchParams.pageNum > 1 &&
+            mpValue.setData({
               isDone: !0,
             }),
           wx.hideLoading());

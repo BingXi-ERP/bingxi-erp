@@ -1,6 +1,5 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   slicedToArray = require("../../../@babel/runtime/helpers/slicedToArray"),
-  mta_analysis = t(require("../../../utils/mta_analysis.js")),
   getWxInfo = t(require("../../../libs/utils/getWxInfo")),
   isVisitor = t(require("../../../libs/utils/isVisitor")),
   throttle = t(require("../../../utils/throttle")),
@@ -104,8 +103,7 @@ Page({
     });
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      login.login.getUserInfo(),
+    (login.login.getUserInfo(),
       this.setData({
         userAuthList: app.userAuthList,
       }),
@@ -224,9 +222,9 @@ Page({
       .then(function () {
         var e = t.currentTarget.dataset,
           slicedToArray = e.id,
-          mta_analysis = e.orderNo,
+          mpValue = e.orderNo,
           getWxInfo = "/pages/order-create/offline/create?id=&orderNo="
-            .concat(mta_analysis, "&orderId=")
+            .concat(mpValue, "&orderId=")
             .concat(slicedToArray, "&onlineOrder=")
             .concat(1);
         wx.navigateTo({
@@ -237,9 +235,9 @@ Page({
   againOrderCreate: function (t) {
     var e = t.currentTarget.dataset,
       slicedToArray = e.id,
-      mta_analysis = e.orderNo,
+      mpValue = e.orderNo,
       getWxInfo = "/pages/order-create/offline/create?id=&orderNo="
-        .concat(mta_analysis, "&orderId=&reBillingId=")
+        .concat(mpValue, "&orderId=&reBillingId=")
         .concat(slicedToArray);
     wx.navigateTo({
       url: getWxInfo,
@@ -248,10 +246,10 @@ Page({
   hanleCreateOn: function (t) {
     var e = t.currentTarget.dataset,
       slicedToArray = e.id,
-      mta_analysis = e.orderNo,
+      mpValue = e.orderNo,
       getWxInfo = "/pages/order-create/offline/create?id="
         .concat(slicedToArray, "&orderNo=")
-        .concat(mta_analysis, "&orderId=&isFromPin=1");
+        .concat(mpValue, "&orderId=&isFromPin=1");
     wx.navigateTo({
       url: getWxInfo,
     });
@@ -265,10 +263,10 @@ Page({
           title: "没有权限",
           icon: "none",
         });
-      var mta_analysis = t.currentTarget.dataset.orderno,
+      var mpValue = t.currentTarget.dataset.orderno,
         getWxInfo = "/pages/order-create/offline/create?id="
           .concat(e, "&orderNo=")
-          .concat(mta_analysis, "&orderId=&isFromPin=1");
+          .concat(mpValue, "&orderId=&isFromPin=1");
       wx.navigateTo({
         url: getWxInfo,
       });
@@ -287,7 +285,7 @@ Page({
     var t = this,
       e = arguments.length > 3 && void 0 !== arguments[3] && arguments[3],
       slicedToArray = this,
-      mta_analysis = {
+      mpValue = {
         status: (arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : 0) || 0,
         saleType: 0,
         keyword: arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : "",
@@ -297,7 +295,7 @@ Page({
         endTime: this.data.endDate,
       };
     (wx.showLoading(),
-      g.shopOrderList(mta_analysis).then(function (o) {
+      g.shopOrderList(mpValue).then(function (o) {
         if ((wx.hideLoading(), 0 === o.code)) {
           if (o.data) {
             var getWxInfo = o.data.content;
@@ -379,11 +377,11 @@ Page({
   },
   closeOrder: function (t, e) {
     var slicedToArray = this,
-      mta_analysis = {
+      mpValue = {
         billingId: t,
         closeReason: e,
       };
-    g.closeOrder(mta_analysis).then(function (t) {
+    g.closeOrder(mpValue).then(function (t) {
       0 === t.code
         ? (ServicesUserLog.servicesUserLog.setUserHandleLog(205), slicedToArray.getShopOrderList())
         : wx.showToast({
@@ -450,7 +448,7 @@ Page({
   handleOrderPrint: function (t) {
     var e = t.currentTarget.dataset.orderid,
       slicedToArray = t.currentTarget.dataset.mobile,
-      mta_analysis = t.currentTarget.dataset.id,
+      mpValue = t.currentTarget.dataset.id,
       getWxInfo = this.data.newPrintType,
       throttle = [
         function () {
@@ -463,7 +461,7 @@ Page({
             url: "/packageB/pages/color-card-management/print-cloth-head/print-format/print-format?orderId="
               .concat(e, "&customMobile=")
               .concat(slicedToArray, "&&billingId=")
-              .concat(mta_analysis, "&&newPrintType=")
+              .concat(mpValue, "&&newPrintType=")
               .concat(getWxInfo),
           });
         },
@@ -525,8 +523,8 @@ Page({
     });
     var t = this.data.activedIndex,
       e = u[t].split("|"),
-      mta_analysis = slicedToArray(e, 2);
-    (mta_analysis[0], mta_analysis[1]);
+      mpValue = slicedToArray(e, 2);
+    (mpValue[0], mpValue[1]);
   },
   handleTabClick: function (t) {
     0 == t.detail.index &&

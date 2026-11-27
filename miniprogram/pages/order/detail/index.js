@@ -1,6 +1,5 @@
 var e = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   o = require("../../../@babel/runtime/helpers/defineProperty"),
-  mta_analysis = e(require("../../../utils/mta_analysis")),
   toast = e(require("../../../miniprogram_npm/@vant/weapp/toast/toast")),
   throttle = e(require("../../../utils/throttle")),
   getWxInfo = e(require("../../../libs/utils/getWxInfo")),
@@ -121,7 +120,7 @@ Page({
   },
   hanleCloseOrder: function (e) {
     var o = e.currentTarget.dataset,
-      mta_analysis = o.id;
+      mpValue = o.id;
     (1 == o.type
       ? this.setData({
           modalExplain: "请输入关闭订单的理由",
@@ -134,7 +133,7 @@ Page({
       this.setData({
         show: !0,
         className: "text-gray",
-        closeId: mta_analysis,
+        closeId: mpValue,
       }));
   },
   closeCanelPopular: function () {
@@ -179,9 +178,9 @@ Page({
         );
       if ("" !== this.data.closeReason || 2 != this.data.closeOrAbolish) {
         var o = this.data.closeId,
-          mta_analysis = this.data.closeReason;
-        (1 == this.data.closeOrAbolish && this.closeOrder(o, mta_analysis),
-          2 == this.data.closeOrAbolish && this.orderCancel(o, mta_analysis),
+          mpValue = this.data.closeReason;
+        (1 == this.data.closeOrAbolish && this.closeOrder(o, mpValue),
+          2 == this.data.closeOrAbolish && this.orderCancel(o, mpValue),
           this.setData({
             show: !1,
           }));
@@ -202,7 +201,7 @@ Page({
         }));
   },
   closeOrder: function (e, o) {
-    var mta_analysis = this,
+    var mpValue = this,
       toast = {
         billingId: e,
         closeReason: o,
@@ -213,7 +212,7 @@ Page({
       ServicesOrder.closeOrder(toast).then(function (e) {
         (wx.hideLoading(),
           0 === e.code
-            ? (ServicesUserLog.servicesUserLog.setUserHandleLog(205), mta_analysis.getOrderDetail())
+            ? (ServicesUserLog.servicesUserLog.setUserHandleLog(205), mpValue.getOrderDetail())
             : wx.showToast({
                 title: e.msg,
                 icon: "none",
@@ -221,14 +220,14 @@ Page({
       }));
   },
   orderCancel: function (e, o) {
-    var mta_analysis = {
+    var mpValue = {
       billingId: e,
       cancelReason: o,
     };
     (wx.showLoading({
       title: "提交中",
     }),
-      ServicesOrder.orderCancel(mta_analysis).then(function (e) {
+      ServicesOrder.orderCancel(mpValue).then(function (e) {
         if ((wx.hideLoading(), 0 === e.code)) {
           (ServicesUserLog.servicesUserLog.setUserHandleLog(206),
             wx.showToast({
@@ -261,29 +260,29 @@ Page({
   goRemarks: function () {
     var e = this.data.orderDetailInfo.id,
       o = this.data.orderDetailInfo.billingRemark,
-      mta_analysis = "/pages/order/remark/index?id=".concat(e, "&&remark=").concat(o);
+      mpValue = "/pages/order/remark/index?id=".concat(e, "&&remark=").concat(o);
     wx.navigateTo({
-      url: mta_analysis,
+      url: mpValue,
     });
   },
   goImages: function () {
     var e = this.data.orderDetailInfo.id,
       o = this.data.orderDetailInfo.billingPurchaseImgList,
-      mta_analysis = "/pages/order/image-remark/index?id=".concat(e, "&&list=").concat(o);
+      mpValue = "/pages/order/image-remark/index?id=".concat(e, "&&list=").concat(o);
     wx.navigateTo({
-      url: mta_analysis,
+      url: mpValue,
     });
   },
   handleReturn: function () {
     var e = this.data.orderDetailInfo,
       o = e.customerId,
-      mta_analysis = e.billingUserId,
+      mpValue = e.billingUserId,
       toast = e.id,
       throttle = e.billingStatus,
       getWxInfo = "/packageB/pages/sales-return/sales-return-select-code-list/index?id="
         .concat(this.data.orderId, "&&customerId=")
         .concat(o, "&&billingUserId=")
-        .concat(mta_analysis, "&&saleBillingId=")
+        .concat(mpValue, "&&saleBillingId=")
         .concat(toast, "&&billingStatus=")
         .concat(throttle);
     wx.navigateTo({
@@ -297,8 +296,7 @@ Page({
     });
   },
   onLoad: function (e) {
-    (mta_analysis.default.Page.init(),
-      this.setData({
+    (this.setData({
         userAuthList: app.userAuthList,
         orderId: e.orderId,
       }),
@@ -315,11 +313,11 @@ Page({
       ])
       .then(function () {
         var o = e.currentTarget.dataset,
-          mta_analysis = o.id,
+          mpValue = o.id,
           toast = o.orderNo,
           throttle = "/pages/order-create/offline/create?id=&orderNo="
             .concat(toast, "&orderId=")
-            .concat(mta_analysis, "&onlineOrder=")
+            .concat(mpValue, "&onlineOrder=")
             .concat(1);
         wx.navigateTo({
           url: throttle,
@@ -335,11 +333,11 @@ Page({
   getOrderDetail: function () {
     var e = this,
       o = this,
-      mta_analysis = {
+      mpValue = {
         orderId: this.data.orderId,
       };
     (wx.showLoading(),
-      ServicesOrder.orderDetail(mta_analysis).then(function (t) {
+      ServicesOrder.orderDetail(mpValue).then(function (t) {
         if ((wx.hideLoading(), 0 === t.code)) {
           o.data.orderDetailInfo = t.data || {};
           var toast = o.data.orderDetailInfo,
@@ -493,9 +491,9 @@ Page({
   },
   detailTableDisplay: function (e) {
     var o = this.data.orderDetailInfo.billingGoodsDetailModelList,
-      mta_analysis = e.currentTarget.dataset,
-      toast = mta_analysis.index,
-      throttle = mta_analysis.productId,
+      mpValue = e.currentTarget.dataset,
+      toast = mpValue.index,
+      throttle = mpValue.productId,
       getWxInfo = o.find(function (e) {
         return e.id === throttle;
       }),
@@ -519,7 +517,7 @@ Page({
   },
   changeCurrentDyelot: function (e) {
     var o = e.currentTarget.dataset,
-      mta_analysis = o.index,
+      mpValue = o.index,
       toast = o.productId,
       throttle = o.productItem.tabCurrentColorId,
       getWxInfo = this.data.orderDetailInfo.billingGoodsDetailModelList.find(function (e) {
@@ -529,9 +527,9 @@ Page({
         return e.goodsColorId === throttle;
       });
     ((getWxInfo.tabCurrentDyelot = ServicesBase.dyelotModelList),
-      (getWxInfo.tabCurrentDyelotId = ServicesBase.dyelotModelList[mta_analysis].dyelot),
+      (getWxInfo.tabCurrentDyelotId = ServicesBase.dyelotModelList[mpValue].dyelot),
       (getWxInfo.tabCurrentColorList =
-        ServicesBase.dyelotModelList[mta_analysis].quantityModelList),
+        ServicesBase.dyelotModelList[mpValue].quantityModelList),
       this.setData({
         orderDetailInfo: this.data.orderDetailInfo,
       }));
@@ -539,7 +537,7 @@ Page({
   handleOrderPrint: function () {
     var e = this.data.orderId,
       o = this.data.orderDetailInfo.mobile,
-      mta_analysis = this.data.orderDetailInfo.id,
+      mpValue = this.data.orderDetailInfo.id,
       toast = [
         function () {
           wx.navigateTo({
@@ -551,7 +549,7 @@ Page({
             url: "/packageB/pages/color-card-management/print-cloth-head/print-format/print-format?orderId="
               .concat(e, "&customMobile=")
               .concat(o, "&&billingId=")
-              .concat(mta_analysis),
+              .concat(mpValue),
           });
         },
       ];
@@ -579,11 +577,11 @@ Page({
   },
   handleShowShareOrder: function (e) {
     var o = this,
-      mta_analysis = e.currentTarget.dataset.id;
+      mpValue = e.currentTarget.dataset.id;
     (wx.showLoading({
       title: "正在生成图片",
     }),
-      (0, orderCreate.getQRCode)(mta_analysis, app.envVersion)
+      (0, orderCreate.getQRCode)(mpValue, app.envVersion)
         .then(function (e) {
           (wx.hideLoading(),
             0 === e.code
@@ -668,11 +666,11 @@ Page({
   },
   againOrderCreate: function (e) {
     var o = e.currentTarget.dataset,
-      mta_analysis = o.id,
+      mpValue = o.id,
       toast = o.orderNo,
       throttle = "/pages/order-create/offline/create?id=&orderNo="
         .concat(toast, "&orderId=&reBillingId=")
-        .concat(mta_analysis);
+        .concat(mpValue);
     wx.navigateTo({
       url: throttle,
     });

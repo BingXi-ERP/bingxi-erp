@@ -12,6 +12,12 @@
 //! - 流转卡/工序记录：小写值（pending/scheduled/dyeing），与 DB CHECK 约束一致
 //! - 不统一为单一大小写：改 DB 数据+CHECK 约束+前端风险高，改为加别名常量+规范注释
 //! - 新增代码必须用本模块常量，禁止字面量（A.19 逐步替换存量字面量）
+/// 草稿：生产订单已创建但尚未提交审批。
+pub const PRODUCTION_DRAFT: &str = "DRAFT";
+
+/// 已审批：生产订单审批通过，可排产。
+pub const PRODUCTION_APPROVED: &str = "APPROVED";
+
 /// 已排产：草稿审批通过后排入生产计划
 pub const PRODUCTION_SCHEDULED: &str = "SCHEDULED";
 
@@ -23,6 +29,12 @@ pub const PRODUCTION_PENDING_APPROVAL: &str = "PENDING_APPROVAL";
 
 /// 已拒绝：审批未通过，可退回草稿重新编辑
 pub const PRODUCTION_REJECTED: &str = "REJECTED";
+
+/// 已完成：生产订单已完工并回写实际数量。
+pub const PRODUCTION_COMPLETED: &str = "COMPLETED";
+
+/// 已取消：生产订单取消，不进入产能趋势。
+pub const PRODUCTION_CANCELLED: &str = "CANCELLED";
 
 /// 排程结果状态（scheduling_result.status，大写值）
 /// 批次 234 v13 真实接入：scheduling_query.rs 中排程结果状态字符串字面量统一引用此模块（规则 0）

@@ -1,7 +1,4 @@
-var e = (0, require("../../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../../utils/mta_analysis.js"),
-  ),
-  ServicesCenter = require("../../../../libs/services/ServicesCenter.js").servicesCenter;
+var ServicesCenter = require("../../../../libs/services/ServicesCenter.js").servicesCenter;
 Page({
   data: {
     color: ["green"],
@@ -10,7 +7,6 @@ Page({
     setInter: "",
   },
   onLoad: function () {
-    e.default.Page.init();
     (this.getCode(), wx.hideShareMenu());
   },
   getCode: function () {

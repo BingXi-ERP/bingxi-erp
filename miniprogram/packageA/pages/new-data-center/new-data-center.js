@@ -1,7 +1,4 @@
-var t = (0, require("../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../utils/mta_analysis.js"),
-  ),
-  login = require("../.../../../../libs/utils/login"),
+var login = require("../.../../../../libs/utils/login"),
   app = getApp();
 Page({
   data: {
@@ -52,8 +49,7 @@ Page({
     ],
   },
   onLoad: function (o) {
-    (t.default.Page.init(),
-      login.login.getUserInfo(),
+    (login.login.getUserInfo(),
       this.setData({
         shopId: o.shopId,
         userAuthList: app.userAuthList,

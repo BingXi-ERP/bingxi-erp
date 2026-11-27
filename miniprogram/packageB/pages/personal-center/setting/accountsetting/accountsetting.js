@@ -17,10 +17,7 @@
  * 与 role_names，那些键落盘值永远是 undefined；userRole 与 lastAccessShopId 与 wxId 与 wxOpenId
  * 四键实测全仓零读方（复核见交付报告），loginToken 与 logoutFlag 属凭据冒充登录态，一并停止写入。
  */
-var e = (0, require("../../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../../../utils/mta_analysis.js"),
-  ),
-  login = require("../../../../libs/utils/login.js").login,
+var login = require("../../../../libs/utils/login.js").login,
   app = getApp();
 Page({
   data: {
@@ -53,7 +50,7 @@ Page({
     });
   },
   onLoad: function (t) {
-    (e.default.Page.init(), wx.hideShareMenu());
+    (wx.hideShareMenu());
   },
   onShow: function () {
     var e = this;

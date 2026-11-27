@@ -1558,6 +1558,8 @@ WHERE r.code IN ('gm', 'deputy_gm', 'manager', 'sales_manager', 'sales_director'
                     ("permissions", "*"),
                     ("field-permissions", "*"),
                     ("system-config", "*"),
+                    ("number-rules", "read"),
+                    ("number-rules", "update"),
                     ("audit-logs", "*"),
                     ("slow-queries", "*"),
                     ("print-templates", "*"),

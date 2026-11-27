@@ -5,7 +5,6 @@ var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   dialog = t(require("../../../miniprogram_npm/@vant/weapp/dialog/dialog")),
   toast = t(require("../../../miniprogram_npm/@vant/weapp/toast/toast")),
   orderCreate = require("../../../libs/services/orderCreate"),
-  mta_analysis = t(require("../../../utils/mta_analysis")),
   util = require("../../../libs/utils/util"),
   s = "orderCreateColors",
   app = getApp();
@@ -227,7 +226,6 @@ Page({
       }));
   },
   onLoad: function (t) {
-    mta_analysis.default.Page.init();
     var e = t.productType,
       toConsumableArray = t.openType,
       objectSpread2 = t.colorCardId,
@@ -324,7 +322,7 @@ Page({
               objectSpread2,
               dialog,
               orderCreate,
-              mta_analysis,
+              mpValue,
               util = e.data;
             if (1 == util.priceType)
               (null === (o = util.priceResp) ||
@@ -353,9 +351,9 @@ Page({
                   (null === (n = util.priceResp) || void 0 === orderCreate
                     ? void 0
                     : orderCreate.bulkPriceResps.length) > 0
-                    ? null === (l = util.priceResp) || void 0 === mta_analysis
+                    ? null === (l = util.priceResp) || void 0 === mpValue
                       ? void 0
-                      : mta_analysis.bulkPriceResps
+                      : mpValue.bulkPriceResps
                     : util.colorList,
                 ));
             var s = e.data.colorList;
@@ -454,14 +452,14 @@ Page({
         dialog = objectSpread2.tabCurrentColorId,
         toast = objectSpread2.tabCurrentColor,
         orderCreate = objectSpread2.tabCurrentColorName,
-        mta_analysis = objectSpread2.tabCurrentColorList;
+        mpValue = objectSpread2.tabCurrentColorList;
       this.setData({
         willAddColorId: dialog,
         willAddColor: toast,
         willAddColorName: orderCreate,
         willAddColorBasePrice: "",
         dyelot: "",
-        willAddColorCodes: toConsumableArray(mta_analysis),
+        willAddColorCodes: toConsumableArray(mpValue),
       });
     }
   },
@@ -659,17 +657,17 @@ Page({
       dialog = this.data,
       toast = dialog.tabCurrentColorId,
       orderCreate = dialog.tabCurrentColorList,
-      mta_analysis = dialog.tabCurrentDyelotId,
+      mpValue = dialog.tabCurrentDyelotId,
       util = dialog.colors.find(function (t) {
         return t.id === toast;
       }),
       s = util.dyelotArr.find(function (t) {
-        return t.index === mta_analysis;
+        return t.index === mpValue;
       }).list;
     if ((s.splice(objectSpread2, 1), (n = s), 0 === s.length)) {
       if (
         ((util.dyelotArr = util.dyelotArr.filter(function (t) {
-          return t.index !== mta_analysis;
+          return t.index !== mpValue;
         })),
         0 === util.dyelotArr.length)
       ) {
@@ -833,10 +831,10 @@ Page({
       dialog = this.data,
       toast = dialog.willAddColorBasePrice,
       orderCreate = dialog.colorFineCodeItem,
-      mta_analysis = dialog.dyelot,
+      mpValue = dialog.dyelot,
       util = dialog.tabCurrentDyelot,
       s = dialog.tabCurrentDyelotId,
-      app = mta_analysis || "无缸号",
+      app = mpValue || "无缸号",
       c = util.find(function (t) {
         return t.index === s;
       }),
@@ -916,7 +914,7 @@ Page({
       dialog = objectSpread2.willAddColorId,
       toast = objectSpread2.willAddColor,
       orderCreate = objectSpread2.willAddColorName,
-      mta_analysis = objectSpread2.willAddColorBasePrice,
+      mpValue = objectSpread2.willAddColorBasePrice,
       util = objectSpread2.dyelot,
       s = objectSpread2.colorFineCodeItem,
       app = objectSpread2.willAddColorCodes,
@@ -925,7 +923,7 @@ Page({
     if (1 === this.data.addColors) {
       var h = s.map(function (t) {
           return {
-            price: Number(mta_analysis),
+            price: Number(mpValue),
             quantity: Number(t.inputVal),
             priceUnit: t.priceUnit,
           };
@@ -934,7 +932,7 @@ Page({
           id: dialog,
           color: toast,
           colorName: orderCreate,
-          basePrice: mta_analysis,
+          basePrice: mpValue,
           dyelotArr: [
             {
               id: c,
@@ -973,7 +971,7 @@ Page({
         return void this.colorHasDyelot(e);
       var g = s.map(function (t) {
           return {
-            price: Number(mta_analysis),
+            price: Number(mpValue),
             quantity: Number(t.inputVal),
             priceUnit: t.priceUnit,
           };
@@ -1034,9 +1032,9 @@ Page({
       dialog = t.target.dataset,
       toast = dialog.key,
       orderCreate = dialog.tabCurrentColorId,
-      mta_analysis = objectSpread2.substr(objectSpread2.length - 1);
+      mpValue = objectSpread2.substr(objectSpread2.length - 1);
     ((0 != objectSpread2 && "" != objectSpread2) || (r = this.data.tabCurrentColorList[0].price),
-      "." == mta_analysis && (r = Number(objectSpread2)),
+      "." == mpValue && (r = Number(objectSpread2)),
       this.setData({
         toast: objectSpread2,
       }),
@@ -1123,14 +1121,14 @@ Page({
       if (dialog >= 0) {
         var toast = Number(t[dialog].quantity) + Number(e.quantity),
           orderCreate = e.price * toast,
-          mta_analysis =
+          mpValue =
             Number(t[dialog].differenceQuantity) +
             Number(this.countDifferenceQuantity(e.quantity, e.quantity)),
           s = {
             priceUnit: t[dialog].priceUnit,
             price: orderCreate,
             quantity: toast,
-            differenceQuantity: util.utils.rounded(mta_analysis, 2),
+            differenceQuantity: util.utils.rounded(mpValue, 2),
           };
         t[dialog] = s;
       } else {
@@ -1193,7 +1191,7 @@ Page({
       dialog = t.priceUnit,
       toast = t.totalQuantity,
       orderCreate = t.totalPrice,
-      mta_analysis = t.colors,
+      mpValue = t.colors,
       s = t.tabCurrentColorId,
       app = t.tabCurrentColorList,
       c = t.tabCurrentDyelot,
@@ -1202,7 +1200,7 @@ Page({
       f = t.differenceSymbol,
       m = t.totalCodeNum,
       g = t.totalNum;
-    mta_analysis.forEach(function (t) {
+    mpValue.forEach(function (t) {
       t.dyelotArr.forEach(function (t, e) {
         t.list.forEach(function (t) {
           var e = {
@@ -1252,11 +1250,11 @@ Page({
         goodsUnit: dialog,
         totalQuantity: toast,
         totalPrice: orderCreate,
-        colors: mta_analysis,
+        colors: mpValue,
         isOpened: !1,
         tabCurrentColorId: s,
-        tabCurrentColor: mta_analysis[0].color,
-        tabCurrentColorName: mta_analysis[0].colorName,
+        tabCurrentColor: mpValue[0].color,
+        tabCurrentColorName: mpValue[0].colorName,
         tabCurrentColorList: app,
         tabCurrentDyelot: c,
         tabCurrentDyelotId: C,
@@ -1273,11 +1271,11 @@ Page({
       objectSpread2 = e.tabCurrentColorId,
       dialog = (e.tabCurrentColorList, e.tabCurrentDyelotId),
       orderCreate = e.colors,
-      mta_analysis = t.detail.value,
+      mpValue = t.detail.value,
       util = t.currentTarget.dataset,
       s = util.index,
       app = util.key;
-    ("" != mta_analysis && 0 != mta_analysis) ||
+    ("" != mpValue && 0 != mpValue) ||
       ((0, toast.default)({
         message: "数值不能为空或0",
         duration: 1500,
@@ -1292,7 +1290,7 @@ Page({
       }).list;
     if (
       ("quantity" === app &&
-        ((c[s].quantity = mta_analysis),
+        ((c[s].quantity = mpValue),
         this.setData({
           tabCurrentColorList: toConsumableArray(c),
         })),
@@ -1300,7 +1298,7 @@ Page({
     ) {
       var C = c[s].priceUnit;
       (c.forEach(function (t, e) {
-        C === t.priceUnit && (c[e].price = mta_analysis);
+        C === t.priceUnit && (c[e].price = mpValue);
       }),
         this.setData({
           tabCurrentColorList: toConsumableArray(c),
@@ -1325,7 +1323,7 @@ Page({
       dialog = (e.tabCurrentColorList, e.tabCurrentDyelotId),
       toast = e.colors,
       orderCreate = t.currentTarget.dataset.key,
-      mta_analysis = this.data.arrayCargo,
+      mpValue = this.data.arrayCargo,
       util = t.detail.value,
       s =
         (this.data.colorFineCodeItem,
@@ -1336,7 +1334,7 @@ Page({
           .dyelotArr.find(function (t) {
             return t.index === dialog;
           }).list);
-    ((s[orderCreate].priceUnit = mta_analysis[util]),
+    ((s[orderCreate].priceUnit = mpValue[util]),
       this.setData({
         tabCurrentColorList: toConsumableArray(s),
       }),
@@ -1347,7 +1345,7 @@ Page({
       dialog = t.target.dataset,
       toast = dialog.key,
       orderCreate = dialog.index,
-      mta_analysis = dialog.input,
+      mpValue = dialog.input,
       util = toConsumableArray.substr(toConsumableArray.length - 1);
     if (
       ((o = 0 == toConsumableArray ? "" : toConsumableArray),
@@ -1356,7 +1354,7 @@ Page({
         this.setData({
           toast: toConsumableArray,
         }),
-      "colorFineCodeItem" === mta_analysis &&
+      "colorFineCodeItem" === mpValue &&
         this.setData({
           "colorFineCodeItem[0].inputVal": toConsumableArray,
         }),
@@ -1414,9 +1412,9 @@ Page({
       dialog = toConsumableArray.key,
       toast = toConsumableArray.index,
       orderCreate = toConsumableArray.input,
-      mta_analysis = /^(\.*)(\d+)(\.?)(\d{0,1}).*$/g,
+      mpValue = /^(\.*)(\d+)(\.?)(\d{0,1}).*$/g,
       util = t.detail.value,
-      s = mta_analysis.test(util) ? util.replace(mta_analysis, "$2$3$4") : "";
+      s = mpValue.test(util) ? util.replace(mpValue, "$2$3$4") : "";
     if (
       (orderCreate &&
         this.setData({

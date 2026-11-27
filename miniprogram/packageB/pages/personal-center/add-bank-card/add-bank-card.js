@@ -1,8 +1,7 @@
 var t = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   e = require("../../../../@babel/runtime/helpers/defineProperty"),
   a =
-    (t(require("../../../utils/mta_analysis.js")),
-    getApp(),
+    (getApp(),
     require("../../../libs/services/ServicesUser").servicesUser);
 Page({
   data: {

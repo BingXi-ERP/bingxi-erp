@@ -10,7 +10,6 @@ var e,
   c = require("../../../../@babel/runtime/helpers/regeneratorRuntime"),
   l = require("../../../../@babel/runtime/helpers/asyncToGenerator"),
   u = require("../../../../@babel/runtime/helpers/defineProperty"),
-  mta_analysis = t(require("../../../../utils/mta_analysis.js")),
   util = require("../../../../libs/utils/util"),
   uploadGateway = require("../../../../libs/utils/uploadGateway.js"),
   ServicesUserLog = require("../../../../libs/services/ServicesUserLog.js"),
@@ -890,7 +889,6 @@ Page({
     switch (
       (console.log(app.config.imgHost),
       this.getCategoryGoodsList(),
-      mta_analysis.default.Page.init(),
       this.getDictData("weightUnit", "array3"),
       this.getDictData("clothWidthUnit", "array4"),
       this.setData({
@@ -1012,17 +1010,17 @@ Page({
       c,
       l = this.data.detailInfo,
       u = l.price,
-      mta_analysis = l.priceUnit;
+      mpValue = l.priceUnit;
     ("" != a && null != a
       ? this.setData({
           minPrice: wx.getStorageSync("miniNum") || u,
           maxPrice: wx.getStorageSync("maxNum") || u,
-          unitName: wx.getStorageSync("unitName") || mta_analysis,
+          unitName: wx.getStorageSync("unitName") || mpValue,
         })
       : this.setData({
           minPrice: u || "",
           maxPrice: u || "",
-          unitName: mta_analysis || "",
+          unitName: mpValue || "",
         }),
     "" != o && null != o) &&
       (this.setData({
@@ -1338,7 +1336,7 @@ Page({
           createForOfIteratorHelper,
           l,
           u,
-          mta_analysis,
+          mpValue,
           ServicesUserLog,
           ServicesBase,
           f,
@@ -1528,10 +1526,10 @@ Page({
                       commodityType: l,
                     })),
                   "" != u && null != u && (createForOfIteratorHelper.bottomCardIds = u),
-                  "" != mta_analysis && null != mta_analysis
+                  "" != mpValue && null != mpValue
                     ? ((m = []),
-                      null == mta_analysis ||
-                        mta_analysis.map(function (t) {
+                      null == mpValue ||
+                        mpValue.map(function (t) {
                           1 == t.checked && ServicesUserLog.push(t.id);
                         }),
                       (createForOfIteratorHelper.classifyIds = ServicesUserLog))
@@ -1601,7 +1599,7 @@ Page({
             c,
             l,
             u,
-            mta_analysis,
+            mpValue,
             ServicesUserLog,
             ServicesBase = e.data;
           if (
@@ -1672,9 +1670,9 @@ Page({
               }),
               wx.setStorageSync(
                 "goodsPriceJson",
-                (null === (g = ServicesBase.priceResp) || void 0 === mta_analysis
+                (null === (g = ServicesBase.priceResp) || void 0 === mpValue
                   ? void 0
-                  : mta_analysis.bulkPriceResps.length) > 0
+                  : mpValue.bulkPriceResps.length) > 0
                   ? null === (m = ServicesBase.priceResp) || void 0 === ServicesUserLog
                     ? void 0
                     : ServicesUserLog.bulkPriceResps
@@ -2015,8 +2013,8 @@ Page({
     e > createForOfIteratorHelper && e < c && (a = !0);
     var l = ((t - this.data.s_h) / (this.data.u_w + this.data.s_h)) >> 0,
       u = this.data.s_h + l * (this.data.u_w + this.data.s_h),
-      mta_analysis = u + this.data.u_w;
-    if ((t > u && t < mta_analysis && (o = !0), a && o)) {
+      mpValue = u + this.data.u_w;
+    if ((t > u && t < mpValue && (o = !0), a && o)) {
       var util = objectSpread2 * i + l;
       return util > this.data.remoteImageFiles.length - 1 ? null : util;
     }
@@ -2034,8 +2032,8 @@ Page({
     e > createForOfIteratorHelper && e < c && (a = !0);
     var l = ((t - this.data.s_h2) / (this.data.u_w2 + this.data.s_h2)) >> 0,
       u = this.data.s_h2 + l * (this.data.u_w2 + this.data.s_h2),
-      mta_analysis = u + this.data.u_w2;
-    if ((t > u && t < mta_analysis && (o = !0), a && o)) {
+      mpValue = u + this.data.u_w2;
+    if ((t > u && t < mpValue && (o = !0), a && o)) {
       var util = objectSpread2 * i + l;
       return util > this.data.detailImageFiles.length - 1 ? null : util;
     }
@@ -2053,8 +2051,8 @@ Page({
     e > createForOfIteratorHelper && e < c && (a = !0);
     var l = ((t - this.data.s_h3) / (this.data.u_w3 + this.data.s_h3)) >> 0,
       u = this.data.s_h3 + l * (this.data.u_w3 + this.data.s_h3),
-      mta_analysis = u + this.data.u_w3;
-    if ((t > u && t < mta_analysis && (o = !0), a && o)) {
+      mpValue = u + this.data.u_w3;
+    if ((t > u && t < mpValue && (o = !0), a && o)) {
       var util = objectSpread2 * i + l;
       return util > this.data.goodsSampleImgList.length - 1 ? null : util;
     }
@@ -2072,8 +2070,8 @@ Page({
     e > createForOfIteratorHelper && e < c && (a = !0);
     var l = ((t - this.data.s_h4) / (this.data.u_w4 + this.data.s_h4)) >> 0,
       u = this.data.s_h4 + l * (this.data.u_w4 + this.data.s_h4),
-      mta_analysis = u + this.data.u_w4;
-    if ((t > u && t < mta_analysis && (o = !0), a && o)) {
+      mpValue = u + this.data.u_w4;
+    if ((t > u && t < mpValue && (o = !0), a && o)) {
       var util = objectSpread2 * i + l;
       return util > this.data.goodsColorImgList.length - 1 ? null : util;
     }

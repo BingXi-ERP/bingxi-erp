@@ -1,6 +1,5 @@
 var t = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   a = require("../../../../@babel/runtime/helpers/defineProperty"),
-  mta_analysis = t(require("../../../../utils/mta_analysis.js")),
   ServicesPrint = require("../../../../libs/services/ServicesPrint");
 getApp();
 Page({
@@ -191,11 +190,11 @@ Page({
           });
         else {
           var a,
-            mta_analysis = !1;
+            mpValue = !1;
           (t.data.modalJarNumList.forEach(function (o, i) {
             o.dyelot == t.data.jarNum && ((a = i), (e = !0));
           }),
-            mta_analysis
+            mpValue
               ? t.data.modalJarNumList[a].quantityDetailModels.push({
                   quantity: t.data.colorFineCode,
                   quantityUnit: t.data.unit[t.data.unitIndex],
@@ -230,7 +229,7 @@ Page({
   },
   handleSwitchColor: function (t) {
     var a = t.currentTarget.dataset.index,
-      mta_analysis = JSON.parse(
+      mpValue = JSON.parse(
         JSON.stringify(
           this.data.colorJarNumFineCodeList[a].dyelotDetailModels[0].quantityDetailModels,
         ),
@@ -239,7 +238,7 @@ Page({
       tabCurrentColor: a,
       selectedjarNumList: this.data.colorJarNumFineCodeList[a].dyelotDetailModels,
       tabCurrentJarNum: 0,
-      colorFineCodeList: mta_analysis,
+      colorFineCodeList: mpValue,
     });
   },
   handleSwitchJarNum: function (t) {
@@ -253,7 +252,7 @@ Page({
   },
   handleDelTabColorTab: function (t) {
     var a = this,
-      mta_analysis = t.currentTarget.dataset.id,
+      mpValue = t.currentTarget.dataset.id,
       ServicesPrint = t.currentTarget.dataset.index;
     wx.showModal({
       content: "该颜色下的所有细码将被删除，确认此操作？",
@@ -261,7 +260,7 @@ Page({
         t.confirm
           ? (a.data.colorJarNumFineCodeList.splice(ServicesPrint, 1),
             a.data.colorList.forEach(function (t, o) {
-              t.id == mta_analysis && (a.data.colorList[o].isSelected = !1);
+              t.id == mpValue && (a.data.colorList[o].isSelected = !1);
             }),
             a.data.colorJarNumFineCodeList.length > 0
               ? a.setData({
@@ -287,13 +286,13 @@ Page({
   },
   handleDelTabJarNum: function (t) {
     var a = this,
-      mta_analysis = t.currentTarget.dataset.index;
+      mpValue = t.currentTarget.dataset.index;
     wx.showModal({
       content: "该缸号下的所有细码将被删除，确认此操作？",
       success: function (t) {
         t.confirm
           ? (a.data.colorJarNumFineCodeList[a.data.tabCurrentColor].dyelotDetailModels.splice(
-              mta_analysis,
+              mpValue,
               1,
             ),
             a.data.colorJarNumFineCodeList[a.data.tabCurrentColor].dyelotDetailModels.length < 1
@@ -319,23 +318,23 @@ Page({
   },
   handleDelFineCode: function (t) {
     var a = this,
-      mta_analysis = this,
+      mpValue = this,
       ServicesPrint = t.currentTarget.dataset.index;
     (wx.showModal({
       content: "确定删除细码？",
       success: function (t) {
         t.confirm
-          ? (mta_analysis.data.colorJarNumFineCodeList[
-              mta_analysis.data.tabCurrentColor
-            ].dyelotDetailModels[mta_analysis.data.tabCurrentJarNum].quantityDetailModels.splice(
+          ? (mpValue.data.colorJarNumFineCodeList[
+              mpValue.data.tabCurrentColor
+            ].dyelotDetailModels[mpValue.data.tabCurrentJarNum].quantityDetailModels.splice(
               ServicesPrint,
               1,
             ),
-            mta_analysis.setData({
-              colorJarNumFineCodeList: mta_analysis.data.colorJarNumFineCodeList,
+            mpValue.setData({
+              colorJarNumFineCodeList: mpValue.data.colorJarNumFineCodeList,
               colorFineCodeList:
-                mta_analysis.data.colorJarNumFineCodeList[mta_analysis.data.tabCurrentColor]
-                  .dyelotDetailModels[mta_analysis.data.tabCurrentJarNum].quantityDetailModels,
+                mpValue.data.colorJarNumFineCodeList[mpValue.data.tabCurrentColor]
+                  .dyelotDetailModels[mpValue.data.tabCurrentJarNum].quantityDetailModels,
             }))
           : t.cancel && console.log("用户点击取消");
       },
@@ -376,9 +375,9 @@ Page({
   },
   handleInputDecimalLengOne: function (t) {
     t.currentTarget.dataset.key;
-    var mta_analysis = /^(\.*)(\d+)(\.?)(\d{0,1}).*$/g,
+    var mpValue = /^(\.*)(\d+)(\.?)(\d{0,1}).*$/g,
       ServicesPrint = t.detail.value,
-      i = mta_analysis.test(ServicesPrint) ? ServicesPrint.replace(mta_analysis, "$2$3$4") : "";
+      i = mpValue.test(ServicesPrint) ? ServicesPrint.replace(mpValue, "$2$3$4") : "";
     return (
       this.setData({
         [t.currentTarget.dataset.name]: i,
@@ -391,12 +390,12 @@ Page({
     if (!(this.data.colorJarNumFineCodeList.length < 1 || this.data.isEdit)) {
       var t = this.data.colorCardId,
         a = JSON.stringify(this.data.colorJarNumFineCodeList),
-        mta_analysis = this.data.newPrintType;
+        mpValue = this.data.newPrintType;
       wx.navigateTo({
         url: "/packageB/pages/color-card-management/print-cloth-head/print-format/print-format?goodsId="
           .concat(t, "&&colorDetailModels=")
           .concat(a, "&&newPrintType=")
-          .concat(mta_analysis),
+          .concat(mpValue),
       });
     }
   },
@@ -455,11 +454,11 @@ Page({
         });
       else {
         var a,
-          mta_analysis = !1;
+          mpValue = !1;
         (t.data.modalJarNumList.forEach(function (o, i) {
           o.dyelot == t.data.jarNum && ((a = i), (e = !0));
         }),
-          mta_analysis
+          mpValue
             ? t.data.modalJarNumList[a].quantityDetailModels.push({
                 quantity: t.data.colorFineCode,
                 quantityUnit: t.data.unit[t.data.unitIndex],
@@ -496,11 +495,11 @@ Page({
         });
       else {
         var a,
-          mta_analysis = !1;
+          mpValue = !1;
         (t.data.modalAloneJarNumList.forEach(function (o, i) {
           o.dyelot == t.data.jarNum && ((a = i), (e = !0));
         }),
-          mta_analysis
+          mpValue
             ? t.data.modalAloneJarNumList[a].quantityDetailModels.push({
                 quantity: t.data.colorFineCode,
                 quantityUnit: t.data.unit[t.data.unitIndex],
@@ -522,8 +521,7 @@ Page({
   },
   onLoad: function (t) {
     var a = this;
-    (mta_analysis.default.Page.init(),
-      this.setData({
+    (this.setData({
         colorCardId: t.goodsId,
         newPrintType: t.newPrintType,
       }),

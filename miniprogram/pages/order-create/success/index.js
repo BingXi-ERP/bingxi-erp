@@ -1,7 +1,6 @@
 var e = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   toast = e(require("../../../miniprogram_npm/@vant/weapp/toast/toast")),
   orderCreate = require("../../../libs/services/orderCreate"),
-  mta_analysis = e(require("../../../utils/mta_analysis")),
   ServicesUserLog = require("../../../libs/services/ServicesUserLog"),
   app = getApp();
 Page({
@@ -25,7 +24,6 @@ Page({
     QRCode: "",
   },
   onLoad: function (e) {
-    mta_analysis.default.Page.init();
     var toast = e.billingId,
       orderCreate = e.billingNo,
       ServicesUserLog = e.orderAmount,
@@ -78,7 +76,7 @@ Page({
     });
   },
   handleShowShareOrder: function (e) {
-    var mta_analysis = this,
+    var mpValue = this,
       i = e.currentTarget.dataset.id;
     (wx.showLoading({
       title: "正在生成图片",
@@ -91,7 +89,7 @@ Page({
             wx.hideLoading(),
             0 === e.code
               ? (ServicesUserLog.servicesUserLog.setUserHandleLog(207),
-                mta_analysis.setData({
+                mpValue.setData({
                   QRCode: orderCreate,
                   showShareImage: !0,
                 }))
@@ -166,9 +164,9 @@ Page({
   handleOrderPrint: function (e) {
     var toast = e.currentTarget.dataset.id,
       orderCreate = "orderId=".concat(toast),
-      mta_analysis = "/pages/printing/order/index?".concat(orderCreate, "&printType=order");
+      mpValue = "/pages/printing/order/index?".concat(orderCreate, "&printType=order");
     wx.navigateTo({
-      url: mta_analysis,
+      url: mpValue,
     });
   },
   drawShareImage: function () {

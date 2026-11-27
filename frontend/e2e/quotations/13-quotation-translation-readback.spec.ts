@@ -39,6 +39,7 @@ import {
   APP_ERROR_CODES,
   BASE_URL,
 } from '../flow/helpers';
+import { withNumberRuleConfigLock } from '../flow/number-rule-config-lock.mjs';
 import { pickListArray } from '../flow/ui-helpers';
 import { cellInputByColumn } from '../flow/table-column';
 
@@ -167,7 +168,9 @@ test.describe('13 报价翻译回读', () => {
     await page.reload();
     await expect(convertButton, '审批通过后同一报价的转单入口应可用').toBeEnabled();
 
-    await apiCall(page, 'POST', `${quotationPath}/convert`);
+    await withNumberRuleConfigLock(async () => {
+      await apiCall(page, 'POST', `${quotationPath}/convert`);
+    });
     interface ConvertedQuotation {
       quotation_no: string;
       status: string;

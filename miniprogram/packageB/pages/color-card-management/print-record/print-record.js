@@ -1,6 +1,5 @@
 var t = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   e = require("../../../../@babel/runtime/helpers/defineProperty"),
-  mta_analysis = t(require("../../../../utils/mta_analysis.js")),
   ServicesPrint = require("../../../../libs/services/ServicesPrint"),
   app = getApp();
 Page({
@@ -14,8 +13,7 @@ Page({
     rightArrow: "/assets/icons/ic_jinru.png",
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      this.setData({
+    (this.setData({
         globalApp: app,
       }),
       this.recordList());
@@ -23,7 +21,7 @@ Page({
   recordList: function () {
     var t = this,
       e = arguments.length > 0 && void 0 !== arguments[0] && arguments[0],
-      mta_analysis = this,
+      mpValue = this,
       app = {
         keyword: this.data.searchKey,
         page: this.data.nowPageNum,
@@ -35,10 +33,10 @@ Page({
           ? (t.data.nowPageNum === o.data.totalPage ? t._closeMore() : t._showMore(),
             e
               ? (o.data.content.forEach(function (t) {
-                  mta_analysis.data.recordList.push(t);
+                  mpValue.data.recordList.push(t);
                 }),
                 t.setData({
-                  recordList: mta_analysis.data.recordList,
+                  recordList: mpValue.data.recordList,
                 }))
               : ((t.data.recordList = o.data.content),
                 t.setData({

@@ -164,6 +164,15 @@ function serdeRenameAll(attrs) {
   return m ? m[1] : null;
 }
 
+function serdeFieldRename(attrs) {
+  const direct = /#\[\s*serde\s*\([^)]*\brename\s*=\s*"([^"]+)"/.exec(attrs || '');
+  if (direct) return direct[1];
+  const deserialize = /#\[\s*serde\s*\([^)]*\brename\s*\([^)]*\bdeserialize\s*=\s*"([^"]+)"/.exec(
+    attrs || ''
+  );
+  return deserialize ? deserialize[1] : null;
+}
+
 function applyCase(name, rule) {
   if (!rule || rule === 'snake_case') return name;
   const parts = name.split('_');
@@ -225,7 +234,7 @@ function rustFieldsOf(typeName, structIndex) {
     out.push({
       name: f.name,
       optional: flattened || optional || hasDefault,
-      renamed: applyCase(f.name, rule),
+      renamed: serdeFieldRename(fieldAttrs) || applyCase(f.name, rule),
       type: t, // 保留类型文本供叶子判定(d)；旧实现直接丢弃，Value 字段无声漂过
     });
     if (out[out.length - 1].renamed === null) return null;

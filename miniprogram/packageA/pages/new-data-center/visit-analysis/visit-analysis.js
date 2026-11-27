@@ -2,7 +2,6 @@ var interopRequireWildcard =
     require("../../../../@babel/runtime/helpers/interopRequireWildcard").default,
   a = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   toConsumableArray = require("../../../../@babel/runtime/helpers/toConsumableArray"),
-  mta_analysis = a(require("../../../../utils/mta_analysis.js")),
   echarts = interopRequireWildcard(require("../../../components/ec-canvas/echarts")),
   util = require("../../../utils/util"),
   ServicesDataCenter = require("../../../services/ServicesDataCenter.js").ServicesDataCenter,
@@ -88,8 +87,7 @@ Page({
   },
   onLoad: function (t) {
     var a = this;
-    (mta_analysis.default.Page.init(),
-      this.setData({
+    (this.setData({
         shopId: t.shopId,
       }),
       setTimeout(function () {
@@ -145,10 +143,10 @@ Page({
     var a = new Date(),
       toConsumableArray = a.getTime() + 864e5 * t;
     a.setTime(toConsumableArray);
-    var mta_analysis = a.getFullYear(),
+    var mpValue = a.getFullYear(),
       echarts = a.getMonth(),
       util = a.getDate();
-    return mta_analysis + "-" + (n = s(echarts + 1)) + "-" + (o = s(util));
+    return mpValue + "-" + (n = s(echarts + 1)) + "-" + (o = s(util));
     function s(t) {
       var a = t;
       return (1 == t.toString().length && (a = "0" + t), a);
@@ -197,15 +195,15 @@ Page({
             var a;
             return (null === (a = t.date) || void 0 === a ? void 0 : a.split(" ")[0]) || "";
           }),
-          mta_analysis = a.data.map(function (t) {
+          mpValue = a.data.map(function (t) {
             return t.num || 0;
           });
         (interopRequireWildcard.setData({
           chartsDate: toConsumableArray,
-          chartsData: mta_analysis,
+          chartsData: mpValue,
         }),
           (u.xAxis.data = toConsumableArray),
-          (u.series[0].data = mta_analysis),
+          (u.series[0].data = mpValue),
           d.setOption(u));
       } else
         wx.showToast({
@@ -217,7 +215,7 @@ Page({
   orderList: function () {
     var interopRequireWildcard = this,
       a = arguments.length > 0 && void 0 !== arguments[0] && arguments[0],
-      mta_analysis = this,
+      mpValue = this,
       echarts = {
         companyId: app.globalData.userInfo.companyId,
         userId: app.globalData.userInfo.id,
@@ -241,14 +239,14 @@ Page({
               });
           }),
             a &&
-              (mta_analysis.data.dataSourceList = [].concat(
-                toConsumableArray(mta_analysis.data.dataSourceList),
+              (mpValue.data.dataSourceList = [].concat(
+                toConsumableArray(mpValue.data.dataSourceList),
                 toConsumableArray(ServicesDataCenter),
               )),
             interopRequireWildcard.setData({
               totalPage: n.data.totalPage,
               dataSourceList:
-                1 === n.data.pageNo ? ServicesDataCenter : mta_analysis.data.dataSourceList,
+                1 === n.data.pageNo ? ServicesDataCenter : mpValue.data.dataSourceList,
             }),
             wx.hideLoading());
         } else
@@ -267,12 +265,12 @@ Page({
   formatDuring: function (t) {
     var a = new Date(t),
       toConsumableArray = (a.getFullYear(), a.getMonth(), a.getDate(), a.getHours()),
-      mta_analysis = a.getMinutes(),
+      mpValue = a.getMinutes(),
       echarts = a.getSeconds();
     return (
       (e = toConsumableArray < 10 ? "0" + toConsumableArray : toConsumableArray) +
       ":" +
-      (i = mta_analysis < 10 ? "0" + mta_analysis : mta_analysis) +
+      (i = mpValue < 10 ? "0" + mpValue : mpValue) +
       ":" +
       (n = echarts < 10 ? "0" + echarts : echarts)
     );

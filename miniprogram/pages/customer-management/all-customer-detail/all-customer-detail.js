@@ -1,6 +1,5 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   ServicesUserLog = require("../../../libs/services/ServicesUserLog.js"),
-  mta_analysis = t(require("../../../utils/mta_analysis.js")),
   app = getApp(),
   util = require("../../../libs/utils/util.js").utils,
   ServicesCustomer = require("../../../libs/services/ServicesCustomer.js").servicesCustomer;
@@ -53,9 +52,9 @@ Page({
       }));
   },
   changechooseItem: function (t) {
-    var mta_analysis = t.currentTarget.dataset.index;
+    var mpValue = t.currentTarget.dataset.index;
     (this.setData({
-      chooseItemActive: mta_analysis,
+      chooseItemActive: mpValue,
     }),
       0 == t.currentTarget.dataset.index
         ? this.setData({
@@ -124,10 +123,10 @@ Page({
   },
   getCustomerDetail: function (t) {
     var ServicesUserLog = this,
-      mta_analysis = {
+      mpValue = {
         customerId: t,
       };
-    ServicesCustomer.customerDetail(mta_analysis).then(function (t) {
+    ServicesCustomer.customerDetail(mpValue).then(function (t) {
       0 === t.code
         ? ((t.data.headImg = util.addDefaultAvatar(t.data.avatar)),
           ServicesUserLog.setData({
@@ -141,14 +140,14 @@ Page({
   },
   customerOrderRecordNum: function (t) {
     var ServicesUserLog = this,
-      mta_analysis = this,
+      mpValue = this,
       app = {
         customerId: t,
       };
     ServicesCustomer.customerOrderRecordNum(app).then(function (t) {
       0 === t.code
         ? ((ServicesUserLog.data.customerOrderRecordNum = t.data),
-          mta_analysis.setData({
+          mpValue.setData({
             customerOrderRecordNum: ServicesUserLog.data.customerOrderRecordNum,
           }))
         : wx.showToast({
@@ -159,7 +158,7 @@ Page({
   },
   trackRecordList: function (t) {
     var ServicesUserLog = this,
-      mta_analysis = arguments.length > 1 && void 0 !== arguments[1] && arguments[1],
+      mpValue = arguments.length > 1 && void 0 !== arguments[1] && arguments[1],
       app = this,
       util = {
         id: t,
@@ -173,7 +172,7 @@ Page({
         if ((wx.hideLoading(), 0 === t.code)) {
           var util = t.data.content || [];
           util.length > 0 &&
-            (mta_analysis
+            (mpValue
               ? (util.forEach(function (t, e) {
                   ((t.recordTime = app.getNowFormatDate(t.recordTime)),
                     t.recordTime ==
@@ -212,7 +211,7 @@ Page({
   },
   customerOrderList: function (t) {
     var ServicesUserLog = this,
-      mta_analysis = arguments.length > 2 && void 0 !== arguments[2] && arguments[2],
+      mpValue = arguments.length > 2 && void 0 !== arguments[2] && arguments[2],
       app = this,
       i = {
         id: t,
@@ -235,7 +234,7 @@ Page({
             ServicesUserLog.setData({
               totalPage: t.data.totalPage,
             }),
-            mta_analysis
+            mpValue
               ? ServicesCustomer &&
                 ServicesCustomer.length > 0 &&
                 ServicesCustomer.forEach(function (t) {
@@ -257,7 +256,7 @@ Page({
   },
   refundOrderList: function (t) {
     var ServicesUserLog = this,
-      mta_analysis = arguments.length > 1 && void 0 !== arguments[1] && arguments[1],
+      mpValue = arguments.length > 1 && void 0 !== arguments[1] && arguments[1],
       app = this,
       i = {
         customerId: t,
@@ -275,7 +274,7 @@ Page({
                 t.goodsImgPath = util.replImage(t.goodsImgPath, 200);
               });
           }),
-            mta_analysis
+            mpValue
               ? ServicesCustomer.length > 0 &&
                 ServicesCustomer.forEach(function (t) {
                   app.data.refundList.push(t);
@@ -333,10 +332,10 @@ Page({
         });
   },
   toDetailPage: function (t) {
-    var mta_analysis = t.currentTarget.dataset.state,
+    var mpValue = t.currentTarget.dataset.state,
       app = t.currentTarget.dataset.id,
       util = t.currentTarget.dataset.orderNo;
-    if ((ServicesUserLog.servicesUserLog.setUserHandleLog(310), 10 == mta_analysis)) {
+    if ((ServicesUserLog.servicesUserLog.setUserHandleLog(310), 10 == mpValue)) {
       if (!this.data.userAuthList["order:saveBilling"])
         return void wx.showToast({
           title: "没有权限",
@@ -348,7 +347,7 @@ Page({
       wx.navigateTo({
         url: ServicesCustomer,
       });
-    } else if (30 == mta_analysis) {
+    } else if (30 == mpValue) {
       if (!this.data.userAuthList["order:saveBilling"])
         return void wx.showToast({
           title: "没有权限",
@@ -360,7 +359,7 @@ Page({
       wx.navigateTo({
         url: i,
       });
-    } else if (0 == mta_analysis) {
+    } else if (0 == mpValue) {
       if (!this.data.userAuthList["order:saveBilling"])
         return void wx.showToast({
           title: "没有权限",
@@ -397,8 +396,7 @@ Page({
         });
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      this.setData({
+    (this.setData({
         userAuthList: app.userAuthList,
       }),
       this.setData({
@@ -454,8 +452,8 @@ Page({
         this.customerOrderList(this.data.customerId, t, this.data.totalPage > t, ServicesUserLog);
     }
     if (3 == this.data.displayContent) {
-      var mta_analysis = ++this.data.refundRecordPageNum;
-      if (mta_analysis > this.data.refundRecordTotalPage)
+      var mpValue = ++this.data.refundRecordPageNum;
+      if (mpValue > this.data.refundRecordTotalPage)
         return (
           (this.data.refundRecordPageNum = this.data.refundRecordTotalPage),
           void this.setData({
@@ -463,9 +461,9 @@ Page({
           })
         );
       (this.setData({
-        refundRecordPageNum: mta_analysis,
+        refundRecordPageNum: mpValue,
       }),
-        this.refundOrderList(this.data.customerId, mta_analysis < this.data.refundRecordTotalPage));
+        this.refundOrderList(this.data.customerId, mpValue < this.data.refundRecordTotalPage));
     }
   },
   onShareAppMessage: function () {},

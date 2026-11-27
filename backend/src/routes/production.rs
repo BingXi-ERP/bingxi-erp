@@ -702,7 +702,7 @@ pub fn capacity() -> Router<AppState> {
             "/capacity/bottlenecks",
             get(capacity_handler::get_load_analysis),
         )
-        .route("/capacity/trend", get(capacity_handler::get_load_analysis))
+        .route("/capacity/trend", get(capacity_handler::get_capacity_trend))
         .route(
             "/capacity/work-centers",
             get(capacity_handler::list_work_centers).post(capacity_handler::create_work_center),

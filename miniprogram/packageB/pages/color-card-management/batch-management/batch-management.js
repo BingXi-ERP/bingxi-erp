@@ -1,7 +1,6 @@
 var t = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   createForOfIteratorHelper = require("../../../../@babel/runtime/helpers/createForOfIteratorHelper"),
   ServicesUserLog = require("../../../../libs/services/ServicesUserLog.js"),
-  mta_analysis = t(require("../../../../utils/mta_analysis.js")),
   app = getApp(),
   ServicesCard = require("../../../../libs/services/ServicesCard.js").servicesCard;
 Page({
@@ -149,7 +148,7 @@ Page({
   checkTap: function (t) {
     var createForOfIteratorHelper = t.currentTarget.dataset,
       ServicesUserLog = createForOfIteratorHelper.goodsid,
-      mta_analysis = (createForOfIteratorHelper.index, createForOfIteratorHelper.mainimgpath),
+      mpValue = (createForOfIteratorHelper.index, createForOfIteratorHelper.mainimgpath),
       app = createForOfIteratorHelper.goodsno,
       ServicesCard = createForOfIteratorHelper.goodsname,
       i = this.data,
@@ -166,7 +165,7 @@ Page({
     (d < 0
       ? (c.push({
           goodsid: ServicesUserLog,
-          mainimgpath: mta_analysis,
+          mainimgpath: mpValue,
           goodsno: app,
           goodsname: ServicesCard,
           count: 1,
@@ -228,10 +227,10 @@ Page({
   },
   onOrOffShelves: function () {
     var t = this,
-      mta_analysis = this.data,
-      app = mta_analysis.selectedArr,
-      i = mta_analysis.saleStatus,
-      r = (mta_analysis.colorCardList, mta_analysis.selectedStatusArr, []),
+      mpValue = this.data,
+      app = mpValue.selectedArr,
+      i = mpValue.saleStatus,
+      r = (mpValue.colorCardList, mpValue.selectedStatusArr, []),
       c = "";
     c = ServicesCard.batchSetOnSale;
     var l,
@@ -294,12 +293,12 @@ Page({
   },
   footerBarTap: function (t) {
     var ServicesUserLog = this,
-      mta_analysis = t.currentTarget.dataset.action,
+      mpValue = t.currentTarget.dataset.action,
       app = this.data,
       i = app.selectedArr,
       r = (app.saleStatus, app.colorCardList, app.typeId);
     if (0 != i.length)
-      switch (mta_analysis) {
+      switch (mpValue) {
         case "del":
           var c,
             l = [],
@@ -366,14 +365,14 @@ Page({
       });
   },
   confirmPopup: function (t) {
-    var mta_analysis,
+    var mpValue,
       app = this,
       i = t.detail.categoryIdList,
       r = [],
       c = createForOfIteratorHelper(this.data.selectedArr);
     try {
       for (c.s(); !(o = c.n()).done;) {
-        var l = mta_analysis.value;
+        var l = mpValue.value;
         r.push(l.goodsid);
       }
     } catch (t) {
@@ -408,8 +407,7 @@ Page({
     });
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      this.setData({
+    (this.setData({
         userAuthList: app.userAuthList,
       }),
       "" != t.id && null != t.id

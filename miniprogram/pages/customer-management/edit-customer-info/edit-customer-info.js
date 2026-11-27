@@ -1,7 +1,6 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   objectSpread2 = require("../../../@babel/runtime/helpers/objectSpread2"),
   o = require("../../../@babel/runtime/helpers/defineProperty"),
-  mta_analysis = t(require("../../../utils/mta_analysis.js")),
   getLocation = require("../../../libs/utils/getLocation"),
   ServicesUserLog = require("../../../libs/services/ServicesUserLog.js"),
   ServicesCustomer = require("../../../libs/services/ServicesCustomer.js").servicesCustomer,
@@ -44,8 +43,7 @@ Page({
     });
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      this.setData({
+    (this.setData({
         userAuthList: app.userAuthList,
       }),
       this.setData({
@@ -102,10 +100,10 @@ Page({
             region: [],
           });
           var o = t.data.customerInfo,
-            mta_analysis = o.provinceName,
+            mpValue = o.provinceName,
             getLocation = o.cityName,
             ServicesUserLog = o.areaName;
-          ((t.data.region = mta_analysis ? [mta_analysis, getLocation, ServicesUserLog] : []),
+          ((t.data.region = mpValue ? [mpValue, getLocation, ServicesUserLog] : []),
             t.setData({
               region: t.data.region,
             }));
@@ -143,10 +141,10 @@ Page({
           (ServicesUserLog.servicesUserLog.setUserHandleLog(302),
             0 === t.status && ServicesUserLog.servicesUserLog.setUserHandleLog(303));
           var o = getCurrentPages(),
-            mta_analysis = o.find(function (t) {
+            mpValue = o.find(function (t) {
               return "pages/customer-management/customer-management" === t.route;
             });
-          (mta_analysis && mta_analysis.updataList(),
+          (mpValue && mpValue.updataList(),
             wx.navigateBack({
               delta: 1,
               success: function () {

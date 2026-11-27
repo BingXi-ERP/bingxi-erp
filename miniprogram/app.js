@@ -74,7 +74,7 @@ App({
         t.globalData.mobileInfo = e;
       },
     });
-    var mta_analysis = "Client/".concat(this.client, ";");
+    var mpValue = "Client/".concat(this.client, ";");
     if (this.globalData.mobileInfo) {
       var envConfig = this.globalData.mobileInfo,
         o = envConfig.model,
@@ -86,7 +86,7 @@ App({
         .concat(i, ";ClientVer/")
         .concat(a, ";");
     }
-    this.AppUserAgent = mta_analysis;
+    this.AppUserAgent = mpValue;
   },
   initEnv: function () {
     var envPage = wx.getStorageSync("envPage") || envConfig.envPage;

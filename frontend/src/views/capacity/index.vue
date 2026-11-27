@@ -20,11 +20,9 @@
         <el-select
           v-model="cp.selectedWorkCenter"
           :placeholder="t('capacityModule.workCenterPlaceholder')"
-          clearable
           style="width: 200px; margin-left: 12px"
           @change="cp.handleWorkCenterChange"
         >
-          <el-option :label="t('capacityModule.allWorkCenters')" :value="undefined" />
           <el-option v-for="wc in cp.workCenters" :key="wc.id" :label="wc.name" :value="wc.id" />
         </el-select>
       </div>

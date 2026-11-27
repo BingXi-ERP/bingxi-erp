@@ -155,6 +155,17 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'system/number-rules',
+        name: 'SystemNumberRules',
+        component: () => import('@/views/system/number-rules/index.vue'),
+        meta: {
+          title: i18n.global.t('system.numberRules.title'),
+          icon: 'SetUp',
+          permission: 'number-rules:read',
+          requiresAuth: true,
+        },
+      },
+      {
         path: 'system/export-approvals',
         name: 'SystemExportApprovals',
         component: () => import('@/views/system/ExportApprovals.vue'),

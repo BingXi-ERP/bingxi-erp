@@ -18,7 +18,7 @@ use axum::{
 use crate::handlers::{
     ai_extend_handler, bpm_definition_handler, bpm_handler, company_profile_handler,
     dashboard_handler, export_approval_handler, health_handler, init_handler,
-    system_update_handler,
+    system_number_rule_handler, system_update_handler,
 };
 use crate::websocket;
 
@@ -269,6 +269,24 @@ pub fn document_no() -> Router<AppState> {
     )
 }
 
+/// 编码规则管理路由；system 为模块前缀，运行时权限资源为 number-rules。
+pub fn number_rules() -> Router<AppState> {
+    Router::new()
+        .route(
+            "/system/number-rules",
+            get(system_number_rule_handler::list_number_rules),
+        )
+        .route(
+            "/system/number-rules/{id}",
+            get(system_number_rule_handler::get_number_rule)
+                .put(system_number_rule_handler::update_number_rule),
+        )
+        .route(
+            "/system/number-rules/{id}/rollback",
+            post(system_number_rule_handler::rollback_number_rule),
+        )
+}
+
 /// 审计日志查询路由（/audit-logs：列表/详情/xlsx 导出/前端打印埋点/导出二次审计记录）
 pub fn audit_logs() -> Router<AppState> {
     use crate::handlers::audit_log_handler;
@@ -512,6 +530,7 @@ pub fn routes() -> Router<AppState> {
         .merge(audit_logs())
         .merge(slow_queries())
         .merge(document_no())
+        .merge(number_rules())
         .merge(company_profile())
         .route(
             "/payment-channels",

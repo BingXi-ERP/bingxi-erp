@@ -1,6 +1,5 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   slicedToArray = require("../../../@babel/runtime/helpers/slicedToArray"),
-  mta_analysis = t(require("../../../utils/mta_analysis.js")),
   toast = t(require("../../../miniprogram_npm/@vant/weapp/toast/toast")),
   s =
     (t(require("../../../miniprogram_npm/@vant/weapp/dialog/dialog")),
@@ -51,8 +50,7 @@ Page({
     },
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      this.setData({
+    (this.setData({
         globalApp: app,
         userAuthList: app.userAuthList,
       }),
@@ -105,9 +103,9 @@ Page({
   hanleOrderCreate: function (t) {
     var e = t.currentTarget.dataset,
       slicedToArray = e.id,
-      mta_analysis = e.orderNo,
+      mpValue = e.orderNo,
       toast = "/pages/order-create/offline/create?id=&orderNo="
-        .concat(mta_analysis, "&orderId=")
+        .concat(mpValue, "&orderId=")
         .concat(slicedToArray);
     wx.navigateTo({
       url: toast,
@@ -117,11 +115,11 @@ Page({
     var e = t.currentTarget.dataset.orderid;
     if (30 === t.currentTarget.dataset.orderstatus) {
       var slicedToArray = t.currentTarget.dataset.orderno,
-        mta_analysis = "/pages/order-create/offline/create?id="
+        mpValue = "/pages/order-create/offline/create?id="
           .concat(e, "&orderNo=")
           .concat(slicedToArray, "&orderId=&isFromPin=1");
       wx.navigateTo({
-        url: mta_analysis,
+        url: mpValue,
       });
     } else
       wx.navigateTo({
@@ -132,7 +130,7 @@ Page({
     var t = this,
       e = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : 10,
       slicedToArray = arguments.length > 3 && void 0 !== arguments[3] && arguments[3],
-      mta_analysis = this,
+      mpValue = this,
       toast = {
         status: 0,
         saleType: 0,
@@ -157,39 +155,39 @@ Page({
                 ? s &&
                   s.length > 0 &&
                   s.forEach(function (t) {
-                    mta_analysis.data.list[0].push(t);
+                    mpValue.data.list[0].push(t);
                   })
-                : (mta_analysis.data.list[0] = s)
+                : (mpValue.data.list[0] = s)
               : 40 == e
                 ? slicedToArray
                   ? s &&
                     s.length > 0 &&
                     s.forEach(function (t) {
-                      mta_analysis.data.list[1].push(t);
+                      mpValue.data.list[1].push(t);
                     })
-                  : (mta_analysis.data.list[1] = s)
+                  : (mpValue.data.list[1] = s)
                 : 50 == e
                   ? slicedToArray
                     ? s &&
                       s.length > 0 &&
                       s.forEach(function (t) {
-                        mta_analysis.data.list[2].push(t);
+                        mpValue.data.list[2].push(t);
                       })
-                    : (mta_analysis.data.list[2] = s)
+                    : (mpValue.data.list[2] = s)
                   : -10 == e &&
                     (slicedToArray
                       ? s &&
                         s.length > 0 &&
                         s.forEach(function (t) {
-                          mta_analysis.data.list[3].push(t);
+                          mpValue.data.list[3].push(t);
                         })
-                      : (mta_analysis.data.list[3] = s)),
+                      : (mpValue.data.list[3] = s)),
             (t.data.currentPageNum = o.data.pageNo));
           var d = o.data.totalPage > o.data.pageNo;
           ((t.data.nowPageNum = d ? o.data.pageNo + 1 : o.data.pageNo),
             (t.data.ishasNextPage = d),
-            mta_analysis.setData({
-              list: mta_analysis.data.list,
+            mpValue.setData({
+              list: mpValue.data.list,
               nowPageNum: t.data.nowPageNum,
               ishasNextPage: t.data.ishasNextPage,
             }));
@@ -237,11 +235,11 @@ Page({
   },
   closeOrder: function (t, e) {
     var slicedToArray = this,
-      mta_analysis = {
+      mpValue = {
         billingId: t,
         closeReason: e,
       };
-    h.closeOrder(mta_analysis).then(function (t) {
+    h.closeOrder(mpValue).then(function (t) {
       0 === t.code
         ? slicedToArray.getShopOrderList()
         : wx.showToast({
@@ -321,8 +319,8 @@ Page({
     });
     var t = this.data.activedIndex,
       e = d[t].split("|"),
-      mta_analysis = slicedToArray(e, 2);
-    (mta_analysis[0], mta_analysis[1]);
+      mpValue = slicedToArray(e, 2);
+    (mpValue[0], mpValue[1]);
   },
   handleTabChange: function (t) {
     var e = t.detail.index;

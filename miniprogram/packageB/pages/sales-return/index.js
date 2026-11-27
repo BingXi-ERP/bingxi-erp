@@ -1,7 +1,6 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   e = require("../../../@babel/runtime/helpers/defineProperty"),
   toConsumableArray = require("../../../@babel/runtime/helpers/toConsumableArray"),
-  mta_analysis = t(require("../../../utils/mta_analysis")),
   time = require("../../../libs/utils/time"),
   dialog = t(require("../../../miniprogram_npm/@vant/weapp/dialog/dialog")),
   ServicesReturn = require("../../libs/services/ServicesReturn"),
@@ -60,12 +59,12 @@ Page({
       var t = app.globalData.userInfo,
         e = t.id,
         toConsumableArray = t.nickName,
-        mta_analysis = t.fullName,
+        mpValue = t.fullName,
         time = t.mobile,
         dialog = t.type,
         ServicesReturn = {
           salesId: e,
-          salesName: toConsumableArray || mta_analysis,
+          salesName: toConsumableArray || mpValue,
           salesMobile: time,
         };
       this.setData({
@@ -91,16 +90,16 @@ Page({
   addItem: function (t) {
     var e = "full",
       toConsumableArray = t.currentTarget.dataset.id,
-      mta_analysis = "/pages/order-create/product-full/index?productType="
+      mpValue = "/pages/order-create/product-full/index?productType="
         .concat(e, "&openType=")
         .concat("salesReturn", "&colorCardId=")
         .concat(toConsumableArray, "&fromCreate=1");
     wx.navigateTo({
-      url: mta_analysis,
+      url: mpValue,
     });
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(), login.login.getUserInfo(), this.getUserId());
+    (login.login.getUserInfo(), this.getUserId());
     var e = t.id,
       toConsumableArray = void 0 === e ? "" : e,
       time = t.orderId,
@@ -188,11 +187,11 @@ Page({
       })
       .then(function () {
         var toConsumableArray = t.currentTarget.dataset.id,
-          mta_analysis = e.data.products.filter(function (t) {
+          mpValue = e.data.products.filter(function (t) {
             return t.id !== toConsumableArray;
           });
         (e.setData({
-          products: mta_analysis,
+          products: mpValue,
         }),
           e.totalProductAccount());
       })
@@ -201,7 +200,7 @@ Page({
   handleProductEdit: function (t) {
     var e = t.currentTarget.dataset.id,
       toConsumableArray = this.data.productType,
-      mta_analysis = this.data.products.find(function (t) {
+      mpValue = this.data.products.find(function (t) {
         return t.id === e;
       }),
       time = "/pages/order-create/product-full/index?productType="
@@ -210,7 +209,7 @@ Page({
         .concat(e, "&fromCreate=1");
     (wx.setStorage({
       key: d,
-      data: mta_analysis,
+      data: mpValue,
     }),
       wx.navigateTo({
         url: time,
@@ -240,10 +239,10 @@ Page({
         toConsumableArray = e.oldId;
       e.expiredFlag;
       this.data.oldId = toConsumableArray;
-      var mta_analysis = "productType="
+      var mpValue = "productType="
           .concat(this.data.productType, "&openType=salesReturn&ids=")
           .concat(""),
-        time = "/pages/order-create/color-card/select?".concat(mta_analysis);
+        time = "/pages/order-create/color-card/select?".concat(mpValue);
       wx.navigateTo({
         url: time,
       });
@@ -256,11 +255,11 @@ Page({
   updateProduct: function (t) {
     var e = this;
     if (this.data.oldId) {
-      var mta_analysis = this.data.products.filter(function (t) {
+      var mpValue = this.data.products.filter(function (t) {
         return t.id !== e.data.oldId;
       });
       this.setData({
-        products: mta_analysis,
+        products: mpValue,
       });
     }
     var time = this.data.products.find(function (e) {
@@ -299,20 +298,20 @@ Page({
     var t = this.data,
       e = t.products,
       toConsumableArray = t.cost,
-      mta_analysis = Number(toConsumableArray);
+      mpValue = Number(toConsumableArray);
     (e.forEach(function (t) {
       o += Number(t.totalPrice);
     }),
       this.setData({
-        totalAccount: mta_analysis.toFixed(2),
+        totalAccount: mpValue.toFixed(2),
       }));
   },
   handleSwitchColor: function (t) {
     var e = t.currentTarget.dataset,
       toConsumableArray = e.index,
-      mta_analysis = e.productId,
+      mpValue = e.productId,
       time = this.data.products.find(function (t) {
-        return t.id === mta_analysis;
+        return t.id === mpValue;
       });
     (console.log(time.colors[toConsumableArray]),
       (time.tabCurrentColorId = time.colors[toConsumableArray].id),
@@ -328,10 +327,10 @@ Page({
   changeCurrentDyelot: function (t) {
     var e = t.currentTarget.dataset,
       toConsumableArray = e.index,
-      mta_analysis = e.productId,
+      mpValue = e.productId,
       time = e.productItem.tabCurrentColorId,
       dialog = this.data.products.find(function (t) {
-        return t.id === mta_analysis;
+        return t.id === mpValue;
       }),
       ServicesReturn = dialog.colors.find(function (t) {
         return t.id === time;
@@ -357,17 +356,17 @@ Page({
   },
   handleUpdateVal: function (t) {
     var toConsumableArray = t.currentTarget.dataset.key,
-      mta_analysis = t.detail.value;
+      mpValue = t.detail.value;
     (this.setData({
-      toConsumableArray: mta_analysis,
+      toConsumableArray: mpValue,
     }),
       "cost" === toConsumableArray && this.totalProductAccount());
   },
   handleUpdateCostVal: function (t) {
     var toConsumableArray = t.currentTarget.dataset.key,
-      mta_analysis = /^(\.*)(\d+)(\.?)(\d{0,2}).*$/g,
+      mpValue = /^(\.*)(\d+)(\.?)(\d{0,2}).*$/g,
       time = t.detail.value,
-      dialog = mta_analysis.test(time) ? time.replace(mta_analysis, "$2$3$4") : "";
+      dialog = mpValue.test(time) ? time.replace(mpValue, "$2$3$4") : "";
     return (
       this.setData({
         toConsumableArray: dialog,
@@ -377,13 +376,13 @@ Page({
   },
   handleBlurCostVal: function (t) {
     var toConsumableArray = t.detail.value,
-      mta_analysis = t.target.dataset.key,
+      mpValue = t.target.dataset.key,
       time = toConsumableArray.substr(toConsumableArray.length - 1);
     ((a =
       "" != (a = 0 == toConsumableArray ? "" : toConsumableArray) ? Number(toConsumableArray) : ""),
       "." == time && (a = Number(toConsumableArray)),
       this.setData({
-        mta_analysis: toConsumableArray,
+        mpValue: toConsumableArray,
       }),
       this.totalProductAccount());
   },
@@ -440,14 +439,14 @@ Page({
     var t = this.data,
       e = (t.id, t.orderId, t.orderNo, t.customerId),
       toConsumableArray = (t.customerName, t.createDate),
-      mta_analysis = t.products,
+      mpValue = t.products,
       time = t.salesList,
       dialog = t.selectSalesBillId,
       ServicesReturn = t.remarks,
       ServicesUserLog = (t.totalAccount, t.billingPurchaseImgList),
       login = [];
     return (
-      mta_analysis.forEach(function (t) {
+      mpValue.forEach(function (t) {
         var e = [];
         t.colors.forEach(function (t) {
           t.dyelotArr.forEach(function (a) {
@@ -497,12 +496,12 @@ Page({
     var t = this.data,
       e = t.customerId,
       toConsumableArray = t.products,
-      mta_analysis = [];
+      mpValue = [];
     if (
       (e && "" !== e
-        ? 0 === toConsumableArray.length && mta_analysis.push("请添加商品")
-        : mta_analysis.push("请选择客户"),
-      0 === mta_analysis.length)
+        ? 0 === toConsumableArray.length && mpValue.push("请添加商品")
+        : mpValue.push("请选择客户"),
+      0 === mpValue.length)
     ) {
       (wx.showLoading({
         title: "保存中",
@@ -529,7 +528,7 @@ Page({
       }, 500);
     } else
       wx.showToast({
-        title: mta_analysis[0],
+        title: mpValue[0],
         icon: "none",
       });
   },

@@ -5,7 +5,6 @@ var t = require("../../../../@babel/runtime/helpers/interopRequireDefault").defa
     require("../../../services/services-demand")),
   i =
     (require("../../../../libs/services/orderPrint"),
-    t(require("../../../../utils/mta_analysis")),
     t(require("../../../../utils/throttle"))),
   app = getApp();
 Page({

@@ -261,6 +261,7 @@ pub const PERMISSION_RESOURCES: &[&str] = &[
     "business-trace",
     // ===== 系统域 =====
     "system-config",
+    "number-rules",
     "audit-logs",
     "slow-queries",
     "print-templates",
