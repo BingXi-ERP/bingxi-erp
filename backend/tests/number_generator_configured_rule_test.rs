@@ -23,8 +23,8 @@ use bingxi_backend::services::system_number_rule_service::SystemNumberRuleServic
 use bingxi_backend::utils::number_generator::DocumentNumberGenerator;
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    Set, TransactionTrait,
 };
 
 async fn seed_rule(db: &DatabaseConnection, rule_key: &str) -> (system_number_rule::Model, i32) {
@@ -115,12 +115,17 @@ async fn allocate_and_insert(db: &DatabaseConnection, rule_key: &str) -> custome
 }
 
 async fn cleanup(db: &DatabaseConnection, rule_id: i32, rule_key: &str) {
+    let txn = db.begin().await.expect("开启编码规则测试清理事务失败");
+    txn.execute_unprepared("SET LOCAL app.audit_purge = 'on'")
+        .await
+        .expect("声明编码规则测试审计清理通道失败");
     audit_log::Entity::delete_many()
         .filter(audit_log::Column::ResourceType.eq("system_number_rules"))
         .filter(audit_log::Column::ResourceId.eq(rule_id.to_string()))
-        .exec(db)
+        .exec(&txn)
         .await
         .expect("清理编码规则测试审计失败");
+    txn.commit().await.expect("提交编码规则测试清理事务失败");
     customer::Entity::delete_many()
         .filter(customer::Column::CustomerCode.starts_with(rule_key))
         .exec(db)

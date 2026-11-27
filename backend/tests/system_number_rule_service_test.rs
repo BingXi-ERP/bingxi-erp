@@ -19,7 +19,10 @@ use bingxi_backend::services::system_number_rule_service::SystemNumberRuleServic
 use bingxi_backend::utils::error::AppError;
 use bingxi_backend::utils::number_generator::DocumentNumberGenerator;
 use chrono::{TimeZone, Utc};
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Set,
+    TransactionTrait,
+};
 
 #[tokio::test]
 async fn update_conflict_rollback_audit_and_generator_are_consistent() {
@@ -191,12 +194,21 @@ async fn update_conflict_rollback_audit_and_generator_are_consistent() {
         .expect("查询不存在规则失败");
     assert!(missing.is_none());
 
+    let cleanup_txn = db.begin().await.expect("开启专用规则测试清理事务失败");
+    cleanup_txn
+        .execute_unprepared("SET LOCAL app.audit_purge = 'on'")
+        .await
+        .expect("声明专用规则测试审计清理通道失败");
     audit_log::Entity::delete_many()
         .filter(audit_log::Column::ResourceType.eq("system_number_rules"))
         .filter(audit_log::Column::ResourceId.eq(rule_id.to_string()))
-        .exec(db.as_ref())
+        .exec(&cleanup_txn)
         .await
         .expect("清理专用规则测试审计失败");
+    cleanup_txn
+        .commit()
+        .await
+        .expect("提交专用规则测试清理事务失败");
     system_number_rule::Entity::delete_by_id(rule_id)
         .exec(db.as_ref())
         .await
