@@ -117,7 +117,7 @@ async fn connect_redis(url: &str) -> Result<ConnectionManager, redis::RedisError
     ConnectionManager::new_with_config(client, config).await
 }
 
-async fn get_redis_conn(state: &mut RedisRuntimeState) -> Option<&mut ConnectionManager> {
+async fn get_redis_conn(state: &mut RedisRuntimeState) -> Option<ConnectionManager> {
     let Some(url) = get_redis_url() else {
         state.record_not_configured();
         return None;
@@ -130,7 +130,7 @@ async fn get_redis_conn(state: &mut RedisRuntimeState) -> Option<&mut Connection
 
         match timeout(REDIS_PROBE_TIMEOUT, connect_redis(&url)).await {
             Ok(Ok(connection)) => {
-                state.connection = Some(connection);
+                state.connection = Some(connection.clone());
                 state.record_success();
                 tracing::info!("分布式缓存已启用 Redis 后端");
             }
@@ -147,88 +147,115 @@ async fn get_redis_conn(state: &mut RedisRuntimeState) -> Option<&mut Connection
         }
     }
 
-    state.connection.as_mut()
+    state.connection.clone()
 }
 
 /// 获取有界、带冷却的 Redis 运行时状态；响应只使用状态枚举，不暴露连接信息。
 pub async fn redis_runtime_status() -> RedisRuntimeStatus {
     let deadline = tokio::time::Instant::now() + REDIS_PROBE_TIMEOUT;
-    let Ok(mut state) = timeout_at(deadline, REDIS_STATE.lock()).await else {
-        tracing::warn!("Redis 健康检查等待连接状态锁超时");
-        return RedisRuntimeStatus::Unreachable;
+    let (url, status, connection) = {
+        let Ok(mut state) = timeout_at(deadline, REDIS_STATE.lock()).await else {
+            tracing::warn!("Redis 健康检查等待连接状态锁超时");
+            return RedisRuntimeStatus::Unreachable;
+        };
+
+        let Some(url) = get_redis_url() else {
+            state.record_not_configured();
+            return RedisRuntimeStatus::NotConfigured;
+        };
+        if !state.allows_probe(Instant::now()) {
+            return state.status;
+        }
+        (url, state.status, state.connection.clone())
     };
 
-    let Some(url) = get_redis_url() else {
-        state.record_not_configured();
-        return RedisRuntimeStatus::NotConfigured;
-    };
-
-    if !state.allows_probe(Instant::now()) {
-        return state.status;
-    }
-
-    if state.connection.is_none() {
-        match timeout_at(deadline, connect_redis(&url)).await {
+    let mut connection = match connection {
+        Some(connection) => connection,
+        None => match timeout_at(deadline, connect_redis(&url)).await {
             Ok(Ok(connection)) => {
-                state.connection = Some(connection);
+                let mut state = REDIS_STATE.lock().await;
+                state.connection = Some(connection.clone());
                 state.record_success();
                 tracing::info!("Redis 健康检查已重新建立连接");
+                connection
             }
             Ok(Err(_)) => {
-                state.record_probe_failure(Instant::now());
+                REDIS_STATE
+                    .lock()
+                    .await
+                    .record_probe_failure(Instant::now());
                 tracing::warn!("Redis 健康检查连接失败");
                 return RedisRuntimeStatus::Unreachable;
             }
             Err(_) => {
-                state.record_probe_failure(Instant::now());
+                REDIS_STATE
+                    .lock()
+                    .await
+                    .record_probe_failure(Instant::now());
                 tracing::warn!("Redis 健康检查连接超时");
                 return RedisRuntimeStatus::Unreachable;
             }
-        }
-    }
-
-    let Some(connection) = state.connection.as_mut() else {
-        state.record_probe_failure(Instant::now());
-        return RedisRuntimeStatus::Unreachable;
+        },
     };
 
-    match timeout_at(
+    let result = timeout_at(
         deadline,
-        redis::cmd("PING").query_async::<String>(connection),
+        redis::cmd("PING").query_async::<String>(&mut connection),
     )
-    .await
-    {
+    .await;
+    match result {
         Ok(Ok(_)) => {
-            state.record_probe_success(Instant::now());
+            REDIS_STATE
+                .lock()
+                .await
+                .record_probe_success(Instant::now());
             RedisRuntimeStatus::Healthy
         }
         Ok(Err(_)) => {
-            state.record_probe_failure(Instant::now());
-            tracing::warn!("Redis 健康检查 PING 失败");
+            REDIS_STATE
+                .lock()
+                .await
+                .record_probe_failure(Instant::now());
+            tracing::warn!(
+                previous_status = status.as_str(),
+                "Redis 健康检查 PING 失败"
+            );
             RedisRuntimeStatus::Unreachable
         }
         Err(_) => {
-            state.record_probe_failure(Instant::now());
-            tracing::warn!("Redis 健康检查 PING 超时");
+            REDIS_STATE
+                .lock()
+                .await
+                .record_probe_failure(Instant::now());
+            tracing::warn!(
+                previous_status = status.as_str(),
+                "Redis 健康检查 PING 超时"
+            );
             RedisRuntimeStatus::Unreachable
         }
     }
 }
 
-fn record_command_failure(state: &mut RedisRuntimeState, error: &redis::RedisError) {
-    state.record_failure(Instant::now());
+async fn record_command_success() {
+    REDIS_STATE.lock().await.record_success();
+}
+
+async fn record_command_failure(error: &redis::RedisError) {
+    REDIS_STATE.lock().await.record_failure(Instant::now());
     tracing::warn!(error = %error, "Redis 命令失败，相关业务操作降级");
 }
 
 /// 从 Redis 读取 JSON 并反序列化（未配置 Redis 或 key 不存在时返回 None，优雅降级）
 pub async fn redis_cache_get_json<T: DeserializeOwned>(key: &str) -> Option<T> {
-    let mut state = REDIS_STATE.lock().await;
-    let connection = get_redis_conn(&mut state).await?;
+    let mut connection = {
+        let mut state = REDIS_STATE.lock().await;
+        get_redis_conn(&mut state).await?
+    };
 
     let result: redis::RedisResult<Option<String>> = connection.get(key).await;
     match result {
         Ok(Some(json_str)) => {
-            state.record_success();
+            record_command_success().await;
             match serde_json::from_str::<T>(&json_str) {
                 Ok(value) => Some(value),
                 Err(e) => {
@@ -238,11 +265,11 @@ pub async fn redis_cache_get_json<T: DeserializeOwned>(key: &str) -> Option<T> {
             }
         }
         Ok(None) => {
-            state.record_success();
+            record_command_success().await;
             None
         }
         Err(e) => {
-            record_command_failure(&mut state, &e);
+            record_command_failure(&e).await;
             tracing::warn!(key = %key, "Redis GET 失败，回退到 DB");
             None
         }
@@ -251,9 +278,12 @@ pub async fn redis_cache_get_json<T: DeserializeOwned>(key: &str) -> Option<T> {
 
 /// 写入 JSON 到 Redis（带 TTL，未配置 Redis 时为 no-op）
 pub async fn redis_cache_set_json<T: Serialize>(key: &str, value: &T, ttl_secs: u64) {
-    let mut state = REDIS_STATE.lock().await;
-    let Some(connection) = get_redis_conn(&mut state).await else {
-        return;
+    let mut connection = {
+        let mut state = REDIS_STATE.lock().await;
+        let Some(connection) = get_redis_conn(&mut state).await else {
+            return;
+        };
+        connection
     };
 
     let json_str = match serde_json::to_string(value) {
@@ -265,74 +295,68 @@ pub async fn redis_cache_set_json<T: Serialize>(key: &str, value: &T, ttl_secs: 
     };
 
     if let Err(e) = connection.set_ex::<_, _, ()>(key, json_str, ttl_secs).await {
-        record_command_failure(&mut state, &e);
+        record_command_failure(&e).await;
         tracing::warn!(key = %key, "Redis SET 失败");
     } else {
-        state.record_success();
+        record_command_success().await;
     }
 }
 
 /// 删除指定 key（未配置 Redis 时为 no-op）
 pub async fn redis_cache_del(key: &str) {
-    let mut state = REDIS_STATE.lock().await;
-    let Some(connection) = get_redis_conn(&mut state).await else {
-        return;
+    let mut connection = {
+        let mut state = REDIS_STATE.lock().await;
+        let Some(connection) = get_redis_conn(&mut state).await else {
+            return;
+        };
+        connection
     };
 
     if let Err(e) = connection.del::<_, ()>(key).await {
-        record_command_failure(&mut state, &e);
+        record_command_failure(&e).await;
         tracing::warn!(key = %key, "Redis DEL 失败");
     } else {
-        state.record_success();
+        record_command_success().await;
     }
 }
 
 /// 按前缀批量删除（使用 SCAN 避免阻塞 Redis，未配置 Redis 时为 no-op）
 /// 注意：前缀匹配扫描 keys 大量 key 时影响性能，仅在创建/更新/删除时调用，不要在热点读路径使用
 pub async fn redis_cache_del_prefix(prefix: &str) {
-    let mut state = REDIS_STATE.lock().await;
-    if get_redis_conn(&mut state).await.is_none() {
-        return;
-    }
+    let mut connection = {
+        let mut state = REDIS_STATE.lock().await;
+        let Some(connection) = get_redis_conn(&mut state).await else {
+            return;
+        };
+        connection
+    };
 
     // 使用 SCAN 模式遍历匹配的 key（生产环境友好，不阻塞 Redis）
     let pattern = format!("{}*", prefix);
     let mut cursor: u64 = 0;
     let mut command_failed = false;
     loop {
-        let scan_result = {
-            let Some(connection) = state.connection.as_mut() else {
-                state.record_failure(Instant::now());
-                return;
-            };
-            redis::cmd("SCAN")
-                .arg(cursor)
-                .arg("MATCH")
-                .arg(&pattern)
-                .arg("COUNT")
-                .arg(100)
-                .query_async::<(u64, Vec<String>)>(connection)
-                .await
-        };
+        let scan_result: redis::RedisResult<(u64, Vec<String>)> = redis::cmd("SCAN")
+            .arg(cursor)
+            .arg("MATCH")
+            .arg(&pattern)
+            .arg("COUNT")
+            .arg(100)
+            .query_async(&mut connection)
+            .await;
         let (next_cursor, keys) = match scan_result {
             Ok(result) => result,
             Err(e) => {
-                record_command_failure(&mut state, &e);
+                record_command_failure(&e).await;
                 tracing::warn!(prefix = %prefix, "Redis SCAN 失败");
                 return;
             }
         };
 
         if !keys.is_empty() {
-            let delete_result = {
-                let Some(connection) = state.connection.as_mut() else {
-                    state.record_failure(Instant::now());
-                    return;
-                };
-                connection.del::<_, ()>(&keys).await
-            };
+            let delete_result: redis::RedisResult<()> = connection.del(&keys).await;
             if let Err(e) = delete_result {
-                record_command_failure(&mut state, &e);
+                record_command_failure(&e).await;
                 tracing::warn!(prefix = %prefix, "Redis 批量 DEL 失败");
                 command_failed = true;
             }
@@ -345,7 +369,7 @@ pub async fn redis_cache_del_prefix(prefix: &str) {
     }
 
     if !command_failed {
-        state.record_success();
+        record_command_success().await;
     }
 }
 
@@ -399,16 +423,19 @@ pub fn get_redis_url() -> Option<String> {
 /// V15 P1 20.3-B：发布消息到 Redis Pub/Sub 频道（多实例广播）
 /// 未配置 Redis 时为 no-op，调用方应自行处理本地广播降级。
 pub async fn publish_to_channel(channel: &str, message: &str) {
-    let mut state = REDIS_STATE.lock().await;
-    let Some(connection) = get_redis_conn(&mut state).await else {
-        return;
+    let mut connection = {
+        let mut state = REDIS_STATE.lock().await;
+        let Some(connection) = get_redis_conn(&mut state).await else {
+            return;
+        };
+        connection
     };
     // PUBLISH 命令：第一个参数是频道名，第二个是消息内容
     if let Err(e) = connection.publish::<_, _, ()>(channel, message).await {
-        record_command_failure(&mut state, &e);
+        record_command_failure(&e).await;
         tracing::warn!(channel = %channel, "Redis PUBLISH 失败");
     } else {
-        state.record_success();
+        record_command_success().await;
     }
 }
 
