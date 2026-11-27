@@ -36,6 +36,7 @@ import {
   failureCode,
   APP_ERROR_CODES,
   genCode,
+  testPassword,
   tryCleanup,
   verifyEndpointHealthy,
 } from '../flow/helpers';
@@ -175,28 +176,27 @@ async function approveMine(
   });
 }
 
-/** 从用户列表取一个≠当前用户的真实用户 id（正向转办的合法受让人；无第二账号立即判红，不许伪造 id） */
+/** 本例自建唯一启用用户作为转办受让人，避免并行分片停用共享 seed 用户造成假红。 */
 async function resolveOtherUserId(
   page: import('@playwright/test').Page,
   myId: number
 ): Promise<number> {
-  const list = await apiCallRaw<{
-    users: Array<{ id: number; username: string; is_active: boolean }>;
-    total: number;
-  }>(page, 'GET', '/users?page=1&page_size=100');
-  if (!Array.isArray(list?.users)) {
-    throw new Error(
-      `GET /users 未返回 users 数组（UserListResponse 契约漂移？）：${JSON.stringify(list).slice(0, 300)}`
-    );
+  const username = `e2e_bpm_gate_${genCode('04G')}`;
+  const created = await apiCall<{ id: number }>(page, 'POST', '/users', {
+    username,
+    password: testPassword(),
+    email: `${username}@test.com`,
+  });
+  const otherId = Number(created.id);
+  if (!Number.isInteger(otherId) || otherId <= 0 || otherId === myId) {
+    throw new Error(`创建转办受让人失败或 id 非法: ${JSON.stringify(created)}`);
   }
-  const other = list.users.find(u => Number(u.id) !== myId && u.is_active === true);
-  if (!other) {
-    throw new Error(
-      `用户列表中找不到与当前用户(${myId})不同的启用用户，无法构造转办正向对照；` +
-        `当前返回 ${list.users.length} 个用户，停用账号不得作为合法受让人`
-    );
-  }
-  return Number(other.id);
+  CLEANUP.push({
+    method: 'DELETE',
+    path: `/users/${otherId}`,
+    label: `删除转办受让人 ${username}`,
+  });
+  return otherId;
 }
 
 test.describe('04 BPM 状态门负例（转办/催办/撤回，防回潮）', () => {
