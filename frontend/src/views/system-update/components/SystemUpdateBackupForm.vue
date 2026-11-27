@@ -21,8 +21,6 @@
       <el-form-item :label="t('systemUpdate.backupForm.labelBackupType')" prop="backup_type">
         <el-select v-model="localForm.backup_type" style="width: 100%">
           <el-option :label="t('systemUpdate.backupForm.optionFull')" value="full" />
-          <el-option :label="t('systemUpdate.backupForm.optionIncremental')" value="incremental" />
-          <el-option :label="t('systemUpdate.backupForm.optionDatabase')" value="database" />
           <el-option :label="t('systemUpdate.backupForm.optionFiles')" value="files" />
         </el-select>
       </el-form-item>
@@ -57,7 +55,7 @@ const { width } = useBreakpoint();
 const isPhone = computed(() => width.value < 768);
 
 interface BackupForm {
-  backup_type: 'full' | 'incremental' | 'database' | 'files';
+  backup_type: 'full' | 'files';
   description: string;
 }
 

@@ -20,7 +20,7 @@ use std::fs;
 use std::path::PathBuf;
 
 impl SystemUpdateService {
-    fn get_releases_dir(&self) -> PathBuf {
+    pub(crate) fn get_releases_dir(&self) -> PathBuf {
         let mut releases_dir = self.app_dir.clone();
 
         if releases_dir.ends_with("backend") || releases_dir.ends_with("backend/target/release") {

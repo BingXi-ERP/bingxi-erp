@@ -133,22 +133,20 @@ test.describe('P5.10 系统运维岗 ops 授权（真实登录）', () => {
     ).toBe('boolean');
   });
 
-  test('ops 可达写端点：创建备份真实成功（RBAC create 键 + admin/ops 深度防御双放行）', async ({
+  test('ops 可达写端点：未实现的备份类型被显式拒绝（RBAC create 键 + admin/ops 深度防御双放行）', async ({
     page,
   }) => {
-    // POST /system-update/backups 仅落一条备份记录（非破坏性），返回 200 即证明
-    // ops 同时通过 RBAC（system-update-backups:create）与 require_admin_role 两道门。
+    // database 备份尚无真实实现，handler 必须返回 400；不得返回 403，也不得登记 completed。
+    // 真实 full/files 备份由后端临时目录回归覆盖，避免 E2E 复制整个仓库与构建产物。
     await loginAsRole(page, 'ops');
-    const created = await apiCall<{ backup_code?: string; status?: string }>(
-      page,
-      'POST',
-      '/system-update/backups',
-      { backup_type: 'full', description: 'e2e-ops-authz' }
-    );
+    const res = await apiCallExpectFail(page, 'POST', '/system-update/backups', {
+      backup_type: 'database',
+      description: 'e2e-ops-authz-unsupported',
+    });
     expect(
-      created.data?.backup_code,
-      `ops 创建备份应成功返回 backup_code，实际=${JSON.stringify(created.data)}`
-    ).toBeTruthy();
+      res.status,
+      `ops 应越过 RBAC/角色门到达 handler，未实现类型返回 400；实际 status=${res.status} code=${res.code}`
+    ).toBe(400);
   });
 
   test('ops 可达写端点：回滚键放行到 handler（非 403，版本不存在的业务失败可接受）', async ({

@@ -229,6 +229,40 @@ fn test_task_to_frontend_json_keys() {
     );
     assert_eq!(obj["created_by"], serde_json::json!(42));
     assert_eq!(obj["created_by_name"], serde_json::json!("admin"));
+    assert_eq!(
+        obj["completed_at"],
+        model
+            .completed_at
+            .map(|dt| dt.to_rfc3339())
+            .map(serde_json::Value::String)
+            .expect("已完成任务应有完成时间")
+    );
+}
+
+/// 未成功任务即使残留历史 completed_at，也不能对外显示完成时间。
+#[test]
+fn test_task_to_frontend_json_hides_completion_for_unfinished_status() {
+    let mut model = sample_task_model();
+    model.status = "installing".to_string();
+    model.progress = 0;
+
+    let json = task_to_frontend_json(&model);
+    assert!(
+        json.get("completed_at").is_some() && json["completed_at"].is_null(),
+        "安装中任务的完成时间必须为 null，实际: {}",
+        json["completed_at"]
+    );
+}
+
+/// 备份记录只对外暴露备份目录名，绝不泄露服务器绝对路径。
+#[test]
+fn test_backup_to_frontend_json_redacts_absolute_path() {
+    let json = backup_to_frontend_json(&sample_backup_model());
+    assert_eq!(
+        json["file_path"],
+        serde_json::json!("bk-001.tar.gz"),
+        "备份 API 只能返回目录名，不能返回服务器绝对路径"
+    );
 }
 
 /// backup_to_frontend_json 输出键集合与前端 SystemBackup 契约逐字段对齐
@@ -264,10 +298,7 @@ fn test_backup_to_frontend_json_keys() {
     assert_eq!(obj["id"], serde_json::json!(1));
     assert_eq!(obj["backup_code"], serde_json::json!("BK-20260929120000"));
     assert_eq!(obj["backup_type"], serde_json::json!("full"));
-    assert_eq!(
-        obj["file_path"],
-        serde_json::json!("/backups/bk-001.tar.gz")
-    );
+    assert_eq!(obj["file_path"], serde_json::json!("bk-001.tar.gz"));
     assert_eq!(obj["file_size"], serde_json::json!(1024));
     assert_eq!(obj["description"], serde_json::json!("系统全量备份"));
     assert_eq!(obj["status"], serde_json::json!("completed"));

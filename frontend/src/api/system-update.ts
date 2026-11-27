@@ -27,7 +27,7 @@ export interface UpdateTask {
   error_message: string;
   backup_path: string;
   started_at: string;
-  completed_at: string;
+  completed_at: string | null;
   created_by: number;
   created_by_name: string;
   created_at: string;

@@ -613,8 +613,16 @@ pub struct CreateBackupRequest {
     pub description: Option<String>,
 }
 
-/// 创建并登记一条更新任务记录（落库 system_update_tasks），返回前端契约 JSON
-async fn push_update_task(
+/// 判断更新任务是否已到达应记录结束时间的终态。
+fn is_terminal_update_status(status: &str) -> bool {
+    matches!(
+        status,
+        "downloaded" | "completed" | "failed" | "rolled_back"
+    )
+}
+
+/// 登记更新任务；非终态任务的 completed_at 始终为空。
+async fn create_update_task(
     state: &AppState,
     from_version: String,
     to_version: String,
@@ -622,7 +630,7 @@ async fn push_update_task(
     status: &str,
     progress: u32,
     auth: &AuthContext,
-) -> Result<serde_json::Value, AppError> {
+) -> Result<system_update_task::Model, AppError> {
     use sea_orm::{ActiveModelTrait, Set};
 
     use std::sync::atomic::{AtomicI32, Ordering};
@@ -632,24 +640,67 @@ async fn push_update_task(
     let model = system_update_task::ActiveModel {
         task_code: Set(format!("UPD-{}-{:04}", now.format("%Y%m%d%H%M%S"), seq)),
         task_type: Set(task_type.to_string()),
-        source_version: Set(from_version.clone()),
-        target_version: Set(to_version.clone()),
+        source_version: Set(from_version),
+        target_version: Set(to_version),
         status: Set(status.to_string()),
         progress: Set(progress as i32),
         error_message: Set(None),
         created_by: Set(auth.user_id),
         created_by_name: Set(auth.username.clone()),
-        completed_at: Set(Some(now.into())),
+        completed_at: Set(if is_terminal_update_status(status) {
+            Some(now.into())
+        } else {
+            None
+        }),
         created_at: Set(now.into()),
         updated_at: Set(now.into()),
         ..Default::default()
     };
-    let saved = model.insert(state.db.as_ref()).await?;
-    Ok(task_to_frontend_json(&saved))
+    model
+        .insert(state.db.as_ref())
+        .await
+        .map_err(AppError::from)
+}
+
+/// 将更新任务推进到终态，只有真实操作成功或失败后才写 completed_at。
+async fn finish_update_task(
+    db: &sea_orm::DatabaseConnection,
+    task_id: i32,
+    status: &str,
+    progress: i32,
+    error_message: Option<String>,
+) -> Result<system_update_task::Model, AppError> {
+    use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+
+    if !is_terminal_update_status(status) {
+        return Err(AppError::bad_request("更新任务终态无效"));
+    }
+    if !(0..=100).contains(&progress) {
+        return Err(AppError::bad_request("更新任务进度必须在 0 到 100 之间"));
+    }
+    let task = system_update_task::Entity::find_by_id(task_id)
+        .one(db)
+        .await?
+        .ok_or_else(|| AppError::not_found(format!("更新任务 {} 不存在", task_id)))?;
+    let now = chrono::Utc::now();
+    let mut active: system_update_task::ActiveModel = task.into();
+    active.status = Set(status.to_string());
+    active.progress = Set(progress);
+    active.error_message = Set(error_message);
+    active.completed_at = Set(Some(now.into()));
+    active.updated_at = Set(now.into());
+    let saved = active.update(db).await?;
+    tracing::info!(task_id, status, progress, "系统更新任务已到达真实终态");
+    Ok(saved)
 }
 
 /// system_update_task Model → 前端 `UpdateTask` 契约 JSON
 pub fn task_to_frontend_json(t: &system_update_task::Model) -> serde_json::Value {
+    let completed_at = if is_terminal_update_status(&t.status) {
+        t.completed_at.map(|value| value.to_rfc3339())
+    } else {
+        None
+    };
     serde_json::json!({
         "id": t.id,
         "task_code": t.task_code,
@@ -660,7 +711,7 @@ pub fn task_to_frontend_json(t: &system_update_task::Model) -> serde_json::Value
         "error_message": t.error_message.clone().unwrap_or_default(),
         "backup_path": "",
         "started_at": t.created_at.to_rfc3339(),
-        "completed_at": t.completed_at.map(|c| c.to_rfc3339()).unwrap_or_default(),
+        "completed_at": completed_at,
         "created_by": t.created_by,
         "created_by_name": t.created_by_name,
         "created_at": t.created_at.to_rfc3339(),
@@ -669,11 +720,15 @@ pub fn task_to_frontend_json(t: &system_update_task::Model) -> serde_json::Value
 
 /// system_update_backup Model → 前端 `SystemBackup` 契约 JSON
 pub fn backup_to_frontend_json(b: &system_update_backup::Model) -> serde_json::Value {
+    let file_name = std::path::Path::new(&b.file_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default();
     serde_json::json!({
         "id": b.id,
         "backup_code": b.backup_code,
         "backup_type": b.backup_type,
-        "file_path": b.file_path,
+        "file_path": file_name,
         "file_size": b.file_size,
         "description": b.description,
         "status": b.status,
@@ -715,37 +770,105 @@ fn system_version_to_frontend_json(v: &system_version::Model) -> serde_json::Val
 }
 
 /// POST /api/v1/erp/system-update/backups - 创建系统备份任务（对应前端 api/system-update.ts createSystemBackup）
-/// 最小实现：生成备份任务记录（内存），异步标记备份完成状态
 pub async fn create_backup_task(
     State(state): State<AppState>,
     auth: AuthContext,
     Json(req): Json<CreateBackupRequest>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
-    // 创建系统备份属更新链前置高危动作（备份是回滚底座），与其余更新写端点保持一致的
-    // admin/ops 深度防御校验；此前该端点仅取 AuthContext 未校验，构成现状不对称，补齐。
     require_admin_role(&state, &auth).await?;
-
     req.validate().map_err(AppError::from)?;
 
+    let service = SystemUpdateService::new();
+    let saved = create_backup_record(state.db.as_ref(), &service, req, &auth).await?;
+    Ok(Json(ApiResponse::success_with_message(
+        backup_to_frontend_json(&saved),
+        "系统备份已完成",
+    )))
+}
+
+/// 先登记 creating，真实文件备份成功后才写 completed；失败记录保留 failed 供审计。
+async fn create_backup_record(
+    db: &sea_orm::DatabaseConnection,
+    service: &SystemUpdateService,
+    req: CreateBackupRequest,
+    auth: &AuthContext,
+) -> Result<system_update_backup::Model, AppError> {
     use sea_orm::{ActiveModelTrait, Set};
+
+    let backup_type = req.backup_type.unwrap_or_else(|| "full".to_string());
+    if !matches!(backup_type.as_str(), "full" | "files") {
+        return Err(AppError::business_displayable(
+            "当前仅支持 full 或 files 文件备份；incremental/database 备份尚未实现",
+        ));
+    }
     let now = chrono::Utc::now();
     let backup = system_update_backup::ActiveModel {
         backup_code: Set(format!("BK-{}", now.format("%Y%m%d%H%M%S"))),
-        backup_type: Set(req.backup_type.unwrap_or_else(|| "full".to_string())),
+        backup_type: Set(backup_type),
         description: Set(req.description.unwrap_or_default()),
-        status: Set("completed".to_string()),
+        status: Set("creating".to_string()),
+        file_path: Set(String::new()),
+        file_size: Set(0),
         created_by: Set(auth.user_id),
         created_by_name: Set(auth.username.clone()),
         created_at: Set(now.into()),
         updated_at: Set(now.into()),
         ..Default::default()
     };
-    let saved = backup.insert(state.db.as_ref()).await?;
+    let saved = backup.insert(db).await?;
+    let backup_id = saved.id;
+    let version = service.get_current_version();
+    let backup_service = service.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        let path = backup_service.create_backup(&version)?;
+        let size = SystemUpdateService::directory_size(&path)?;
+        Ok::<_, UpdateError>((path, size))
+    })
+    .await;
 
-    Ok(Json(ApiResponse::success_with_message(
-        backup_to_frontend_json(&saved),
-        "备份任务已创建",
-    )))
+    match result {
+        Ok(Ok((path, size))) => {
+            let file_size = i64::try_from(size)
+                .map_err(|_| AppError::internal("备份文件大小超过数据库可存储上限"))?;
+            let mut active: system_update_backup::ActiveModel = saved.into();
+            active.status = Set("completed".to_string());
+            active.file_path = Set(path.to_string_lossy().into_owned());
+            active.file_size = Set(file_size);
+            active.updated_at = Set(chrono::Utc::now().into());
+            active.update(db).await.map_err(AppError::from)
+        }
+        Ok(Err(error)) => {
+            mark_backup_failed(db, backup_id).await;
+            Err(map_update_error(error))
+        }
+        Err(error) => {
+            mark_backup_failed(db, backup_id).await;
+            Err(AppError::internal(format!("备份任务执行失败: {error}")))
+        }
+    }
+}
+
+/// 备份失败只更新状态，不写入伪造路径或大小；状态更新失败另行显式记录。
+async fn mark_backup_failed(db: &sea_orm::DatabaseConnection, backup_id: i32) {
+    use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+
+    let failed = system_update_backup::Entity::find_by_id(backup_id)
+        .one(db)
+        .await
+        .ok()
+        .flatten();
+    if let Some(model) = failed {
+        let mut active: system_update_backup::ActiveModel = model.into();
+        active.status = Set("failed".to_string());
+        active.file_path = Set(String::new());
+        active.file_size = Set(0);
+        active.updated_at = Set(chrono::Utc::now().into());
+        if let Err(error) = active.update(db).await {
+            tracing::error!(backup_id, error = %error, "备份失败状态落库失败");
+        }
+    } else {
+        tracing::error!(backup_id, "备份失败但原记录不可读，无法落库 failed 状态");
+    }
 }
 
 /// GET /api/v1/erp/system-update/tasks/{id} - 获取更新任务详情（对应前端 api/system-update.ts getUpdateTask）
@@ -763,7 +886,7 @@ pub async fn get_update_task_by_id(
 }
 
 /// POST /api/v1/erp/system-update/tasks/{id}/cancel - 取消更新任务（对应前端 api/system-update.ts cancelUpdateTask）
-/// 仅允许取消未结束的任务（completed/failed/rolled_back 视为已结束）
+/// 仅允许取消未结束的任务；下载完成、安装完成、失败与回滚均为终态。
 pub async fn cancel_update_task(
     State(state): State<AppState>,
     auth: AuthContext,
@@ -778,7 +901,7 @@ pub async fn cancel_update_task(
         .await?
         .ok_or_else(|| AppError::not_found(format!("更新任务 {} 不存在", id)))?;
 
-    if matches!(task.status.as_str(), "completed" | "failed" | "rolled_back") {
+    if is_terminal_update_status(&task.status) {
         return Err(AppError::business(format!(
             "更新任务 {} 已结束（状态：{}），无法取消",
             id, task.status
@@ -811,59 +934,108 @@ pub async fn get_system_version_by_id(
 }
 
 /// POST /api/v1/erp/system-update/versions/{version_id}/download - 下载指定版本更新包（对应前端 api/system-update.ts downloadUpdate）
-/// 最小实现：校验版本存在后登记下载任务（status=downloaded）
 pub async fn download_version_update(
     State(state): State<AppState>,
     auth: AuthContext,
     Path(version_id): Path<i32>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
-    // 与现有 download_and_update 一致：下载并应用更新属高危操作，仅 admin 可执行
     require_admin_role(&state, &auth).await?;
 
     let version = load_system_version(&state, version_id).await?;
     let service = SystemUpdateService::new();
-    let task = push_update_task(
+    let task = create_update_task(
         &state,
         service.get_current_version(),
-        version.version,
+        version.version.clone(),
         "download",
-        "downloaded",
-        100,
+        "downloading",
+        0,
         &auth,
     )
     .await?;
-    Ok(Json(ApiResponse::success_with_message(
-        task,
-        "更新包下载任务已完成",
-    )))
+
+    match service.download_update_for_version(&version.version).await {
+        Ok(_) => {
+            let completed =
+                finish_update_task(state.db.as_ref(), task.id, "downloaded", 100, None).await?;
+            Ok(Json(ApiResponse::success_with_message(
+                task_to_frontend_json(&completed),
+                "更新包下载完成",
+            )))
+        }
+        Err(error) => {
+            let mapped = map_update_error(error);
+            record_update_failure(&state, task.id, &mapped).await;
+            Err(mapped)
+        }
+    }
 }
 
 /// POST /api/v1/erp/system-update/versions/{version_id}/install - 安装指定版本更新（对应前端 api/system-update.ts installUpdate）
-/// 最小实现：校验版本存在后登记安装任务（status=installing）
 pub async fn install_version_update(
     State(state): State<AppState>,
     auth: AuthContext,
     Path(version_id): Path<i32>,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
-    // 安装更新会替换二进制，属最高危操作，仅 admin 可执行
     require_admin_role(&state, &auth).await?;
 
     let version = load_system_version(&state, version_id).await?;
     let service = SystemUpdateService::new();
-    let task = push_update_task(
+    if let Err(error) = service.downloaded_update_path(&version.version) {
+        return Err(AppError::business_displayable(error.to_string()));
+    }
+    let task = create_update_task(
         &state,
         service.get_current_version(),
-        version.version,
+        version.version.clone(),
         "install",
         "installing",
         0,
         &auth,
     )
     .await?;
-    Ok(Json(ApiResponse::success_with_message(
-        task,
-        "版本安装任务已创建",
-    )))
+
+    match service.apply_downloaded_update(&version.version).await {
+        Ok(message) => {
+            if let Err(error) = persist_applied_version(state.db.as_ref(), &version.version).await {
+                record_update_failure(&state, task.id, &error).await;
+                return Err(error);
+            }
+            let completed =
+                finish_update_task(state.db.as_ref(), task.id, "completed", 100, None).await?;
+            let mut message = message;
+            maybe_schedule_restart(&mut message);
+            Ok(Json(ApiResponse::success_with_message(
+                task_to_frontend_json(&completed),
+                &message,
+            )))
+        }
+        Err(error) => {
+            let mapped = map_update_error(error);
+            record_update_failure(&state, task.id, &mapped).await;
+            Err(mapped)
+        }
+    }
+}
+
+/// 真实更新操作失败后落 failed 终态；状态落库失败只记录，不顶替原始失败原因。
+async fn record_update_failure(state: &AppState, task_id: i32, error: &AppError) {
+    if let Err(status_error) = finish_update_task(
+        state.db.as_ref(),
+        task_id,
+        "failed",
+        0,
+        Some(error.public_message()),
+    )
+    .await
+    {
+        tracing::error!(
+            task_id,
+            original_error = %error,
+            status_error = %status_error,
+            "系统更新失败终态落库失败"
+        );
+    }
 }
 
 /// GET /api/v1/erp/system-update/tasks — 更新任务列表（全表，按 id 降序）
@@ -912,4 +1084,139 @@ pub async fn list_backup_tasks(
     Ok(Json(ApiResponse::success(PaginatedResponse::new(
         items, total, 1, total,
     ))))
+}
+
+#[cfg(test)]
+mod task_state_tests {
+    use super::*;
+    use crate::services::test_common::setup_test_db;
+    use sea_orm::QueryOrder;
+    use std::sync::Arc;
+
+    fn test_auth() -> AuthContext {
+        AuthContext {
+            user_id: 23123,
+            username: "system-update-state-test".to_string(),
+            role_id: Some(1),
+            department_id: None,
+            data_scope: None,
+            dept_ids: None,
+            dept_member_user_ids: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn backup_and_update_tasks_only_complete_after_real_terminal_outcomes() {
+        let db: Arc<sea_orm::DatabaseConnection> = Arc::new(setup_test_db().await);
+        let state = AppState {
+            db: db.clone(),
+            ..AppState::default()
+        };
+        let auth = test_auth();
+
+        let downloading = create_update_task(
+            &state,
+            "2026.11.27.1200".to_string(),
+            "2026.11.28.1200".to_string(),
+            "download",
+            "downloading",
+            0,
+            &auth,
+        )
+        .await
+        .expect("登记下载任务失败");
+        assert!(
+            downloading.completed_at.is_none(),
+            "下载尚未结束时 completed_at 必须为空"
+        );
+        let task_id = downloading.id;
+        let failed = finish_update_task(
+            state.db.as_ref(),
+            task_id,
+            "failed",
+            0,
+            Some("下载失败".to_string()),
+        )
+        .await
+        .expect("登记失败终态失败");
+        assert!(failed.completed_at.is_some(), "失败终态必须记录结束时间");
+        assert_eq!(failed.error_message.as_deref(), Some("下载失败"));
+
+        let downloaded = create_update_task(
+            &state,
+            "2026.11.27.1200".to_string(),
+            "2026.11.28.1200".to_string(),
+            "download",
+            "downloading",
+            0,
+            &auth,
+        )
+        .await
+        .expect("登记第二个下载任务失败");
+        let task_id = downloaded.id;
+        let completed = finish_update_task(state.db.as_ref(), task_id, "downloaded", 100, None)
+            .await
+            .expect("登记下载完成终态失败");
+        assert!(completed.completed_at.is_some(), "下载完成必须记录结束时间");
+        assert_eq!(completed.progress, 100);
+
+        let root =
+            std::env::temp_dir().join(format!("bingxi-update-handler-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("backend")).expect("创建测试 backend 目录失败");
+        std::fs::write(root.join("backend/server.bin"), b"real-backend")
+            .expect("写入测试二进制失败");
+        let service = SystemUpdateService::with_app_dir(root.clone());
+        let backup = create_backup_record(
+            state.db.as_ref(),
+            &service,
+            CreateBackupRequest {
+                backup_type: Some("full".to_string()),
+                description: Some("状态回归".to_string()),
+            },
+            &auth,
+        )
+        .await
+        .expect("真实备份记录应成功");
+        assert_eq!(backup.status, "completed");
+        assert!(!backup.file_path.is_empty(), "完成后必须记录真实备份路径");
+        assert!(backup.file_size > 0, "完成后必须记录真实备份大小");
+        assert_eq!(
+            std::fs::read(PathBuf::from(&backup.file_path).join("backend/server.bin"))
+                .expect("读取真实备份文件失败"),
+            b"real-backend"
+        );
+        std::fs::remove_dir_all(&root).expect("清理测试备份目录失败");
+
+        let failed_root = std::env::temp_dir().join(format!(
+            "bingxi-update-handler-fail-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&failed_root).expect("创建失败夹具目录失败");
+        std::fs::write(failed_root.join("backups"), b"not-a-directory")
+            .expect("写入失败夹具文件失败");
+        let failed_service = SystemUpdateService::with_app_dir(failed_root.clone());
+        assert!(
+            create_backup_record(
+                state.db.as_ref(),
+                &failed_service,
+                CreateBackupRequest {
+                    backup_type: Some("full".to_string()),
+                    description: None,
+                },
+                &auth,
+            )
+            .await
+            .is_err(),
+            "备份复制失败必须显式返回错误"
+        );
+        let failed_backup = system_update_backup::Entity::find()
+            .order_by_desc(system_update_backup::Column::Id)
+            .one(state.db.as_ref())
+            .await
+            .expect("回读失败备份记录失败")
+            .expect("失败备份记录应存在");
+        assert_eq!(failed_backup.status, "failed");
+        assert!(failed_backup.file_path.is_empty());
+        std::fs::remove_dir_all(&failed_root).expect("清理失败夹具目录失败");
+    }
 }

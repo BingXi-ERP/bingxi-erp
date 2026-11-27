@@ -237,17 +237,71 @@ impl SystemUpdateService {
             .ok_or_else(|| UpdateError::NetworkError("无法获取发布信息".to_string()))?;
 
         let asset = Self::find_release_asset(&release, asset_name)?;
-
-        self.log_update(&format!("开始下载更新包: {}", asset.name));
-
-        // M-2 修复（v9 复审）：校验 asset.name 防止路径穿越
         validate_asset_name(&asset.name)?;
+        let download_path = self.app_dir.join("downloads").join(&asset.name);
+        self.download_release_asset(&release, asset, &download_path)
+            .await
+    }
 
-        let download_dir = self.app_dir.join("downloads");
-        if !download_dir.exists() {
-            fs::create_dir_all(&download_dir)?;
+    /// 指定版本下载使用固定文件名，安装端无需信任数据库中的路径或上游任意文件名。
+    fn downloaded_archive_path(&self, version: &str) -> Result<PathBuf, UpdateError> {
+        let file_name = format!("bingxi-erp-{version}.zip");
+        validate_asset_name(&file_name)?;
+        Ok(self.app_dir.join("downloads").join(file_name))
+    }
+
+    /// 安装前要求指定版本的 ZIP 已真实下载并通过完整性校验；缺失即显式拒绝。
+    pub fn downloaded_update_path(&self, version: &str) -> Result<PathBuf, UpdateError> {
+        let path = self.downloaded_archive_path(version)?;
+        if !path.is_file() {
+            return Err(UpdateError::VersionError(format!(
+                "请先下载版本 {version} 的更新包"
+            )));
         }
-        let download_path = download_dir.join(&asset.name);
+        Ok(path)
+    }
+
+    /// 按版本精确查询 Release，下载 ZIP 资产并复用官方 SHA-256 强校验。
+    pub async fn download_update_for_version(&self, version: &str) -> Result<PathBuf, UpdateError> {
+        let download_path = self.downloaded_archive_path(version)?;
+        let release = self
+            .fetch_release_by_tag(version)
+            .await?
+            .ok_or_else(|| UpdateError::VersionError(format!("版本 {version} 没有可用发布记录")))?;
+        if release.tag_name.trim_start_matches('v') != version {
+            return Err(UpdateError::VersionError(format!(
+                "发布记录版本 {} 与请求版本 {version} 不一致",
+                release.tag_name
+            )));
+        }
+        let asset = release
+            .assets
+            .iter()
+            .find(|asset| asset.name.ends_with(".zip"))
+            .ok_or_else(|| {
+                UpdateError::VersionError(format!("版本 {version} 没有可应用的 ZIP 更新包"))
+            })?;
+        self.download_release_asset(&release, asset, &download_path)
+            .await
+    }
+
+    /// 应用本端点已下载并校验过的指定版本更新包，应用前再次核对包内 VERSION。
+    pub async fn apply_downloaded_update(&self, version: &str) -> Result<String, UpdateError> {
+        let path = self.downloaded_update_path(version)?;
+        self.apply_update_expected(&path, Some(version)).await
+    }
+
+    async fn download_release_asset(
+        &self,
+        release: &GitHubRelease,
+        asset: &GitHubAsset,
+        download_path: &Path,
+    ) -> Result<PathBuf, UpdateError> {
+        self.log_update(&format!("开始下载更新包: {}", asset.name));
+        validate_asset_name(&asset.name)?;
+        if let Some(parent) = download_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
 
         // 读取进程级更新配置，按 mirror_order 生成候选下载 URL（官方永远列入并兜底）。
         let cfg = global_update_config();
@@ -263,7 +317,7 @@ impl SystemUpdateService {
         let mut last_err: Option<UpdateError> = None;
         let mut downloaded = false;
         for (idx, cand_url) in candidates.iter().enumerate() {
-            match self.try_download_candidate(cand_url, &download_path).await {
+            match self.try_download_candidate(cand_url, download_path).await {
                 Ok(()) => {
                     tracing::info!(
                         "[system_update] 下载候选[{}/{}] 成功: {}",
@@ -283,7 +337,7 @@ impl SystemUpdateService {
                         e
                     );
                     // 清理该候选写入的半成品，避免残损文件影响后续候选与校验
-                    if let Err(rm) = fs::remove_file(&download_path)
+                    if let Err(rm) = fs::remove_file(download_path)
                         && rm.kind() != std::io::ErrorKind::NotFound
                     {
                         tracing::warn!("[system_update] 清理失败候选残件出错: {}", rm);
@@ -300,13 +354,13 @@ impl SystemUpdateService {
         }
 
         // 字节到手后取【官方】校验值 + 本地 SHA-256 重算比对（fail-closed）。
-        // 校验值只从官方域取（CI .sha256 资产优先，其次 API assets[].digest）；镜像仅搬 tar 字节。
+        // 校验值只从官方域取（CI .sha256 资产优先，其次 API assets[].digest）；镜像仅搬字节。
         if let Err(e) = self
-            .verify_downloaded_integrity(asset, &release.assets, &download_path, &cfg)
+            .verify_downloaded_integrity(asset, &release.assets, download_path, &cfg)
             .await
         {
             // 校验不通过 / 不可得 → 删除已下文件 + 返回错误（绝不 apply）
-            if let Err(rm) = fs::remove_file(&download_path)
+            if let Err(rm) = fs::remove_file(download_path)
                 && rm.kind() != std::io::ErrorKind::NotFound
             {
                 tracing::warn!("[system_update] 校验失败后清理下载文件出错: {}", rm);
@@ -316,7 +370,7 @@ impl SystemUpdateService {
         }
 
         self.log_update(&format!("更新包下载并通过完整性校验: {:?}", download_path));
-        Ok(download_path)
+        Ok(download_path.to_path_buf())
     }
 
     /// 按 `mirror_order` 生成候选下载 URL 列表。
@@ -712,5 +766,48 @@ mod download_candidate_tests {
                 "{order:?} 下官方域必须在候选中"
             );
         }
+    }
+
+    fn temp_service(test_name: &str) -> (SystemUpdateService, PathBuf) {
+        use std::sync::Arc;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("系统时间应可读取")
+            .as_nanos();
+        let app_dir = std::env::temp_dir().join(format!(
+            "bingxi_system_update_{test_name}_{}_{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&app_dir).expect("创建测试目录失败");
+        let service = SystemUpdateService {
+            app_dir: app_dir.clone(),
+            backup_dir: app_dir.join("backups"),
+            is_updating: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        };
+        (service, app_dir)
+    }
+
+    #[test]
+    fn downloaded_update_path_requires_real_file_and_safe_version() {
+        let (service, app_dir) = temp_service("download_path");
+        let err = service
+            .downloaded_update_path("9999.1.1.0000")
+            .expect_err("未下载的版本不能进入安装");
+        assert!(
+            matches!(err, UpdateError::VersionError(_)),
+            "缺少包应明确拒绝，实得: {err:?}"
+        );
+
+        let err = service
+            .downloaded_update_path("../escape")
+            .expect_err("路径穿越版本号必须拒绝");
+        assert!(
+            matches!(err, UpdateError::ValidationError(_)),
+            "非法版本号应拒绝，实得: {err:?}"
+        );
+
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
     }
 }

@@ -205,6 +205,7 @@ impl From<UpdateError> for AppError {
 
 /// 系统更新服务
 /// struct 定义保留在 facade，impl 块按职责分散到 `system_update_ops/` 子模块。；字段使用 `pub(crate)` 可见性：status/apply/backup/github 子模块的 impl 块需直接访问。
+#[derive(Clone)]
 pub struct SystemUpdateService {
     pub(crate) app_dir: PathBuf,
     pub(crate) backup_dir: PathBuf,
@@ -213,10 +214,14 @@ pub struct SystemUpdateService {
 
 impl SystemUpdateService {
     pub fn new() -> Self {
-        let app_dir = std::env::current_exe()
-            .map(|p| p.parent().unwrap_or(Path::new(".")).to_path_buf())
+        let exe_dir = std::env::current_exe()
+            .map(|path| path.parent().unwrap_or(Path::new(".")).to_path_buf())
             .unwrap_or_else(|_| PathBuf::from("."));
+        Self::with_app_dir(resolve_app_dir(exe_dir))
+    }
 
+    /// 使用显式应用根目录构造服务，便于部署与隔离测试指定备份、下载和安装边界。
+    pub fn with_app_dir(app_dir: PathBuf) -> Self {
         let backup_dir = app_dir.join("backups");
 
         Self {
@@ -225,6 +230,21 @@ impl SystemUpdateService {
             is_updating: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
+}
+
+/// 可执行文件位于 backend 或 target/debug(deps) 时，向上定位包含 backend/frontend/VERSION 的应用根。
+fn resolve_app_dir(exe_dir: PathBuf) -> PathBuf {
+    if exe_dir.join("backend").is_dir() || exe_dir.join("VERSION").is_file() {
+        return exe_dir;
+    }
+    exe_dir
+        .ancestors()
+        .find(|candidate| {
+            candidate.join("backend").is_dir()
+                && (candidate.join("frontend").is_dir() || candidate.join("VERSION").is_file())
+        })
+        .unwrap_or(&exe_dir)
+        .to_path_buf()
 }
 
 impl Default for SystemUpdateService {
@@ -834,7 +854,23 @@ mod integrity_tests {
         }
     }
 
-    /// validate_official_digest_url：官方 https pass；镜像 host 被 IntegrityError 拒；http 被 NetworkError 拒
+    #[test]
+    fn resolve_app_dir_finds_root_above_backend_and_target_dirs() {
+        let root =
+            std::env::temp_dir().join(format!("bingxi-update-app-dir-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("backend/target/debug/deps"))
+            .expect("创建 backend 测试目录失败");
+        std::fs::create_dir_all(root.join("frontend")).expect("创建 frontend 测试目录失败");
+        std::fs::write(root.join("VERSION"), b"1.2.3\n").expect("写入 VERSION 失败");
+
+        let from_backend = resolve_app_dir(root.join("backend"));
+        let from_target = resolve_app_dir(root.join("backend/target/debug/deps"));
+        assert_eq!(from_backend, root);
+        assert_eq!(from_target, root);
+
+        std::fs::remove_dir_all(root).expect("清理测试目录失败");
+    }
+
     #[test]
     fn validate_official_digest_url_rejects_mirror() {
         assert!(

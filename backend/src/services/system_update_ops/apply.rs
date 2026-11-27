@@ -34,6 +34,15 @@ impl SystemUpdateService {
     }
 
     pub async fn apply_update(&self, update_file: &Path) -> Result<String, UpdateError> {
+        self.apply_update_expected(update_file, None).await
+    }
+
+    /// 应用更新包；传入目标版本时，解压后必须先核对 VERSION，再触碰任何运行文件。
+    pub(crate) async fn apply_update_expected(
+        &self,
+        update_file: &Path,
+        expected_version: Option<&str>,
+    ) -> Result<String, UpdateError> {
         if self
             .is_updating
             .swap(true, std::sync::atomic::Ordering::SeqCst)
@@ -41,7 +50,7 @@ impl SystemUpdateService {
             return Err(UpdateError::AlreadyUpdating);
         }
 
-        let result = self.do_update(update_file).await;
+        let result = self.do_update(update_file, expected_version).await;
 
         self.is_updating
             .store(false, std::sync::atomic::Ordering::SeqCst);
@@ -49,7 +58,11 @@ impl SystemUpdateService {
         result
     }
 
-    async fn do_update(&self, update_file: &Path) -> Result<String, UpdateError> {
+    async fn do_update(
+        &self,
+        update_file: &Path,
+        expected_version: Option<&str>,
+    ) -> Result<String, UpdateError> {
         let current_version = self.get_current_version();
         self.log_update(&format!("开始更新，当前版本: {}", current_version));
 
@@ -66,6 +79,13 @@ impl SystemUpdateService {
         self.log_update("更新包验证通过");
 
         let new_version = self.read_version_from_dir(&extract_dir)?;
+        if let Some(expected) = expected_version
+            && expected != new_version
+        {
+            return Err(UpdateError::VersionError(format!(
+                "更新包版本 {new_version} 与请求版本 {expected} 不一致，已拒绝应用"
+            )));
+        }
 
         self.log_update("步骤4: 应用更新");
         if let Err(e) = self.apply_files(&extract_dir) {
@@ -242,5 +262,61 @@ impl SystemUpdateService {
                 tracing::warn!("写入更新日志失败 {:?}: {}", log_file, e);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[tokio::test]
+    async fn expected_version_mismatch_is_rejected_before_files_are_applied() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("系统时间应可读取")
+            .as_nanos();
+        let app_dir = std::env::temp_dir().join(format!(
+            "bingxi_system_update_expected_version_{}_{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&app_dir).expect("创建测试目录失败");
+        fs::write(app_dir.join("VERSION"), b"1.0.0\n").expect("写入当前 VERSION 失败");
+        let service = SystemUpdateService {
+            app_dir: app_dir.clone(),
+            backup_dir: app_dir.join("backups"),
+            is_updating: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        };
+
+        let update_file = app_dir.join("candidate.zip");
+        let file = fs::File::create(&update_file).expect("创建测试更新包失败");
+        let mut archive = zip::ZipWriter::new(file);
+        for (name, content) in [
+            ("VERSION", b"2.0.0\n".as_slice()),
+            ("UPDATE_MANIFEST.json", b"{}".as_slice()),
+        ] {
+            archive
+                .start_file(name, zip::write::SimpleFileOptions::default())
+                .expect("写入更新包条目失败");
+            archive.write_all(content).expect("写入更新包内容失败");
+        }
+        archive.finish().expect("完成测试更新包失败");
+
+        let err = service
+            .apply_update_expected(&update_file, Some("3.0.0"))
+            .await
+            .expect_err("目标版本不一致必须在应用前拒绝");
+        assert!(
+            matches!(err, UpdateError::VersionError(_)),
+            "版本不一致应返回 VersionError，实得: {err:?}"
+        );
+        assert_eq!(
+            fs::read(app_dir.join("VERSION")).expect("读取当前 VERSION 失败"),
+            b"1.0.0\n",
+            "拒绝目标版本不一致时不得改写当前版本"
+        );
+
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
     }
 }

@@ -87,7 +87,7 @@ export function useSysUpd() {
 
   // 备份表单
   const backupForm = reactive({
-    backup_type: 'full' as 'full' | 'incremental' | 'database' | 'files',
+    backup_type: 'full' as 'full' | 'files',
     description: '',
   });
   const backupSubmitLoading = ref(false);

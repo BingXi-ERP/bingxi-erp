@@ -44,6 +44,33 @@ impl SystemUpdateService {
         Ok(backup_path)
     }
 
+    /// 统计备份目录中真实文件的字节数，供备份记录展示实际大小。
+    pub fn directory_size(path: &Path) -> std::io::Result<u64> {
+        let metadata = fs::metadata(path)?;
+        if !metadata.is_dir() {
+            return Ok(metadata.len());
+        }
+
+        let mut total = 0_u64;
+        for entry in fs::read_dir(path)? {
+            let entry = entry?;
+            let path = entry.path();
+            let metadata = fs::metadata(&path)?;
+            if metadata.is_dir() {
+                total = total
+                    .checked_add(Self::directory_size(&path)?)
+                    .ok_or_else(|| {
+                        std::io::Error::new(std::io::ErrorKind::InvalidData, "备份目录大小累计溢出")
+                    })?;
+            } else {
+                total = total.checked_add(metadata.len()).ok_or_else(|| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "备份目录大小累计溢出")
+                })?;
+            }
+        }
+        Ok(total)
+    }
+
     pub(crate) fn copy_dir(&self, src: &Path, dst: &Path) -> std::io::Result<()> {
         fs::create_dir_all(dst)?;
 
@@ -135,5 +162,64 @@ impl SystemUpdateService {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_service(test_name: &str) -> (SystemUpdateService, PathBuf) {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("系统时间应可读取")
+            .as_nanos();
+        let app_dir = std::env::temp_dir().join(format!(
+            "bingxi_system_update_{test_name}_{}_{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&app_dir).expect("创建测试目录失败");
+        let service = SystemUpdateService {
+            app_dir: app_dir.clone(),
+            backup_dir: app_dir.join("backups"),
+            is_updating: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        };
+        (service, app_dir)
+    }
+
+    #[test]
+    fn create_backup_copies_real_files_and_reports_their_size() {
+        let (service, app_dir) = temp_service("backup");
+        fs::create_dir_all(app_dir.join("backend")).expect("创建 backend 测试目录失败");
+        fs::create_dir_all(app_dir.join("frontend")).expect("创建 frontend 测试目录失败");
+        fs::create_dir_all(app_dir.join("config")).expect("创建 config 测试目录失败");
+        fs::write(app_dir.join("backend/main.rs"), b"backend").expect("写入 backend 测试文件失败");
+        fs::write(app_dir.join("frontend/index.html"), b"frontend").expect("写入前端测试文件失败");
+        fs::write(app_dir.join("config/app.toml"), b"config").expect("写入配置测试文件失败");
+        fs::write(app_dir.join("VERSION"), b"1.2.3\n").expect("写入 VERSION 测试文件失败");
+
+        let backup_path = service.create_backup("1.2.3").expect("真实文件备份应成功");
+        assert_eq!(
+            fs::read(backup_path.join("backend/main.rs")).unwrap(),
+            b"backend"
+        );
+        assert_eq!(
+            fs::read(backup_path.join("frontend/index.html")).unwrap(),
+            b"frontend"
+        );
+        assert_eq!(
+            fs::read(backup_path.join("config/app.toml")).unwrap(),
+            b"config"
+        );
+        assert_eq!(fs::read(backup_path.join("VERSION")).unwrap(), b"1.2.3\n");
+        assert_eq!(
+            SystemUpdateService::directory_size(&backup_path).expect("统计备份大小应成功"),
+            27,
+            "备份大小应为四个真实文件字节数之和"
+        );
+
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
     }
 }
