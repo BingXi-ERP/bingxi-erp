@@ -100,7 +100,7 @@ fn create_request() -> CreateApprovalRequest {
 
 fn bpm_number_lock_key(date: &str) -> i64 {
     let mut hasher = DefaultHasher::new();
-    "BPM".hash(&mut hasher);
+    format!("BPM{date}").hash(&mut hasher);
     date.hash(&mut hasher);
     hasher.finish() as i64
 }

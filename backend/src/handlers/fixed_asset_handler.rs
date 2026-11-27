@@ -532,7 +532,7 @@ pub async fn create_impairment_test(
     State(state): State<AppState>,
     auth: AuthContext,
     Json(req): Json<CreateImpairmentTestDto>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     req.validate()?;
     let service = FixedAssetService::new(state.db.clone());
     let test = service
@@ -546,24 +546,20 @@ pub async fn create_impairment_test(
             auth.user_id,
         )
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "资产减值测试创建成功",
-        "data": test
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(test)?,
+        "资产减值测试创建成功",
+    )))
 }
 
 /// GET /api/v1/erp/fixed-assets/impairment-tests/:asset_id - 获取资产减值测试列表
 pub async fn get_impairment_tests(
     State(state): State<AppState>,
     Path(asset_id): Path<i32>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = FixedAssetService::new(state.db.clone());
     let tests = service.get_impairment_tests(asset_id).await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "data": tests
-    })))
+    Ok(Json(ApiResponse::success(serde_json::to_value(tests)?)))
 }
 
 /// PUT /api/v1/erp/fixed-assets/impairment-tests/:id/approve - 审批资产减值测试
@@ -571,16 +567,15 @@ pub async fn approve_impairment_test(
     State(state): State<AppState>,
     auth: AuthContext,
     Path(test_id): Path<i32>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = FixedAssetService::new(state.db.clone());
     let test = service
         .approve_impairment_test(test_id, auth.user_id)
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "资产减值测试审批成功",
-        "data": test
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(test)?,
+        "资产减值测试审批成功",
+    )))
 }
 
 /// V15 P1 17.8-D6：创建折旧政策变更请求 DTO
@@ -615,7 +610,7 @@ pub async fn create_depreciation_policy_change(
     State(state): State<AppState>,
     auth: AuthContext,
     Json(req): Json<CreateDepreciationPolicyChangeDto>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     req.validate()?;
     let service = FixedAssetService::new(state.db.clone());
     let change = service
@@ -632,24 +627,20 @@ pub async fn create_depreciation_policy_change(
             user_id: auth.user_id,
         })
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "折旧政策变更创建成功",
-        "data": change
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(change)?,
+        "折旧政策变更创建成功",
+    )))
 }
 
 /// GET /api/v1/erp/fixed-assets/depreciation-policy-changes/:asset_id - 获取折旧政策变更列表
 pub async fn get_depreciation_policy_changes(
     State(state): State<AppState>,
     Path(asset_id): Path<i32>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = FixedAssetService::new(state.db.clone());
     let changes = service.get_depreciation_policy_changes(asset_id).await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "data": changes
-    })))
+    Ok(Json(ApiResponse::success(serde_json::to_value(changes)?)))
 }
 
 /// PUT /api/v1/erp/fixed-assets/depreciation-policy-changes/:id/approve - 审批折旧政策变更
@@ -657,16 +648,15 @@ pub async fn approve_depreciation_policy_change(
     State(state): State<AppState>,
     auth: AuthContext,
     Path(change_id): Path<i32>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = FixedAssetService::new(state.db.clone());
     let change = service
         .approve_depreciation_policy_change(change_id, auth.user_id)
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "折旧政策变更审批成功",
-        "data": change
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(change)?,
+        "折旧政策变更审批成功",
+    )))
 }
 
 /// 自动折旧请求
@@ -681,16 +671,15 @@ pub async fn auto_monthly_depreciation(
     State(state): State<AppState>,
     auth: AuthContext,
     Json(req): Json<AutoDepreciationRequestDto>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = FixedAssetService::new(state.db.clone());
     let result = service
         .auto_monthly_depreciation(&req.period, auth.user_id)
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "月度自动折旧完成",
-        "data": result
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(result)?,
+        "月度自动折旧完成",
+    )))
 }
 
 /// 盘点计划请求
@@ -709,7 +698,7 @@ pub async fn create_count_plan(
     State(state): State<AppState>,
     auth: AuthContext,
     Json(req): Json<CreateCountPlanRequestDto>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = FixedAssetService::new(state.db.clone());
     let result = service
         .create_count_plan(
@@ -723,11 +712,10 @@ pub async fn create_count_plan(
             auth.user_id,
         )
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "盘点计划创建成功",
-        "data": result
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(result)?,
+        "盘点计划创建成功",
+    )))
 }
 
 /// 盘点记录请求
@@ -748,7 +736,7 @@ pub async fn record_count_item(
     State(state): State<AppState>,
     auth: AuthContext,
     Json(req): Json<RecordCountItemRequestDto>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = FixedAssetService::new(state.db.clone());
     let result = service
         .record_count_item(
@@ -762,11 +750,10 @@ pub async fn record_count_item(
             auth.user_id,
         )
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "盘点记录成功",
-        "data": result
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(result)?,
+        "盘点记录成功",
+    )))
 }
 
 /// PUT /api/v1/erp/fixed-assets/count-plans/:id/complete - 完成盘点
@@ -774,14 +761,13 @@ pub async fn complete_count_plan(
     State(state): State<AppState>,
     auth: AuthContext,
     Path(plan_id): Path<i64>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = FixedAssetService::new(state.db.clone());
     let result = service.complete_count_plan(plan_id, auth.user_id).await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "盘点完成",
-        "data": result
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(result)?,
+        "盘点完成",
+    )))
 }
 
 /// GET /api/v1/erp/fixed-assets/count-plans - 查询盘点计划
@@ -798,26 +784,20 @@ pub struct ListCountPlansQuery {
 pub async fn list_count_plans(
     State(state): State<AppState>,
     Query(params): Query<ListCountPlansQuery>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = FixedAssetService::new(state.db.clone());
     let page = params.page.unwrap_or(1);
     let page_size = params.page_size.unwrap_or(20);
     let result = service.list_count_plans(page, page_size).await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "data": result
-    })))
+    Ok(Json(ApiResponse::success(serde_json::to_value(result)?)))
 }
 
 /// GET /api/v1/erp/fixed-assets/count-plans/:id/items - 查询盘点明细
 pub async fn list_count_items(
     State(state): State<AppState>,
     Path(plan_id): Path<i64>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = FixedAssetService::new(state.db.clone());
     let result = service.list_count_items(plan_id).await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "data": result
-    })))
+    Ok(Json(ApiResponse::success(serde_json::to_value(result)?)))
 }

@@ -122,6 +122,7 @@
 //!   复用库上也必然执行）
 
 pub mod system;
+pub mod system_number_rules;
 pub mod business;
 pub mod sales_crm;
 pub mod production;

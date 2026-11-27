@@ -7,4 +7,3 @@
     <input bindinput="test_number" maxlength="11" placeholder="请填写手机号码"></input>
 </view>
 <button bindtap="toNext" class="btn-active">下一步</button>
-<aj-captcha bind:success="ajCaptchaSuccess" class="smsCaptchas" opt="{{captchaOpt}}"></aj-captcha>

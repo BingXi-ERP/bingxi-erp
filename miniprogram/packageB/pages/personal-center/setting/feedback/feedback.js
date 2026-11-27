@@ -13,10 +13,7 @@
  *   这些非后端出参的键
  * 存哪里：无
  */
-var e = (0, require("../../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../../utils/mta_analysis.js"),
-  ),
-  ServicesUser = require("../../../../libs/services/ServicesUser.js"),
+var ServicesUser = require("../../../../libs/services/ServicesUser.js"),
   login = require("../../../../libs/utils/login.js").login,
   request = require("../../../../libs/services/request.js").request,
   app = getApp();
@@ -37,8 +34,7 @@ Page({
     userRole: 0,
   },
   onLoad: function (t) {
-    (e.default.Page.init(),
-      this.setData({
+    (this.setData({
         showPhone: app.globalData.userInfo.phone,
         userRole: app.globalData.userInfo.role,
       }),

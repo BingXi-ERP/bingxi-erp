@@ -1,6 +1,5 @@
 var e = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   t = require("../../../../@babel/runtime/helpers/defineProperty"),
-  mta_analysis = e(require("../../../../utils/mta_analysis.js")),
   util = require("../../../../libs/utils/util"),
   uploadGateway = require("../../../../libs/utils/uploadGateway.js"),
   s =
@@ -36,7 +35,6 @@ Page({
     delImgIcon: "/assets/icons/Icon_Delete.png",
   },
   onLoad: function (e) {
-    mta_analysis.default.Page.init();
     var t = wx.getStorageSync("colorCaraSetting");
     ((t.isRepeatUpload = !1),
       this.setData({
@@ -84,7 +82,7 @@ Page({
             title: "上传中",
           });
         }, 500);
-        var mta_analysis = 0;
+        var mpValue = 0;
         e.tempFiles.map(function (s) {
           uploadGateway.uploadFile({
             header: {
@@ -116,7 +114,7 @@ Page({
                       title: resp.msg || "上传图片失败",
                     });
               (a += 1) &&
-                mta_analysis === e.tempFiles.length &&
+                mpValue === e.tempFiles.length &&
                 setTimeout(function () {
                   (console.log("上传完成"), wx.hideLoading());
                 }, 500);
@@ -174,10 +172,10 @@ Page({
     };
     s.colorCardDetails(t).then(function (t) {
       if ((console.log("获取色卡设置信息"), console.log(t), 0 === t.code)) {
-        var mta_analysis = t.data;
+        var mpValue = t.data;
         e.setData({
-          nowList: mta_analysis,
-          labelType: mta_analysis.labelType,
+          nowList: mpValue,
+          labelType: mpValue.labelType,
         });
       }
       wx.hideLoading();
@@ -191,57 +189,57 @@ Page({
   },
   changeStatus: function (e) {
     var t,
-      mta_analysis = this.data.nowList;
+      mpValue = this.data.nowList;
     switch (e.currentTarget.id) {
       case "shape":
-        ((t = 1 == mta_analysis.shape ? 0 : 1), this.onChangeSetting("shape", t));
+        ((t = 1 == mpValue.shape ? 0 : 1), this.onChangeSetting("shape", t));
         break;
       case "shape2":
-        ((t = 2 == mta_analysis.shape ? 0 : 2), this.onChangeSetting("shape", t));
+        ((t = 2 == mpValue.shape ? 0 : 2), this.onChangeSetting("shape", t));
         break;
       case "colorImage":
-        ((t = 1 == mta_analysis.colorImage ? 0 : 1), this.onChangeSetting("colorImage", t));
+        ((t = 1 == mpValue.colorImage ? 0 : 1), this.onChangeSetting("colorImage", t));
         break;
       case "colorImage2":
-        ((t = 2 == mta_analysis.colorImage ? 0 : 2), this.onChangeSetting("colorImage", t));
+        ((t = 2 == mpValue.colorImage ? 0 : 2), this.onChangeSetting("colorImage", t));
         break;
       case "showImageTwo":
-        ((t = 1 == mta_analysis.showImageTwo ? 0 : 1), this.onChangeSetting("showImageTwo", t));
+        ((t = 1 == mpValue.showImageTwo ? 0 : 1), this.onChangeSetting("showImageTwo", t));
         break;
       case "showImageTwo2":
-        ((t = 0 == mta_analysis.showImageTwo ? 1 : 0), this.onChangeSetting("showImageTwo", t));
+        ((t = 0 == mpValue.showImageTwo ? 1 : 0), this.onChangeSetting("showImageTwo", t));
         break;
       case "showQrcode":
-        ((t = 1 == mta_analysis.showQrcode ? 0 : 1), this.onChangeSetting("showQrcode", t));
+        ((t = 1 == mpValue.showQrcode ? 0 : 1), this.onChangeSetting("showQrcode", t));
         break;
       case "showProductName":
-        ((t = 1 == mta_analysis.showProductName ? 0 : 1),
+        ((t = 1 == mpValue.showProductName ? 0 : 1),
           this.onChangeSetting("showProductName", t));
         break;
       case "showShelvesNumber":
-        ((t = 1 == mta_analysis.showShelvesNumber ? 0 : 1),
+        ((t = 1 == mpValue.showShelvesNumber ? 0 : 1),
           this.onChangeSetting("showShelvesNumber", t));
         break;
       case "showPrice":
-        ((t = 1 == mta_analysis.showPrice ? 0 : 1), this.onChangeSetting("showPrice", t));
+        ((t = 1 == mpValue.showPrice ? 0 : 1), this.onChangeSetting("showPrice", t));
         break;
       case "showContacts":
-        ((t = 1 == mta_analysis.showContacts ? 0 : 1), this.onChangeSetting("showContacts", t));
+        ((t = 1 == mpValue.showContacts ? 0 : 1), this.onChangeSetting("showContacts", t));
         break;
       case "showRemark":
-        ((t = 1 == mta_analysis.showRemark ? 0 : 1), this.onChangeSetting("showRemark", t));
+        ((t = 1 == mpValue.showRemark ? 0 : 1), this.onChangeSetting("showRemark", t));
         break;
       case "showMaterial":
-        ((t = 1 == mta_analysis.showMaterial ? 0 : 1), this.onChangeSetting("showMaterial", t));
+        ((t = 1 == mpValue.showMaterial ? 0 : 1), this.onChangeSetting("showMaterial", t));
         break;
       case "showGramWeight":
-        ((t = 1 == mta_analysis.showGramWeight ? 0 : 1), this.onChangeSetting("showGramWeight", t));
+        ((t = 1 == mpValue.showGramWeight ? 0 : 1), this.onChangeSetting("showGramWeight", t));
         break;
       case "showClothWidth":
-        ((t = 1 == mta_analysis.showClothWidth ? 0 : 1), this.onChangeSetting("showClothWidth", t));
+        ((t = 1 == mpValue.showClothWidth ? 0 : 1), this.onChangeSetting("showClothWidth", t));
         break;
       case "showClothEnough":
-        ((t = 1 == mta_analysis.showClothEnough ? 0 : 1),
+        ((t = 1 == mpValue.showClothEnough ? 0 : 1),
           this.onChangeSetting("showClothEnough", t));
     }
   },

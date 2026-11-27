@@ -4,7 +4,6 @@ var t,
   n = require("../../@babel/runtime/helpers/defineProperty"),
   o = require("../../@babel/runtime/helpers/regeneratorRuntime"),
   s = require("../../@babel/runtime/helpers/asyncToGenerator"),
-  mta_analysis = a(require("../../utils/mta_analysis")),
   formatRichText = require("../../utils/formatRichText.js"),
   global = require("../../libs/services/global"),
   request = require("../../libs/services/request.js").request,
@@ -292,8 +291,7 @@ Page(
         await this.getAdvertisingData(4);
         this.getUnreadMessageCount();
       }
-      (mta_analysis.default.Page.init(),
-        this.setData({
+      (this.setData({
           saveOptions: e,
         }));
     },
@@ -409,15 +407,15 @@ Page(
                 : a.title,
             o = 1 === a.showType,
             s = a.content ? (0, formatRichText.formatRichText)(a.content) : "",
-            mta_analysis = wx.getStorageSync("messageTipId"),
+            mpValue = wx.getStorageSync("messageTipId"),
             global =
-              mta_analysis &&
-              mta_analysis.filter(function (t) {
+              mpValue &&
+              mpValue.filter(function (t) {
                 return t.id === app.globalData.userInfo.id;
               }),
             isVisitor =
-              mta_analysis &&
-              mta_analysis.filter(function (t) {
+              mpValue &&
+              mpValue.filter(function (t) {
                 return t.messageId === a.id;
               });
           t.setData({

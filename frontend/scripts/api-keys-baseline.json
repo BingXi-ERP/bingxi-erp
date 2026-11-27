@@ -1,5 +1,5 @@
 {
-  "total": 93,
+  "total": 90,
   "files": {
     "frontend/src/api/ai-extend.ts": {
       "count": 2,
@@ -80,7 +80,7 @@
       ]
     },
     "frontend/src/api/capacity.ts": {
-      "count": 10,
+      "count": 7,
       "keys": [
         "CapacityRow.bottleneck",
         "CapacityRow.load_status",
@@ -88,10 +88,7 @@
         "CapacitySummary.bottleneck_count",
         "CapacitySummary.busy_count",
         "CapacitySummary.normal_count",
-        "CapacitySummary.overload_count",
-        "CapacityTrend.actual_hours",
-        "CapacityTrend.capacity_hours",
-        "CapacityTrend.planned_hours"
+        "CapacitySummary.overload_count"
       ]
     },
     "frontend/src/api/crm-enhanced.ts": {

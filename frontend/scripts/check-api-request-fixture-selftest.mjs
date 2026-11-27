@@ -127,6 +127,13 @@ const structIndex = {
       { name: 'periods', type: 'Vec<i32>', attrs: '#[serde(default)]' },
     ],
   },
+  RenamedFieldPayload: {
+    attrs: '',
+    allFields: [
+      { name: 'template_name', type: 'String' },
+      { name: 'template_type', type: 'Option<String>', attrs: '#[serde(rename = "type")]' },
+    ],
+  },
 };
 
 console.log('=== fixture 自测：check-api-request 四类盲区解析器 ===');
@@ -523,6 +530,30 @@ console.log('\n[i] 同名跨文件副本调用点补录');
   );
   const again = supplementMissedCallSites(feFunctions, [{ rel: '/src/api/twin.ts', src: twinSrc }]);
   ok(again === 0, '(i3) 重复执行不双计（幂等）');
+}
+
+// ---------- (j) 字段级 serde(rename) 必须参与线上键名比对 ----------
+console.log('\n[j] 字段级 serde(rename)：template_type ↔ type 不应误报');
+{
+  const fields = rustFieldsOf('RenamedFieldPayload', structIndex);
+  const renamed = fields && fields.find(f => f.name === 'template_type');
+  ok(
+    renamed && renamed.renamed === 'type',
+    '(j1) 字段级 rename 覆盖 rename_all 结果',
+    JSON.stringify(renamed)
+  );
+  const cmp = compareKeys(
+    [
+      { name: 'template_name', optional: false },
+      { name: 'type', optional: true },
+    ],
+    fields
+  );
+  ok(
+    cmp.status === 'ok',
+    '(j2) 前端 type 与后端 #[serde(rename="type")] 判定一致',
+    JSON.stringify(cmp)
+  );
 }
 
 console.log('\n---- fixture 自测结论 ----');

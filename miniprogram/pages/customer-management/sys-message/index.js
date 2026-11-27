@@ -2,7 +2,6 @@ var e = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   toConsumableArray = require("../../../@babel/runtime/helpers/toConsumableArray"),
   ServicesUserLog = require("../../../libs/services/ServicesUserLog.js"),
   formatRichText = require("../../../utils/formatRichText.js"),
-  mta_analysis = e(require("../../../utils/mta_analysis.js")),
   app = getApp(),
   ServicesCustomer = require("../../../libs/services/ServicesCustomer.js").servicesCustomer,
   util = require("../../../libs/utils/util.js").utils;
@@ -75,8 +74,7 @@ Page({
     });
   },
   onLoad: function (e) {
-    (mta_analysis.default.Page.init(),
-      ServicesUserLog.servicesUserLog.setUserHandleLog(602),
+    (ServicesUserLog.servicesUserLog.setUserHandleLog(602),
       wx.hideShareMenu(),
       this.getShopNews());
   },

@@ -1,7 +1,4 @@
-var e = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../../utils/mta_analysis.js"),
-  ),
-  ServicesIndex = require("../../../../libs/services/ServicesIndex.js").ServicesIndex,
+var ServicesIndex = require("../../../../libs/services/ServicesIndex.js").ServicesIndex,
   util = require("../../../../libs/utils/util").utils;
 Page({
   data: {
@@ -14,8 +11,7 @@ Page({
     list: [],
   },
   onLoad: function (t) {
-    (e.default.Page.init(),
-      wx.hideShareMenu(),
+    (wx.hideShareMenu(),
       console.log(t.goodsId),
       this.setData({
         goodsId: t.goodsId,

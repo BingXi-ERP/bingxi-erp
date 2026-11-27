@@ -1,7 +1,6 @@
 var e = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   objectSpread2 = require("../../../../@babel/runtime/helpers/objectSpread2"),
   t = require("../../../../@babel/runtime/helpers/defineProperty"),
-  mta_analysis = e(require("../../../utils/mta_analysis.js")),
   util = require("../../../utils/util"),
   getLocation = require("../../../libs/utils/getLocation"),
   ServicesCenter = require("../../../libs/services/ServicesCenter.js").servicesCenter,
@@ -266,11 +265,11 @@ Page({
   },
   removeContact: function (e) {
     var objectSpread2 = e.currentTarget.dataset.type,
-      mta_analysis = e.currentTarget.dataset.item,
+      mpValue = e.currentTarget.dataset.item,
       util = 1 === objectSpread2 ? "telPhone" : "faxNo",
       getLocation = this.data[util],
       ServicesCenter = getLocation.findIndex(function (e) {
-        return e.name === mta_analysis.name;
+        return e.name === mpValue.name;
       });
     ServicesCenter > -1 &&
       (getLocation.splice(ServicesCenter, 1),
@@ -316,7 +315,7 @@ Page({
     });
   },
   onLoad: function (e) {
-    (mta_analysis.default.Page.init(), wx.hideShareMenu(), this.getShopId());
+    (wx.hideShareMenu(), this.getShopId());
   },
   getShopCategory: function () {
     ServicesShop.allShopCategoryV2({}).then(function (e) {
@@ -330,17 +329,17 @@ Page({
   },
   input_val: function (e) {
     var objectSpread2 = e.detail.value,
-      mta_analysis = e.currentTarget.dataset.name,
-      util = "formParams.".concat(mta_analysis);
+      mpValue = e.currentTarget.dataset.name,
+      util = "formParams.".concat(mpValue);
     this.setData({
       util: objectSpread2,
     });
   },
   input_val2: function (e) {
     var objectSpread2 = e.currentTarget.dataset.type,
-      mta_analysis = e.currentTarget.dataset.index,
+      mpValue = e.currentTarget.dataset.index,
       util = 1 === objectSpread2 ? "telPhone" : "faxNo";
-    ((this.data[util][mta_analysis].value = e.detail.value),
+    ((this.data[util][mpValue].value = e.detail.value),
       this.setData({
         util: this.data[util],
       }),
@@ -396,18 +395,18 @@ Page({
       };
     if (objectSpread2.id) {
       var t = function (a, t) {
-          var mta_analysis =
+          var mpValue =
               1 === t
                 ? ["province", "city", "area"]
                 : ["warehouseProvince", "warehouseCity", "warehouseArea"],
-            util = a[mta_analysis[0]]
-              ? mta_analysis.map(function (e) {
+            util = a[mpValue[0]]
+              ? mpValue.map(function (e) {
                   return a[e];
                 })
               : [];
           return (e.setLocationId(util, t), util);
         },
-        mta_analysis = function (e, a) {
+        mpValue = function (e, a) {
           return e
             ? null == e
               ? void 0
@@ -433,8 +432,8 @@ Page({
               backupList: a.data,
               shopImg: util.utils.addDefaultAvatar(a.data.ownerHeadImg),
               bannerImg: a.data.bannerImg,
-              telPhone: mta_analysis(a.data.telephone, "电话"),
-              faxNo: mta_analysis(a.data.faxNo, "传真"),
+              telPhone: mpValue(a.data.telephone, "电话"),
+              faxNo: mpValue(a.data.faxNo, "传真"),
             }),
             console.log(app.changeType),
             app.changeType)
@@ -496,7 +495,7 @@ Page({
     if (e.detail.value.companyName) {
       if (e.detail.value.contacts) {
         if (e.detail.value.phone) {
-          var t, mta_analysis, util;
+          var t, mpValue, util;
           ("",
             1 == objectSpread2.data.phoneHide && (t = e.detail.value.telephone_delete0),
             1 == objectSpread2.data.phoneHide_second && (o = e.detail.value.telephone_delete1),
@@ -506,10 +505,10 @@ Page({
               null != t &&
               void 0 !== t &&
               (t = e.detail.value.telephone_delete0),
-            "undefined" != mta_analysis &&
-              "" != mta_analysis &&
-              null != mta_analysis &&
-              void 0 !== mta_analysis &&
+            "undefined" != mpValue &&
+              "" != mpValue &&
+              null != mpValue &&
+              void 0 !== mpValue &&
               (o = e.detail.value.telephone_delete1),
             "undefined" != util &&
               "" != util &&
@@ -517,17 +516,17 @@ Page({
               void 0 !== util &&
               (n = e.detail.value.telephone_delete2),
             "" != t && null != t
-              ? "" != mta_analysis && null != mta_analysis
+              ? "" != mpValue && null != mpValue
                 ? "" != util && null != util
-                  ? t + "," + mta_analysis + "," + util
-                  : t + "," + mta_analysis
+                  ? t + "," + mpValue + "," + util
+                  : t + "," + mpValue
                 : "" != util && null != util
                   ? t + "," + util
                   : t
-              : "" != mta_analysis && null != mta_analysis
+              : "" != mpValue && null != mpValue
                 ? "" != util && null != util
-                  ? mta_analysis + "," + util
-                  : mta_analysis
+                  ? mpValue + "," + util
+                  : mpValue
                 : "" != util && null != util && util);
           var getLocation, ServicesCenter;
           if (
@@ -598,10 +597,10 @@ Page({
   uploadData: function () {
     var e = this,
       t = this,
-      mta_analysis = this.data,
-      util = mta_analysis.formParams,
-      getLocation = mta_analysis.telPhone,
-      ServicesShop = mta_analysis.faxNo,
+      mpValue = this.data,
+      util = mpValue.formParams,
+      getLocation = mpValue.telPhone,
+      ServicesShop = mpValue.faxNo,
       l = objectSpread2(
         objectSpread2({}, util),
         {},

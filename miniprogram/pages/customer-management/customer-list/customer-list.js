@@ -1,6 +1,5 @@
 var e = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   ServicesUserLog = require("../../../libs/services/ServicesUserLog.js"),
-  mta_analysis = e(require("../../../utils/mta_analysis.js")),
   app = getApp(),
   ServicesCustomer = require("../../../libs/services/ServicesCustomer.js").servicesCustomer,
   util = require("../../../libs/utils/util.js").utils;
@@ -103,14 +102,14 @@ Page({
   },
   getCustomersList: function (e) {
     var ServicesUserLog = this,
-      mta_analysis = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : "desc";
+      mpValue = arguments.length > 1 && void 0 !== arguments[1] ? arguments[1] : "desc";
     return new Promise(function (a, n) {
       wx.showLoading();
       var c = {
           grouping: e,
           size: ServicesUserLog.data.pageSize,
           page: ServicesUserLog.data.pageNum,
-          sort: mta_analysis,
+          sort: mpValue,
         },
         r = ServicesUserLog.data.customerList;
       ServicesCustomer.customersList(c)
@@ -162,9 +161,9 @@ Page({
   },
   filterTap: function (e) {
     var ServicesUserLog = e.detail,
-      mta_analysis = (ServicesUserLog.value, ServicesUserLog.sortType),
+      mpValue = (ServicesUserLog.value, ServicesUserLog.sortType),
       app = this.data.sort;
-    switch (mta_analysis) {
+    switch (mpValue) {
       case "all":
         a = "";
         break;
@@ -184,16 +183,16 @@ Page({
   },
   tabBlock: function (e) {
     var ServicesUserLog = this.data.grouping,
-      mta_analysis = e.detail.id;
+      mpValue = e.detail.id;
     3 == ServicesUserLog
       ? wx.navigateTo({
           url: "/pages/customer-management/edit-customer-info/edit-customer-info?customerId=".concat(
-            mta_analysis,
+            mpValue,
           ),
         })
       : wx.navigateTo({
           url: "/pages/customer-management/all-customer-detail/all-customer-detail?customerId=".concat(
-            mta_analysis,
+            mpValue,
           ),
         });
   },
@@ -215,7 +214,6 @@ Page({
     }
   },
   onLoad: function (e) {
-    mta_analysis.default.Page.init();
     var ServicesUserLog = e.grouping;
     (this.setEnterPageLog(ServicesUserLog),
       wx.setNavigationBarTitle({
@@ -244,7 +242,7 @@ Page({
   onReachBottom: function () {
     var e = this.data,
       ServicesUserLog = e.pageNum,
-      mta_analysis = e.grouping,
+      mpValue = e.grouping,
       app = e.isDone,
       ServicesCustomer = e.sort;
     app
@@ -256,7 +254,7 @@ Page({
         this.setData({
           pageNum: ServicesUserLog,
         }),
-        this.getCustomersList(mta_analysis, ServicesCustomer));
+        this.getCustomersList(mpValue, ServicesCustomer));
   },
   onShareAppMessage: function () {},
 });

@@ -399,6 +399,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::customer_portal_binding::Migration),
             // BI 利润字段读权限存量补授，链尾独立域（field_permissions 与 roles 均早于本域）
             Box::new(domain::bi_profit_field_grant::Migration),
+            // 可配置单据号规则与追加版本快照，链尾独立域（复用库上属 pending 必然执行）
+            Box::new(domain::system_number_rules::Migration),
         ]
     }
 }

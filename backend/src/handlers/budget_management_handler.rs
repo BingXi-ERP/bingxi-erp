@@ -908,7 +908,7 @@ pub async fn create_budget_version(
     State(state): State<AppState>,
     auth: AuthContext,
     Json(req): Json<CreateBudgetVersionDto>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     req.validate()?;
     let service = BudgetManagementService::new(state.db.clone());
     let version = service
@@ -921,24 +921,20 @@ pub async fn create_budget_version(
             auth.user_id,
         )
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "预算版本创建成功",
-        "data": version
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(version)?,
+        "预算版本创建成功",
+    )))
 }
 
 /// GET /api/v1/erp/budgets/versions/:plan_id - 获取预算版本列表
 pub async fn get_budget_versions(
     State(state): State<AppState>,
     Path(plan_id): Path<i32>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = BudgetManagementService::new(state.db.clone());
     let versions = service.get_budget_versions(plan_id).await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "data": versions
-    })))
+    Ok(Json(ApiResponse::success(serde_json::to_value(versions)?)))
 }
 
 /// PUT /api/v1/erp/budgets/versions/:id/approve - 审批预算版本
@@ -946,16 +942,15 @@ pub async fn approve_budget_version(
     State(state): State<AppState>,
     auth: AuthContext,
     Path(version_id): Path<i32>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = BudgetManagementService::new(state.db.clone());
     let version = service
         .approve_budget_version(version_id, auth.user_id)
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "预算版本审批成功",
-        "data": version
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(version)?,
+        "预算版本审批成功",
+    )))
 }
 
 /// GET /api/v1/erp/budgets/assessment - 预算考核报表
@@ -963,17 +958,16 @@ pub async fn approve_budget_version(
 pub async fn get_budget_assessment(
     State(state): State<AppState>,
     _auth: AuthContext,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     let service = BudgetManagementService::new(state.db.clone());
 
     // 获取预算执行汇总
     let summary = service.get_budget_summary().await?;
 
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "success",
-        "data": summary
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(summary)?,
+        "success",
+    )))
 }
 
 /// POST /api/v1/erp/budgets/variance-analysis - 预算差异分析
@@ -992,7 +986,7 @@ pub async fn variance_analysis(
     State(state): State<AppState>,
     auth: AuthContext,
     Json(req): Json<VarianceAnalysisRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     info!("用户 {} 执行预算差异分析", auth.username);
     req.validate().map_err(AppError::from)?;
     let service = BudgetManagementService::new(state.db.clone());
@@ -1002,10 +996,7 @@ pub async fn variance_analysis(
     let result = service
         .variance_analysis(budget_year, req.department_id)
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "data": result
-    })))
+    Ok(Json(ApiResponse::success(serde_json::to_value(result)?)))
 }
 
 /// POST /api/v1/erp/budgets/create-with-mode - 多模式预算编制
@@ -1028,7 +1019,7 @@ pub async fn create_budget_with_mode(
     State(state): State<AppState>,
     auth: AuthContext,
     Json(req): Json<CreateBudgetWithModeRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     info!("用户 {} 创建多模式预算", auth.username);
     req.validate().map_err(AppError::from)?;
     let service = BudgetManagementService::new(state.db.clone());
@@ -1059,11 +1050,10 @@ pub async fn create_budget_with_mode(
             auth.user_id,
         )
         .await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "message": "预算创建成功",
-        "data": result
-    })))
+    Ok(Json(ApiResponse::success_with_message(
+        serde_json::to_value(result)?,
+        "预算创建成功",
+    )))
 }
 
 /// GET /api/v1/erp/budgets/execution-warnings - 预算执行预警
@@ -1080,15 +1070,12 @@ pub async fn budget_execution_warnings(
     State(state): State<AppState>,
     auth: AuthContext,
     Query(params): Query<ExecutionWarningsQuery>,
-) -> Result<Json<serde_json::Value>, AppError> {
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     info!("用户 {} 查询预算执行预警", auth.username);
     let service = BudgetManagementService::new(state.db.clone());
     let budget_year = params
         .budget_year
         .unwrap_or_else(|| chrono::Utc::now().date_naive().year());
     let result = service.budget_execution_warnings(budget_year).await?;
-    Ok(Json(serde_json::json!({
-        "code": 200,
-        "data": result
-    })))
+    Ok(Json(ApiResponse::success(serde_json::to_value(result)?)))
 }

@@ -61,6 +61,10 @@ const SEALED_REFERENCE_TABLES: &[&str] = &[
     "supplier_product_colors",
     "supplier_products",
     "suppliers",
+    // 编码规则与版本快照由迁移播种，取号器每次事务直接读取；清空会改变既有单号语义。
+    // 持久化号段计数属于业务状态，不列入参照表，测试清表时随业务数据重置。
+    "system_number_rules",
+    "system_number_rule_revisions",
     // 纺织品安全合规域 m0112 种子三表（判定矩阵与项目主数据属迁移种子，
     // 与 suppliers 族同理不清表；单据族 submission/report/result/check 属业务表照常清空）
     "textile_export_market_requirement",

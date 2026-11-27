@@ -1,5 +1,4 @@
 var e = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
-  mta_analysis = e(require("../../../utils/mta_analysis.js")),
   isVisitor = e(require("../../../libs/utils/isVisitor")),
   ServicesCard = require("../../../libs/services/ServicesCard.js").servicesCard;
 Page({
@@ -7,7 +6,6 @@ Page({
     printType: null,
   },
   onLoad: function () {
-    mta_analysis.default.Page.init();
   },
   onShow: function () {
     this.getPrintType();
@@ -31,13 +29,13 @@ Page({
     });
   },
   handleLinkTo: function (e) {
-    var mta_analysis;
+    var mpValue;
     (this.data.printType && 1 === this.data.printType
       ? (console.log("是新打印"),
         (i = "/packageB/pages/personal-center/link-print-new/link-print-new"))
       : (console.log("是旧打印"), (i = "/packageB/pages/personal-center/link-print/link-print")),
       wx.navigateTo({
-        url: mta_analysis,
+        url: mpValue,
       }));
   },
   handleLinkToZhen: function (e) {

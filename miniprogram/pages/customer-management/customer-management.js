@@ -1,7 +1,6 @@
 var t = require("../../@babel/runtime/helpers/interopRequireDefault").default,
   toConsumableArray = require("../../@babel/runtime/helpers/toConsumableArray"),
   objectSpread2 = require("../../@babel/runtime/helpers/objectSpread2"),
-  mta_analysis = t(require("../../utils/mta_analysis")),
   o = (require("../../libs/services/global"), require("../../libs/services/ServicesUserLog")),
   app = getApp(),
   ServicesCustomer = require("../../libs/services/ServicesCustomer.js").servicesCustomer,
@@ -99,7 +98,7 @@ Page({
   handleClickCustom: function (t) {
     var toConsumableArray = t.currentTarget.dataset,
       objectSpread2 = toConsumableArray.id,
-      mta_analysis = toConsumableArray.fullname,
+      mpValue = toConsumableArray.fullname,
       o = toConsumableArray.mobile,
       app = getCurrentPages(),
       ServicesCustomer = app.find(function (t) {
@@ -108,7 +107,7 @@ Page({
     if (ServicesCustomer)
       (ServicesCustomer.updateCustomer({
         id: objectSpread2,
-        fullname: mta_analysis,
+        fullname: mpValue,
         mobile: o,
       }),
         wx.navigateBack({
@@ -128,10 +127,10 @@ Page({
     for (
       var toConsumableArray = t.importantCount,
         objectSpread2 = t.potentialCount,
-        mta_analysis = t.visitorCount,
+        mpValue = t.visitorCount,
         o = t.blackCount,
         app = t.totalCount,
-        ServicesCustomer = [toConsumableArray, objectSpread2, mta_analysis, o],
+        ServicesCustomer = [toConsumableArray, objectSpread2, mpValue, o],
         util = this.data.panel,
         login = 0;
       login < util.length;
@@ -162,7 +161,7 @@ Page({
     });
   },
   getAllCustomer: function (t) {
-    var mta_analysis = this;
+    var mpValue = this;
     wx.showLoading();
     this.data.customerList;
     var o = {
@@ -175,7 +174,7 @@ Page({
       if (0 === t.code) {
         var o = t.data.pageResult,
           app = t.data.customerGroupResp;
-        mta_analysis.getIndexData(app);
+        mpValue.getIndexData(app);
         var ServicesCustomer = o.content.map(function (t) {
           return objectSpread2(
             objectSpread2({}, t),
@@ -185,15 +184,15 @@ Page({
             },
           );
         });
-        (mta_analysis.setData({
+        (mpValue.setData({
           customerList:
-            1 === mta_analysis.data.searchParams.pageNum
+            1 === mpValue.data.searchParams.pageNum
               ? ServicesCustomer
               : [].concat(
-                  toConsumableArray(mta_analysis.data.customerList),
+                  toConsumableArray(mpValue.data.customerList),
                   toConsumableArray(ServicesCustomer),
                 ),
-          isDone: o.totalPage <= mta_analysis.data.searchParams.pageNum,
+          isDone: o.totalPage <= mpValue.data.searchParams.pageNum,
           totalPage: o.totalPage,
         }),
           wx.hideLoading());
@@ -206,8 +205,7 @@ Page({
     });
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      login.getUserInfo(),
+    (login.getUserInfo(),
       wx.hideShareMenu(),
       this.setData({
         userAuthList: app.userAuthList,

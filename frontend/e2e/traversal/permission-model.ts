@@ -130,6 +130,7 @@ export const ROUTE_PERMISSIONS: Record<string, RoutePermValue> = {
   'field-permissions': 'users:read',
   webhooks: 'users:read',
   'system-audit-log': 'audit-logs:read',
+  'system-number-rules': 'number-rules:read',
   'system-export-approvals': 'audit-logs:read',
   'system-slow-query': 'audit-logs:read',
   'payment-channels': 'payment-channels:read',

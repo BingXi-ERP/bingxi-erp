@@ -9,10 +9,7 @@
  * 存什么：QRcodeRed 一个红点标记；不再读写任何凭据键
  * 存哪里：wx.storage
  */
-var e = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../utils/mta_analysis.js"),
-  ),
-  login = require("../../../libs/utils/login"),
+var login = require("../../../libs/utils/login"),
   ServicesIndex = require("../../../libs/services/ServicesIndex.js").ServicesIndex,
   checkToken = require("../../../libs/utils/checkToken.js").checkToken,
   app = getApp();
@@ -29,7 +26,7 @@ Page({
     },
   },
   onLoad: function () {
-    (e.default.Page.init(), login.login.getUserInfo(), wx.hideShareMenu());
+    (login.login.getUserInfo(), wx.hideShareMenu());
     var ServicesIndex = wx.getStorageSync("QRcodeRed") || "";
     this.setData({
       QRcodeRed: ServicesIndex,

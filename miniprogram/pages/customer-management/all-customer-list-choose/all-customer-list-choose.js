@@ -1,7 +1,6 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   toConsumableArray = require("../../../@babel/runtime/helpers/toConsumableArray"),
   createForOfIteratorHelper = require("../../../@babel/runtime/helpers/createForOfIteratorHelper"),
-  mta_analysis = t(require("../../../utils/mta_analysis")),
   ServicesCustomer = require("../../../libs/services/ServicesCustomer.js").servicesCustomer,
   util = require("../../../libs/utils/util.js").utils,
   app = getApp();
@@ -73,8 +72,7 @@ Page({
     scrollViewHeight: 0,
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      wx.hideShareMenu(),
+    (wx.hideShareMenu(),
       this.setData({
         userAuthList: app.userAuthList,
       }));
@@ -96,19 +94,19 @@ Page({
         .selectAll(".list-group")
         .boundingClientRect(function (a) {
           for (
-            var mta_analysis = a, ServicesCustomer = mta_analysis.length, util = 0;
+            var mpValue = a, ServicesCustomer = mpValue.length, util = 0;
             util < ServicesCustomer;
             util++
           )
-            ((e += mta_analysis[util].height), t.push(createForOfIteratorHelper));
+            ((e += mpValue[util].height), t.push(createForOfIteratorHelper));
         })
         .exec());
-    var mta_analysis = setInterval(function () {
+    var mpValue = setInterval(function () {
       t != [0] &&
         (toConsumableArray.setData({
           listHeight: t,
         }),
-        clearInterval(mta_analysis));
+        clearInterval(mpValue));
     }, 1e3);
   },
   scroll: function (t) {
@@ -128,9 +126,9 @@ Page({
         createForOfIteratorHelper < toConsumableArray.length - 1;
         createForOfIteratorHelper++
       ) {
-        var mta_analysis = toConsumableArray[createForOfIteratorHelper],
+        var mpValue = toConsumableArray[createForOfIteratorHelper],
           ServicesCustomer = toConsumableArray[createForOfIteratorHelper + 1];
-        if (t >= mta_analysis && t < ServicesCustomer)
+        if (t >= mpValue && t < ServicesCustomer)
           return void this.setData({
             currentIndex: createForOfIteratorHelper,
             fixedTitle: this.data.customerList[createForOfIteratorHelper]
@@ -154,7 +152,7 @@ Page({
   handleClickCustom: function (t) {
     var toConsumableArray,
       createForOfIteratorHelper = t.currentTarget.dataset,
-      mta_analysis = createForOfIteratorHelper.id,
+      mpValue = createForOfIteratorHelper.id,
       ServicesCustomer = createForOfIteratorHelper.fullname,
       util = createForOfIteratorHelper.mobile,
       app = getCurrentPages(),
@@ -172,7 +170,7 @@ Page({
       toConsumableArray)
     )
       (toConsumableArray.updateCustomer({
-        id: mta_analysis,
+        id: mpValue,
         fullname: ServicesCustomer,
         mobile: util,
       }),
@@ -182,7 +180,7 @@ Page({
     else {
       var n =
         "/pages/customer-management/all-customer-detail/all-customer-detail?customerId=".concat(
-          mta_analysis,
+          mpValue,
         );
       wx.navigateTo({
         url: n,
@@ -212,14 +210,14 @@ Page({
   searchList: function () {
     var t = this;
     1 === this.data.searchParams.pageNum && wx.showLoading();
-    var mta_analysis = this,
+    var mpValue = this,
       app = this.data,
       o = (app.customerList, app.nav, app.customerObj),
       n = {
-        size: mta_analysis.data.searchParams.pageSize,
-        page: mta_analysis.data.searchParams.pageNum,
-        keyword: mta_analysis.data.searchParams.keyword,
-        isFirstLetterAsc: mta_analysis.data.searchParams.isFirstLetterAsc,
+        size: mpValue.data.searchParams.pageSize,
+        page: mpValue.data.searchParams.pageNum,
+        keyword: mpValue.data.searchParams.keyword,
+        isFirstLetterAsc: mpValue.data.searchParams.isFirstLetterAsc,
       };
     ServicesCustomer.selectPageList(n).then(function (r) {
       if (0 === r.code) {
@@ -237,21 +235,21 @@ Page({
         } finally {
           u.f();
         }
-        (mta_analysis.setData({
+        (mpValue.setData({
           totalPage: r.data.totalPage,
           total: r.data.total,
           customerObj: o,
           customerList:
-            1 === mta_analysis.data.searchParams.pageNum
+            1 === mpValue.data.searchParams.pageNum
               ? app
               : [].concat(
-                  toConsumableArray(mta_analysis.data.customerList),
+                  toConsumableArray(mpValue.data.customerList),
                   toConsumableArray(app),
                 ),
         }),
-          r.data.totalPage <= mta_analysis.data.searchParams.pageNum &&
+          r.data.totalPage <= mpValue.data.searchParams.pageNum &&
             0 === app.length &&
-            mta_analysis.setData({
+            mpValue.setData({
               isDone: !0,
             }),
           t._calculateHeight());
@@ -343,11 +341,11 @@ Page({
   drawStart: function (t) {
     var toConsumableArray = this,
       createForOfIteratorHelper = t.touches[0],
-      mta_analysis = t.currentTarget.dataset.findex,
+      mpValue = t.currentTarget.dataset.findex,
       ServicesCustomer = t.currentTarget.dataset.index;
     (this.data.customerList.forEach(function (t, e) {
       t.childer.forEach(function (t, i) {
-        (e == mta_analysis && ServicesCustomer == i) ||
+        (e == mpValue && ServicesCustomer == i) ||
           (toConsumableArray.data.customerList[e].childer[i].right = 0);
       });
     }),
@@ -359,10 +357,10 @@ Page({
   drawMove: function (t) {
     var toConsumableArray = t.currentTarget.dataset.findex,
       createForOfIteratorHelper = t.currentTarget.dataset.index,
-      mta_analysis = t.touches[0],
+      mpValue = t.touches[0],
       ServicesCustomer =
         this.data.customerList[toConsumableArray].childer[createForOfIteratorHelper],
-      util = this.data.startX - mta_analysis.clientX;
+      util = this.data.startX - mpValue.clientX;
     util >= 20
       ? (util > this.data.delBtnWidth && (i = this.data.delBtnWidth),
         (ServicesCustomer.right = util),
@@ -379,14 +377,14 @@ Page({
   drawEnd: function (t) {
     var toConsumableArray = t.currentTarget.dataset.findex,
       createForOfIteratorHelper = t.currentTarget.dataset.index,
-      mta_analysis = this.data.customerList[toConsumableArray].childer[createForOfIteratorHelper];
-    mta_analysis.right >= this.data.delBtnWidth / 2
-      ? ((mta_analysis.right = this.data.delBtnWidth),
+      mpValue = this.data.customerList[toConsumableArray].childer[createForOfIteratorHelper];
+    mpValue.right >= this.data.delBtnWidth / 2
+      ? ((mpValue.right = this.data.delBtnWidth),
         this.setData({
           isScroll: !0,
           customerList: this.data.customerList,
         }))
-      : ((mta_analysis.right = 0),
+      : ((mpValue.right = 0),
         this.setData({
           isScroll: !0,
           customerList: this.data.customerList,

@@ -2,7 +2,6 @@ var e = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   t = require("../../../@babel/runtime/helpers/defineProperty"),
   toast = e(require("../../../miniprogram_npm/@vant/weapp/toast/toast")),
   orderPrint = require("../../../libs/services/orderPrint"),
-  mta_analysis = e(require("../../../utils/mta_analysis")),
   throttle = e(require("../../../utils/throttle")),
   app = getApp();
 Page({
@@ -65,8 +64,7 @@ Page({
     });
   },
   onLoad: function (e) {
-    (mta_analysis.default.Page.init(),
-      this.setData({
+    (this.setData({
         userAuthList: app.userAuthList,
         userType: app.globalData.userInfo.type,
         orderId: e.orderId,
@@ -88,7 +86,7 @@ Page({
       t = e.orderId,
       toast = e.billingFooter,
       orderPrint = e.refundBillingFooter,
-      mta_analysis = e.printPaymentType,
+      mpValue = e.printPaymentType,
       throttle = e.hasBankInfo,
       app = e.printCopies,
       s = e.billingDeliveryman,
@@ -103,7 +101,7 @@ Page({
         .concat(toast, "&refundBillingFooter=")
         .concat(orderPrint, "&hasBankInfo=")
         .concat(throttle, "&printPaymentType=")
-        .concat(mta_analysis, "&printCopies=")
+        .concat(mpValue, "&printCopies=")
         .concat(app, "&printRemark=")
         .concat(p, "&billingDeliveryman=")
         .concat(s, "&printerSale=")
@@ -167,7 +165,7 @@ Page({
         .then(function (t) {
           if ((wx.hideLoading(), 0 === t.code)) {
             var orderPrint = t.data,
-              mta_analysis = orderPrint.printPaymentType,
+              mpValue = orderPrint.printPaymentType,
               throttle = orderPrint.hasBankInfo,
               app = orderPrint.hasMoneyCodeInfo,
               s = orderPrint.billingFooter,
@@ -187,7 +185,7 @@ Page({
                   printerName: l,
                 }))
               : e.setData({
-                  printPaymentType: null === mta_analysis ? "" : mta_analysis,
+                  printPaymentType: null === mpValue ? "" : mpValue,
                   hasBankInfo: throttle,
                   hasMoneyCodeInfo: app,
                   billingFooter:
@@ -226,7 +224,7 @@ Page({
         .then(function (t) {
           if ((wx.hideLoading(), 0 === t.code)) {
             var orderPrint = t.data,
-              mta_analysis = orderPrint.hasBankInfo,
+              mpValue = orderPrint.hasBankInfo,
               throttle = orderPrint.hasMoneyCodeInfo,
               app = orderPrint.printPaymentType,
               s = orderPrint.billingFooter,
@@ -240,13 +238,13 @@ Page({
             e.data.isInit
               ? (0 == e.data.hasBankInfo &&
                   e.setData({
-                    hasBankInfo: mta_analysis,
+                    hasBankInfo: mpValue,
                   }),
                 e.setData({
                   printerName: l,
                 }))
               : e.setData({
-                  hasBankInfo: mta_analysis,
+                  hasBankInfo: mpValue,
                   hasMoneyCodeInfo: throttle,
                   printPaymentType: null === app ? "" : app,
                   billingFooter: s,
@@ -311,9 +309,9 @@ Page({
   saleOrderCheckbox: function (e) {
     var toast = e.currentTarget.dataset,
       orderPrint = toast.value,
-      mta_analysis = toast.key;
+      mpValue = toast.key;
     this.setData({
-      mta_analysis: Number(orderPrint),
+      mpValue: Number(orderPrint),
     });
   },
   handleCheckbox: function (e) {
@@ -324,7 +322,7 @@ Page({
   handlePrint: throttle.default.throttle(function () {
     var e = this.data,
       t = e.footerMaxLeng,
-      mta_analysis = e.remarkMaxLeng,
+      mpValue = e.remarkMaxLeng,
       throttle = e.orderId,
       app = e.printerName,
       s = e.billingFooter,
@@ -344,7 +342,7 @@ Page({
       "" === c && y.push("请输入打印份数"),
       0 === c && y.push("打印份数不能为 0"),
       s.length > t && y.push("自定义页脚字数已超出限制"),
-      m.length > mta_analysis && y.push("备注字数已超出限制"),
+      m.length > mpValue && y.push("备注字数已超出限制"),
       0 === y.length)
     ) {
       var I = {

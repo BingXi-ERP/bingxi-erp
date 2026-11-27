@@ -21,6 +21,7 @@ fn is_system_module_prefix(part: &str) -> bool {
         "auth"
             | "ws"
             | "init"
+            | "system"
             | "system-update"
             | "audit-logs"
             | "user"

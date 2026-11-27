@@ -1,7 +1,4 @@
-var n = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../utils/mta_analysis.js"),
-  ),
-  app = getApp();
+var app = getApp();
 Page({
   data: {
     app: app,
@@ -13,7 +10,6 @@ Page({
     },
   },
   onLoad: function (o) {
-    n.default.Page.init();
   },
   onReady: function () {},
   onShow: function () {},

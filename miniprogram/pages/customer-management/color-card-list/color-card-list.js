@@ -1,6 +1,5 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   createForOfIteratorHelper = require("../../../@babel/runtime/helpers/createForOfIteratorHelper"),
-  mta_analysis = t(require("../../../utils/mta_analysis.js")),
   app = getApp(),
   ServicesCustomer = require("../../../libs/services/ServicesCustomer.js").servicesCustomer,
   util = require("../../../libs/utils/util.js").utils;
@@ -76,7 +75,7 @@ Page({
   },
   checkTap: function (t) {
     var createForOfIteratorHelper = t.currentTarget.dataset,
-      mta_analysis = createForOfIteratorHelper.goodsid,
+      mpValue = createForOfIteratorHelper.goodsid,
       app = createForOfIteratorHelper.index,
       ServicesCustomer = createForOfIteratorHelper.mainimgpath,
       util = createForOfIteratorHelper.goodsno,
@@ -85,13 +84,13 @@ Page({
       d = this.data.selectedArr;
     if (((n[app] = !n[app]), n[app]))
       d.push({
-        goodsid: mta_analysis,
+        goodsid: mpValue,
         mainimgpath: ServicesCustomer,
         goodsno: util,
         goodsname: r,
         count: 1,
       });
-    else for (var l = 0; l < d.length; l++) d[l].goodsid == mta_analysis && d.splice(l, 1);
+    else for (var l = 0; l < d.length; l++) d[l].goodsid == mpValue && d.splice(l, 1);
     (this.setData({
       selectedStatusArr: n,
       selectedArr: d,
@@ -124,7 +123,7 @@ Page({
     for (
       var t = this.data,
         createForOfIteratorHelper = (t.colorCardList, t.selectedStatusArr),
-        mta_analysis = t.selectedArr,
+        mpValue = t.selectedArr,
         app = 0;
       app < this.data.colorCardList.length;
       app++
@@ -133,16 +132,16 @@ Page({
     ((o = []),
       this.setData({
         selectedStatusArr: createForOfIteratorHelper,
-        selectedArr: mta_analysis,
+        selectedArr: mpValue,
       }));
   },
   minTap: function (t) {
     for (
       var createForOfIteratorHelper = t.detail.index,
-        mta_analysis = this.data,
-        app = mta_analysis.selectedArr,
-        ServicesCustomer = mta_analysis.colorCardList,
-        util = mta_analysis.selectedStatusArr,
+        mpValue = this.data,
+        app = mpValue.selectedArr,
+        ServicesCustomer = mpValue.colorCardList,
+        util = mpValue.selectedStatusArr,
         r = 0;
       r < ServicesCustomer.length;
       r++
@@ -156,7 +155,7 @@ Page({
   },
   scan: function () {
     var t = this,
-      mta_analysis = this.data.selectedArr;
+      mpValue = this.data.selectedArr;
     wx.scanCode({
       onlyFromCamera: !0,
       success: function (a) {
@@ -165,7 +164,7 @@ Page({
           var n = util.getQueryString(r, "goodsId");
           if ((console.log("扫码goodsId：", n), n && "" != n)) {
             var d,
-              l = createForOfIteratorHelper(mta_analysis);
+              l = createForOfIteratorHelper(mpValue);
             try {
               for (l.s(); !(d = l.n()).done;) {
                 if (d.value.goodsid == n)
@@ -187,7 +186,7 @@ Page({
                     title: "不能添加别家店铺色卡",
                     icon: "none",
                   });
-                (mta_analysis.push({
+                (mpValue.push({
                   goodsid: app.id,
                   mainimgpath: app.mainImgPath,
                   goodsno: app.goodsNo,
@@ -195,7 +194,7 @@ Page({
                   count: 1,
                 }),
                   t.setData({
-                    selectedArr: mta_analysis,
+                    selectedArr: mpValue,
                   }),
                   console.log(t.data.selectedArr));
               } else
@@ -234,20 +233,20 @@ Page({
           size: this.data.pageSize,
           keyword: this.data.inputValue,
         },
-        mta_analysis = this.data,
-        app = mta_analysis.selectedStatusArr,
-        util = (mta_analysis.selectedArr, mta_analysis.colorCardList);
+        mpValue = this.data,
+        app = mpValue.selectedStatusArr,
+        util = (mpValue.selectedArr, mpValue.colorCardList);
       ServicesCustomer.colorCardList(createForOfIteratorHelper).then(function (e) {
         if (0 === e.code) {
-          var mta_analysis = e.data.content || [];
-          if (0 == mta_analysis.length)
+          var mpValue = e.data.content || [];
+          if (0 == mpValue.length)
             return void wx.showToast({
               title: "搜索不到色卡",
               icon: "none",
             });
           i = [];
-          for (var ServicesCustomer = 0; ServicesCustomer < mta_analysis.length; ServicesCustomer++)
-            ((app[ServicesCustomer] = !1), util.push(mta_analysis[ServicesCustomer]));
+          for (var ServicesCustomer = 0; ServicesCustomer < mpValue.length; ServicesCustomer++)
+            ((app[ServicesCustomer] = !1), util.push(mpValue[ServicesCustomer]));
           t.setData({
             selectedStatusArr: app,
             colorCardList: util,
@@ -275,20 +274,20 @@ Page({
           size: this.data.pageSize,
           keyword: this.data.inputValue,
         },
-        mta_analysis = this.data,
-        app = mta_analysis.selectedStatusArr,
-        util = (mta_analysis.selectedArr, mta_analysis.colorCardList);
+        mpValue = this.data,
+        app = mpValue.selectedStatusArr,
+        util = (mpValue.selectedArr, mpValue.colorCardList);
       ServicesCustomer.colorCardList(createForOfIteratorHelper).then(function (e) {
         if (0 === e.code) {
-          var mta_analysis = e.data.content || [];
-          if (0 == mta_analysis.length)
+          var mpValue = e.data.content || [];
+          if (0 == mpValue.length)
             return void wx.showToast({
               title: "搜索不到色卡",
               icon: "none",
             });
           i = [];
-          for (var ServicesCustomer = 0; ServicesCustomer < mta_analysis.length; ServicesCustomer++)
-            ((app[ServicesCustomer] = !1), util.push(mta_analysis[ServicesCustomer]));
+          for (var ServicesCustomer = 0; ServicesCustomer < mpValue.length; ServicesCustomer++)
+            ((app[ServicesCustomer] = !1), util.push(mpValue[ServicesCustomer]));
           t.setData({
             selectedStatusArr: app,
             colorCardList: util,
@@ -322,7 +321,7 @@ Page({
           }));
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(), this.getColorCardList(), wx.hideShareMenu());
+    (this.getColorCardList(), wx.hideShareMenu());
   },
   onReady: function () {},
   onShow: function () {},

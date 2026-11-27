@@ -154,8 +154,12 @@ fn registry_rejects_unknown_doc_types_instead_of_defaulting_to_available() {
         "注册表兜底臂必须对未知 doc_type 返回 bad_request（可区分错误），\
          否则 /document-no/check 会把未登记单据误判为可用"
     );
+    let registry_start = src
+        .find("pub async fn is_document_no_taken")
+        .expect("查重注册表入口缺失");
+    let registry = &src[registry_start..];
     assert!(
-        !src.contains("_ => false") && !src.contains("other => false"),
+        !registry.contains("_ => false") && !registry.contains("other => false"),
         "禁止默认放行臂（未登记 doc_type 静默返回可用 = 查重形同虚设的根因形态）"
     );
 }

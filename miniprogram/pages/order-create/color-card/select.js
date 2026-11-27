@@ -3,7 +3,6 @@ var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   ServicesReturn = require("../../../libs/services/ServicesReturn"),
   ServicesCard = require("../../../libs/services/ServicesCard"),
   toast = t(require("../../../miniprogram_npm/@vant/weapp/toast/toast")),
-  mta_analysis = t(require("../../../utils/mta_analysis")),
   app = getApp();
 Page({
   data: {
@@ -22,7 +21,6 @@ Page({
     noDataBg: "/assets/icons/dz@2x.png",
   },
   onLoad: function (t) {
-    mta_analysis.default.Page.init();
     var orderCreate = t.productType,
       ServicesReturn = t.openType,
       ServicesCard = t.ids;

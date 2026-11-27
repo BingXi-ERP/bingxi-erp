@@ -60,9 +60,10 @@ export interface CapacityRow extends WorkCenter {
 
 export interface CapacityTrend {
   date: string;
-  planned_hours: number;
-  actual_hours: number;
-  capacity_hours: number;
+  planned_quantity: string;
+  actual_quantity: string;
+  capacity_quantity: string;
+  capacity_unit: string | null;
 }
 
 export interface CapacitySummary {
@@ -78,9 +79,14 @@ export interface CapacitySummary {
 export const getCapacitySummary = () =>
   request.get<ApiResponse<CapacitySummary>>('/production/capacity/summary');
 
-// D14 Batch 5b：原 capacityApi.getTrend 转为风格 B 函数
-export const getCapacityTrend = (params?: { days?: number; work_center_id?: number }) =>
-  request.get<ApiResponse<CapacityTrend[]>>('/production/capacity/trend', { params });
+// D14 Batch 5b：原 capacityApi.getTrend 转为风格 B 函数。
+// 必须指定工作中心：不同工作中心的 capacity_unit 可能不同，不能把数量直接相加。
+export const getCapacityTrend = (params: {
+  days?: number;
+  date_from?: string;
+  date_to?: string;
+  work_center_id: number;
+}) => request.get<ApiResponse<CapacityTrend[]>>('/production/capacity/trend', { params });
 
 // 后端 capacity_handler::list_work_centers 无 Query<T> 提取器，任何 page/page_size/status 都会被
 // Axum 整体丢弃，故前端不再发送 params。其返回为 ApiResponse::success(to_value(Vec<WorkCenterCapacity>))，

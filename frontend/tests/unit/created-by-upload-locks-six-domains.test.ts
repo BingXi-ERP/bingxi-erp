@@ -108,10 +108,25 @@ function payloadLiteralBodies(src: string, name: string, kind: 'call' | 'payload
 function reactiveFormBodies(src: string, formName: string): string[] {
   const pattern = new RegExp(`const ${formName} = reactive\\(\\{([^{}]*)\\}\\)`, 'g');
   const bodies = [...src.matchAll(pattern)].map(m => m[1]);
-  if (bodies.length === 0) {
-    throw new Error(`未找到 const ${formName} = reactive({...})——表单模型被重写，身份锁失效`);
+  if (bodies.length > 0) return bodies;
+
+  const factoryPattern = new RegExp(
+    `const ${formName} = reactive<[^>]+>\\(([A-Za-z_]\\w*)\\(\\)\\)`
+  );
+  const factory = factoryPattern.exec(src)?.[1];
+  if (!factory) {
+    throw new Error(
+      `未找到 const ${formName} = reactive({...}) 或其工厂初始化——表单模型被重写，身份锁失效`
+    );
   }
-  return bodies;
+  const factoryBodyPattern = new RegExp(
+    `(?:function\\s+${factory}\\s*\\([^)]*\\)\\s*(?::[^\\{]+)?\\{\\s*return\\s*\\{|const\\s+${factory}\\s*=\\s*\\([^)]*\\)\\s*=>\\s*\\()([^{}]*)(?:\\}|\\))`
+  );
+  const factoryBody = factoryBodyPattern.exec(src)?.[1];
+  if (!factoryBody) {
+    throw new Error(`未找到 ${factory} 的初始对象字面量——身份锁失去表单初始值覆盖`);
+  }
+  return [factoryBody];
 }
 
 /**

@@ -4,7 +4,6 @@ var a = require("../../../@babel/runtime/helpers/regeneratorRuntime"),
   o = require("../../../@babel/runtime/helpers/asyncToGenerator"),
   r = require("../../../@babel/runtime/helpers/defineProperty"),
   createForOfIteratorHelper = require("../../../@babel/runtime/helpers/createForOfIteratorHelper"),
-  mta_analysis = t(require("../../../utils/mta_analysis.js")),
   app = getApp(),
   login = require("../../../libs/utils/login.js").login,
   ServicesCard = require("../../../libs/services/ServicesCard.js").servicesCard,
@@ -178,11 +177,11 @@ Page({
               }),
               a)
             ) {
-              var mta_analysis,
+              var mpValue,
                 login = createForOfIteratorHelper(e.data.content);
               try {
                 for (login.s(); !(s = login.n()).done;) {
-                  var ServicesCard = mta_analysis.value;
+                  var ServicesCard = mpValue.value;
                   (1 == ServicesCard.onSale
                     ? (ServicesCard.onOrOff = {
                         name: "下架",
@@ -302,7 +301,7 @@ Page({
       a = t.detail,
       o = a.goodsid,
       createForOfIteratorHelper = a.operateType,
-      mta_analysis = a.idx,
+      mpValue = a.idx,
       app = this.data.colorCardList,
       login = {
         I: {
@@ -324,7 +323,7 @@ Page({
       login.method(util).then(function (t) {
         0 === t.code
           ? (ServicesUserLog.setUserHandleLog(login.logType),
-            app.splice(mta_analysis, 1),
+            app.splice(mpValue, 1),
             toConsumableArray.setData({
               colorCardList: app,
               "colorCardCount.off":
@@ -505,7 +504,7 @@ Page({
           ]).then(
             o(
               a().mark(function t() {
-                var o, r, createForOfIteratorHelper, mta_analysis;
+                var o, r, createForOfIteratorHelper, mpValue;
                 return a().wrap(function (t) {
                   for (;;)
                     switch ((t.prev = t.next)) {
@@ -519,7 +518,7 @@ Page({
                           toConsumableArray.drawProdShare(createForOfIteratorHelper, 1)
                         );
                       case 1:
-                        return ((t.next = 2), toConsumableArray.drawProdShare(mta_analysis, 2));
+                        return ((t.next = 2), toConsumableArray.drawProdShare(mpValue, 2));
                       case 2:
                         (toConsumableArray.setData({
                           "popupInit.canvas.show": !0,
@@ -552,7 +551,7 @@ Page({
           : ""),
       r = this.formatPrice(this.data.shareProdInfo.price),
       createForOfIteratorHelper = this.data.tempImgUrl.goodUrl,
-      mta_analysis = this.data.tempImgUrl.qrUrl,
+      mpValue = this.data.tempImgUrl.qrUrl,
       app = this.data.shareProdInfo.material;
     (t.setFillStyle("white"),
       this.roundRect(
@@ -576,7 +575,7 @@ Page({
       ),
       1 === a.showQrcode &&
         (t.drawImage(
-          mta_analysis,
+          mpValue,
           190 * toConsumableArray,
           300 * toConsumableArray,
           100 * toConsumableArray,
@@ -625,19 +624,19 @@ Page({
     return new Promise(function (a, o) {
       var createForOfIteratorHelper = "";
       if (t.includes("clothImage")) {
-        var mta_analysis = toConsumableArray.data.colorCardInfo.imageInfoList
+        var mpValue = toConsumableArray.data.colorCardInfo.imageInfoList
           ? toConsumableArray.data.colorCardInfo.imageInfoList.slice(0, 2)
           : [];
-        mta_analysis &&
-          mta_analysis.length &&
-          (mta_analysis[0] &&
-            mta_analysis[0].storagePath &&
+        mpValue &&
+          mpValue.length &&
+          (mpValue[0] &&
+            mpValue[0].storagePath &&
             "clothImage1" === t &&
-            (n = util.replImage(mta_analysis[0].storagePath)),
-          mta_analysis[1] &&
-            mta_analysis[1].storagePath &&
+            (n = util.replImage(mpValue[0].storagePath)),
+          mpValue[1] &&
+            mpValue[1].storagePath &&
             "clothImage2" === t &&
-            (n = util.replImage(mta_analysis[1].storagePath)));
+            (n = util.replImage(mpValue[1].storagePath)));
       } else
         n =
           (toConsumableArray.data.colorCardInfo.detailImage &&
@@ -667,7 +666,7 @@ Page({
       o = t.showProductName,
       r = t.showQrcode,
       createForOfIteratorHelper = t.showRemark,
-      mta_analysis = t.showClothEnough,
+      mpValue = t.showClothEnough,
       app = t.showClothWidth,
       login = t.showGramWeight,
       ServicesCard = t.showMaterial,
@@ -679,7 +678,7 @@ Page({
         0 !== util ||
         0 !== r ||
         0 !== createForOfIteratorHelper ||
-        0 !== mta_analysis ||
+        0 !== mpValue ||
         0 !== app ||
         0 !== login ||
         0 !== ServicesCard
@@ -720,7 +719,7 @@ Page({
               return t.colorValue;
             }).length));
           var createForOfIteratorHelper = o.data.setting.shape,
-            mta_analysis = 0 === o.data.setting.showImageTwo ? 130 : 0,
+            mpValue = 0 === o.data.setting.showImageTwo ? 130 : 0,
             app = 0 === o.data.setting.showRemark ? 20 : 0,
             login = a.data.shareColorList.filter(function (t) {
               return t.colorImagePath;
@@ -730,7 +729,7 @@ Page({
                 (2 === createForOfIteratorHelper ? 120 : 82) +
               355 +
               (login.length / 4) * 8 -
-              mta_analysis -
+              mpValue -
               app -
               (a.data.settingAllHide ? 140 : 0);
           (console.log("shareColorList", a.data.shareColorList),
@@ -782,7 +781,7 @@ Page({
     var r = this;
     return o(
       a().mark(function o() {
-        var createForOfIteratorHelper, mta_analysis, app, login;
+        var createForOfIteratorHelper, mpValue, app, login;
         return a().wrap(function (a) {
           for (;;)
             switch ((a.prev = a.next)) {
@@ -791,7 +790,7 @@ Page({
                   (n = r.data.popupInit.canvas.canvasId.shareCanvas + e),
                   (s = r.data.popupInit.canvas.canvasId.photoCanvas + e),
                   (i = wx.createCanvasContext(createForOfIteratorHelper)),
-                  (c = wx.createCanvasContext(mta_analysis)),
+                  (c = wx.createCanvasContext(mpValue)),
                   (a.next = 1),
                   r.drawColorShare(app, t, 1)
                 );
@@ -816,7 +815,7 @@ Page({
       createForOfIteratorHelper = this;
     return o(
       a().mark(function o() {
-        var mta_analysis,
+        var mpValue,
           app,
           login,
           ServicesCard,
@@ -905,150 +904,150 @@ Page({
                   (q = "幅宽：" + (x || "-")),
                   (O = "空差：" + (v || "-")),
                   (B = createForOfIteratorHelper.data.colorCardInfo.setting),
-                  (Q = createForOfIteratorHelper.data.settingAllHide ? 140 * mta_analysis : 0),
+                  (Q = createForOfIteratorHelper.data.settingAllHide ? 140 * mpValue : 0),
                   t.setFillStyle("white"),
                   createForOfIteratorHelper.roundRect(
                     t,
-                    0 * mta_analysis,
-                    0 * mta_analysis,
-                    305 * mta_analysis,
-                    createForOfIteratorHelper.data.popupInit.canvasHeight * mta_analysis,
+                    0 * mpValue,
+                    0 * mpValue,
+                    305 * mpValue,
+                    createForOfIteratorHelper.data.popupInit.canvasHeight * mpValue,
                     8,
                     "#ffffff",
                   ),
                   t.setFillStyle("#000000"),
-                  (t.font = "normal bold ".concat(16 * mta_analysis, "px Arial, sans-serif")),
+                  (t.font = "normal bold ".concat(16 * mpValue, "px Arial, sans-serif")),
                   t.setTextAlign("center"),
-                  t.fillText(y, 155 * mta_analysis, 30 * mta_analysis),
+                  t.fillText(y, 155 * mpValue, 30 * mpValue),
                   1 === B.showQrcode &&
                     t.drawImage(
                       F,
-                      210 * mta_analysis,
-                      62 * mta_analysis,
-                      80 * mta_analysis,
-                      80 * mta_analysis,
+                      210 * mpValue,
+                      62 * mpValue,
+                      80 * mpValue,
+                      80 * mpValue,
                     ),
                   1 === B.showProductName &&
-                    (t.setFontSize(14 * mta_analysis),
+                    (t.setFontSize(14 * mpValue),
                     t.setFillStyle("#000000"),
-                    (t.font = "normal 400 ".concat(14 * mta_analysis, "px Arial, sans-serif")),
+                    (t.font = "normal 400 ".concat(14 * mpValue, "px Arial, sans-serif")),
                     t.setTextAlign("left"),
                     t.fillText(
                       P.length > 19 ? P.substring(0, 19) + "..." : P,
-                      20 * mta_analysis,
-                      55 * mta_analysis,
+                      20 * mpValue,
+                      55 * mpValue,
                     )),
                   1 === B.showShelvesNumber &&
                     (t.setFillStyle("#000000"),
-                    (t.font = "normal bold ".concat(14 * mta_analysis, "px Arial, sans-serif")),
+                    (t.font = "normal bold ".concat(14 * mpValue, "px Arial, sans-serif")),
                     t.setTextAlign("left"),
-                    t.fillText(L, 20 * mta_analysis, 75 * mta_analysis)),
+                    t.fillText(L, 20 * mpValue, 75 * mpValue)),
                   1 === B.showPrice &&
                     (t.setFillStyle("#FF2332"),
-                    (t.font = "normal bold ".concat(14 * mta_analysis, "px Arial, sans-serif")),
+                    (t.font = "normal bold ".concat(14 * mpValue, "px Arial, sans-serif")),
                     t.setTextAlign("left"),
-                    t.fillText(b, 20 * mta_analysis, 95 * mta_analysis)),
+                    t.fillText(b, 20 * mpValue, 95 * mpValue)),
                   1 === B.showMaterial &&
                     ((j = (V = "成分：" + (C || "-")).length > 15 ? V.substring(0, 15) : V),
                     (K = V.length > 15 ? V.substring(15, 28) + "..." : ""),
                     t.setFillStyle("#808080"),
-                    (t.font = "normal 400 ".concat(14 * mta_analysis, "px Arial, sans-serif")),
+                    (t.font = "normal 400 ".concat(14 * mpValue, "px Arial, sans-serif")),
                     t.setTextAlign("left"),
-                    t.fillText(j, 20 * mta_analysis, 115 * mta_analysis),
+                    t.fillText(j, 20 * mpValue, 115 * mpValue),
                     "" != K &&
                       (t.setFillStyle("#808080"),
-                      (t.font = "normal 400 ".concat(14 * mta_analysis, "px Arial, sans-serif")),
+                      (t.font = "normal 400 ".concat(14 * mpValue, "px Arial, sans-serif")),
                       t.setTextAlign("left"),
-                      t.fillText(K, 20 * mta_analysis, 131 * mta_analysis))),
+                      t.fillText(K, 20 * mpValue, 131 * mpValue))),
                   1 === B.showGramWeight &&
                     (t.setFontSize(14),
                     t.setFillStyle("#808080"),
-                    (t.font = "normal 400 ".concat(14 * mta_analysis, "px Arial, sans-serif")),
+                    (t.font = "normal 400 ".concat(14 * mpValue, "px Arial, sans-serif")),
                     t.setTextAlign("left"),
-                    t.fillText(R, 20 * mta_analysis, 147 * mta_analysis)),
+                    t.fillText(R, 20 * mpValue, 147 * mpValue)),
                   1 === B.showClothWidth &&
                     (t.setFontSize(14),
                     t.setFillStyle("#808080"),
-                    (t.font = "normal 400 ".concat(14 * mta_analysis, "px Arial, sans-serif")),
+                    (t.font = "normal 400 ".concat(14 * mpValue, "px Arial, sans-serif")),
                     t.setTextAlign("left"),
-                    t.fillText(q, 20 * mta_analysis, 166 * mta_analysis)),
+                    t.fillText(q, 20 * mpValue, 166 * mpValue)),
                   1 === B.showClothEnough &&
                     (t.setFontSize(14),
                     t.setFillStyle("#808080"),
-                    (t.font = "normal 400 ".concat(14 * mta_analysis, "px Arial, sans-serif")),
+                    (t.font = "normal 400 ".concat(14 * mpValue, "px Arial, sans-serif")),
                     t.setTextAlign("left"),
-                    t.fillText(O, 20 * mta_analysis, 185 * mta_analysis)),
+                    t.fillText(O, 20 * mpValue, 185 * mpValue)),
                   1 === B.showRemark &&
-                    (t.setFontSize(12 * mta_analysis),
+                    (t.setFontSize(12 * mpValue),
                     t.setFillStyle("#c1c1c1"),
                     t.setTextAlign("left"),
                     t.fillText(
                       A && A.length < 20 ? A : A.substring(0, 20),
-                      20 * mta_analysis,
-                      210 * mta_analysis,
+                      20 * mpValue,
+                      210 * mpValue,
                     ),
                     A.length > 20 &&
-                      (t.setFontSize(12 * mta_analysis),
+                      (t.setFontSize(12 * mpValue),
                       t.setFillStyle("#c1c1c1"),
                       t.setTextAlign("left"),
                       t.fillText(
                         A.substring(20, A.length),
-                        20 * mta_analysis,
-                        215 * mta_analysis,
+                        20 * mpValue,
+                        215 * mpValue,
                       ))),
                   1 === B.showContacts &&
-                    (t.setFontSize(12 * mta_analysis),
+                    (t.setFontSize(12 * mpValue),
                     t.setFillStyle("#808080"),
                     t.setTextAlign("right"),
-                    (t.font = "normal 400 ".concat(12 * mta_analysis, "px Arial, sans-serif")),
-                    t.fillText(U, 290 * mta_analysis, 160 * mta_analysis),
-                    t.setFontSize(12 * mta_analysis),
+                    (t.font = "normal 400 ".concat(12 * mpValue, "px Arial, sans-serif")),
+                    t.fillText(U, 290 * mpValue, 160 * mpValue),
+                    t.setFontSize(12 * mpValue),
                     t.setFillStyle("#808080"),
                     t.setTextAlign("right"),
-                    (t.font = "normal 400 ".concat(12 * mta_analysis, "px Arial, sans-serif")),
-                    t.fillText(z, 290 * mta_analysis, 175 * mta_analysis)),
+                    (t.font = "normal 400 ".concat(12 * mpValue, "px Arial, sans-serif")),
+                    t.fillText(z, 290 * mpValue, 175 * mpValue)),
                   (W = 0 === B.showRemark ? 200 : 230),
                   B.showImageTwo >= 0 &&
                     (createForOfIteratorHelper.drawProdImage(
                       t,
-                      16 * mta_analysis,
-                      W * mta_analysis - Q,
-                      131 * mta_analysis,
-                      102 * mta_analysis,
-                      4 * mta_analysis,
+                      16 * mpValue,
+                      W * mpValue - Q,
+                      131 * mpValue,
+                      102 * mpValue,
+                      4 * mpValue,
                       1 === B.showImageTwo ? D : M,
                     ),
                     (t.globalAlpha = 0.3),
                     (t.globalAlpha = 1),
-                    t.setFontSize(10 * mta_analysis),
+                    t.setFontSize(10 * mpValue),
                     t.setFillStyle("#000000"),
                     t.setTextAlign("center"),
                     t.fillText(
                       "".concat(1 === B.showImageTwo ? "正面细节图" : ""),
-                      80 * mta_analysis,
-                      (W + 117) * mta_analysis - Q,
+                      80 * mpValue,
+                      (W + 117) * mpValue - Q,
                     ),
                     createForOfIteratorHelper.drawProdImage(
                       t,
-                      160 * mta_analysis,
-                      W * mta_analysis - Q,
-                      131 * mta_analysis,
-                      102 * mta_analysis,
-                      4 * mta_analysis,
+                      160 * mpValue,
+                      W * mpValue - Q,
+                      131 * mpValue,
+                      102 * mpValue,
+                      4 * mpValue,
                       1 === B.showImageTwo ? _ : N,
                     ),
                     (t.globalAlpha = 0.3),
                     (t.globalAlpha = 1),
-                    t.setFontSize(10 * mta_analysis),
+                    t.setFontSize(10 * mpValue),
                     t.setFillStyle("#000000"),
                     t.setTextAlign("center"),
                     t.fillText(
                       "".concat(1 === B.showImageTwo ? "背面细节图" : ""),
-                      225 * mta_analysis,
-                      (W + 117) * mta_analysis - Q,
+                      225 * mpValue,
+                      (W + 117) * mpValue - Q,
                     )),
                   (E = 1),
-                  (G = -56 * mta_analysis),
+                  (G = -56 * mpValue),
                   (J = 0),
                   (X = 0),
                   (Y = 0 === B.showRemark ? 30 : 0),
@@ -1060,10 +1059,10 @@ Page({
                 }
                 if (
                   (($ = e[Z]),
-                  (G += (71 + (2 === B.shape ? 3 : 0)) * mta_analysis),
+                  (G += (71 + (2 === B.shape ? 3 : 0)) * mpValue),
                   (J =
-                    E * (82 * mta_analysis + (2 === B.shape ? 10 * mta_analysis : 0)) +
-                    ((2 === B.shape ? 265 * mta_analysis - X - Y : 275 * mta_analysis - X - Y) -
+                    E * (82 * mpValue + (2 === B.shape ? 10 * mpValue : 0)) +
+                    ((2 === B.shape ? 265 * mpValue - X - Y : 275 * mpValue - X - Y) -
                       Q)),
                   (tt = $.colorVal || ""),
                   (et = $.colorName || ""),
@@ -1078,18 +1077,18 @@ Page({
                         t,
                         G,
                         J,
-                        48 * mta_analysis,
-                        48 * mta_analysis,
-                        24 * mta_analysis,
+                        48 * mpValue,
+                        48 * mpValue,
+                        24 * mpValue,
                         $.colorValue || "",
                       )
                     : createForOfIteratorHelper.drawProdImage(
                         t,
                         G,
                         J,
-                        48 * mta_analysis,
-                        48 * mta_analysis,
-                        24 * mta_analysis,
+                        48 * mpValue,
+                        48 * mpValue,
+                        24 * mpValue,
                         H,
                       )
                   : $.colorValue
@@ -1097,31 +1096,31 @@ Page({
                         t,
                         G,
                         J,
-                        62 * mta_analysis,
-                        38 * mta_analysis,
-                        4 * mta_analysis,
+                        62 * mpValue,
+                        38 * mpValue,
+                        4 * mpValue,
                         $.colorValue || "",
                       )
                     : createForOfIteratorHelper.drawProdImage(
                         t,
                         G,
                         J,
-                        62 * mta_analysis,
-                        38 * mta_analysis,
-                        4 * mta_analysis,
+                        62 * mpValue,
+                        38 * mpValue,
+                        4 * mpValue,
                         k,
                       ),
                   (at = createForOfIteratorHelper.data.color_icon),
                   createForOfIteratorHelper.drawProdImage(
                     t,
                     G +
-                      30 * mta_analysis +
-                      (2 === B.shape ? -8 * mta_analysis : 0) -
-                      (3 * tt.length + 9) * mta_analysis,
-                    J + 44 * mta_analysis + (2 === B.shape ? 8 * mta_analysis : 0),
-                    10 * mta_analysis,
-                    10 * mta_analysis,
-                    0 * mta_analysis,
+                      30 * mpValue +
+                      (2 === B.shape ? -8 * mpValue : 0) -
+                      (3 * tt.length + 9) * mpValue,
+                    J + 44 * mpValue + (2 === B.shape ? 8 * mpValue : 0),
+                    10 * mpValue,
+                    10 * mpValue,
+                    0 * mpValue,
                     at,
                   ),
                   (a.next = 3));
@@ -1137,64 +1136,64 @@ Page({
                             t,
                             G - 6,
                             J,
-                            60 * mta_analysis,
-                            60 * mta_analysis,
-                            30 * mta_analysis,
+                            60 * mpValue,
+                            60 * mpValue,
+                            30 * mpValue,
                             e,
                           )
                         : createForOfIteratorHelper.drawProdImage(
                             t,
                             G,
                             J,
-                            62 * mta_analysis,
-                            41 * mta_analysis,
-                            4 * mta_analysis,
+                            62 * mpValue,
+                            41 * mpValue,
+                            4 * mpValue,
                             e,
                           );
                     })
                 );
               case 3:
-                (t.setFontSize(10 * mta_analysis),
+                (t.setFontSize(10 * mpValue),
                   t.setFillStyle("#333333"),
                   t.setTextAlign("center"),
                   t.fillText(
                     tt,
-                    G + 30 * mta_analysis + (2 === B.shape ? -8 * mta_analysis : 0),
+                    G + 30 * mpValue + (2 === B.shape ? -8 * mpValue : 0),
                     J +
-                      52 * mta_analysis +
+                      52 * mpValue +
                       (2 === B.shape
                         ? $.colorImagePath
-                          ? 18 * mta_analysis
-                          : 8 * mta_analysis
+                          ? 18 * mpValue
+                          : 8 * mpValue
                         : 0),
                   ),
-                  t.setFontSize(10 * mta_analysis),
+                  t.setFontSize(10 * mpValue),
                   t.setFillStyle("#333333"),
                   t.setTextAlign("center"),
                   t.fillText(
                     et,
-                    G + 30 * mta_analysis + (2 === B.shape ? -8 * mta_analysis : 0),
+                    G + 30 * mpValue + (2 === B.shape ? -8 * mpValue : 0),
                     J +
-                      64 * mta_analysis +
+                      64 * mpValue +
                       (2 === B.shape
                         ? $.colorImagePath
-                          ? 18 * mta_analysis
-                          : 8 * mta_analysis
+                          ? 18 * mpValue
+                          : 8 * mpValue
                         : 0),
                   ),
-                  (Z + 1) % 4 == 0 && ((E += 1), (G = -56 * mta_analysis)));
+                  (Z + 1) % 4 == 0 && ((E += 1), (G = -56 * mpValue)));
               case 4:
                 (Z++, (a.next = 1));
                 break;
               case 5:
                 ("秉羲工作台·技术支持",
-                  t.setFontSize(10 * mta_analysis),
+                  t.setFontSize(10 * mpValue),
                   t.setFillStyle("#d8d8d8"),
                   t.setTextAlign("center"),
                   t.fillText(
                     "秉羲工作台·技术支持",
-                    160 * mta_analysis,
-                    createForOfIteratorHelper.data.popupInit.canvasHeight * mta_analysis - 10,
+                    160 * mpValue,
+                    createForOfIteratorHelper.data.popupInit.canvasHeight * mpValue - 10,
                   ),
                   t.stroke(),
                   t.draw());
@@ -1249,7 +1248,7 @@ Page({
     var toConsumableArray = this;
     return o(
       a().mark(function o() {
-        var r, createForOfIteratorHelper, mta_analysis;
+        var r, createForOfIteratorHelper, mpValue;
         return a().wrap(function (a) {
           for (;;)
             switch ((a.prev = a.next)) {
@@ -1304,7 +1303,7 @@ Page({
                                   });
                               },
                             }),
-                            clearTimeout(mta_analysis));
+                            clearTimeout(mpValue));
                         },
                       },
                       r,
@@ -1359,8 +1358,7 @@ Page({
     }
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      login.getUserInfo(),
+    (login.getUserInfo(),
       this.setData({
         userAuthList: app.userAuthList,
       }),

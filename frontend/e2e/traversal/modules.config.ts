@@ -56,6 +56,7 @@ export const TRAVERSAL_MODULES: TraversalModule[] = [
   // ===== system 域 =====
   { id: 'payment-channels', route: '/system/payment-channels', domain: 'system', tier: 'C', listApi: '/payment-channels', noCreate: true },
   { id: 'system-audit-log', route: '/system/audit-log', domain: 'system', tier: 'C', listApi: '/audit-logs', noCreate: true },
+  { id: 'system-number-rules', route: '/system/number-rules', domain: 'system', tier: 'C', listApi: '/system/number-rules', noCreate: true },
   { id: 'system-export-approvals', route: '/system/export-approvals', domain: 'system', tier: 'C', listApi: '/export-approvals', noCreate: true },
   { id: 'system-slow-query', route: '/system/slow-query', domain: 'system', tier: 'C', noCreate: true },
   // listApi 必须是页面真正消费的那个端点：本页读 /reports/enhanced/templates（DB 表），

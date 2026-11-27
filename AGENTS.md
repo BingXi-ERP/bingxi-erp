@@ -8,8 +8,10 @@
 - `.monkeycode/docs/CODEBASE_INTERNALS.md` — 中间件洋葱、信封、状态词表权威表、JOIN 富化范式、CI/e2e 结构、假绿盲区。
 - `.monkeycode/MEMORY.md` — IR 硬规则（验证方式、提交规范、推送授权、单据号生成、注释规范）。
 
-⚠️ `.monkeycode/docs/INTERFACES.md` 是早期设想稿：其中 gRPC、`@bingxi/sdk`、Python SDK、`backend/proto/`、
-`backend/docs/postman_collection.json`、`AUTH_001/BIZ_001` 错误码**仓库里都不存在**。不要据它改代码。
+⚠️ `.monkeycode/docs/ARCHITECTURE.md` 的技术栈与 ER 段已过时（Axum 0.8、`i32` 主键、
+`backend/migration/` 独立迁移 crate），只作历史背景；当前契约以实码、`CODEBASE_INTERNALS.md`
+与 `INTERFACES.md` 为准。`INTERFACES.md` 已按当前实现校正，其中“项目没有 gRPC”等是否定式说明，
+不得据此反推存在 gRPC、SDK 或 proto。
 
 ## 验证：只有 CI 能证明对错
 

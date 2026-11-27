@@ -2,8 +2,7 @@ var t = require("../../../../@babel/runtime/helpers/interopRequireDefault").defa
   e = require("../../../../@babel/runtime/helpers/defineProperty");
 var objectSpread2 = require("../../../../@babel/runtime/helpers/objectSpread2"),
   a =
-    (t(require("../../../../miniprogram_npm/@vant/weapp/toast/toast.js")),
-    t(require("../../../../utils/mta_analysis.js"))),
+    (t(require("../../../../miniprogram_npm/@vant/weapp/toast/toast.js"))),
   i =
     (require("../../../../libs/utils/cpcl-exp.js"),
     require("../../../../libs/services/ServicesCard.js").servicesCard),
@@ -89,7 +88,6 @@ Page({
     showLoading: !0,
   },
   onLoad: function (t) {
-    a.default.Page.init();
     var e = wx.getSystemInfoSync();
     (this.setData({
       sysInfo: e,

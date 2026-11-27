@@ -15,7 +15,6 @@ import {
 } from '@/api/custom-order';
 import { listOaAnnouncements, publishOaAnnouncement } from '@/api/oa-announcement';
 import { INSPECTION_STATUS_LABEL } from '@/api/fabric-inspection';
-import { WAGE_RECORD_STATUS_LABEL } from '@/api/wage';
 import {
   OUTSOURCING_ORDER_STATUS_VALUES,
   normalizeOutsourcingStatus,
@@ -61,9 +60,16 @@ describe('新增域状态映射', () => {
     expect(INSPECTION_STATUS_LABEL.graded).toBe('已定级');
   });
 
-  it('工资单状态映射', () => {
-    expect(WAGE_RECORD_STATUS_LABEL.calculated).toBe('已核算');
-    expect(WAGE_RECORD_STATUS_LABEL.paid).toBe('已发放');
+  it('工资单状态映射与后端 draft→confirmed→paid→cancelled 一致', () => {
+    const pick = (locale: unknown, key: string): unknown =>
+      key.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown>)?.[k], locale);
+    for (const status of ['draft', 'confirmed', 'paid', 'cancelled']) {
+      const key = `wage.recordStatus.${status}`;
+      expect(pick(zhCN, key), `中文工资状态键 ${key}`).toBeTypeOf('string');
+      expect(pick(enUS, key), `英文工资状态键 ${key}`).toBeTypeOf('string');
+      expect(pick(zhCN, key)).not.toBe(key);
+      expect(pick(enUS, key)).not.toBe(key);
+    }
   });
 
   it('委外状态映射与后端 7 态词表逐字对齐且双语可解析', () => {
