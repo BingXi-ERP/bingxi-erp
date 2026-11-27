@@ -94,9 +94,10 @@ fn start_req(code: &str, business_id: i64, initiator_id: i32) -> StartProcessReq
 }
 
 /// 与单据取号器使用同一哈希口径，测试只负责在取号临界区前放置可观测的阻塞点。
+/// 生产锁键使用实际输出前缀（legacy 为 `BPM{YYYYMMDD}`）与周期，不能只哈希 `BPM`。
 fn bpm_number_lock_key(date: &str) -> i64 {
     let mut hasher = DefaultHasher::new();
-    "BPM".hash(&mut hasher);
+    format!("BPM{date}").hash(&mut hasher);
     date.hash(&mut hasher);
     hasher.finish() as i64
 }
