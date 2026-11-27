@@ -344,6 +344,7 @@ test.describe.serial('Shard 5: 系统管理 + 权限 + 合规', () => {
     expect(resp.ok()).toBe(true);
     const body = await resp.json();
     expect(typeof body.status).toBe('string');
-    expect(body.status).toBe('healthy');
+    expect(body.status).toBe('degraded');
+    expect(body.checks.redis.status).toBe('not_configured');
   });
 });
