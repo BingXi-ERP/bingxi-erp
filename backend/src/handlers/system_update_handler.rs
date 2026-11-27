@@ -621,6 +621,12 @@ fn is_terminal_update_status(status: &str) -> bool {
     )
 }
 
+/// 只有尚未开始真实下载/安装的任务可取消；执行中的任务没有协作式取消信号，
+/// 允许改数据库状态会造成“接口已取消但操作继续并最终完成”的假象。
+fn is_update_task_cancellable(status: &str) -> bool {
+    status == "pending"
+}
+
 /// 登记更新任务；非终态任务的 completed_at 始终为空。
 async fn create_update_task(
     state: &AppState,
@@ -910,6 +916,12 @@ pub async fn cancel_update_task(
             id, task.status
         )));
     }
+    if !is_update_task_cancellable(&task.status) {
+        return Err(AppError::business_displayable(format!(
+            "更新任务 {} 已开始执行（状态：{}），无法取消；请等待真实完成或失败",
+            id, task.status
+        )));
+    }
 
     let mut active: system_update_task::ActiveModel = task.into();
     active.status = Set("failed".to_string());
@@ -1105,6 +1117,24 @@ mod task_state_tests {
             data_scope: None,
             dept_ids: None,
             dept_member_user_ids: None,
+        }
+    }
+
+    #[test]
+    fn only_not_started_tasks_are_cancellable() {
+        assert!(is_update_task_cancellable("pending"));
+        for status in [
+            "downloading",
+            "installing",
+            "downloaded",
+            "completed",
+            "failed",
+            "rolled_back",
+        ] {
+            assert!(
+                !is_update_task_cancellable(status),
+                "已开始或已终态的任务不得通过取消接口伪造状态: {status}"
+            );
         }
     }
 
