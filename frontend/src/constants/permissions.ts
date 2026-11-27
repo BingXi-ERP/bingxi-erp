@@ -461,6 +461,10 @@ export const PERMISSIONS = {
   SUPPLIER_PRODUCT_COLOR_CREATE: 'supplier-product-colors:create',
   SUPPLIER_PRODUCT_COLOR_UPDATE: 'supplier-product-colors:update',
 
+  // 编码规则（后端资源：number-rules，读取与更新分权）
+  NUMBER_RULES_READ: 'number-rules:read',
+  NUMBER_RULES_UPDATE: 'number-rules:update',
+
   // 系统更新（高危敏感面：二进制替换 / 版本回滚 / 上传安装 / 备份 / 任务）
   // 权限键与后端 utils/path_utils.rs 消歧（("system-update", "<seg>") →
   // "system-update-<seg>"）及 init_service.rs 注册逐字符一致；读取面统一 :read，

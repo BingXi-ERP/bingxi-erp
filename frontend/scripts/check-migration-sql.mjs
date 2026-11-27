@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * 迁移/内联 SQL 里 PL/pgSQL 块的静态配平检查
+ * 迁移/内联 SQL 静态门禁：迁移注册集合一致性、PL/pgSQL 块配平与 RAISE 占位符配平
  *
- * 功能：在不连数据库的前提下，静态校验 Rust 源码中以文本形式书写的 `DO $$ … $$;`
+ * 注册集合校验确认 Rust 迁移文件、mod 声明、MigratorTrait 登记与 up/down 调用一致，
+ * 并先执行漏登记、重复执行与合法替代形态的变异自证；未过自证则拒绝后续扫描。
+ * PL/pgSQL 配平在不连数据库的前提下，静态校验 Rust 源码中以文本形式书写的 `DO $$ … $$;`
  * PL/pgSQL 块是否语法自洽。rustfmt 只保证 Rust 可解析、`cargo check` 不校验 SQL 语义，
  * 而这类块里的语法错会在 PG **编译块时**（执行前）就失败，一个块不成立即打断整条迁移链，
  * 连带后端无法启动。
@@ -31,6 +33,10 @@
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
+import {
+  checkMigrationRegistration,
+  printMigrationRegistrationReport,
+} from './check-migration-registration.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const FRONTEND = resolve(__dirname, '..');
@@ -384,6 +390,7 @@ END`,
 }
 
 function main() {
+  if (!printMigrationRegistrationReport(checkMigrationRegistration())) process.exit(1);
   const bad = selfProof();
   if (bad.length) {
     console.error('FAIL: RAISE 配平判定器自证未过——本检查不可信，拒绝扫库：');

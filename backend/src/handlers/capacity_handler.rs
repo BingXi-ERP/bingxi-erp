@@ -11,7 +11,7 @@ use serde::Deserialize;
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use crate::models::dto::capacity_dto::{
-    CreateWorkCenterInput, LoadAnalysisQuery, UpdateWorkCenterInput,
+    CapacityTrendQuery, CreateWorkCenterInput, LoadAnalysisQuery, UpdateWorkCenterInput,
 };
 use crate::services::capacity_service::CapacityService;
 use crate::utils::error::AppError;
@@ -70,6 +70,72 @@ pub async fn get_load_analysis(
 
     let items = service.load_analysis(query).await?;
     Ok(Json(ApiResponse::success(serde_json::to_value(items)?)))
+}
+
+/// 产能趋势查询参数。
+#[allow(dead_code, reason = "反序列化输入字段")]
+#[derive(Debug, Deserialize)]
+pub struct CapacityTrendParams {
+    pub days: Option<i32>,
+    pub date_from: Option<String>,
+    pub date_to: Option<String>,
+    pub work_center_id: Option<i32>,
+}
+
+impl CapacityTrendParams {
+    pub fn into_query(self, today: chrono::NaiveDate) -> Result<CapacityTrendQuery, AppError> {
+        let work_center_id = self
+            .work_center_id
+            .ok_or_else(|| AppError::bad_request("查询产能趋势必须指定工作中心"))?;
+
+        let (date_from, date_to) = match (self.date_from, self.date_to) {
+            (Some(from), Some(to)) => {
+                let date_from = chrono::NaiveDate::parse_from_str(&from, "%Y-%m-%d")
+                    .map_err(|_| AppError::bad_request("date_from 格式无效，应为 YYYY-MM-DD"))?;
+                let date_to = chrono::NaiveDate::parse_from_str(&to, "%Y-%m-%d")
+                    .map_err(|_| AppError::bad_request("date_to 格式无效，应为 YYYY-MM-DD"))?;
+                if date_from > date_to {
+                    return Err(AppError::bad_request("date_from 不能晚于 date_to"));
+                }
+                let inclusive_days = (date_to - date_from).num_days() + 1;
+                if inclusive_days > 366 {
+                    return Err(AppError::bad_request("产能趋势日期区间不能超过 366 天"));
+                }
+                (date_from, date_to)
+            }
+            (None, None) => {
+                let days = self.days.unwrap_or(7);
+                if !(1..=366).contains(&days) {
+                    return Err(AppError::bad_request("产能趋势天数必须在 1 到 366 之间"));
+                }
+                let date_from = today
+                    .checked_sub_signed(chrono::Duration::days(i64::from(days - 1)))
+                    .ok_or_else(|| AppError::bad_request("产能趋势起始日期超出有效范围"))?;
+                (date_from, today)
+            }
+            _ => {
+                return Err(AppError::bad_request("date_from 与 date_to 必须同时提供"));
+            }
+        };
+
+        Ok(CapacityTrendQuery {
+            date_from: Some(date_from),
+            date_to: Some(date_to),
+            work_center_id: Some(work_center_id),
+        })
+    }
+}
+
+/// GET /api/v1/erp/capacity/trend - 产能趋势
+pub async fn get_capacity_trend(
+    State(state): State<AppState>,
+    _auth: AuthContext,
+    Query(params): Query<CapacityTrendParams>,
+) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
+    let query = params.into_query(chrono::Utc::now().date_naive())?;
+    let service = CapacityService::new(state.db.clone());
+    let points = service.trend(query).await?;
+    Ok(Json(ApiResponse::success(serde_json::to_value(points)?)))
 }
 
 /// POST /api/v1/erp/capacity/work-centers - 创建工作中心

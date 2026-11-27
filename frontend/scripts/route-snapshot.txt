@@ -1,4 +1,4 @@
-# layers=8 endpoints=1845
+# layers=8 endpoints=1849
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -682,7 +682,7 @@ GET	/api/v1/erp/production/capacity/load-analysis	capacity_handler::get_load_ana
 GET	/api/v1/erp/production/capacity/overload-check	capacity_handler::check_capacity_overload	production
 GET	/api/v1/erp/production/capacity/overview	capacity_handler::get_capacity_overview	production
 GET	/api/v1/erp/production/capacity/summary	capacity_handler::get_capacity_overview	production
-GET	/api/v1/erp/production/capacity/trend	capacity_handler::get_load_analysis	production
+GET	/api/v1/erp/production/capacity/trend	capacity_handler::get_capacity_trend	production
 GET	/api/v1/erp/production/capacity/work-centers	capacity_handler::list_work_centers	production
 GET	/api/v1/erp/production/capacity/work-centers/*/available	capacity_handler::get_available_capacity	production
 GET	/api/v1/erp/production/capacity/work-centers/*/forecast	capacity_handler::forecast_capacity	production
@@ -977,6 +977,8 @@ GET	/api/v1/erp/system-update/tasks/*	system_update_handler::get_update_task_by_
 GET	/api/v1/erp/system-update/update-status	system_update_handler::get_update_status	system
 GET	/api/v1/erp/system-update/version	system_update_handler::get_version	system
 GET	/api/v1/erp/system-update/versions/*	system_update_handler::get_system_version_by_id	mod
+GET	/api/v1/erp/system/number-rules	system_number_rule_handler::list_number_rules	system
+GET	/api/v1/erp/system/number-rules/*	system_number_rule_handler::get_number_rule	system
 GET	/api/v1/erp/templates/download/*	import_export_handler::download_template	analytics
 GET	/api/v1/erp/templates/meta/*	import_export_handler::describe_import_template	analytics
 GET	/api/v1/erp/textile-export-requirements	textile_safety_master_handler::list_export_requirements	textile_safety
@@ -1645,6 +1647,7 @@ POST	/api/v1/erp/system-update/update	system_update_handler::download_and_update
 POST	/api/v1/erp/system-update/upload	system_update_handler::upload_and_update	system
 POST	/api/v1/erp/system-update/versions/*/download	system_update_handler::download_version_update	mod
 POST	/api/v1/erp/system-update/versions/*/install	system_update_handler::install_version_update	mod
+POST	/api/v1/erp/system/number-rules/*/rollback	system_number_rule_handler::rollback_number_rule	system
 POST	/api/v1/erp/textile-export-requirements	textile_safety_master_handler::create_export_requirement	textile_safety
 POST	/api/v1/erp/textile-limit-rules	textile_safety_master_handler::create_limit_rule	textile_safety
 POST	/api/v1/erp/textile-reports	textile_safety_report_handler::create_report	textile_safety
@@ -1827,6 +1830,7 @@ PUT	/api/v1/erp/scheduling/*	scheduling_handler::adjust_schedule	mod
 PUT	/api/v1/erp/scheduling/tasks/*/adjust	scheduling_handler::adjust_schedule_task	mod
 PUT	/api/v1/erp/slow-queries/*/optimization	slow_query_handler::update_slow_query_optimization	system
 PUT	/api/v1/erp/subjects/*	account_subject_handler::update_subject	finance
+PUT	/api/v1/erp/system/number-rules/*	system_number_rule_handler::update_number_rule	system
 PUT	/api/v1/erp/textile-export-requirements/*	textile_safety_master_handler::update_export_requirement	textile_safety
 PUT	/api/v1/erp/textile-limit-rules/*	textile_safety_master_handler::update_limit_rule	textile_safety
 PUT	/api/v1/erp/textile-reports/*	textile_safety_report_handler::update_report	textile_safety

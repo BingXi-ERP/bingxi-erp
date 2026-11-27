@@ -22,6 +22,7 @@
 //   node scripts/check-e2e-shard-coverage.mjs [--workflow <path>] [--min-shard-list <n>]
 // 退出码：0=全覆盖通过；1=任一层校验失败。
 import { spawnSync } from 'node:child_process';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import {
   DEFAULT_WORKFLOW_PATH,
@@ -32,6 +33,7 @@ import {
   parseShardAssignments,
   readWorkflowText,
 } from './e2e-shard-registry.mjs';
+import { auditNumberRuleIsolationGroup } from './number-rule-e2e-isolation.mjs';
 
 function arg(name, dflt) {
   const i = process.argv.indexOf(`--${name}`);
@@ -50,6 +52,30 @@ function note(msg) {
 }
 function annotate(msg) {
   console.log(`::error::${msg}`);
+}
+
+const isolationTestFiles = readdirSync(path.join(FRONTEND_DIR, 'scripts'))
+  .filter(file => /^number-rule-.*\.test\.mjs$/.test(file))
+  .sort();
+if (isolationTestFiles.length === 0) {
+  fail('D0. 未找到编码规则隔离自测文件，拒绝把缺失测试当作通过');
+} else {
+  const result = spawnSync(
+    process.execPath,
+    ['--test', ...isolationTestFiles.map(file => `scripts/${file}`)],
+    {
+      cwd: FRONTEND_DIR,
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+    }
+  );
+  if (result.status !== 0) {
+    fail(
+      `D0. 编码规则隔离自测失败（exit=${result.status}）：\n${(result.stdout || result.stderr || '').split('\n').slice(-40).join('\n')}`
+    );
+  } else {
+    note(`编码规则隔离自测：${isolationTestFiles.join(', ')} 全部通过`);
+  }
 }
 
 // ---------------------------------------------------------------- 1. 解析 workflow
@@ -118,6 +144,30 @@ for (const [key, g] of groups) {
 }
 
 // ---------------------------------------------------------------- 3. 校验 C：真实 --list 并集
+function collectTargetSpecFiles(targets) {
+  const files = new Map();
+  const add = absolutePath => {
+    const relativePath = path.relative(FRONTEND_DIR, absolutePath).split(path.sep).join('/');
+    files.set(relativePath, {
+      path: relativePath,
+      source: readFileSync(absolutePath, 'utf8'),
+    });
+  };
+  const walk = directory => {
+    for (const entry of readdirSync(directory)) {
+      const absolutePath = path.join(directory, entry);
+      if (statSync(absolutePath).isDirectory()) walk(absolutePath);
+      else if (entry.endsWith('.spec.ts')) add(absolutePath);
+    }
+  };
+  for (const target of targets) {
+    const absolutePath = path.resolve(FRONTEND_DIR, target);
+    if (statSync(absolutePath).isDirectory()) walk(absolutePath);
+    else if (target.endsWith('.spec.ts')) add(absolutePath);
+  }
+  return [...files.values()].sort((left, right) => left.path.localeCompare(right.path));
+}
+
 function playwrightList(targets) {
   const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
   const args = [
@@ -175,6 +225,33 @@ note(`workflow: ${WORKFLOW_PATH}`);
 note(`矩阵 shard：${[...matrixSet].sort((x, y) => x - y).join(', ')}（共 ${matrixSet.size} 个）`);
 note(`目录分组：${groups.size} 个（同 targets+total 计一组）`);
 
+const helperPath = path.join(FRONTEND_DIR, 'e2e/flow/helpers.ts');
+const helperSource = readFileSync(helperPath, 'utf8');
+for (const [key, group] of groups) {
+  let files;
+  try {
+    files = collectTargetSpecFiles(group.targets);
+  } catch (error) {
+    fail(`D. 分组 ${key} 的 spec 文件收集失败：${error.message}`);
+    continue;
+  }
+  const isolationErrors = auditNumberRuleIsolationGroup({
+    targets: group.targets,
+    total: group.total,
+    files,
+    sharedFiles: [
+      {
+        path: 'e2e/flow/helpers.ts',
+        source: helperSource,
+      },
+    ],
+  });
+  for (const error of isolationErrors) fail(`D. 编码规则全局配置隔离失败：${error}`);
+  if (isolationErrors.length === 0 && files.some(file => file.path.includes('/system/'))) {
+    note(`  编码规则隔离组 ${key}：${files.length} 个 spec，无未持锁订单创建写点`);
+  }
+}
+
 if (errors.length === 0) {
   const universe = playwrightList([]);
   const seenInGroups = new Set();
@@ -207,4 +284,6 @@ if (errors.length > 0) {
   for (const e of errors) console.error(' - ' + e);
   process.exit(1);
 }
-note('✅ E2E 分片覆盖自检通过：分配并集 == --list 全集，且每个分组的 hash 分片序号 1..N 无缺口');
+note(
+  '✅ E2E 分片覆盖自检通过：分配并集 == --list 全集，hash 分片序号完整，编码规则全局配置写点已隔离'
+);

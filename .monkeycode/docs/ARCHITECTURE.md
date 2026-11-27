@@ -1,5 +1,9 @@
 # Bingxi Management Platform 系统架构文档
 
+> 过时提示：本文技术栈与 ER 段保留历史背景，不再作为改动依据。当前以后端 `Cargo.toml`、
+> `backend/src/models/`、`backend/migration/`、`.monkeycode/docs/CODEBASE_INTERNALS.md` 与
+> `.monkeycode/docs/INTERFACES.md` 及实码为准；已知差异包括 Axum 0.8、`i32` 主键和独立迁移 crate。
+
 ## 概述
 
 Bingxi Management Platform 是一个面向面料纺织行业的现代化企业资源计划平台，集成了采购、销售、库存、生产、财务、CRM 等核心业务模块，并引入 AI 智能分析能力。系统采用前后端分离架构，后端使用 Rust + Axum 构建 REST 服务（实时推送走 WebSocket），前端使用 Vue 3 + Element Plus 构建响应式管理界面。系统具备完整的权限管理（RBAC + 数据范围 + 字段级权限）、审计日志、工作流引擎和法律合规（个人信息保护法/数据安全法/网络安全法）。

@@ -16,6 +16,26 @@ export type FlowCardStatus =
   | 'shipped'
   | 'terminated';
 
+export interface ProcessRoute {
+  id: number;
+  route_code: string;
+  route_name: string;
+  seq: number;
+  process_type: string;
+  default_duration_minutes: number | null;
+  require_scan: boolean;
+  is_active: boolean;
+  remarks: string | null;
+  is_deleted: boolean;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function listProcessRoutes(): Promise<ApiResponse<ProcessRoute[]>> {
+  return request.get('/production/process-routes');
+}
+
 export interface FlowCard {
   id: number;
   card_no: string;

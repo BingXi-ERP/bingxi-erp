@@ -645,9 +645,6 @@ ALTER TABLE "sales_quotations" ADD COLUMN IF NOT EXISTS "insurance_cost" DECIMAL
         m0052_add_piece_no_to_flow_documents::Migration
             .down(manager)
             .await?;
-        m0052_add_piece_no_to_flow_documents::Migration
-            .down(manager)
-            .await?;
         m0051_add_piece_type_and_machine_no::Migration
             .down(manager)
             .await?;

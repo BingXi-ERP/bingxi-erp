@@ -113,6 +113,7 @@ pub mod outsourcing_handler;
 pub mod production_recipe_handler;
 pub mod sales_return_handler;
 pub mod system_update_handler;
+pub mod system_number_rule_handler;
 // 生产计划与扫码/物流/切箱 handler 组
 pub mod barcode_scanner_handler;
 pub mod logistics_handler;

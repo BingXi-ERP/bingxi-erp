@@ -2240,6 +2240,28 @@ function compare(fe, be) {
   return { status: 'ok' };
 }
 
+// ---------- 手写信封旁路 ----------
+// 统一 ApiResponse 之外再手写 {code,message,data} 会产生第二套错误/成功契约。
+// 这里只判成功旁路；二进制流与 Setup 探针不匹配该构造，不纳入豁免。
+function findRawEnvelopeBypassesInSource(source, file) {
+  const pattern = /Ok\s*\(\s*Json\s*\(\s*(?:serde_json::)?json!\s*\(\s*\{[\s\S]*?"code"\s*:/g;
+  const hits = [];
+  for (const match of source.matchAll(pattern)) {
+    const prefix = source.slice(0, match.index);
+    const line = prefix.split('\n').length;
+    hits.push({ file, line });
+  }
+  return hits;
+}
+
+function findRawEnvelopeBypasses() {
+  const hits = [];
+  for (const file of collectRsFiles(BACKEND)) {
+    hits.push(...findRawEnvelopeBypassesInSource(readFileSync(file, 'utf8'), file));
+  }
+  return hits;
+}
+
 // ---------- 主流程 ----------
 // 全量扫描：建索引 → 解析路由与前端 api 函数 → 逐条比对 → 分桶。
 // 门禁输出(main)与自证(--self-test)共用这一份实现，两处各写口径必然漂移。
@@ -2358,6 +2380,7 @@ function runScan() {
 
 function main() {
   const { buckets, results, feFunctions } = runScan();
+  const rawEnvelopeBypasses = findRawEnvelopeBypasses();
 
   // 分类分布（后端载荷形态）
   const beDist = {};
@@ -2447,17 +2470,25 @@ function main() {
 
   const failingUnclassified = buckets.unclassified.filter(r => !exemptionHit(r.key));
 
+  if (rawEnvelopeBypasses.length) {
+    console.log('\n[手写信封旁路 · 成功响应绕过 ApiResponse，必须修正]');
+    for (const hit of rawEnvelopeBypasses) {
+      console.log(`  - ${hit.file}:${hit.line} Ok(Json(json!({ "code": ... })))`);
+    }
+  }
+
   console.log('\n---- 结论 ----');
   console.log(
-    `失配: ${buckets.mismatch.length}  |  未分类(未豁免): ${failingUnclassified.length}  |  已豁免: ${buckets.unclassified.length - failingUnclassified.length}  |  handler 符号未定义: ${buckets['handler-not-found'].length}`
+    `失配: ${buckets.mismatch.length}  |  未分类(未豁免): ${failingUnclassified.length}  |  已豁免: ${buckets.unclassified.length - failingUnclassified.length}  |  handler 符号未定义: ${buckets['handler-not-found'].length}  |  手写信封旁路: ${rawEnvelopeBypasses.length}`
   );
   if (
     buckets.mismatch.length ||
     failingUnclassified.length ||
-    buckets['handler-not-found'].length
+    buckets['handler-not-found'].length ||
+    rawEnvelopeBypasses.length
   ) {
     console.error(
-      `\nFAIL: 失配 ${buckets.mismatch.length} 条 + 未分类(未豁免) ${failingUnclassified.length} 条 + handler 符号未定义 ${buckets['handler-not-found'].length} 条`
+      `\nFAIL: 失配 ${buckets.mismatch.length} 条 + 未分类(未豁免) ${failingUnclassified.length} 条 + handler 符号未定义 ${buckets['handler-not-found'].length} 条 + 手写信封旁路 ${rawEnvelopeBypasses.length} 条`
     );
     process.exit(1);
   }
@@ -2575,6 +2606,18 @@ function runSelfTest() {
     '②合规 前端具名类型/动态声明(盲区) -> skip 不判负',
     compare({ kind: 'named' }, { kind: 'array' }).status === 'skip' &&
       compare({ kind: 'opaque' }, { kind: 'array' }).status === 'skip'
+  );
+  check(
+    '②注入违例 手写 Json(json!({code,data})) 成功信封必须判红',
+    findRawEnvelopeBypassesInSource(
+      'Ok(Json(serde_json::json!({"code": 200, "data": value})))',
+      'synthetic.rs'
+    ).length === 1
+  );
+  check(
+    '②合规 ApiResponse::success 不误伤',
+    findRawEnvelopeBypassesInSource('Ok(Json(ApiResponse::success(value)))', 'synthetic.rs')
+      .length === 0
   );
 
   // ③ 防过期锁：先用合成数据验证锁本身会抓，再对真实 EXEMPTIONS 上锁
