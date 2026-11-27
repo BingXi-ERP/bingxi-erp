@@ -933,20 +933,22 @@ mod tests {
     #[test]
     fn configured_rule_resolves_day_month_and_never_periods() {
         let now = at(2026, 11, 26);
-        let day = DocumentNumberGenerator::resolve_rule_values("SALE", 4, "day", 3, 3, now)
+        let day = DocumentNumberGenerator::resolve_rule_values("SALE", "SALE", 4, "day", 3, now)
             .expect("日重置规则必须可解析");
         assert_eq!(day.output_prefix, "SALE20261126");
         assert_eq!(day.period, "20261126");
         assert_eq!(day.seq_width, 4);
 
-        let month = DocumentNumberGenerator::resolve_rule_values("SALE", 2, "month", 3, 3, now)
-            .expect("月重置规则必须可解析");
+        let month =
+            DocumentNumberGenerator::resolve_rule_values("SALE", "SALE", 2, "month", 3, now)
+                .expect("月重置规则必须可解析");
         assert_eq!(month.output_prefix, "SALE202611");
         assert_eq!(month.period, "202611");
         assert_eq!(month.seq_width, 2);
 
-        let never = DocumentNumberGenerator::resolve_rule_values("SALE", 6, "never", 3, 3, now)
-            .expect("永久规则必须可解析");
+        let never =
+            DocumentNumberGenerator::resolve_rule_values("SALE", "SALE", 6, "never", 3, now)
+                .expect("永久规则必须可解析");
         assert_eq!(never.output_prefix, "SALE");
         assert_eq!(never.period, "");
         assert_eq!(never.seq_width, 6);
@@ -955,7 +957,7 @@ mod tests {
     #[test]
     fn explicit_non_default_width_overrides_rule_width() {
         let resolved =
-            DocumentNumberGenerator::resolve_rule_values("SO", 4, "day", 5, at(2026, 7, 15))
+            DocumentNumberGenerator::resolve_rule_values("SO", "SO", 4, "day", 5, at(2026, 7, 15))
                 .expect("显式宽度必须保留");
         assert_eq!(resolved.output_prefix, "SO20260715");
         assert_eq!(resolved.seq_width, 5);
@@ -964,19 +966,19 @@ mod tests {
     #[test]
     fn invalid_rule_values_fail_visibly() {
         assert!(
-            DocumentNumberGenerator::resolve_rule_values(" ", 3, "day", 3, 3, at(2026, 7, 15))
+            DocumentNumberGenerator::resolve_rule_values("SO", " ", 3, "day", 3, at(2026, 7, 15))
                 .is_err()
         );
         assert!(
-            DocumentNumberGenerator::resolve_rule_values("SO", 0, "day", 3, 3, at(2026, 7, 15))
+            DocumentNumberGenerator::resolve_rule_values("SO", "SO", 0, "day", 3, at(2026, 7, 15))
                 .is_err()
         );
         assert!(
-            DocumentNumberGenerator::resolve_rule_values("SO", 13, "day", 3, 3, at(2026, 7, 15))
+            DocumentNumberGenerator::resolve_rule_values("SO", "SO", 13, "day", 3, at(2026, 7, 15))
                 .is_err()
         );
         assert!(
-            DocumentNumberGenerator::resolve_rule_values("SO", 3, "year", 3, 3, at(2026, 7, 15))
+            DocumentNumberGenerator::resolve_rule_values("SO", "SO", 3, "year", 3, at(2026, 7, 15))
                 .is_err()
         );
     }
