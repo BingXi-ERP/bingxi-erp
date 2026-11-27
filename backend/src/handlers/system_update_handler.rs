@@ -13,7 +13,10 @@ use axum::{
     Json,
     extract::{Multipart, Path, State},
 };
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
+    TransactionTrait,
+};
 use serde::Deserialize;
 use std::path::PathBuf;
 use tokio::fs;
@@ -56,12 +59,73 @@ async fn require_admin_role(state: &AppState, auth: &AuthContext) -> Result<(), 
 /// 是否把该列改为可空以表达未知，属需用户裁定的事项，本轮不擅改列定义。
 /// changelog 列语义说明：写入路径当前无更新说明来源，新行落 NULL 是忠实的，NULL 代表未知
 /// 而非空串；消费方需把未知与有值区分渲染，不要把未知当无内容。
+#[derive(Debug)]
+enum PersistenceError {
+    /// 事务执行或提交前已明确失败，可安全补偿文件。
+    Definite(AppError),
+    /// COMMIT 返回错误且无法重新确认数据库状态，禁止擅自回滚文件。
+    CommitUncertain(AppError),
+}
+
+fn applied_version_commit_confirmed(applied: Option<&str>, expected: &str) -> bool {
+    applied == Some(expected)
+}
+
+fn install_commit_confirmed(applied: Option<&str>, status: Option<&str>, expected: &str) -> bool {
+    applied_version_commit_confirmed(applied, expected) && status == Some("completed")
+}
+
+impl From<AppError> for PersistenceError {
+    fn from(error: AppError) -> Self {
+        Self::Definite(error)
+    }
+}
+
+impl From<sea_orm::DbErr> for PersistenceError {
+    fn from(error: sea_orm::DbErr) -> Self {
+        Self::Definite(AppError::from(error))
+    }
+}
+
 async fn persist_applied_version(
     db: &sea_orm::DatabaseConnection,
     version: &str,
+) -> Result<(), PersistenceError> {
+    let txn = db.begin().await?;
+    persist_applied_version_on(&txn, version).await?;
+    if let Err(commit_error) = txn.commit().await {
+        let cause = AppError::from(commit_error);
+        match load_current_applied_version(db).await {
+            Ok(Some(applied)) if applied_version_commit_confirmed(Some(&applied), version) => {
+                tracing::warn!(
+                    version = %version,
+                    error = %cause,
+                    "系统版本事务提交确认失败，但新连接回读确认已提交"
+                );
+            }
+            _ => {
+                return Err(PersistenceError::CommitUncertain(
+                    AppError::business_displayable(format!(
+                        "系统版本事务提交结果不确定，禁止自动回滚文件，需人工检查: {cause}"
+                    )),
+                ));
+            }
+        }
+    }
+    tracing::info!(
+        event = "SYSTEM_VERSION_PERSISTED",
+        version = %version,
+        "系统更新目标版本已落库并置为当前版本"
+    );
+    Ok(())
+}
+
+async fn persist_applied_version_on<C: ConnectionTrait>(
+    db: &C,
+    version: &str,
 ) -> Result<(), AppError> {
     let now = chrono::Utc::now();
-    // 先取消全部当前标记，再写目标版本为当前：保证至多一行 is_current=true（翻转为原子语义，两步同库同连接）。
+    // 先取消全部当前标记，再写目标版本为当前；调用方负责把两步包在事务里。
     system_version::Entity::update_many()
         .col_expr(
             system_version::Column::IsCurrent,
@@ -95,12 +159,6 @@ async fn persist_applied_version(
             model.insert(db).await?;
         }
     }
-
-    tracing::info!(
-        event = "SYSTEM_VERSION_PERSISTED",
-        version = %version,
-        "系统更新目标版本已落库并置为当前版本"
-    );
     Ok(())
 }
 
@@ -265,13 +323,29 @@ pub async fn download_and_update(
     require_admin_role(&state, &auth).await?;
 
     let service = SystemUpdateService::new();
+    let _update_lock = service.try_lock_update()?;
+    let previous_version = service
+        .applied_version()
+        .unwrap_or_else(|| service.get_current_version());
 
-    match service.download_and_update().await {
+    match service.download_and_update_locked().await {
         Ok(message) => {
             let new_version = service
                 .applied_version()
                 .unwrap_or_else(|| service.get_current_version());
-            persist_applied_version(state.db.as_ref(), &new_version).await?;
+            match persist_applied_version(state.db.as_ref(), &new_version).await {
+                Ok(()) => {}
+                Err(PersistenceError::Definite(error)) => {
+                    return Err(restore_after_metadata_failure(
+                        &service,
+                        &previous_version,
+                        &error,
+                    )
+                    .await);
+                }
+                Err(PersistenceError::CommitUncertain(error)) => return Err(error),
+            }
+            service.cleanup_old_backups();
             let mut message = message;
             maybe_schedule_restart(&mut message);
             Ok(Json(ApiResponse::success_with_message(
@@ -331,6 +405,16 @@ async fn load_current_applied_version(
     Ok(row.map(|v| v.version))
 }
 
+async fn load_update_task_status(
+    db: &sea_orm::DatabaseConnection,
+    task_id: i32,
+) -> Result<Option<String>, AppError> {
+    let row = system_update_task::Entity::find_by_id(task_id)
+        .one(db)
+        .await?;
+    Ok(row.map(|task| task.status))
+}
+
 pub async fn get_update_status(
     State(state): State<AppState>,
 ) -> Result<Json<ApiResponse<UpdateStatusResponse>>, AppError> {
@@ -366,12 +450,28 @@ pub async fn upload_and_update(
     let update_file = extract_update_file_from_multipart(multipart).await?;
 
     let service = SystemUpdateService::new();
-    match service.apply_update(&update_file).await {
+    let _update_lock = service.try_lock_update()?;
+    let previous_version = service
+        .applied_version()
+        .unwrap_or_else(|| service.get_current_version());
+    match service.do_update(&update_file, None).await {
         Ok(message) => {
             let new_version = service
                 .applied_version()
                 .unwrap_or_else(|| service.get_current_version());
-            persist_applied_version(state.db.as_ref(), &new_version).await?;
+            match persist_applied_version(state.db.as_ref(), &new_version).await {
+                Ok(()) => {}
+                Err(PersistenceError::Definite(error)) => {
+                    return Err(restore_after_metadata_failure(
+                        &service,
+                        &previous_version,
+                        &error,
+                    )
+                    .await);
+                }
+                Err(PersistenceError::CommitUncertain(error)) => return Err(error),
+            }
+            service.cleanup_old_backups();
             let mut message = message;
             maybe_schedule_restart(&mut message);
             Ok(Json(ApiResponse::success_with_message(
@@ -497,12 +597,24 @@ pub async fn rollback_version(
 
     match service.rollback_to_version(&payload.version) {
         Ok(message) => {
-            let current_version = service.get_current_version();
+            match persist_applied_version(state.db.as_ref(), &payload.version).await {
+                Ok(()) => {}
+                Err(PersistenceError::Definite(error)) => {
+                    return Err(AppError::business_displayable(format!(
+                        "文件已回滚到版本 {}，但版本元数据落库失败，需人工检查: {}",
+                        payload.version,
+                        error.public_message()
+                    )));
+                }
+                Err(PersistenceError::CommitUncertain(error)) => return Err(error),
+            }
+            let mut message = message;
+            maybe_schedule_restart(&mut message);
             Ok(Json(ApiResponse::success_with_message(
                 UpdateResult {
                     success: true,
                     message,
-                    new_version: Some(current_version),
+                    new_version: Some(payload.version),
                 },
                 "版本回滚成功",
             )))
@@ -577,12 +689,31 @@ pub async fn apply_local_update(
         .find(|r| r.version == payload.version)
         .ok_or_else(|| AppError::not_found(format!("找不到版本 {} 的发布包", payload.version)))?;
 
-    match service.apply_local_update(&release).await {
+    let _update_lock = service.try_lock_update()?;
+    let previous_version = service
+        .applied_version()
+        .unwrap_or_else(|| service.get_current_version());
+    match service
+        .do_update(&release.file_path, Some(&release.version))
+        .await
+    {
         Ok(message) => {
             let new_version = service
                 .applied_version()
                 .unwrap_or_else(|| service.get_current_version());
-            persist_applied_version(state.db.as_ref(), &new_version).await?;
+            match persist_applied_version(state.db.as_ref(), &new_version).await {
+                Ok(()) => {}
+                Err(PersistenceError::Definite(error)) => {
+                    return Err(restore_after_metadata_failure(
+                        &service,
+                        &previous_version,
+                        &error,
+                    )
+                    .await);
+                }
+                Err(PersistenceError::CommitUncertain(error)) => return Err(error),
+            }
+            service.cleanup_old_backups();
             let mut message = message;
             maybe_schedule_restart(&mut message);
             Ok(Json(ApiResponse::success_with_message(
@@ -677,8 +808,18 @@ async fn finish_update_task(
     progress: i32,
     error_message: Option<String>,
 ) -> Result<system_update_task::Model, AppError> {
-    use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+    let saved = finish_update_task_on(db, task_id, status, progress, error_message).await?;
+    tracing::info!(task_id, status, progress, "系统更新任务已到达真实终态");
+    Ok(saved)
+}
 
+async fn finish_update_task_on<C: ConnectionTrait>(
+    db: &C,
+    task_id: i32,
+    status: &str,
+    progress: i32,
+    error_message: Option<String>,
+) -> Result<system_update_task::Model, AppError> {
     if !is_terminal_update_status(status) {
         return Err(AppError::bad_request("更新任务终态无效"));
     }
@@ -697,8 +838,49 @@ async fn finish_update_task(
     active.completed_at = Set(Some(now.into()));
     active.updated_at = Set(now.into());
     let saved = active.update(db).await?;
-    tracing::info!(task_id, status, progress, "系统更新任务已到达真实终态");
     Ok(saved)
+}
+
+/// 安装成功后的版本元数据与任务 completed 终态必须同事务提交，避免“版本已落库但任务仍 installing”或反向半态。
+async fn persist_applied_version_and_finish_task(
+    db: &sea_orm::DatabaseConnection,
+    task_id: i32,
+    version: &str,
+) -> Result<system_update_task::Model, PersistenceError> {
+    let txn = db.begin().await?;
+    persist_applied_version_on(&txn, version).await?;
+    let task = finish_update_task_on(&txn, task_id, "completed", 100, None).await?;
+    if let Err(commit_error) = txn.commit().await {
+        let cause = AppError::from(commit_error);
+        let applied = load_current_applied_version(db).await;
+        let status = load_update_task_status(db, task_id).await;
+        match (applied, status) {
+            (Ok(Some(applied)), Ok(Some(status)))
+                if install_commit_confirmed(Some(&applied), Some(&status), version) =>
+            {
+                tracing::warn!(
+                    task_id,
+                    version = %version,
+                    error = %cause,
+                    "安装事务提交确认失败，但新连接回读确认版本与任务终态均已提交"
+                );
+            }
+            _ => {
+                return Err(PersistenceError::CommitUncertain(
+                    AppError::business_displayable(format!(
+                        "安装事务提交结果不确定，禁止自动回滚文件，需人工检查: {cause}"
+                    )),
+                ));
+            }
+        }
+    }
+    tracing::info!(
+        task_id,
+        status = "completed",
+        progress = 100,
+        "系统更新任务已到达真实终态"
+    );
+    Ok(task)
 }
 
 /// system_update_task Model → 前端 `UpdateTask` 契约 JSON
@@ -1000,12 +1182,16 @@ pub async fn install_version_update(
 
     let version = load_system_version(&state, version_id).await?;
     let service = SystemUpdateService::new();
+    let _update_lock = service.try_lock_update()?;
+    let previous_version = service
+        .applied_version()
+        .unwrap_or_else(|| service.get_current_version());
     if let Err(error) = service.downloaded_update_path(&version.version) {
         return Err(AppError::business_displayable(error.to_string()));
     }
     let task = create_update_task(
         &state,
-        service.get_current_version(),
+        previous_version.clone(),
         version.version.clone(),
         "install",
         "installing",
@@ -1014,14 +1200,28 @@ pub async fn install_version_update(
     )
     .await?;
 
-    match service.apply_downloaded_update(&version.version).await {
+    match service
+        .apply_downloaded_update_locked(&version.version)
+        .await
+    {
         Ok(message) => {
-            if let Err(error) = persist_applied_version(state.db.as_ref(), &version.version).await {
-                record_update_failure(&state, task.id, &error).await;
-                return Err(error);
-            }
-            let completed =
-                finish_update_task(state.db.as_ref(), task.id, "completed", 100, None).await?;
+            let completed = match persist_applied_version_and_finish_task(
+                state.db.as_ref(),
+                task.id,
+                &version.version,
+            )
+            .await
+            {
+                Ok(task) => task,
+                Err(PersistenceError::Definite(error)) => {
+                    let mapped =
+                        restore_after_metadata_failure(&service, &previous_version, &error).await;
+                    record_update_failure(&state, task.id, &mapped).await;
+                    return Err(mapped);
+                }
+                Err(PersistenceError::CommitUncertain(error)) => return Err(error),
+            };
+            service.cleanup_old_backups();
             let mut message = message;
             maybe_schedule_restart(&mut message);
             Ok(Json(ApiResponse::success_with_message(
@@ -1033,6 +1233,39 @@ pub async fn install_version_update(
             let mapped = map_update_error(error);
             record_update_failure(&state, task.id, &mapped).await;
             Err(mapped)
+        }
+    }
+}
+
+/// 文件已应用但版本元数据/任务终态落库失败时，用本次更新创建的备份补偿回滚文件。
+/// 回滚失败必须显式提示人工检查，不能把磁盘新版本误报成普通更新失败。
+async fn restore_after_metadata_failure(
+    service: &SystemUpdateService,
+    previous_version: &str,
+    cause: &AppError,
+) -> AppError {
+    match service.rollback_to_version(previous_version) {
+        Ok(_) => {
+            tracing::error!(
+                previous_version,
+                error = %cause,
+                "系统更新元数据落库失败，文件已补偿回滚"
+            );
+            AppError::business_displayable(format!(
+                "系统更新元数据落库失败，文件已回滚到版本 {previous_version}: {}",
+                cause.public_message()
+            ))
+        }
+        Err(rollback_error) => {
+            tracing::error!(
+                previous_version,
+                error = %cause,
+                rollback_error = %rollback_error,
+                "系统更新元数据落库失败且文件回滚失败，需人工检查"
+            );
+            AppError::business_displayable(format!(
+                "系统更新元数据落库失败且文件回滚也失败，需人工检查: {cause}; 回滚错误: {rollback_error}"
+            ))
         }
     }
 }
@@ -1125,6 +1358,31 @@ mod task_state_tests {
     }
 
     #[test]
+    fn commit_confirmation_requires_exact_target_state() {
+        assert!(applied_version_commit_confirmed(
+            Some("2026.11.28.1200"),
+            "2026.11.28.1200"
+        ));
+        for applied in [None, Some("2026.11.27.1200"), Some("2026.11.29.1200")] {
+            assert!(
+                !applied_version_commit_confirmed(applied, "2026.11.28.1200"),
+                "COMMIT 确认失败时，旧值/缺失值/其它版本都不得判为已提交: {applied:?}"
+            );
+        }
+        assert!(install_commit_confirmed(
+            Some("2026.11.28.1200"),
+            Some("completed"),
+            "2026.11.28.1200"
+        ));
+        for status in [None, Some("installing"), Some("failed")] {
+            assert!(
+                !install_commit_confirmed(Some("2026.11.28.1200"), status, "2026.11.28.1200"),
+                "安装事务只有版本与 completed 终态同时匹配才可按已提交处理: {status:?}"
+            );
+        }
+    }
+
+    #[test]
     fn only_not_started_tasks_are_cancellable() {
         assert!(is_update_task_cancellable("pending"));
         for status in [
@@ -1196,6 +1454,48 @@ mod task_state_tests {
             .expect("登记下载完成终态失败");
         assert!(completed.completed_at.is_some(), "下载完成必须记录结束时间");
         assert_eq!(completed.progress, 100);
+
+        persist_applied_version(state.db.as_ref(), "2026.11.27.1200")
+            .await
+            .expect("写入基线当前版本失败");
+        let installing = create_update_task(
+            &state,
+            "2026.11.27.1200".to_string(),
+            "2026.11.28.1200".to_string(),
+            "install",
+            "installing",
+            0,
+            &auth,
+        )
+        .await
+        .expect("登记安装任务失败");
+        let installed = persist_applied_version_and_finish_task(
+            state.db.as_ref(),
+            installing.id,
+            "2026.11.28.1200",
+        )
+        .await
+        .expect("版本元数据与安装完成终态应同事务提交");
+        assert_eq!(installed.status, "completed");
+        assert_eq!(
+            load_current_applied_version(state.db.as_ref())
+                .await
+                .expect("读取当前应用版本失败")
+                .as_deref(),
+            Some("2026.11.28.1200")
+        );
+
+        persist_applied_version_and_finish_task(state.db.as_ref(), -1, "2026.11.29.1200")
+            .await
+            .expect_err("任务不存在时版本元数据写入必须回滚");
+        assert_eq!(
+            load_current_applied_version(state.db.as_ref())
+                .await
+                .expect("读取回滚后的当前应用版本失败")
+                .as_deref(),
+            Some("2026.11.28.1200"),
+            "任务终态写入失败时，不得留下半提交的新当前版本"
+        );
 
         let root =
             std::env::temp_dir().join(format!("bingxi-update-handler-{}", uuid::Uuid::new_v4()));

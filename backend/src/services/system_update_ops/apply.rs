@@ -13,7 +13,7 @@
 //!
 //! 跨模块依赖：
 //! - `do_update` 调用 `status::get_current_version`（pub）、`backup::create_backup` /
-//!  `rollback` / `cleanup_old_backups`（`pub(crate)`）
+//!  `rollback`（`pub(crate)`）
 //! - `apply_files` 调用 `backup::copy_dir`（`pub(crate)`）
 //! - `extract_update_package` 调用 facade 纯函数 `extract_zip_entry`（`pub(crate)`）
 //! - `log_update` 被 `backup::rollback` / `github::download_update` /
@@ -55,7 +55,8 @@ impl SystemUpdateService {
         self.do_update(update_file, expected_version).await
     }
 
-    async fn do_update(
+    /// 调用方必须持有 `try_lock_update` 返回的进程级操作锁。
+    pub(crate) async fn do_update(
         &self,
         update_file: &Path,
         expected_version: Option<&str>,
@@ -132,8 +133,6 @@ impl SystemUpdateService {
             to_version = %new_version,
             "系统升级完成通知"
         );
-
-        self.cleanup_old_backups();
 
         Ok(format!("系统已成功更新到版本 {}", new_version))
     }
@@ -589,6 +588,13 @@ mod tests {
     #[tokio::test]
     async fn official_release_tar_gz_without_embedded_version_installs_expected_version() {
         let (service, app_dir) = temp_service("official_tar");
+        let preexisting_backups: Vec<PathBuf> = (0..4)
+            .map(|index| app_dir.join(format!("backups/v9.0.0_20261127_12000{index}")))
+            .collect();
+        for backup in &preexisting_backups {
+            fs::create_dir_all(backup).expect("创建历史备份目录失败");
+            fs::write(backup.join("VERSION"), b"9.0.0\n").expect("写入历史备份 VERSION 失败");
+        }
         let update_file = app_dir.join("release-2.0.0.tar.gz");
         let backend = valid_executable_bytes();
         write_release_tar_gz(
@@ -623,6 +629,13 @@ mod tests {
             fs::read(app_dir.join("frontend/index.html")).expect("读取应用后 frontend 失败"),
             b"new-frontend"
         );
+        for backup in &preexisting_backups {
+            assert!(
+                backup.exists(),
+                "元数据提交前不得清理历史备份，本次更新备份必须保留供失败补偿: {}",
+                backup.display()
+            );
+        }
 
         fs::remove_dir_all(app_dir).expect("清理测试目录失败");
     }

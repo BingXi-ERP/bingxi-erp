@@ -5,7 +5,7 @@
 //! - `copy_dir`：递归复制目录（`pub(crate)`，供 apply 子模块 `apply_files` 调用）
 //! - `rollback`：从备份路径回滚 backend/frontend/config/VERSION（`pub(crate)`，供 apply 子模块 `do_update` 调用）
 //! - `rollback_to_version`：按版本号查找备份并回滚（pub，handler 调用）
-//! - `cleanup_old_backups`：保留最近 3 个备份，清理更旧版本（`pub(crate)`，供 apply 子模块 `do_update` 调用）
+//! - `cleanup_old_backups`：保留最近 3 个备份，清理更旧版本（`pub(crate)`，仅在版本元数据成功提交后调用）
 //!
 //! 跨模块依赖：`rollback` / `rollback_to_version` 调用 `apply` 子模块的 `log_update`（`pub(crate)`）；
 //! `rollback_to_version` / `cleanup_old_backups` 调用 `status` 子模块的 `list_backup_versions`（pub）。

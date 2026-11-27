@@ -293,8 +293,17 @@ impl SystemUpdateService {
 
     /// 应用本端点已下载并校验过的指定版本更新包，应用前再次核对包内 VERSION。
     pub async fn apply_downloaded_update(&self, version: &str) -> Result<String, UpdateError> {
+        let _update_lock = self.try_lock_update()?;
+        self.apply_downloaded_update_locked(version).await
+    }
+
+    /// 调用方必须持有进程级操作锁，并把版本元数据与任务终态写入纳入同一锁边界。
+    pub(crate) async fn apply_downloaded_update_locked(
+        &self,
+        version: &str,
+    ) -> Result<String, UpdateError> {
         let path = self.downloaded_update_path(version)?;
-        self.apply_update_expected(&path, Some(version)).await
+        self.do_update(&path, Some(version)).await
     }
 
     async fn download_release_asset(
@@ -669,10 +678,14 @@ impl SystemUpdateService {
     }
 
     pub async fn download_and_update(&self) -> Result<String, UpdateError> {
+        let _update_lock = self.try_lock_update()?;
+        self.download_and_update_locked().await
+    }
+
+    /// 调用方必须持有进程级操作锁，并把后续版本元数据写入纳入同一锁边界。
+    pub(crate) async fn download_and_update_locked(&self) -> Result<String, UpdateError> {
         let (download_path, version) = self.download_update_with_version(None).await?;
-        let result = self
-            .apply_update_expected(&download_path, Some(&version))
-            .await?;
+        let result = self.do_update(&download_path, Some(&version)).await?;
 
         if let Err(e) = fs::remove_file(&download_path) {
             self.log_update(&format!("清理下载文件失败: {}", e));
