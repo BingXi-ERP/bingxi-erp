@@ -129,20 +129,14 @@ async fn seed_product(db: &DatabaseConnection) -> i32 {
     .id
 }
 
-/// 取号失败分支的真库前置:种一枚"当日 PO 号段基数顶到 u64::MAX 且候选位仍被占用"的
-/// 旁路病态号,让 `DocumentNumberGenerator::allocate_no` 在 100 次探测后走**显式报错**
-/// 路径(number_generator.rs:326-352),从而在生产方言上稳定复现
-/// "取号失败→400 业务族→订单零写入"这一被锁的分支。
-///
-/// 为什么不用"号段内连排 100 个已占用号"造前置:`allocate_no` 的基数取
-/// `max(后缀流水)+1`,候选位恒高于既有最大值,连排占用只会把基数一起推高,
-/// 无法在真库上穷尽——这正是源码注释所说的"病态号段"形态。
+/// 取号失败分支的真库前置:种一枚带显式饱和标记的旁路号，生成器在读取历史号后
+/// 立即拒绝，避免 `u64::MAX` 经数据库整数列回读降级为 i64 后误判为可分配。
 ///
 /// 除 order_no(探针本体)外的列一律照写入方 `build_create_active_model` 的口径:
 /// order_type='normal'(NOT NULL+CHECK 词表)、status/priority 不 Set(由 DB DEFAULT 生效)、
 /// planned_quantity 给合法数量 1(该列 NOT NULL 且无 DB 默认值,不塞 0 假值)。
 async fn seed_exhausted_number_segment(db: &DatabaseConnection, product_id: i32) -> String {
-    let probe_no = format!("PO{}{}", Utc::now().format("%Y%m%d"), u64::MAX);
+    let probe_no = format!("PO{}MAX", Utc::now().format("%Y%m%d"));
     production_order::ActiveModel {
         order_no: Set(probe_no.clone()),
         product_id: Set(product_id),
@@ -185,9 +179,9 @@ async fn seeded_app() -> (Router, DatabaseConnection, i32) {
 // =========================================================
 
 /// 携带伪造 order_no 的创建请求:DTO 无该字段(serde 残差吸收,请求体不报错),
-/// 服务链走到服务端取号为止——当日号段基数被前置探针顶到饱和、100 个候选位全部占用,
-/// 取号显式失败并返回 BUSINESS_ERROR;关键断言是除该前置探针行外 production_orders
-/// **零行**:修复前该请求会以 "FORGED-9999" 直接落库(伪造单号成功)。
+/// 服务链走到服务端取号为止——当日号段带显式饱和标记，取号立即失败并返回
+/// BUSINESS_ERROR；关键断言是除该前置探针行外 production_orders **零行**：
+/// 修复前该请求会以 "FORGED-9999" 直接落库（伪造单号成功）。
 #[tokio::test]
 async fn forged_order_no_never_reaches_insert_zero_rows_written() {
     let (app, db, product_id) = seeded_app().await;
@@ -211,7 +205,7 @@ async fn forged_order_no_never_reaches_insert_zero_rows_written() {
     assert_eq!(v["code"], "BUSINESS_ERROR", "取号失败归业务族: {v}");
     assert_eq!(
         v["message"], "生产订单号生成失败，请稍后重试",
-        "取号分支失败(号段候选位穷尽)即为预期拒绝点,真实落库断言见活库用例"
+        "取号分支失败（号段显式饱和）即为预期拒绝点，真实落库断言见活库用例"
     );
 
     // 回读排除夹具自建的前置探针行本身:被锁语义是"这笔被拒的请求零写入"
