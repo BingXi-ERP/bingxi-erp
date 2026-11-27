@@ -102,29 +102,77 @@ fn bpm_number_lock_key(date: &str) -> i64 {
     hasher.finish() as i64
 }
 
-async fn advisory_waiter_count(db: &sea_orm::DatabaseConnection) -> i64 {
+async fn find_advisory_waiter_blocked_by(
+    db: &sea_orm::DatabaseConnection,
+    blocker_pid: i32,
+) -> Option<i32> {
+    db.query_one_raw(Statement::from_sql_and_values(
+        DbBackend::Postgres,
+        "SELECT waiter.pid FROM pg_locks waiter \
+         WHERE waiter.locktype = 'advisory' \
+         AND NOT waiter.granted \
+         AND $1 = ANY(pg_blocking_pids(waiter.pid))",
+        vec![blocker_pid.into()],
+    ))
+    .await
+    .expect("读取 BPM 取号等待事务失败")
+    .map(|row| {
+        row.try_get_by_index(0)
+            .expect("BPM 取号等待事务 PID 解码失败")
+    })
+}
+
+async fn advisory_waiter_count_blocked_by(
+    db: &sea_orm::DatabaseConnection,
+    blocker_pid: i32,
+) -> i64 {
     let row = db
         .query_one_raw(Statement::from_sql_and_values(
             DbBackend::Postgres,
-            "SELECT COUNT(*) FROM pg_locks WHERE locktype = 'advisory' AND NOT granted",
-            [],
+            "SELECT COUNT(*) FROM pg_locks waiter \
+             WHERE waiter.locktype = 'advisory' \
+             AND NOT waiter.granted \
+             AND $1 = ANY(pg_blocking_pids(waiter.pid))",
+            vec![blocker_pid.into()],
         ))
         .await
-        .expect("读取 PostgreSQL 咨询锁等待数失败")
-        .expect("咨询锁等待数查询必须返回一行");
+        .expect("读取 BPM 咨询锁等待数失败")
+        .expect("BPM 咨询锁等待数查询必须返回一行");
     row.try_get_by_index::<i64>(0)
-        .expect("咨询锁等待数解码失败")
+        .expect("BPM 咨询锁等待数解码失败")
 }
 
-async fn wait_for_two_advisory_waiters(db: &sea_orm::DatabaseConnection) {
+async fn waiter_count_blocked_by(db: &sea_orm::DatabaseConnection, blocker_pid: i32) -> i64 {
+    let row = db
+        .query_one_raw(Statement::from_sql_and_values(
+            DbBackend::Postgres,
+            "SELECT COUNT(*) FROM pg_locks waiter \
+             WHERE NOT waiter.granted \
+             AND $1 = ANY(pg_blocking_pids(waiter.pid))",
+            vec![blocker_pid.into()],
+        ))
+        .await
+        .expect("读取 BPM 串行等待数失败")
+        .expect("BPM 串行等待数查询必须返回一行");
+    row.try_get_by_index::<i64>(0)
+        .expect("BPM 串行等待数解码失败")
+}
+
+async fn wait_for_two_serialized_waiters(db: &sea_orm::DatabaseConnection, blocker_pid: i32) {
     let deadline = Instant::now() + Duration::from_secs(15);
     loop {
-        if advisory_waiter_count(db).await >= 2 {
+        let advisory_waiters = advisory_waiter_count_blocked_by(db, blocker_pid).await;
+        if advisory_waiters >= 2 {
+            return;
+        }
+        if let Some(first_waiter_pid) = find_advisory_waiter_blocked_by(db, blocker_pid).await
+            && waiter_count_blocked_by(db, first_waiter_pid).await >= 1
+        {
             return;
         }
         assert!(
             Instant::now() < deadline,
-            "两个并发发起请求未在取号或业务临界区形成可观测等待，无法证明竞态已被覆盖"
+            "两个并发发起请求未形成取号锁或规则行锁的可观测串行等待，无法证明竞态已被覆盖"
         );
         sleep(Duration::from_millis(20)).await;
     }
@@ -141,6 +189,16 @@ async fn concurrent_start_process_reuses_single_instance_and_task() {
 
     // 同时锁住今天与明天的取号键，覆盖测试跨 UTC 零点的极端边界。
     let blocker = db.begin().await.expect("创建取号阻塞事务失败");
+    let blocker_pid: i32 = blocker
+        .query_one_raw(Statement::from_string(
+            DatabaseBackend::Postgres,
+            "SELECT pg_backend_pid()".to_string(),
+        ))
+        .await
+        .expect("读取 BPM 取号阻塞事务 PID 失败")
+        .expect("PostgreSQL 当前后端 PID 必须返回一行")
+        .try_get_by_index(0)
+        .expect("BPM 取号阻塞事务 PID 解码失败");
     let today = Utc::now().format("%Y%m%d").to_string();
     let tomorrow = (Utc::now() + ChronoDuration::days(1))
         .format("%Y%m%d")
@@ -170,7 +228,7 @@ async fn concurrent_start_process_reuses_single_instance_and_task() {
         }));
     }
     barrier.wait().await;
-    wait_for_two_advisory_waiters(&db).await;
+    wait_for_two_serialized_waiters(&db, blocker_pid).await;
     blocker.commit().await.expect("释放取号阻塞事务失败");
 
     let first = tasks
