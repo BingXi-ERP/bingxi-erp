@@ -251,10 +251,9 @@ async fn allocate_advances_past_preempted_candidate_without_duplicate() {
 
 /// 探测被占到达上限 → **显式报错**（原 NGA3 意图"占满不得静默跳号/不得无界
 /// 循环"的独立保留守卫）。新基数语义下起点恒等于 max+1（空闲位），静态占满
-/// 101..=200 无法再触发探测上限；确定性可达路径是源码注释明说的病态饱和号段：
-/// 存量含后缀恰为 `u64::MAX` 的单号 → 基数 `saturating_add(1)` 饱和停在
-/// u64::MAX → 同一候选位被连探 `NO_PROBE_MAX=100` 次 → 显式
-/// `BusinessErrorDisplayable`（真实文案可外显），绝不无界循环、绝不静默产号。
+/// 101..=200 无法再触发探测上限；确定性可达路径是显式饱和哨兵或
+/// `u64::MAX` 后缀：前者立即拒绝，后者在 `checked_add(1)` 处显式失败，
+/// 均返回 `BusinessErrorDisplayable`，绝不无界循环、绝不静默产号。
 #[tokio::test]
 #[ignore = "需已迁移 PG（advisory lock），由专用 job（--run-ignored only）执行"]
 async fn allocate_errors_explicitly_when_probe_cap_exhausted() {
@@ -273,20 +272,18 @@ async fn allocate_errors_explicitly_when_probe_cap_exhausted() {
         customer::Column::CustomerCode,
     )
     .await
-    .expect_err(
-        "候选位连续被占用达 NO_PROBE_MAX=100 上限时必须显式报错（防止无界循环/静默产错号）",
-    );
+    .expect_err("饱和号段必须显式报错（防止无界循环/静默产错号）");
     match &err {
         // 注意：必须是 business_displayable（真实文案可外显）；若是 business
         // （出参脱敏成"业务处理失败"）此处会变红，如实暴露变体误用。
         AppError::BusinessErrorDisplayable(m) => {
             assert!(
-                m.contains("连续 100 个号位被占用"),
-                "报错文案应说明号段占满与探测上限，实际文案: {m}"
+                m.contains("计数上限"),
+                "报错文案应说明流水计数达到上限，实际文案: {m}"
             );
             assert!(
-                m.contains(&format!("{}{}", pfx, today())),
-                "报错文案应带上被占满的号段前缀，便于数据侧排查，实际文案: {m}"
+                m.contains("单号流水"),
+                "报错文案应点名单号流水，便于数据侧排查，实际文案: {m}"
             );
         }
         other => panic!("期望 AppError::BusinessErrorDisplayable，实际: {other:?}"),
