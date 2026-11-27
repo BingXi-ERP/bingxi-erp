@@ -14,7 +14,6 @@ const EXCLUDED_DIRECTORIES = new Set([
   'report',
   'reports',
 ]);
-const EPHEMERAL_FILE_PATTERN = /\.tmp\.\d+\.\d+$/;
 const THIRD_PARTY_PATTERNS = [
   ['品牌', /duibu|对布|budadang|jzcang/i],
   ['旧资源前缀', /(?:^|[^a-z0-9])bdd[-_]/i],
@@ -29,7 +28,7 @@ function candidateFiles(root, directory = root) {
     if (EXCLUDED_DIRECTORIES.has(entry.name)) continue;
     const fullPath = path.join(directory, entry.name);
     if (entry.isDirectory()) files.push(...candidateFiles(root, fullPath));
-    else if (entry.isFile() && !EPHEMERAL_FILE_PATTERN.test(entry.name)) files.push(fullPath);
+    else if (entry.isFile()) files.push(fullPath);
   }
   return files.sort();
 }
@@ -353,7 +352,7 @@ test('第三方扫描覆盖未跟踪文件并排除指定构建目录', () => {
       fs.mkdirSync(fullDirectory);
       fs.writeFileSync(path.join(fullDirectory, 'ignored.js'), 'budadang');
     }
-    assert.deepEqual(scanThirdParty(root), ['untracked.md#品牌']);
+    assert.deepEqual(scanThirdParty(root), ['app.js.tmp.1.2#品牌', 'untracked.md#品牌']);
   });
 });
 
