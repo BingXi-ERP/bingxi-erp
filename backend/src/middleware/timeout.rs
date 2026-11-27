@@ -28,6 +28,8 @@ fn request_timeout(path: &str, method: &Method) -> Duration {
     let is_update_write = method != Method::GET
         && (path == "/api/v1/erp/system-update/update"
             || path == "/api/v1/erp/system-update/upload"
+            || path == "/api/v1/erp/system-update/local-update"
+            || path == "/api/v1/erp/system-update/rollback"
             || path == "/api/v1/erp/system-update/backups"
             || path.starts_with("/api/v1/erp/system-update/versions/")
                 && (path.ends_with("/download") || path.ends_with("/install")));
@@ -85,6 +87,8 @@ mod tests {
         for path in [
             "/api/v1/erp/system-update/update",
             "/api/v1/erp/system-update/upload",
+            "/api/v1/erp/system-update/local-update",
+            "/api/v1/erp/system-update/rollback",
             "/api/v1/erp/system-update/backups",
             "/api/v1/erp/system-update/versions/1/download",
             "/api/v1/erp/system-update/versions/1/install",
