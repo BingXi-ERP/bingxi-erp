@@ -234,7 +234,7 @@ impl SystemUpdateService {
         if entry_type.is_dir() {
             fs::create_dir_all(&outpath)?;
             #[cfg(unix)]
-            set_safe_permissions(&outpath, entry.header().mode(), true);
+            set_safe_permissions(&outpath, entry.header().mode()?, true);
             return Ok(0);
         }
         if !entry_type.is_file() {
@@ -259,7 +259,7 @@ impl SystemUpdateService {
             )));
         }
         #[cfg(unix)]
-        set_safe_permissions(&outpath, entry.header().mode(), false);
+        set_safe_permissions(&outpath, entry.header().mode()?, false);
 
         Ok(copied)
     }
