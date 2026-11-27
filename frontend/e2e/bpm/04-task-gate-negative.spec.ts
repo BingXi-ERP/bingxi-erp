@@ -182,7 +182,7 @@ async function resolveOtherUserId(
   myId: number
 ): Promise<number> {
   const username = `e2e_bpm_gate_${genCode('04G')}`;
-  const created = await apiCall<{ id: number }>(page, 'POST', '/users', {
+  const created = await apiCallRaw<{ id: number }>(page, 'POST', '/users', {
     username,
     password: testPassword(),
     email: `${username}@test.com`,
