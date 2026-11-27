@@ -5,7 +5,6 @@ var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   toast = t(require("../../../miniprogram_npm/@vant/weapp/toast/toast")),
   orderCreate = require("../../../libs/services/orderCreate"),
   util = require("../../../libs/utils/util"),
-  mta_analysis = t(require("../../../utils/mta_analysis")),
   ServicesUserLog = require("../../../libs/services/ServicesUserLog"),
   number = t(require("../../../utils/number")),
   m = "orderCreateInfo",
@@ -39,8 +38,7 @@ Page({
   },
   onLoad: function (t) {
     var objectSpread2 = this;
-    (mta_analysis.default.Page.init(),
-      this.setData({
+    (this.setData({
         isFromPin: t.isFromPin,
         openType: t.openType,
         orderId: t.orderId,
@@ -94,15 +92,15 @@ Page({
       dialog = a.totalB,
       orderCreate = a.discount,
       util = void 0 === orderCreate ? 0 : orderCreate,
-      mta_analysis =
+      mpValue =
         (Number(dialog),
         Number(objectSpread2),
         Number(dialog) + Number(objectSpread2) - Number(util));
     return (
-      (u = Number(mta_analysis).toFixed(2)),
+      (u = Number(mpValue).toFixed(2)),
       this.setData({
         otherCost: objectSpread2,
-        unpay: mta_analysis,
+        unpay: mpValue,
         countModeIndex: 0,
       }),
       Number(this.data.discount) > Number(this.data.total) &&
@@ -137,10 +135,10 @@ Page({
       );
     var orderCreate = this.data,
       util = orderCreate.total,
-      mta_analysis = orderCreate.countModeIndex,
+      mpValue = orderCreate.countModeIndex,
       ServicesUserLog =
-        mta_analysis > 0
-          ? Math[["", "round", "floor", "ceil"][mta_analysis]](Number(util))
+        mpValue > 0
+          ? Math[["", "round", "floor", "ceil"][mpValue]](Number(util))
           : Number(util).toFixed(2),
       m = a ? Number(ServicesUserLog) + Number(dialog) : Number(ServicesUserLog),
       app = number.default.operation(Number(m), Number(objectSpread2), "subtract");
@@ -190,13 +188,13 @@ Page({
       a = (objectSpread2.orderInfo, objectSpread2.total, objectSpread2.unpay),
       orderCreate = (objectSpread2.discount, objectSpread2.otherCost, objectSpread2.payment),
       util = objectSpread2.paymentWechat,
-      mta_analysis = objectSpread2.paymentAlipay,
+      mpValue = objectSpread2.paymentAlipay,
       ServicesUserLog = objectSpread2.paymentCash,
       number = objectSpread2.paymentCard,
       m = objectSpread2.paymentRemit;
     Number(orderCreate) - Number(a) > 0
       ? (0, toast.default)("本次收款金额不得大于待收金额")
-      : "" === util && "" === mta_analysis && "" === ServicesUserLog && "" === number && "" === m
+      : "" === util && "" === mpValue && "" === ServicesUserLog && "" === number && "" === m
         ? dialog.default
             .confirm({
               message: "收款方式为空，确定开单？",
@@ -211,7 +209,7 @@ Page({
     var t = this,
       a = this.data,
       dialog = a.orderId,
-      mta_analysis = a.orderInfo,
+      mpValue = a.orderInfo,
       number = a.total,
       m = a.discount,
       app = a.otherCost,
@@ -230,7 +228,7 @@ Page({
         {
           orderId: dialog,
         },
-        mta_analysis,
+        mpValue,
       ),
       {},
       {
@@ -254,8 +252,8 @@ Page({
         var a = e.data,
           dialog = a.billingId,
           orderCreate = void 0 === dialog ? "" : dialog,
-          mta_analysis = a.billingNo,
-          number = void 0 === mta_analysis ? "" : mta_analysis,
+          mpValue = a.billingNo,
+          number = void 0 === mpValue ? "" : mpValue,
           m = a.orderAmount,
           l = void 0 === m ? "" : m,
           p = a.totalAmount,

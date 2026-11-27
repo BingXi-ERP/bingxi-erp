@@ -2,7 +2,6 @@ var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   e = require("../../../@babel/runtime/helpers/defineProperty"),
   toConsumableArray = require("../../../@babel/runtime/helpers/toConsumableArray"),
   objectSpread2 = require("../../../@babel/runtime/helpers/objectSpread2"),
-  mta_analysis = t(require("../../../utils/mta_analysis")),
   time = require("../../../libs/utils/time"),
   dialog = t(require("../../../miniprogram_npm/@vant/weapp/dialog/dialog")),
   toast = t(require("../../../miniprogram_npm/@vant/weapp/toast/toast")),
@@ -152,7 +151,6 @@ Page({
   },
   onLoad: function (t) {
     (this.getIsIPhoneX(),
-      mta_analysis.default.Page.init(),
       login.login.getUserInfo(),
       this.getDictData());
     var e = t.id,
@@ -190,9 +188,9 @@ Page({
       successsuccess: function (o) {
         console.log(o);
         var objectSpread2 = o.model,
-          mta_analysis = o.screenHeight,
+          mpValue = o.screenHeight,
           time = /iphone x/i.test(objectSpread2),
-          dialog = /iPhone11/i.test(objectSpread2) && 812 === mta_analysis,
+          dialog = /iPhone11/i.test(objectSpread2) && 812 === mpValue,
           toast = /iPhone12/i.test(objectSpread2);
         ((t = time || dialog || toast),
           e.setData({
@@ -215,7 +213,7 @@ Page({
         .then(function (t) {
           if ((wx.hideLoading(), 0 === t.code)) {
             var toConsumableArray = t.data,
-              mta_analysis = [];
+              mpValue = [];
             toConsumableArray.billingGoodsDetailModelList &&
               toConsumableArray.billingGoodsDetailModelList.forEach(function (t) {
                 var time,
@@ -288,7 +286,7 @@ Page({
                       tabCurrentDyelotId: dialog[0].dyelotArr[0].id,
                     },
                   )),
-                  mta_analysis.push(toast));
+                  mpValue.push(toast));
               });
             (e.setData({
               customerId: toConsumableArray.customerId,
@@ -301,7 +299,7 @@ Page({
                 "-1": "full",
               }[toConsumableArray.saleType],
               remarks: toConsumableArray.billingRemark,
-              products: mta_analysis,
+              products: mpValue,
               productsDeclaration: [],
               billingPurchaseImgList: toConsumableArray.billingPurchaseImgList,
               buyerRemarks: toConsumableArray.remark || "-",
@@ -334,12 +332,12 @@ Page({
             objectSpread2 = [];
           toConsumableArray.billingGoodsDetailModelList &&
             toConsumableArray.billingGoodsDetailModelList.forEach(function (t) {
-              var mta_analysis,
+              var mpValue,
                 time = [];
               e.data.onlineOrder ||
                 null === (r = t.billingGoodsColorModels) ||
-                void 0 === mta_analysis ||
-                mta_analysis.forEach(function (t) {
+                void 0 === mpValue ||
+                mpValue.forEach(function (t) {
                   var e,
                     toConsumableArray = [];
                   t.dyelotModelList &&
@@ -426,10 +424,10 @@ Page({
                   }),
                 objectSpread2.push(dialog));
             });
-          var mta_analysis = [];
+          var mpValue = [];
           (toConsumableArray.orderGoodsDetailModelList &&
             toConsumableArray.orderGoodsDetailModelList.forEach(function (t) {
-              ((t.isOpened = !1), mta_analysis.push(t));
+              ((t.isOpened = !1), mpValue.push(t));
             }),
             e.setData({
               customerId: toConsumableArray.customerId,
@@ -443,7 +441,7 @@ Page({
               }[toConsumableArray.saleType],
               remarks: toConsumableArray.billingRemark,
               products: objectSpread2,
-              productsDeclaration: mta_analysis,
+              productsDeclaration: mpValue,
               buyerRemarks: toConsumableArray.remark || "-",
               orderTime: toConsumableArray.orderTime ? toConsumableArray.orderTime : "",
               billingPurchaseImgList: toConsumableArray.billingPurchaseImgList,
@@ -515,7 +513,7 @@ Page({
       objectSpread2 = this.data.products.find(function (t) {
         return t.id === e;
       }),
-      mta_analysis = "/pages/order-create/product-full/index?productType="
+      mpValue = "/pages/order-create/product-full/index?productType="
         .concat(toConsumableArray, "&openType=")
         .concat("offline", "&colorCardId=")
         .concat(e, "&fromCreate=1");
@@ -524,7 +522,7 @@ Page({
       data: objectSpread2,
     }),
       wx.navigateTo({
-        url: mta_analysis,
+        url: mpValue,
       }));
   },
   addProduct: function () {
@@ -554,9 +552,9 @@ Page({
       var objectSpread2 = "productType="
           .concat(this.data.productType, "&openType=offline&ids=")
           .concat(""),
-        mta_analysis = "/pages/order-create/color-card/select?".concat(objectSpread2);
+        mpValue = "/pages/order-create/color-card/select?".concat(objectSpread2);
       wx.navigateTo({
-        url: mta_analysis,
+        url: mpValue,
       });
     } else
       wx.showToast({
@@ -574,24 +572,24 @@ Page({
         products: objectSpread2,
       });
     }
-    var mta_analysis = this.data.products.find(function (e) {
+    var mpValue = this.data.products.find(function (e) {
       return e.id === t.id;
     });
-    if (mta_analysis)
-      ((mta_analysis.colors = toConsumableArray(t.colors)),
-        (mta_analysis.totalQuantity = t.totalQuantity),
-        (mta_analysis.totalPrice = t.totalPrice),
-        (mta_analysis.tabCurrentColorId = t.tabCurrentColorId),
-        (mta_analysis.tabCurrentColor = t.tabCurrentColor),
-        (mta_analysis.tabCurrentColorName = t.tabCurrentColorName),
-        (mta_analysis.tabCurrentColorList = toConsumableArray(t.tabCurrentColorList)),
-        (mta_analysis.tabCurrentDyelot = t.tabCurrentDyelot),
-        (mta_analysis.tabCurrentDyelotId = t.tabCurrentDyelotId),
-        (mta_analysis.billingStatus = null),
-        (mta_analysis.differenceNum = t.differenceNum),
-        (mta_analysis.differenceSymbol = t.differenceSymbol),
-        (mta_analysis.totalNum = t.totalNum),
-        (mta_analysis.totalCodeNum = t.totalCodeNum),
+    if (mpValue)
+      ((mpValue.colors = toConsumableArray(t.colors)),
+        (mpValue.totalQuantity = t.totalQuantity),
+        (mpValue.totalPrice = t.totalPrice),
+        (mpValue.tabCurrentColorId = t.tabCurrentColorId),
+        (mpValue.tabCurrentColor = t.tabCurrentColor),
+        (mpValue.tabCurrentColorName = t.tabCurrentColorName),
+        (mpValue.tabCurrentColorList = toConsumableArray(t.tabCurrentColorList)),
+        (mpValue.tabCurrentDyelot = t.tabCurrentDyelot),
+        (mpValue.tabCurrentDyelotId = t.tabCurrentDyelotId),
+        (mpValue.billingStatus = null),
+        (mpValue.differenceNum = t.differenceNum),
+        (mpValue.differenceSymbol = t.differenceSymbol),
+        (mpValue.totalNum = t.totalNum),
+        (mpValue.totalCodeNum = t.totalCodeNum),
         this.setData({
           products: this.data.products,
         }));
@@ -637,8 +635,8 @@ Page({
           wx.showLoading({
             title: "挂单中",
           });
-          var mta_analysis = this.getOrderPinParams();
-          (0, orderCreate.draftOrder)(mta_analysis)
+          var mpValue = this.getOrderPinParams();
+          (0, orderCreate.draftOrder)(mpValue)
             .then(function (t) {
               (wx.hideLoading(),
                 0 === t.code
@@ -680,7 +678,7 @@ Page({
       e = t.id,
       toConsumableArray = t.orderId,
       objectSpread2 = t.orderNo,
-      mta_analysis = t.customerId,
+      mpValue = t.customerId,
       time = t.customerName,
       dialog = t.createDate,
       toast = t.productType,
@@ -694,7 +692,7 @@ Page({
       t.colors.forEach(function (t) {
         t.dyelotArr.forEach(function (o) {
           o.list.forEach(function (a) {
-            var mta_analysis = {
+            var mpValue = {
               goodsColorId: t.id || "",
               colorNo: t.color || "",
               colorName: t.colorName || "",
@@ -704,7 +702,7 @@ Page({
               colorAmount: a.total || "",
               totalQuantity: a.quantity || "",
             };
-            e.push(mta_analysis);
+            e.push(mpValue);
           });
         });
       });
@@ -731,7 +729,7 @@ Page({
       id: e,
       orderId: toConsumableArray,
       orderNo: objectSpread2,
-      customerId: mta_analysis,
+      customerId: mpValue,
       userId: "",
       fullname: time,
       billingDate: dialog || "",
@@ -751,7 +749,7 @@ Page({
       e = this.data,
       toConsumableArray = e.isFromPin,
       objectSpread2 = e.id,
-      mta_analysis = e.orderId,
+      mpValue = e.orderId,
       time = e.orderNo,
       dialog = e.customerId,
       toast = e.productType,
@@ -779,7 +777,7 @@ Page({
           });
           var ServicesBase = "openType=offline&id="
               .concat(objectSpread2, "&orderId=")
-              .concat(mta_analysis, "&orderNo=")
+              .concat(mpValue, "&orderNo=")
               .concat(time, "&isFromPin=")
               .concat(toConsumableArray),
             login = "/pages/order-create/receipt/index?".concat(ServicesBase);
@@ -806,15 +804,15 @@ Page({
     var e = t.currentTarget.dataset,
       toConsumableArray = e.index,
       objectSpread2 = e.productId,
-      mta_analysis = this.data.products.find(function (t) {
+      mpValue = this.data.products.find(function (t) {
         return t.id === objectSpread2;
       });
-    ((mta_analysis.tabCurrentColorId = mta_analysis.colors[toConsumableArray].id),
-      (mta_analysis.tabCurrentColor = mta_analysis.colors[toConsumableArray].color),
-      (mta_analysis.tabCurrentColorName = mta_analysis.colors[toConsumableArray].colorName),
-      (mta_analysis.tabCurrentDyelot = mta_analysis.colors[toConsumableArray].dyelotArr),
-      (mta_analysis.tabCurrentDyelotId = mta_analysis.colors[toConsumableArray].dyelotArr[0].id),
-      (mta_analysis.tabCurrentColorList = mta_analysis.colors[toConsumableArray].dyelotArr[0].list),
+    ((mpValue.tabCurrentColorId = mpValue.colors[toConsumableArray].id),
+      (mpValue.tabCurrentColor = mpValue.colors[toConsumableArray].color),
+      (mpValue.tabCurrentColorName = mpValue.colors[toConsumableArray].colorName),
+      (mpValue.tabCurrentDyelot = mpValue.colors[toConsumableArray].dyelotArr),
+      (mpValue.tabCurrentDyelotId = mpValue.colors[toConsumableArray].dyelotArr[0].id),
+      (mpValue.tabCurrentColorList = mpValue.colors[toConsumableArray].dyelotArr[0].list),
       this.setData({
         products: this.data.products,
       }));
@@ -823,12 +821,12 @@ Page({
     var e = t.currentTarget.dataset,
       toConsumableArray = e.index,
       objectSpread2 = e.productId,
-      mta_analysis = e.productItem.tabCurrentColorId,
+      mpValue = e.productItem.tabCurrentColorId,
       time = this.data.products.find(function (t) {
         return t.id === objectSpread2;
       }),
       dialog = time.colors.find(function (t) {
-        return t.id === mta_analysis;
+        return t.id === mpValue;
       });
     ((time.tabCurrentDyelot = dialog.dyelotArr),
       (time.tabCurrentDyelotId = dialog.dyelotArr[toConsumableArray].id),
@@ -860,8 +858,8 @@ Page({
   handleUpdateCostVal: function (t) {
     var toConsumableArray = t.currentTarget.dataset.key,
       objectSpread2 = /^(\.*)(\d+)(\.?)(\d{0,2}).*$/g,
-      mta_analysis = t.detail.value,
-      time = objectSpread2.test(mta_analysis) ? mta_analysis.replace(objectSpread2, "$2$3$4") : "";
+      mpValue = t.detail.value,
+      time = objectSpread2.test(mpValue) ? mpValue.replace(objectSpread2, "$2$3$4") : "";
     return (
       this.setData({
         toConsumableArray: time,
@@ -872,10 +870,10 @@ Page({
   handleBlurCostVal: function (t) {
     var toConsumableArray = t.detail.value,
       objectSpread2 = t.target.dataset.key,
-      mta_analysis = toConsumableArray.substr(toConsumableArray.length - 1);
+      mpValue = toConsumableArray.substr(toConsumableArray.length - 1);
     ((o =
       "" != (o = 0 == toConsumableArray ? "" : toConsumableArray) ? Number(toConsumableArray) : ""),
-      "." == mta_analysis && (o = Number(toConsumableArray)),
+      "." == mpValue && (o = Number(toConsumableArray)),
       this.setData({
         objectSpread2: toConsumableArray,
       }),

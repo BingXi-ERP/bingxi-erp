@@ -6,7 +6,6 @@ var t = require("../../@babel/runtime/helpers/interopRequireDefault").default,
 var objectSpread2 = require("../../@babel/runtime/helpers/objectSpread2"),
   createForOfIteratorHelper = require("../../@babel/runtime/helpers/createForOfIteratorHelper"),
   ServicesUserLog = require("../../libs/services/ServicesUserLog.js"),
-  mta_analysis = t(require("../../utils/mta_analysis.js")),
   app = getApp(),
   ServicesCustomer = require("../../libs/services/ServicesCustomer.js").servicesCustomer,
   ServicesCard = require("../../libs/services/ServicesCard.js").servicesCard,
@@ -266,12 +265,12 @@ Page({
       new Promise(function (o, s) {
         var objectSpread2 = t.data,
           ServicesUserLog = objectSpread2.pageNum,
-          mta_analysis = objectSpread2.pageSize,
+          mpValue = objectSpread2.pageSize,
           app = objectSpread2.cargoPassList,
           ServicesCustomer = {
             productStatus: -1,
             page: ServicesUserLog,
-            size: mta_analysis,
+            size: mpValue,
             searchField: e,
           };
         releaseCargoPass.releaseCargoPassList(ServicesCustomer).then(function (e) {
@@ -282,8 +281,8 @@ Page({
                 ServicesUserLog = createForOfIteratorHelper(s);
               try {
                 for (ServicesUserLog.s(); !(r = ServicesUserLog.n()).done;) {
-                  var mta_analysis = objectSpread2.value;
-                  app.push(mta_analysis);
+                  var mpValue = objectSpread2.value;
+                  app.push(mpValue);
                 }
               } catch (t) {
                 ServicesUserLog.e(t);
@@ -340,9 +339,9 @@ Page({
           ServicesUserLog = createForOfIteratorHelper(s);
         try {
           for (ServicesUserLog.s(); !(r = ServicesUserLog.n()).done;) {
-            var mta_analysis = objectSpread2.value;
-            ((mta_analysis.headImg = util.addDefaultAvatar(mta_analysis.avatar)),
-              e.push(mta_analysis));
+            var mpValue = objectSpread2.value;
+            ((mpValue.headImg = util.addDefaultAvatar(mpValue.avatar)),
+              e.push(mpValue));
           }
         } catch (t) {
           ServicesUserLog.e(t);
@@ -386,12 +385,12 @@ Page({
       }),
       new Promise(function (a, o) {
         var s = t.data,
-          mta_analysis = s.pageNum,
+          mpValue = s.pageNum,
           ServicesCustomer = s.pageSize,
           releaseCargoPass = s.colorCardList,
           util = {
             filterKey: 1,
-            page: mta_analysis,
+            page: mpValue,
             size: ServicesCustomer,
             searchFiled: e,
           };
@@ -408,18 +407,18 @@ Page({
                   objectSpread2 = createForOfIteratorHelper(toConsumableArray);
                 try {
                   for (objectSpread2.s(); !(s = objectSpread2.n()).done;) {
-                    var mta_analysis = s.value;
-                    (1 == mta_analysis.onSale
-                      ? (mta_analysis.onOrOff = {
+                    var mpValue = s.value;
+                    (1 == mpValue.onSale
+                      ? (mpValue.onOrOff = {
                           name: "下架",
                           icon: "/assets/icons/Icon_Delete.png",
                         })
-                      : 0 == mta_analysis.onSale &&
-                        (mta_analysis.onOrOff = {
+                      : 0 == mpValue.onSale &&
+                        (mpValue.onOrOff = {
                           name: "上架",
                           icon: "/assets/icons/no_img.png",
                         }),
-                      releaseCargoPass.push(mta_analysis));
+                      releaseCargoPass.push(mpValue));
                   }
                 } catch (t) {
                   objectSpread2.e(t);
@@ -629,7 +628,7 @@ Page({
         t.setFillStyle("#333333"),
         t.setTextAlign("center"),
         t.fillText("查看更多商品", 238 * e, 435 * e)));
-    var mta_analysis =
+    var mpValue =
       toConsumableArray.length > 13 ? toConsumableArray.substring(0, 13) : toConsumableArray;
     if (toConsumableArray.length > 13) {
       c = toConsumableArray.substring(0, 13);
@@ -644,7 +643,7 @@ Page({
       (t.setFontSize(14 * e),
       t.setFillStyle("#000000"),
       t.setTextAlign("left"),
-      t.fillText(mta_analysis, 15 * e, 320 * e),
+      t.fillText(mpValue, 15 * e, 320 * e),
       1 === a.showPrice &&
         (t.setFontSize(18 * e),
         t.setFillStyle("#ff0000"),
@@ -709,7 +708,7 @@ Page({
       objectSpread2 = t.showRemark,
       createForOfIteratorHelper = t.showClothEnough,
       ServicesUserLog = t.showClothWidth,
-      mta_analysis = t.showGramWeight,
+      mpValue = t.showGramWeight,
       app = t.showMaterial,
       ServicesCustomer = t.showShelvesNumber,
       ServicesCard = !(
@@ -721,7 +720,7 @@ Page({
         0 !== objectSpread2 ||
         0 !== createForOfIteratorHelper ||
         0 !== ServicesUserLog ||
-        0 !== mta_analysis ||
+        0 !== mpValue ||
         0 !== app
       );
     this.setData({
@@ -759,7 +758,7 @@ Page({
           var objectSpread2 = a.data.setting.shape,
             createForOfIteratorHelper = 0 === a.data.setting.showImageTwo ? 130 : 0,
             ServicesUserLog = 0 === a.data.setting.showRemark ? 20 : 0,
-            mta_analysis =
+            mpValue =
               Math.ceil(e.data.shareColorList.length / 4) * (2 === objectSpread2 ? 92 : 82) +
               355 -
               createForOfIteratorHelper -
@@ -771,13 +770,13 @@ Page({
           console.log("一共多少行色块", app);
           var ServicesCustomer = 320 + 90 * app + 50;
           (console.log("真实高度", ServicesCustomer),
-            console.log("_height", mta_analysis),
-            console.log("录得高度", mta_analysis < 550 ? 650 : ServicesCustomer),
+            console.log("_height", mpValue),
+            console.log("录得高度", mpValue < 550 ? 650 : ServicesCustomer),
             e.setData({
               shareColorList: e.data.shareColorList,
               colorCardInfo: a.data,
-              "popupInit.canvasHeight": mta_analysis < 550 ? 650 : ServicesCustomer,
-              "popupInit.canvasHeight2": mta_analysis < 550 ? 1050 : 2 * mta_analysis,
+              "popupInit.canvasHeight": mpValue < 550 ? 650 : ServicesCustomer,
+              "popupInit.canvasHeight2": mpValue < 550 ? 1050 : 2 * mpValue,
             }),
             wx.setStorageSync("colorCaraSetting", a.data.setting));
           var ServicesCard = [
@@ -811,7 +810,7 @@ Page({
     var s = this;
     return a(
       e().mark(function a() {
-        var objectSpread2, createForOfIteratorHelper, ServicesUserLog, mta_analysis;
+        var objectSpread2, createForOfIteratorHelper, ServicesUserLog, mpValue;
         return e().wrap(function (e) {
           for (;;)
             switch ((e.prev = e.next)) {
@@ -825,7 +824,7 @@ Page({
                   s.drawColorShare(ServicesUserLog, t, 1)
                 );
               case 1:
-                return ((e.next = 2), s.drawColorShare(mta_analysis, t, 2));
+                return ((e.next = 2), s.drawColorShare(mpValue, t, 2));
               case 2:
                 (s.setData({
                   "popupInit.canvas.show": !0,
@@ -847,7 +846,7 @@ Page({
       e().mark(function a() {
         var createForOfIteratorHelper,
           ServicesUserLog,
-          mta_analysis,
+          mpValue,
           app,
           ServicesCustomer,
           ServicesCard,
@@ -916,7 +915,7 @@ Page({
                   (x = ServicesUserLog.clothWidth),
                   (S = ServicesUserLog.gramWeight),
                   (P = ServicesUserLog.shelvesNumber),
-                  (y = mta_analysis || "-"),
+                  (y = mpValue || "-"),
                   (L = (L = app || "-").length > 17 ? L.substring(0, 17) + "..." : L),
                   (T = P || "-"),
                   (D = ""),
@@ -1426,7 +1425,7 @@ Page({
   },
   onLoad: function (t) {
     var e = this;
-    switch ((mta_analysis.default.Page.init(), wx.hideShareMenu(), t.type)) {
+    switch ((wx.hideShareMenu(), t.type)) {
       case "customer":
         this.setData({
           searchType: t.type,

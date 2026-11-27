@@ -2,7 +2,6 @@ var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   a = require("../../../@babel/runtime/helpers/defineProperty"),
   toast = t(require("../../../miniprogram_npm/@vant/weapp/toast/toast")),
   number = t(require("../../../utils/number")),
-  mta_analysis = t(require("../../../utils/mta_analysis.js")),
   ServicesUserLog = require("../../../libs/services/ServicesUserLog"),
   ServicesOrder = require("../../../libs/services/ServicesOrder").ServicesOrder,
   app = getApp();
@@ -32,7 +31,6 @@ Page({
     },
   },
   onLoad: function (t) {
-    mta_analysis.default.Page.init();
     var a = t.id;
     this.setData({
       choosedItemId: a,
@@ -86,9 +84,9 @@ Page({
     var t = this,
       a = this.data,
       number = a.unpay,
-      mta_analysis = (a.unpayTemp, a.payment);
-    if (0 != mta_analysis) {
-      if (Number(mta_analysis) - Number(number) > 0)
+      mpValue = (a.unpayTemp, a.payment);
+    if (0 != mpValue) {
+      if (Number(mpValue) - Number(number) > 0)
         (0, toast.default)({
           message: "本次收款金额不得大于待收金额",
           duration: 1500,
@@ -158,9 +156,9 @@ Page({
         }),
         ""
       );
-    var mta_analysis = this.data,
-      ServicesUserLog = mta_analysis.actualPay,
-      ServicesOrder = mta_analysis.payed,
+    var mpValue = this.data,
+      ServicesUserLog = mpValue.actualPay,
+      ServicesOrder = mpValue.payed,
       app = number.default.operation(Number(ServicesUserLog), Number(ServicesOrder), "subtract");
     return (
       (u = number.default.operation(Number(app), Number(a), "subtract")),
@@ -177,10 +175,10 @@ Page({
       a = t.paymentWechat,
       toast = t.paymentAlipay,
       number = t.paymentCash,
-      mta_analysis = t.paymentCard,
+      mpValue = t.paymentCard,
       ServicesUserLog = t.paymentRemit,
       ServicesOrder =
-        Number(a) + Number(toast) + Number(number) + Number(mta_analysis) + Number(ServicesUserLog);
+        Number(a) + Number(toast) + Number(number) + Number(mpValue) + Number(ServicesUserLog);
     this.setData({
       payment: ServicesOrder.toFixed(2),
     });

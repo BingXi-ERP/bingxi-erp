@@ -1,7 +1,6 @@
 var t = require("../../../../../@babel/runtime/helpers/interopRequireDefault").default,
   orderCreate = require("../../../../../libs/services/orderCreate"),
   dialog = t(require("../../../../../miniprogram_npm/@vant/weapp/dialog/dialog")),
-  mta_analysis = t(require("../../../../../utils/mta_analysis")),
   app = getApp();
 Page({
   data: {
@@ -19,7 +18,6 @@ Page({
     },
   },
   onLoad: function (t) {
-    mta_analysis.default.Page.init();
     var orderCreate = wx.getStorageSync("changeBottomCard");
     (this.setData({
       productIds: orderCreate.map(function (t) {
@@ -42,13 +40,13 @@ Page({
       title: "加载中",
     });
     var dialog = this.data,
-      mta_analysis = {
+      mpValue = {
         searchFiled: dialog.keyword,
         page: dialog.page,
         size: 10,
         excludeProductIds: dialog.productIds,
       };
-    (0, orderCreate.getColorCards)(mta_analysis)
+    (0, orderCreate.getColorCards)(mpValue)
       .then(function (e) {
         if (0 === e.code)
           try {
@@ -84,10 +82,10 @@ Page({
   handleSelect: function (t) {
     var orderCreate = t.currentTarget.dataset,
       dialog = orderCreate.id,
-      mta_analysis = orderCreate.name;
+      mpValue = orderCreate.name;
     this.setData({
       checkedId: dialog,
-      checkName: mta_analysis,
+      checkName: mpValue,
     });
   },
   goback: function () {

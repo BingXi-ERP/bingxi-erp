@@ -1,5 +1,4 @@
 var e = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
-  mta_analysis = e(require("../../../utils/mta_analysis.js")),
   toast = e(require("../../../../miniprogram_npm/@vant/weapp/toast/toast")),
   ServicesIndex = require("../../../libs/services/ServicesIndex.js").ServicesIndex;
 Page({
@@ -18,7 +17,6 @@ Page({
     ],
   },
   onLoad: function (e) {
-    mta_analysis.default.Page.init();
   },
   onShow: function () {
     this.getPrintNeedle();
@@ -76,23 +74,23 @@ Page({
       }));
   },
   getStatus: function (e) {
-    var mta_analysis = {
+    var mpValue = {
       0: "--",
       1: "在线",
       2: "离线",
     }[e];
     this.setData({
       statusCode: e,
-      statusText: mta_analysis,
+      statusText: mpValue,
     });
   },
   handleSubmitForm: function (e) {
-    var mta_analysis = e.detail.value;
-    if ("" !== mta_analysis.serialNumber) {
-      if ("" !== mta_analysis.checkCode) {
+    var mpValue = e.detail.value;
+    if ("" !== mpValue.serialNumber) {
+      if ("" !== mpValue.checkCode) {
         var n = {
-          printerSn: mta_analysis.serialNumber,
-          checkCode: mta_analysis.checkCode,
+          printerSn: mpValue.serialNumber,
+          checkCode: mpValue.checkCode,
         };
         ServicesIndex.saveBillingPrinter(n).then(function (e) {
           0 === e.code

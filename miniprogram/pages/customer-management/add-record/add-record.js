@@ -1,6 +1,5 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   ServicesUserLog = require("../../../libs/services/ServicesUserLog.js"),
-  mta_analysis = t(require("../../../utils/mta_analysis.js")),
   app = getApp(),
   ServicesCustomer = require("../../../libs/services/ServicesCustomer.js").servicesCustomer;
 require("../../../libs/utils/util.js").utils;
@@ -48,15 +47,15 @@ Page({
   },
   submit: function () {
     var t = this.data,
-      mta_analysis = t.inputValue,
+      mpValue = t.inputValue,
       app = t.showImgList,
       n = t.colorCardArr,
       a = t.customerId;
-    if ("" != mta_analysis || 0 != app.length || 0 != n.length) {
+    if ("" != mpValue || 0 != app.length || 0 != n.length) {
       for (var r = [], c = 0; c < n.length; c++) r.push(n[c].goodsid);
       var u = {
         customerId: a,
-        content: mta_analysis,
+        content: mpValue,
         recordImgPathList: app,
         goodsIdList: r,
       };
@@ -85,7 +84,7 @@ Page({
       });
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(), wx.hideShareMenu());
+    (wx.hideShareMenu());
   },
   onReady: function () {},
   onShow: function () {

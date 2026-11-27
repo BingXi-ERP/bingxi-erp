@@ -1,8 +1,7 @@
 var t = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   createForOfIteratorHelper = require("../../../../@babel/runtime/helpers/createForOfIteratorHelper"),
   a =
-    (require("../../../libs/services/ServicesUserLog.js"),
-    t(require("../../../utils/mta_analysis.js"))),
+    (require("../../../libs/services/ServicesUserLog.js")),
   app = getApp(),
   releaseCargoPass = require("../../../libs/services/releaseCargoPass.js").servicesCargoPass;
 Page({
@@ -233,8 +232,7 @@ Page({
     }
   },
   onLoad: function (t) {
-    (a.default.Page.init(),
-      this.setData({
+    (this.setData({
         userAuthList: app.userAuthList,
       }),
       "" != t.id && null != t.id

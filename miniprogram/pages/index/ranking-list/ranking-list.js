@@ -1,7 +1,4 @@
-var t = (0, require("../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../utils/mta_analysis.js"),
-  ),
-  ServicesIndex = require("../../../libs/services/ServicesIndex.js").ServicesIndex,
+var ServicesIndex = require("../../../libs/services/ServicesIndex.js").ServicesIndex,
   app = getApp();
 Page({
   data: {
@@ -27,8 +24,7 @@ Page({
     });
   },
   onLoad: function (a) {
-    (t.default.Page.init(),
-      this.setData({
+    (this.setData({
         globalApp: app,
         shopId: a.shopId,
         userId: a.userId,

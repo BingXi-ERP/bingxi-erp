@@ -3,7 +3,6 @@ var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default
   a = require("../../../@babel/runtime/helpers/asyncToGenerator"),
   o = require("../../../@babel/runtime/helpers/defineProperty");
 var toConsumableArray = require("../../../@babel/runtime/helpers/toConsumableArray"),
-  mta_analysis = t(require("../../../utils/mta_analysis.js")),
   util = require("../../../libs/utils/util"),
   uploadGateway = require("../../../libs/utils/uploadGateway.js"),
   r =
@@ -80,7 +79,7 @@ Page({
     },
   },
   onLoad: function (t) {
-    (console.log(t, "options"), mta_analysis.default.Page.init());
+    (console.log(t, "options"));
     var e = t.productId;
     (this.setData({
       productId: e,
@@ -139,10 +138,10 @@ Page({
             name: "file",
             success: function (resp) {
               if (0 === resp.code) {
-                var mta_analysis = resp.data;
+                var mpValue = resp.data;
                 (e.setData({
-                  customColorImage: util.utils.replImage(mta_analysis, 300),
-                  "nowList.customColorImage": mta_analysis,
+                  customColorImage: util.utils.replImage(mpValue, 300),
+                  "nowList.customColorImage": mpValue,
                   "nowList.isRepeatUpload": !0,
                 }),
                   e.onSubColorSettingData());
@@ -183,7 +182,7 @@ Page({
         return t.colorValue;
       }).length));
     var o = e.setting.shape,
-      mta_analysis = 0 === e.setting.showImageTwo ? 130 : 0,
+      mpValue = 0 === e.setting.showImageTwo ? 130 : 0,
       util = 0 === e.setting.showRemark ? 20 : 0,
       r = this.data.shareColorList.filter(function (t) {
         return t.colorImagePath;
@@ -192,7 +191,7 @@ Page({
         Math.ceil(this.data.shareColorList.length / 4) * (2 === o ? 92 : 82) +
         355 +
         (r.length / 4) * 8 -
-        mta_analysis -
+        mpValue -
         util -
         (this.data.settingAllHide ? 140 : 0);
     (this.setData({
@@ -254,7 +253,7 @@ Page({
   getColorCardImg: function (t) {
     var e = this;
     return new Promise(function (a, s) {
-      var mta_analysis = "";
+      var mpValue = "";
       if (t.includes("clothImage")) {
         var r = e.data.colorCardInfo.imageInfoList
           ? e.data.colorCardInfo.imageInfoList.slice(0, 2)
@@ -276,15 +275,15 @@ Page({
           e.data.icon.def_img;
       ("color_def" === t && (n = e.data.icon.color_def),
         "color_def2" === t && (n = e.data.icon.color_def2),
-        mta_analysis || (n = e.data.icon.def_img),
+        mpValue || (n = e.data.icon.def_img),
         wx.getImageInfo({
-          src: mta_analysis,
+          src: mpValue,
           success: function (s) {
             if ("getImageInfo:ok" === s.errMsg) {
               console.log(s.path);
-              var mta_analysis = "colorCardInfo." + t;
+              var mpValue = "colorCardInfo." + t;
               (e.setData({
-                mta_analysis: s.path,
+                mpValue: s.path,
               }),
                 a());
             } else (a(e.data.icon.def_img), wx.hideLoading());
@@ -334,7 +333,7 @@ Page({
       a = t.showPrice,
       o = t.showProductName,
       toConsumableArray = t.showQrcode,
-      mta_analysis = t.showRemark,
+      mpValue = t.showRemark,
       util = t.showClothEnough,
       r = t.showClothWidth,
       app = t.showGramWeight,
@@ -346,7 +345,7 @@ Page({
         0 !== o ||
         0 !== h ||
         0 !== toConsumableArray ||
-        0 !== mta_analysis ||
+        0 !== mpValue ||
         0 !== util ||
         0 !== r ||
         0 !== app ||
@@ -387,7 +386,7 @@ Page({
     var toConsumableArray = this;
     return a(
       e().mark(function a() {
-        var mta_analysis, util, r, app;
+        var mpValue, util, r, app;
         return e().wrap(function (e) {
           for (;;)
             switch ((e.prev = e.next)) {
@@ -395,7 +394,7 @@ Page({
                 return (
                   (n = toConsumableArray.data.popupInit.canvas.canvasId.shareCanvas + o),
                   (i = toConsumableArray.data.popupInit.canvas.canvasId.photoCanvas + o),
-                  (r = wx.createCanvasContext(mta_analysis)),
+                  (r = wx.createCanvasContext(mpValue)),
                   (l = wx.createCanvasContext(util)),
                   (e.next = 1),
                   toConsumableArray.drawColorShare(r, t, 1)
@@ -485,7 +484,7 @@ Page({
   },
   drawColorShare: function (t, o) {
     var toConsumableArray = arguments,
-      mta_analysis = this;
+      mpValue = this;
     return a(
       e().mark(function a() {
         var r,
@@ -546,7 +545,7 @@ Page({
                   toConsumableArray.length > 2 && void 0 !== toConsumableArray[2]
                     ? toConsumableArray[2]
                     : 1),
-                  (l = mta_analysis.data.colorCardInfo),
+                  (l = mpValue.data.colorCardInfo),
                   (c = app.businessProductName),
                   (h = app.companyName),
                   (g = app.price),
@@ -570,29 +569,29 @@ Page({
                   0 != g && "0.0" != g && g
                     ? (k = g ? "¥ ".concat(g, "/").concat(d) : "")
                     : ((k = "面议"), ""),
-                  (A = mta_analysis.data.colorCardInfo.remark || ""),
-                  mta_analysis.data.tempImgUrl.goodUrl,
-                  (L = mta_analysis.data.tempImgUrl.qrUrl),
+                  (A = mpValue.data.colorCardInfo.remark || ""),
+                  mpValue.data.tempImgUrl.goodUrl,
+                  (L = mpValue.data.tempImgUrl.qrUrl),
                   (F = m),
                   (D = u),
                   (M = f),
                   (_ = p),
-                  (H = mta_analysis.data.colorCardInfo.color_def),
-                  (R = mta_analysis.data.colorCardInfo.color_def2),
+                  (H = mpValue.data.colorCardInfo.color_def),
+                  (R = mpValue.data.colorCardInfo.color_def2),
                   (N = w > 10 ? w.substring(0, 10) + "..." : w),
                   (z = I || ""),
                   (q = "克重：" + (x || "-")),
                   (V = "幅宽：" + (S || "-")),
                   (W = "空差：" + (v || "-")),
-                  (U = mta_analysis.data.colorCardInfo.setting),
-                  (Q = mta_analysis.data.settingAllHide ? 140 * r : 0),
+                  (U = mpValue.data.colorCardInfo.setting),
+                  (Q = mpValue.data.settingAllHide ? 140 * r : 0),
                   t.setFillStyle("white"),
-                  mta_analysis.roundRect(
+                  mpValue.roundRect(
                     t,
                     0 * r,
                     0 * r,
                     305 * r,
-                    mta_analysis.data.popupInit.canvasHeight * r,
+                    mpValue.data.popupInit.canvasHeight * r,
                     8,
                     "#ffffff",
                   ),
@@ -670,7 +669,7 @@ Page({
                     t.fillText(z, 290 * r, 175 * r)),
                   (B = 0 === U.showRemark ? 200 : 230),
                   U.showImageTwo >= 0 &&
-                    (mta_analysis.drawProdImage(
+                    (mpValue.drawProdImage(
                       t,
                       16 * r,
                       B * r - Q,
@@ -689,7 +688,7 @@ Page({
                       80 * r,
                       (B + 117) * r - Q,
                     ),
-                    mta_analysis.drawProdImage(
+                    mpValue.drawProdImage(
                       t,
                       160 * r,
                       B * r - Q,
@@ -734,13 +733,13 @@ Page({
                 }
                 (2 === U.shape
                   ? $.colorValue
-                    ? mta_analysis.roundRect(t, O, K, 48 * r, 48 * r, 24 * r, $.colorValue || "")
-                    : mta_analysis.drawProdImage(t, O, K, 48 * r, 48 * r, 24 * r, R)
+                    ? mpValue.roundRect(t, O, K, 48 * r, 48 * r, 24 * r, $.colorValue || "")
+                    : mpValue.drawProdImage(t, O, K, 48 * r, 48 * r, 24 * r, R)
                   : $.colorValue
-                    ? mta_analysis.roundRect(t, O, K, 62 * r, 38 * r, 4 * r, $.colorValue || "")
-                    : mta_analysis.drawProdImage(t, O, K, 62 * r, 38 * r, 4 * r, H),
-                  (at = mta_analysis.data.color_icon),
-                  mta_analysis.drawProdImage(
+                    ? mpValue.roundRect(t, O, K, 62 * r, 38 * r, 4 * r, $.colorValue || "")
+                    : mpValue.drawProdImage(t, O, K, 62 * r, 38 * r, 4 * r, H),
+                  (at = mpValue.data.color_icon),
+                  mpValue.drawProdImage(
                     t,
                     O + 30 * r + (2 === U.shape ? -8 * r : 0) - (3 * tt.length + 9) * r,
                     K + 44 * r + (2 === U.shape ? 8 * r : 0),
@@ -754,12 +753,12 @@ Page({
               case 2:
                 return (
                   (e.next = 3),
-                  mta_analysis
+                  mpValue
                     .getCanvasColorImg(util.utils.replImage($.colorImagePath, 122))
                     .then(function (e) {
                       2 === U.shape
-                        ? mta_analysis.drawProdImage(t, O - 6, K, 60 * r, 60 * r, 30 * r, e)
-                        : mta_analysis.drawProdImage(t, O, K, 62 * r, 41 * r, 4 * r, e);
+                        ? mpValue.drawProdImage(t, O - 6, K, 60 * r, 60 * r, 30 * r, e)
+                        : mpValue.drawProdImage(t, O, K, 62 * r, 41 * r, 4 * r, e);
                     })
                 );
               case 3:
@@ -791,7 +790,7 @@ Page({
                   t.fillText(
                     "秉羲工作台·技术支持",
                     160 * r,
-                    mta_analysis.data.popupInit.canvasHeight * r - 10,
+                    mpValue.data.popupInit.canvasHeight * r - 10,
                   ),
                   t.stroke(),
                   t.draw());
@@ -855,7 +854,7 @@ Page({
     var o = this;
     return a(
       e().mark(function a() {
-        var toConsumableArray, mta_analysis, util, c;
+        var toConsumableArray, mpValue, util, c;
         return e().wrap(function (e) {
           for (;;)
             switch ((e.prev = e.next)) {
@@ -925,7 +924,7 @@ Page({
                               success: function (resp) {
                                 if (0 === resp.code) {
                                   var a = {
-                                    productId: mta_analysis,
+                                    productId: mpValue,
                                     shareColorImg: resp.data,
                                   };
                                   r.saveColorCardImage(a);

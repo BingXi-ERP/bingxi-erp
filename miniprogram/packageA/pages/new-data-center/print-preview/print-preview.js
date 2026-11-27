@@ -1,7 +1,4 @@
-var e = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../../utils/mta_analysis"),
-  ),
-  services_demand = require("../../../services/services-demand"),
+var services_demand = require("../../../services/services-demand"),
   ServicesUserLog = require("../../../services/ServicesUserLog"),
   app = getApp();
 Page({
@@ -16,7 +13,6 @@ Page({
     isSingleCustomer: !1,
   },
   onLoad: function (t) {
-    e.default.Page.init();
     // 原写法读 storage 的 token 拼进 webview 查询串：storage 从来没有 token 键，拼出的永远是
     // token=undefined 假凭据；预览腿本身是旧路径待拍板面，这里只断凭据面，
     // 改带会话快照里后端确认过的用户 id 作对账键（非凭据、非敏感）

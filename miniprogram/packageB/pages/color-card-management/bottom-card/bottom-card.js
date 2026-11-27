@@ -1,7 +1,4 @@
-var t = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../../utils/mta_analysis.js"),
-  ),
-  ServicesCardType = require("../../../../libs/services/ServicesCardType.js").ServicesCardType,
+var ServicesCardType = require("../../../../libs/services/ServicesCardType.js").ServicesCardType,
   ServicesCard = require("../../../../libs/services/ServicesCard.js").servicesCard,
   app = getApp();
 Page({
@@ -122,8 +119,7 @@ Page({
   },
   onLoad: function (a) {
     if (
-      (t.default.Page.init(),
-      console.log(a),
+      (console.log(a),
       a.goodsId &&
         this.setData({
           globalApp: app,

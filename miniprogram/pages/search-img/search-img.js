@@ -1,6 +1,5 @@
 var e = require("../../@babel/runtime/helpers/interopRequireDefault").default,
   ServicesUserLog = require("../../libs/services/ServicesUserLog.js"),
-  mta_analysis = e(require("../../utils/mta_analysis.js")),
   app = getApp(),
   login = require("../../libs/utils/login.js").login;
 require("../../libs/utils/util.js").utils;
@@ -21,11 +20,11 @@ Page({
     });
   },
   chooseImage: function (e) {
-    var mta_analysis = e.currentTarget.dataset.action;
+    var mpValue = e.currentTarget.dataset.action;
     wx.chooseMedia({
       count: 1,
       sizeType: ["original", "compressed"],
-      sourceType: ["".concat(mta_analysis)],
+      sourceType: ["".concat(mpValue)],
       mediaType: ["image"],
       success: function (e) {
         (ServicesUserLog.servicesUserLog.setUserHandleLog(601),
@@ -43,7 +42,7 @@ Page({
     });
   },
   onLoad: function (e) {
-    (mta_analysis.default.Page.init(), wx.hideShareMenu());
+    (wx.hideShareMenu());
   },
   onReady: function () {},
   onShow: function () {

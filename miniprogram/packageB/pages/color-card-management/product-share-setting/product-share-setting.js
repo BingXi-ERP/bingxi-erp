@@ -1,6 +1,5 @@
 var e = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   t = require("../../../../@babel/runtime/helpers/defineProperty"),
-  mta_analysis = e(require("../../../../utils/mta_analysis.js")),
   i =
     (require("../../../../libs/utils/cpcl-exp.js"),
     require("../../../../libs/services/ServicesCard.js").servicesCard),
@@ -29,7 +28,6 @@ Page({
     showLoading: !0,
   },
   onLoad: function (e) {
-    mta_analysis.default.Page.init();
     var t = wx.getStorageSync("colorCaraSetting");
     (this.setData({
       productId: t.productId,
@@ -60,10 +58,10 @@ Page({
     };
     i.colorCardDetails(t).then(function (t) {
       if ((console.log("获取色卡设置信息"), console.log(t), 0 === t.code)) {
-        var mta_analysis = t.data;
+        var mpValue = t.data;
         e.setData({
-          nowList: mta_analysis,
-          labelType: mta_analysis.labelType,
+          nowList: mpValue,
+          labelType: mpValue.labelType,
         });
       }
       wx.hideLoading();
@@ -77,24 +75,24 @@ Page({
   },
   changeStatus: function (e) {
     var t,
-      mta_analysis = this.data.nowList;
+      mpValue = this.data.nowList;
     switch (e.currentTarget.id) {
       case "showQrcode":
-        ((t = 1 == mta_analysis.showQrcode ? 0 : 1), this.onChangeSetting("showQrcode", t));
+        ((t = 1 == mpValue.showQrcode ? 0 : 1), this.onChangeSetting("showQrcode", t));
         break;
       case "showProductName":
-        ((t = 1 == mta_analysis.showProductName ? 0 : 1),
+        ((t = 1 == mpValue.showProductName ? 0 : 1),
           this.onChangeSetting("showProductName", t));
         break;
       case "showPrice":
-        ((t = 1 == mta_analysis.showPrice ? 0 : 1), this.onChangeSetting("showPrice", t));
+        ((t = 1 == mpValue.showPrice ? 0 : 1), this.onChangeSetting("showPrice", t));
         break;
       case "showShelvesNumber":
-        ((t = 1 == mta_analysis.showShelvesNumber ? 0 : 1),
+        ((t = 1 == mpValue.showShelvesNumber ? 0 : 1),
           this.onChangeSetting("showShelvesNumber", t));
         break;
       case "showMaterial":
-        ((t = 1 == mta_analysis.showMaterial ? 0 : 1), this.onChangeSetting("showMaterial", t));
+        ((t = 1 == mpValue.showMaterial ? 0 : 1), this.onChangeSetting("showMaterial", t));
     }
   },
   onChangeSetting: function (e, t) {

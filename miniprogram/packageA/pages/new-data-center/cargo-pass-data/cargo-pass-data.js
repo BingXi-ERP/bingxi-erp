@@ -1,8 +1,5 @@
 var interopRequireWildcard =
     require("../../../../@babel/runtime/helpers/interopRequireWildcard").default,
-  a = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../..//utils/mta_analysis.js"),
-  ),
   e =
     (require("../../../utils/util"),
     interopRequireWildcard(require("../../../components/ec-canvas/echarts"))),
@@ -100,8 +97,7 @@ Page({
     globalApp: {},
   },
   onLoad: function (t) {
-    (a.default.Page.init(),
-      this.setData({
+    (this.setData({
         globalApp: app,
         shopId: t.shopId,
       }));

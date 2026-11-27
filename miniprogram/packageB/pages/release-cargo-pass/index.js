@@ -1,7 +1,6 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   e = require("../../../@babel/runtime/helpers/defineProperty"),
   createForOfIteratorHelper = require("../../../@babel/runtime/helpers/createForOfIteratorHelper"),
-  mta_analysis = t(require("../../utils/mta_analysis.js")),
   app = getApp(),
   login = require("../../libs/utils/login.js").login,
   releaseCargoPass = require("../../libs/services/releaseCargoPass.js").servicesCargoPass,
@@ -145,7 +144,7 @@ Page({
   getCargoList: function () {
     var t = this,
       e = arguments.length > 0 && void 0 !== arguments[0] ? arguments[0] : "",
-      mta_analysis = !(arguments.length > 1 && void 0 !== arguments[1]) || arguments[1],
+      mpValue = !(arguments.length > 1 && void 0 !== arguments[1]) || arguments[1],
       app = arguments.length > 2 && void 0 !== arguments[2] && arguments[2],
       login = !(arguments.length > 3 && void 0 !== arguments[3]) || arguments[3];
     return (
@@ -175,7 +174,7 @@ Page({
                 "colorCardCount.breakCount": e.data.breakCount,
                 "colorCardCount.inReviewCount": e.data.inReviewCount,
               }),
-              mta_analysis)
+              mpValue)
             ) {
               var g,
                 d = createForOfIteratorHelper(releaseCargoPass);
@@ -218,18 +217,18 @@ Page({
   revokeApply: function (t) {
     var e = this,
       createForOfIteratorHelper = t.detail,
-      mta_analysis = createForOfIteratorHelper.status,
+      mpValue = createForOfIteratorHelper.status,
       app = createForOfIteratorHelper.id;
     releaseCargoPass[
       ["", "releaseCargoPassSuspend", "releaseCargoPassRestart", "releaseCargoPassRevoke"][
-        mta_analysis
+        mpValue
       ]
     ]({
       productId: app,
     }).then(function (t) {
       0 === t.code &&
         (wx.showToast({
-          title: ["", "暂停成功", "放货成功", "撤销成功"][mta_analysis],
+          title: ["", "暂停成功", "放货成功", "撤销成功"][mpValue],
           icon: "none",
         }),
         e.setData({
@@ -265,7 +264,7 @@ Page({
   onOrOff: function (t) {
     var e = this,
       createForOfIteratorHelper = t.detail,
-      mta_analysis = createForOfIteratorHelper.goodsid,
+      mpValue = createForOfIteratorHelper.goodsid,
       app = createForOfIteratorHelper.operateType,
       login = createForOfIteratorHelper.idx,
       releaseCargoPass = this.data.cargoPassList;
@@ -275,7 +274,7 @@ Page({
       ? ("下架成功", (c = servicesCard.batchSetOffSale))
       : 1 == app && ("上架成功", (c = servicesCard.batchSetOnSale)),
       c({
-        productIds: mta_analysis.split(","),
+        productIds: mpValue.split(","),
         onSale: Number(app),
       }).then(function (t) {
         0 === t.code
@@ -411,8 +410,7 @@ Page({
     }
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      login.getUserInfo(),
+    (login.getUserInfo(),
       this.setData({
         userAuthList: app.userAuthList,
       }),
