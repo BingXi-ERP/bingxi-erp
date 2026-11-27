@@ -38,6 +38,9 @@ pub const GITHUB_REPO_NAME: &str = "bingxi-erp";
 pub(crate) const GITHUB_REPO_ENV: &str = "UPDATE__GITHUB_REPO";
 pub(crate) const GITHUB_API_URL: &str = "https://api.github.com";
 
+/// ZIP 与 tar.gz 共用的单文件解压上限；必须容纳真实 Release 的 backend/server（约 131MB）。
+pub(crate) const MAX_SINGLE_UPDATE_FILE_SIZE: u64 = 256 * 1024 * 1024;
+
 /// 判定 GitHub 账户名：一至三十九位字母数字或单个连字符，不得以连字符开头结尾，也不得连续连字符。
 fn is_valid_repo_owner(value: &str) -> bool {
     !value.is_empty()
@@ -444,18 +447,17 @@ pub(crate) fn extract_zip_entry(
             }
         }
         let mut outfile = std::fs::File::create(&outpath)?;
-        // P1-03-6 修复：限制单文件解压大小 100MB，防 zip bomb
-        const MAX_SINGLE_FILE_SIZE: u64 = 100 * 1024 * 1024;
-        let mut limited = zip_entry.take(MAX_SINGLE_FILE_SIZE + 1);
+        // P1-03-6 修复：限制单文件解压大小，防 zip bomb；与 tar.gz 共用同一上限。
+        let mut limited = zip_entry.take(MAX_SINGLE_UPDATE_FILE_SIZE + 1);
         let copied = io::copy(&mut limited, &mut outfile)?;
-        if copied > MAX_SINGLE_FILE_SIZE {
+        if copied > MAX_SINGLE_UPDATE_FILE_SIZE {
             return Err(UpdateError::ValidationError(format!(
                 "单文件解压大小超过限制 ({}MB)，疑似 zip bomb",
-                MAX_SINGLE_FILE_SIZE / 1024 / 1024
+                MAX_SINGLE_UPDATE_FILE_SIZE / 1024 / 1024
             )));
         }
 
-        // P0-2 修复（v9 复审）：文件权限掩码在文件分支内设置（mode & 0o600）
+        // P0-2 修复（v9 复审）：文件仅保留所有者读写执行位（mode & 0o700），确保 server 可启动。
         #[cfg(unix)]
         {
             if let Some(mode) = zip_entry.unix_mode() {
@@ -471,11 +473,12 @@ pub(crate) fn extract_zip_entry(
 // =====================================================
 
 /// 设置安全权限掩码（P0-2 修复 v9 复审）
-/// is_dir=true 时应用 0o755（所有者可写，其他可读可执行），；is_dir=false 时应用 0o600（仅所有者可读写），；重置 SUID/SGID/粘性位，防止恶意更新包设置特殊权限位导致权限提升；私有可见性：仅本 facade 的 `extract_zip_entry` 调用。
+/// is_dir=true 时应用 0o755；is_dir=false 时仅保留所有者读写执行位（0o700）。
+/// backend/server 需要所有者执行位，否则 Linux 更新后无法启动；SUID/SGID/sticky 与组/其他权限全部清除。
 #[cfg(unix)]
 pub fn set_safe_permissions(path: &Path, mode: u32, is_dir: bool) {
     use std::os::unix::fs::PermissionsExt;
-    let safe_mode = if is_dir { mode & 0o755 } else { mode & 0o600 };
+    let safe_mode = if is_dir { mode & 0o755 } else { mode & 0o700 };
     if let Ok(metadata) = std::fs::metadata(path) {
         let mut perms = metadata.permissions();
         perms.set_mode(safe_mode);

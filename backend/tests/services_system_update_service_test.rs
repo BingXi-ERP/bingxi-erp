@@ -59,6 +59,10 @@ fn test_extract_version_from_filename() {
         svc.extract_version_from_filename("bingxi-erp-2026.7.12.zip"),
         Some("2026.7.12".to_string())
     );
+    assert_eq!(
+        svc.extract_version_from_filename("release-2026.11.22.603.tar.gz"),
+        Some("2026.11.22.603".to_string())
+    );
 }
 
 /// M8 测试：extract_version_from_filename 无效文件名返回 None
@@ -69,7 +73,8 @@ fn test_extract_version_from_filename_invalid() {
     assert_eq!(svc.extract_version_from_filename("bingxi-erp-.zip"), None);
 }
 
-/// P0-2 测试（v9 复审）：set_safe_permissions 文件分支应用 0o600 掩码
+/// P0-2 测试（v9 复审）：文件仅保留所有者读写执行位，清除组/其他位与 SUID/SGID/sticky。
+/// backend/server 必须保留所有者执行位，否则 Linux 更新后服务无法启动。
 #[cfg(unix)]
 #[test]
 fn test_set_safe_permissions_file_mode() {
@@ -79,8 +84,8 @@ fn test_set_safe_permissions_file_mode() {
     // 模拟恶意 zip 设置 SUID + SGID + sticky + 全读写（0o7777）
     set_safe_permissions(&temp, 0o7777, false);
     let mode = std::fs::metadata(&temp).unwrap().permissions().mode();
-    // 0o7777 & 0o600 = 0o600
-    assert_eq!(mode & 0o7777, 0o600, "文件权限应为 0o600，实际 {:#o}", mode);
+    // 0o7777 & 0o700 = 0o700：保留 server 可执行，同时清除特权位与组/其他权限。
+    assert_eq!(mode & 0o7777, 0o700, "文件权限应为 0o700，实际 {:#o}", mode);
     let _ = std::fs::remove_file(&temp);
 }
 

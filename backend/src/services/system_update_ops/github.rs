@@ -5,7 +5,8 @@
 //! - `fetch_latest_release`：调用 GitHub API `/repos/{owner}/{repo}/releases/latest`（私有）
 //! - `compare_versions`：比较 current < latest（`pub(crate)`，供 status 子模块 `check_local_updates`
 //!  + facade 测试调用）
-//! - `compare_versions_for_sort`：版本号排序比较（`pub(crate)`，供 status 子模块 `list_local_releases` 调用）//! - `download_update`：下载 GitHub Release asset（pub，handler + `download_and_update` 调用）
+//! - `compare_versions_for_sort`：版本号排序比较（`pub(crate)`，供 status 子模块 `list_local_releases` 调用）//! - `download_update`：下载 GitHub Release 正式更新包（pub）
+//! - `download_update_for_version`：按版本下载 CI 正式 tar.gz（pub，handler 调用）
 //! - `find_release_asset`：在 Release 中查找匹配 asset（私有，关联函数）
 //! - `build_safe_download_client`：构建 SSRF 防御下载客户端（私有，关联函数）
 //! - `download_and_update`：下载并应用更新（pub，handler 调用）
@@ -226,6 +227,15 @@ impl SystemUpdateService {
     }
 
     pub async fn download_update(&self, asset_name: Option<&str>) -> Result<PathBuf, UpdateError> {
+        self.download_update_with_version(asset_name)
+            .await
+            .map(|(path, _)| path)
+    }
+
+    async fn download_update_with_version(
+        &self,
+        asset_name: Option<&str>,
+    ) -> Result<(PathBuf, String), UpdateError> {
         let check_result = self.check_for_updates().await;
 
         if !check_result.has_update {
@@ -235,22 +245,24 @@ impl SystemUpdateService {
         let release = check_result
             .release_info
             .ok_or_else(|| UpdateError::NetworkError("无法获取发布信息".to_string()))?;
-
+        let version = release.tag_name.trim_start_matches('v').to_string();
         let asset = Self::find_release_asset(&release, asset_name)?;
         validate_asset_name(&asset.name)?;
         let download_path = self.app_dir.join("downloads").join(&asset.name);
-        self.download_release_asset(&release, asset, &download_path)
-            .await
+        let path = self
+            .download_release_asset(&release, asset, &download_path)
+            .await?;
+        Ok((path, version))
     }
 
-    /// 指定版本下载使用固定文件名，安装端无需信任数据库中的路径或上游任意文件名。
+    /// 指定版本下载使用 CI 正式资产名，安装端无需信任数据库中的路径或上游任意文件名。
     fn downloaded_archive_path(&self, version: &str) -> Result<PathBuf, UpdateError> {
-        let file_name = format!("bingxi-erp-{version}.zip");
+        let file_name = format!("release-{version}.tar.gz");
         validate_asset_name(&file_name)?;
         Ok(self.app_dir.join("downloads").join(file_name))
     }
 
-    /// 安装前要求指定版本的 ZIP 已真实下载并通过完整性校验；缺失即显式拒绝。
+    /// 安装前要求指定版本的 tar.gz 已真实下载并通过完整性校验；缺失即显式拒绝。
     pub fn downloaded_update_path(&self, version: &str) -> Result<PathBuf, UpdateError> {
         let path = self.downloaded_archive_path(version)?;
         if !path.is_file() {
@@ -261,7 +273,7 @@ impl SystemUpdateService {
         Ok(path)
     }
 
-    /// 按版本精确查询 Release，下载 ZIP 资产并复用官方 SHA-256 强校验。
+    /// 按版本精确查询 Release，下载 CI 正式 tar.gz 资产并复用官方 SHA-256 强校验。
     pub async fn download_update_for_version(&self, version: &str) -> Result<PathBuf, UpdateError> {
         let download_path = self.downloaded_archive_path(version)?;
         let release = self
@@ -274,13 +286,7 @@ impl SystemUpdateService {
                 release.tag_name
             )));
         }
-        let asset = release
-            .assets
-            .iter()
-            .find(|asset| asset.name.ends_with(".zip"))
-            .ok_or_else(|| {
-                UpdateError::VersionError(format!("版本 {version} 没有可应用的 ZIP 更新包"))
-            })?;
+        let asset = Self::find_versioned_release_asset(&release, version)?;
         self.download_release_asset(&release, asset, &download_path)
             .await
     }
@@ -575,6 +581,22 @@ impl SystemUpdateService {
     }
 
     /// 在发布信息中查找匹配的资源（按名称匹配或按扩展名自动选择 .zip/.tar.gz）
+    fn find_versioned_release_asset<'a>(
+        release: &'a GitHubRelease,
+        version: &str,
+    ) -> Result<&'a GitHubAsset, UpdateError> {
+        let expected_name = format!("release-{version}.tar.gz");
+        release
+            .assets
+            .iter()
+            .find(|asset| asset.name == expected_name)
+            .ok_or_else(|| {
+                UpdateError::VersionError(format!(
+                    "版本 {version} 没有可应用的正式更新包 {expected_name}"
+                ))
+            })
+    }
+
     fn find_release_asset<'a>(
         release: &'a GitHubRelease,
         asset_name: Option<&str>,
@@ -583,14 +605,12 @@ impl SystemUpdateService {
             release
                 .assets
                 .iter()
-                .find(|a| a.name.contains(name))
-                .ok_or_else(|| UpdateError::NetworkError(format!("找不到资源: {}", name)))
+                .find(|asset| asset.name == name)
+                .filter(|asset| asset.name.ends_with(".zip") || asset.name.ends_with(".tar.gz"))
+                .ok_or_else(|| UpdateError::NetworkError(format!("找不到可应用的更新包: {}", name)))
         } else {
-            release
-                .assets
-                .iter()
-                .find(|a| a.name.ends_with(".zip") || a.name.ends_with(".tar.gz"))
-                .ok_or_else(|| UpdateError::NetworkError("找不到更新包".to_string()))
+            let version = release.tag_name.trim_start_matches('v');
+            Self::find_versioned_release_asset(release, version)
         }
     }
 
@@ -609,8 +629,10 @@ impl SystemUpdateService {
     }
 
     pub async fn download_and_update(&self) -> Result<String, UpdateError> {
-        let download_path = self.download_update(None).await?;
-        let result = self.apply_update(&download_path).await?;
+        let (download_path, version) = self.download_update_with_version(None).await?;
+        let result = self
+            .apply_update_expected(&download_path, Some(&version))
+            .await?;
 
         if let Err(e) = fs::remove_file(&download_path) {
             self.log_update(&format!("清理下载文件失败: {}", e));
@@ -790,6 +812,51 @@ mod download_candidate_tests {
     }
 
     #[test]
+    fn versioned_download_selects_exact_ci_release_archive() {
+        let release = GitHubRelease {
+            tag_name: "v2026.11.22.603".to_string(),
+            name: "release".to_string(),
+            body: None,
+            published_at: "2026-11-22T00:00:00Z".to_string(),
+            assets: vec![
+                GitHubAsset {
+                    name: "bingxi-erp-2026.11.22.603-android.apk".to_string(),
+                    browser_download_url: "https://github.com/apk".to_string(),
+                    size: 1,
+                    content_type: "application/vnd.android.package-archive".to_string(),
+                    digest: None,
+                },
+                GitHubAsset {
+                    name: "bingxi-erp-2026.11.22.603.zip".to_string(),
+                    browser_download_url: "https://github.com/legacy".to_string(),
+                    size: 1,
+                    content_type: "application/zip".to_string(),
+                    digest: None,
+                },
+                GitHubAsset {
+                    name: "release-2026.11.22.603.tar.gz".to_string(),
+                    browser_download_url: "https://github.com/server".to_string(),
+                    size: 1,
+                    content_type: "application/gzip".to_string(),
+                    digest: None,
+                },
+            ],
+        };
+
+        let asset = SystemUpdateService::find_versioned_release_asset(&release, "2026.11.22.603")
+            .expect("必须选中 CI 正式 tar.gz，不能误选 APK 或旧 ZIP");
+        assert_eq!(asset.name, "release-2026.11.22.603.tar.gz");
+
+        let err = SystemUpdateService::find_versioned_release_asset(&release, "2026.11.22.604")
+            .expect_err("版本不匹配时不得借用其它版本资产");
+        assert!(matches!(err, UpdateError::VersionError(_)), "实得: {err:?}");
+
+        let err = SystemUpdateService::find_release_asset(&release, Some("android"))
+            .expect_err("显式资产选择也不得用子串误选 APK 或其它版本文件");
+        assert!(matches!(err, UpdateError::NetworkError(_)), "实得: {err:?}");
+    }
+
+    #[test]
     fn downloaded_update_path_requires_real_file_and_safe_version() {
         let (service, app_dir) = temp_service("download_path");
         let err = service
@@ -806,6 +873,19 @@ mod download_candidate_tests {
         assert!(
             matches!(err, UpdateError::ValidationError(_)),
             "非法版本号应拒绝，实得: {err:?}"
+        );
+
+        let version = "2026.11.22.603";
+        let expected_path = app_dir.join("downloads/release-2026.11.22.603.tar.gz");
+        fs::create_dir_all(expected_path.parent().expect("下载目录应存在"))
+            .expect("创建下载目录失败");
+        fs::write(&expected_path, b"official release bytes").expect("写入发布包失败");
+        assert_eq!(
+            service
+                .downloaded_update_path(version)
+                .expect("真实 tar.gz 发布包必须能进入安装"),
+            expected_path,
+            "安装路径必须与 CI/GitHub Release 的 release-<version>.tar.gz 契约一致"
         );
 
         fs::remove_dir_all(app_dir).expect("清理测试目录失败");

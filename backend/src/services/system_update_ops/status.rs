@@ -2,7 +2,7 @@
 //!
 //! 从原 `system_update_service.rs` 迁移 7 个方法：
 //! - `get_releases_dir`：定位本地 releases 目录（私有，仅本模块 `list_local_releases` 调用）
-//! - `list_local_releases`：列出本地 releases 目录下所有 bingxi-erp-*.zip 发布包
+//! - `list_local_releases`：列出本地 releases 目录下 ZIP 与 CI 正式 tar.gz 发布包
 //! - `extract_version_from_filename`：从文件名提取版本号（`pub(crate)` 供 facade 测试调用）
 //! - `check_local_updates`：检查本地是否有新版本可应用
 //! - `get_current_version`：读取 VERSION 文件获取当前版本号
@@ -47,24 +47,19 @@ impl SystemUpdateService {
             let entry = entry?;
             let path = entry.path();
 
-            if path.is_file() {
-                if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                    if file_name.ends_with(".zip") && file_name.starts_with("bingxi-erp-") {
-                        if let Some(version) = self.extract_version_from_filename(file_name) {
-                            let metadata = fs::metadata(&path)?;
-                            let created_at: chrono::DateTime<chrono::Utc> =
-                                metadata.created()?.into();
-
-                            releases.push(LocalRelease {
-                                version,
-                                file_name: file_name.to_string(),
-                                file_path: path,
-                                file_size: metadata.len(),
-                                created_at: created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
-                            });
-                        }
-                    }
-                }
+            if path.is_file()
+                && let Some(file_name) = path.file_name().and_then(|name| name.to_str())
+                && let Some(version) = self.extract_version_from_filename(file_name)
+            {
+                let metadata = fs::metadata(&path)?;
+                let created_at: chrono::DateTime<chrono::Utc> = metadata.created()?.into();
+                releases.push(LocalRelease {
+                    version,
+                    file_name: file_name.to_string(),
+                    file_path: path,
+                    file_size: metadata.len(),
+                    created_at: created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+                });
             }
         }
 
@@ -73,15 +68,15 @@ impl SystemUpdateService {
     }
 
     pub fn extract_version_from_filename(&self, filename: &str) -> Option<String> {
-        let parts: Vec<&str> = filename.split('-').collect();
-        if parts.len() >= 3 {
-            let version_part = parts[2];
-            let version = version_part.trim_end_matches(".zip");
-            if !version.is_empty() {
-                return Some(version.to_string());
-            }
-        }
-        None
+        let version = filename
+            .strip_prefix("bingxi-erp-")
+            .and_then(|value| value.strip_suffix(".zip"))
+            .or_else(|| {
+                filename
+                    .strip_prefix("release-")
+                    .and_then(|value| value.strip_suffix(".tar.gz"))
+            })?;
+        (!version.is_empty()).then(|| version.to_string())
     }
 
     pub fn check_local_updates(&self) -> LocalUpdateCheckResult {
@@ -126,7 +121,7 @@ impl SystemUpdateService {
         // GitHub latest 同为四段，跨格式比较假阴性从根上消除；未注入（本地/历史二进制）时
         // 回退构建内嵌三段 `CARGO_PKG_VERSION`，回退由 `authoritative_current_version` 显式
         // 告警一次并交由 MD 反解兜底（见 `normalize_versions_for_compare`），不静默。
-        // VERSION 文件仍作为更新包结构文件存在（apply.rs 包校验逻辑不动）。
+        // 本地 ZIP 仍校验包内 VERSION；CI 正式 tar.gz 无该文件时，由已校验的 Release tag 提供目标版本。
         authoritative_current_version()
     }
 
