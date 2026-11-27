@@ -10250,8 +10250,6 @@ export default {
       labelBackupType: 'Backup Type',
       labelDescription: 'Description',
       optionFull: 'Full Backup',
-      optionIncremental: 'Incremental Backup',
-      optionDatabase: 'Database Backup',
       optionFiles: 'Files Backup',
       placeholderDescription: 'Please enter backup description',
       buttonCancel: 'Cancel',
