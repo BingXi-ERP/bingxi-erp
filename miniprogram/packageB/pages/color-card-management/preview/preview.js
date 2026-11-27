@@ -1,7 +1,6 @@
 var e = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   toConsumableArray = require("../../../../@babel/runtime/helpers/toConsumableArray"),
   ServicesUserLog = require("../../../../libs/services/ServicesUserLog.js"),
-  mta_analysis = e(require("../../../../utils/mta_analysis.js")),
   dialog = e(require("../../../../miniprogram_npm/@vant/weapp/dialog/dialog")),
   app = getApp(),
   ServicesCard = require("../../../../libs/services/ServicesCard.js").servicesCard,
@@ -86,13 +85,13 @@ Page({
   colorCardDetail: function () {
     var e = this,
       ServicesUserLog = this.data,
-      mta_analysis = ServicesUserLog.goodsId,
+      mpValue = ServicesUserLog.goodsId,
       dialog = ServicesUserLog.goodsInfo,
       app = ServicesUserLog.detailImageFields,
       ServicesShop = ServicesUserLog.detailTypeImage;
-    ServicesCard.ColorCardDetail({}, mta_analysis).then(function (a) {
+    ServicesCard.ColorCardDetail({}, mpValue).then(function (a) {
       if (0 === a.code) {
-        var mta_analysis = a.data.detailImage || {};
+        var mpValue = a.data.detailImage || {};
         (ServicesShop.forEach(function (e) {
           (1 === e.type &&
             (e.images = [].concat(
@@ -104,7 +103,7 @@ Page({
               (e.images = app
                 .map(function (e) {
                   return {
-                    storagePath: mta_analysis[e],
+                    storagePath: mpValue[e],
                   };
                 })
                 .filter(function (e) {
@@ -132,12 +131,12 @@ Page({
   previewImg: function (e) {
     var toConsumableArray = e.currentTarget.dataset,
       ServicesUserLog = toConsumableArray.detailtype,
-      mta_analysis = toConsumableArray.url,
+      mpValue = toConsumableArray.url,
       dialog = this.data.detailTypeImage[Number(ServicesUserLog) - 1].images.map(function (e) {
         return e.storagePath;
       });
     wx.previewImage({
-      current: mta_analysis,
+      current: mpValue,
       urls: dialog,
     });
   },
@@ -189,9 +188,9 @@ Page({
       var ServicesUserLog = e.data.detailTypeImage[0].images.length
           ? e.data.detailTypeImage[0].images[0].storagePath
           : "",
-        mta_analysis = util.replImage(ServicesUserLog);
+        mpValue = util.replImage(ServicesUserLog);
       wx.getImageInfo({
-        src: mta_analysis + "?x-oss-process=image/auto-orient,1",
+        src: mpValue + "?x-oss-process=image/auto-orient,1",
         success: function (a) {
           (e.setData({
             "tempImgUrl.goodUrl": a.path,
@@ -203,7 +202,7 @@ Page({
   },
   drawCanvas: function (e, t) {
     var ServicesUserLog = t.goodTempUrl,
-      mta_analysis = t.qrTempUrl,
+      mpValue = t.qrTempUrl,
       dialog = t.item_name,
       app = t.item_price,
       ServicesCard = t.notice_txt,
@@ -225,7 +224,7 @@ Page({
     (e.setFillStyle("white"),
       e.fillRect(0, 0, ServicesShop, g),
       e.drawImage(ServicesUserLog, u, l, h, p),
-      e.drawImage(mta_analysis, d, m, f, f),
+      e.drawImage(mpValue, d, m, f, f),
       e.setFontSize(v),
       e.setFillStyle("#333333"),
       e.setTextAlign("left"),
@@ -251,9 +250,9 @@ Page({
       Promise.all([this.getCanvasImg(), this.getQRCode()]).then(function () {
         var toConsumableArray = e.data.popupInit.canvas.canvasId,
           ServicesUserLog = toConsumableArray.shareCanvas,
-          mta_analysis = toConsumableArray.photoCanvas,
+          mpValue = toConsumableArray.photoCanvas,
           dialog = wx.createCanvasContext(ServicesUserLog),
-          app = wx.createCanvasContext(mta_analysis),
+          app = wx.createCanvasContext(mpValue),
           ServicesCard = e.data.goodsInfo.businessProductName,
           util = e.getPriceText(),
           ServicesShop = "长按识别",
@@ -407,20 +406,19 @@ Page({
     var e = this.data,
       toConsumableArray = e.userAuthList,
       ServicesUserLog = e.searchId,
-      mta_analysis = e.goodsInfo;
+      mpValue = e.goodsInfo;
     toConsumableArray["search:supplier:view"]
       ? wx.navigateTo({
           url: "../../../packageB/pages/search-supplier/index?searchId="
             .concat(ServicesUserLog, "&uuid=")
-            .concat(mta_analysis.uuid, "&spuNumber=")
-            .concat(mta_analysis.platformSpuNumber),
+            .concat(mpValue.uuid, "&spuNumber=")
+            .concat(mpValue.platformSpuNumber),
         })
       : dialog.default.alert({
           message: "您好，您的平台检索结果暂时无法提供商家信息，请联系平台工作人员为您提供服务~",
         });
   },
   onLoad: function (e) {
-    mta_analysis.default.Page.init();
     var toConsumableArray = util.formatUrlQuery(e);
     (this.setData({
       globalApp: app,
@@ -443,12 +441,12 @@ Page({
     var e = this.data,
       toConsumableArray = e.goodsId,
       ServicesUserLog = e.goodsInfo,
-      mta_analysis = "/packageB/pages/color-card-management/preview/preview?goodsId=".concat(
+      mpValue = "/packageB/pages/color-card-management/preview/preview?goodsId=".concat(
         toConsumableArray,
       );
     return {
       title: ServicesUserLog.goodsName,
-      path: mta_analysis,
+      path: mpValue,
       imageUrl: ServicesUserLog.imageSampleList[0],
     };
   },

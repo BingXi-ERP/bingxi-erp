@@ -1,7 +1,6 @@
 var e = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   createForOfIteratorHelper = require("../../../@babel/runtime/helpers/createForOfIteratorHelper"),
   ServicesUserLog = require("../../../libs/services/ServicesUserLog.js"),
-  mta_analysis = e(require("../../../utils/mta_analysis.js")),
   app = getApp(),
   ServicesCustomer = require("../../../libs/services/ServicesCustomer.js").servicesCustomer,
   util = require("../../../libs/utils/util.js").utils;
@@ -79,8 +78,7 @@ Page({
     });
   },
   onLoad: function (e) {
-    (mta_analysis.default.Page.init(),
-      ServicesUserLog.servicesUserLog.setUserHandleLog(603),
+    (ServicesUserLog.servicesUserLog.setUserHandleLog(603),
       wx.hideShareMenu(),
       this.getShopNews());
   },

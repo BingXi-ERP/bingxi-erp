@@ -1,7 +1,4 @@
-var t = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../utils/mta_analysis.js"),
-  ),
-  app = getApp(),
+var app = getApp(),
   envConfig = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
     require("../../../../envConfig.js"),
   );
@@ -21,7 +18,7 @@ Page({
     showExplain: !1,
   },
   onLoad: function (i) {
-    (t.default.Page.init(), wx.hideShareMenu());
+    (wx.hideShareMenu());
     wx.getStorageSync("storageList").length > 0 && wx.getStorageSync("storageList");
     var a,
       o = wx.getStorageSync("printList").length > 0 ? wx.getStorageSync("printList") : [];

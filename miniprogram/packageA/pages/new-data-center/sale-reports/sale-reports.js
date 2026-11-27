@@ -1,8 +1,5 @@
 var interopRequireWildcard =
     require("../../../../@babel/runtime/helpers/interopRequireWildcard").default,
-  a = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../..//utils/mta_analysis.js"),
-  ),
   echarts = interopRequireWildcard(require("../../../components/ec-canvas/echarts")),
   ServicesDataCenter = require("../../../services/ServicesDataCenter.js").ServicesDataCenter,
   i = (require("../../../../libs/utils/util").utils, getApp()),
@@ -110,8 +107,7 @@ Page({
     chooseRole: 1,
   },
   onLoad: function (t) {
-    (a.default.Page.init(),
-      this.setData({
+    (this.setData({
         userAuthList: i.userAuthList,
       }));
   },

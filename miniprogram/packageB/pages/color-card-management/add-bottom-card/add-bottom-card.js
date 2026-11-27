@@ -2,7 +2,6 @@ var a,
   e,
   t = require("../../../../@babel/runtime/helpers/interopRequireDefault").default,
   i = require("../../../../@babel/runtime/helpers/defineProperty"),
-  mta_analysis = t(require("../../../../utils/mta_analysis.js")),
   util = require("../../../../libs/utils/util"),
   ServicesUserLog = require("../../../../libs/services/ServicesUserLog.js"),
   ServicesCardType = require("../../../../libs/services/ServicesCardType.js").ServicesCardType,
@@ -385,7 +384,7 @@ Page(
             }),
             wx.setStorageSync("commodityType", i),
             wx.setStorageSync("colorColorCardList", a.data.colorList));
-          var mta_analysis = a.data.imgList.map(function (a) {
+          var mpValue = a.data.imgList.map(function (a) {
             return util.utils.replImage(a.storagePath);
           });
           (a.data.detailImage.imageFive0 && a.data.detailImage.imageTwo0
@@ -400,7 +399,7 @@ Page(
             }),
             t.setData({
               cardDetailsInfo: t.data.cardDetailsInfo,
-              imageList: mta_analysis,
+              imageList: mpValue,
               detailImageFiles: e.data.detailImageFiles,
             }));
         } else
@@ -474,8 +473,7 @@ Page(
         }));
     },
     onLoad: function (a) {
-      (mta_analysis.default.Page.init(),
-        a.goodsId &&
+      (a.goodsId &&
           (this.setData({
             goodsId: a.goodsId,
           }),
@@ -726,7 +724,7 @@ Page(
           ) {
             var t,
               i = a,
-              mta_analysis =
+              mpValue =
                 null === (t = a.imgList) || void 0 === t
                   ? void 0
                   : t.map(function (a) {
@@ -734,7 +732,7 @@ Page(
                     });
             this.setData({
               cardDetailsInfo: i,
-              imageList: mta_analysis,
+              imageList: mpValue,
             });
           }
         },

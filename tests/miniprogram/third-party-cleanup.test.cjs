@@ -3,13 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const Module = require('node:module');
-const {
-  assert,
-  MP_ROOT,
-  environment,
-  installGlobals,
-  loadMiniProgram,
-} = require('./helpers.cjs');
+const { assert, MP_ROOT, environment, installGlobals, loadMiniProgram } = require('./helpers.cjs');
 
 const mpRequire = Module.createRequire(path.join(MP_ROOT, 'package.json'));
 
@@ -20,9 +14,13 @@ const EXCLUDED_DIRECTORIES = new Set([
   'report',
   'reports',
 ]);
+const EPHEMERAL_FILE_PATTERN = /\.tmp\.\d+\.\d+$/;
 const THIRD_PARTY_PATTERNS = [
   ['品牌', /duibu|对布|budadang|jzcang/i],
   ['旧资源前缀', /(?:^|[^a-z0-9])bdd[-_]/i],
+  ['验证码品牌或组件', /anji-plus|aj-captcha/i],
+  ['统计品牌或模块', /pingtas|mta_analysis/i],
+  ['统计初始化调用', /\.Page\.init\s*\(/],
 ];
 
 function candidateFiles(root, directory = root) {
@@ -31,7 +29,7 @@ function candidateFiles(root, directory = root) {
     if (EXCLUDED_DIRECTORIES.has(entry.name)) continue;
     const fullPath = path.join(directory, entry.name);
     if (entry.isDirectory()) files.push(...candidateFiles(root, fullPath));
-    else if (entry.isFile()) files.push(fullPath);
+    else if (entry.isFile() && !EPHEMERAL_FILE_PATTERN.test(entry.name)) files.push(fullPath);
   }
   return files.sort();
 }
@@ -59,9 +57,7 @@ function isHostExpression(node) {
       return /host$/i.test(node.property.name);
     }
     return (
-      node.computed &&
-      node.property.type === 'StringLiteral' &&
-      /host$/i.test(node.property.value)
+      node.computed && node.property.type === 'StringLiteral' && /host$/i.test(node.property.value)
     );
   }
   return false;
@@ -104,16 +100,13 @@ function hostJoinedLocalAssets(root, files) {
         node.callee.property.type === 'Identifier' &&
         node.callee.property.name === 'concat'
       ) {
-        joined =
-          node.arguments.some(isHostExpression) &&
-          node.arguments.some(localAssetArgument);
+        joined = node.arguments.some(isHostExpression) && node.arguments.some(localAssetArgument);
       } else if (
         node.type === 'BinaryExpression' &&
         node.operator === '+' &&
         (isHostExpression(node.left) || isHostExpression(node.right))
       ) {
-        joined =
-          localAssetArgument(node.left) || localAssetArgument(node.right);
+        joined = localAssetArgument(node.left) || localAssetArgument(node.right);
       } else if (node.type === 'TemplateLiteral') {
         joined =
           node.expressions.some(isHostExpression) &&
@@ -141,10 +134,7 @@ function localIconViolations(root, files) {
       if (directoryPrefix) continue;
       const fullResourcePath = path.resolve(root, resourcePath.slice(1));
       const relativeResource = path.relative(root, fullResourcePath);
-      if (
-        relativeResource.startsWith('..' + path.sep) ||
-        path.isAbsolute(relativeResource)
-      ) {
+      if (relativeResource.startsWith('..' + path.sep) || path.isAbsolute(relativeResource)) {
         violations.push(file + '#' + resourcePath + '#outside-package');
         continue;
       }
@@ -171,6 +161,111 @@ function withFixture(run) {
     fs.rmSync(root, { recursive: true, force: true });
   }
 }
+
+function loadChangePhonePage(response) {
+  const source = fs.readFileSync(
+    path.join(
+      MP_ROOT,
+      'packageB/pages/personal-center/setting/accountsetting/changephone/changephone.js'
+    ),
+    'utf8'
+  );
+  const calls = { sms: [], navigations: [], toasts: [], components: [], componentShows: 0 };
+  let definition;
+  const app = {
+    config: { bingxiHost: 'https://erp.example.com' },
+    globalData: { userInfo: { phone: '13800000000' } },
+  };
+  const sandbox = {
+    Page(value) {
+      definition = value;
+    },
+    getApp() {
+      return app;
+    },
+    require(request) {
+      assert.equal(request, '../../../../../libs/services/ServicesIndex.js');
+      return {
+        ServicesIndex: {
+          sendVerCode(payload) {
+            calls.sms.push(JSON.parse(JSON.stringify(payload)));
+            return {
+              then(callback) {
+                callback(response);
+                return { catch() {} };
+              },
+            };
+          },
+        },
+      };
+    },
+    wx: {
+      navigateTo(spec) {
+        calls.navigations.push(JSON.parse(JSON.stringify(spec)));
+      },
+      showToast(spec) {
+        calls.toasts.push(JSON.parse(JSON.stringify(spec)));
+      },
+    },
+    console,
+  };
+  require('node:vm').runInNewContext(source, sandbox, { filename: 'changephone.js' });
+  definition.setData = function (patch) {
+    Object.assign(this.data, patch);
+  };
+  definition.selectComponent = function (selector) {
+    calls.components.push(selector);
+    return {
+      show() {
+        calls.componentShows += 1;
+      },
+    };
+  };
+  definition.onLoad({ id: '0' });
+  return { page: definition, calls };
+}
+
+test('换绑手机号校验通过后直接发送既有短信验证码并进入验证页', () => {
+  const { page, calls } = loadChangePhonePage({ code: 0 });
+  page.test_number({ detail: { value: '13900000000' } });
+  page.toNext();
+
+  assert.deepEqual(calls.sms, [{ mobile: '13900000000' }]);
+  assert.deepEqual(calls.navigations, [
+    {
+      url: '/packageB/pages/personal-center/setting/accountsetting/phone-code/phone-code?type=edit&mobile=13900000000',
+    },
+  ]);
+  assert.deepEqual(calls.toasts, [{ title: '验证码已发送', icon: 'success' }]);
+  assert.deepEqual(calls.components, []);
+});
+
+test('短信接口要求安全验证时不再调用第三方验证码组件', () => {
+  const { page, calls } = loadChangePhonePage({ code: 100, msg: '请完成安全验证' });
+  page.test_number({ detail: { value: '13900000000' } });
+  page.toNext();
+
+  assert.deepEqual(calls.sms, [{ mobile: '13900000000' }]);
+  assert.deepEqual(calls.components, []);
+  assert.equal(calls.componentShows, 0);
+  assert.deepEqual(calls.navigations, []);
+  assert.deepEqual(calls.toasts, [{ title: '请完成安全验证', icon: 'none' }]);
+});
+
+test('换绑手机号继续拒绝无效号码与当前号码', () => {
+  const { page, calls } = loadChangePhonePage({ code: 0 });
+  page.test_number({ detail: { value: '139' } });
+  page.toNext();
+  page.test_number({ detail: { value: '13800000000' } });
+  page.toNext();
+
+  assert.deepEqual(calls.sms, []);
+  assert.deepEqual(calls.navigations, []);
+  assert.deepEqual(calls.toasts, [
+    { title: '请输入正确的手机号', icon: 'none', duration: 1000 },
+    { title: '该号码与当前手机号码一致，请重新填写', icon: 'none' },
+  ]);
+});
 
 test('小程序候选发布面不存在第三方品牌词、旧前缀、域名、文件名或资源路径', () => {
   assert.deepEqual(scanThirdParty(MP_ROOT), []);
@@ -252,6 +347,7 @@ test('分包图标按分包绝对路径校验，缺失资源不能被主包同�
 test('第三方扫描覆盖未跟踪文件并排除指定构建目录', () => {
   withFixture(root => {
     fs.writeFileSync(path.join(root, 'untracked.md'), '对布管家');
+    fs.writeFileSync(path.join(root, 'app.js.tmp.1.2'), 'budadang');
     for (const directory of EXCLUDED_DIRECTORIES) {
       const fullDirectory = path.join(root, directory);
       fs.mkdirSync(fullDirectory);
@@ -286,6 +382,43 @@ test('第三方扫描自证能抓到中文品牌、英文品牌、旧前缀与�
   }
 });
 
+test('第三方扫描自证覆盖验证码与统计模块的文件名和内容变异', () => {
+  const mutations = [
+    [
+      '验证码品牌.js',
+      'const baseUrl = "https://CAPTCHA.ANJI-PLUS.COM/captcha-api";',
+      ['验证码品牌.js#验证码品牌或组件'],
+    ],
+    [
+      'aj-captcha.js',
+      'const component = "aj-captcha";',
+      ['aj-captcha.js#filename', 'aj-captcha.js#验证码品牌或组件'],
+    ],
+    [
+      '统计品牌.js',
+      'const apiBase = "https://PINGTAS.QQ.COM/pingd";',
+      ['统计品牌.js#统计品牌或模块'],
+    ],
+    [
+      'mta_analysis.js',
+      'const analytics = require("mta_analysis.js");',
+      ['mta_analysis.js#filename', 'mta_analysis.js#统计品牌或模块'],
+    ],
+    [
+      '统计模块无扩展.js',
+      'const analytics = require("../../utils/mta_analysis");',
+      ['统计模块无扩展.js#统计品牌或模块'],
+    ],
+    ['统计调用.js', 'mta_analysis.default.Page.init();', ['统计调用.js#统计品牌或模块', '统计调用.js#统计初始化调用']],
+  ];
+  for (const [file, source, expected] of mutations) {
+    withFixture(root => {
+      fs.writeFileSync(path.join(root, file), source);
+      assert.deepEqual(scanThirdParty(root), expected, file);
+    });
+  }
+});
+
 test('本地资源门禁自证能抓到 Host 拼接和缺失或空图标', () => {
   withFixture(root => {
     fs.mkdirSync(path.join(root, 'assets', 'icons'), { recursive: true });
@@ -297,18 +430,14 @@ test('本地资源门禁自证能抓到 Host 拼接和缺失或空图标', () =>
         'const icon = "".concat(app.config.apiHost, "/assets/icons/ok.png");',
         'const next = app.config["imgHost"] + "/assets/icons/empty.png";',
         'const missing = `${getApp().config.imgHost}/assets/icons/missing.png`;',
-      ].join('\n'),
+      ].join('\n')
     );
     fs.writeFileSync(
       path.join(root, 'page.wxss'),
-      '.empty { background: url(/assets/icons/empty.png); }',
+      '.empty { background: url(/assets/icons/empty.png); }'
     );
     const files = candidateFiles(root);
-    assert.deepEqual(hostJoinedLocalAssets(root, files), [
-      'page.js:1',
-      'page.js:2',
-      'page.js:3',
-    ]);
+    assert.deepEqual(hostJoinedLocalAssets(root, files), ['page.js:1', 'page.js:2', 'page.js:3']);
     assert.deepEqual(localIconViolations(root, files), [
       'page.js#/assets/icons/empty.png#not-nonempty-file',
       'page.js#/assets/icons/missing.png#missing',

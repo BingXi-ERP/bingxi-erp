@@ -1,7 +1,6 @@
 var t = require("../../../../../@babel/runtime/helpers/interopRequireDefault").default,
   objectSpread2 = require("../../../../../@babel/runtime/helpers/objectSpread2"),
   e = require("../../../../../@babel/runtime/helpers/defineProperty"),
-  mta_analysis = t(require("../../../../../utils/mta_analysis.js")),
   ServicesPrint = require("../../../../../libs/services/ServicesPrint"),
   util = require("../../../../../libs/utils/util"),
   ServicesCard = require("../../../../../libs/services/ServicesCard.js").servicesCard,
@@ -223,7 +222,6 @@ Page({
       this.setData({
         userAuthList: app.userAuthList,
       }),
-      mta_analysis.default.Page.init(),
       this.setData({
         newPrintType: t.newPrintType,
         customMobile: t.customMobile ? t.customMobile : "",

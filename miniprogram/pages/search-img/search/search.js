@@ -1,6 +1,5 @@
 var t = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   createForOfIteratorHelper = require("../../../@babel/runtime/helpers/createForOfIteratorHelper"),
-  mta_analysis = t(require("../../../utils/mta_analysis.js")),
   app = getApp(),
   ServicesCard = require("../../../libs/services/ServicesCard.js").servicesCard,
   util = require("../../../libs/utils/util.js").utils,
@@ -34,13 +33,13 @@ Page({
   },
   getSearchList: function () {
     var t = this,
-      mta_analysis = this.data.searchImgUrl;
+      mpValue = this.data.searchImgUrl;
     (wx.showLoading({
       title: "搜索中",
     }),
       uploadGateway.uploadFile({
         url: "".concat(app.config.bingxiHost, "/app-api/goods/imgSearch/goodsImgSearch"),
-        filePath: mta_analysis,
+        filePath: mpValue,
         name: "file",
         header: {
           terminalType: 81,
@@ -95,9 +94,9 @@ Page({
   },
   onOrOff: function (t) {
     var createForOfIteratorHelper = this,
-      mta_analysis = t.detail,
-      app = mta_analysis.goodsid,
-      util = mta_analysis.operateType,
+      mpValue = t.detail,
+      app = mpValue.goodsid,
+      util = mpValue.operateType,
       o = "";
     (0 == util
       ? ("下架成功", (o = ServicesCard.batchSetOffSale))
@@ -186,9 +185,9 @@ Page({
       }),
       Promise.all([this.getCanvasImg(), this.getQRCode(t.detail.goodsid)]).then(function () {
         var t = createForOfIteratorHelper.data.popupInit.canvas.canvasId.shareCanvas,
-          mta_analysis = createForOfIteratorHelper.data.popupInit.canvas.canvasId.photoCanvas,
+          mpValue = createForOfIteratorHelper.data.popupInit.canvas.canvasId.photoCanvas,
           app = wx.createCanvasContext(t),
-          ServicesCard = wx.createCanvasContext(mta_analysis),
+          ServicesCard = wx.createCanvasContext(mpValue),
           util = createForOfIteratorHelper.data.shareFriendData.name,
           o = "¥ "
             .concat(createForOfIteratorHelper.data.shareFriendData.price, "/")
@@ -255,7 +254,7 @@ Page({
       title: "正在保存图片...",
       mask: !0,
     });
-    var mta_analysis = setTimeout(function () {
+    var mpValue = setTimeout(function () {
       wx.canvasToTempFilePath({
         x: 0,
         y: 0,
@@ -277,7 +276,7 @@ Page({
                   t.setData({
                     "popupInit:canvas.show": !1,
                   }),
-                  clearTimeout(mta_analysis));
+                  clearTimeout(mpValue));
               },
               fail: function (e) {
                 "saveImageToPhotosAlbum:fail auth deny" === e.errMsg &&
@@ -307,8 +306,7 @@ Page({
     }, 3e3);
   },
   onLoad: function (t) {
-    (mta_analysis.default.Page.init(),
-      t.imgUrl &&
+    (t.imgUrl &&
         null != t.imgUrl &&
         this.setData({
           searchImgUrl: t.imgUrl,

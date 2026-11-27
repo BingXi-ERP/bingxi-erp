@@ -1,7 +1,4 @@
-var t = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
-    require("../../../utils/mta_analysis.js"),
-  ),
-  app = getApp(),
+var app = getApp(),
   envConfig = (0, require("../../../../@babel/runtime/helpers/interopRequireDefault").default)(
     require("../../../../envConfig.js"),
   );
@@ -24,7 +21,7 @@ Page({
     showExplain: !1,
   },
   onLoad: function (o) {
-    (t.default.Page.init(), wx.hideShareMenu());
+    (wx.hideShareMenu());
     var i = wx.getStorageSync("printList");
     (console.log("内存", i),
       i.length > 0 &&

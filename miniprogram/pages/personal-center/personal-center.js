@@ -1,5 +1,4 @@
 var e = require("../../@babel/runtime/helpers/interopRequireDefault").default,
-  mta_analysis = e(require("../../utils/mta_analysis.js")),
   isVisitor = e(require("../../libs/utils/isVisitor")),
   envConfig = e(require("../../envConfig.js")),
   app = getApp(),
@@ -46,7 +45,6 @@ Page({
       userAuthList: app.userAuthList,
       customsPhoneNum: app.customsPhoneNum,
     }),
-      mta_analysis.default.Page.init(),
       wx.hideShareMenu(),
       wx.login({
         success: function (e) {
@@ -60,12 +58,12 @@ Page({
     // 判据换成 apiGateway.isLoggedIn()（读的是 auth/me 回读确认后写入的会话快照，是真判据）
     (apiGateway.isLoggedIn()
       ? this.getUserInfo().then(function () {
-          var mta_analysis = util.addDefaultAvatar(
+          var mpValue = util.addDefaultAvatar(
               app.globalData.userInfo.avatar,
             ),
             isVisitor = app.globalData.userInfo.type;
           (e.setData({
-            avatar: mta_analysis,
+            avatar: mpValue,
             userType: isVisitor,
           }),
             "type" === isVisitor ? e.getProfessData() : e.getShopDetail());
@@ -122,7 +120,7 @@ Page({
   },
   hasPower: function () {
     var e = this,
-      mta_analysis = this.data.redPointList,
+      mpValue = this.data.redPointList,
       isVisitor = [
         {
           name: "待审核",
@@ -134,13 +132,13 @@ Page({
           name: "审核通过",
           icon: "/assets/icons/no_img.png",
           action: "audit",
-          isNew: 1 == mta_analysis.passType,
+          isNew: 1 == mpValue.passType,
         },
         {
           name: "审核失败",
           icon: "/assets/icons/no_img.png",
           action: "failAudit",
-          isNew: 1 == mta_analysis.rejectType,
+          isNew: 1 == mpValue.rejectType,
         },
       ];
     this.setData({
@@ -254,9 +252,9 @@ Page({
     }
   },
   toDetailTap: function (e) {
-    var mta_analysis = e.currentTarget.dataset,
-      app = mta_analysis.action,
-      ServicesCenter = mta_analysis.auth;
+    var mpValue = e.currentTarget.dataset,
+      app = mpValue.action,
+      ServicesCenter = mpValue.auth;
     // 原门 wx.getStorageSync("token") 恒假，只剩带 auth 标记的入口可走；凭 token 键判登录态
     // 属假判据，换成会话快照判据，auth 数据属性维持原语义
     if (apiGateway.isLoggedIn() || ServicesCenter)

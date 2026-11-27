@@ -1,6 +1,5 @@
 var e = require("../../../@babel/runtime/helpers/interopRequireDefault").default,
   ServicesUserLog = require("../../../libs/services/ServicesUserLog"),
-  mta_analysis = e(require("../../../utils/mta_analysis")),
   ServicesOrder = require("../../../libs/services/ServicesOrder").ServicesOrder,
   app = getApp();
 Page({
@@ -11,7 +10,6 @@ Page({
     index: 0,
   },
   onLoad: function (e) {
-    mta_analysis.default.Page.init();
     // 原写法读 storage 的 token 拼进 webview 查询串：storage 从来没有 token 键，拼出的永远是
     // token=undefined 假凭据；预览腿本身是旧路径待拍板面，这里只断凭据面，
     // 改带会话快照里后端确认过的用户 id 作对账键（非凭据、非敏感）
@@ -62,14 +60,14 @@ Page({
       : "return" == e.printType && this.getRefundImage(ServicesOrder, v);
   },
   getPreviewImage: function (e, t) {
-    var mta_analysis = this;
+    var mpValue = this;
     (wx.showLoading({
       title: "",
     }),
       ServicesOrder.previewImage(e, t).then(function (e) {
         (wx.hideLoading(),
           0 === e.code
-            ? mta_analysis.setData({
+            ? mpValue.setData({
                 imageList: e.data,
               })
             : wx.showToast({
@@ -79,14 +77,14 @@ Page({
       }));
   },
   getRefundImage: function (e, t) {
-    var mta_analysis = this;
+    var mpValue = this;
     (wx.showLoading({
       title: "",
     }),
       ServicesOrder.previewRefundImage(e, t).then(function (e) {
         (wx.hideLoading(),
           0 === e.code
-            ? mta_analysis.setData({
+            ? mpValue.setData({
                 imageList: e.data,
               })
             : wx.showToast({
