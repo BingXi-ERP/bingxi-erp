@@ -4,19 +4,19 @@
 //! - `check_for_updates`：查询 GitHub Releases 最新版本（pub，handler 调用）
 //! - `fetch_latest_release`：调用 GitHub API `/repos/{owner}/{repo}/releases/latest`（私有）
 //! - `compare_versions`：比较 current < latest（`pub(crate)`，供 status 子模块 `check_local_updates`
-//!  + facade 测试调用）
-//! - `compare_versions_for_sort`：版本号排序比较（`pub(crate)`，供 status 子模块 `list_local_releases` 调用）//! - `download_update`：下载 GitHub Release 正式更新包（pub）
+//!   + facade 测试调用）
+//! - `compare_versions_for_sort`：版本号排序比较（`pub(crate)`，供 status 子模块 `list_local_releases` 调用）
 //! - `download_update_for_version`：按版本下载 CI 正式 tar.gz（pub，handler 调用）
 //! - `find_release_asset`：在 Release 中查找匹配 asset（私有，关联函数）
 //! - `build_safe_download_client`：构建 SSRF 防御下载客户端（私有，关联函数）
-//! - `download_and_update`：下载并应用更新（pub，handler 调用）
+//! - `download_and_update_locked`：调用方持锁时下载并应用更新（`pub(crate)`）
 //!
 //! 跨模块依赖：
 //! - `check_for_updates` 调用 `status::get_current_version`（pub）
 //! - `compare_versions` / `compare_versions_for_sort` 调用 facade 归一函数 `normalize_versions_for_compare`（`pub(crate)`，内部含 `parse_version` 与三段↔四段 MD 反解兜底）
-//! - `download_update` 调用 `apply::log_update`（`pub(crate)`）+ facade 纯函数
-//!  `validate_asset_name` / `validate_download_url`（`pub(crate)`）
-//! - `download_and_update` 调用 `apply::apply_update`（pub）+ `apply::log_update`（`pub(crate)`）
+//! - `download_release_asset` 调用 `apply::log_update`（`pub(crate)`）+ facade 纯函数
+//!   `validate_asset_name` / `validate_download_url`（`pub(crate)`）
+//! - `download_and_update_locked` 调用 `apply::do_update`（`pub(crate)`）+ `apply::log_update`（`pub(crate)`）
 //! - `fetch_latest_release` 与 `fetch_release_by_tag` 使用 facade 常量 `GITHUB_API_URL`（`pub(crate)`）
 //!   与仓身份 `github_repo()`（`pub`，返回 `Result`）；取不到合法身份即转 `UpdateError::ValidationError`
 //!   早退，URL 不拼半截，出参由 facade 的 `From<UpdateError> for AppError` 映射成面向运维的可读校验错误
@@ -226,12 +226,6 @@ impl SystemUpdateService {
         std::cmp::Ordering::Equal
     }
 
-    pub async fn download_update(&self, asset_name: Option<&str>) -> Result<PathBuf, UpdateError> {
-        self.download_update_with_version(asset_name)
-            .await
-            .map(|(path, _)| path)
-    }
-
     async fn download_update_with_version(
         &self,
         asset_name: Option<&str>,
@@ -289,12 +283,6 @@ impl SystemUpdateService {
         let asset = Self::find_versioned_release_asset(&release, version)?;
         self.download_release_asset(&release, asset, &download_path)
             .await
-    }
-
-    /// 应用本端点已下载并校验过的指定版本更新包，应用前再次核对包内 VERSION。
-    pub async fn apply_downloaded_update(&self, version: &str) -> Result<String, UpdateError> {
-        let _update_lock = self.try_lock_update()?;
-        self.apply_downloaded_update_locked(version).await
     }
 
     /// 调用方必须持有进程级操作锁，并把版本元数据与任务终态写入纳入同一锁边界。
@@ -675,11 +663,6 @@ impl SystemUpdateService {
             .resolve_to_addrs(&dl_host, &dl_safe_addrs)
             .build()
             .map_err(|e| UpdateError::NetworkError(e.to_string()))
-    }
-
-    pub async fn download_and_update(&self) -> Result<String, UpdateError> {
-        let _update_lock = self.try_lock_update()?;
-        self.download_and_update_locked().await
     }
 
     /// 调用方必须持有进程级操作锁，并把后续版本元数据写入纳入同一锁边界。

@@ -1,10 +1,7 @@
 //! 更新应用主流程子模块（system_update_ops/apply）
 //!
 //! 从原 `system_update_service.rs` 迁移并扩展更新应用流程：
-//! - `apply_local_update`：应用本地发布包，版本以发布记录为准（pub，handler 调用）
-//! - `apply_update`：应用本地 ZIP 更新包（pub，handler 调用）
-//! - `apply_update_expected`：应用指定版本 ZIP 或 CI 正式 tar.gz（`pub(crate)`，github 子模块调用）
-//! - `do_update`：更新 5 步主流程（备份→解压→校验→应用→验证，私有）
+//! - `do_update`：更新 5 步主流程（备份→解压→校验→应用→验证，调用方持进程级操作锁）
 //! - `extract_update_package`：按扩展名解压 ZIP 或 tar.gz 到 temp_update（私有）
 //! - `validate_update_package`：校验 backend 二进制、frontend 与版本来源（私有）
 //! - `apply_files`：应用 backend/frontend/config，并写入真实目标 VERSION（私有）
@@ -13,16 +10,16 @@
 //!
 //! 跨模块依赖：
 //! - `do_update` 调用 `status::get_current_version`（pub）、`backup::create_backup` /
-//!  `rollback`（`pub(crate)`）
+//!   `rollback`（`pub(crate)`）
 //! - `apply_files` 调用 `backup::copy_dir`（`pub(crate)`）
 //! - `extract_update_package` 调用 facade 纯函数 `extract_zip_entry`（`pub(crate)`）
-//! - `log_update` 被 `backup::rollback` / `github::download_update` /
-//!  `github::download_and_update` 跨模块调用
+//! - `log_update` 被 `backup::rollback` / `github::download_release_asset` /
+//!   `github::download_and_update_locked` 跨模块调用
 
 #[cfg(unix)]
 use crate::services::system_update_service::set_safe_permissions;
 use crate::services::system_update_service::{
-    LocalRelease, MAX_SINGLE_UPDATE_FILE_SIZE, SystemUpdateService, UpdateError, extract_zip_entry,
+    MAX_SINGLE_UPDATE_FILE_SIZE, SystemUpdateService, UpdateError, extract_zip_entry,
     sha256_hex_of_file,
 };
 use chrono::Utc;
@@ -35,18 +32,9 @@ const MAX_TOTAL_EXTRACT_SIZE: u64 = 500 * 1024 * 1024;
 const MIN_EXECUTABLE_HEADER_SIZE: u64 = 64;
 
 impl SystemUpdateService {
-    pub async fn apply_local_update(&self, release: &LocalRelease) -> Result<String, UpdateError> {
-        self.apply_update_expected(&release.file_path, Some(&release.version))
-            .await
-    }
-
-    pub async fn apply_update(&self, update_file: &Path) -> Result<String, UpdateError> {
-        self.apply_update_expected(update_file, None).await
-    }
-
-    /// 应用更新包；传入目标版本时，包内有 VERSION 必须逐字一致；官方 tar.gz 无内嵌
-    /// VERSION 时使用已校验的 Release tag 版本。任何版本或结构校验都在改写运行文件前完成。
-    pub(crate) async fn apply_update_expected(
+    /// 测试专用入口：生产 handler 直接持锁调用 `do_update`。
+    #[cfg(test)]
+    async fn apply_update_expected(
         &self,
         update_file: &Path,
         expected_version: Option<&str>,
@@ -426,10 +414,10 @@ impl SystemUpdateService {
             if src.exists() {
                 if dst.exists() {
                     let old_dst = self.app_dir.join(format!("{}.old", dir));
-                    if old_dst.exists() {
-                        if let Err(e) = fs::remove_dir_all(&old_dst) {
-                            tracing::warn!("清理旧 .old 目录失败 {:?}: {}", old_dst, e);
-                        }
+                    if old_dst.exists()
+                        && let Err(e) = fs::remove_dir_all(&old_dst)
+                    {
+                        tracing::warn!("清理旧 .old 目录失败 {:?}: {}", old_dst, e);
                     }
                     if let Err(e) = fs::rename(&dst, &old_dst) {
                         fs::remove_dir_all(&dst).map_err(|_| e)?;
@@ -538,7 +526,7 @@ mod tests {
             header.as_mut_bytes()[path_bytes.len()] = 0;
             header.set_cksum();
             builder
-                .append(&mut header, content)
+                .append(&header, content)
                 .unwrap_or_else(|e| panic!("写入 tar 条目 {name} 失败: {e}"));
         }
         builder
@@ -579,8 +567,9 @@ mod tests {
 
     #[test]
     fn single_file_limit_accommodates_real_release_binary() {
+        let limit = std::hint::black_box(MAX_SINGLE_EXTRACT_SIZE);
         assert!(
-            MAX_SINGLE_EXTRACT_SIZE >= 128 * 1024 * 1024,
+            limit >= 128 * 1024 * 1024,
             "真实 Release 的 backend/server 约 131MB，单文件上限不得沿用 ZIP 的 100MB"
         );
     }

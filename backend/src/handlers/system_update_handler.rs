@@ -143,17 +143,17 @@ async fn persist_applied_version_on<C: ConnectionTrait>(
         Some(row) => {
             let mut active: system_version::ActiveModel = row.into();
             active.is_current = Set(true);
-            active.updated_at = Set(now.into());
+            active.updated_at = Set(now);
             active.update(db).await?;
         }
         None => {
             let model = system_version::ActiveModel {
                 version: Set(version.to_string()),
-                release_date: Set(now.into()),
+                release_date: Set(now),
                 changelog: Set(None),
                 is_current: Set(true),
-                created_at: Set(now.into()),
-                updated_at: Set(now.into()),
+                created_at: Set(now),
+                updated_at: Set(now),
                 ..Default::default()
             };
             model.insert(db).await?;

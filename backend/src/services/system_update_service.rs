@@ -461,10 +461,10 @@ pub(crate) fn extract_zip_entry(
         }
         Ok(0)
     } else {
-        if let Some(p) = outpath.parent() {
-            if !p.exists() {
-                std::fs::create_dir_all(p)?;
-            }
+        if let Some(p) = outpath.parent()
+            && !p.exists()
+        {
+            std::fs::create_dir_all(p)?;
         }
         let mut outfile = std::fs::File::create(&outpath)?;
         // P1-03-6 修复：限制单文件解压大小，防 zip bomb；与 tar.gz 共用同一上限。
@@ -544,13 +544,11 @@ fn allowed_download_hosts() -> Vec<String> {
         if let Some(h) = url::Url::parse(raw.trim())
             .ok()
             .and_then(|u| u.host_str().map(|h| h.to_string()))
-        {
-            if !hosts
+            && !hosts
                 .iter()
                 .any(|existing| existing.eq_ignore_ascii_case(&h))
-            {
-                hosts.push(h);
-            }
+        {
+            hosts.push(h);
         }
     }
     hosts
