@@ -284,8 +284,10 @@ fn number_generator_base_is_segment_aligned_and_errors_are_classified() {
         "allocate_no 应经 select_only+into_tuple 投影真实单号解析序号基数"
     );
     assert!(
-        src.contains("max_seq.map_or(1, |m| m.saturating_add(1))"),
-        "取号基数应为 max(seq)+1（与真实号段同源）"
+        src.contains("let mut seq = match max_seq")
+            && src.contains(".checked_add(1)")
+            && src.contains("单号流水已达到计数上限"),
+        "取号基数应为 max(seq)+1，并在 u64 溢出时显式失败（与真实号段同源）"
     );
     assert!(
         !src.contains("let mut seq = count + 1") && !src.contains(".count(conn)"),

@@ -316,8 +316,10 @@ fn number_cardinal_must_not_regress_to_count_based() {
         "allocate_no 内检测到 count 调用：基数禁止回潮为 count+1（软删/旁路行计入行数导致起点错且跳号），必须与真实号段同源取 max+1"
     );
     assert!(
-        body.contains("max_seq") && body.contains("saturating_add(1)"),
-        "allocate_no 必须保持『基数 = max(当日真实单号后缀流水).saturating_add(1)』形态；max_seq/saturating_add 缺失说明基数实现被改动，需同步复核本锁与 NGA3"
+        body.contains("max_seq")
+            && body.contains(".checked_add(1)")
+            && body.contains("单号流水已达到计数上限"),
+        "allocate_no 必须保持『基数 = max(当日真实单号后缀流水)+1』形态，并在 u64 溢出时显式失败；max_seq/checked_add 缺失说明基数实现被改动，需同步复核本锁与 NGA3"
     );
 }
 

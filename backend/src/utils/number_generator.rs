@@ -488,22 +488,19 @@ impl DocumentNumberGenerator {
 
             let matches_digits =
                 |value: &str| !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit());
-            match previous.reset_mode.as_str() {
-                "day" if current_period.len() == 6 => {
-                    let bytes = suffix.as_bytes();
-                    bytes.len() == 2 + previous.seq_width
-                        && bytes[..2].iter().all(u8::is_ascii_digit)
-                        && bytes[2..].iter().all(u8::is_ascii_digit)
-                        && (bytes[0] - b'0') * 10 + (bytes[1] - b'0') <= 31
-                        && (bytes[0] != b'0' || bytes[1] != b'0')
-                }
-                "day" if current_period.is_empty() => {
-                    suffix.len() == 8 + previous.seq_width && matches_digits(suffix)
-                }
-                "month" if current_period.is_empty() => {
-                    suffix.len() == 6 + previous.seq_width && matches_digits(suffix)
-                }
-                _ => false,
+            if previous.reset_mode == "day" && current_period.len() == 6 {
+                let bytes = suffix.as_bytes();
+                bytes.len() == 2 + previous.seq_width
+                    && bytes[..2].iter().all(u8::is_ascii_digit)
+                    && bytes[2..].iter().all(u8::is_ascii_digit)
+                    && (bytes[0] - b'0') * 10 + (bytes[1] - b'0') <= 31
+                    && (bytes[0] != b'0' || bytes[1] != b'0')
+            } else if previous.reset_mode == "day" && current_period.is_empty() {
+                suffix.len() == 8 + previous.seq_width && matches_digits(suffix)
+            } else if previous.reset_mode == "month" && current_period.is_empty() {
+                suffix.len() == 6 + previous.seq_width && matches_digits(suffix)
+            } else {
+                false
             }
         })
     }
