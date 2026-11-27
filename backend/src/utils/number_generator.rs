@@ -490,11 +490,12 @@ impl DocumentNumberGenerator {
                 |value: &str| !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit());
             match previous.reset_mode.as_str() {
                 "day" if current_period.len() == 6 => {
-                    suffix.len() == 2 + previous.seq_width
-                        && suffix[..2]
-                            .parse::<u8>()
-                            .is_ok_and(|day| (1..=31).contains(&day))
-                        && suffix[2..].bytes().all(|byte| byte.is_ascii_digit())
+                    let bytes = suffix.as_bytes();
+                    bytes.len() == 2 + previous.seq_width
+                        && bytes[..2].iter().all(u8::is_ascii_digit)
+                        && bytes[2..].iter().all(u8::is_ascii_digit)
+                        && (bytes[0] - b'0') * 10 + (bytes[1] - b'0') <= 31
+                        && (bytes[0] != b'0' || bytes[1] != b'0')
                 }
                 "day" if current_period.is_empty() => {
                     suffix.len() == 8 + previous.seq_width && matches_digits(suffix)
@@ -1176,6 +1177,15 @@ mod tests {
                 std::slice::from_ref(&previous_day),
             ),
             "月重置自身格式仍应参与基数"
+        );
+        assert!(
+            !DocumentNumberGenerator::suffix_belongs_to_previous_config(
+                "中00",
+                "NR202611",
+                "202611",
+                std::slice::from_ref(&previous_day),
+            ),
+            "非 ASCII 后缀不得触发 UTF-8 切片 panic"
         );
 
         let previous_month = PreviousNumberRuleConfig {
