@@ -211,11 +211,13 @@ test.describe.serial('引导页初始化真实链路（真实后端 + 真实 Pos
       env: { ...process.env, BACKEND_BIN: process.env.BACKEND_BIN ?? '' },
     });
 
-    // 完整模式 /health 返回 200 healthy（重启脚本已探活，此处断言契约形态）
+    // 完整模式 /health 返回 200；开发环境未配置 Redis 时整体 degraded，
+    // 但 Redis 检查项必须明确为 not_configured，不能伪装成 healthy。
     const health = await request.get(`${API_BASE}/health`);
     expect(health.ok()).toBeTruthy();
     const healthBody = await health.json();
-    expect(healthBody.status).toBe('healthy');
+    expect(healthBody.status).toBe('degraded');
+    expect(healthBody.checks.redis.status).toBe('not_configured');
 
     // 完整模式 /init/status：code=200 + data.initialized=true
     const resp = await request.get(`${API_BASE}/api/v1/erp/init/status`);
