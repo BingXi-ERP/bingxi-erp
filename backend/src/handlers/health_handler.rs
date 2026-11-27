@@ -6,6 +6,7 @@ use std::time::Instant;
 use sysinfo::{Disks, System};
 
 use crate::container::AppState;
+use crate::utils::redis_cache::{RedisRuntimeStatus, redis_runtime_status};
 
 use utoipa::ToSchema;
 
@@ -47,6 +48,8 @@ pub struct HealthStatus {
 pub struct HealthChecks {
     /// 数据库连接状态
     pub database: HealthCheckItem,
+    /// Redis 运行时状态
+    pub redis: HealthCheckItem,
     /// 内存状态
     pub memory: HealthCheckItem,
     /// 磁盘状态
@@ -57,7 +60,7 @@ pub struct HealthChecks {
 #[allow(dead_code, reason = "序列化输出字段")]
 #[derive(Debug, Serialize, ToSchema)]
 pub struct HealthCheckItem {
-    /// 状态 (healthy, unhealthy)
+    /// 状态 (healthy, degraded, unhealthy, not_configured, unreachable)
     pub status: String,
     /// 消息
     pub message: Option<String>,
@@ -85,6 +88,10 @@ pub async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
     // 检查数据库连接
     let db_check = check_database(&state).await;
 
+    // 检查 Redis 运行时状态
+    let production = crate::utils::config::is_production();
+    let redis_check = check_redis(production).await;
+
     // 检查内存
     let memory_check = check_memory();
 
@@ -92,16 +99,13 @@ pub async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
     let disk_check = check_disk();
 
     // 计算整体状态
-    let overall_status = if db_check.status == "healthy"
-        && memory_check.status == "healthy"
-        && disk_check.status == "healthy"
-    {
-        "healthy"
-    } else if db_check.status == "unhealthy" {
-        "unhealthy"
-    } else {
-        "degraded"
+    let checks = HealthChecks {
+        database: db_check,
+        redis: redis_check,
+        memory: memory_check,
+        disk: disk_check,
     };
+    let overall_status = overall_health_status(&checks, production);
 
     let health = HealthStatus {
         status: overall_status.to_string(),
@@ -109,11 +113,7 @@ pub async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
         timestamp: Utc::now(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         uptime_seconds: get_uptime(),
-        checks: HealthChecks {
-            database: db_check,
-            memory: memory_check,
-            disk: disk_check,
-        },
+        checks,
     };
 
     let status_code = if overall_status == "healthy" {
@@ -125,6 +125,46 @@ pub async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
     };
 
     (status_code, Json(health))
+}
+
+fn overall_health_status(checks: &HealthChecks, production: bool) -> &'static str {
+    if checks.database.status == "unhealthy"
+        || (production
+            && matches!(
+                checks.redis.status.as_str(),
+                "unreachable" | "not_configured"
+            ))
+    {
+        "unhealthy"
+    } else if checks.database.status == "healthy"
+        && checks.redis.status == "healthy"
+        && checks.memory.status == "healthy"
+        && checks.disk.status == "healthy"
+    {
+        "healthy"
+    } else {
+        "degraded"
+    }
+}
+
+async fn check_redis(production: bool) -> HealthCheckItem {
+    let start = Instant::now();
+    let runtime_status = redis_runtime_status().await;
+    let duration = start.elapsed().as_millis();
+
+    let message = match (runtime_status, production) {
+        (RedisRuntimeStatus::Healthy, _) => "Redis 连接正常",
+        (RedisRuntimeStatus::NotConfigured, true) => "生产环境未配置 Redis",
+        (RedisRuntimeStatus::NotConfigured, false) => "Redis 未配置，使用进程内降级",
+        (RedisRuntimeStatus::Unreachable, true) => "Redis 不可达",
+        (RedisRuntimeStatus::Unreachable, false) => "Redis 不可达，业务操作使用降级路径",
+    };
+
+    HealthCheckItem {
+        status: runtime_status.as_str().to_string(),
+        message: Some(message.to_string()),
+        response_time_ms: Some(duration),
+    }
 }
 
 /// 检查数据库连接
@@ -249,27 +289,60 @@ fn get_uptime() -> u64 {
     start_time().elapsed().as_secs()
 }
 
-/// 就绪检查（检查所有依赖是否就绪）；P3 2-13 说明：本接口刻意不使用 `ApiResponse` 包装，原因是： 1. 负载均衡器 / 监控探针仅依赖 HTTP 状态码（200/503）
-/// 不需要业务层 envelope； 2. 探针响应需保持简洁结构（仅 `status`/`reason`），避免暴露内部细节； 3. 与 liveness_check 保持一致的轻量化响应风格。
+#[derive(Debug, PartialEq, Eq)]
+enum ReadinessDecision {
+    Healthy,
+    Degraded,
+    NotReady(&'static str),
+}
+
+fn readiness_decision(
+    database_healthy: bool,
+    redis_status: RedisRuntimeStatus,
+    production: bool,
+) -> ReadinessDecision {
+    if !database_healthy {
+        return ReadinessDecision::NotReady("数据库连接失败");
+    }
+
+    match (redis_status, production) {
+        (RedisRuntimeStatus::Healthy, _) => ReadinessDecision::Healthy,
+        (RedisRuntimeStatus::NotConfigured, true) => {
+            ReadinessDecision::NotReady("生产环境未配置 Redis")
+        }
+        (RedisRuntimeStatus::NotConfigured, false) => ReadinessDecision::Degraded,
+        (RedisRuntimeStatus::Unreachable, true) => ReadinessDecision::NotReady("Redis 不可用"),
+        (RedisRuntimeStatus::Unreachable, false) => ReadinessDecision::Degraded,
+    }
+}
+
+/// 就绪检查（检查所有依赖是否就绪）；本接口不使用业务 envelope，仅返回探针状态与固定原因。
 pub async fn readiness_check(State(state): State<AppState>) -> impl IntoResponse {
     // 检查数据库是否可连接
     let db_status = check_database(&state).await;
+    let redis_status = redis_runtime_status().await;
+    let production = crate::utils::config::is_production();
 
-    if db_status.status == "healthy" {
-        (
+    match readiness_decision(db_status.status == "healthy", redis_status, production) {
+        ReadinessDecision::Healthy => (
             StatusCode::OK,
             Json(serde_json::json!({
                 "status": "healthy"
             })),
-        )
-    } else {
-        (
+        ),
+        ReadinessDecision::Degraded => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "status": "degraded"
+            })),
+        ),
+        ReadinessDecision::NotReady(reason) => (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(serde_json::json!({
                 "status": "not_ready",
-                "reason": db_status.message
+                "reason": reason
             })),
-        )
+        ),
     }
 }
 
@@ -277,4 +350,89 @@ pub async fn readiness_check(State(state): State<AppState>) -> impl IntoResponse
 pub async fn liveness_check() -> impl IntoResponse {
     // 简单的存活检查，只要服务能响应就返回成功
     StatusCode::OK
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn healthy_item() -> HealthCheckItem {
+        HealthCheckItem {
+            status: "healthy".to_string(),
+            message: None,
+            response_time_ms: Some(1),
+        }
+    }
+
+    fn checks_with_redis(status: &str) -> HealthChecks {
+        HealthChecks {
+            database: healthy_item(),
+            redis: HealthCheckItem {
+                status: status.to_string(),
+                message: None,
+                response_time_ms: Some(1),
+            },
+            memory: healthy_item(),
+            disk: healthy_item(),
+        }
+    }
+
+    #[test]
+    fn configured_redis_failure_prevents_overall_healthy_status() {
+        let checks = checks_with_redis("unreachable");
+
+        assert_eq!(overall_health_status(&checks, true), "unhealthy");
+        assert_eq!(overall_health_status(&checks, false), "degraded");
+    }
+
+    #[test]
+    fn development_redis_degradation_is_reflected_without_blocking_health() {
+        let checks = checks_with_redis("not_configured");
+
+        assert_eq!(overall_health_status(&checks, true), "unhealthy");
+        assert_eq!(overall_health_status(&checks, false), "degraded");
+    }
+
+    #[test]
+    fn all_healthy_dependencies_report_healthy() {
+        let checks = checks_with_redis("healthy");
+
+        assert_eq!(overall_health_status(&checks, true), "healthy");
+    }
+
+    #[test]
+    fn readiness_blocks_unreachable_redis_only_in_production() {
+        assert_eq!(
+            readiness_decision(true, RedisRuntimeStatus::Unreachable, true),
+            ReadinessDecision::NotReady("Redis 不可用")
+        );
+        assert_eq!(
+            readiness_decision(true, RedisRuntimeStatus::Unreachable, false),
+            ReadinessDecision::Degraded
+        );
+    }
+
+    #[test]
+    fn readiness_preserves_missing_redis_environment_semantics() {
+        assert_eq!(
+            readiness_decision(true, RedisRuntimeStatus::NotConfigured, true),
+            ReadinessDecision::NotReady("生产环境未配置 Redis")
+        );
+        assert_eq!(
+            readiness_decision(true, RedisRuntimeStatus::NotConfigured, false),
+            ReadinessDecision::Degraded
+        );
+        assert_eq!(
+            readiness_decision(true, RedisRuntimeStatus::Healthy, true),
+            ReadinessDecision::Healthy
+        );
+    }
+
+    #[test]
+    fn database_failure_always_blocks_readiness() {
+        assert_eq!(
+            readiness_decision(false, RedisRuntimeStatus::Healthy, false),
+            ReadinessDecision::NotReady("数据库连接失败")
+        );
+    }
 }
