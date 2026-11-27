@@ -829,7 +829,7 @@ async fn create_backup_record(
     match result {
         Ok(Ok((path, size))) => {
             let file_size = i64::try_from(size)
-                .map_err(|_| AppError::internal("备份文件大小超过数据库可存储上限"))?;
+                .map_err(|_| AppError::validation("备份文件大小超过数据库可存储上限"))?;
             let mut active: system_update_backup::ActiveModel = saved.into();
             active.status = Set("completed".to_string());
             active.file_path = Set(path.to_string_lossy().into_owned());
@@ -843,7 +843,10 @@ async fn create_backup_record(
         }
         Err(error) => {
             mark_backup_failed(db, backup_id).await;
-            Err(AppError::internal(format!("备份任务执行失败: {error}")))
+            tracing::error!(backup_id, error = %error, "备份任务线程异常退出");
+            Err(AppError::business_displayable(
+                "备份任务执行失败，请查看服务日志",
+            ))
         }
     }
 }
