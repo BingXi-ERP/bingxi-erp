@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use thiserror::Error;
 
 // GitHub 仓库与 API 地址。仓身份唯一真源在此，`pub` 供 `github` 子模块、`cli` 升级链与
@@ -212,6 +212,14 @@ pub struct SystemUpdateService {
     pub(crate) is_updating: Arc<std::sync::atomic::AtomicBool>,
 }
 
+static SYSTEM_UPDATE_LOCK: OnceLock<Arc<std::sync::atomic::AtomicBool>> = OnceLock::new();
+
+fn shared_system_update_lock() -> Arc<std::sync::atomic::AtomicBool> {
+    SYSTEM_UPDATE_LOCK
+        .get_or_init(|| Arc::new(std::sync::atomic::AtomicBool::new(false)))
+        .clone()
+}
+
 impl SystemUpdateService {
     pub fn new() -> Self {
         let exe_dir = std::env::current_exe()
@@ -227,7 +235,7 @@ impl SystemUpdateService {
         Self {
             app_dir,
             backup_dir,
-            is_updating: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            is_updating: shared_system_update_lock(),
         }
     }
 }
@@ -869,6 +877,17 @@ mod integrity_tests {
         assert_eq!(from_target, root);
 
         std::fs::remove_dir_all(root).expect("清理测试目录失败");
+    }
+
+    #[test]
+    fn constructors_share_process_update_lock() {
+        let first = SystemUpdateService::with_app_dir(std::env::temp_dir());
+        let second = SystemUpdateService::with_app_dir(std::env::temp_dir());
+
+        assert!(
+            Arc::ptr_eq(&first.is_updating, &second.is_updating),
+            "不同 handler 构造的服务必须共享同一进程级更新互斥锁"
+        );
     }
 
     #[test]

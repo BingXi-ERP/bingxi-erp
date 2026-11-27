@@ -27,6 +27,7 @@ use chrono::Utc;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 impl SystemUpdateService {
     pub async fn apply_local_update(&self, release: &LocalRelease) -> Result<String, UpdateError> {
@@ -50,12 +51,16 @@ impl SystemUpdateService {
             return Err(UpdateError::AlreadyUpdating);
         }
 
-        let result = self.do_update(update_file, expected_version).await;
+        struct UpdateLockGuard(Arc<std::sync::atomic::AtomicBool>);
 
-        self.is_updating
-            .store(false, std::sync::atomic::Ordering::SeqCst);
+        impl Drop for UpdateLockGuard {
+            fn drop(&mut self) {
+                self.0.store(false, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
 
-        result
+        let _lock_guard = UpdateLockGuard(Arc::clone(&self.is_updating));
+        self.do_update(update_file, expected_version).await
     }
 
     async fn do_update(
@@ -90,9 +95,15 @@ impl SystemUpdateService {
         self.log_update("步骤4: 应用更新");
         if let Err(e) = self.apply_files(&extract_dir) {
             self.log_update(&format!("应用更新文件失败: {}，正在回滚", e));
-            // 批次 98 P2-C 修复（v5 复审）：吞错改日志记录，便于事后排查回滚失败
             if let Err(rollback_err) = self.rollback(&backup_path) {
-                tracing::warn!("应用更新失败后回滚也失败: {}", rollback_err);
+                tracing::error!(
+                    apply_error = %e,
+                    rollback_error = %rollback_err,
+                    "应用更新失败且回滚失败，需人工检查"
+                );
+                return Err(UpdateError::BackupError(format!(
+                    "应用文件失败: {e}；回滚也失败: {rollback_err}，需人工检查"
+                )));
             }
             return Err(UpdateError::ValidationError(format!(
                 "应用文件失败并已回滚: {}",
@@ -102,9 +113,17 @@ impl SystemUpdateService {
         self.log_update("文件已更新");
 
         self.log_update("步骤5: 验证更新结果");
-        if !self.verify_update() {
+        if !self.verify_update(&new_version) {
             self.log_update("更新验证失败，正在回滚");
-            self.rollback(&backup_path)?;
+            if let Err(rollback_err) = self.rollback(&backup_path) {
+                tracing::error!(
+                    rollback_error = %rollback_err,
+                    "更新验证失败且回滚失败，需人工检查"
+                );
+                return Err(UpdateError::BackupError(format!(
+                    "更新验证失败: 目标版本 {new_version} 的 backend/server 或 VERSION 不匹配；回滚也失败: {rollback_err}，需人工检查"
+                )));
+            }
             return Err(UpdateError::ValidationError(
                 "更新验证失败，已回滚".to_string(),
             ));
@@ -172,6 +191,14 @@ impl SystemUpdateService {
         Ok(())
     }
 
+    fn backend_executable_relative_path() -> PathBuf {
+        if cfg!(windows) {
+            Path::new("backend").join("server.exe")
+        } else {
+            Path::new("backend").join("server")
+        }
+    }
+
     fn validate_update_package(&self, extract_dir: &Path) -> Result<(), UpdateError> {
         let version_file = extract_dir.join("VERSION");
         if !version_file.exists() {
@@ -181,10 +208,18 @@ impl SystemUpdateService {
         }
 
         let manifest_file = extract_dir.join("UPDATE_MANIFEST.json");
-        if !manifest_file.exists() {
+        if !manifest_file.is_file() {
             return Err(UpdateError::ValidationError(
                 "更新包缺少 UPDATE_MANIFEST.json 文件".to_string(),
             ));
+        }
+
+        let backend_exe = extract_dir.join(Self::backend_executable_relative_path());
+        if !backend_exe.is_file() {
+            return Err(UpdateError::ValidationError(format!(
+                "更新包缺少 {} 可执行文件",
+                Self::backend_executable_relative_path().display()
+            )));
         }
 
         Ok(())
@@ -232,19 +267,16 @@ impl SystemUpdateService {
         Ok(())
     }
 
-    fn verify_update(&self) -> bool {
-        let backend_exe = if cfg!(windows) {
-            self.app_dir.join("backend").join("bingxi_backend.exe")
-        } else {
-            self.app_dir.join("backend").join("bingxi_backend")
-        };
-
-        if backend_exe.exists() {
-            return true;
+    fn verify_update(&self, expected_version: &str) -> bool {
+        let backend_exe = self.app_dir.join(Self::backend_executable_relative_path());
+        if !backend_exe.is_file() {
+            return false;
         }
 
-        let version_file = self.app_dir.join("VERSION");
-        version_file.exists()
+        match fs::read_to_string(self.app_dir.join("VERSION")) {
+            Ok(version) => version.trim() == expected_version,
+            Err(_) => false,
+        }
     }
 
     pub(crate) fn log_update(&self, message: &str) {
@@ -295,6 +327,8 @@ mod tests {
         for (name, content) in [
             ("VERSION", b"2.0.0\n".as_slice()),
             ("UPDATE_MANIFEST.json", b"{}".as_slice()),
+            ("backend/server", b"backend".as_slice()),
+            ("backend/server.exe", b"backend".as_slice()),
         ] {
             archive
                 .start_file(name, zip::write::SimpleFileOptions::default())
@@ -315,6 +349,56 @@ mod tests {
             fs::read(app_dir.join("VERSION")).expect("读取当前 VERSION 失败"),
             b"1.0.0\n",
             "拒绝目标版本不一致时不得改写当前版本"
+        );
+
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
+    }
+
+    #[tokio::test]
+    async fn package_without_backend_binary_is_rejected_before_files_are_applied() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("系统时间应可读取")
+            .as_nanos();
+        let app_dir = std::env::temp_dir().join(format!(
+            "bingxi_system_update_missing_backend_{}_{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&app_dir).expect("创建测试目录失败");
+        fs::write(app_dir.join("VERSION"), b"1.0.0\n").expect("写入当前 VERSION 失败");
+        let service = SystemUpdateService {
+            app_dir: app_dir.clone(),
+            backup_dir: app_dir.join("backups"),
+            is_updating: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        };
+
+        let update_file = app_dir.join("candidate.zip");
+        let file = fs::File::create(&update_file).expect("创建测试更新包失败");
+        let mut archive = zip::ZipWriter::new(file);
+        for (name, content) in [
+            ("VERSION", b"2.0.0\n".as_slice()),
+            ("UPDATE_MANIFEST.json", b"{}".as_slice()),
+        ] {
+            archive
+                .start_file(name, zip::write::SimpleFileOptions::default())
+                .expect("写入更新包条目失败");
+            archive.write_all(content).expect("写入更新包内容失败");
+        }
+        archive.finish().expect("完成测试更新包失败");
+
+        let err = service
+            .apply_update_expected(&update_file, Some("2.0.0"))
+            .await
+            .expect_err("缺少后端二进制的更新包必须拒绝");
+        let expected_backend = SystemUpdateService::backend_executable_relative_path();
+        assert!(
+            matches!(err, UpdateError::ValidationError(ref message) if message.contains(&expected_backend.display().to_string())),
+            "应明确缺少后端二进制，实得: {err:?}"
+        );
+        assert_eq!(
+            fs::read(app_dir.join("VERSION")).expect("读取当前 VERSION 失败"),
+            b"1.0.0\n",
+            "拒绝缺少二进制的更新包时不得改写当前版本"
         );
 
         fs::remove_dir_all(app_dir).expect("清理测试目录失败");
