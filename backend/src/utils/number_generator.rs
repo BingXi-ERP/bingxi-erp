@@ -394,7 +394,19 @@ impl DocumentNumberGenerator {
         suffix.parse::<u64>().ok()
     }
 
-    /// 已配置规则按持久化号段计数分配；历史单号只参与占用探测，不反推跨周期基数。
+    fn configured_historical_suffix(suffix: &str, width: usize, never: bool) -> Option<u64> {
+        if never {
+            Self::base_seq_from_suffix(suffix, 1)
+        } else if suffix.len() == width {
+            Self::base_seq_from_suffix(suffix, width)
+        } else {
+            None
+        }
+    }
+
+    /// 已配置规则按持久化号段计数分配；历史单号参与占用探测与首次基数。
+    /// 日/月周期只把严格匹配配置宽度的纯数字后缀计入基数；永久周期兼容历史日期流水，
+    /// 避免切换为 never 后把旧单号的年月日当成新流水。
     ///
     /// 入参为当前事务、单号列与已解析规则；调用方已持有实际输出前缀与周期的咨询锁。
     /// 传给谁 PostgreSQL `system_number_sequences` 与目标实体单号列。
@@ -425,7 +437,9 @@ impl DocumentNumberGenerator {
         let historical_max = existing_numbers
             .iter()
             .filter_map(|(no,)| no.strip_prefix(rule.output_prefix.as_str()))
-            .filter_map(|suffix| Self::base_seq_from_suffix(suffix, width))
+            .filter_map(|suffix| {
+                Self::configured_historical_suffix(suffix, width, rule.period.is_empty())
+            })
             .max();
 
         let row = conn
@@ -952,6 +966,25 @@ mod tests {
         assert_eq!(never.output_prefix, "SALE");
         assert_eq!(never.period, "");
         assert_eq!(never.seq_width, 6);
+    }
+
+    #[test]
+    fn configured_period_requires_exact_width_for_historical_sequence() {
+        assert_eq!(
+            DocumentNumberGenerator::configured_historical_suffix("261127001", 5, false),
+            None,
+            "月/日周期不能把旧日期流水误当新周期序号"
+        );
+        assert_eq!(
+            DocumentNumberGenerator::configured_historical_suffix("00001", 5, false),
+            Some(1),
+            "严格匹配配置宽度的纯数字后缀仍应计入基数"
+        );
+        assert_eq!(
+            DocumentNumberGenerator::configured_historical_suffix("261127001", 5, true),
+            Some(261127001),
+            "永久周期需要兼容历史日期流水，避免切回后重复取号"
+        );
     }
 
     #[test]
