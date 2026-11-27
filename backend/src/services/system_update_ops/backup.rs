@@ -22,7 +22,10 @@ impl SystemUpdateService {
         }
 
         let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
-        let backup_name = format!("v{}_{}", version, timestamp);
+        let backup_version = self
+            .applied_version()
+            .unwrap_or_else(|| version.to_string());
+        let backup_name = format!("v{}_{}", backup_version, timestamp);
         let backup_path = self.backup_dir.join(&backup_name);
 
         fs::create_dir_all(&backup_path)?;
@@ -144,9 +147,18 @@ impl SystemUpdateService {
         let backup_versions = self.list_backup_versions();
         let backup_path = backup_versions
             .iter()
-            .find(|v| v.starts_with(&format!("v{}", version)))
+            .find(|v| v.starts_with(&format!("v{}_", version)))
             .map(|v| self.backup_dir.join(v))
             .ok_or_else(|| UpdateError::BackupError(format!("找不到版本 {} 的备份", version)))?;
+        let backup_version = fs::read_to_string(backup_path.join("VERSION"))
+            .map_err(|e| UpdateError::BackupError(format!("读取备份 VERSION 失败: {e}")))?
+            .trim()
+            .to_string();
+        if backup_version != version {
+            return Err(UpdateError::BackupError(format!(
+                "备份目录版本与内部 VERSION 不一致：目录请求 {version}，备份实际 {backup_version}"
+            )));
+        }
 
         self.rollback(&backup_path)?;
         Ok(format!("已回滚到版本 {}", version))
@@ -187,6 +199,54 @@ mod tests {
             is_updating: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         };
         (service, app_dir)
+    }
+
+    #[test]
+    fn create_backup_uses_disk_applied_version_for_backup_identity() {
+        let (service, app_dir) = temp_service("backup_version");
+        fs::write(app_dir.join("VERSION"), b"2.0.0\n").expect("写入磁盘 VERSION 失败");
+        fs::create_dir_all(app_dir.join("backend")).expect("创建 backend 测试目录失败");
+        fs::write(app_dir.join("backend/server"), b"new-backend").expect("写入 backend 失败");
+
+        let backup_path = service.create_backup("1.0.0").expect("创建备份失败");
+        let backup_name = backup_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("备份目录名应可读取");
+        assert!(
+            backup_name.starts_with("v2.0.0_"),
+            "待重启窗口的备份名必须使用磁盘已应用版本，实得: {backup_name}"
+        );
+        assert_eq!(
+            fs::read_to_string(backup_path.join("VERSION")).expect("读取备份 VERSION 失败"),
+            "2.0.0\n"
+        );
+
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
+    }
+
+    #[test]
+    fn rollback_to_version_rejects_backup_with_mismatched_internal_version() {
+        let (service, app_dir) = temp_service("rollback_version");
+        fs::write(app_dir.join("VERSION"), b"1.0.0\n").expect("写入当前 VERSION 失败");
+        let backup_path = app_dir.join("backups/v2.0.0_20261127_120000");
+        fs::create_dir_all(&backup_path).expect("创建备份目录失败");
+        fs::write(backup_path.join("VERSION"), b"3.0.0\n").expect("写入备份 VERSION 失败");
+
+        let err = service
+            .rollback_to_version("2.0.0")
+            .expect_err("备份目录名与内部 VERSION 不一致时必须拒绝");
+        assert!(
+            matches!(err, UpdateError::BackupError(_)),
+            "版本不匹配应返回 BackupError，实得: {err:?}"
+        );
+        assert_eq!(
+            fs::read_to_string(app_dir.join("VERSION")).expect("读取当前 VERSION 失败"),
+            "1.0.0\n",
+            "拒绝错配备份时不得改写当前版本"
+        );
+
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
     }
 
     #[test]

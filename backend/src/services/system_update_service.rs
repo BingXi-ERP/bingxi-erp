@@ -215,6 +215,15 @@ pub struct SystemUpdateService {
     pub(crate) is_updating: Arc<std::sync::atomic::AtomicBool>,
 }
 
+/// 系统更新操作互斥锁；备份、安装、回滚共用，drop 时释放。
+pub(crate) struct UpdateOperationLock(Arc<std::sync::atomic::AtomicBool>);
+
+impl Drop for UpdateOperationLock {
+    fn drop(&mut self) {
+        self.0.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
 static SYSTEM_UPDATE_LOCK: OnceLock<Arc<std::sync::atomic::AtomicBool>> = OnceLock::new();
 
 fn shared_system_update_lock() -> Arc<std::sync::atomic::AtomicBool> {
@@ -240,6 +249,17 @@ impl SystemUpdateService {
             backup_dir,
             is_updating: shared_system_update_lock(),
         }
+    }
+
+    /// 获取进程级系统更新操作锁；已有备份、安装或回滚在执行时显式拒绝。
+    pub(crate) fn try_lock_update(&self) -> Result<UpdateOperationLock, UpdateError> {
+        if self
+            .is_updating
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(UpdateError::AlreadyUpdating);
+        }
+        Ok(UpdateOperationLock(Arc::clone(&self.is_updating)))
     }
 }
 
@@ -890,6 +910,23 @@ mod integrity_tests {
         assert!(
             Arc::ptr_eq(&first.is_updating, &second.is_updating),
             "不同 handler 构造的服务必须共享同一进程级更新互斥锁"
+        );
+    }
+
+    #[test]
+    fn update_operation_lock_rejects_concurrent_work_and_releases_on_drop() {
+        let service = SystemUpdateService::with_app_dir(std::env::temp_dir());
+        let guard = service
+            .try_lock_update()
+            .expect("首次获取系统更新操作锁应成功");
+        assert!(
+            matches!(service.try_lock_update(), Err(UpdateError::AlreadyUpdating)),
+            "备份、安装、回滚必须互斥，不能并发改写同一应用目录"
+        );
+        drop(guard);
+        assert!(
+            service.try_lock_update().is_ok(),
+            "操作结束或 panic drop 后必须释放锁"
         );
     }
 

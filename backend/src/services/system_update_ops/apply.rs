@@ -29,7 +29,6 @@ use chrono::Utc;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::sync::Arc;
 
 const MAX_SINGLE_EXTRACT_SIZE: u64 = MAX_SINGLE_UPDATE_FILE_SIZE;
 const MAX_TOTAL_EXTRACT_SIZE: u64 = 500 * 1024 * 1024;
@@ -52,22 +51,7 @@ impl SystemUpdateService {
         update_file: &Path,
         expected_version: Option<&str>,
     ) -> Result<String, UpdateError> {
-        if self
-            .is_updating
-            .swap(true, std::sync::atomic::Ordering::SeqCst)
-        {
-            return Err(UpdateError::AlreadyUpdating);
-        }
-
-        struct UpdateLockGuard(Arc<std::sync::atomic::AtomicBool>);
-
-        impl Drop for UpdateLockGuard {
-            fn drop(&mut self) {
-                self.0.store(false, std::sync::atomic::Ordering::SeqCst);
-            }
-        }
-
-        let _lock_guard = UpdateLockGuard(Arc::clone(&self.is_updating));
+        let _lock_guard = self.try_lock_update()?;
         self.do_update(update_file, expected_version).await
     }
 
@@ -76,7 +60,9 @@ impl SystemUpdateService {
         update_file: &Path,
         expected_version: Option<&str>,
     ) -> Result<String, UpdateError> {
-        let current_version = self.get_current_version();
+        let current_version = self
+            .applied_version()
+            .unwrap_or_else(|| self.get_current_version());
         self.log_update(&format!("开始更新，当前版本: {}", current_version));
 
         self.log_update("步骤1: 创建备份");

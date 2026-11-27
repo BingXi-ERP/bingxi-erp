@@ -493,6 +493,7 @@ pub async fn rollback_version(
     require_admin_role(&state, &auth).await?;
 
     let service = SystemUpdateService::new();
+    let _update_lock = service.try_lock_update()?;
 
     match service.rollback_to_version(&payload.version) {
         Ok(message) => {
@@ -785,6 +786,7 @@ pub async fn create_backup_task(
     req.validate().map_err(AppError::from)?;
 
     let service = SystemUpdateService::new();
+    let _update_lock = service.try_lock_update()?;
     let saved = create_backup_record(state.db.as_ref(), &service, req, &auth).await?;
     Ok(Json(ApiResponse::success_with_message(
         backup_to_frontend_json(&saved),
@@ -823,7 +825,9 @@ async fn create_backup_record(
     };
     let saved = backup.insert(db).await?;
     let backup_id = saved.id;
-    let version = service.get_current_version();
+    let version = service
+        .applied_version()
+        .unwrap_or_else(|| service.get_current_version());
     let backup_service = service.clone();
     let result = tokio::task::spawn_blocking(move || {
         let path = backup_service.create_backup(&version)?;
