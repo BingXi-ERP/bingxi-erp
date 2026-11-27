@@ -303,9 +303,61 @@ impl SystemUpdateService {
         asset: &GitHubAsset,
         download_path: &Path,
     ) -> Result<PathBuf, UpdateError> {
+        let temp_path = Self::temporary_download_path(download_path);
+        if let Err(error) = self
+            .download_release_asset_to_temp(release, asset, &temp_path)
+            .await
+        {
+            Self::remove_temp_download(&temp_path);
+            return Err(error);
+        }
+        if let Err(error) = Self::commit_downloaded_file(&temp_path, download_path) {
+            Self::remove_temp_download(&temp_path);
+            return Err(error);
+        }
+
+        self.log_update(&format!("更新包下载并通过完整性校验: {:?}", download_path));
+        Ok(download_path.to_path_buf())
+    }
+
+    /// 临时文件与最终包同目录且唯一，避免并发下载互相截断。
+    fn temporary_download_path(final_path: &Path) -> PathBuf {
+        let file_name = final_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("update.tar.gz");
+        final_path.with_file_name(format!(".{file_name}.{}.part", uuid::Uuid::new_v4()))
+    }
+
+    /// 校验通过后才原子替换最终路径；Rust 在 Windows 上也通过替换语义重命名，
+    /// 失败时保留旧完整包与临时包，绝不先删旧包再重试。
+    fn commit_downloaded_file(temp_path: &Path, final_path: &Path) -> Result<(), UpdateError> {
+        let metadata = fs::metadata(temp_path)?;
+        if !metadata.is_file() || metadata.len() == 0 {
+            return Err(UpdateError::ValidationError(
+                "下载临时文件不是非空普通文件，拒绝提交".to_string(),
+            ));
+        }
+        fs::rename(temp_path, final_path).map_err(Into::into)
+    }
+
+    fn remove_temp_download(temp_path: &Path) {
+        if let Err(error) = fs::remove_file(temp_path)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!("清理下载临时文件失败 {:?}: {}", temp_path, error);
+        }
+    }
+
+    async fn download_release_asset_to_temp(
+        &self,
+        release: &GitHubRelease,
+        asset: &GitHubAsset,
+        temp_path: &Path,
+    ) -> Result<(), UpdateError> {
         self.log_update(&format!("开始下载更新包: {}", asset.name));
         validate_asset_name(&asset.name)?;
-        if let Some(parent) = download_path.parent() {
+        if let Some(parent) = temp_path.parent() {
             fs::create_dir_all(parent)?;
         }
 
@@ -323,7 +375,7 @@ impl SystemUpdateService {
         let mut last_err: Option<UpdateError> = None;
         let mut downloaded = false;
         for (idx, cand_url) in candidates.iter().enumerate() {
-            match self.try_download_candidate(cand_url, download_path).await {
+            match self.try_download_candidate(cand_url, temp_path).await {
                 Ok(()) => {
                     tracing::info!(
                         "[system_update] 下载候选[{}/{}] 成功: {}",
@@ -342,12 +394,7 @@ impl SystemUpdateService {
                         cand_url,
                         e
                     );
-                    // 清理该候选写入的半成品，避免残损文件影响后续候选与校验
-                    if let Err(rm) = fs::remove_file(download_path)
-                        && rm.kind() != std::io::ErrorKind::NotFound
-                    {
-                        tracing::warn!("[system_update] 清理失败候选残件出错: {}", rm);
-                    }
+                    Self::remove_temp_download(temp_path);
                     last_err = Some(e);
                 }
             }
@@ -362,21 +409,14 @@ impl SystemUpdateService {
         // 字节到手后取【官方】校验值 + 本地 SHA-256 重算比对（fail-closed）。
         // 校验值只从官方域取（CI .sha256 资产优先，其次 API assets[].digest）；镜像仅搬字节。
         if let Err(e) = self
-            .verify_downloaded_integrity(asset, &release.assets, download_path, &cfg)
+            .verify_downloaded_integrity(asset, &release.assets, temp_path, &cfg)
             .await
         {
-            // 校验不通过 / 不可得 → 删除已下文件 + 返回错误（绝不 apply）
-            if let Err(rm) = fs::remove_file(download_path)
-                && rm.kind() != std::io::ErrorKind::NotFound
-            {
-                tracing::warn!("[system_update] 校验失败后清理下载文件出错: {}", rm);
-            }
             self.log_update(&format!("完整性校验未通过，已删除下载文件: {}", e));
             return Err(e);
         }
 
-        self.log_update(&format!("更新包下载并通过完整性校验: {:?}", download_path));
-        Ok(download_path.to_path_buf())
+        Ok(())
     }
 
     /// 按 `mirror_order` 生成候选下载 URL 列表。
@@ -854,6 +894,52 @@ mod download_candidate_tests {
         let err = SystemUpdateService::find_release_asset(&release, Some("android"))
             .expect_err("显式资产选择也不得用子串误选 APK 或其它版本文件");
         assert!(matches!(err, UpdateError::NetworkError(_)), "实得: {err:?}");
+    }
+
+    #[test]
+    fn download_uses_unique_sibling_temp_and_atomic_commit() {
+        let (_service, app_dir) = temp_service("atomic_download");
+        let final_path = app_dir.join("downloads/release-2026.11.22.603.tar.gz");
+        let first_temp = SystemUpdateService::temporary_download_path(&final_path);
+        let second_temp = SystemUpdateService::temporary_download_path(&final_path);
+
+        assert_ne!(first_temp, second_temp, "并发下载不得共用临时文件");
+        assert_eq!(first_temp.parent(), final_path.parent());
+        assert_eq!(second_temp.parent(), final_path.parent());
+
+        fs::create_dir_all(final_path.parent().expect("下载目录应存在")).expect("创建下载目录失败");
+        fs::write(&final_path, b"old-complete").expect("写入旧完整包失败");
+        fs::write(&first_temp, b"new-complete").expect("写入新临时包失败");
+        SystemUpdateService::commit_downloaded_file(&first_temp, &final_path)
+            .expect("校验通过的临时包必须能替换最终文件");
+
+        assert_eq!(
+            fs::read(&final_path).expect("读取提交后的更新包失败"),
+            b"new-complete"
+        );
+        assert!(!first_temp.exists(), "提交成功后临时文件必须被消费");
+        assert!(!second_temp.exists(), "未使用的临时路径不得被创建");
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
+    }
+
+    #[test]
+    fn failed_commit_preserves_previous_complete_download() {
+        let (_service, app_dir) = temp_service("failed_commit");
+        let final_path = app_dir.join("downloads/release-2026.11.22.603.tar.gz");
+        fs::create_dir_all(final_path.parent().expect("下载目录应存在")).expect("创建下载目录失败");
+        fs::write(&final_path, b"old-complete").expect("写入旧完整包失败");
+        let invalid_temp = SystemUpdateService::temporary_download_path(&final_path);
+        fs::create_dir_all(&invalid_temp).expect("创建无效临时路径失败");
+
+        let result = SystemUpdateService::commit_downloaded_file(&invalid_temp, &final_path);
+        assert!(result.is_err(), "目录不能作为更新包文件提交");
+        assert_eq!(
+            fs::read(&final_path).expect("读取旧完整包失败"),
+            b"old-complete",
+            "提交失败时不得删除旧完整包"
+        );
+
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
     }
 
     #[test]

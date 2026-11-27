@@ -33,6 +33,7 @@ use std::sync::Arc;
 
 const MAX_SINGLE_EXTRACT_SIZE: u64 = MAX_SINGLE_UPDATE_FILE_SIZE;
 const MAX_TOTAL_EXTRACT_SIZE: u64 = 500 * 1024 * 1024;
+const MIN_EXECUTABLE_HEADER_SIZE: u64 = 64;
 
 impl SystemUpdateService {
     pub async fn apply_local_update(&self, release: &LocalRelease) -> Result<String, UpdateError> {
@@ -324,6 +325,45 @@ impl SystemUpdateService {
         }
     }
 
+    fn validate_backend_executable(path: &Path) -> Result<(), UpdateError> {
+        let metadata = fs::metadata(path).map_err(|_| {
+            UpdateError::ValidationError(format!("更新包缺少 {} 可执行文件", path.display()))
+        })?;
+        if !metadata.is_file() {
+            return Err(UpdateError::ValidationError(format!(
+                "更新包缺少 {} 可执行文件",
+                path.display()
+            )));
+        }
+        if metadata.len() < MIN_EXECUTABLE_HEADER_SIZE {
+            return Err(UpdateError::ValidationError(format!(
+                "backend 可执行文件为空或截断: {}",
+                path.display()
+            )));
+        }
+
+        let mut header = [0_u8; 4];
+        let mut file = fs::File::open(path)?;
+        file.read_exact(&mut header)?;
+        #[cfg(windows)]
+        let valid_magic = &header[..2] == b"MZ";
+        #[cfg(not(windows))]
+        let valid_magic = &header == b"\x7fELF";
+        if !valid_magic {
+            return Err(UpdateError::ValidationError(format!(
+                "backend 可执行文件格式无效（{}）: {}",
+                if cfg!(windows) {
+                    "需要 MZ"
+                } else {
+                    "需要 ELF"
+                },
+                path.display()
+            )));
+        }
+
+        Ok(())
+    }
+
     fn resolve_package_root(extract_root: &Path) -> PathBuf {
         if extract_root.join("backend").exists() {
             return extract_root.to_path_buf();
@@ -342,12 +382,7 @@ impl SystemUpdateService {
         expected_version: Option<&str>,
     ) -> Result<(), UpdateError> {
         let backend_exe = package_dir.join(Self::backend_executable_relative_path());
-        if !backend_exe.is_file() {
-            return Err(UpdateError::ValidationError(format!(
-                "更新包缺少 {} 可执行文件",
-                Self::backend_executable_relative_path().display()
-            )));
-        }
+        Self::validate_backend_executable(&backend_exe)?;
         if !package_dir.join("frontend").is_dir() {
             return Err(UpdateError::ValidationError(
                 "更新包缺少 frontend 目录".to_string(),
@@ -440,12 +475,7 @@ impl SystemUpdateService {
         let relative_backend = Self::backend_executable_relative_path();
         let source_backend = package_dir.join(&relative_backend);
         let target_backend = self.app_dir.join(&relative_backend);
-        if !target_backend.is_file() {
-            return Err(UpdateError::ValidationError(format!(
-                "应用后缺少 {}",
-                relative_backend.display()
-            )));
-        }
+        Self::validate_backend_executable(&target_backend)?;
 
         let source_hash = sha256_hex_of_file(&source_backend)?;
         let target_hash = sha256_hex_of_file(&target_backend)?;
@@ -552,6 +582,16 @@ mod tests {
         (service, app_dir)
     }
 
+    fn valid_executable_bytes() -> Vec<u8> {
+        let mut bytes = vec![0_u8; 64];
+        if cfg!(windows) {
+            bytes[..2].copy_from_slice(b"MZ");
+        } else {
+            bytes[..4].copy_from_slice(b"\x7fELF");
+        }
+        bytes
+    }
+
     #[test]
     fn single_file_limit_accommodates_real_release_binary() {
         assert!(
@@ -564,11 +604,12 @@ mod tests {
     async fn official_release_tar_gz_without_embedded_version_installs_expected_version() {
         let (service, app_dir) = temp_service("official_tar");
         let update_file = app_dir.join("release-2.0.0.tar.gz");
+        let backend = valid_executable_bytes();
         write_release_tar_gz(
             &update_file,
             &[
-                ("bingxi-erp/backend/server", b"new-backend".as_slice()),
-                ("bingxi-erp/backend/server.exe", b"new-backend".as_slice()),
+                ("bingxi-erp/backend/server", backend.as_slice()),
+                ("bingxi-erp/backend/server.exe", backend.as_slice()),
                 ("bingxi-erp/frontend/index.html", b"new-frontend".as_slice()),
                 ("bingxi-erp/deploy/deploy.sh", b"deploy".as_slice()),
             ],
@@ -589,7 +630,8 @@ mod tests {
         );
         assert_eq!(
             fs::read(app_dir.join("backend/server")).expect("读取应用后 backend 失败"),
-            b"new-backend"
+            backend,
+            "应用后的 backend 必须与更新包字节一致"
         );
         assert_eq!(
             fs::read(app_dir.join("frontend/index.html")).expect("读取应用后 frontend 失败"),
@@ -597,6 +639,48 @@ mod tests {
         );
 
         fs::remove_dir_all(app_dir).expect("清理测试目录失败");
+    }
+
+    #[tokio::test]
+    async fn empty_truncated_or_invalid_backend_binary_is_rejected_before_files_are_applied() {
+        let truncated_header = if cfg!(windows) {
+            b"MZ".to_vec()
+        } else {
+            b"\x7fELF".to_vec()
+        };
+        let cases = [
+            ("empty", Vec::new()),
+            ("truncated_header", truncated_header),
+            ("invalid_magic", vec![b'X'; 64]),
+        ];
+
+        for (case_name, backend) in cases {
+            let (service, app_dir) = temp_service(&format!("invalid_backend_{case_name}"));
+            let update_file = app_dir.join("release-2.0.0.tar.gz");
+            write_release_tar_gz(
+                &update_file,
+                &[
+                    ("bingxi-erp/backend/server", backend.as_slice()),
+                    ("bingxi-erp/backend/server.exe", backend.as_slice()),
+                    ("bingxi-erp/frontend/index.html", b"frontend".as_slice()),
+                ],
+            );
+
+            let err = service
+                .apply_update_expected(&update_file, Some("2.0.0"))
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(err, UpdateError::ValidationError(_)),
+                "{case_name} backend 应返回 ValidationError，实得: {err:?}"
+            );
+            assert_eq!(
+                fs::read_to_string(app_dir.join("VERSION")).expect("读取当前 VERSION 失败"),
+                "1.0.0\n",
+                "{case_name} backend 被拒绝时不得改写运行版本"
+            );
+            fs::remove_dir_all(app_dir).expect("清理测试目录失败");
+        }
     }
 
     #[tokio::test]
@@ -651,11 +735,12 @@ mod tests {
         let update_file = app_dir.join("candidate.zip");
         let file = fs::File::create(&update_file).expect("创建测试更新包失败");
         let mut archive = zip::ZipWriter::new(file);
+        let backend = valid_executable_bytes();
         for (name, content) in [
             ("VERSION", b"2.0.0\n".as_slice()),
             ("UPDATE_MANIFEST.json", b"{}".as_slice()),
-            ("backend/server", b"backend".as_slice()),
-            ("backend/server.exe", b"backend".as_slice()),
+            ("backend/server", backend.as_slice()),
+            ("backend/server.exe", backend.as_slice()),
             ("frontend/index.html", b"frontend".as_slice()),
         ] {
             archive
