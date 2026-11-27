@@ -27,6 +27,8 @@ use axum::{
 use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::system_update_handler;
 use bingxi_backend::middleware::auth_context::AuthContext;
+use bingxi_backend::models::{system_update_backup, system_update_task, system_version};
+use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use serde_json::Value;
 use test_common::setup_test_db;
 use tower::ServiceExt;
@@ -55,6 +57,14 @@ fn build_app(state: AppState, auth: AuthContext) -> Router {
         .route(
             "/api/v1/erp/system-update/rollback",
             post(system_update_handler::rollback_version),
+        )
+        .route(
+            "/api/v1/erp/system-update/backups",
+            post(system_update_handler::create_backup_task),
+        )
+        .route(
+            "/api/v1/erp/system-update/versions/{versionId}/install",
+            post(system_update_handler::install_version_update),
         );
     // with_state 消费 AppState（handlers 有 State<AppState> extractor），再挂注入层
     routes
@@ -256,4 +266,111 @@ async fn test_system_update_version_readonly_200() {
         "查无当前版本行时 changelog 应为 null（未知），实际: {:?}",
         data.get("changelog")
     );
+}
+
+/// 未实现的增量/数据库备份必须显式拒绝，且不能落任何“已完成”记录。
+#[tokio::test]
+async fn test_unsupported_backup_types_rejected_without_records() {
+    let db = setup_test_db().await;
+    let state = AppState {
+        db: std::sync::Arc::new(db.clone()),
+        ..AppState::default()
+    };
+    let app = build_app(state, make_auth(1, "e2e_admin", Some(1)));
+
+    for backup_type in ["incremental", "database"] {
+        let resp = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/erp/system-update/backups")
+                    .header("content-type", "application/json")
+                    .body(Body::from(format!(
+                        r#"{{"backup_type":"{backup_type}","description":"honesty test"}}"#
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status(),
+            StatusCode::BAD_REQUEST,
+            "未实现的备份类型 {backup_type} 必须显式拒绝，实际 {}",
+            resp.status()
+        );
+        let json = read_json(resp.into_body()).await;
+        assert_eq!(json["code"], serde_json::json!("BUSINESS_ERROR"));
+        let message = json["message"].as_str().unwrap_or("");
+        assert!(
+            message.contains("尚未实现"),
+            "拒绝原因应明确说明该备份类型尚未实现，实际: {message}"
+        );
+    }
+
+    let count = system_update_backup::Entity::find()
+        .all(&db)
+        .await
+        .expect("查询备份记录失败")
+        .len();
+    assert_eq!(count, 0, "拒绝的备份请求不得落完成记录");
+}
+
+/// 未下载指定版本更新包时，安装端点必须拒绝且不能留下 installing 占位任务。
+#[tokio::test]
+async fn test_install_without_downloaded_package_rejected_without_task() {
+    let db = setup_test_db().await;
+    let now = chrono::Utc::now();
+    let version = system_version::ActiveModel {
+        version: Set("9999.1.1.0000".to_string()),
+        release_date: Set(now.into()),
+        changelog: Set(None),
+        is_current: Set(false),
+        created_at: Set(now.into()),
+        updated_at: Set(now.into()),
+        ..Default::default()
+    }
+    .insert(&db)
+    .await
+    .expect("插入测试版本失败");
+    let state = AppState {
+        db: std::sync::Arc::new(db.clone()),
+        ..AppState::default()
+    };
+    let app = build_app(state, make_auth(1, "e2e_admin", Some(1)));
+
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri(format!(
+                    "/api/v1/erp/system-update/versions/{}/install",
+                    version.id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "缺少下载包时必须拒绝安装，实际 {}",
+        resp.status()
+    );
+    let json = read_json(resp.into_body()).await;
+    assert_eq!(json["code"], serde_json::json!("BUSINESS_ERROR"));
+    assert!(
+        json["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("请先下载")),
+        "应明确要求先下载目标版本，实际: {json}"
+    );
+
+    let count = system_update_task::Entity::find()
+        .all(&db)
+        .await
+        .expect("查询更新任务失败")
+        .len();
+    assert_eq!(count, 0, "未执行的安装不得留下 installing 占位任务");
 }

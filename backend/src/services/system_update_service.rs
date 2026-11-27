@@ -26,7 +26,7 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use thiserror::Error;
 
 // GitHub 仓库与 API 地址。仓身份唯一真源在此，`pub` 供 `github` 子模块、`cli` 升级链与
@@ -37,6 +37,9 @@ pub const GITHUB_REPO_OWNER: &str = "BingXi-ERP";
 pub const GITHUB_REPO_NAME: &str = "bingxi-erp";
 pub(crate) const GITHUB_REPO_ENV: &str = "UPDATE__GITHUB_REPO";
 pub(crate) const GITHUB_API_URL: &str = "https://api.github.com";
+
+/// ZIP 与 tar.gz 共用的单文件解压上限；必须容纳真实 Release 的 backend/server（约 131MB）。
+pub(crate) const MAX_SINGLE_UPDATE_FILE_SIZE: u64 = 256 * 1024 * 1024;
 
 /// 判定 GitHub 账户名：一至三十九位字母数字或单个连字符，不得以连字符开头结尾，也不得连续连字符。
 fn is_valid_repo_owner(value: &str) -> bool {
@@ -205,26 +208,74 @@ impl From<UpdateError> for AppError {
 
 /// 系统更新服务
 /// struct 定义保留在 facade，impl 块按职责分散到 `system_update_ops/` 子模块。；字段使用 `pub(crate)` 可见性：status/apply/backup/github 子模块的 impl 块需直接访问。
+#[derive(Clone)]
 pub struct SystemUpdateService {
     pub(crate) app_dir: PathBuf,
     pub(crate) backup_dir: PathBuf,
     pub(crate) is_updating: Arc<std::sync::atomic::AtomicBool>,
 }
 
+/// 系统更新操作互斥锁；备份、安装、回滚共用，drop 时释放。
+pub(crate) struct UpdateOperationLock(Arc<std::sync::atomic::AtomicBool>);
+
+impl Drop for UpdateOperationLock {
+    fn drop(&mut self) {
+        self.0.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+static SYSTEM_UPDATE_LOCK: OnceLock<Arc<std::sync::atomic::AtomicBool>> = OnceLock::new();
+
+fn shared_system_update_lock() -> Arc<std::sync::atomic::AtomicBool> {
+    SYSTEM_UPDATE_LOCK
+        .get_or_init(|| Arc::new(std::sync::atomic::AtomicBool::new(false)))
+        .clone()
+}
+
 impl SystemUpdateService {
     pub fn new() -> Self {
-        let app_dir = std::env::current_exe()
-            .map(|p| p.parent().unwrap_or(Path::new(".")).to_path_buf())
+        let exe_dir = std::env::current_exe()
+            .map(|path| path.parent().unwrap_or(Path::new(".")).to_path_buf())
             .unwrap_or_else(|_| PathBuf::from("."));
+        Self::with_app_dir(resolve_app_dir(exe_dir))
+    }
 
+    /// 使用显式应用根目录构造服务，便于部署与隔离测试指定备份、下载和安装边界。
+    pub fn with_app_dir(app_dir: PathBuf) -> Self {
         let backup_dir = app_dir.join("backups");
 
         Self {
             app_dir,
             backup_dir,
-            is_updating: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            is_updating: shared_system_update_lock(),
         }
     }
+
+    /// 获取进程级系统更新操作锁；已有备份、安装或回滚在执行时显式拒绝。
+    pub(crate) fn try_lock_update(&self) -> Result<UpdateOperationLock, UpdateError> {
+        if self
+            .is_updating
+            .swap(true, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(UpdateError::AlreadyUpdating);
+        }
+        Ok(UpdateOperationLock(Arc::clone(&self.is_updating)))
+    }
+}
+
+/// 可执行文件位于 backend 或 target/debug(deps) 时，向上定位包含 backend/frontend/VERSION 的应用根。
+fn resolve_app_dir(exe_dir: PathBuf) -> PathBuf {
+    if exe_dir.join("backend").is_dir() || exe_dir.join("VERSION").is_file() {
+        return exe_dir;
+    }
+    exe_dir
+        .ancestors()
+        .find(|candidate| {
+            candidate.join("backend").is_dir()
+                && (candidate.join("frontend").is_dir() || candidate.join("VERSION").is_file())
+        })
+        .unwrap_or(&exe_dir)
+        .to_path_buf()
 }
 
 impl Default for SystemUpdateService {
@@ -410,24 +461,23 @@ pub(crate) fn extract_zip_entry(
         }
         Ok(0)
     } else {
-        if let Some(p) = outpath.parent() {
-            if !p.exists() {
-                std::fs::create_dir_all(p)?;
-            }
+        if let Some(p) = outpath.parent()
+            && !p.exists()
+        {
+            std::fs::create_dir_all(p)?;
         }
         let mut outfile = std::fs::File::create(&outpath)?;
-        // P1-03-6 修复：限制单文件解压大小 100MB，防 zip bomb
-        const MAX_SINGLE_FILE_SIZE: u64 = 100 * 1024 * 1024;
-        let mut limited = zip_entry.take(MAX_SINGLE_FILE_SIZE + 1);
+        // P1-03-6 修复：限制单文件解压大小，防 zip bomb；与 tar.gz 共用同一上限。
+        let mut limited = zip_entry.take(MAX_SINGLE_UPDATE_FILE_SIZE + 1);
         let copied = io::copy(&mut limited, &mut outfile)?;
-        if copied > MAX_SINGLE_FILE_SIZE {
+        if copied > MAX_SINGLE_UPDATE_FILE_SIZE {
             return Err(UpdateError::ValidationError(format!(
                 "单文件解压大小超过限制 ({}MB)，疑似 zip bomb",
-                MAX_SINGLE_FILE_SIZE / 1024 / 1024
+                MAX_SINGLE_UPDATE_FILE_SIZE / 1024 / 1024
             )));
         }
 
-        // P0-2 修复（v9 复审）：文件权限掩码在文件分支内设置（mode & 0o600）
+        // P0-2 修复（v9 复审）：文件仅保留所有者读写执行位（mode & 0o700），确保 server 可启动。
         #[cfg(unix)]
         {
             if let Some(mode) = zip_entry.unix_mode() {
@@ -443,11 +493,12 @@ pub(crate) fn extract_zip_entry(
 // =====================================================
 
 /// 设置安全权限掩码（P0-2 修复 v9 复审）
-/// is_dir=true 时应用 0o755（所有者可写，其他可读可执行），；is_dir=false 时应用 0o600（仅所有者可读写），；重置 SUID/SGID/粘性位，防止恶意更新包设置特殊权限位导致权限提升；私有可见性：仅本 facade 的 `extract_zip_entry` 调用。
+/// is_dir=true 时应用 0o755；is_dir=false 时仅保留所有者读写执行位（0o700）。
+/// backend/server 需要所有者执行位，否则 Linux 更新后无法启动；SUID/SGID/sticky 与组/其他权限全部清除。
 #[cfg(unix)]
 pub fn set_safe_permissions(path: &Path, mode: u32, is_dir: bool) {
     use std::os::unix::fs::PermissionsExt;
-    let safe_mode = if is_dir { mode & 0o755 } else { mode & 0o600 };
+    let safe_mode = if is_dir { mode & 0o755 } else { mode & 0o700 };
     if let Ok(metadata) = std::fs::metadata(path) {
         let mut perms = metadata.permissions();
         perms.set_mode(safe_mode);
@@ -493,13 +544,11 @@ fn allowed_download_hosts() -> Vec<String> {
         if let Some(h) = url::Url::parse(raw.trim())
             .ok()
             .and_then(|u| u.host_str().map(|h| h.to_string()))
-        {
-            if !hosts
+            && !hosts
                 .iter()
                 .any(|existing| existing.eq_ignore_ascii_case(&h))
-            {
-                hosts.push(h);
-            }
+        {
+            hosts.push(h);
         }
     }
     hosts
@@ -834,7 +883,51 @@ mod integrity_tests {
         }
     }
 
-    /// validate_official_digest_url：官方 https pass；镜像 host 被 IntegrityError 拒；http 被 NetworkError 拒
+    #[test]
+    fn resolve_app_dir_finds_root_above_backend_and_target_dirs() {
+        let root =
+            std::env::temp_dir().join(format!("bingxi-update-app-dir-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("backend/target/debug/deps"))
+            .expect("创建 backend 测试目录失败");
+        std::fs::create_dir_all(root.join("frontend")).expect("创建 frontend 测试目录失败");
+        std::fs::write(root.join("VERSION"), b"1.2.3\n").expect("写入 VERSION 失败");
+
+        let from_backend = resolve_app_dir(root.join("backend"));
+        let from_target = resolve_app_dir(root.join("backend/target/debug/deps"));
+        assert_eq!(from_backend, root);
+        assert_eq!(from_target, root);
+
+        std::fs::remove_dir_all(root).expect("清理测试目录失败");
+    }
+
+    #[test]
+    fn constructors_share_process_update_lock() {
+        let first = SystemUpdateService::with_app_dir(std::env::temp_dir());
+        let second = SystemUpdateService::with_app_dir(std::env::temp_dir());
+
+        assert!(
+            Arc::ptr_eq(&first.is_updating, &second.is_updating),
+            "不同 handler 构造的服务必须共享同一进程级更新互斥锁"
+        );
+    }
+
+    #[test]
+    fn update_operation_lock_rejects_concurrent_work_and_releases_on_drop() {
+        let service = SystemUpdateService::with_app_dir(std::env::temp_dir());
+        let guard = service
+            .try_lock_update()
+            .expect("首次获取系统更新操作锁应成功");
+        assert!(
+            matches!(service.try_lock_update(), Err(UpdateError::AlreadyUpdating)),
+            "备份、安装、回滚必须互斥，不能并发改写同一应用目录"
+        );
+        drop(guard);
+        assert!(
+            service.try_lock_update().is_ok(),
+            "操作结束或 panic drop 后必须释放锁"
+        );
+    }
+
     #[test]
     fn validate_official_digest_url_rejects_mirror() {
         assert!(

@@ -2,11 +2,10 @@ import { request } from './request';
 import type { ApiResponse, PaginatedResponse } from '@/types/api';
 
 /**
- * 应用更新（POST /system-update/update）为下载+校验+二进制替换+落库的同步长任务，
- * 远超全局 axios 默认 30s。仅对这一条请求放宽 per-request timeout，避免长任务被
- * 前端提前掐断而误判失败（后端真实耗时由部署环境决定，此处给足上界）。
+ * 系统更新写操作（更新、回滚、真实文件备份）都是同步长任务。
+ * 与后端 timeout 中间件的 1800 秒有界上界保持一致，避免前端提前掐断后误判失败。
  */
-const APPLY_UPDATE_TIMEOUT_MS = 300_000;
+const SYSTEM_UPDATE_TIMEOUT_MS = 30 * 60 * 1000;
 
 export interface UpdateTask {
   id: number;
@@ -27,7 +26,7 @@ export interface UpdateTask {
   error_message: string;
   backup_path: string;
   started_at: string;
-  completed_at: string;
+  completed_at: string | null;
   created_by: number;
   created_by_name: string;
   created_at: string;
@@ -113,7 +112,7 @@ export interface UpdateApplyResult {
  * 故给本条长任务单独放宽 per-request timeout（仅 applyUpdate，不影响全局默认）。
  */
 export function applyUpdate(): Promise<ApiResponse<UpdateApplyResult>> {
-  return request.post('/system-update/update', undefined, { timeout: APPLY_UPDATE_TIMEOUT_MS });
+  return request.post('/system-update/update', undefined, { timeout: SYSTEM_UPDATE_TIMEOUT_MS });
 }
 
 // 后端 handler: system_update_handler::list_update_tasks (GET /system-update/tasks)
@@ -140,7 +139,11 @@ export function cancelUpdateTask(id: number): Promise<ApiResponse<void>> {
  * 请求体：{ version: string }（后端 RollbackRequest 需要 version 字段，非 taskId）
  */
 export function rollbackUpdate(version: string): Promise<ApiResponse<void>> {
-  return request.post('/system-update/rollback', { version });
+  return request.post(
+    '/system-update/rollback',
+    { version },
+    { timeout: SYSTEM_UPDATE_TIMEOUT_MS }
+  );
 }
 
 export function getSystemBackup(id: number): Promise<ApiResponse<SystemBackup>> {
@@ -150,7 +153,7 @@ export function getSystemBackup(id: number): Promise<ApiResponse<SystemBackup>> 
 export function createSystemBackup(
   data: Partial<SystemBackup>
 ): Promise<ApiResponse<SystemBackup>> {
-  return request.post('/system-update/backups', data);
+  return request.post('/system-update/backups', data, { timeout: SYSTEM_UPDATE_TIMEOUT_MS });
 }
 
 export function getCurrentVersion(): Promise<

@@ -67,15 +67,7 @@
             >
               {{ t('systemUpdate.taskTab.buttonRollback') }}
             </el-button>
-            <el-button
-              v-if="
-                row.status === 'pending' ||
-                row.status === 'downloading' ||
-                row.status === 'installing'
-              "
-              type="danger"
-              @click="emit('cancel', row)"
-            >
+            <el-button v-if="row.status === 'pending'" type="danger" @click="emit('cancel', row)">
               {{ t('systemUpdate.taskTab.buttonCancel') }}
             </el-button>
           </div>
@@ -163,11 +155,7 @@
             >{{ t('systemUpdate.taskTab.buttonRollback') }}</el-button
           >
           <el-button
-            v-if="
-              row.status === 'pending' ||
-              row.status === 'downloading' ||
-              row.status === 'installing'
-            "
+            v-if="row.status === 'pending'"
             v-permission="PERMISSIONS.SYSTEM_UPDATE_TASKS_CANCEL"
             type="danger"
             link

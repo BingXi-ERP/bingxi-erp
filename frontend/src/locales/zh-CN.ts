@@ -10344,8 +10344,6 @@ export default {
       labelBackupType: '备份类型',
       labelDescription: '描述',
       optionFull: '完整备份',
-      optionIncremental: '增量备份',
-      optionDatabase: '数据库备份',
       optionFiles: '文件备份',
       placeholderDescription: '请输入备份描述',
       buttonCancel: '取消',

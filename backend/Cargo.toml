@@ -80,8 +80,10 @@ once_cell = "1.20"
 # Base64编码
 base64 = "0.22"
 
-# ZIP 压缩
+# 更新包：兼容本地 ZIP 与 CI 正式 release-<version>.tar.gz
 zip = "2.2"
+flate2 = "1.0"
+tar = { version = "0.4", default-features = false }
 
 # 时间类型（axum-extra Cookie::max_age 需要 time::Duration，axum-extra 不 re-export）
 time = { version = "0.3", features = ["macros"] }

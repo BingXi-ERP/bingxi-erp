@@ -4,18 +4,19 @@
 //! - `check_for_updates`：查询 GitHub Releases 最新版本（pub，handler 调用）
 //! - `fetch_latest_release`：调用 GitHub API `/repos/{owner}/{repo}/releases/latest`（私有）
 //! - `compare_versions`：比较 current < latest（`pub(crate)`，供 status 子模块 `check_local_updates`
-//!  + facade 测试调用）
-//! - `compare_versions_for_sort`：版本号排序比较（`pub(crate)`，供 status 子模块 `list_local_releases` 调用）//! - `download_update`：下载 GitHub Release asset（pub，handler + `download_and_update` 调用）
+//!   + facade 测试调用）
+//! - `compare_versions_for_sort`：版本号排序比较（`pub(crate)`，供 status 子模块 `list_local_releases` 调用）
+//! - `download_update_for_version`：按版本下载 CI 正式 tar.gz（pub，handler 调用）
 //! - `find_release_asset`：在 Release 中查找匹配 asset（私有，关联函数）
 //! - `build_safe_download_client`：构建 SSRF 防御下载客户端（私有，关联函数）
-//! - `download_and_update`：下载并应用更新（pub，handler 调用）
+//! - `download_and_update_locked`：调用方持锁时下载并应用更新（`pub(crate)`）
 //!
 //! 跨模块依赖：
 //! - `check_for_updates` 调用 `status::get_current_version`（pub）
 //! - `compare_versions` / `compare_versions_for_sort` 调用 facade 归一函数 `normalize_versions_for_compare`（`pub(crate)`，内部含 `parse_version` 与三段↔四段 MD 反解兜底）
-//! - `download_update` 调用 `apply::log_update`（`pub(crate)`）+ facade 纯函数
-//!  `validate_asset_name` / `validate_download_url`（`pub(crate)`）
-//! - `download_and_update` 调用 `apply::apply_update`（pub）+ `apply::log_update`（`pub(crate)`）
+//! - `download_release_asset` 调用 `apply::log_update`（`pub(crate)`）+ facade 纯函数
+//!   `validate_asset_name` / `validate_download_url`（`pub(crate)`）
+//! - `download_and_update_locked` 调用 `apply::do_update`（`pub(crate)`）+ `apply::log_update`（`pub(crate)`）
 //! - `fetch_latest_release` 与 `fetch_release_by_tag` 使用 facade 常量 `GITHUB_API_URL`（`pub(crate)`）
 //!   与仓身份 `github_repo()`（`pub`，返回 `Result`）；取不到合法身份即转 `UpdateError::ValidationError`
 //!   早退，URL 不拼半截，出参由 facade 的 `From<UpdateError> for AppError` 映射成面向运维的可读校验错误
@@ -225,7 +226,10 @@ impl SystemUpdateService {
         std::cmp::Ordering::Equal
     }
 
-    pub async fn download_update(&self, asset_name: Option<&str>) -> Result<PathBuf, UpdateError> {
+    async fn download_update_with_version(
+        &self,
+        asset_name: Option<&str>,
+    ) -> Result<(PathBuf, String), UpdateError> {
         let check_result = self.check_for_updates().await;
 
         if !check_result.has_update {
@@ -235,19 +239,124 @@ impl SystemUpdateService {
         let release = check_result
             .release_info
             .ok_or_else(|| UpdateError::NetworkError("无法获取发布信息".to_string()))?;
-
+        let version = release.tag_name.trim_start_matches('v').to_string();
         let asset = Self::find_release_asset(&release, asset_name)?;
-
-        self.log_update(&format!("开始下载更新包: {}", asset.name));
-
-        // M-2 修复（v9 复审）：校验 asset.name 防止路径穿越
         validate_asset_name(&asset.name)?;
+        let download_path = self.app_dir.join("downloads").join(&asset.name);
+        let path = self
+            .download_release_asset(&release, asset, &download_path)
+            .await?;
+        Ok((path, version))
+    }
 
-        let download_dir = self.app_dir.join("downloads");
-        if !download_dir.exists() {
-            fs::create_dir_all(&download_dir)?;
+    /// 指定版本下载使用 CI 正式资产名，安装端无需信任数据库中的路径或上游任意文件名。
+    fn downloaded_archive_path(&self, version: &str) -> Result<PathBuf, UpdateError> {
+        let file_name = format!("release-{version}.tar.gz");
+        validate_asset_name(&file_name)?;
+        Ok(self.app_dir.join("downloads").join(file_name))
+    }
+
+    /// 安装前要求指定版本的 tar.gz 已真实下载并通过完整性校验；缺失即显式拒绝。
+    pub fn downloaded_update_path(&self, version: &str) -> Result<PathBuf, UpdateError> {
+        let path = self.downloaded_archive_path(version)?;
+        if !path.is_file() {
+            return Err(UpdateError::VersionError(format!(
+                "请先下载版本 {version} 的更新包"
+            )));
         }
-        let download_path = download_dir.join(&asset.name);
+        Ok(path)
+    }
+
+    /// 按版本精确查询 Release，下载 CI 正式 tar.gz 资产并复用官方 SHA-256 强校验。
+    pub async fn download_update_for_version(&self, version: &str) -> Result<PathBuf, UpdateError> {
+        let download_path = self.downloaded_archive_path(version)?;
+        let release = self
+            .fetch_release_by_tag(version)
+            .await?
+            .ok_or_else(|| UpdateError::VersionError(format!("版本 {version} 没有可用发布记录")))?;
+        if release.tag_name.trim_start_matches('v') != version {
+            return Err(UpdateError::VersionError(format!(
+                "发布记录版本 {} 与请求版本 {version} 不一致",
+                release.tag_name
+            )));
+        }
+        let asset = Self::find_versioned_release_asset(&release, version)?;
+        self.download_release_asset(&release, asset, &download_path)
+            .await
+    }
+
+    /// 调用方必须持有进程级操作锁，并把版本元数据与任务终态写入纳入同一锁边界。
+    pub(crate) async fn apply_downloaded_update_locked(
+        &self,
+        version: &str,
+    ) -> Result<String, UpdateError> {
+        let path = self.downloaded_update_path(version)?;
+        self.do_update(&path, Some(version)).await
+    }
+
+    async fn download_release_asset(
+        &self,
+        release: &GitHubRelease,
+        asset: &GitHubAsset,
+        download_path: &Path,
+    ) -> Result<PathBuf, UpdateError> {
+        let temp_path = Self::temporary_download_path(download_path);
+        if let Err(error) = self
+            .download_release_asset_to_temp(release, asset, &temp_path)
+            .await
+        {
+            Self::remove_temp_download(&temp_path);
+            return Err(error);
+        }
+        if let Err(error) = Self::commit_downloaded_file(&temp_path, download_path) {
+            Self::remove_temp_download(&temp_path);
+            return Err(error);
+        }
+
+        self.log_update(&format!("更新包下载并通过完整性校验: {:?}", download_path));
+        Ok(download_path.to_path_buf())
+    }
+
+    /// 临时文件与最终包同目录且唯一，避免并发下载互相截断。
+    fn temporary_download_path(final_path: &Path) -> PathBuf {
+        let file_name = final_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("update.tar.gz");
+        final_path.with_file_name(format!(".{file_name}.{}.part", uuid::Uuid::new_v4()))
+    }
+
+    /// 校验通过后才原子替换最终路径；Rust 在 Windows 上也通过替换语义重命名，
+    /// 失败时保留旧完整包与临时包，绝不先删旧包再重试。
+    fn commit_downloaded_file(temp_path: &Path, final_path: &Path) -> Result<(), UpdateError> {
+        let metadata = fs::metadata(temp_path)?;
+        if !metadata.is_file() || metadata.len() == 0 {
+            return Err(UpdateError::ValidationError(
+                "下载临时文件不是非空普通文件，拒绝提交".to_string(),
+            ));
+        }
+        fs::rename(temp_path, final_path).map_err(Into::into)
+    }
+
+    fn remove_temp_download(temp_path: &Path) {
+        if let Err(error) = fs::remove_file(temp_path)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            tracing::warn!("清理下载临时文件失败 {:?}: {}", temp_path, error);
+        }
+    }
+
+    async fn download_release_asset_to_temp(
+        &self,
+        release: &GitHubRelease,
+        asset: &GitHubAsset,
+        temp_path: &Path,
+    ) -> Result<(), UpdateError> {
+        self.log_update(&format!("开始下载更新包: {}", asset.name));
+        validate_asset_name(&asset.name)?;
+        if let Some(parent) = temp_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
 
         // 读取进程级更新配置，按 mirror_order 生成候选下载 URL（官方永远列入并兜底）。
         let cfg = global_update_config();
@@ -263,7 +372,7 @@ impl SystemUpdateService {
         let mut last_err: Option<UpdateError> = None;
         let mut downloaded = false;
         for (idx, cand_url) in candidates.iter().enumerate() {
-            match self.try_download_candidate(cand_url, &download_path).await {
+            match self.try_download_candidate(cand_url, temp_path).await {
                 Ok(()) => {
                     tracing::info!(
                         "[system_update] 下载候选[{}/{}] 成功: {}",
@@ -282,12 +391,7 @@ impl SystemUpdateService {
                         cand_url,
                         e
                     );
-                    // 清理该候选写入的半成品，避免残损文件影响后续候选与校验
-                    if let Err(rm) = fs::remove_file(&download_path)
-                        && rm.kind() != std::io::ErrorKind::NotFound
-                    {
-                        tracing::warn!("[system_update] 清理失败候选残件出错: {}", rm);
-                    }
+                    Self::remove_temp_download(temp_path);
                     last_err = Some(e);
                 }
             }
@@ -300,23 +404,16 @@ impl SystemUpdateService {
         }
 
         // 字节到手后取【官方】校验值 + 本地 SHA-256 重算比对（fail-closed）。
-        // 校验值只从官方域取（CI .sha256 资产优先，其次 API assets[].digest）；镜像仅搬 tar 字节。
+        // 校验值只从官方域取（CI .sha256 资产优先，其次 API assets[].digest）；镜像仅搬字节。
         if let Err(e) = self
-            .verify_downloaded_integrity(asset, &release.assets, &download_path, &cfg)
+            .verify_downloaded_integrity(asset, &release.assets, temp_path, &cfg)
             .await
         {
-            // 校验不通过 / 不可得 → 删除已下文件 + 返回错误（绝不 apply）
-            if let Err(rm) = fs::remove_file(&download_path)
-                && rm.kind() != std::io::ErrorKind::NotFound
-            {
-                tracing::warn!("[system_update] 校验失败后清理下载文件出错: {}", rm);
-            }
             self.log_update(&format!("完整性校验未通过，已删除下载文件: {}", e));
             return Err(e);
         }
 
-        self.log_update(&format!("更新包下载并通过完整性校验: {:?}", download_path));
-        Ok(download_path)
+        Ok(())
     }
 
     /// 按 `mirror_order` 生成候选下载 URL 列表。
@@ -521,6 +618,22 @@ impl SystemUpdateService {
     }
 
     /// 在发布信息中查找匹配的资源（按名称匹配或按扩展名自动选择 .zip/.tar.gz）
+    fn find_versioned_release_asset<'a>(
+        release: &'a GitHubRelease,
+        version: &str,
+    ) -> Result<&'a GitHubAsset, UpdateError> {
+        let expected_name = format!("release-{version}.tar.gz");
+        release
+            .assets
+            .iter()
+            .find(|asset| asset.name == expected_name)
+            .ok_or_else(|| {
+                UpdateError::VersionError(format!(
+                    "版本 {version} 没有可应用的正式更新包 {expected_name}"
+                ))
+            })
+    }
+
     fn find_release_asset<'a>(
         release: &'a GitHubRelease,
         asset_name: Option<&str>,
@@ -529,14 +642,12 @@ impl SystemUpdateService {
             release
                 .assets
                 .iter()
-                .find(|a| a.name.contains(name))
-                .ok_or_else(|| UpdateError::NetworkError(format!("找不到资源: {}", name)))
+                .find(|asset| asset.name == name)
+                .filter(|asset| asset.name.ends_with(".zip") || asset.name.ends_with(".tar.gz"))
+                .ok_or_else(|| UpdateError::NetworkError(format!("找不到可应用的更新包: {}", name)))
         } else {
-            release
-                .assets
-                .iter()
-                .find(|a| a.name.ends_with(".zip") || a.name.ends_with(".tar.gz"))
-                .ok_or_else(|| UpdateError::NetworkError("找不到更新包".to_string()))
+            let version = release.tag_name.trim_start_matches('v');
+            Self::find_versioned_release_asset(release, version)
         }
     }
 
@@ -554,9 +665,10 @@ impl SystemUpdateService {
             .map_err(|e| UpdateError::NetworkError(e.to_string()))
     }
 
-    pub async fn download_and_update(&self) -> Result<String, UpdateError> {
-        let download_path = self.download_update(None).await?;
-        let result = self.apply_update(&download_path).await?;
+    /// 调用方必须持有进程级操作锁，并把后续版本元数据写入纳入同一锁边界。
+    pub(crate) async fn download_and_update_locked(&self) -> Result<String, UpdateError> {
+        let (download_path, version) = self.download_update_with_version(None).await?;
+        let result = self.do_update(&download_path, Some(&version)).await?;
 
         if let Err(e) = fs::remove_file(&download_path) {
             self.log_update(&format!("清理下载文件失败: {}", e));
@@ -712,5 +824,152 @@ mod download_candidate_tests {
                 "{order:?} 下官方域必须在候选中"
             );
         }
+    }
+
+    fn temp_service(test_name: &str) -> (SystemUpdateService, PathBuf) {
+        use std::sync::Arc;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("系统时间应可读取")
+            .as_nanos();
+        let app_dir = std::env::temp_dir().join(format!(
+            "bingxi_system_update_{test_name}_{}_{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&app_dir).expect("创建测试目录失败");
+        let service = SystemUpdateService {
+            app_dir: app_dir.clone(),
+            backup_dir: app_dir.join("backups"),
+            is_updating: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        };
+        (service, app_dir)
+    }
+
+    #[test]
+    fn versioned_download_selects_exact_ci_release_archive() {
+        let release = GitHubRelease {
+            tag_name: "v2026.11.22.603".to_string(),
+            name: "release".to_string(),
+            body: None,
+            published_at: "2026-11-22T00:00:00Z".to_string(),
+            assets: vec![
+                GitHubAsset {
+                    name: "bingxi-erp-2026.11.22.603-android.apk".to_string(),
+                    browser_download_url: "https://github.com/apk".to_string(),
+                    size: 1,
+                    content_type: "application/vnd.android.package-archive".to_string(),
+                    digest: None,
+                },
+                GitHubAsset {
+                    name: "bingxi-erp-2026.11.22.603.zip".to_string(),
+                    browser_download_url: "https://github.com/legacy".to_string(),
+                    size: 1,
+                    content_type: "application/zip".to_string(),
+                    digest: None,
+                },
+                GitHubAsset {
+                    name: "release-2026.11.22.603.tar.gz".to_string(),
+                    browser_download_url: "https://github.com/server".to_string(),
+                    size: 1,
+                    content_type: "application/gzip".to_string(),
+                    digest: None,
+                },
+            ],
+        };
+
+        let asset = SystemUpdateService::find_versioned_release_asset(&release, "2026.11.22.603")
+            .expect("必须选中 CI 正式 tar.gz，不能误选 APK 或旧 ZIP");
+        assert_eq!(asset.name, "release-2026.11.22.603.tar.gz");
+
+        let err = SystemUpdateService::find_versioned_release_asset(&release, "2026.11.22.604")
+            .expect_err("版本不匹配时不得借用其它版本资产");
+        assert!(matches!(err, UpdateError::VersionError(_)), "实得: {err:?}");
+
+        let err = SystemUpdateService::find_release_asset(&release, Some("android"))
+            .expect_err("显式资产选择也不得用子串误选 APK 或其它版本文件");
+        assert!(matches!(err, UpdateError::NetworkError(_)), "实得: {err:?}");
+    }
+
+    #[test]
+    fn download_uses_unique_sibling_temp_and_atomic_commit() {
+        let (_service, app_dir) = temp_service("atomic_download");
+        let final_path = app_dir.join("downloads/release-2026.11.22.603.tar.gz");
+        let first_temp = SystemUpdateService::temporary_download_path(&final_path);
+        let second_temp = SystemUpdateService::temporary_download_path(&final_path);
+
+        assert_ne!(first_temp, second_temp, "并发下载不得共用临时文件");
+        assert_eq!(first_temp.parent(), final_path.parent());
+        assert_eq!(second_temp.parent(), final_path.parent());
+
+        fs::create_dir_all(final_path.parent().expect("下载目录应存在")).expect("创建下载目录失败");
+        fs::write(&final_path, b"old-complete").expect("写入旧完整包失败");
+        fs::write(&first_temp, b"new-complete").expect("写入新临时包失败");
+        SystemUpdateService::commit_downloaded_file(&first_temp, &final_path)
+            .expect("校验通过的临时包必须能替换最终文件");
+
+        assert_eq!(
+            fs::read(&final_path).expect("读取提交后的更新包失败"),
+            b"new-complete"
+        );
+        assert!(!first_temp.exists(), "提交成功后临时文件必须被消费");
+        assert!(!second_temp.exists(), "未使用的临时路径不得被创建");
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
+    }
+
+    #[test]
+    fn failed_commit_preserves_previous_complete_download() {
+        let (_service, app_dir) = temp_service("failed_commit");
+        let final_path = app_dir.join("downloads/release-2026.11.22.603.tar.gz");
+        fs::create_dir_all(final_path.parent().expect("下载目录应存在")).expect("创建下载目录失败");
+        fs::write(&final_path, b"old-complete").expect("写入旧完整包失败");
+        let invalid_temp = SystemUpdateService::temporary_download_path(&final_path);
+        fs::create_dir_all(&invalid_temp).expect("创建无效临时路径失败");
+
+        let result = SystemUpdateService::commit_downloaded_file(&invalid_temp, &final_path);
+        assert!(result.is_err(), "目录不能作为更新包文件提交");
+        assert_eq!(
+            fs::read(&final_path).expect("读取旧完整包失败"),
+            b"old-complete",
+            "提交失败时不得删除旧完整包"
+        );
+
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
+    }
+
+    #[test]
+    fn downloaded_update_path_requires_real_file_and_safe_version() {
+        let (service, app_dir) = temp_service("download_path");
+        let err = service
+            .downloaded_update_path("9999.1.1.0000")
+            .expect_err("未下载的版本不能进入安装");
+        assert!(
+            matches!(err, UpdateError::VersionError(_)),
+            "缺少包应明确拒绝，实得: {err:?}"
+        );
+
+        let err = service
+            .downloaded_update_path("../escape")
+            .expect_err("路径穿越版本号必须拒绝");
+        assert!(
+            matches!(err, UpdateError::ValidationError(_)),
+            "非法版本号应拒绝，实得: {err:?}"
+        );
+
+        let version = "2026.11.22.603";
+        let expected_path = app_dir.join("downloads/release-2026.11.22.603.tar.gz");
+        fs::create_dir_all(expected_path.parent().expect("下载目录应存在"))
+            .expect("创建下载目录失败");
+        fs::write(&expected_path, b"official release bytes").expect("写入发布包失败");
+        assert_eq!(
+            service
+                .downloaded_update_path(version)
+                .expect("真实 tar.gz 发布包必须能进入安装"),
+            expected_path,
+            "安装路径必须与 CI/GitHub Release 的 release-<version>.tar.gz 契约一致"
+        );
+
+        fs::remove_dir_all(app_dir).expect("清理测试目录失败");
     }
 }

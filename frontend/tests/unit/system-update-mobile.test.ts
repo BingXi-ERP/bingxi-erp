@@ -75,4 +75,23 @@ describe('系统更新域手机端适配契约锁', () => {
     const form = read('src/views/system-update/components/SystemUpdateBackupForm.vue');
     expect(form).toMatch(/:label-position="isPhone \? 'top' : 'right'"/);
   });
+
+  it('只有未开始任务显示取消按钮，执行中任务不提供假取消入口', () => {
+    const source = read('src/views/system-update/tabs/SystemUpdateTaskTab.vue');
+    const cancelButtons = source.match(/<el-button[^>]*@click="emit\('cancel', row\)"[^>]*>/g);
+    expect(cancelButtons, '移动端与桌面端应各保留一个取消入口').toHaveLength(2);
+    for (const button of cancelButtons || []) {
+      expect(button).toContain(`v-if="row.status === 'pending'"`);
+      expect(button).not.toContain('downloading');
+      expect(button).not.toContain('installing');
+    }
+  });
+
+  it('系统更新长任务前端超时与后端 30 分钟上界一致', () => {
+    const source = read('src/api/system-update.ts');
+    expect(source).toContain('const SYSTEM_UPDATE_TIMEOUT_MS = 30 * 60 * 1000');
+    expect(
+      (source.match(/timeout:\s*SYSTEM_UPDATE_TIMEOUT_MS/g) || []).length
+    ).toBeGreaterThanOrEqual(3);
+  });
 });

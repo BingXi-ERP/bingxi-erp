@@ -52,8 +52,6 @@ export const BACKUP_STATUS_TYPE: Record<string, string> = {
 /** 备份类型下拉选项 */
 export const BACKUP_TYPE_OPTIONS = [
   { label: '完整备份', value: 'full' },
-  { label: '增量备份', value: 'incremental' },
-  { label: '数据库备份', value: 'database' },
   { label: '文件备份', value: 'files' },
 ];
 

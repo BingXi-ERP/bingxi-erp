@@ -21,8 +21,30 @@ use crate::utils::error::AppError;
 /// 生产默认超时阈值（秒）
 const TIMEOUT_SECONDS: u64 = 30;
 
+/// 系统更新/备份为真实长任务，单独使用有界上界，避免全局 30 秒探针中途丢弃终态写入。
+const SYSTEM_UPDATE_TIMEOUT_SECONDS: u64 = 1800;
+
+fn request_timeout(path: &str, method: &Method) -> Duration {
+    let is_update_write = method != Method::GET
+        && (path == "/api/v1/erp/system-update/update"
+            || path == "/api/v1/erp/system-update/upload"
+            || path == "/api/v1/erp/system-update/local-update"
+            || path == "/api/v1/erp/system-update/rollback"
+            || path == "/api/v1/erp/system-update/backups"
+            || path.starts_with("/api/v1/erp/system-update/versions/")
+                && (path.ends_with("/download") || path.ends_with("/install")));
+    if is_update_write {
+        Duration::from_secs(SYSTEM_UPDATE_TIMEOUT_SECONDS)
+    } else {
+        Duration::from_secs(TIMEOUT_SECONDS)
+    }
+}
+
 pub async fn timeout_middleware(request: Request<Body>, next: Next) -> Response {
-    timeout_middleware_with(Duration::from_secs(TIMEOUT_SECONDS), request, next).await
+    let path = request.uri().path().to_string();
+    let method = request.method().clone();
+    let timeout = request_timeout(&path, &method);
+    timeout_middleware_with(timeout, request, next).await
 }
 
 /// [`timeout_middleware`] 的可注入阈值版本：真实短路逻辑只有一份，
@@ -53,4 +75,41 @@ pub fn timeout_error_response(method: &Method, path: &str, timeout: Duration) ->
         method,
         path
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::http::Method;
+
+    #[test]
+    fn system_update_long_routes_get_extended_timeout() {
+        for path in [
+            "/api/v1/erp/system-update/update",
+            "/api/v1/erp/system-update/upload",
+            "/api/v1/erp/system-update/local-update",
+            "/api/v1/erp/system-update/rollback",
+            "/api/v1/erp/system-update/backups",
+            "/api/v1/erp/system-update/versions/1/download",
+            "/api/v1/erp/system-update/versions/1/install",
+        ] {
+            assert_eq!(
+                request_timeout(path, &Method::POST),
+                Duration::from_secs(SYSTEM_UPDATE_TIMEOUT_SECONDS),
+                "长任务路径 {path} 不得使用全局 30 秒超时"
+            );
+        }
+    }
+
+    #[test]
+    fn unrelated_routes_keep_default_timeout() {
+        assert_eq!(
+            request_timeout("/api/v1/erp/system-update/tasks", &Method::GET),
+            Duration::from_secs(TIMEOUT_SECONDS)
+        );
+        assert_eq!(
+            request_timeout("/api/v1/erp/products", &Method::POST),
+            Duration::from_secs(TIMEOUT_SECONDS)
+        );
+    }
 }
