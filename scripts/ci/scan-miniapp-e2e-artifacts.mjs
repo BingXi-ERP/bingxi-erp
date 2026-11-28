@@ -206,7 +206,9 @@ export function runSelfTest() {
     sanitizeArtifacts(root, env);
     assert.equal(scanArtifacts(root, env).ok, true);
 
-    const privateKeyBody = "c2VsZi10ZXN0LW5vdC1hLXJlYWwta2V5";
+    const privateKeyBody = ["self", "test", "not", "a", "real", "key"].join(
+      "-",
+    );
     writeFileSync(
       join(root, "private-key.pem"),
       [
