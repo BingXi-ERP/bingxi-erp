@@ -13,12 +13,12 @@
 //! - AuthContext 通过自定义注入中间件写入 request extensions，模拟 auth_middleware 行为。
 
 use axum::{
-    Json, Router,
+    Router,
     body::Body,
     http::{Request, StatusCode},
     middleware::{Next, from_fn_with_state},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use bingxi_backend::container::AppState;
 use bingxi_backend::middleware::auth_context::AuthContext;
@@ -70,6 +70,24 @@ fn build_test_app_with_public_path(state: AppState, auth: AuthContext) -> Router
         .route("/api/v1/erp/auth/login", get(ok_handler))
         .layer(from_fn_with_state(state.clone(), permission_middleware))
         .layer(from_fn_with_state(auth, inject_auth))
+}
+
+fn build_self_service_test_app(state: AppState, auth: AuthContext) -> Router {
+    Router::new()
+        .route("/api/v1/erp/users/me", get(ok_handler))
+        .route("/api/v1/erp/user/profile", get(ok_handler).put(ok_handler))
+        .route("/api/v1/erp/user/avatar", post(ok_handler))
+        .route("/api/v1/erp/users/{id}", get(ok_handler))
+        .layer(from_fn_with_state(state.clone(), permission_middleware))
+        .layer(from_fn_with_state(auth, inject_auth))
+}
+
+fn build_self_service_test_app_no_auth(state: AppState) -> Router {
+    Router::new()
+        .route("/api/v1/erp/users/me", get(ok_handler))
+        .route("/api/v1/erp/user/profile", get(ok_handler).put(ok_handler))
+        .route("/api/v1/erp/user/avatar", post(ok_handler))
+        .layer(from_fn_with_state(state, permission_middleware))
 }
 
 /// 构造测试用 AuthContext
@@ -190,6 +208,67 @@ async fn test_public_path_bypasses_permission_check() {
         resp.status(),
         StatusCode::OK,
         "公共路径应放行，不受权限校验限制"
+    );
+}
+
+/// 自服务端点只按 auth.user_id 工作，普通用户甚至未分配角色时也不应被 RBAC 命名空间挡住。
+#[tokio::test]
+async fn test_self_service_paths_bypass_rbac_but_keep_auth_required() {
+    let state = AppState::default();
+    let auth = make_auth(6006, "self_service_user", None);
+
+    for (method, uri) in [
+        ("GET", "/api/v1/erp/users/me"),
+        ("GET", "/api/v1/erp/user/profile"),
+        ("PUT", "/api/v1/erp/user/profile"),
+        ("POST", "/api/v1/erp/user/avatar"),
+    ] {
+        let app = build_self_service_test_app(state.clone(), auth.clone());
+        let req = Request::builder()
+            .method(method)
+            .uri(uri)
+            .body(Body::empty())
+            .expect("构造自服务请求失败");
+        let resp = app.oneshot(req).await.expect("执行自服务请求失败");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "自服务路径 {method} {uri} 应放行"
+        );
+    }
+
+    for (method, uri) in [
+        ("GET", "/api/v1/erp/users/me"),
+        ("GET", "/api/v1/erp/user/profile"),
+        ("PUT", "/api/v1/erp/user/profile"),
+        ("POST", "/api/v1/erp/user/avatar"),
+    ] {
+        let app = build_self_service_test_app_no_auth(AppState::default());
+        let req = Request::builder()
+            .method(method)
+            .uri(uri)
+            .body(Body::empty())
+            .expect("构造未认证自服务请求失败");
+        let resp = app.oneshot(req).await.expect("执行未认证自服务请求失败");
+        assert_eq!(
+            resp.status(),
+            StatusCode::UNAUTHORIZED,
+            "自服务路径 {method} {uri} 仍必须认证"
+        );
+    }
+
+    let app =
+        build_self_service_test_app(AppState::default(), make_auth(7007, "no_role_user", None));
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/erp/users/123")
+        .body(Body::empty())
+        .expect("构造跨用户请求失败");
+    let resp = app.oneshot(req).await.expect("执行跨用户请求失败");
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "自服务豁免不得外溢到 /users/{{id}} 管理面"
     );
 }
 

@@ -26,7 +26,7 @@ use axum::{
     http::{Request, StatusCode, header},
     middleware::from_fn_with_state,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{get, post, put},
 };
 use bingxi_backend::container::AppState;
 use bingxi_backend::middleware::auth_context::{AuthContext, CsrfSession};
@@ -55,6 +55,8 @@ fn build_test_app(state: AppState) -> Router {
     Router::new()
         .route("/api/v1/erp/business/list", get(ok_handler).options(ok_handler))
         .route("/api/v1/erp/business/create", post(ok_handler))
+        .route("/api/v1/erp/user/profile", put(ok_handler))
+        .route("/api/v1/erp/user/avatar", post(ok_handler))
         // 模拟公开路径（与 PUBLIC_PATHS 中的 /api/v1/erp/auth/login 对齐）
         .route("/api/v1/erp/auth/login", post(ok_handler))
         .layer(from_fn_with_state(state, csrf_middleware))
@@ -223,6 +225,33 @@ async fn test_post_without_csrf_header_returns_missing() {
         "timestamp 应为数字（秒级 i64），实际: {:?}",
         body.get("timestamp")
     );
+}
+
+#[tokio::test]
+async fn test_self_service_writes_still_require_csrf_token() {
+    for (method, uri) in [
+        ("PUT", "/api/v1/erp/user/profile"),
+        ("POST", "/api/v1/erp/user/avatar"),
+    ] {
+        let app = build_test_app(AppState::default());
+        let mut req = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("content-type", "application/json")
+            .body(Body::from("{}"))
+            .expect("构造自服务写请求失败");
+        req.extensions_mut().insert(auth_of(USER_ID));
+        req.extensions_mut().insert(CsrfSession::new(SESSION));
+
+        let resp = app.oneshot(req).await.expect("执行自服务写请求失败");
+        assert_eq!(
+            resp.status(),
+            StatusCode::FORBIDDEN,
+            "自服务写路径 {method} {uri} 不得豁免 CSRF"
+        );
+        let body = read_json(resp.into_body()).await;
+        assert_eq!(code_of(&body), Some("CSRF_TOKEN_MISSING"));
+    }
 }
 
 /// 场景 3：POST 请求带无效 token 即 403 CSRF_TOKEN_INVALID
