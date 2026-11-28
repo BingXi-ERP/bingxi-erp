@@ -2,8 +2,8 @@
 
 - 验收日期：2026-11-28
 - 工作树：`E:/work/bingxi/wt-miniapp-rebuild`
-- 基线 HEAD：`2d5bfd4fddb71f98c127c9d35b4d13f68979f130`（完整 40 位；这是基线提交，不是 Phase 1 变更提交）
-- 候选代码提交：`2e8ea2a02a8df5ba7ef47600b25209d408aa831f`；验收文档提交以 PR #1404 最终 head SHA 为准
+- 基线 HEAD：`5e8b00c5a2d9adad1263278ee68d1fac4c71d563`（完整 40 位；重放前远端 `main`，不是 Phase 1 变更提交）
+- 候选代码提交：见 PR #1404 的提交历史；验收 head SHA 以 GitHub 回读为准
 - 总体状态：**BLOCKED / NOT ACCEPTED**
 - 当前结论：**不可合并 main，不可发布**。最终复审的 8 项 findings 与残余波 F2/F3/F5/F6、E2E 路径触发缺口均已修复，并通过独立 scoped 复审；但 Vite dev-only 风险接受仍未签署，CI、真实微信构建与真机证据也尚未闭环。
 
