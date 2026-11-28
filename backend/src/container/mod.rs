@@ -2,6 +2,7 @@ use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU32;
 
+use crate::config::settings::MiniappConfig;
 use crate::services::audit_cleanup_service::AuditCleanupService;
 use crate::services::audit_log_service::AuditLogService;
 use crate::services::failover_service::FailoverExecutor;
@@ -39,6 +40,7 @@ use dashmap::DashMap;
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<DatabaseConnection>,
+    pub miniapp: MiniappConfig,
     pub omni_audit: Arc<OmniAuditEngine>,
     /// L-32 修复（批次 380 v13 复审）：审计日志服务（mpsc channel + handle 保存）
     pub audit_log: Arc<AuditLogService>,
@@ -88,6 +90,8 @@ pub struct AppState {
 pub struct AppStateParams {
     /// 数据库连接
     pub db: Arc<DatabaseConnection>,
+    /// 微信小程序登录配置
+    pub miniapp: MiniappConfig,
     /// 全量审计引擎
     pub omni_audit: Arc<OmniAuditEngine>,
     /// L-32 修复（批次 380 v13 复审）：审计日志服务（mpsc channel + handle 保存）
@@ -258,6 +262,7 @@ fn construct_app_state(params: AppStateParams, services: AppServices) -> AppStat
         Arc::new(CacheService::new().with_metrics(metrics.business_metrics.clone()));
     AppState {
         db: params.db.clone(),
+        miniapp: params.miniapp,
         omni_audit: params.omni_audit,
         audit_log: params.audit_log,
         audit_cleanup: params.audit_cleanup,
@@ -392,6 +397,7 @@ impl Default for AppState {
             Arc::new(CacheService::new().with_metrics(metrics.business_metrics.clone()));
         Self {
             db: svc.db,
+            miniapp: MiniappConfig::default(),
             omni_audit: svc.omni_audit,
             audit_log: svc.audit_log,
             audit_cleanup: svc.audit_cleanup,

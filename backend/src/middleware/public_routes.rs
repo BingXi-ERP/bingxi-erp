@@ -19,6 +19,7 @@ pub const PUBLIC_PATHS: &[&str] = &[
     "/health/readiness",
     // 认证流程必需端点
     "/api/v1/erp/auth/login",
+    "/api/v1/erp/auth/miniapp/login",
     "/api/v1/erp/auth/refresh",
     // 安全审计 P1-08-1：登录页 handleUsernameBlur 预检查账号锁定状态
     // （GET /security/lock-status），属登录前公开接口（未登录时无 cookie），

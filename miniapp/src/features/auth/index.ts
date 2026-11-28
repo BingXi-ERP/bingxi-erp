@@ -1,0 +1,8 @@
+export { authService } from './services/auth'
+export type { LoginResponse, MiniappLoginPayload, PasswordLoginPayload } from './services/auth'
+export { createAuthGuard } from './guards'
+export type { AuthGuard, AuthNavigationMethod, AuthNavigationOptions } from './guards'
+export { useSessionStore } from './stores/session'
+export type { SessionState, SessionVerification } from './stores/session'
+export { useSession } from './composables/useSession'
+export type { UserInfo } from '../../shared/types/user'

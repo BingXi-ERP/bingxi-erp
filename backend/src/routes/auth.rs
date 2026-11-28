@@ -16,6 +16,7 @@ use crate::middleware::rate_limit;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/login", post(auth_handler::login))
+        .route("/miniapp/login", post(auth_handler::miniapp_login))
         .route("/logout", post(auth_handler_session::logout))
         .route("/refresh", post(auth_handler_misc::refresh_token))
         // P3 7-17 修复：删除 get_csrf_token 死代码接口

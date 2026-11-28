@@ -1,0 +1,81 @@
+name: 新小程序静态门
+
+on:
+  pull_request:
+    paths:
+      - "miniapp/**"
+      - "scripts/ci/miniapp-*"
+      - "scripts/ci/fixtures/miniapp/**"
+      - "backend/**"
+      - "frontend/scripts/route-snapshot.txt"
+      - "docs/security/miniapp-dev-dependency-risk-acceptance.json"
+      - ".github/workflows/miniapp-checks.yml"
+  push:
+    branches: [main]
+    paths:
+      - "miniapp/**"
+      - "scripts/ci/miniapp-*"
+      - "scripts/ci/fixtures/miniapp/**"
+      - "backend/**"
+      - "frontend/scripts/route-snapshot.txt"
+      - "docs/security/miniapp-dev-dependency-risk-acceptance.json"
+      - ".github/workflows/miniapp-checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: miniapp-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: miniapp/package-lock.json
+      - name: 安装契约门解析依赖
+        run: npm --prefix miniapp ci
+      - name: npm 审计判定器反向自证
+        run: node scripts/ci/miniapp-npm-audit.mjs --self-test
+      - name: npm 审计与生产依赖风险门
+        id: npm-audit
+        run: |
+          node scripts/ci/miniapp-npm-audit.mjs \
+            --markdown-output miniapp/test-results/miniapp-npm-audit.md \
+            --json-output miniapp/test-results/miniapp-npm-audit.json
+      - name: 上传 npm 审计报告
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: miniapp-npm-audit-report
+          path: |
+            miniapp/test-results/miniapp-npm-audit.md
+            miniapp/test-results/miniapp-npm-audit.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: 判定器反向自证
+        run: bash scripts/ci/miniapp-checks.sh --self-test
+      - name: 静态门与微信构建
+        id: static-gate
+        env:
+          MINIAPP_SKIP_INSTALL: "1"
+        run: bash scripts/ci/miniapp-checks.sh
+      - name: 写入静态门 Step Summary（成功或失败）
+        if: always()
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          JOB_STATUS: ${{ job.status }}
+          NPM_AUDIT_OUTCOME: ${{ steps.npm-audit.outcome }}
+          STATIC_GATE_OUTCOME: ${{ steps.static-gate.outcome }}
+          ARCHITECTURE_OUTCOME: ${{ steps.static-gate.outputs.architecture || 'not-run' }}
+          SOURCE_OUTCOME: ${{ steps.static-gate.outputs.source || 'not-run' }}
+          PAGES_OUTCOME: ${{ steps.static-gate.outputs.pages || 'not-run' }}
+          SIZE_OUTCOME: ${{ steps.static-gate.outputs.size || 'not-run' }}
+        run: node scripts/ci/miniapp-write-step-summary.mjs --mode static

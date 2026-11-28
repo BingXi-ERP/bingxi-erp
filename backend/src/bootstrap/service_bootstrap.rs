@@ -629,6 +629,7 @@ fn build_app_state(
 ) -> Result<AppState, Box<dyn std::error::Error>> {
     let app_state_params = AppStateParams {
         db,
+        miniapp: settings.miniapp.clone(),
         omni_audit,
         audit_log,
         audit_cleanup,

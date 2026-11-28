@@ -31,22 +31,69 @@ pub async fn record_login_attempt(
     status: &str,
     fail_reason: Option<&str>,
 ) {
+    let attempt = build_login_attempt(
+        username,
+        user_id,
+        ip_address,
+        user_agent,
+        "password",
+        status,
+        fail_reason,
+    );
+    insert_login_attempt(state, attempt).await;
+}
+
+/// 按登录通道记录尝试，小程序通道使用 `miniapp`，既有密码登录保持 `password`。
+pub async fn record_miniapp_login_attempt(
+    state: &AppState,
+    username: &str,
+    user_id: i32,
+    ip_address: &str,
+    user_agent: &str,
+    status: &str,
+    fail_reason: Option<&str>,
+) {
+    let attempt = build_login_attempt(
+        username,
+        user_id,
+        ip_address,
+        user_agent,
+        "miniapp",
+        status,
+        fail_reason,
+    );
+    insert_login_attempt(state, attempt).await;
+}
+
+fn build_login_attempt(
+    username: &str,
+    user_id: i32,
+    ip_address: &str,
+    user_agent: &str,
+    login_type: &str,
+    status: &str,
+    fail_reason: Option<&str>,
+) -> crate::models::log_login::ActiveModel {
     use crate::models::log_login;
+    use sea_orm::ActiveValue::Set;
+
+    log_login::ActiveModel {
+        user_id: Set(Some(user_id)),
+        username: Set(username.to_string()),
+        login_type: Set(Some(login_type.to_string())),
+        ip_address: Set(Some(ip_address.to_string())),
+        user_agent: Set(Some(user_agent.to_string())),
+        status: Set(status.to_string()),
+        fail_reason: Set(fail_reason.map(|s| s.to_string())),
+        login_time: Set(Some(Utc::now())),
+        ..Default::default()
+    }
+}
+
+async fn insert_login_attempt(state: &AppState, attempt: crate::models::log_login::ActiveModel) {
     use sea_orm::ActiveModelTrait;
 
-    let active_log = log_login::ActiveModel {
-        user_id: sea_orm::Set(Some(user_id)),
-        username: sea_orm::Set(username.to_string()),
-        login_type: sea_orm::Set(Some("password".to_string())),
-        ip_address: sea_orm::Set(Some(ip_address.to_string())),
-        user_agent: sea_orm::Set(Some(user_agent.to_string())),
-        status: sea_orm::Set(status.to_string()),
-        fail_reason: sea_orm::Set(fail_reason.map(|s| s.to_string())),
-        login_time: sea_orm::Set(Some(Utc::now())),
-        ..Default::default()
-    };
-
-    match active_log.insert(state.db.as_ref()).await {
+    match attempt.insert(state.db.as_ref()).await {
         Ok(_) => {}
         Err(e) => tracing::error!("Failed to record login attempt: {}", e),
     }

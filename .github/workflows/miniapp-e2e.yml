@@ -1,0 +1,234 @@
+name: 新小程序运行时 E2E
+
+on:
+  pull_request:
+    paths:
+      - "miniapp/**"
+      - "backend/**"
+      - "rust-toolchain.toml"
+      - "scripts/ci/install-wechat-devtools.ps1"
+      - "scripts/ci/start-miniapp-e2e-backend.sh"
+      - "scripts/ci/scan-miniapp-e2e-artifacts.mjs"
+      - "scripts/ci/miniapp-write-step-summary.mjs"
+      - ".github/workflows/miniapp-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: miniapp-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      VITE_API_BASE_URL: http://127.0.0.1:8082
+      VITE_APP_ID: ${{ secrets.MINIAPP_TEST_APPID }}
+      VITE_ENV_NAME: test
+      VITE_TERMINAL_SOURCE: "81"
+      MINIAPP_APPID: ${{ secrets.MINIAPP_TEST_APPID }}
+      MINIAPP_SECRET: ${{ secrets.MINIAPP_TEST_SECRET }}
+      MINIAPP_API_BASE_URL: https://api.weixin.qq.com
+      WECHAT_DEVTOOLS_INSTALLER_URL: ${{ secrets.WECHAT_DEVTOOLS_INSTALLER_URL }}
+      WECHAT_DEVTOOLS_CLI: ${{ secrets.WECHAT_DEVTOOLS_CLI }}
+      E2E_BASE_URL: http://127.0.0.1:8082
+      E2E_USERNAME: ${{ secrets.MINIAPP_E2E_USERNAME }}
+      E2E_PASSWORD: ${{ secrets.MINIAPP_E2E_PASSWORD }}
+      MINIAPP_AUTOMATOR_WS: ws://127.0.0.1:9420
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/bingxi_miniapp_test
+      JWT_SECRET: ci-only-miniapp-e2e-jwt-secret-32bytes
+      COOKIE_SECRET: ci-only-miniapp-e2e-cookie-secret-32bytes
+      WEBHOOK_SECRET: ci-only-miniapp-e2e-webhook-secret-32bytes
+      AUDIT_SECRET_KEY: ci-only-miniapp-e2e-audit-secret-32bytes
+      INIT_TOKEN: ci-only-miniapp-e2e-init-token-32bytes
+      APP_ENV: development
+      ENV: development
+      KAFKA_ENABLED: "false"
+      ELASTICSEARCH_URL: ""
+      CACHE_ENABLED: "false"
+      SERVER__HOST: 127.0.0.1
+      SERVER__PORT: "8082"
+      DATABASE__HOST: 127.0.0.1
+      DATABASE__PORT: "5432"
+      DATABASE__NAME: bingxi_miniapp_test
+      DATABASE__USERNAME: postgres
+      DATABASE__PASSWORD: postgres
+      DATABASE__MAX_CONNECTIONS: "10"
+      LOG__LEVEL: info
+      LOG__DIR: ${{ github.workspace }}/miniapp/test-results
+      SLOW_QUERY__ENABLED: "false"
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: 校验运行时 E2E 配置
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path 'miniapp/test-results' | Out-Null
+          $required = @(
+            'VITE_APP_ID',
+            'MINIAPP_SECRET',
+            'WECHAT_DEVTOOLS_INSTALLER_URL',
+            'WECHAT_DEVTOOLS_CLI',
+            'E2E_USERNAME',
+            'E2E_PASSWORD'
+          )
+          foreach ($name in $required) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
+              throw "缺少必需 Secrets 配置：$name"
+            }
+          }
+          $appId = [Environment]::GetEnvironmentVariable('VITE_APP_ID').Trim()
+          if ($appId -eq 'touristappid' -or $appId -notmatch '^wx[0-9a-fA-F]{16}$') {
+            throw 'MINIAPP_TEST_APPID 必须是真实微信测试 AppID，禁止 touristappid'
+          }
+          Write-Host 'MINIAPP_E2E_CONFIG_OK'
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: miniapp/package-lock.json
+
+      - name: 安装小程序依赖
+        run: npm --prefix miniapp ci
+
+      - name: 制品敏感信息扫描器反向自证
+        run: node scripts/ci/scan-miniapp-e2e-artifacts.mjs --self-test
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9
+        with:
+          toolchain: "1.94"
+
+      - name: 启动真实 PostgreSQL
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          docker version
+          if ($LASTEXITCODE -ne 0) { throw 'Docker 不可用' }
+          docker rm -f miniapp-postgres 2>$null | Out-Null
+          docker run -d --name miniapp-postgres `
+            -e POSTGRES_USER=postgres `
+            -e POSTGRES_PASSWORD=postgres `
+            -e POSTGRES_DB=bingxi_miniapp_test `
+            -p 5432:5432 postgres:16
+          if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL 容器启动失败' }
+          $ready = $false
+          for ($i = 0; $i -lt 60; $i++) {
+            docker exec miniapp-postgres pg_isready -U postgres -d bingxi_miniapp_test | Out-Host
+            if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+            Start-Sleep -Seconds 1
+          }
+          if (-not $ready) {
+            docker logs miniapp-postgres
+            throw 'PostgreSQL 未在 60 秒内就绪'
+          }
+          Write-Host 'MINIAPP_E2E_POSTGRES_READY'
+
+      - name: 在 Windows 同 job 构建真实后端
+        shell: pwsh
+        working-directory: backend
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build --locked --release --bin server --bin bingxi
+          if ($LASTEXITCODE -ne 0) { throw 'Windows 后端构建失败' }
+          Write-Host 'MINIAPP_E2E_BACKEND_BUILD_OK'
+
+      - name: 安装微信开发者工具
+        shell: pwsh
+        run: ./scripts/ci/install-wechat-devtools.ps1
+
+      - name: 构建小程序
+        run: npm --prefix miniapp run build:mp-weixin
+
+      - name: 迁移并启动真实后端
+        shell: bash
+        run: bash scripts/ci/start-miniapp-e2e-backend.sh
+
+      - name: 启动 automator 服务
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $cli = $env:WECHAT_DEVTOOLS_CLI
+          $project = Join-Path $env:GITHUB_WORKSPACE 'miniapp/dist/build/mp-weixin'
+          $stdout = Join-Path $env:GITHUB_WORKSPACE 'miniapp/test-results/automator.stdout.log'
+          $stderr = Join-Path $env:GITHUB_WORKSPACE 'miniapp/test-results/automator.stderr.log'
+          $process = Start-Process -FilePath $cli `
+            -ArgumentList @('auto', '--project', $project, '--auto-port', '9420') `
+            -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+          $process.Id | Set-Content -Path 'miniapp/test-results/automator.pid'
+          $ready = $false
+          for ($i = 0; $i -lt 90; $i++) {
+            $listener = Get-NetTCPConnection -LocalPort 9420 -State Listen -ErrorAction SilentlyContinue
+            if ($listener) { $ready = $true; break }
+            if ($process.HasExited) {
+              Get-Content -LiteralPath $stdout -ErrorAction SilentlyContinue
+              Get-Content -LiteralPath $stderr -ErrorAction SilentlyContinue
+              throw "automator 服务提前退出，退出码：$($process.ExitCode)"
+            }
+            Start-Sleep -Seconds 1
+          }
+          if (-not $ready) {
+            Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            Get-Content -LiteralPath $stdout -ErrorAction SilentlyContinue
+            Get-Content -LiteralPath $stderr -ErrorAction SilentlyContinue
+            throw 'automator 服务未在 90 秒内监听 9420 端口'
+          }
+          Write-Host 'MINIAPP_E2E_AUTOMATOR_READY port=9420'
+
+      - name: 运行真实运行时 E2E
+        id: e2e
+        run: npm --prefix miniapp run test:e2e
+
+      - name: 清理 CI 运行时进程与容器
+        if: always()
+        shell: pwsh
+        run: |
+          $backendPidFile = 'miniapp/test-results/backend.pid'
+          if (Test-Path -LiteralPath $backendPidFile) {
+            $backendPid = [int](Get-Content -LiteralPath $backendPidFile -Raw).Trim()
+            Stop-Process -Id $backendPid -Force -ErrorAction SilentlyContinue
+          }
+          $automatorPidFile = 'miniapp/test-results/automator.pid'
+          if (Test-Path -LiteralPath $automatorPidFile) {
+            $automatorPid = [int](Get-Content -LiteralPath $automatorPidFile -Raw).Trim()
+            Stop-Process -Id $automatorPid -Force -ErrorAction SilentlyContinue
+          }
+          docker rm -f miniapp-postgres 2>$null | Out-Null
+
+      - name: 脱敏并强制扫描 E2E 制品
+        id: scan_artifacts
+        if: always()
+        shell: bash
+        run: node scripts/ci/scan-miniapp-e2e-artifacts.mjs --root miniapp/test-results --sanitize
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: upload_artifacts
+        if: always() && steps.scan_artifacts.outcome == 'success'
+        with:
+          name: miniapp-e2e-results
+          path: |
+            miniapp/test-results/e2e.json
+            miniapp/test-results/exit-code.txt
+            miniapp/test-results/backend.log
+            miniapp/test-results/backend.stderr.log
+            miniapp/test-results/automator.stdout.log
+            miniapp/test-results/automator.stderr.log
+            miniapp/test-results/readiness.json
+            miniapp/test-results/init-status.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: 写入运行时 E2E Step Summary（成功或失败）
+        if: always()
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          JOB_STATUS: ${{ job.status }}
+          E2E_OUTCOME: ${{ steps.e2e.outcome }}
+          ARTIFACT_SCAN_OUTCOME: ${{ steps.scan_artifacts.outcome }}
+          ARTIFACT_UPLOAD_OUTCOME: ${{ steps.upload_artifacts.outcome }}
+        run: node scripts/ci/miniapp-write-step-summary.mjs --mode e2e

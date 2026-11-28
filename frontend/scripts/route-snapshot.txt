@@ -1,4 +1,4 @@
-# layers=8 endpoints=1849
+# layers=8 endpoints=1850
 DELETE	/api/v1/erp/aging-alert-rules/*	crate::handlers::aging_alert_rule_handler::delete_rule	finance
 DELETE	/api/v1/erp/aging-grades/*	crate::handlers::aging_grade_handler::delete_aging_grade	finance
 DELETE	/api/v1/erp/ai/process-optimizations/*	ai_extend_handler::delete_process_optimization	system
@@ -1092,6 +1092,7 @@ POST	/api/v1/erp/audit-logs/record-print	audit_log_handler::record_print_event	s
 POST	/api/v1/erp/auth/agree-terms	auth_handler_misc::agree_to_terms	auth
 POST	/api/v1/erp/auth/login	auth_handler::login	auth
 POST	/api/v1/erp/auth/logout	auth_handler_session::logout	auth
+POST	/api/v1/erp/auth/miniapp/login	auth_handler::miniapp_login	auth
 POST	/api/v1/erp/auth/refresh	auth_handler_misc::refresh_token	auth
 POST	/api/v1/erp/auth/totp/enable	auth_handler_misc::enable_totp	auth
 POST	/api/v1/erp/auth/totp/recovery-codes	auth_handler_misc::generate_recovery_codes	auth

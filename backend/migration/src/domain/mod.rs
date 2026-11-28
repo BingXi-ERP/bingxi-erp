@@ -233,3 +233,5 @@ pub mod fabric_inspection_edge_trim;
 pub mod quality_standard_tolerance;
 // BI 利润字段读权限存量补授域：成本、利润、毛利率仅主管、财务与数据分析岗默认可读。
 pub mod bi_profit_field_grant;
+// 微信小程序身份绑定表。独立顶层域，复用库上也会执行。
+pub mod miniapp_identity;
