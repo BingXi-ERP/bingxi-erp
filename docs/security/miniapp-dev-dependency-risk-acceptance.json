@@ -1,0 +1,18 @@
+{
+  "status": "pending",
+  "approvedBy": null,
+  "approvedAt": null,
+  "expiresAt": "2026-12-31T23:59:59.000Z",
+  "scope": "dev/build/test dependency tree only",
+  "packages": [],
+  "rationale": "2026-11-28 Vite 6.4.6 工具链升级后，生产依赖树与 dev/build/test 树的 critical/high 均为 0，当前没有需要接受的 dev critical/high 包。本文件不构成批准，status 保持 pending、未签署；若后续复扫出现新的 dev critical/high，必须另行精确评估并有效签署，不能沿用本次结论。",
+  "controls": [
+    "生产依赖树 critical/high 持续硬失败，不接受风险。",
+    "dev 依赖不得打包进入小程序生产产物，发布前检查构建产物来源。",
+    "uni-app 构建、Vite dev server 与 automator 本地服务仅处理仓库内受信输入。",
+    "Vite dev server 仅绑定回环地址，不暴露到不可信网络；禁止使用 /__open-in-editor 处理外部输入。",
+    "不得对不可信代码、参数、路径、图像或网络流量运行测试与构建工具。",
+    "每次 npm audit 复扫后核对 packages 覆盖全部 dev critical/high，新增漏洞必须更新或阻断。",
+    "风险接受到期后自动失败，必须重新评估、修复或重新签署。"
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "easycom": {
+    "autoscan": true,
+    "custom": {
+      "^wd-(.*)": "wot-design-uni/components/wd-$1/wd-$1.vue"
+    }
+  },
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录"
+      }
+    },
+    {
+      "path": "features/workspace/pages/index/index",
+      "style": {
+        "navigationBarTitleText": "工作台"
+      }
+    },
+    {
+      "path": "features/customers/pages/list/index",
+      "style": {
+        "navigationBarTitleText": "客户管理"
+      }
+    },
+    {
+      "path": "features/customers/pages/detail/index",
+      "style": {
+        "navigationBarTitleText": "客户详情"
+      }
+    },
+    {
+      "path": "features/customers/pages/form/index",
+      "style": {
+        "navigationBarTitleText": "客户编辑"
+      }
+    },
+    {
+      "path": "features/catalog/pages/products/index",
+      "style": {
+        "navigationBarTitleText": "商品管理"
+      }
+    },
+    {
+      "path": "features/catalog/pages/products/detail",
+      "style": {
+        "navigationBarTitleText": "商品详情"
+      }
+    },
+    {
+      "path": "features/catalog/pages/color-cards/index",
+      "style": {
+        "navigationBarTitleText": "色卡管理"
+      }
+    },
+    {
+      "path": "features/catalog/pages/color-cards/detail",
+      "style": {
+        "navigationBarTitleText": "色卡详情"
+      }
+    },
+    {
+      "path": "features/orders/pages/list/index",
+      "style": {
+        "navigationBarTitleText": "销售订单"
+      }
+    },
+    {
+      "path": "features/orders/pages/detail/index",
+      "style": {
+        "navigationBarTitleText": "订单详情"
+      }
+    },
+    {
+      "path": "features/orders/pages/create/index",
+      "style": {
+        "navigationBarTitleText": "新建订单"
+      }
+    },
+    {
+      "path": "features/payments/pages/collect/index",
+      "style": {
+        "navigationBarTitleText": "收款登记"
+      }
+    }
+  ],
+  "tabBar": {
+    "custom": true,
+    "list": [
+      {
+        "pagePath": "features/workspace/pages/index/index",
+        "text": "工作台"
+      },
+      {
+        "pagePath": "features/orders/pages/list/index",
+        "text": "订单"
+      }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "秉羲工作台",
+    "navigationBarBackgroundColor": "#F8F8F8",
+    "backgroundColor": "#F8F8F8"
+  }
+}

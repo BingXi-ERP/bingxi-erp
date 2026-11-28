@@ -1,0 +1,48 @@
+/**
+ * 设计令牌：颜色、间距、圆角、字号与阴影的唯一来源。
+ * 页面与组件一律通过 var(--token) 取用，禁止再写死视觉值。
+ *
+ * 令牌只声明一份，宿主选择器按平台条件编译分岔：
+ * WXSS 没有文档根伪类，把它和 page 写进同一个选择器列表会让整条规则在微信小程序里失效，
+ * 所有 var(--token) 在真机上取空。所以根选择器只出现在 H5 构建里，其余平台一律只留 page
+ * ——page 是两端都认的页面根选择器。构建 mp-weixin 时下面的条件块被整体剥离，
+ * 产物 app.wxss 里不残留根选择器字样（由 tests/contract/design-tokens-platform.test.ts 锁住）。
+ */
+/* #ifdef H5 */
+:root,
+/* #endif */
+page {
+  /* 品牌与语义色 */
+  --color-primary: #176b87;
+  --color-primary-light: #e8f4f8;
+  --color-success: #2f855a;
+  --color-warning: #b7791f;
+  --color-danger: #c53030;
+  --color-text: #1a202c;
+  --color-text-secondary: #4a5568;
+  --color-border: #e2e8f0;
+  --color-surface: #ffffff;
+  --color-background: #f7fafc;
+
+  /* 间距阶梯（8rpx 一档，只允许取这四级） */
+  --space-1: 8rpx;
+  --space-2: 16rpx;
+  --space-3: 24rpx;
+  --space-4: 32rpx;
+
+  /* 圆角 */
+  --radius-sm: 8rpx;
+  --radius-md: 16rpx;
+  --radius-lg: 24rpx;
+
+  /* 字号阶梯 */
+  --font-sm: 24rpx;
+  --font-md: 28rpx;
+  --font-lg: 32rpx;
+
+  /* 卡片阴影 */
+  --shadow-card: 0 8rpx 24rpx rgba(15, 23, 42, 0.06);
+
+  /* 分隔线宽度：唯一的发丝线取值，组件里不再各写各的 1rpx */
+  --hairline: 1rpx;
+}

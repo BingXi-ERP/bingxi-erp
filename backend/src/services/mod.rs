@@ -242,6 +242,7 @@ pub mod amount_visibility;
 pub mod email_service;
 // 公众号模板消息通知腿，与邮件同属出件通道
 pub mod wechat_mp_service;
+pub mod wechat_miniapp_service;
 pub mod event_notification_service;
 pub mod notification_scheduler;
 pub mod notification_service;

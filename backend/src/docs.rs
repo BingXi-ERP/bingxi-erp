@@ -20,6 +20,7 @@ use utoipa::OpenApi;
     paths(
         // 认证相关（A.25.1 auth 域补全，struct 已加 ToSchema）
         crate::handlers::auth_handler::login,
+        crate::handlers::auth_handler::miniapp_login,
         crate::handlers::auth_handler_session::logout,
         crate::handlers::auth_handler_misc::refresh_token,
         crate::handlers::auth_handler_misc::setup_totp,
@@ -39,6 +40,7 @@ use utoipa::OpenApi;
         schemas(
             // 认证相关
             crate::handlers::auth_handler::LoginRequest,
+            crate::handlers::auth_handler::MiniappLoginRequest,
             crate::handlers::auth_handler::LoginResponse,
             crate::handlers::auth_handler::UserInfo,
             crate::handlers::auth_handler_misc::TotpSetupResponse,

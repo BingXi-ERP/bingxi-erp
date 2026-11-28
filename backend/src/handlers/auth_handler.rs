@@ -1,7 +1,7 @@
 use crate::container::AppState;
 use crate::middleware::audit_context::AuditContext;
 // v9 P1-G 修复：移除未使用的 AuthContext import
-use super::auth_handler_session::record_login_attempt;
+use super::auth_handler_session::{record_login_attempt, record_miniapp_login_attempt};
 use crate::models::audit_log::{OperationType, Severity};
 use crate::services::audit_log_service::{AuditEvent, AuditLogService};
 use crate::services::auth_service::AuthService;
@@ -9,6 +9,7 @@ use crate::services::enhanced_logger::{
     self, DeviceInfo, FailureInfo, LoginAttempt, LoginSecurityLog, SecurityInfo,
 };
 use crate::services::totp_service::TotpService;
+use crate::services::wechat_miniapp_service::WechatMiniappService;
 use crate::utils::admin_checker::ADMIN_ROLE_CODE;
 use crate::utils::error::AppError;
 use crate::utils::response::ApiResponse;
@@ -20,15 +21,33 @@ use axum::{
 };
 use axum_extra::extract::cookie::{Cookie, SameSite};
 use chrono::{Duration as ChronoDuration, Utc};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, ExprTrait, QueryFilter,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use time::Duration as CookieDuration;
 use utoipa::ToSchema;
-use validator::Validate;
+use validator::{Validate, ValidationError};
 
 pub const MAX_FAILED_ATTEMPTS: i32 = 9;
 const LOCKOUT_DURATION_MINUTES: i64 = 30;
+const MINIAPP_LOGIN_PATH: &str = "/api/v1/erp/auth/miniapp/login";
+
+/// 小程序登录请求：微信临时登录 code 与手机号授权 code。
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+pub struct MiniappLoginRequest {
+    #[validate(
+        length(min = 1, max = 512, message = "code 不能为空且长度不能超过512"),
+        custom(function = "validate_non_blank")
+    )]
+    pub code: String,
+    #[validate(
+        length(min = 1, max = 512, message = "phone_code 不能为空且长度不能超过512"),
+        custom(function = "validate_non_blank")
+    )]
+    pub phone_code: String,
+}
 
 #[allow(dead_code, reason = "反序列化输入字段")]
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -289,6 +308,236 @@ pub async fn login(
             Err(app_err)
         }
     }
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/erp/auth/miniapp/login",
+    request_body = MiniappLoginRequest,
+    responses(
+        (status = 200, description = "登录成功", body = ApiResponse<LoginResponse>),
+        (status = 400, description = "请求参数错误"),
+        (status = 401, description = "用户停用或需要两步验证"),
+        (status = 404, description = "手机号未绑定 ERP 用户"),
+        (status = 503, description = "微信接口或小程序配置不可用")
+    ),
+    tags = ["Auth"]
+)]
+pub async fn miniapp_login(
+    State(state): State<AppState>,
+    audit_ctx: Option<Extension<AuditContext>>,
+    jar: axum_extra::extract::PrivateCookieJar,
+    headers: HeaderMap,
+    Json(payload): Json<MiniappLoginRequest>,
+) -> Result<axum::response::Response, AppError> {
+    let client_ip = extract_client_ip(&audit_ctx, &headers);
+    let user_agent = extract_user_agent(&headers);
+    let result: Result<axum::response::Response, AppError> = async {
+        validate_miniapp_payload(&payload)?;
+        let service = WechatMiniappService::with_cache(&state.miniapp, state.cache.clone())?;
+        let session = service.code2session(&payload.code).await?;
+        let openid = session
+            .get("openid")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| AppError::unauthorized("微信会话缺少 openid"))?;
+        let phone = service.get_phone_number(&payload.phone_code).await?;
+        let appid = state
+            .miniapp
+            .appid
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| AppError::service_unavailable("MINIAPP_APPID 未配置"))?;
+        let user = resolve_miniapp_user(&state, appid, openid, &phone).await?;
+        let auth_service = AuthService::new(state.db.clone(), state.jwt_secret.clone());
+        let token = auth_service
+            .generate_token(user.id, &user.username, user.role_id)
+            .map_err(|error| AppError::internal(format!("生成令牌失败：{error}")))?;
+
+        record_miniapp_login_attempt(
+            &state,
+            &user.username,
+            user.id,
+            &client_ip,
+            &user_agent,
+            "SUCCESS",
+            None,
+        )
+        .await;
+        let audit_service = Arc::new(AuditLogService::new(state.db.clone()));
+        audit_service.record_async(
+            build_success_audit_event_for_path(
+                &user,
+                &user.username,
+                MINIAPP_LOGIN_PATH,
+                "用户通过小程序登录成功",
+            ),
+            audit_ctx.clone().map(|context| context.0),
+        );
+        let user_service = crate::services::user_service::UserService::new(state.db.clone());
+        if let Err(error) = user_service.update_last_login(user.id).await {
+            tracing::warn!(error = %error, user_id = user.id, "小程序登录更新最后登录时间失败");
+        }
+        tracing::info!(user_id = user.id, "小程序登录成功");
+        complete_login(
+            &state,
+            &audit_ctx,
+            jar,
+            &headers,
+            token,
+            user,
+            &client_ip,
+            &user_agent,
+        )
+        .await
+    }
+    .await;
+
+    if let Err(error) = &result {
+        tracing::warn!(error = %error, "小程序登录失败");
+        record_miniapp_login_attempt(
+            &state,
+            "miniapp",
+            0,
+            &client_ip,
+            &user_agent,
+            "FAILED",
+            Some(&error.to_string()),
+        )
+        .await;
+        let audit_service = Arc::new(AuditLogService::new(state.db.clone()));
+        audit_service.record_async(
+            build_failure_audit_event_for_path("miniapp", error, MINIAPP_LOGIN_PATH),
+            audit_ctx.clone().map(|context| context.0),
+        );
+    }
+    result
+}
+
+fn validate_non_blank(value: &str) -> Result<(), ValidationError> {
+    if value.trim().is_empty() {
+        Err(ValidationError::new("不能为空白"))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_miniapp_payload(payload: &MiniappLoginRequest) -> Result<(), AppError> {
+    if payload.code.trim().is_empty() || payload.phone_code.trim().is_empty() {
+        return Err(AppError::validation_displayable(
+            "code 与 phone_code 不能为空",
+        ));
+    }
+    if let Err(errors) = payload.validate() {
+        return Err(AppError::validation_displayable(format!(
+            "小程序登录参数错误: {errors}"
+        )));
+    }
+    Ok(())
+}
+
+/// 先按身份绑定查询，再以当前微信手机号核对既有用户；未绑定才按手机号首次匹配。
+async fn resolve_miniapp_user(
+    state: &AppState,
+    appid: &str,
+    openid: &str,
+    phone: &str,
+) -> Result<crate::models::user::Model, AppError> {
+    use crate::models::miniapp_identity;
+    use crate::models::user;
+
+    let binding = miniapp_identity::Entity::find()
+        .filter(miniapp_identity::Column::Appid.eq(appid))
+        .filter(miniapp_identity::Column::Openid.eq(openid))
+        .one(state.db.as_ref())
+        .await?;
+    if let Some(binding) = binding {
+        let user = user::Entity::find_by_id(binding.user_id)
+            .one(state.db.as_ref())
+            .await?
+            .ok_or_else(|| AppError::internal("小程序身份绑定的用户不存在"))?;
+        ensure_bound_phone_matches(&user, phone)?;
+        ensure_miniapp_user_allowed(&user)?;
+        tracing::info!(user_id = user.id, "复用既有小程序身份绑定");
+        return Ok(user);
+    }
+
+    let international_phone = format!("+86{phone}");
+    let candidates = user::Entity::find()
+        .filter(
+            user::Column::Phone
+                .eq(phone)
+                .or(user::Column::Phone.eq(international_phone)),
+        )
+        .all(state.db.as_ref())
+        .await?;
+    let user = match candidates.as_slice() {
+        [] => {
+            tracing::warn!("小程序登录手机号未命中 ERP 用户");
+            return Err(AppError::not_found_displayable("手机号未绑定 ERP 用户"));
+        }
+        [user] => user.clone(),
+        _ => {
+            tracing::error!("小程序登录手机号命中多个 ERP 用户，拒绝登录与绑定");
+            return Err(AppError::internal(
+                "手机号对应多个 ERP 用户，请先修正重复数据",
+            ));
+        }
+    };
+    ensure_miniapp_user_allowed(&user)?;
+
+    let now = Utc::now();
+    let insert_result = miniapp_identity::ActiveModel {
+        appid: Set(appid.to_string()),
+        openid: Set(openid.to_string()),
+        user_id: Set(user.id),
+        created_at: Set(now),
+        updated_at: Set(now),
+        ..Default::default()
+    }
+    .insert(state.db.as_ref())
+    .await;
+    if let Err(error) = insert_result {
+        let existing = miniapp_identity::Entity::find()
+            .filter(miniapp_identity::Column::Appid.eq(appid))
+            .filter(miniapp_identity::Column::Openid.eq(openid))
+            .one(state.db.as_ref())
+            .await?;
+        if existing.is_some_and(|binding| binding.user_id == user.id) {
+            tracing::info!(user_id = user.id, "并发小程序登录已由另一请求完成身份绑定");
+            return Ok(user);
+        }
+        return Err(error.into());
+    }
+    tracing::info!(user_id = user.id, "小程序身份绑定成功");
+    Ok(user)
+}
+
+fn ensure_bound_phone_matches(
+    user: &crate::models::user::Model,
+    phone: &str,
+) -> Result<(), AppError> {
+    let stored = user
+        .phone
+        .as_deref()
+        .ok_or_else(|| AppError::not_found_displayable("手机号未绑定 ERP 用户"))?;
+    let normalized = crate::services::wechat_miniapp_service::normalize_mainland_phone(stored)?;
+    if normalized != phone {
+        return Err(AppError::not_found_displayable("手机号未绑定 ERP 用户"));
+    }
+    Ok(())
+}
+
+fn ensure_miniapp_user_allowed(user: &crate::models::user::Model) -> Result<(), AppError> {
+    if !user.is_active {
+        return Err(AppError::unauthorized("用户已停用，无法登录"));
+    }
+    if user.is_totp_enabled {
+        return Err(AppError::unauthorized(
+            "小程序登录不支持两步验证，请使用网页端登录",
+        ));
+    }
+    Ok(())
 }
 
 /// 处理登录失败：记录登录尝试 + 增强安全日志 + 异步审计事件，返回统一 AppError。
@@ -683,6 +932,15 @@ fn build_failure_security_info(recent_user_failures: u64, recent_ip_failures: u6
 
 /// 构建登录成功审计事件（OperationType::Login / Severity::Info）。
 fn build_success_audit_event(user: &crate::models::user::Model, username: &str) -> AuditEvent {
+    build_success_audit_event_for_path(user, username, "/api/v1/erp/auth/login", "用户登录成功")
+}
+
+fn build_success_audit_event_for_path(
+    user: &crate::models::user::Model,
+    username: &str,
+    request_path: &str,
+    description: &str,
+) -> AuditEvent {
     AuditEvent {
         user_id: Some(user.id),
         username: Some(username.to_string()),
@@ -691,9 +949,9 @@ fn build_success_audit_event(user: &crate::models::user::Model, username: &str) 
         resource_type: Some("auth".to_string()),
         resource_id: Some(user.id.to_string()),
         resource_name: Some(user.username.clone()),
-        description: Some("用户登录成功".to_string()),
+        description: Some(description.to_string()),
         request_method: Some("POST".to_string()),
-        request_path: Some("/api/v1/erp/auth/login".to_string()),
+        request_path: Some(request_path.to_string()),
         before_snapshot: None,
         after_snapshot: None,
     }
@@ -701,6 +959,14 @@ fn build_success_audit_event(user: &crate::models::user::Model, username: &str) 
 
 /// 构建登录失败审计事件（OperationType::Login / Severity::Warn）。
 fn build_failure_audit_event(username: &str, error: &AppError) -> AuditEvent {
+    build_failure_audit_event_for_path(username, error, "/api/v1/erp/auth/login")
+}
+
+fn build_failure_audit_event_for_path(
+    username: &str,
+    error: &AppError,
+    request_path: &str,
+) -> AuditEvent {
     AuditEvent {
         user_id: None,
         username: Some(username.to_string()),
@@ -711,7 +977,7 @@ fn build_failure_audit_event(username: &str, error: &AppError) -> AuditEvent {
         resource_name: None,
         description: Some(format!("用户登录失败：{}", error)),
         request_method: Some("POST".to_string()),
-        request_path: Some("/api/v1/erp/auth/login".to_string()),
+        request_path: Some(request_path.to_string()),
         before_snapshot: None,
         after_snapshot: None,
     }
@@ -810,7 +1076,7 @@ fn build_session_cookie(
         .build()
 }
 
-/// 处理登录成功：TOTP 已通过 → 构建 UserInfo + CSRF + refresh_token + Cookie + 响应。
+/// 处理密码登录成功，并复用统一的小程序/密码会话完成逻辑。
 #[allow(clippy::too_many_arguments)]
 async fn handle_login_success(
     state: &AppState,
@@ -822,7 +1088,32 @@ async fn handle_login_success(
     user: crate::models::user::Model,
     client_ip: &str,
     _user_agent: &str,
-    auth_service: &AuthService,
+    _auth_service: &AuthService,
+) -> Result<axum::response::Response, AppError> {
+    complete_login(
+        state,
+        audit_ctx,
+        jar,
+        headers,
+        token,
+        user,
+        client_ip,
+        &payload.username,
+    )
+    .await
+}
+
+/// 构建用户信息、CSRF、刷新令牌与登录 Cookie，密码和小程序登录共用同一响应契约。
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn complete_login(
+    state: &AppState,
+    audit_ctx: &Option<Extension<AuditContext>>,
+    jar: axum_extra::extract::PrivateCookieJar,
+    headers: &HeaderMap,
+    token: String,
+    user: crate::models::user::Model,
+    client_ip: &str,
+    _user_agent: &str,
 ) -> Result<axum::response::Response, AppError> {
     // 批次 24 v6 P0-2 修复：使用统一的 build_with_permissions 构建 UserInfo
     // 安全漏洞 #14 修复：权限列表转换为 `Vec<String>` 资源标识符 `"{resource}:{action}"`
@@ -832,6 +1123,7 @@ async fn handle_login_success(
     let (csrf_token, session_id) = prepare_csrf_state(state, &token, audit_ctx, client_ip, &user)?;
 
     // 生成 refresh_token：JWT 形式（P1 7-1 修复），session_id 与 access_token 共享
+    let auth_service = AuthService::new(state.db.clone(), state.jwt_secret.clone());
     let refresh_token = auth_service
         .generate_refresh_token(user.id, &user.username, user.role_id, &session_id)
         .map_err(|e| AppError::internal(format!("生成刷新令牌失败：{}", e)))?;
@@ -845,7 +1137,7 @@ async fn handle_login_success(
     if password_expired {
         tracing::info!(
             user_id = user.id,
-            username = %payload.username,
+            username = %user.username,
             "[SECURITY] 用户密码已过期（超过 {} 天未修改），前端将引导改密",
             policy_svc.max_age_days.unwrap_or(0)
         );

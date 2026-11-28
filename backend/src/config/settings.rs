@@ -125,6 +125,9 @@ pub struct AppSettings {
     /// 通知腿据此标记不可用并显式记日志，禁止静默跳过、禁止把未配置当成功。
     #[serde(default)]
     pub wechat_mp: WechatMpConfig,
+    /// 微信小程序登录凭证与接口地址。未配置时服务可启动，登录端点显式返回不可用。
+    #[serde(default)]
+    pub miniapp: MiniappConfig,
     /// 环保税适用税额（元/污染当量；env 覆盖键 `ENV_TAX_RATE_PER_EQUIVALENT`）——
     /// **地方可变值**：《环境保护税法》附表规定法定幅度为每污染当量 **1.2–12 元**，
     /// 具体适用税额由省级人民政府在本行政区域内确定（运维取值须落在该法定幅度内）。
@@ -759,6 +762,40 @@ impl WechatMpConfig {
     }
 }
 
+fn default_miniapp_api_base_url() -> String {
+    "https://api.weixin.qq.com".to_string()
+}
+
+/// 微信小程序登录配置，与公众号通知凭据完全分离。
+#[derive(Clone, Deserialize)]
+#[serde(default)]
+pub struct MiniappConfig {
+    pub appid: Option<String>,
+    pub secret: Option<String>,
+    #[serde(default = "default_miniapp_api_base_url")]
+    pub api_base_url: String,
+}
+
+impl Default for MiniappConfig {
+    fn default() -> Self {
+        Self {
+            appid: None,
+            secret: None,
+            api_base_url: default_miniapp_api_base_url(),
+        }
+    }
+}
+
+impl std::fmt::Debug for MiniappConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MiniappConfig")
+            .field("appid_configured", &self.appid.is_some())
+            .field("secret_configured", &self.secret.is_some())
+            .field("api_base_url_configured", &!self.api_base_url.is_empty())
+            .finish()
+    }
+}
+
 impl AppSettings {
     pub fn new() -> Result<Self, ConfigError> {
         let mut app_settings = Self::load_from_env()?;
@@ -770,6 +807,7 @@ impl AppSettings {
         Self::load_update_from_env(&mut app_settings);
         Self::load_print_from_env(&mut app_settings);
         Self::load_wechat_mp_from_env(&mut app_settings);
+        Self::load_miniapp_from_env(&mut app_settings);
         // 镜像清单 fail-fast 校验（非法 https/内网/IP 字面量 → 拒绝启动），
         // 校验通过后再写入进程级单例供下载链路读取，避免带病镜像进入运行期。
         Self::validate_update_mirrors(&app_settings)?;
@@ -1096,6 +1134,38 @@ impl AppSettings {
                     env_name
                 );
             }
+        }
+    }
+
+    /// 从扁平环境变量加载小程序登录配置；空白值按未配置处理，接口地址只接受非空覆盖。
+    fn load_miniapp_from_env(app_settings: &mut AppSettings) {
+        let read_env = |name: &str| -> Option<String> {
+            match std::env::var(name) {
+                Ok(raw) => {
+                    let trimmed = raw.trim();
+                    if trimmed.is_empty() {
+                        warn!("环境变量 {} 已设置但为空，按未配置处理", name);
+                        None
+                    } else {
+                        Some(trimmed.to_string())
+                    }
+                }
+                Err(_) => None,
+            }
+        };
+
+        if let Some(appid) = read_env("MINIAPP_APPID") {
+            app_settings.miniapp.appid = Some(appid);
+        }
+        if let Some(secret) = read_env("MINIAPP_SECRET") {
+            app_settings.miniapp.secret = Some(secret);
+        }
+        if let Some(api_base_url) = read_env("MINIAPP_API_BASE_URL") {
+            app_settings.miniapp.api_base_url = api_base_url;
+        }
+
+        if app_settings.miniapp.appid.is_none() || app_settings.miniapp.secret.is_none() {
+            warn!("小程序登录不可用：MINIAPP_APPID 与 MINIAPP_SECRET 必须同时配置");
         }
     }
 

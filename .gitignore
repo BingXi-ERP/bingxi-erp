@@ -157,3 +157,7 @@ reports/
 # 该道只判产物里出现的包必须在 package.json 声明，产物是否入库由本处两条规则判。
 /miniprogram/miniprogram_npm/
 /miniprogram/@babel/
+
+# 新小程序运行时 E2E 的本地证据与生成状态
+/miniapp/test-results/
+/miniapp/tests/e2e/exit-code.txt

@@ -9,6 +9,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+/// 外部平台接口令牌缓存值；到期时刻由写入方按平台有效期与提前刷新量计算。
+#[derive(Clone)]
+pub struct CachedApiToken {
+    pub token: String,
+    pub expires_at: Instant,
+}
+
 /// 缓存统计信息
 #[derive(Debug, Clone, Default)]
 pub struct CacheStats {
@@ -411,6 +418,8 @@ pub struct AppCache {
     /// 缺陷 3.1 修复：BI 多维分析聚合结果缓存（5 分钟 TTL）
     pub bi_cache: Arc<MemoryCache<String, serde_json::Value>>,
     pub token_blacklist: Arc<MemoryCache<String, bool>>,
+    /// 外部平台接口调用令牌，键由平台与应用标识组成，值按平台有效期自动失效。
+    pub api_token_cache: Arc<MemoryCache<String, CachedApiToken>>,
     /// CSRF Token 缓存：key=csrf_token，value=CsrfTokenBinding（会话 + 用户 + 观测 IP）。
     /// 拒绝依据是会话与用户绑定；观测 IP 只用于漂移判定与审计留痕。
     pub csrf_token_cache: Arc<MemoryCache<String, CsrfTokenBinding>>,
@@ -439,6 +448,7 @@ impl AppCache {
             warehouse_cache: MemoryCache::arc(),
             bi_cache: MemoryCache::arc(),
             token_blacklist: MemoryCache::arc(),
+            api_token_cache: MemoryCache::arc(),
             csrf_token_cache: MemoryCache::arc(),
             csrf_user_index: DashMap::new(),
         }
@@ -747,6 +757,7 @@ impl AppCache {
         self.supplier_cache.reset_stats();
         self.warehouse_cache.reset_stats();
         self.token_blacklist.reset_stats();
+        self.api_token_cache.reset_stats();
         self.csrf_token_cache.reset_stats();
         // csrf_user_index 是原始 DashMap（无统计字段），无需重置
     }

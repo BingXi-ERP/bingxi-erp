@@ -490,6 +490,7 @@ pub mod contract_template_clause;
 pub mod contract_clause;
 pub mod wechat_mp_binding;
 pub mod wechat_mp_notification_outbox;
+pub mod miniapp_identity;
 
 pub mod scheduler_job_run;
 

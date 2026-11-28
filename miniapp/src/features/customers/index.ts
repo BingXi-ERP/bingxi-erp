@@ -1,0 +1,8 @@
+export { default as CustomerListPage } from './pages/list/index.vue'
+export { default as CustomerDetailPage } from './pages/detail/index.vue'
+export { default as CustomerFormPage } from './pages/form/index.vue'
+export { default as CustomerPicker } from './components/CustomerPicker.vue'
+export { customerService } from './services/customers'
+export { useCustomers } from './composables/useCustomers'
+export { customerSchema, customerStatusSchema, customerTypeSchema } from './types'
+export type { Customer, CustomerInput, CustomerListQuery } from './types'

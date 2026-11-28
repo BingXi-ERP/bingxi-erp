@@ -1,0 +1,46 @@
+/**
+ * 全局样式：只放跨页面复用的基底（页面容器、卡片、次要文字），
+ * 所有取值来自 shared/design/tokens，禁止在这里出现写死的颜色与尺寸。
+ * 由 src/main.ts 引入，随应用全局样式一起编译。
+ */
+page {
+  background: var(--color-background);
+  color: var(--color-text);
+  font-size: var(--font-md);
+
+  /**
+   * 组件库主题接到项目令牌上：wot-design-uni 的每个视觉取值都读 --wot-* 变量，
+   * 这里做一次映射，组件就跟着项目配色走，不需要在页面里逐个改样式。
+   * 取值只引用 tokens，不重复写第二套颜色。
+   */
+  --wot-color-theme: var(--color-primary);
+  --wot-color-success: var(--color-success);
+  --wot-color-warning: var(--color-warning);
+  --wot-color-danger: var(--color-danger);
+  --wot-color-border: var(--color-border);
+  --wot-color-border-light: var(--color-border);
+  --wot-color-title: var(--color-text);
+  --wot-color-content: var(--color-text);
+  --wot-color-secondary: var(--color-text-secondary);
+}
+
+/* 页面模板的公共外壳，三个 PageTemplate 都带 .page 类。 */
+.page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: var(--space-3);
+}
+
+/* 列表卡片与表单分组的通用容器。 */
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-3);
+}
+
+/* 次要说明文字。 */
+.text-secondary {
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
+}

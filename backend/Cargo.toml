@@ -154,6 +154,7 @@ image = { version = "0.25.10", default-features = false, features = ["png"] }
 tokio-test = "0.4"
 mockall = "0.12"
 tower = "0.5"
+wiremock = "0.6"
 # 测试环境使用 SQLite
 sea-orm = { version = "2.0.2", features = ["sqlx-sqlite", "runtime-tokio"] }
 # 测试用 Decimal 字面量宏

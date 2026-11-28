@@ -401,6 +401,8 @@ impl MigratorTrait for Migrator {
             Box::new(domain::bi_profit_field_grant::Migration),
             // 可配置单据号规则与追加版本快照，链尾独立域（复用库上属 pending 必然执行）
             Box::new(domain::system_number_rules::Migration),
+            // 微信小程序身份绑定表，链尾独立域（users 由 system 域先建）
+            Box::new(domain::miniapp_identity::Migration),
         ]
     }
 }
