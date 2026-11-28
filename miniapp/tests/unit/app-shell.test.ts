@@ -130,12 +130,12 @@ describe('application shell', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([[7]])
   })
 
-  it('does not offer placeholder routes in the phase-one tab bar', () => {
+  it('offers only implemented workspace and order tab routes', () => {
     const wrapper = mount(AppTabBar, { global })
 
-    expect(wrapper.findAll('.app-tab-bar__item')).toHaveLength(1)
-    expect(wrapper.find('.app-tab-bar__item').attributes('data-route')).toBe(
-      '/features/workspace/pages/index/index',
-    )
+    expect(wrapper.findAll('.app-tab-bar__item')).toHaveLength(2)
+    expect(
+      wrapper.findAll('.app-tab-bar__item').map((item) => item.attributes('data-route')),
+    ).toEqual(['/features/workspace/pages/index/index', '/features/orders/pages/list/index'])
   })
 })
