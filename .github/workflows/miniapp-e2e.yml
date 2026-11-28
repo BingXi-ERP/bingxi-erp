@@ -208,6 +208,7 @@ jobs:
           } else {
             Write-Warning 'docker 不可用，跳过 PostgreSQL 容器清理。'
           }
+          exit 0
 
       - name: 脱敏并强制扫描 E2E 制品
         id: scan_artifacts

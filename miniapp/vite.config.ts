@@ -13,6 +13,8 @@ const uniManifest = UniManifest({
   insertFinalNewline: true,
 })
 
+const createUniPlugin = (uni as unknown as { default?: typeof uni }).default ?? uni
+
 export default defineConfig({
-  plugins: [uniManifest, uni()],
+  plugins: [uniManifest, createUniPlugin()],
 })
