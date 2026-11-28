@@ -10,8 +10,10 @@ import {
   getCtx,
   loginAsRole,
   loginViaUI,
+  seedGreigeStockIn,
   type DeferredCleanup,
 } from './helpers';
+import { PRODUCT_TYPE } from '../../src/constants/product-type';
 
 /**
  * 501 定时任务与后台作业：预警推送对象正确性与重复触发的幂等守恒
@@ -582,16 +584,51 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
   test('501-04 库存预警派生词表正确且重复读取不新增站内信', async ({ page }) => {
     test.setTimeout(240_000);
 
+    await ensureTestEntities(page);
+    const tag = uniq();
+    const product = await apiCall<{ id: number }>(page, 'POST', '/products', {
+      name: `501-04库存预警${tag}`,
+      code: `501-04-${tag}`,
+      category_id: getCtx().productCategoryIds[0],
+      unit: '米',
+      standard_price: 1,
+      status: 'active',
+      product_type: PRODUCT_TYPE.auxiliary,
+    });
+    const productId = product.data.id;
+    deferCleanup(cleanup, 'DELETE', `/products/${productId}`, `501-04 产品-${productId}`);
+
+    const warehouseId = getCtx().warehouseIds[0];
+    const stock = await seedGreigeStockIn(page, {
+      productId,
+      warehouseId,
+      batchNo: `501-04-${tag}`,
+      quantityMeters: '0',
+    });
+    deferCleanup(
+      cleanup,
+      'DELETE',
+      `/inventory/stock/${stock.id}`,
+      `501-04 库存-${String(stock.id)}`
+    );
+    await apiCall(page, 'PUT', `/inventory/stock/${stock.id}`, {
+      version: stock.version,
+      reorder_point: 10,
+    });
+
+    const alertPath = `/inventory/stock/alerts?product_id=${productId}` + `&page=1&page_size=50`;
     const alerts1 = await apiCall<{ items?: StockAlertRow[]; total?: number }>(
       page,
       'GET',
-      '/inventory/stock/alerts?page=1&page_size=50'
+      alertPath
     );
-    const rows1 = requireItems(alerts1.data, '501-04 /inventory/stock/alerts');
+    const rows1 = requireItems(alerts1.data, '501-04 专属产品告警');
     const total1 = alerts1.data.total;
     if (typeof total1 !== 'number') {
       throw new Error(`501-04 前置不成立：告警列表缺 total 键，实际 ${String(total1)}`);
     }
+    expect(rows1, '501-04 专属零库存且订货点为正的产品必须派生告警').toHaveLength(1);
+    expect(rows1[0].alert_type, '501-04 零库存应派生 out_of_stock').toBe('out_of_stock');
     // 派生集合是 worker 的输入面：逐行核对 alert_type 落在写入方词表内，不认识的 token 即点名
     for (const row of rows1) {
       expect(
@@ -600,23 +637,20 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
       ).toBe(true);
       expect(row.alert_type, '501-04 告警列表不应带回无告警值 normal').not.toBe('normal');
     }
-    if (rows1.length === 0) {
-      console.log('[501-04] 本轮告警派生集合为空（total=0），词表核对退化为读侧守恒');
-    }
 
     // 触发面：GET /inventory/stock 每页都会走 send_inventory_alerts；连续两次读取即两次触发
     const inboxBefore = await readInbox(page);
     const stock1 = await apiCallRaw<{ items?: unknown[]; total?: number }>(
       page,
       'GET',
-      '/inventory/stock?page=1&page_size=20'
+      `/inventory/stock?product_id=${productId}&warehouse_id=${warehouseId}&page=1&page_size=20`
     );
     const alerts2 = await apiCall<{ items?: StockAlertRow[]; total?: number }>(
       page,
       'GET',
-      '/inventory/stock/alerts?page=1&page_size=50'
+      alertPath
     );
-    const rows2 = requireItems(alerts2.data, '501-04 二次 /inventory/stock/alerts');
+    const rows2 = requireItems(alerts2.data, '501-04 二次专属产品告警');
     expect(
       rows2.map(r => r.id),
       '501-04 重复读取的告警行集合应守恒（纯派生读侧不应改变库存台账）'
@@ -648,7 +682,7 @@ test.describe.serial('501 定时任务幂等与预警推送对象', () => {
     await apiCallRaw<{ items?: unknown[]; total?: number }>(
       page,
       'GET',
-      '/inventory/stock?page=1&page_size=20'
+      `/inventory/stock?product_id=${productId}&warehouse_id=${warehouseId}&page=1&page_size=20`
     );
     const warehouseInboxAfter = await loginAsRole(page, 'warehouse_manager').then(() =>
       readInbox(page)
