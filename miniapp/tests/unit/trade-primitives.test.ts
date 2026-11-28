@@ -35,7 +35,9 @@ describe('trade decimal helpers', () => {
 describe('trade pagination helpers', () => {
   it('accepts only positive integer pagination values', () => {
     expect(normalizePageQuery({ page: 2, page_size: 50 })).toEqual({ page: 2, page_size: 50 })
-    expect(() => normalizePageQuery({ page: 0, page_size: 50 })).toThrow('page must be a positive integer')
+    expect(() => normalizePageQuery({ page: 0, page_size: 50 })).toThrow(
+      'page must be a positive integer',
+    )
     expect(() => normalizePageQuery({ page: 1, page_size: 1.5 })).toThrow(
       'page_size must be a positive integer',
     )
