@@ -14,7 +14,7 @@ use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::auth_handler::miniapp_login;
 use bingxi_backend::models::audit_log;
 use bingxi_backend::models::user::{self, ActiveModel as UserActiveModel};
-use bingxi_backend::services::audit_log_service::AuditLogService;
+use bingxi_backend::services::audit_log_service::flush;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::json;
@@ -98,7 +98,11 @@ async fn miniapp_login_persists_success_audit_log() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    AuditLogService::flush(Duration::from_secs(5)).await;
+    let counts = flush(Duration::from_secs(5)).await;
+    assert_eq!(counts.pending, 0, "审计总线未在超时前排空");
+    assert_eq!(counts.failed, 0, "审计事件落库失败");
+    assert_eq!(counts.panicked, 0, "审计消费者发生 panic");
+    assert!(counts.inserted >= 1, "至少应落库一条审计事件");
     let login_audit = audit_log::Entity::find()
         .filter(audit_log::Column::OperationType.eq("LOGIN"))
         .filter(audit_log::Column::RequestPath.eq(LOGIN_PATH))

@@ -461,7 +461,7 @@ async fn miniapp_access_token_refreshes_when_ttl_reaches_refresh_window() {
         secret: Some("test-secret".to_string()),
         api_base_url: server.uri(),
     };
-    let service = WechatMiniappService::new(&config).unwrap();
+    let service = WechatMiniappService::with_cache(&config, Arc::new(AppCache::new())).unwrap();
 
     service.get_phone_number("phone-code-a").await.unwrap();
     service.get_phone_number("phone-code-b").await.unwrap();
@@ -485,7 +485,7 @@ async fn miniapp_service_rejects_wechat_error_responses() {
         secret: Some("test-secret".to_string()),
         api_base_url: server.uri(),
     };
-    let service = WechatMiniappService::new(&config).unwrap();
+    let service = WechatMiniappService::with_cache(&config, Arc::new(AppCache::new())).unwrap();
 
     let error = service.code2session("invalid-code").await.unwrap_err();
     assert!(error.to_string().contains("code2session"));

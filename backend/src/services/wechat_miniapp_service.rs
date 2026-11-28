@@ -47,11 +47,6 @@ pub struct WechatMiniappService {
 }
 
 impl WechatMiniappService {
-    /// 校验配置并构造服务；独立实例使用自己的缓存，适用于单服务测试。
-    pub fn new(config: &MiniappConfig) -> Result<Self, AppError> {
-        Self::with_cache(config, Arc::new(AppCache::new()))
-    }
-
     /// 注入 AppState 的共享缓存，使同一进程内的请求实例复用 access_token。
     pub fn with_cache(config: &MiniappConfig, cache: Arc<AppCache>) -> Result<Self, AppError> {
         let appid = required_config(config.appid.as_deref(), "MINIAPP_APPID")?;
@@ -276,13 +271,15 @@ fn required_config<'a>(value: Option<&'a str>, name: &str) -> Result<&'a str, Ap
 }
 
 fn reject_wechat_error(response: &Value, operation: &str) -> Result<(), AppError> {
-    if let Some(errcode) = response.get("errcode").and_then(Value::as_i64) {
-        if errcode != 0 {
-            error!(operation, errcode, "微信接口返回业务错误");
-            return Err(AppError::service_unavailable(format!(
-                "微信 {operation} 返回错误 errcode={errcode}"
-            )));
-        }
+    if let Some(errcode) = response
+        .get("errcode")
+        .and_then(Value::as_i64)
+        .filter(|code| *code != 0)
+    {
+        error!(operation, errcode, "微信接口返回业务错误");
+        return Err(AppError::service_unavailable(format!(
+            "微信 {operation} 返回错误 errcode={errcode}"
+        )));
     }
     Ok(())
 }
