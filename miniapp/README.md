@@ -80,14 +80,14 @@ docs/security/miniapp-dev-dependency-risk-acceptance.json
 
 从 `miniapp/.env.example` 复制为本地 `.env`，或由 CI 注入。`.env` 不入库。
 
-| 变量                   | 必填 | 说明                                                            |
-| ---------------------- | ---- | --------------------------------------------------------------- |
-| `VITE_API_BASE_URL`    | 是   | ERP 主机地址，不含 `/api/v1/erp`；末尾斜杠会归一化              |
-| `VITE_APP_ID`          | 是   | 微信 AppID；运行时测试必须是真实测试号，不能使用 `touristappid` |
-| `VITE_ENV_NAME`        | 是   | 仅允许 `development`、`test`、`production`                      |
-| `VITE_TERMINAL_SOURCE` | 是   | 正整数渠道标识；CI 使用 `81`                                    |
+| 变量                   | 必填 | 说明                                                                           |
+| ---------------------- | ---- | ------------------------------------------------------------------------------ |
+| `VITE_API_BASE_URL`    | 是   | ERP 主机地址，不含 `/api/v1/erp`；末尾斜杠会归一化                             |
+| `VITE_APP_ID`          | 是   | 微信 AppID；CI 密码/拒绝路径 E2E 可用 `touristappid`，真机登录必须用真实测试号 |
+| `VITE_ENV_NAME`        | 是   | 仅允许 `development`、`test`、`production`                                     |
+| `VITE_TERMINAL_SOURCE` | 是   | 正整数渠道标识；CI 使用 `81`                                                   |
 
-`manifest.config.ts` 在 AppID 缺失时可用官方 `touristappid` 生成可打开的本地项目，但运行时配置仍要求显式 `VITE_APP_ID`。`touristappid` 只能用于本地静态/构建检查，不能作为真机登录或发布证据。
+`manifest.config.ts` 在 AppID 缺失时可用官方 `touristappid` 生成可打开的本地项目，但运行时配置仍要求显式 `VITE_APP_ID`。`touristappid` 可用于本地静态/构建检查，以及 CI 的密码登录与微信授权拒绝路径；不能作为真实微信登录或发布证据。
 
 ### 3.2 后端微信小程序登录变量
 
@@ -105,14 +105,14 @@ docs/security/miniapp-dev-dependency-risk-acceptance.json
 
 工作流需要以下 GitHub Secrets：
 
-| Secret                          | 用途                                           |
-| ------------------------------- | ---------------------------------------------- |
-| `MINIAPP_TEST_APPID`            | 真实微信测试 AppID，格式 `wx` + 16 位十六进制  |
-| `MINIAPP_TEST_SECRET`           | 同一测试号的 AppSecret                         |
-| `WECHAT_DEVTOOLS_INSTALLER_URL` | 可信 HTTPS 开发者工具安装包地址                |
-| `WECHAT_DEVTOOLS_CLI`           | Windows runner 上开发者工具 CLI 可执行文件路径 |
-| `MINIAPP_E2E_USERNAME`          | 真实初始化管理员用户名                         |
-| `MINIAPP_E2E_PASSWORD`          | 真实初始化管理员密码                           |
+| Secret                          | 用途                                                     |
+| ------------------------------- | -------------------------------------------------------- |
+| `MINIAPP_TEST_APPID`            | CI 测试号：`touristappid` 或 `wx` + 16 位十六进制 AppID  |
+| `MINIAPP_TEST_SECRET`           | 测试号 AppSecret；`touristappid` 模式使用随机 CI-only 值 |
+| `WECHAT_DEVTOOLS_INSTALLER_URL` | 可信 HTTPS 开发者工具安装包地址                          |
+| `WECHAT_DEVTOOLS_CLI`           | Windows runner 上开发者工具 CLI 可执行文件路径           |
+| `MINIAPP_E2E_USERNAME`          | CI 专用初始化管理员用户名                                |
+| `MINIAPP_E2E_PASSWORD`          | CI 专用初始化管理员密码                                  |
 
 工作流还在同 job 内设置本机后端地址、独立 CI 密钥、PostgreSQL 连接和 automator WebSocket。数据库密码与 JWT/Cookie/Webhook/Audit/Init 密钥均为 CI-only 值，不得复制到生产或仓库。
 

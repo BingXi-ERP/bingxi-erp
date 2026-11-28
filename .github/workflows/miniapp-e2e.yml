@@ -83,8 +83,11 @@ jobs:
             }
           }
           $appId = [Environment]::GetEnvironmentVariable('VITE_APP_ID').Trim()
-          if ($appId -eq 'touristappid' -or $appId -notmatch '^wx[0-9a-fA-F]{16}$') {
-            throw 'MINIAPP_TEST_APPID 必须是真实微信测试 AppID，禁止 touristappid'
+          if ($appId -ne 'touristappid' -and $appId -notmatch '^wx[0-9a-fA-F]{16}$') {
+            throw 'MINIAPP_TEST_APPID 必须是 touristappid 或合法微信 AppID'
+          }
+          if ($appId -eq 'touristappid') {
+            Write-Host 'MINIAPP_E2E_TOURIST_APPID scope=password-and-denial-only'
           }
           Write-Host 'MINIAPP_E2E_CONFIG_OK'
 

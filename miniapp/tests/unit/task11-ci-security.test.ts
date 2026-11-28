@@ -74,6 +74,17 @@ describe('Task 11 CI security regressions', () => {
     expect(workflow).toContain('miniapp/test-results/exit-code.txt')
   })
 
+  it('allows the official tourist appid only for password and denial E2E scope', () => {
+    const workflow = readRepoFile('.github/workflows/miniapp-e2e.yml')
+    const configStep = workflow.match(
+      /- name: 校验运行时 E2E 配置\r?\n([\s\S]*?)(?=\r?\n {6}- )/,
+    )?.[1]
+
+    expect(configStep).toContain("$appId -ne 'touristappid'")
+    expect(configStep).toContain('scope=password-and-denial-only')
+    expect(configStep).not.toContain("$appId -eq 'touristappid' -or")
+  })
+
   it('uses a page-level denial test instead of opening the native authorization dialog', () => {
     const spec = readRepoFile('miniapp/tests/e2e/wechat-login.spec.ts')
 

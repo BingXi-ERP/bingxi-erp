@@ -5,28 +5,28 @@
 - 基线 HEAD：`5e8b00c5a2d9adad1263278ee68d1fac4c71d563`（完整 40 位；重放前远端 `main`，不是 Phase 1 变更提交）
 - 候选代码提交：见 PR #1404 的提交历史；验收 head SHA 以 GitHub 回读为准
 - 总体状态：**BLOCKED / NOT ACCEPTED**
-- 当前结论：**不可合并 main，不可发布**。最终复审的 8 项 findings 与残余波 F2/F3/F5/F6、E2E 路径触发缺口均已修复，并通过独立 scoped 复审；Vite 已升级至 6.4.6，本地审计 critical/high 清零，但新 HEAD 的真实微信构建、运行时 E2E Secrets 与真机证据尚未闭环。
+- 当前结论：**不可合并 main，不可发布**。最终复审的 8 项 findings 与残余波 F2/F3/F5/F6、E2E 路径触发缺口均已修复，并通过独立 scoped 复审；Vite 6.4.6 升级后的真实微信构建已在 CI 通过，主包 229KB，但运行时 E2E Secrets 与真机证据尚未闭环。
 
 > 本文件不把“未运行”写成通过，不伪造 workflow run、制品、包体积或风险批准。勾选只在对应证据存在后更新。
 
 ## 1. 验收结论与阻断边界
 
-| 类别         | 当前结论                                                             | 证据 / 下一步                                                                            | 负责人           |
-| ------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------- |
-| 生产依赖安全 | 本次审计 `productionBlockers=0`，不代表代码无缺陷或验收通过          | 最终修复波 npm audit 分类报告；仍需新 HEAD 复扫与 scoped 复审                            | 小程序依赖维护者 |
-| 开发依赖安全 | Vite 6.4.6 升级后 dev critical/high 均为 0                           | 本地审计 `high=0 critical=0`；风险接受文件保持未签署，但当前无需接受包                   | 安全负责人       |
-| 本地质量     | Vite 升级后 typecheck、lint、Prettier、完整 Vitest、npm 审计门均通过 | 18 files / 309 tests；`npm ls` 无 invalid dependency；此前最终波与残余波证据保留         | 质量交付工程师   |
-| 审计门       | **通过**                                                             | 退出码 0；`productionBlockers=0`、`devBlockers=0`、`devRiskStatus=pending`（无待接受包） | 安全负责人       |
-| CI           | 主 CI 已通过；新 HEAD 的两条独立工作流待复跑                         | 主 CI run `46106185936` attempt 2 对应已推送 head；Vite 升级提交尚未推送                 | 仓库维护者       |
-| 运行时       | Windows CI、uni-app 微信构建、automator 均未实跑                     | 必须由对应 PR 的 GitHub Actions 提供证据                                                 | CI/测试负责人    |
-| 微信真机     | 真实手机号授权登录未验收                                             | automator 只覆盖拒绝授权/缺码路径；真实授权是人工发布门                                  | 产品/测试负责人  |
-| 旧版保护     | `miniprogram/` 与 `.github/workflows/ci-cd.yml` 无 diff              | 本次 `git diff --name-only` 输出为空；旧版可部署性未重新构建                             | 仓库维护者       |
+| 类别         | 当前结论                                                             | 证据 / 下一步                                                                                     | 负责人           |
+| ------------ | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------- |
+| 生产依赖安全 | 本次审计 `productionBlockers=0`，不代表代码无缺陷或验收通过          | 最终修复波 npm audit 分类报告；仍需新 HEAD 复扫与 scoped 复审                                     | 小程序依赖维护者 |
+| 开发依赖安全 | Vite 6.4.6 升级后 dev critical/high 均为 0                           | 本地审计 `high=0 critical=0`；风险接受文件保持未签署，但当前无需接受包                            | 安全负责人       |
+| 本地质量     | Vite 升级后 typecheck、lint、Prettier、完整 Vitest、npm 审计门均通过 | 18 files / 309 tests；`npm ls` 无 invalid dependency；此前最终波与残余波证据保留                  | 质量交付工程师   |
+| 审计门       | **通过**                                                             | 退出码 0；`productionBlockers=0`、`devBlockers=0`、`devRiskStatus=pending`（无待接受包）          | 安全负责人       |
+| CI           | 当前 HEAD 静态门通过；主 CI 运行中；E2E 被 Secrets 缺失阻断          | `miniapp-checks` run `46149272726`：static success；`miniapp-e2e` run `46149272772`：仅配置门失败 | 仓库维护者       |
+| 运行时       | uni-app 微信构建已通过；Windows automator 未实跑                     | 当前 HEAD 真实构建 `DONE`，主包 229KB / 2048KB；E2E 在配置门停止，0 条运行时用例执行              | CI/测试负责人    |
+| 微信真机     | 真实手机号授权登录未验收                                             | automator 只覆盖拒绝授权/缺码路径；真实授权是人工发布门                                           | 产品/测试负责人  |
+| 旧版保护     | `miniprogram/` 与 `.github/workflows/ci-cd.yml` 无 diff              | 本次 `git diff --name-only` 输出为空；旧版可部署性未重新构建                                      | 仓库维护者       |
 
 ### 阻断判定
 
 1. **代码侧最终复审已通过**：最终复审登记的 8 项 findings 及残余波 F2/F3/F5/F6、N1 均已修复，独立 scoped re-review 为 PASS（5/5 ADDRESSED），未发现新增 Critical/Important。
 2. **Vite 风险已通过升级消除**：Vite 6.4.6 升级后本地 dev critical/high 为 0，审计门通过；风险接受文件仍保持未签署，但没有待接受包，不得伪造批准。
-3. **新 HEAD 的 CI 与真机证据未闭环**：Vite 升级后的 uni-app 微信构建、六个 E2E Secrets、Windows automator 与真实微信设备验收尚未完成。未完成前不得合并或发布。
+3. **运行时与真机证据未闭环**：真实 uni-app 微信构建已通过，但六个 E2E Secrets 缺失导致 Windows automator 未执行，真实微信设备验收也未完成。未完成前不得合并或发布。
 4. 生产依赖 critical/high 不接受风险。若后续复扫出现生产 critical/high，必须升级、移除或隔离，不允许用 dev 风险接受覆盖。
 5. 本任务已提交并推送至 `feat/miniapp-rebuild-phase1`，PR #1404 已创建；独立工作流尚未成为分支保护必需检查，仓库管理员仍须将两条工作流设为 PR 必需检查。
 
@@ -48,34 +48,34 @@
 
 ## 3. Phase 1 exit criteria 逐项验收
 
-| #   | Exit criterion                                                                  | 状态                   | 本地证据                                                                                  | CI / 发布证据                                                                            | 负责人 / 下一步                                                  |
-| --- | ------------------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| 1   | 干净 checkout 可不经人工步骤运行 `miniapp-checks.yml` 与 `miniapp-e2e.yml`      | 未验收                 | 工作流存在；action 全量固定；YAML 解析通过                                                | 两条工作流均未运行； Secrets、Windows 工具链和干净安装未验证                             | 仓库维护者：获授权推送后运行 PR 工作流并记录 run URL/head SHA    |
-| 2   | 新应用可用密码与微信测试凭据登录，验证 `/auth/me` 并渲染工作台                  | 部分实现，未验收       | 单元测试覆盖会话与页面；密码 E2E 已定义；登录成功路径会回读 `/auth/me`                    | 密码运行时 E2E 未跑；真实微信手机号登录未跑                                              | 测试负责人：先跑 Windows E2E，再执行人工微信验收                 |
-| 3   | API client、CSRF queue、error model、permission model、session store 有单元覆盖 | 本地通过               | 完整 Vitest：18 files / 309 tests，全部通过                                               | CI 复跑待完成                                                                            | 前端负责人：保持覆盖并接入 PR 必需检查                           |
-| 4   | 契约门证明零旧端点、零旧分页键                                                  | 本地通过               | `MINIAPP_CONTRACT calls=4 failures=0`；自证通过                                           | CI 复跑待完成                                                                            | 前端负责人：新增端点必须继续通过 AST 契约门                      |
-| 5   | 195 页后端缺口台账完整并已评审                                                  | 本地通过               | 195 pages / 4381 rows；重新生成与提交候选文件 `cmp` 一致；Task 9 已独立复审               | 无额外 CI 运行记录                                                                       | 后端负责人：Phase 2 按域评审 `manual-review` 与缺口              |
-| 6   | 后端小程序登录为增量实现，经 PostgreSQL 测试且不自动建用户                      | 代码完成，动态证据缺失 | migration 有 `(appid,openid)` 唯一键；测试覆盖未知手机号不建用户、重复绑定、唯一约束/外键 | Rust/PostgreSQL 集成测试未在本次实跑；Windows E2E 工作流只构建后端，不替代 Rust 测试 job | 后端负责人：在真实 PostgreSQL CI 中运行新增集成测试并记录结果    |
-| 7   | 运行时 E2E 使用真实微信开发者工具、真实后端、真实 PostgreSQL，无 mock/拦截      | 未验收                 | E2E 源码使用 automator；工作流显式启动 PostgreSQL、迁移并启动后端                         | Windows job、微信开发者工具安装、automator 连接均未实跑；0 条运行时用例执行              | CI/测试负责人：运行 `miniapp-e2e.yml`，上传并审查 8 个白名单制品 |
-| 8   | 旧 `miniprogram/` 在 Phase 4 切换前保持不变且可部署                             | 本地部分通过           | 受保护路径无 diff                                                                         | 旧版未重新构建，可部署性无新证据                                                         | 仓库维护者：保持旧版门禁与回退入口，Phase 4 再统一下线           |
+| #   | Exit criterion                                                                  | 状态                   | 本地证据                                                                                  | CI / 发布证据                                                                            | 负责人 / 下一步                                               |
+| --- | ------------------------------------------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 1   | 干净 checkout 可不经人工步骤运行 `miniapp-checks.yml` 与 `miniapp-e2e.yml`      | 部分通过               | 工作流存在；action 全量固定；YAML 解析通过；干净 `npm ci` 已验证                          | `miniapp-checks` 已通过；`miniapp-e2e` 因 6 个 Secrets 缺失在配置门失败                  | 仓库维护者：配置 Secrets 后以新 HEAD 重跑 E2E                 |
+| 2   | 新应用可用密码与微信测试凭据登录，验证 `/auth/me` 并渲染工作台                  | 部分实现，未验收       | 单元测试覆盖会话与页面；密码 E2E 已定义；登录成功路径会回读 `/auth/me`                    | 密码运行时 E2E 未跑；真实微信手机号登录未跑                                              | 测试负责人：先跑 Windows E2E，再执行人工微信验收              |
+| 3   | API client、CSRF queue、error model、permission model、session store 有单元覆盖 | 本地与 CI 通过         | 完整 Vitest：18 files / 309 tests，全部通过                                               | 当前 HEAD `miniapp-checks` static success                                                | 前端负责人：保持覆盖并接入 PR 必需检查                        |
+| 4   | 契约门证明零旧端点、零旧分页键                                                  | 本地与 CI 通过         | `MINIAPP_CONTRACT calls=4 failures=0`；自证通过                                           | 当前 HEAD CI 同样为 `calls=4 failures=0`                                                 | 前端负责人：新增端点必须继续通过 AST 契约门                   |
+| 5   | 195 页后端缺口台账完整并已评审                                                  | 本地通过               | 195 pages / 4381 rows；重新生成与提交候选文件 `cmp` 一致；Task 9 已独立复审               | 无额外 CI 运行记录                                                                       | 后端负责人：Phase 2 按域评审 `manual-review` 与缺口           |
+| 6   | 后端小程序登录为增量实现，经 PostgreSQL 测试且不自动建用户                      | 代码完成，动态证据缺失 | migration 有 `(appid,openid)` 唯一键；测试覆盖未知手机号不建用户、重复绑定、唯一约束/外键 | Rust/PostgreSQL 集成测试未在本次实跑；Windows E2E 工作流只构建后端，不替代 Rust 测试 job | 后端负责人：在真实 PostgreSQL CI 中运行新增集成测试并记录结果 |
+| 7   | 运行时 E2E 使用真实微信开发者工具、真实后端、真实 PostgreSQL，无 mock/拦截      | Secrets 阻断           | E2E 源码使用 automator；工作流显式启动 PostgreSQL、迁移并启动后端                         | 当前 HEAD 仅配置门失败；Windows 工具链、automator 均未执行，0 条运行时用例               | CI/测试负责人：配置 6 个 Secrets 后运行并审查白名单制品       |
+| 8   | 旧 `miniprogram/` 在 Phase 4 切换前保持不变且可部署                             | 本地部分通过           | 受保护路径无 diff                                                                         | 旧版未重新构建，可部署性无新证据                                                         | 仓库维护者：保持旧版门禁与回退入口，Phase 4 再统一下线        |
 
 ## 4. Task 12 验收清单
 
-| 验收项                                           | 状态                     | 证据与限制                                                                                   | 负责人 / 下一步                                             |
-| ------------------------------------------------ | ------------------------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `miniapp/` 在 CI 中完成微信构建                  | 待执行                   | `build:mp-weixin` 已配置；未本地构建                                                         | CI 负责人：记录 `static` job 日志                           |
-| TypeScript、ESLint、Prettier、单测、契约测试通过 | 本地通过 / CI 待执行     | 本次本地全部通过；Vitest 309/309                                                             | CI 负责人：PR 复跑                                          |
-| 契约门零 `/app-api`、`/oauth-api`、旧分页键      | 本地通过                 | `calls=4 failures=0`；反向自证通过                                                           | 前端负责人：持续门禁                                        |
-| 页面检查零缺失                                   | 本地通过                 | `MINIAPP_PAGES declared=2 missing=0`                                                         | 前端负责人：新增页面同步 `pages.json`                       |
-| 主包 ≤ 2048KB                                    | 待执行                   | 只有自证夹具的 `MINIAPP_SIZE totalKb=2 limitKb=2`，不是真实产物                              | CI 负责人：记录真实 `miniapp/dist/build/mp-weixin` 体积输出 |
-| 运行时 E2E 连接真实开发者工具、后端、PostgreSQL  | 待执行                   | 工作流已实现，未实跑                                                                         | CI/测试负责人：提供 `miniapp-e2e-results` 制品              |
-| 密码登录与 `/auth/me` 验证通过                   | 待执行                   | `smoke.spec.ts` 定义真实密码登录并断言工作台用户名；session store 回读 `/auth/me`            | 测试负责人：运行时确认                                      |
-| 微信登录仅匹配既有手机号且不创建 ERP 用户        | 人工待验收               | 后端测试已覆盖未知手机号不建用户；automator 不操作原生授权框                                 | 产品/测试负责人：真机授权并核对用户/绑定数量                |
-| 身份绑定唯一约束由集成测试验证                   | 代码完成 / CI 待执行     | `miniapp_identity_unique_key_and_user_foreign_key_are_enforced` 直接插库断言重复键与外键失败 | 后端负责人：真实 PostgreSQL CI 证据                         |
-| 195 页缺口台账完整且确定性生成                   | 本地通过                 | 195 / 4381，`cmp` 一致                                                                       | 后端负责人：Phase 2 域级评审                                |
-| 无 Secret 或真实主机值被跟踪                     | 静态检查通过 / CI 待执行 | env 示例均为占位值；制品扫描器自证通过；未做全仓真实 Secret 鉴定                             | 安全负责人：复核 diff 与 CI 制品                            |
-| 旧 `miniprogram/` 保持不变                       | 本地通过                 | 无 diff                                                                                      | 仓库维护者：Phase 4 前持续保护                              |
-| 风险接受单独变更触发新 HEAD 审计门               | 静态通过 / CI 待执行     | 文件已加入 PR 与 main push 的 `paths`；YAML 解析通过                                         | 安全负责人：签署提交后以新 HEAD 的 run 与报告判定放行       |
+| 验收项                                           | 状态                     | 证据与限制                                                                                   | 负责人 / 下一步                                       |
+| ------------------------------------------------ | ------------------------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `miniapp/` 在 CI 中完成微信构建                  | **CI 通过**              | 当前 HEAD `static` success；`DONE Build complete`                                            | CI 负责人：保持门禁                                   |
+| TypeScript、ESLint、Prettier、单测、契约测试通过 | **本地与 CI 通过**       | 当前 HEAD CI：18 files / 309 tests；typecheck、lint、Prettier 均通过                         | CI 负责人：保持门禁                                   |
+| 契约门零 `/app-api`、`/oauth-api`、旧分页键      | **本地与 CI 通过**       | 当前 HEAD CI：`calls=4 failures=0`；反向自证通过                                             | 前端负责人：持续门禁                                  |
+| 页面检查零缺失                                   | **本地与 CI 通过**       | 当前 HEAD CI：`MINIAPP_PAGES declared=2 missing=0`                                           | 前端负责人：新增页面同步 `pages.json`                 |
+| 主包 ≤ 2048KB                                    | **CI 通过**              | 当前 HEAD 真实产物：`MINIAPP_SIZE totalKb=229 limitKb=2048`                                  | CI 负责人：持续监控包体积                             |
+| 运行时 E2E 连接真实开发者工具、后端、PostgreSQL  | 待执行                   | 工作流已实现，未实跑                                                                         | CI/测试负责人：提供 `miniapp-e2e-results` 制品        |
+| 密码登录与 `/auth/me` 验证通过                   | 待执行                   | `smoke.spec.ts` 定义真实密码登录并断言工作台用户名；session store 回读 `/auth/me`            | 测试负责人：运行时确认                                |
+| 微信登录仅匹配既有手机号且不创建 ERP 用户        | 人工待验收               | 后端测试已覆盖未知手机号不建用户；automator 不操作原生授权框                                 | 产品/测试负责人：真机授权并核对用户/绑定数量          |
+| 身份绑定唯一约束由集成测试验证                   | 代码完成 / CI 待执行     | `miniapp_identity_unique_key_and_user_foreign_key_are_enforced` 直接插库断言重复键与外键失败 | 后端负责人：真实 PostgreSQL CI 证据                   |
+| 195 页缺口台账完整且确定性生成                   | 本地通过                 | 195 / 4381，`cmp` 一致                                                                       | 后端负责人：Phase 2 域级评审                          |
+| 无 Secret 或真实主机值被跟踪                     | 静态检查通过 / CI 待执行 | env 示例均为占位值；制品扫描器自证通过；未做全仓真实 Secret 鉴定                             | 安全负责人：复核 diff 与 CI 制品                      |
+| 旧 `miniprogram/` 保持不变                       | 本地通过                 | 无 diff                                                                                      | 仓库维护者：Phase 4 前持续保护                        |
+| 风险接受单独变更触发新 HEAD 审计门               | 静态通过 / CI 待执行     | 文件已加入 PR 与 main push 的 `paths`；YAML 解析通过                                         | 安全负责人：签署提交后以新 HEAD 的 run 与报告判定放行 |
 
 ## 5. 本地验证记录
 
@@ -108,27 +108,26 @@ Vite 6.4.6 升级后的审计摘要：`{"info":0,"low":13,"moderate":20,"high":0
 验证边界与注意事项：
 
 - 本次完整 Vitest 是用户明确授权的本地例外；常规开发仍以 CI 为最终证据。
-- Vite 升级后已执行 `npm ci`（含 postinstall）、`npm ls`、typecheck 与 lint，均通过；另已验证 manifest 前置生成与 AppID 环境注入。未执行 uni-app 构建、Rust 编译/测试、dev server、automator 或任何运行时 E2E。真实构建仍由新 HEAD 的 CI 验证。
+- Vite 升级后已执行 `npm ci`（含 postinstall）、`npm ls`、typecheck 与 lint，均通过；另已验证 manifest 前置生成、AppID 环境注入和 Vite ESM 配置加载。本地未执行 uni-app 构建、Rust 编译/测试、dev server、automator 或任何运行时 E2E；真实 uni-app 构建已由当前 HEAD 的 CI 验证。
 - `scripts/ci/miniapp-checks.sh` 的 `miniapp/*.ts` 已覆盖 `miniapp/shims-uni.d.ts`；本轮 Prettier 还显式列出该 shim，不存在 CI 漏检结论。
-- 未生成真实微信构建产物，因此真实包体积仍必须由 CI 构建后登记；自证夹具的 2 KB 不是产物证据。
+- 当前 HEAD 的 CI 已生成真实微信构建产物并登记主包 229KB；自证夹具的 2 KB 不作为产物证据。
 - 最终修复波首轮完整 Vitest 暴露 3 个测试侧过期断言：两处仍期待旧中文错误文案，一处 upload step 文本切片吞入后续 `if: always()` 摘要步骤。已修正文案断言与 step 边界，未修改生产行为；随后完整套件通过。
 - 实际契约扫描另暴露判定器把 TypeScript `CaseBlock.clauses` 误当 `statements` 的工具缺陷；已按真实 AST 结构修复，并同时加入 Vitest 回归与静态门 self-test，实际扫描恢复 `calls=4 failures=0`。
 - Vitest 有 Vite CJS Node API 弃用警告，未影响 309 条用例；CI 应继续观察。
 - 残余波 F2 的 metadata 计数对象与 `npm audit` 的 vulnerability 明细对象逐级对账；报告行按安装节点展开，节点行数可以与 metadata total 不同。F3 增加 advisory entry 双向差集；F5 收紧 i18n 路径并加入 feature 伪 locale 反向夹具；F6 增加 PR head 优先与非法 HEAD_SHA 拒绝测试；N1 补入 E2E 摘要脚本路径触发。
 
-## 6. CI 证据登记（待实跑后填写）
+## 6. CI 证据登记
 
-| 字段             | `miniapp-checks.yml`                                                                                                                   | `miniapp-e2e.yml`                                                                                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 工作流           | [miniapp-checks.yml](../../.github/workflows/miniapp-checks.yml)                                                                       | [miniapp-e2e.yml](../../.github/workflows/miniapp-e2e.yml)                                                                                             |
-| 最终 head SHA    | PR #1404 head SHA（以 GitHub 回读为准）                                                                                                | PR #1404 head SHA（以 GitHub 回读为准）                                                                                                                |
-| Workflow run URL | 未执行                                                                                                                                 | 未执行                                                                                                                                                 |
-| Step Summary     | `if: always()`；优先完整 40 位 `HEAD_SHA`（PR head，非 PR 回退 `github.sha`）、`job.status`、审计、架构/源码、页数、真实体积（若存在） | `if: always()`；优先完整 40 位 `HEAD_SHA`（PR head，非 PR 回退 `github.sha`）、`job.status`、exit-code、测试数量/结果、制品路径与上传结果              |
-| Job / conclusion | `static`: 未执行                                                                                                                       | `e2e`: 未执行                                                                                                                                          |
-| 主包体积         | 未执行                                                                                                                                 | 不适用                                                                                                                                                 |
-| E2E 数量         | 不适用                                                                                                                                 | 源码定义 2 条；实际执行 0 条                                                                                                                           |
-| E2E 制品         | 不适用                                                                                                                                 | 预期 `miniapp-e2e-results`，当前无制品                                                                                                                 |
-| 制品路径         | 预期 `miniapp-npm-audit-report`                                                                                                        | `e2e.json`、`exit-code.txt`、`backend.log`、`backend.stderr.log`、`automator.stdout.log`、`automator.stderr.log`、`readiness.json`、`init-status.json` |
+| 字段             | `miniapp-checks.yml`                                                             | `miniapp-e2e.yml`                                                                |
+| ---------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 工作流           | [miniapp-checks.yml](../../.github/workflows/miniapp-checks.yml)                 | [miniapp-e2e.yml](../../.github/workflows/miniapp-e2e.yml)                       |
+| head SHA         | `5b6b447dc981c0f72a9ecc710f45b6520a81db18`                                       | `5b6b447dc981c0f72a9ecc710f45b6520a81db18`                                       |
+| Workflow run     | [46149272726](https://github.com/BingXi-ERP/bingxi-erp/actions/runs/46149272726) | [46149272772](https://github.com/BingXi-ERP/bingxi-erp/actions/runs/46149272772) |
+| Job / conclusion | `static`: **success**                                                            | `e2e`: **failure**，仅配置门缺 6 个 Secrets                                      |
+| 主包体积         | **229KB / 2048KB**                                                               | 不适用                                                                           |
+| E2E 数量         | 不适用                                                                           | 源码定义 2 条；实际执行 0 条                                                     |
+| E2E 制品         | 不适用                                                                           | 无有效运行时制品；配置门已明确失败                                               |
+| 制品路径         | `miniapp-npm-audit-report`                                                       | 配置补齐后才可生成并审查 `miniapp-e2e-results`                                   |
 
 此外必须在现有 Rust CI 中记录新增后端集成测试的 PostgreSQL job 名称、run URL、head SHA 与 conclusion。不得用 Windows E2E 的“后端构建成功”替代数据库集成测试证据。
 
@@ -165,8 +164,8 @@ Task 12 不代签、不把 `pending` 伪改为 `approved`。新风险出现时�
 ### 7.3 CI 运行时验收
 
 1. PR #1404 已创建，两条独立工作流由该 PR 触发；不得仅手动运行旧分支或伪造 run。风险接受签署提交也必须通过 PR 路径触发，并以新候选 HEAD 的审计结果为准。
-2. 配置六个 Secrets：`MINIAPP_TEST_APPID`、`MINIAPP_TEST_SECRET`、`WECHAT_DEVTOOLS_INSTALLER_URL`、`WECHAT_DEVTOOLS_CLI`、`MINIAPP_E2E_USERNAME`、`MINIAPP_E2E_PASSWORD`。
-3. 确认 `MINIAPP_TEST_APPID` 符合 `wx` + 16 位十六进制格式且不是 `touristappid`。
+2. 配置六个 Secrets：`MINIAPP_TEST_APPID`、`MINIAPP_TEST_SECRET`、`WECHAT_DEVTOOLS_INSTALLER_URL`、`WECHAT_DEVTOOLS_CLI`、`MINIAPP_E2E_USERNAME`、`MINIAPP_E2E_PASSWORD`。CI 密码/拒绝路径可使用官方 `touristappid` 与随机测试 Secret；不得使用旧生产 AppID。
+3. 确认 `MINIAPP_TEST_APPID` 为 `touristappid` 或符合 `wx` + 16 位十六进制格式；真实微信登录人工验收仍必须使用真实测试号，不能用 `touristappid` 代替。
 4. 审查 Windows PostgreSQL、Rust release 构建、微信开发者工具安装、uni-app 构建、迁移、automator 与 2 条 E2E 的逐步日志。
 5. 审查 npm 审计报告、真实包体积和 E2E 白名单制品；敏感信息扫描失败时不得上传或采信制品。
 6. 将两条工作流设为 PR 必需检查后，才可讨论合并。
