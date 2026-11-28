@@ -44,6 +44,9 @@ normalize_empty_query_params → timeout → security_headers → rate_limiting
 要点（都是踩过坑的位置）：
 - **RLS 必须在 auth 内侧**：`middleware_bootstrap.rs:88-99` 记录了原缺陷——RLS 注册在 auth 链外侧时
   永远读不到 `AuthContext`，`SET LOCAL app.user_id` 静默跳过，PostgreSQL RLS 从未生效。
+- **RLS 当前边界**：数据库策略只覆盖 `customers`、`suppliers`、`sales_orders`、`crm_lead`、
+  `crm_opportunity` 五张表；`service_bootstrap.rs` 的 13 个 Scheduler 没有请求级 GUC，CLI/初始化路径亦然。
+  策略在 GUC 缺失时仍 fail-open，实际隔离依赖 service 层数据范围过滤；这是企业内部数据范围边界，不是多租户隔离。
 - `normalize_empty_query_params`（`utils/query_params.rs:55`）在**最外层**把空串/纯空白的 query 值剔除，
   所以 `?status=` 到 handler 是"键不存在"→ `None`。这是"空筛选条件恒 0 行"这一类缺陷的全局根治点，
   字段级替代方案是 `empty_str_as_none` / `empty_str_vec_as_none`（`query_params.rs:85,99`，
@@ -57,6 +60,11 @@ normalize_empty_query_params → timeout → security_headers → rate_limiting
   `resource_type`/`action` 支持 `"*"`，缓存 `:477 PERMISSION_CACHE`，管理员在查询前短路）。
   **推论：路由挂载形状直接决定鉴权键。路径写法不统一 = 权限键不统一 = 可能静默放行或静默 403。**
   这就是"路由挂载唯一约定"（`.monkeycode/MEMORY.md:98`）的安全依据。
+- **自服务路径只免 RBAC**：`public_routes.rs::SELF_SERVICE_PATHS` 精确覆盖 `/users/me`、
+  `/user/profile`、`/user/avatar`，在 `extract_role_id` 前放行，因此无角色账号也可维护本人资料；
+  这些路径不在 `AUTH_ONLY_PATHS`，JWT 与写操作 CSRF 仍保留，`/users/{id}` 管理面不外溢。
+- **跨层常量保持叶子单源**：`X_TRACE_ID_HEADER` 与 `CLIENT_IP_UNRESOLVED` 定义在 `constants.rs`，
+  middleware 与 utils 共同引用；`utils/error.rs`、`utils/response.rs`、`utils/cache.rs` 不得反向依赖 middleware。
 - 认证：httpOnly Cookie 方案，`AuthContext`（`middleware/auth_context.rs:47`）由 `FromRequestParts`（`:159`）
   注入，缺失即 `AuthRejection::unauthorized`（`:170`）。只记录"可能未登录"的端点用 `OptionalAuthContext`（`:176`）。
   数据权限：`auth.to_data_scope_context() -> DataScopeContext`（`:90`），配合 `utils/data_scope.rs:177 apply_data_scope`。
