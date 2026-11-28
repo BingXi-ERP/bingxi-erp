@@ -1,4 +1,5 @@
 import { request } from './request';
+import { apiUrl } from '@/api/base-url';
 import type { ApiResponse } from '@/types/api';
 
 /**
@@ -126,6 +127,5 @@ export function calculateRefund(
 
 /** 申报表打印页地址（DOCX 下载） */
 export function getRefundDeclarationPrintUrl(id: number): string {
-  const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1/erp';
-  return `${baseURL}/export-refunds/${id}/print`;
+  return apiUrl(`/export-refunds/${id}/print`);
 }

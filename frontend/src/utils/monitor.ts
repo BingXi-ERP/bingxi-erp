@@ -17,6 +17,7 @@
  * initMonitor()  // 在 main.ts 中调用一次
  * ```
  */
+import { apiUrl } from '@/api/base-url';
 import { logger } from '@/utils/logger';
 import { msg } from '@/utils/message';
 
@@ -49,7 +50,7 @@ const DEDUP_WINDOW_MS = 5 * 60 * 1000;
 const errorFingerprints = new Map<string, number>();
 
 /** 上报端点 */
-const REPORT_ENDPOINT = '/api/v1/erp/tracking/frontend-error';
+const REPORT_ENDPOINT = apiUrl('/tracking/frontend-error');
 
 /**
  * ElMessageBox（confirm/prompt）在用户取消或以 X/遮罩关闭时以字符串 'cancel' | 'close' reject。

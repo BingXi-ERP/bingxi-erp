@@ -1,3 +1,4 @@
+import { apiUrl } from '@/api/base-url';
 import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteRecordRaw } from 'vue-router';
 import { watchEffect } from 'vue';
@@ -1576,7 +1577,7 @@ async function checkInitStatus(): Promise<boolean> {
   for (let attempt = 0; attempt < 3 && !result; attempt++) {
     if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt));
     try {
-      const response = await fetch('/api/v1/erp/init/status', {
+      const response = await fetch(apiUrl('/init/status'), {
         method: 'GET',
         headers: { Accept: 'application/json' },
       });

@@ -174,6 +174,7 @@
 </template>
 
 <script setup lang="ts">
+import { apiUrl } from '@/api/base-url';
 import { ref, computed } from 'vue';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useRouter } from 'vue-router';
@@ -320,7 +321,7 @@ async function checkEnvironment() {
     // 磁盘/内存仅在 /health 可达（完整模式）时按 checks 校验，不可达时跳过不阻塞。
     let backendOk = false;
     try {
-      const statusRes = await fetch('/api/v1/erp/init/status');
+      const statusRes = await fetch(apiUrl('/init/status'));
       if (statusRes.ok) {
         await statusRes.json();
         backendOk = true;
@@ -335,7 +336,7 @@ async function checkEnvironment() {
     envChecks.value[2].status = true;
     if (backendOk) {
       try {
-        const healthRes = await fetch('/api/v1/erp/health');
+        const healthRes = await fetch(apiUrl('/health'));
         if (healthRes.ok) {
           const healthData = await healthRes.json();
           if (healthData.checks && healthData.checks.disk) {
@@ -362,7 +363,7 @@ async function testConnection() {
     // X-Init-Token 与 initialize-with-db 保持同一契约形态：部署包
     // v2026.9.7.1357 的缺陷是该请求漏带此头（401 认证报错），补上以对齐
     // /init/* 端点的统一请求形态，并为未来服务端强制校验此头留好兼容
-    const res = await fetch('/api/v1/erp/init/test-database', {
+    const res = await fetch(apiUrl('/init/test-database'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -396,7 +397,7 @@ async function install() {
     // 批次 24 v6 P0-3 修复：添加 X-Init-Token 请求头。
     // 后端 init_token_middleware 强制校验此头与 INIT_TOKEN 环境变量匹配，
     // 缺失或不匹配时返回 401，防止未授权的初始化操作。
-    const res = await fetch('/api/v1/erp/init/initialize-with-db', {
+    const res = await fetch(apiUrl('/init/initialize-with-db'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -459,7 +460,7 @@ async function goToLogin() {
     };
     for (let i = 0; i < 30; i++) {
       try {
-        const res = await fetch('/api/v1/erp/health', { signal: AbortSignal.timeout(2000) });
+        const res = await fetch(apiUrl('/health'), { signal: AbortSignal.timeout(2000) });
         if (res.ok) {
           router.push('/login');
           return;

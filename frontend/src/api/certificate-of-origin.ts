@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { API_BASE_URL, apiUrl } from '@/api/base-url';
 
 /**
  * 出口产地证域 API
@@ -11,10 +12,8 @@ import axios from 'axios';
  * 注意：该域 handler 直接返回裸 JSON（{ items, total } / 模型对象），
  * 无 ApiResponse code 信封，故使用独立 axios 实例绕过全局响应拦截器的 code 校验。
  */
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1/erp';
-
 const bareApi = axios.create({
-  baseURL: BASE_URL,
+  baseURL: API_BASE_URL,
   timeout: 30000,
   withCredentials: true,
 });
@@ -88,5 +87,5 @@ export function getCertificatesByInspection(
 
 /** 产地证打印页地址（DOCX 下载） */
 export function getCertificateOfOriginPrintUrl(id: number): string {
-  return `${BASE_URL}/export-inspections/certificates/${id}/print`;
+  return apiUrl(`/export-inspections/certificates/${id}/print`);
 }

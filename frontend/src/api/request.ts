@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/api/base-url';
 import axios from 'axios';
 import type { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { ElMessage } from 'element-plus';
@@ -122,7 +123,7 @@ class Request {
 
   constructor() {
     this.instance = axios.create({
-      baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1/erp',
+      baseURL: API_BASE_URL,
       timeout: 30000,
       // Wave B-3：开启凭据发送，使 httpOnly Cookie（access_token / refresh_token）能随请求到达后端
       // 这是 httpOnly Cookie 鉴权方案的**关键开关**：未开启则浏览器拒绝发送 Set-Cookie 之外的 Cookie
