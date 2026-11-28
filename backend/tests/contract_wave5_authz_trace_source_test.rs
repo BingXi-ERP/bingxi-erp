@@ -25,12 +25,13 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
+use bingxi_backend::constants::X_TRACE_ID_HEADER;
 use bingxi_backend::container::AppState;
 use bingxi_backend::middleware::auth::auth_middleware;
 use bingxi_backend::middleware::auth_context::AuthContext;
 use bingxi_backend::middleware::csrf::csrf_error_response;
 use bingxi_backend::middleware::permission::permission_middleware;
-use bingxi_backend::middleware::trace_context::{X_TRACE_ID_HEADER, trace_context_middleware};
+use bingxi_backend::middleware::trace_context::trace_context_middleware;
 use serde_json::Value;
 use tower::ServiceExt; // oneshot
 
