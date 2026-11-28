@@ -5,6 +5,7 @@
 // 端点路径相对于 baseURL（/api/v1/erp），不要重复添加前缀，否则会产生双重前缀
 
 import { request } from './request';
+import { apiUrl } from './base-url';
 
 // ============== 枚举与常量 ==============
 
@@ -343,5 +344,5 @@ export function scanColorCode(code: string) {
 }
 
 export function exportColorCardUrl(cardId: number) {
-  return `/color-cards/export/${cardId}`;
+  return apiUrl(`/color-cards/export/${cardId}`);
 }

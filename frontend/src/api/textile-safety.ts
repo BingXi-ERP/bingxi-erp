@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { API_BASE_URL } from '@/api/base-url';
 
 /**
  * 纺织品安全合规域 API
@@ -14,9 +15,7 @@ import axios from 'axios';
  * 分页载荷 PaginatedResponse{items,total,page,page_size}。
  * 类型键与后端 SeaORM 实体逐字段对齐（check-api-keys 棘轮），不得手添后端不存在的键。
  */
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1/erp';
-
-const api = axios.create({ baseURL: BASE_URL, timeout: 30000, withCredentials: true });
+const api = axios.create({ baseURL: API_BASE_URL, timeout: 30000, withCredentials: true });
 
 async function unwrap<T>(p: Promise<{ data: { data?: T } }>): Promise<T> {
   const body = (await p).data;

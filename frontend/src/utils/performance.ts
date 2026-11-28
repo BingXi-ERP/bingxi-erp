@@ -131,7 +131,7 @@ export function collectMetrics(): Promise<PerformanceMetric[]> {
 export async function reportMetrics(metrics: PerformanceMetric[]): Promise<void> {
   try {
     const { request } = await import('@/api/request');
-    await request.post('/api/v1/erp/performance/metrics', {
+    await request.post('/performance/metrics', {
       metrics,
       url: window.location.href,
       timestamp: Date.now(),

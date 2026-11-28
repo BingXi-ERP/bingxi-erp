@@ -37,7 +37,7 @@ export const useSystemStore = defineStore('system', () => {
     loading.value = true;
     error.value = null;
     try {
-      const res = await request.get<SystemInfo>('/api/v1/erp/system/info');
+      const res = await request.get<SystemInfo>('/system/info');
       systemInfo.value = res;
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : '获取系统信息失败';
@@ -51,7 +51,7 @@ export const useSystemStore = defineStore('system', () => {
     loading.value = true;
     error.value = null;
     try {
-      const res = await request.get<SystemConfig>('/api/v1/erp/system/config');
+      const res = await request.get<SystemConfig>('/system/config');
       systemConfig.value = res;
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : '获取系统配置失败';

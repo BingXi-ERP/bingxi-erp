@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { API_BASE_URL, apiUrl } from '@/api/base-url';
 import type { ApiResponse, PaginatedResponse } from '@/types/api';
 
 /**
@@ -18,10 +19,8 @@ import type { ApiResponse, PaginatedResponse } from '@/types/api';
  * 本文件沿用独立 axios 实例（bareApi）：不挂全局响应拦截器，`r.data` 即完整响应体，
  * 由调用方按上述约定自行取载荷（信封端点取 r.data.data，裸 JSON 端点取 r.data）。
  */
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1/erp';
-
 const bareApi = axios.create({
-  baseURL: BASE_URL,
+  baseURL: API_BASE_URL,
   timeout: 30000,
   withCredentials: true,
 });
@@ -85,12 +84,12 @@ export function getExportInspection(id: number): Promise<ExportInspection> {
 
 /** 商检单打印页地址（DOCX 下载，Cookie 随请求自动携带） */
 export function getExportInspectionPrintUrl(id: number): string {
-  return `${BASE_URL}/export-inspections/${id}/print`;
+  return apiUrl(`/export-inspections/${id}/print`);
 }
 
 /** 报关单打印页地址（DOCX 下载） */
 export function getCustomsDeclarationPrintUrl(id: number): string {
-  return `${BASE_URL}/export-inspections/${id}/customs-declaration/print`;
+  return apiUrl(`/export-inspections/${id}/customs-declaration/print`);
 }
 
 /** 产地证列表（GET /{id}/certificates，certificate_of_origin_handler 仍为裸 JSON） */

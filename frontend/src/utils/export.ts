@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { API_BASE_URL } from '@/api/base-url';
 import type { AxiosResponse } from 'axios';
 import { ElMessage } from 'element-plus';
 import { logger } from '@/utils/logger';
@@ -15,7 +16,7 @@ import { msg } from '@/utils/message';
  * - baseURL 与 request.ts 保持一致，避免硬编码
  */
 const exportAxios = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1/erp',
+  baseURL: API_BASE_URL,
   timeout: 60000,
   withCredentials: true,
   headers: {
