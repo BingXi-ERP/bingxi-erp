@@ -183,7 +183,6 @@ async fn miniapp_login_binds_existing_phone_and_returns_login_envelope() {
     let response = login_request(&wechat.app(), "wx-code", "phone-code").await;
 
     assert_eq!(response.status(), StatusCode::OK);
-    let mut response = response;
     let set_cookie = response.headers().get_all(axum::http::header::SET_COOKIE);
     assert!(set_cookie.iter().any(|value| {
         value

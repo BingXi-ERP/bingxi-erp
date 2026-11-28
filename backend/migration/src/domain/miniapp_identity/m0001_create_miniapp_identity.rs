@@ -26,13 +26,13 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(MiniappIdentity::UserId).integer().not_null())
                     .col(
                         ColumnDef::new(MiniappIdentity::CreatedAt)
-                            .date_time()
+                            .timestamp_with_time_zone()
                             .default(SimpleExpr::current_timestamp())
                             .not_null(),
                     )
                     .col(
                         ColumnDef::new(MiniappIdentity::UpdatedAt)
-                            .date_time()
+                            .timestamp_with_time_zone()
                             .default(SimpleExpr::current_timestamp())
                             .not_null(),
                     )

@@ -13,7 +13,7 @@ use bingxi_backend::config::settings::MiniappConfig;
 use bingxi_backend::container::AppState;
 use bingxi_backend::handlers::auth_handler::miniapp_login;
 use bingxi_backend::models::audit_log;
-use bingxi_backend::models::user::{self, ActiveModel as UserActiveModel};
+use bingxi_backend::models::user::ActiveModel as UserActiveModel;
 use bingxi_backend::services::audit_log_service::flush;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};

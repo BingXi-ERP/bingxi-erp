@@ -14,13 +14,14 @@ test.describe('小程序登录契约', () => {
       code?: string;
       message?: string;
       trace_id?: string;
-      timestamp?: string;
+      timestamp?: number;
     };
     expect(body.code).toBe('VALIDATION_ERROR');
     expect(body.message).toContain('code 与 phone_code 不能为空');
     expect(typeof body.trace_id).toBe('string');
     expect(body.trace_id).not.toBe('');
-    expect(typeof body.timestamp).toBe('string');
-    expect(body.timestamp).not.toBe('');
+    expect(typeof body.timestamp).toBe('number');
+    expect(Number.isInteger(body.timestamp)).toBe(true);
+    expect(body.timestamp).toBeGreaterThan(0);
   });
 });
