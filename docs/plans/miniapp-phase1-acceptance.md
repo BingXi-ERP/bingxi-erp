@@ -3,7 +3,7 @@
 - 验收日期：2026-11-28
 - 工作树：`E:/work/bingxi/wt-miniapp-rebuild`
 - 基线 HEAD：`2d5bfd4fddb71f98c127c9d35b4d13f68979f130`（完整 40 位；这是基线提交，不是 Phase 1 变更提交）
-- 候选变更状态：Task 1–12 均在未提交工作树中；最终验收 head SHA 尚未产生
+- 候选代码提交：`2e8ea2a02a8df5ba7ef47600b25209d408aa831f`；验收文档提交以 PR #1404 最终 head SHA 为准
 - 总体状态：**BLOCKED / NOT ACCEPTED**
 - 当前结论：**不可合并 main，不可发布**。最终复审的 8 项 findings 与残余波 F2/F3/F5/F6、E2E 路径触发缺口均已修复，并通过独立 scoped 复审；但 Vite dev-only 风险接受仍未签署，CI、真实微信构建与真机证据也尚未闭环。
 
@@ -28,7 +28,7 @@
 2. **Vite 风险接受未签署**：`docs/security/miniapp-dev-dependency-risk-acceptance.json` 仍为 `status=pending`、`approvedBy=null`、`approvedAt=null`，审计门按设计失败关闭。签署前不得合并或发布。
 3. **CI 与真机证据未闭环**：Windows GitHub Actions、uni-app 微信构建、automator、真实 PostgreSQL 集成测试与真实微信设备验收尚未完成。未完成前不得合并或发布。
 4. 生产依赖 critical/high 不接受风险。若后续复扫出现生产 critical/high，必须升级、移除或隔离，不允许用 dev 风险接受覆盖。
-5. 本任务未提交、未暂存、未推送、未创建 PR。独立工作流尚未成为分支保护必需检查；推送获授权后，仓库管理员须将两条工作流设为 PR 必需检查。
+5. 本任务已提交并推送至 `feat/miniapp-rebuild-phase1`，PR #1404 已创建；独立工作流尚未成为分支保护必需检查，仓库管理员仍须将两条工作流设为 PR 必需检查。
 
 ## 2. 最终复审 findings 与修复状态
 
@@ -121,7 +121,7 @@
 | 字段             | `miniapp-checks.yml`                                                                                                                   | `miniapp-e2e.yml`                                                                                                                                      |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 工作流           | [miniapp-checks.yml](../../.github/workflows/miniapp-checks.yml)                                                                       | [miniapp-e2e.yml](../../.github/workflows/miniapp-e2e.yml)                                                                                             |
-| 最终 head SHA    | 待提交/推送后填写                                                                                                                      | 待提交/推送后填写                                                                                                                                      |
+| 最终 head SHA    | PR #1404 head SHA（以 GitHub 回读为准）                                                                                                                      | PR #1404 head SHA（以 GitHub 回读为准）                                                                                                                                      |
 | Workflow run URL | 未执行                                                                                                                                 | 未执行                                                                                                                                                 |
 | Step Summary     | `if: always()`；优先完整 40 位 `HEAD_SHA`（PR head，非 PR 回退 `github.sha`）、`job.status`、审计、架构/源码、页数、真实体积（若存在） | `if: always()`；优先完整 40 位 `HEAD_SHA`（PR head，非 PR 回退 `github.sha`）、`job.status`、exit-code、测试数量/结果、制品路径与上传结果              |
 | Job / conclusion | `static`: 未执行                                                                                                                       | `e2e`: 未执行                                                                                                                                          |
@@ -162,7 +162,7 @@ Task 12 不代签、不修改 `pending`。若选择不接受风险，则升级 u
 
 ### 7.3 CI 运行时验收
 
-1. 获得推送授权后，由对应 PR 触发两条独立工作流；不得仅手动运行旧分支或伪造 run。风险接受签署提交也必须通过 PR 路径触发，并以新候选 HEAD 的审计结果为准。
+1. PR #1404 已创建，两条独立工作流由该 PR 触发；不得仅手动运行旧分支或伪造 run。风险接受签署提交也必须通过 PR 路径触发，并以新候选 HEAD 的审计结果为准。
 2. 配置六个 Secrets：`MINIAPP_TEST_APPID`、`MINIAPP_TEST_SECRET`、`WECHAT_DEVTOOLS_INSTALLER_URL`、`WECHAT_DEVTOOLS_CLI`、`MINIAPP_E2E_USERNAME`、`MINIAPP_E2E_PASSWORD`。
 3. 确认 `MINIAPP_TEST_APPID` 符合 `wx` + 16 位十六进制格式且不是 `touristappid`。
 4. 审查 Windows PostgreSQL、Rust release 构建、微信开发者工具安装、uni-app 构建、迁移、automator 与 2 条 E2E 的逐步日志。
