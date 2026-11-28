@@ -50,6 +50,16 @@ describe('Task 11 CI security regressions', () => {
     expect(pullRequestPaths).toContain('scripts/ci/miniapp-write-step-summary.mjs')
   })
 
+  it('uses the Windows runner PostgreSQL service instead of Linux Docker images', () => {
+    const workflow = readRepoFile('.github/workflows/miniapp-e2e.yml')
+
+    expect(workflow).toContain("$service = 'postgresql-x64-17'")
+    expect(workflow).toContain('Start-Service -Name $service')
+    expect(workflow).toContain('bingxi_miniapp_test')
+    expect(workflow).not.toContain('docker run')
+    expect(workflow).not.toContain('postgres:16')
+  })
+
   it('uploads artifacts only after a successful sensitive-information scan', () => {
     const workflow = readRepoFile('.github/workflows/miniapp-e2e.yml')
     const scanStep = workflow.match(

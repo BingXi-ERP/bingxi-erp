@@ -112,23 +112,24 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          docker version
-          if ($LASTEXITCODE -ne 0) { throw 'Docker 不可用' }
-          docker rm -f miniapp-postgres 2>$null | Out-Null
-          docker run -d --name miniapp-postgres `
-            -e POSTGRES_USER=postgres `
-            -e POSTGRES_PASSWORD=postgres `
-            -e POSTGRES_DB=bingxi_miniapp_test `
-            -p 5432:5432 postgres:16
-          if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL 容器启动失败' }
+          $service = 'postgresql-x64-17'
+          if (-not (Get-Service -Name $service -ErrorAction SilentlyContinue)) {
+            throw "Windows runner 缺少 PostgreSQL 服务：$service"
+          }
+          Start-Service -Name $service
+          $env:PGPASSWORD = 'root'
+          & "$env:PGBIN\psql.exe" -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"
+          if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL 测试账号密码设置失败' }
+          $env:PGPASSWORD = 'postgres'
+          & "$env:PGBIN\createdb.exe" -U postgres -h localhost -p 5432 -O postgres bingxi_miniapp_test
+          if ($LASTEXITCODE -ne 0) { throw 'PostgreSQL 测试数据库创建失败' }
           $ready = $false
           for ($i = 0; $i -lt 60; $i++) {
-            docker exec miniapp-postgres pg_isready -U postgres -d bingxi_miniapp_test | Out-Host
+            & "$env:PGBIN\pg_isready.exe" -U postgres -d bingxi_miniapp_test -h localhost -p 5432 | Out-Host
             if ($LASTEXITCODE -eq 0) { $ready = $true; break }
             Start-Sleep -Seconds 1
           }
           if (-not $ready) {
-            docker logs miniapp-postgres
             throw 'PostgreSQL 未在 60 秒内就绪'
           }
           Write-Host 'MINIAPP_E2E_POSTGRES_READY'
@@ -203,13 +204,8 @@ jobs:
             $automatorPid = [int](Get-Content -LiteralPath $automatorPidFile -Raw).Trim()
             Stop-Process -Id $automatorPid -Force -ErrorAction SilentlyContinue
           }
-          if (Get-Command docker -ErrorAction SilentlyContinue) {
-            docker rm -f miniapp-postgres 2>$null | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-              Write-Warning 'PostgreSQL 容器清理失败；runner 为一次性环境，不影响主失败判定。'
-            }
-          } else {
-            Write-Warning 'docker 不可用，跳过 PostgreSQL 容器清理。'
+          if (Get-Service -Name 'postgresql-x64-17' -ErrorAction SilentlyContinue) {
+            Stop-Service -Name 'postgresql-x64-17' -ErrorAction SilentlyContinue
           }
           exit 0
 
