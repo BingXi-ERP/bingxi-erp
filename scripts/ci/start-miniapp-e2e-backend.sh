@@ -116,6 +116,7 @@ HTTP_CODE=$(curl --silent --show-error --max-time 120 \
   -w '%{http_code}' \
   -X POST "$BACKEND_URL/api/v1/erp/init/initialize" \
   -H 'Content-Type: application/json' \
+  -H 'X-Requested-With: XMLHttpRequest' \
   -H "X-Init-Token: $INIT_TOKEN" \
   --data-binary "@$INIT_PAYLOAD_FILE")
 rm -f "$INIT_PAYLOAD_FILE"
