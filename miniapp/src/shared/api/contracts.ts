@@ -38,7 +38,15 @@ export const PRODUCTS_PATH = `${API_BASE_PATH}/products`
 
 export const PRODUCT_COLORS_PATH = `${API_BASE_PATH}/products/{id}/colors`
 
+export const PRODUCT_DETAIL_PATH = `${API_BASE_PATH}/products/{id}`
+
+export const PRODUCT_SELECT_PATH = `${API_BASE_PATH}/products/select`
+
 export const COLOR_CARDS_PATH = `${API_BASE_PATH}/color-cards`
+
+export const COLOR_CARD_DETAIL_PATH = `${COLOR_CARDS_PATH}/{id}`
+
+export const COLOR_CARD_ITEMS_PATH = `${COLOR_CARD_DETAIL_PATH}/items`
 
 export const ORDERS_PATH = `${API_BASE_PATH}/sales/orders`
 

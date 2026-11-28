@@ -35,6 +35,30 @@
       "style": {
         "navigationBarTitleText": "客户编辑"
       }
+    },
+    {
+      "path": "features/catalog/pages/products/index",
+      "style": {
+        "navigationBarTitleText": "商品管理"
+      }
+    },
+    {
+      "path": "features/catalog/pages/products/detail",
+      "style": {
+        "navigationBarTitleText": "商品详情"
+      }
+    },
+    {
+      "path": "features/catalog/pages/color-cards/index",
+      "style": {
+        "navigationBarTitleText": "色卡管理"
+      }
+    },
+    {
+      "path": "features/catalog/pages/color-cards/detail",
+      "style": {
+        "navigationBarTitleText": "色卡详情"
+      }
     }
   ],
   "tabBar": {
