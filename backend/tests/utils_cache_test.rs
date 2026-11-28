@@ -1,4 +1,4 @@
-use bingxi_backend::middleware::audit_context::CLIENT_IP_UNRESOLVED;
+use bingxi_backend::constants::CLIENT_IP_UNRESOLVED;
 use bingxi_backend::utils::cache::*;
 use std::time::Duration;
 

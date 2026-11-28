@@ -61,6 +61,12 @@ async function recoverStaleLock(lockPath) {
   await rm(stalePath, { recursive: true, force: true });
 }
 
+const LOCK_CONTENTION_CODES = new Set(['EEXIST', 'ENOTEMPTY', 'EPERM', 'EACCES']);
+
+function isLockContention(error) {
+  return LOCK_CONTENTION_CODES.has(error?.code);
+}
+
 async function acquire(lockPath, timeoutMs, retryMs) {
   const parent = path.dirname(lockPath);
   await mkdir(parent, { recursive: true });
@@ -92,7 +98,9 @@ async function acquire(lockPath, timeoutMs, retryMs) {
       };
     } catch (error) {
       await rm(pendingPath, { recursive: true, force: true });
-      if (!(await exists(lockPath))) throw error;
+      // 竞争错误发生时，持有者可能在本进程检查锁目录前恰好释放锁。
+      // 此时 exists=false 只说明现在可重试，不能把上一轮 EPERM/EEXIST 误抛为致命错误。
+      if (!isLockContention(error) && !(await exists(lockPath))) throw error;
       await recoverStaleLock(lockPath);
       const remaining = deadline - Date.now();
       if (remaining <= 0) {

@@ -54,7 +54,7 @@ use serde::Serialize;
 use std::fmt;
 use uuid::Uuid;
 
-use crate::middleware::trace_context::X_TRACE_ID_HEADER;
+use crate::constants::X_TRACE_ID_HEADER;
 use crate::utils::messages::err_msg;
 
 // 请求级 trace id（task-local，全站唯一来源）。
@@ -1089,7 +1089,7 @@ mod displayable_message_tests {
 #[cfg(test)]
 mod trace_id_tests {
     use super::*;
-    use crate::middleware::trace_context::X_TRACE_ID_HEADER;
+    use crate::constants::X_TRACE_ID_HEADER;
     use std::sync::{Arc, Mutex};
 
     /// 把 tracing 输出捕获到内存缓冲（断言「回退不是静默」用）。

@@ -10,7 +10,7 @@
 //! A.18.1 状态大小写规范（历史包袱治理）：
 //! - 生产订单/MRP/排程/工作中心：大写值（SCHEDULED/IN_PROGRESS/PLANNED），与 DB CHECK 约束一致
 //! - 流转卡/工序记录：小写值（pending/scheduled/dyeing），与 DB CHECK 约束一致
-//! - 不统一为单一大小写：改 DB 数据+CHECK 约束+前端风险高，改为加别名常量+规范注释
+//! - 不统一为单一大小写：改 DB 数据+CHECK 约束+前端风险高；各实体只保留与 DB CHECK 逐字符一致的一套常量
 //! - 新增代码必须用本模块常量，禁止字面量（A.19 逐步替换存量字面量）
 /// 草稿：生产订单已创建但尚未提交审批。
 pub const PRODUCTION_DRAFT: &str = "DRAFT";
@@ -105,13 +105,6 @@ pub mod flow_card {
 
     /// 已终止：异常终止（合缸/缸变更/取消）
     pub const TERMINATED: &str = "terminated";
-
-    // A.18.1 大写别名（供需要大写的调用方使用，DB 值保持小写不变）
-    pub const PENDING_UPPER: &str = "PENDING";
-    pub const SCHEDULED_UPPER: &str = "SCHEDULED";
-    pub const COMPLETED_UPPER: &str = "COMPLETED";
-    pub const SHIPPED_UPPER: &str = "SHIPPED";
-    pub const TERMINATED_UPPER: &str = "TERMINATED";
 }
 
 /// 工序流转记录状态（process_step_record.status 小写，v14 批次 425，状态机 pending→in_progress→completed/abnormal/rework）

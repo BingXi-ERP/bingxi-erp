@@ -20,13 +20,12 @@ use axum::http::header::CONTENT_TYPE;
 use axum::middleware::{Next, from_fn};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use bingxi_backend::constants::X_TRACE_ID_HEADER;
 use bingxi_backend::middleware::circuit_breaker::{
     CircuitEntry, CircuitEvent, CircuitState, circuit_breaker_middleware,
 };
 use bingxi_backend::middleware::timeout::timeout_middleware_with;
-use bingxi_backend::middleware::trace_context::{
-    X_TRACE_ID_HEADER, catch_panic_middleware, trace_context_middleware,
-};
+use bingxi_backend::middleware::trace_context::{catch_panic_middleware, trace_context_middleware};
 use bingxi_backend::utils::error::AppError;
 use bingxi_backend::utils::messages::err_msg;
 use serde_json::Value;

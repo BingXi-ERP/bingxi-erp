@@ -23,6 +23,7 @@ use axum::{
 use std::net::SocketAddr;
 use uuid::Uuid;
 
+use crate::constants::CLIENT_IP_UNRESOLVED;
 use crate::middleware::auth_context::SessionRoleCode;
 use crate::observability::trace_context::TraceContext;
 
@@ -233,9 +234,6 @@ fn bound_operation_page(page: Option<String>) -> Option<String> {
         other => other,
     }
 }
-
-/// 无法解析客户端 IP 时的占位值（不是可用的客户端标识，禁止当作真实 IP 参与任何判定）
-pub const CLIENT_IP_UNRESOLVED: &str = "unknown";
 
 /// 客户端 IP 的来源档位。用途：CSRF Token 的 IP 漂移留痕需要标注这条 IP 是谁给的，
 /// 因为 `X-Forwarded-For` 首段在客户端可自填（Nginx 用 `$proxy_add_x_forwarded_for` 追加，
