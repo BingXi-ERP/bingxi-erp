@@ -24,6 +24,8 @@ describe('Task 11 CI security regressions', () => {
     expect(backendScript).toContain('"$BACKEND_URL/health/readiness"')
     expect(backendScript).not.toContain('"$BACKEND_URL/api/v1/erp/health/readiness"')
     expect(runner).toContain("new URL('/health/readiness'")
+    expect(backendScript).toContain("body.status === 'healthy' || body.status === 'degraded'")
+    expect(runner).toContain("body.status !== 'healthy' && body.status !== 'degraded'")
   })
 
   it('strips URLs from every WeChat reqwest error', () => {

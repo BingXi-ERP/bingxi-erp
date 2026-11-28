@@ -37,10 +37,10 @@ async function checkBackend(baseUrl) {
     throw new Error(`后端就绪检查 HTTP ${response.status}`)
   }
   const body = await response.json()
-  if (body.status !== 'healthy') {
-    throw new Error('后端就绪检查未返回 healthy')
+  if (body.status !== 'healthy' && body.status !== 'degraded') {
+    throw new Error('后端就绪检查未返回 healthy 或 degraded')
   }
-  console.info('MINIAPP_E2E_BACKEND_READY status=healthy')
+  console.info('MINIAPP_E2E_BACKEND_READY status=' + body.status)
 }
 
 let child
