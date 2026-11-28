@@ -31,4 +31,6 @@ regexes = [
   '''REDACTED''',
   '''trace_id=[0-9a-f]{16}|span_id=[0-9a-f]{16}''',
   '''example|placeholder|change-me|dummy|sample|test-token|fake-token|ci-setup-wizard-real-token''',
+  # miniapp 制品扫描器自测的合成私钥历史串（非真实凭据；精确匹配，不放行整文件）
+  '''c2VsZi10ZXN0LW5vdC1hLXJlYWwta2V[5]''',
 ]
