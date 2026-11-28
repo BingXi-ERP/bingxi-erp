@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@/api/base-url';
+import { apiWsUrl } from '@/api/base-url';
 import { WebSocketClient, type NotificationPayload } from '@/utils/websocket';
 import { getWsTicket, type WsTicketResponse } from '@/api/notification';
 
@@ -18,8 +18,7 @@ let client: WebSocketClient | null = null;
 const listeners = new Set<(payload: NotificationPayload) => void>();
 
 function buildWsUrl(): string {
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${window.location.host}${API_BASE_URL}/ws/notifications`;
+  return apiWsUrl('/ws/notifications');
 }
 
 export function startNotificationWs(): void {

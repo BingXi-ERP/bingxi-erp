@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { API_BASE_URL, apiUrl } from '@/api/base-url';
+import { API_BASE_URL, apiUrl, apiWsUrl } from '@/api/base-url';
 
 const srcRoot = resolve(process.cwd(), 'src');
 
@@ -11,6 +11,21 @@ describe('SPA API 前缀单源', () => {
     expect(apiUrl('/system/info')).toBe(`${API_BASE_URL}/system/info`);
     expect(apiUrl('system/info')).toBe(`${API_BASE_URL}/system/info`);
     expect(apiUrl('/')).toBe(`${API_BASE_URL}/`);
+  });
+
+  it('WebSocket 相对地址沿用当前站点', () => {
+    expect(apiWsUrl('/ws/notifications')).toBe(
+      `ws://localhost:3000${API_BASE_URL}/ws/notifications`
+    );
+  });
+
+  it('WebSocket 绝对地址使用 API 主机并升级安全协议', () => {
+    expect(apiWsUrl('/ws/notifications', 'https://api.example.com/api/v1/erp/')).toBe(
+      'wss://api.example.com/api/v1/erp/ws/notifications'
+    );
+    expect(apiWsUrl('/ws/notifications', 'http://api.example.com/api/v1/erp')).toBe(
+      'ws://api.example.com/api/v1/erp/ws/notifications'
+    );
   });
 
   it('request 与 raw fetch 不得再传完整 ERP 前缀', () => {
