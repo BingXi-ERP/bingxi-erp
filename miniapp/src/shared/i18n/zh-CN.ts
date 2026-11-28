@@ -73,6 +73,11 @@ export const zhCN = {
     save: '保存',
     loadFailed: '客户数据加载失败，请重试',
   },
+  salesReturns: {
+    title: '销售退货',
+    create: '新建退货',
+    submitFailed: '退货提交失败，请重试',
+  },
   payments: {
     title: '收款登记',
     customer: '客户',

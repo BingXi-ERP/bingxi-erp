@@ -20,6 +20,8 @@ import {
   PRODUCT_SELECT_PATH,
   PRODUCTS_PATH,
   SALES_RETURNS_PATH,
+  SALES_RETURN_DETAIL_PATH,
+  SALES_RETURN_ITEMS_PATH,
 } from '../../src/shared/api/contracts'
 
 const snapshotPath = resolve(import.meta.dirname, '../../../frontend/scripts/route-snapshot.txt')
@@ -56,6 +58,12 @@ const endpoints = [
   ['PAYMENT_DETAIL_PATH', PAYMENT_DETAIL_PATH, '/api/v1/erp/ar/payments/{id}'],
   ['PRINT_TASKS_PATH', PRINT_TASKS_PATH, '/api/v1/erp/print-tasks'],
   ['SALES_RETURNS_PATH', SALES_RETURNS_PATH, '/api/v1/erp/sales/sales-returns'],
+  ['SALES_RETURN_DETAIL_PATH', SALES_RETURN_DETAIL_PATH, '/api/v1/erp/sales/sales-returns/{id}'],
+  [
+    'SALES_RETURN_ITEMS_PATH',
+    SALES_RETURN_ITEMS_PATH,
+    '/api/v1/erp/sales/sales-returns/{id}/items',
+  ],
 ] as const
 
 describe('Phase 2 endpoint contracts', () => {

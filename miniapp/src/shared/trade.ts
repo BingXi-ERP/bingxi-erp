@@ -17,7 +17,13 @@ export const SALES_ORDER_STATUSES = [
   'rejected',
 ] as const
 
-const SALES_RETURN_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'COMPLETED'] as const
+export const SALES_RETURN_STATUSES = [
+  'DRAFT',
+  'SUBMITTED',
+  'APPROVED',
+  'REJECTED',
+  'COMPLETED',
+] as const
 const PAYMENT_STATUSES = ['pending', 'confirmed', 'cancelled'] as const
 const CUSTOMER_STATUSES = ['active', 'inactive', 'merged', 'blacklist'] as const
 const PRODUCT_STATUSES = ['active', 'inactive'] as const

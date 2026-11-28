@@ -75,3 +75,15 @@ export const PAYMENT_CANCEL_PATH = `${PAYMENT_DETAIL_PATH}/cancel`
 export const PRINT_TASKS_PATH = `${API_BASE_PATH}/print-tasks`
 
 export const SALES_RETURNS_PATH = `${API_BASE_PATH}/sales/sales-returns`
+
+export const SALES_RETURN_DETAIL_PATH = `${SALES_RETURNS_PATH}/{id}`
+
+export const SALES_RETURN_ITEMS_PATH = `${SALES_RETURN_DETAIL_PATH}/items`
+
+export const SALES_RETURN_SUBMIT_PATH = `${SALES_RETURN_DETAIL_PATH}/submit`
+
+export const SALES_RETURN_APPROVE_PATH = `${SALES_RETURN_DETAIL_PATH}/approve`
+
+export const SALES_RETURN_REJECT_PATH = `${SALES_RETURN_DETAIL_PATH}/reject`
+
+export const SALES_RETURN_EXECUTE_PATH = `${SALES_RETURN_DETAIL_PATH}/execute`
