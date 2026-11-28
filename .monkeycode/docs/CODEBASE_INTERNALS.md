@@ -123,7 +123,7 @@ init_token 的数字码 `40101`+`detail` 也并入同一构造器。
 | `common` / `payment` / `login_log` / `email_log` / `active_status` / `batch_trace_operation_type` | 大写 | `general.rs:16,37,105,127,177` |
 | `work_center` | 大写 `IDLE/OVERLOADED`（只有负载项两态） | `production.rs:64` |
 | `mrp` / `scheduling` / 顶层 `PRODUCTION_*` | 大写 | `production.rs:16,26,...` |
-| `flow_card` / `step_record` / `process_node` | 小写（flow_card 另有 `*_UPPER` 别名） | `production.rs:72,101` |
+| `flow_card` / `step_record` / `process_node` | 小写（各实体只保留一套 DB 写入词表，无大写镜像别名） | `production.rs:45,81,111` |
 | `ap_invoice` / `ap_payment_request` / `accounting_period` / `ap_reconciliation` / `ap_verification` | 大写 `AUDITED/APPROVING/...` | `status/finance.rs` |
 | `voucher` / `finance_invoice` / `finance_payment` / `ar_collection` / `ar_reconciliation` / `bad_debt_*` | 小写 | `status/finance.rs` |
 | `contract` / `budget` / `bpm_task` / `crm_lead` / `logistics_event_type` | 小写（`contract` = `draft/active/cancelled`） | `status/bpm_crm_contract.rs:34` |

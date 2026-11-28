@@ -363,7 +363,7 @@ async fn module_validate_is_equivalent_to_standard_validator_channel() {
             (Err(old_errs), Err(new_err)) => {
                 // 两条通道产生的 AppError 信封逐字段一致（族别+文案同一构造函数）
                 let (old_status, old_env) = envelope_of(AppError::from(old_errs.clone())).await;
-                let (new_status, new_env) = envelope_of(new_err.clone()).await;
+                let (new_status, new_env) = envelope_of(AppError::from(new_err.clone())).await;
                 assert_eq!(old_status, new_status, "输入 {input:?} 拒绝状态码不一致");
                 assert_eq!(old_status, StatusCode::BAD_REQUEST);
                 assert_eq!(
@@ -416,6 +416,15 @@ async fn module_none_default_equals_create_entry_default_and_is_other() {
         serde_json::from_value(serde_json::json!({"customer_name": "缺省锁客户"})).unwrap();
     req.validate()
         .expect("customer_type 缺省（None）必须通过 validator 通道");
+}
+
+#[test]
+fn customer_type_vocabulary_does_not_depend_on_utils() {
+    let source = include_str!("../src/constants/customer_type.rs");
+    assert!(
+        !source.contains("crate::utils"),
+        "constants 是叶子层，客户类型词表不得反向依赖 utils/AppError"
+    );
 }
 
 #[test]
