@@ -61,6 +61,15 @@ describe('Task 11 CI security regressions', () => {
     expect(workflow).not.toContain('postgres:16')
   })
 
+  it('discovers the installed devtools CLI and exports it to later steps', () => {
+    const script = readRepoFile('scripts/ci/install-wechat-devtools.ps1')
+
+    expect(script).toContain('function Find-DevtoolsCli')
+    expect(script).toContain("Get-ChildItem -LiteralPath $root -Filter 'cli.bat'")
+    expect(script).toContain('WECHAT_DEVTOOLS_CLI=$cliPath')
+    expect(script).toContain('$env:GITHUB_ENV')
+  })
+
   it('uploads artifacts only after a successful sensitive-information scan', () => {
     const workflow = readRepoFile('.github/workflows/miniapp-e2e.yml')
     const scanStep = workflow.match(
