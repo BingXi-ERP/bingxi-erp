@@ -17,6 +17,24 @@
       "style": {
         "navigationBarTitleText": "工作台"
       }
+    },
+    {
+      "path": "features/customers/pages/list/index",
+      "style": {
+        "navigationBarTitleText": "客户管理"
+      }
+    },
+    {
+      "path": "features/customers/pages/detail/index",
+      "style": {
+        "navigationBarTitleText": "客户详情"
+      }
+    },
+    {
+      "path": "features/customers/pages/form/index",
+      "style": {
+        "navigationBarTitleText": "客户编辑"
+      }
     }
   ],
   "tabBar": {

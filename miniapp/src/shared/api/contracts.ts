@@ -28,6 +28,12 @@ export const DASHBOARD_OVERVIEW_PATH = `${API_BASE_PATH}/dashboard/overview`
 
 export const CUSTOMERS_PATH = `${API_BASE_PATH}/crm/customers`
 
+export const CUSTOMER_DETAIL_PATH = `${CUSTOMERS_PATH}/{id}`
+
+export const CUSTOMER_SELECT_PATH = `${CUSTOMERS_PATH}/select`
+
+export const CUSTOMER_FOLLOW_UPS_PATH = `${CUSTOMER_DETAIL_PATH}/follow-ups`
+
 export const PRODUCTS_PATH = `${API_BASE_PATH}/products`
 
 export const PRODUCT_COLORS_PATH = `${API_BASE_PATH}/products/{id}/colors`

@@ -3,6 +3,9 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   COLOR_CARDS_PATH,
+  CUSTOMER_DETAIL_PATH,
+  CUSTOMER_FOLLOW_UPS_PATH,
+  CUSTOMER_SELECT_PATH,
   CUSTOMERS_PATH,
   DASHBOARD_OVERVIEW_PATH,
   ORDERS_PATH,
@@ -27,6 +30,13 @@ for (const line of readFileSync(snapshotPath, 'utf8').split(/\r?\n/)) {
 const endpoints = [
   ['DASHBOARD_OVERVIEW_PATH', DASHBOARD_OVERVIEW_PATH, '/api/v1/erp/dashboard/overview'],
   ['CUSTOMERS_PATH', CUSTOMERS_PATH, '/api/v1/erp/crm/customers'],
+  ['CUSTOMER_DETAIL_PATH', CUSTOMER_DETAIL_PATH, '/api/v1/erp/crm/customers/{id}'],
+  ['CUSTOMER_SELECT_PATH', CUSTOMER_SELECT_PATH, '/api/v1/erp/crm/customers/select'],
+  [
+    'CUSTOMER_FOLLOW_UPS_PATH',
+    CUSTOMER_FOLLOW_UPS_PATH,
+    '/api/v1/erp/crm/customers/{id}/follow-ups',
+  ],
   ['PRODUCTS_PATH', PRODUCTS_PATH, '/api/v1/erp/products'],
   ['PRODUCT_COLORS_PATH', PRODUCT_COLORS_PATH, '/api/v1/erp/products/{id}/colors'],
   ['COLOR_CARDS_PATH', COLOR_CARDS_PATH, '/api/v1/erp/color-cards'],
