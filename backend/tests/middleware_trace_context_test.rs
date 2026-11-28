@@ -4,8 +4,8 @@ use axum::http::Request;
 use axum::middleware::from_fn;
 use axum::response::Response;
 use axum::routing::get;
+use bingxi_backend::constants::X_TRACE_ID_HEADER;
 use bingxi_backend::middleware::auth_context::*;
-use bingxi_backend::middleware::trace_context::X_TRACE_ID_HEADER;
 use bingxi_backend::middleware::trace_context::trace_context_middleware;
 use bingxi_backend::services::cache_service::*;
 use tower::ServiceExt; // for oneshot()

@@ -1,7 +1,7 @@
 // dead_code 检查已开启；当前所有 pub API 均已被业务引用（AppCache/MemoryCache/Cache trait/CacheStats）。
 // 私有项 CachedValue<T> 内部使用。
 
-use crate::middleware::audit_context::CLIENT_IP_UNRESOLVED;
+use crate::constants::CLIENT_IP_UNRESOLVED;
 use dashmap::DashMap;
 use std::collections::HashSet;
 use std::net::IpAddr;
