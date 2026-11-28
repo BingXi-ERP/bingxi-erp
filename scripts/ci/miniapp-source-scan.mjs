@@ -64,13 +64,17 @@ function exempt(file, root) {
 }
 
 function publicIpv4(value) {
-  const candidates =
-    value.match(/(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])/g) ?? [];
-  return candidates.some((candidate) => {
+  for (const match of value.matchAll(/(?:\d{1,3}\.){3}\d{1,3}/g)) {
+    const candidate = match[0];
+    const index = match.index ?? 0;
+    const before = value[index - 1];
+    const after = value[index + candidate.length];
+    if (before !== undefined && /[\d.]/.test(before)) continue;
+    if (after !== undefined && /[\d.]/.test(after)) continue;
     const octets = candidate.split(".").map(Number);
-    if (octets.some((octet) => octet < 0 || octet > 255)) return false;
+    if (octets.some((octet) => octet < 0 || octet > 255)) continue;
     const [a, b] = octets;
-    return !(
+    if (!(
       a === 0 ||
       a === 10 ||
       a === 127 ||
@@ -80,8 +84,11 @@ function publicIpv4(value) {
       (a === 192 && b === 168) ||
       (a === 198 && (b === 18 || b === 19)) ||
       (a === 100 && b >= 64 && b <= 127)
-    );
-  });
+    )) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function sensitiveLiteral(name, value) {
@@ -284,6 +291,9 @@ function runSelfTest() {
       scanSource(fixture).map((item) => item.rule),
       ["public-ip", "bare-chinese-token"],
     );
+    write("src/bad.ts", "export const host = 'https://1234.8.8.8'\n");
+    assert.deepEqual(scanSource(fixture), []);
+    rmSync(join(fixture, "src/bad.ts"));
     write("src/bad.ts", "export const password = 'real-looking-secret'\n");
     assert.equal(scanSource(fixture)[0]?.rule, "credential-literal");
     write(

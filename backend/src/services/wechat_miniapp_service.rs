@@ -21,13 +21,13 @@ const REFRESH_AHEAD_SECS: u64 = 300;
 const CONNECT_TIMEOUT_SECS: u64 = 10;
 const REQUEST_TIMEOUT_SECS: u64 = 15;
 static TOKEN_FETCH_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
-static HTTP_CLIENT: LazyLock<Client> = LazyLock::new(|| {
+static HTTP_CLIENT: LazyLock<Option<Client>> = LazyLock::new(|| {
     Client::builder()
         .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .redirect(reqwest::redirect::Policy::none())
         .build()
-        .expect("微信小程序 HTTP 客户端参数均为固定值，构建不应失败")
+        .ok()
 });
 
 #[derive(Debug, Deserialize)]
@@ -85,7 +85,7 @@ impl WechatMiniappService {
             return Err(AppError::validation_displayable("code 不能为空"));
         }
         let response = self
-            .client()
+            .client()?
             .get(format!("{}/sns/jscode2session", self.api_base_url))
             .query(&[
                 ("appid", self.appid.as_str()),
@@ -131,7 +131,7 @@ impl WechatMiniappService {
         }
         let access_token = self.access_token().await?;
         let response = self
-            .client()
+            .client()?
             .post(format!(
                 "{}/wxa/business/getuserphonenumber",
                 self.api_base_url
@@ -206,7 +206,7 @@ impl WechatMiniappService {
 
     async fn fetch_access_token(&self) -> Result<FetchedToken, AppError> {
         let response = self
-            .client()
+            .client()?
             .get(format!("{}/cgi-bin/token", self.api_base_url))
             .query(&[
                 ("grant_type", "client_credential"),
@@ -256,8 +256,10 @@ impl WechatMiniappService {
         Ok(FetchedToken { token, ttl })
     }
 
-    fn client(&self) -> &Client {
-        &HTTP_CLIENT
+    fn client(&self) -> Result<&Client, AppError> {
+        HTTP_CLIENT
+            .as_ref()
+            .ok_or_else(|| AppError::service_unavailable("微信小程序 HTTP 客户端初始化失败"))
     }
 }
 

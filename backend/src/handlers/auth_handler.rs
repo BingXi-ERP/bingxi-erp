@@ -21,7 +21,9 @@ use axum::{
 };
 use axum_extra::extract::cookie::{Cookie, SameSite};
 use chrono::{Duration as ChronoDuration, Utc};
-use sea_orm::{ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, ExprTrait, QueryFilter,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use time::Duration as CookieDuration;
