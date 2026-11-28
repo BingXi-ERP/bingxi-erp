@@ -41,8 +41,6 @@
 //! 也是**两回事**：`potential` 属分层侧 token，禁止出现在本列（含其大写形式
 //! `"POTENTIAL"`）——把分层词写进渠道列就是混维撞名，读取侧按渠道精确匹配必然永不命中。
 
-use crate::utils::error::AppError;
-
 /// 零售 token——`ALLOWED` 成员之一，当前唯一的显式业务写值：
 /// 客户导入入口（`services/import_export_ops/import.rs`）按导入模板语境写本常量，
 /// 大小写必须与读侧的小写精确匹配一致（`services/customer_ops/crud.rs:136`、
@@ -85,10 +83,10 @@ pub fn check(raw: &str) -> Result<(), validator::ValidationError> {
 /// - `Some(v)` 命中 `ALLOWED` → `Ok(v)`：**原文返回**，不 trim、不归一大小写；
 /// - `Some(v)` 未命中 → `Err`：拒绝族别与文案与标准入口**同一构造函数**产生——
 ///   构造 `validator::ValidationErrors`（字段名 `customer_type`、code
-///   `invalid_customer_type`）后走 `From<validator::ValidationErrors> for AppError`
-///   （`utils/error.rs:641-645`）既有通道，出参信封 400 + `VALIDATION_ERROR`，
-///   message `customer_type: invalid_customer_type`。非法值一律显式拒绝，不静默兜底。
-pub fn validate(raw: Option<&str>) -> Result<String, AppError> {
+///   `invalid_customer_type`）返回；调用方通过既有 `From<validator::ValidationErrors>
+///   for AppError` 转换，出参信封仍为 400 + `VALIDATION_ERROR`，message
+///   `customer_type: invalid_customer_type`。非法值一律显式拒绝，不静默兜底。
+pub fn validate(raw: Option<&str>) -> Result<String, validator::ValidationErrors> {
     match raw {
         None => Ok(OTHER.to_string()),
         Some(v) => match check(v) {
@@ -96,7 +94,7 @@ pub fn validate(raw: Option<&str>) -> Result<String, AppError> {
             Err(e) => {
                 let mut errors = validator::ValidationErrors::new();
                 errors.add("customer_type", e);
-                Err(AppError::from(errors))
+                Err(errors)
             }
         },
     }
