@@ -7,7 +7,10 @@
   },
   "scripts": {
     "dev:mp-weixin": "uni -p mp-weixin",
+    "predev:mp-weixin": "npm run prepare:manifest",
     "build:mp-weixin": "uni build -p mp-weixin",
+    "prebuild:mp-weixin": "npm run prepare:manifest",
+    "prepare:manifest": "node scripts/prepare-manifest.mjs",
     "typecheck": "vue-tsc -b --force",
     "lint": "eslint src tests",
     "format": "prettier --write src tests",

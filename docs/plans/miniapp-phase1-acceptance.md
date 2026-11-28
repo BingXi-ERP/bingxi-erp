@@ -108,7 +108,7 @@ Vite 6.4.6 升级后的审计摘要：`{"info":0,"low":13,"moderate":20,"high":0
 验证边界与注意事项：
 
 - 本次完整 Vitest 是用户明确授权的本地例外；常规开发仍以 CI 为最终证据。
-- Vite 升级后已执行 `npm ci`（含 postinstall）、`npm ls`、typecheck 与 lint，均通过；未执行 uni-app 构建、Rust 编译/测试、dev server、automator 或任何运行时 E2E。真实构建仍由新 HEAD 的 CI 验证。
+- Vite 升级后已执行 `npm ci`（含 postinstall）、`npm ls`、typecheck 与 lint，均通过；另已验证 manifest 前置生成与 AppID 环境注入。未执行 uni-app 构建、Rust 编译/测试、dev server、automator 或任何运行时 E2E。真实构建仍由新 HEAD 的 CI 验证。
 - `scripts/ci/miniapp-checks.sh` 的 `miniapp/*.ts` 已覆盖 `miniapp/shims-uni.d.ts`；本轮 Prettier 还显式列出该 shim，不存在 CI 漏检结论。
 - 未生成真实微信构建产物，因此真实包体积仍必须由 CI 构建后登记；自证夹具的 2 KB 不是产物证据。
 - 最终修复波首轮完整 Vitest 暴露 3 个测试侧过期断言：两处仍期待旧中文错误文案，一处 upload step 文本切片吞入后续 `if: always()` 摘要步骤。已修正文案断言与 step 边界，未修改生产行为；随后完整套件通过。
