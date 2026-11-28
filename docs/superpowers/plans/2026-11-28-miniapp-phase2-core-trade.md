@@ -126,8 +126,6 @@ expect(() => normalizeSalesReturnStatus('submitted')).toThrow()
 - Create: `miniapp/src/features/workspace/services/dashboard.ts`
 - Create: `miniapp/src/features/workspace/composables/useDashboard.ts`
 - Modify: `miniapp/src/features/workspace/index.ts`
-- Modify: `miniapp/src/pages.json`
-- Modify: `miniapp/src/shared/ui/AppTabBar.vue`
 - Modify: `miniapp/src/shared/i18n/zh-CN.ts`
 - Test: `miniapp/tests/unit/workspace-page.test.ts`
 
@@ -158,9 +156,9 @@ const dashboardOverviewSchema = z.strictObject({
 ```
 
 - [ ] **Step 4: Write failing workspace test for metrics and permission-gated navigation**
-- [ ] **Step 5: Implement dashboard composable and workspace cards**
-- [ ] **Step 6: Add Orders tab and register Phase 2 page paths**
-- [ ] **Step 7: Run tests, typecheck, lint and page inventory**
+- [ ] **Step 5: Implement dashboard composable and workspace metric cards**
+- [ ] **Step 6: Run tests, typecheck, lint and page inventory**
+- [ ] **Step 7: Each later domain task registers its own page paths; Task 5 adds the Orders tab only after the order list page exists**
 
 ---
 
@@ -175,6 +173,7 @@ const dashboardOverviewSchema = z.strictObject({
 - Create: `miniapp/src/features/customers/pages/form/index.vue`
 - Create: `miniapp/src/features/customers/components/CustomerPicker.vue`
 - Create: `miniapp/src/features/customers/index.ts`
+- Modify: `miniapp/src/pages.json`
 - Test: `miniapp/tests/unit/customer-service.test.ts`
 - Test: `miniapp/tests/unit/customer-picker.test.ts`
 
@@ -191,7 +190,8 @@ const dashboardOverviewSchema = z.strictObject({
 - [ ] **Step 4: Implement paginated list composable with keyword/type/status filters**
 - [ ] **Step 5: Implement detail and form pages using `ListPageTemplate`/`FormPageTemplate`**
 - [ ] **Step 6: Implement customer picker with route return and selected label**
-- [ ] **Step 7: Run tests, typecheck, lint and permission checks**
+- [ ] **Step 7: Register customer pages in `pages.json`**
+- [ ] **Step 8: Run tests, typecheck, lint and permission checks**
 
 ```ts
 const customerSchema = z.strictObject({
@@ -220,6 +220,7 @@ const customerSchema = z.strictObject({
 - Create: `miniapp/src/features/catalog/pages/color-cards/index.vue`
 - Create: `miniapp/src/features/catalog/components/ProductPicker.vue`
 - Create: `miniapp/src/features/catalog/index.ts`
+- Modify: `miniapp/src/pages.json`
 - Test: `miniapp/tests/unit/catalog-service.test.ts`
 - Test: `miniapp/tests/unit/product-picker.test.ts`
 
@@ -234,7 +235,8 @@ const customerSchema = z.strictObject({
 - [ ] **Step 3: Implement product/color/color-card schemas and services**
 - [ ] **Step 4: Implement product list/detail and color-card list/detail pages**
 - [ ] **Step 5: Implement product picker that loads colors after product selection**
-- [ ] **Step 6: Run tests, typecheck, lint and contract gate**
+- [ ] **Step 6: Register catalog pages in `pages.json`**
+- [ ] **Step 7: Run tests, typecheck, lint and contract gate**
 
 ```ts
 const productColorSchema = z.strictObject({
@@ -260,6 +262,8 @@ const productColorSchema = z.strictObject({
 - Create: `miniapp/src/features/orders/pages/create/index.vue`
 - Create: `miniapp/src/features/orders/components/OrderGoodsEditor.vue`
 - Create: `miniapp/src/features/orders/index.ts`
+- Modify: `miniapp/src/pages.json`
+- Modify: `miniapp/src/shared/ui/AppTabBar.vue`
 - Test: `miniapp/tests/unit/order-service.test.ts`
 - Test: `miniapp/tests/unit/order-draft.test.ts`
 - Test: `miniapp/tests/unit/order-page.test.ts`
@@ -278,7 +282,8 @@ const productColorSchema = z.strictObject({
 - [ ] **Step 5: Implement draft composable using `calculateLineTotal`**
 - [ ] **Step 6: Implement list/detail/create pages and goods editor**
 - [ ] **Step 7: Add permission-gated submit/approve/reject/cancel actions**
-- [ ] **Step 8: Run tests, typecheck, lint and contract gate**
+- [ ] **Step 8: Register order pages and add the Orders tab now that the list page exists**
+- [ ] **Step 9: Run tests, typecheck, lint and contract gate**
 
 ```ts
 const createOrderSchema = z.strictObject({
@@ -313,6 +318,8 @@ const createOrderSchema = z.strictObject({
 - Create: `miniapp/src/features/printing/pages/preview/index.vue`
 - Create: `miniapp/src/features/printing/index.ts`
 - Create: `miniapp/src/shared/api/download.ts`
+- Modify: `miniapp/src/features/orders/pages/detail/index.vue`
+- Modify: `miniapp/src/pages.json`
 - Test: `miniapp/tests/unit/payment-service.test.ts`
 - Test: `miniapp/tests/unit/payment-form.test.ts`
 - Test: `miniapp/tests/unit/printing-service.test.ts`
@@ -332,7 +339,8 @@ const createOrderSchema = z.strictObject({
 - [ ] **Step 5: Implement collect form and confirmation flow**
 - [ ] **Step 6: Write failing print task tests for accepted vs terminal states**
 - [ ] **Step 7: Implement print task service, polling and binary download**
-- [ ] **Step 8: Run tests, typecheck, lint and contract gate**
+- [ ] **Step 8: Register payment/print pages and add order detail entry points**
+- [ ] **Step 9: Run tests, typecheck, lint and contract gate**
 
 ```ts
 const paymentMethods = ['wechat', 'alipay', 'cash', 'card', 'bank_transfer'] as const
@@ -353,6 +361,7 @@ expect(validatePaymentAmount('100.01', '100.00')).toThrow('不得超过待收金
 - Create: `miniapp/src/features/sales-returns/pages/create/index.vue`
 - Create: `miniapp/src/features/sales-returns/components/ReturnItemEditor.vue`
 - Create: `miniapp/src/features/sales-returns/index.ts`
+- Modify: `miniapp/src/pages.json`
 - Test: `miniapp/tests/unit/sales-return-service.test.ts`
 - Test: `miniapp/tests/unit/return-draft.test.ts`
 - Test: `miniapp/tests/unit/sales-return-page.test.ts`
@@ -371,7 +380,8 @@ expect(validatePaymentAmount('100.01', '100.00')).toThrow('不得超过待收金
 - [ ] **Step 5: Implement return draft composable**
 - [ ] **Step 6: Implement list/detail/create pages and item editor**
 - [ ] **Step 7: Add print entry and permission-gated actions**
-- [ ] **Step 8: Run tests, typecheck, lint and contract gate**
+- [ ] **Step 8: Register sales-return pages in `pages.json`**
+- [ ] **Step 9: Run tests, typecheck, lint and contract gate**
 
 ```ts
 expect(normalizeSalesReturnStatus('SUBMITTED')).toBe('SUBMITTED')
