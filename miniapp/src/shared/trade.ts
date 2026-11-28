@@ -42,7 +42,8 @@ function formatDecimal(units: bigint, scale: number, negative: boolean): string 
   if (units === 0n) return '0'
   const digits = units.toString().padStart(scale + 1, '0')
   const integer = scale === 0 ? digits : digits.slice(0, -scale)
-  const fraction = scale === 0 ? '' : `.${digits.slice(-scale).replace(/0+$/, '')}`
+  const fractionDigits = scale === 0 ? '' : digits.slice(-scale).replace(/0+$/, '')
+  const fraction = fractionDigits.length > 0 ? `.${fractionDigits}` : ''
   return `${negative ? '-' : ''}${integer}${fraction}`
 }
 
@@ -80,7 +81,10 @@ export function compareDecimals(leftValue: string, rightValue: string): -1 | 0 |
   return 0
 }
 
-export function normalizePageQuery(query: Record<string, unknown>): { page: number; page_size: number } {
+export function normalizePageQuery(query: Record<string, unknown>): {
+  page: number
+  page_size: number
+} {
   const { page, page_size: pageSize } = query
   if (!Number.isInteger(page) || (page as number) < 1) {
     throw new Error('page must be a positive integer')

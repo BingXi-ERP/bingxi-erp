@@ -39,4 +39,22 @@ export const zhCN = {
     title: '选择用户',
     placeholder: '请选择用户',
   },
+  statusTag: {
+    salesOrderDraft: '草稿',
+    salesOrderPending: '待审核',
+    salesOrderApproved: '已审核',
+    salesOrderPartialShipped: '部分发货',
+    salesOrderShipped: '已发货',
+    salesOrderCompleted: '已完成',
+    salesOrderCancelled: '已取消',
+    salesOrderRejected: '已拒绝',
+    salesReturnDraft: '草稿',
+    salesReturnSubmitted: '已提交',
+    salesReturnApproved: '已审核',
+    salesReturnRejected: '已拒绝',
+    salesReturnCompleted: '已完成',
+  },
+  money: {
+    currency: '¥',
+  },
 } as const

@@ -23,3 +23,21 @@ export const AUTH_LOGOUT_PATH = `${API_BASE_PATH}/auth/logout`
 export const AUTH_ME_PATH = `${API_BASE_PATH}/auth/me`
 
 export const MINIAPP_LOGIN_PATH = `${API_BASE_PATH}/auth/miniapp/login`
+
+export const DASHBOARD_OVERVIEW_PATH = `${API_BASE_PATH}/dashboard/overview`
+
+export const CUSTOMERS_PATH = `${API_BASE_PATH}/crm/customers`
+
+export const PRODUCTS_PATH = `${API_BASE_PATH}/products`
+
+export const PRODUCT_COLORS_PATH = `${API_BASE_PATH}/products/{id}/colors`
+
+export const COLOR_CARDS_PATH = `${API_BASE_PATH}/color-cards`
+
+export const ORDERS_PATH = `${API_BASE_PATH}/sales/orders`
+
+export const PAYMENTS_PATH = `${API_BASE_PATH}/ar/payments`
+
+export const PRINT_TASKS_PATH = `${API_BASE_PATH}/print-tasks`
+
+export const SALES_RETURNS_PATH = `${API_BASE_PATH}/sales/sales-returns`
