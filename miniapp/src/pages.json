@@ -77,6 +77,12 @@
       "style": {
         "navigationBarTitleText": "新建订单"
       }
+    },
+    {
+      "path": "features/payments/pages/collect/index",
+      "style": {
+        "navigationBarTitleText": "收款登记"
+      }
     }
   ],
   "tabBar": {

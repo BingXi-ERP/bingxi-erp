@@ -43,6 +43,14 @@
           {{ t('orders.submit') }}
         </PermissionButton>
         <PermissionButton
+          v-if="order.balance_amount"
+          permission="payments:create"
+          :can="session.can"
+          @click="collectPayment"
+        >
+          {{ t('payments.title') }}
+        </PermissionButton>
+        <PermissionButton
           v-if="order.status === 'draft'"
           permission="orders:cancel"
           :can="session.can"
@@ -110,6 +118,13 @@ async function submitOrder() {
   } finally {
     submitting.value = false
   }
+}
+
+function collectPayment() {
+  if (!order.value?.balance_amount) return
+  uni.navigateTo({
+    url: `/features/payments/pages/collect/index?customer_id=${order.value.customer_id}&outstanding=${encodeURIComponent(order.value.balance_amount)}`,
+  })
 }
 
 async function cancelOrder() {

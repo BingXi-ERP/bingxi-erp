@@ -66,6 +66,12 @@ export const ORDER_COMPLETE_PATH = `${ORDER_DETAIL_PATH}/complete`
 
 export const PAYMENTS_PATH = `${API_BASE_PATH}/ar/payments`
 
+export const PAYMENT_DETAIL_PATH = `${PAYMENTS_PATH}/{id}`
+
+export const PAYMENT_CONFIRM_PATH = `${PAYMENT_DETAIL_PATH}/confirm`
+
+export const PAYMENT_CANCEL_PATH = `${PAYMENT_DETAIL_PATH}/cancel`
+
 export const PRINT_TASKS_PATH = `${API_BASE_PATH}/print-tasks`
 
 export const SALES_RETURNS_PATH = `${API_BASE_PATH}/sales/sales-returns`
