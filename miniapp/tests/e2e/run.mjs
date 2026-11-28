@@ -31,7 +31,7 @@ function requireEnv(name) {
 }
 
 async function checkBackend(baseUrl) {
-  const readinessUrl = new URL('/api/v1/erp/health/readiness', baseUrl)
+  const readinessUrl = new URL('/health/readiness', baseUrl)
   const response = await fetch(readinessUrl, { signal: AbortSignal.timeout(10_000) })
   if (!response.ok) {
     throw new Error(`后端就绪检查 HTTP ${response.status}`)

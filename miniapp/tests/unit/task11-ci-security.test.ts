@@ -17,6 +17,15 @@ describe('Task 11 CI security regressions', () => {
     expect(script).toContain('trap cleanup_init_payload EXIT')
   })
 
+  it('uses the public top-level readiness endpoint', () => {
+    const backendScript = readRepoFile('scripts/ci/start-miniapp-e2e-backend.sh')
+    const runner = readRepoFile('miniapp/tests/e2e/run.mjs')
+
+    expect(backendScript).toContain('"$BACKEND_URL/health/readiness"')
+    expect(backendScript).not.toContain('"$BACKEND_URL/api/v1/erp/health/readiness"')
+    expect(runner).toContain("new URL('/health/readiness'")
+  })
+
   it('strips URLs from every WeChat reqwest error', () => {
     const service = readRepoFile('backend/src/services/wechat_miniapp_service.rs')
     const reqwestErrorMappings = (service.match(/map_err\(\|error\|[\s\S]*?\}\)\?/g) ?? []).filter(

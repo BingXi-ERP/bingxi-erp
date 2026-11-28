@@ -80,7 +80,7 @@ NODE
 READY=false
 for attempt in $(seq 1 180); do
   if curl --fail --silent --show-error --max-time 3 \
-    "$BACKEND_URL/api/v1/erp/health/readiness" \
+    "$BACKEND_URL/health/readiness" \
     -o "$RESULTS_DIR/readiness.json" 2>/dev/null; then
     if node -e "const fs=require('node:fs'); const body=JSON.parse(fs.readFileSync(process.argv[1], 'utf8')); process.exit(body.status === 'healthy' ? 0 : 1)" \
       "$RESULTS_DIR/readiness.json"; then
