@@ -651,19 +651,23 @@ fn trace_middleware_must_still_bind_root_span_by_instrument() {
         !code.contains(".enter("),
         "本文件不得再出现同步 enter 守卫，异步路径唯一正确形态是 instrument"
     );
-    // 尾采样标记、X-Trace-Id 回写与两条收尾日志的出参形态不得在重构中丢失，
+    // 尾采样标记与两条收尾日志的出参形态不得在重构中丢失，
     // 字符串常量只出现在原文里（归一化会剔除字面量内容），故对原文断言
-    for needle in [
-        "x-trace-sampled",
-        "x-trace-id",
-        "trace.complete",
-        "trace.tail_sampled",
-    ] {
+    for needle in ["x-trace-sampled", "trace.complete", "trace.tail_sampled"] {
         assert!(
             src.contains(needle),
             "收尾步骤缺失，中间件重构后仍必须保留 {needle} 行为"
         );
     }
+    let constants = read_source(&root.join("src").join("constants.rs"));
+    assert!(
+        constants.contains("pub const X_TRACE_ID_HEADER: &str = \"x-trace-id\";"),
+        "X-Trace-Id 名称必须由 constants 单一事实源提供"
+    );
+    assert!(
+        code.contains("X_TRACE_ID_HEADER"),
+        "中间件必须引用统一 X-Trace-Id 常量，不得复制字面量"
+    );
     assert!(
         code.contains("or_insert"),
         "X-Trace-Id 回写仍是仅缺失时写入的单一形态"

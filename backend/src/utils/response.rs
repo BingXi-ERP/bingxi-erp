@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use utoipa::ToSchema;
 
-use crate::middleware::trace_context::X_TRACE_ID_HEADER;
+use crate::constants::X_TRACE_ID_HEADER;
 use crate::utils::error::{
     CODE_FORBIDDEN, CODE_UNAUTHORIZED, ErrorResponse, TraceIdSource, current_trace_id,
 };

@@ -1,8 +1,7 @@
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
-use bingxi_backend::middleware::audit_context::{
-    CLIENT_IP_UNRESOLVED, ClientIpSource, extract_client_ip_with_source,
-};
+use bingxi_backend::constants::CLIENT_IP_UNRESOLVED;
+use bingxi_backend::middleware::audit_context::{ClientIpSource, extract_client_ip_with_source};
 use bingxi_backend::middleware::csrf::*;
 use std::net::SocketAddr;
 

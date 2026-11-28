@@ -15,6 +15,12 @@ pub mod customer_type;
 /// 是大客户二级审批唯一判据的单一来源）
 pub mod customer_tier;
 
+/// 响应头中的 trace id 名称，供中间件与统一响应/错误工具共同引用。
+pub const X_TRACE_ID_HEADER: &str = "x-trace-id";
+
+/// 无法解析客户端 IP 时的占位值，不是可用的客户端标识。
+pub const CLIENT_IP_UNRESOLVED: &str = "unknown";
+
 /// 默认币种码（ISO 4217）
 ///
 /// 用于 currency 字段的默认值。当前业务主要面向国内市场，默认人民币。
