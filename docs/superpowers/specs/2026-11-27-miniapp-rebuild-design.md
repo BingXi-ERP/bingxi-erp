@@ -421,7 +421,7 @@ Vue 页面
 |---|---|
 | 全量范围导致周期失控 | 严格按 1→2→3 阶段验收，每阶段独立交付 |
 | 微信开发者工具在 GitHub Windows 安装不稳定 | 固定版本、校验安装、失败即红；保留完整安装日志 |
-| GitHub Windows 不支持 Linux `services:` 容器 | PostgreSQL 使用显式 `docker run`，后端在 Windows job 内构建；Docker 或构建不可用即失败，不降级为 mock |
+| GitHub Windows 不支持 Linux `services:` 容器 | PostgreSQL 使用 runner 原生 `postgresql-x64-17` 服务，后端在 Windows job 内构建；数据库或构建不可用即失败，不降级为 mock |
 | 新 AppID 与后端微信配置不一致 | 环境变量集中管理，测试号与正式号配置分离，上线前真机验收 |
 | 后端缺口数量超出预期 | 阶段 1 先产出完整台账，按业务域排序，禁止未盘点先写页面 |
 | 现有 API 契约被破坏 | 只做增量扩展，契约测试和现有 Web E2E 同步门禁 |

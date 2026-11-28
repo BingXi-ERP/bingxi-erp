@@ -116,6 +116,7 @@ jobs:
           if (-not (Get-Service -Name $service -ErrorAction SilentlyContinue)) {
             throw "Windows runner 缺少 PostgreSQL 服务：$service"
           }
+          Set-Service -Name $service -StartupType Manual
           Start-Service -Name $service
           $env:PGPASSWORD = 'root'
           & "$env:PGBIN\psql.exe" -U postgres -d postgres -v ON_ERROR_STOP=1 -c "ALTER USER postgres WITH PASSWORD 'postgres';"

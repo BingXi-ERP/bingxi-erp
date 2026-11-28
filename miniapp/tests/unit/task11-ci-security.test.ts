@@ -54,6 +54,7 @@ describe('Task 11 CI security regressions', () => {
     const workflow = readRepoFile('.github/workflows/miniapp-e2e.yml')
 
     expect(workflow).toContain("$service = 'postgresql-x64-17'")
+    expect(workflow).toContain('Set-Service -Name $service -StartupType Manual')
     expect(workflow).toContain('Start-Service -Name $service')
     expect(workflow).toContain('bingxi_miniapp_test')
     expect(workflow).not.toContain('docker run')
