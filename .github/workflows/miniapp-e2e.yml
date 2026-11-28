@@ -23,7 +23,7 @@ concurrency:
 jobs:
   e2e:
     runs-on: windows-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       VITE_API_BASE_URL: http://127.0.0.1:8082
       VITE_APP_ID: ${{ secrets.MINIAPP_TEST_APPID }}

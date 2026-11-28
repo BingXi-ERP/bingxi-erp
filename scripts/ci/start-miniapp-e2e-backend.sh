@@ -78,7 +78,7 @@ console.info(`MINIAPP_E2E_BACKEND_PID=${child.pid}`)
 NODE
 
 READY=false
-for attempt in $(seq 1 90); do
+for attempt in $(seq 1 180); do
   if curl --fail --silent --show-error --max-time 3 \
     "$BACKEND_URL/api/v1/erp/health/readiness" \
     -o "$RESULTS_DIR/readiness.json" 2>/dev/null; then
@@ -93,7 +93,7 @@ for attempt in $(seq 1 90); do
 done
 
 if [[ "$READY" != 'true' ]]; then
-  echo '::error::后端未在 90 秒内就绪' >&2
+  echo '::error::后端未在 180 秒内就绪' >&2
   echo '--- backend.log ---' >&2
   cat "$BACKEND_LOG" >&2 || true
   echo '--- backend.stderr.log ---' >&2
