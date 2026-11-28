@@ -27,6 +27,12 @@ describe('Task 11 CI security regressions', () => {
     expect(backendScript).toContain("body.status === 'healthy' || body.status === 'degraded'")
     expect(runner).toContain("body.status !== 'healthy' && body.status !== 'degraded'")
     expect(backendScript).toContain("-H 'X-Requested-With: XMLHttpRequest'")
+    const workflow = readRepoFile('.github/workflows/miniapp-e2e.yml')
+    const initToken = workflow.match(/INIT_TOKEN:\s*([^\n]+)/)?.[1] ?? ''
+    expect(initToken.length).toBeGreaterThanOrEqual(32)
+    expect(initToken.toLowerCase()).not.toMatch(
+      /change-me|changeme|please-change-me|init-token|default|secret/,
+    )
   })
 
   it('strips URLs from every WeChat reqwest error', () => {

@@ -43,7 +43,7 @@ jobs:
       COOKIE_SECRET: ci-only-miniapp-e2e-cookie-secret-32bytes
       WEBHOOK_SECRET: ci-only-miniapp-e2e-webhook-secret-32bytes
       AUDIT_SECRET_KEY: ci-only-miniapp-e2e-audit-secret-32bytes
-      INIT_TOKEN: ci-only-miniapp-e2e-init-token-32bytes
+      INIT_TOKEN: Q7m4V9n2X8k5R1t6Y3u0I4o9P8s2D7fG
       APP_ENV: development
       ENV: development
       KAFKA_ENABLED: "false"
