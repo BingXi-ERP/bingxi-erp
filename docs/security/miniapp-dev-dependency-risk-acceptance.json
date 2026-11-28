@@ -5,7 +5,7 @@
   "expiresAt": "2026-12-31T23:59:59.000Z",
   "scope": "dev/build/test dependency tree only",
   "packages": [],
-  "rationale": "2026-11-28 依赖安全修复轮 3 后，生产依赖树 critical/high 为 0，dev critical 为 0，dev high 为 1（vite@5.2.8 聚合的 launch-editor Windows 开发服务器公告）。vite 必须固定 5.2.8 以满足 @dcloudio/vite-plugin-uni 的精确 peer；可清除 high 的 Vite 5.4.9+/6.4.4+ 均不满足该 peer，且 launch-editor 代码打包在 Vite 内，无法通过独立 override 修复。本文件仅登记待评估风险，不构成批准，status 保持 pending，未签署。",
+  "rationale": "2026-11-28 Vite 6.4.6 工具链升级后，生产依赖树与 dev/build/test 树的 critical/high 均为 0，当前没有需要接受的 dev critical/high 包。本文件不构成批准，status 保持 pending、未签署；若后续复扫出现新的 dev critical/high，必须另行精确评估并有效签署，不能沿用本次结论。",
   "controls": [
     "生产依赖树 critical/high 持续硬失败，不接受风险。",
     "dev 依赖不得打包进入小程序生产产物，发布前检查构建产物来源。",

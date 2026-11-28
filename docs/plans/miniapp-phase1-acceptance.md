@@ -5,28 +5,28 @@
 - 基线 HEAD：`5e8b00c5a2d9adad1263278ee68d1fac4c71d563`（完整 40 位；重放前远端 `main`，不是 Phase 1 变更提交）
 - 候选代码提交：见 PR #1404 的提交历史；验收 head SHA 以 GitHub 回读为准
 - 总体状态：**BLOCKED / NOT ACCEPTED**
-- 当前结论：**不可合并 main，不可发布**。最终复审的 8 项 findings 与残余波 F2/F3/F5/F6、E2E 路径触发缺口均已修复，并通过独立 scoped 复审；但 Vite dev-only 风险接受仍未签署，CI、真实微信构建与真机证据也尚未闭环。
+- 当前结论：**不可合并 main，不可发布**。最终复审的 8 项 findings 与残余波 F2/F3/F5/F6、E2E 路径触发缺口均已修复，并通过独立 scoped 复审；Vite 已升级至 6.4.6，本地审计 critical/high 清零，但新 HEAD 的真实微信构建、运行时 E2E Secrets 与真机证据尚未闭环。
 
 > 本文件不把“未运行”写成通过，不伪造 workflow run、制品、包体积或风险批准。勾选只在对应证据存在后更新。
 
 ## 1. 验收结论与阻断边界
 
-| 类别         | 当前结论                                                                       | 证据 / 下一步                                                                                                                                                                                                                                    | 负责人           |
-| ------------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
-| 生产依赖安全 | 本次审计 `productionBlockers=0`，不代表代码无缺陷或验收通过                    | 最终修复波 npm audit 分类报告；仍需新 HEAD 复扫与 scoped 复审                                                                                                                                                                                    | 小程序依赖维护者 |
-| 开发依赖安全 | dev critical = 0，dev high = 1                                                 | `vite@5.2.8` 聚合的 Windows dev-server `launch-editor` high；风险接受仍为 `pending`                                                                                                                                                              | 安全负责人       |
-| 本地质量     | 最终修复波与残余波 typecheck、lint、Prettier、完整 Vitest、架构/源码扫描均通过 | 最终波：[final-fix-evidence.txt](../../.superpowers/sdd/2026-11-27-miniapp-phase1-foundation/final-fix-evidence.txt)；残余波：[residual-fix-evidence.txt](../../.superpowers/sdd/2026-11-27-miniapp-phase1-foundation/residual-fix-evidence.txt) | 质量交付工程师   |
-| 审计门       | **失败，符合预期**                                                             | 退出码 1；`devRiskStatus=pending`，不得改写成绿色                                                                                                                                                                                                | 安全负责人       |
-| CI           | 两条独立工作流均未实跑                                                         | 无 run URL、job conclusion、构建产物或 E2E 制品                                                                                                                                                                                                  | 仓库维护者       |
-| 运行时       | Windows CI、uni-app 微信构建、automator 均未实跑                               | 必须由对应 PR 的 GitHub Actions 提供证据                                                                                                                                                                                                         | CI/测试负责人    |
-| 微信真机     | 真实手机号授权登录未验收                                                       | automator 只覆盖拒绝授权/缺码路径；真实授权是人工发布门                                                                                                                                                                                          | 产品/测试负责人  |
-| 旧版保护     | `miniprogram/` 与 `.github/workflows/ci-cd.yml` 无 diff                        | 本次 `git diff --name-only` 输出为空；旧版可部署性未重新构建                                                                                                                                                                                     | 仓库维护者       |
+| 类别         | 当前结论                                                             | 证据 / 下一步                                                                            | 负责人           |
+| ------------ | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------- |
+| 生产依赖安全 | 本次审计 `productionBlockers=0`，不代表代码无缺陷或验收通过          | 最终修复波 npm audit 分类报告；仍需新 HEAD 复扫与 scoped 复审                            | 小程序依赖维护者 |
+| 开发依赖安全 | Vite 6.4.6 升级后 dev critical/high 均为 0                           | 本地审计 `high=0 critical=0`；风险接受文件保持未签署，但当前无需接受包                   | 安全负责人       |
+| 本地质量     | Vite 升级后 typecheck、lint、Prettier、完整 Vitest、npm 审计门均通过 | 18 files / 309 tests；`npm ls` 无 invalid dependency；此前最终波与残余波证据保留         | 质量交付工程师   |
+| 审计门       | **通过**                                                             | 退出码 0；`productionBlockers=0`、`devBlockers=0`、`devRiskStatus=pending`（无待接受包） | 安全负责人       |
+| CI           | 主 CI 已通过；新 HEAD 的两条独立工作流待复跑                         | 主 CI run `46106185936` attempt 2 对应已推送 head；Vite 升级提交尚未推送                 | 仓库维护者       |
+| 运行时       | Windows CI、uni-app 微信构建、automator 均未实跑                     | 必须由对应 PR 的 GitHub Actions 提供证据                                                 | CI/测试负责人    |
+| 微信真机     | 真实手机号授权登录未验收                                             | automator 只覆盖拒绝授权/缺码路径；真实授权是人工发布门                                  | 产品/测试负责人  |
+| 旧版保护     | `miniprogram/` 与 `.github/workflows/ci-cd.yml` 无 diff              | 本次 `git diff --name-only` 输出为空；旧版可部署性未重新构建                             | 仓库维护者       |
 
 ### 阻断判定
 
 1. **代码侧最终复审已通过**：最终复审登记的 8 项 findings 及残余波 F2/F3/F5/F6、N1 均已修复，独立 scoped re-review 为 PASS（5/5 ADDRESSED），未发现新增 Critical/Important。
-2. **Vite 风险接受未签署**：`docs/security/miniapp-dev-dependency-risk-acceptance.json` 仍为 `status=pending`、`approvedBy=null`、`approvedAt=null`，审计门按设计失败关闭。签署前不得合并或发布。
-3. **CI 与真机证据未闭环**：Windows GitHub Actions、uni-app 微信构建、automator、真实 PostgreSQL 集成测试与真实微信设备验收尚未完成。未完成前不得合并或发布。
+2. **Vite 风险已通过升级消除**：Vite 6.4.6 升级后本地 dev critical/high 为 0，审计门通过；风险接受文件仍保持未签署，但没有待接受包，不得伪造批准。
+3. **新 HEAD 的 CI 与真机证据未闭环**：Vite 升级后的 uni-app 微信构建、六个 E2E Secrets、Windows automator 与真实微信设备验收尚未完成。未完成前不得合并或发布。
 4. 生产依赖 critical/high 不接受风险。若后续复扫出现生产 critical/high，必须升级、移除或隔离，不允许用 dev 风险接受覆盖。
 5. 本任务已提交并推送至 `feat/miniapp-rebuild-phase1`，PR #1404 已创建；独立工作流尚未成为分支保护必需检查，仓库管理员仍须将两条工作流设为 PR 必需检查。
 
@@ -34,8 +34,8 @@
 
 最终复审结论为 **NO-GO**，共 1 Critical、6 Important、1 Minor；残余修复波补入 1 项 Important 触发缺口。下表只登记本地修复状态，不将其等同于复审通过；逐文件明细与剩余 concern 见 [final-fix-report.md](../../.superpowers/sdd/2026-11-27-miniapp-phase1-foundation/final-fix-report.md)，残余波原始输出见 [residual-fix-evidence.txt](../../.superpowers/sdd/2026-11-27-miniapp-phase1-foundation/residual-fix-evidence.txt)。
 
-| ID  | 级别      | Finding                                                      | 当前修复状态               | 主要证据                                                                                                                                                                    |
-| --- | --------- | ------------------------------------------------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ID  | 级别      | Finding                                                      | 当前修复状态    | 主要证据                                                                                                                                                                    |
+| --- | --------- | ------------------------------------------------------------ | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | F1  | Critical  | 异步 auth guard 破坏 uni-app 同步 interceptor 契约           | scoped 复审通过 | guard 同步返回 options/false；验证后按原 method/options 重放；真实 interceptor 回调测试                                                                                     |
 | F2  | Important | npm audit 命令失败、畸形 JSON 或 metadata 计数不完整可能假绿 | scoped 复审通过 | 六个计数必填且为非负整数、total=各级之和、metadata 与漏洞明细对象逐级一致；反向覆盖 status=0/high=1/空明细、缺字段、非法数值和严重级错配                                    |
 | F3  | Important | dev 风险接受按包名放行，范围过宽                             | scoped 复审通过 | 包名、版本、安装节点、advisory URL/range/severity、scope 精确匹配；requiredEntries/acceptedEntries 双向差集为空；同包同版本多余 advisory 自证失败                           |
@@ -92,7 +92,7 @@
 | 源码扫描 self-test  | `node scripts/ci/miniapp-source-scan.mjs --self-test`                                                                        | `MINIAPP_SOURCE_SCAN_SELFTEST_OK`，退出码 0                                                                                           |
 | 源码实际扫描        | `node scripts/ci/miniapp-source-scan.mjs`                                                                                    | `MINIAPP_SOURCE_SCAN_OK`，退出码 0                                                                                                    |
 | npm audit self-test | `node scripts/ci/miniapp-npm-audit.mjs --self-test`                                                                          | `MINIAPP_NPM_AUDIT_SELFTEST_OK`，退出码 0                                                                                             |
-| npm audit gate      | `node scripts/ci/miniapp-npm-audit.mjs --markdown-output ... --json-output ...`                                              | **退出码 1，预期阻断**；`productionBlockers=0`、`devBlockers=1`、`devRiskStatus=pending`                                              |
+| npm audit gate      | `node scripts/ci/miniapp-npm-audit.mjs`                                                                                      | **退出码 0**；`productionBlockers=0`、`devBlockers=0`、`devRiskStatus=pending`（当前无待接受包）                                      |
 | 静态门 self-test    | `bash scripts/ci/miniapp-checks.sh --self-test`                                                                              | `MINIAPP_STATIC_SELFTEST_OK`，退出码 0                                                                                                |
 | 契约实际检查        | `node scripts/ci/miniapp-contract-check.mjs --root miniapp/src --snapshot frontend/scripts/route-snapshot.txt`               | `calls=4 failures=0`，退出码 0                                                                                                        |
 | 页面实际检查        | `node scripts/ci/miniapp-check-pages.mjs miniapp/src`                                                                        | `declared=2 missing=0`，退出码 0                                                                                                      |
@@ -103,12 +103,12 @@
 | Bash 语法           | `bash -n scripts/ci/miniapp-checks.sh scripts/ci/start-miniapp-e2e-backend.sh`                                               | 退出码 0                                                                                                                              |
 | 保护路径            | `git diff --name-only -- miniprogram/ .github/workflows/ci-cd.yml`                                                           | 空输出，退出码 0                                                                                                                      |
 
-审计摘要：`{"info":0,"low":12,"moderate":21,"high":1,"critical":0,"total":34}`。详细分类见 [npm audit 报告](miniapp-npm-audit.md)。
+Vite 6.4.6 升级后的审计摘要：`{"info":0,"low":13,"moderate":20,"high":0,"critical":0,"total":33}`；`npm ls --all --long --json` 通过。详细分类见 [npm audit 报告](miniapp-npm-audit.md)。
 
 验证边界与注意事项：
 
 - 本次完整 Vitest 是用户明确授权的本地例外；常规开发仍以 CI 为最终证据。
-- 未执行 `npm ci`、uni-app 构建、Rust 编译/测试、dev server、automator 或任何运行时 E2E。首次运行或锁文件变化后仍必须先清洁安装。
+- Vite 升级后已执行 `npm ci`（含 postinstall）、`npm ls`、typecheck 与 lint，均通过；未执行 uni-app 构建、Rust 编译/测试、dev server、automator 或任何运行时 E2E。真实构建仍由新 HEAD 的 CI 验证。
 - `scripts/ci/miniapp-checks.sh` 的 `miniapp/*.ts` 已覆盖 `miniapp/shims-uni.d.ts`；本轮 Prettier 还显式列出该 shim，不存在 CI 漏检结论。
 - 未生成真实微信构建产物，因此真实包体积仍必须由 CI 构建后登记；自证夹具的 2 KB 不是产物证据。
 - 最终修复波首轮完整 Vitest 暴露 3 个测试侧过期断言：两处仍期待旧中文错误文案，一处 upload step 文本切片吞入后续 `if: always()` 摘要步骤。已修正文案断言与 step 边界，未修改生产行为；随后完整套件通过。
@@ -121,7 +121,7 @@
 | 字段             | `miniapp-checks.yml`                                                                                                                   | `miniapp-e2e.yml`                                                                                                                                      |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 工作流           | [miniapp-checks.yml](../../.github/workflows/miniapp-checks.yml)                                                                       | [miniapp-e2e.yml](../../.github/workflows/miniapp-e2e.yml)                                                                                             |
-| 最终 head SHA    | PR #1404 head SHA（以 GitHub 回读为准）                                                                                                                      | PR #1404 head SHA（以 GitHub 回读为准）                                                                                                                                      |
+| 最终 head SHA    | PR #1404 head SHA（以 GitHub 回读为准）                                                                                                | PR #1404 head SHA（以 GitHub 回读为准）                                                                                                                |
 | Workflow run URL | 未执行                                                                                                                                 | 未执行                                                                                                                                                 |
 | Step Summary     | `if: always()`；优先完整 40 位 `HEAD_SHA`（PR head，非 PR 回退 `github.sha`）、`job.status`、审计、架构/源码、页数、真实体积（若存在） | `if: always()`；优先完整 40 位 `HEAD_SHA`（PR head，非 PR 回退 `github.sha`）、`job.status`、exit-code、测试数量/结果、制品路径与上传结果              |
 | Job / conclusion | `static`: 未执行                                                                                                                       | `e2e`: 未执行                                                                                                                                          |
@@ -136,14 +136,16 @@
 
 ### 7.1 风险接受签署
 
-安全负责人须审阅 [Vite 风险记录](miniapp-npm-audit.md) 与 [待签署 JSON](../security/miniapp-dev-dependency-risk-acceptance.json)，确认：
+Vite 6.4.6 升级后，生产树与 dev/build/test 树的 critical/high 均为 0，当前没有需要接受的包。[风险接受 JSON](../security/miniapp-dev-dependency-risk-acceptance.json) 保持 `pending`、未签署，不构成批准。
+
+若后续复扫出现新的 dev critical/high，安全负责人须审阅 [npm audit 报告](miniapp-npm-audit.md) 并确认：
 
 - 仅覆盖 dev/build/test 树，不覆盖生产依赖；
-- 风险包清单覆盖当前及复扫后的全部 dev critical/high；
+- 风险包清单精确覆盖当前及复扫后的全部 dev critical/high；
 - dev server 仅绑定回环、仅处理受信输入，不使用 `/__open-in-editor` 处理外部输入；
 - 签署人、签署时间、到期时间与缓解措施真实有效。
 
-Task 12 不代签、不修改 `pending`。若选择不接受风险，则升级 uni-app/Vite 工具链并重新验证 peer、构建、审计和运行时 E2E。
+Task 12 不代签、不把 `pending` 伪改为 `approved`。新风险出现时必须重新评估，不能沿用本次清零结论。
 
 `docs/security/miniapp-dev-dependency-risk-acceptance.json` 已加入 `miniapp-checks.yml` 的 `pull_request.paths` 与 `push.paths`。因此，单独签署该文件也会产生新的候选 HEAD，并在 PR 或推送到 `main` 时触发新的审计门。必须登记并审查该新 HEAD 的 workflow run、`static` job conclusion 与 npm 审计报告；签署前 HEAD 的通过结果不得复用为新 HEAD 证据。审计仍失败时，后续静态步骤不会执行，其他本地检查也不能替代该门。
 
