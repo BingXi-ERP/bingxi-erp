@@ -4,6 +4,7 @@ import { AUTH_ME_PATH } from './contracts'
 import { CSRF_KEY, csrfQueue } from './csrf'
 import { SAFE_METHODS } from './http-methods'
 import { logger } from './logger'
+import { resolveApiPath, type ApiPathParams } from './path'
 import { AppError, isAppError, normalizeError, normalizeSuccess } from './response'
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -16,6 +17,10 @@ interface RequestConfig {
   query?: Record<string, unknown>
   data?: unknown
   headers?: Record<string, string>
+}
+
+export interface RequestOptions {
+  pathParams?: ApiPathParams
 }
 
 /**
@@ -358,12 +363,14 @@ async function request<T = unknown>(config: RequestConfig): Promise<T> {
 }
 
 export const apiClient = {
-  get: <T = unknown>(path: string, query?: Record<string, unknown>) =>
-    request<T>({ method: 'GET', path, query }),
-  post: <T = unknown>(path: string, data?: unknown) => request<T>({ method: 'POST', path, data }),
-  put: <T = unknown>(path: string, data?: unknown) => request<T>({ method: 'PUT', path, data }),
-  delete: <T = unknown>(path: string, data?: unknown) =>
-    request<T>({ method: 'DELETE', path, data }),
+  get: <T = unknown>(path: string, query?: Record<string, unknown>, options?: RequestOptions) =>
+    request<T>({ method: 'GET', path: resolveApiPath(path, options?.pathParams), query }),
+  post: <T = unknown>(path: string, data?: unknown, options?: RequestOptions) =>
+    request<T>({ method: 'POST', path: resolveApiPath(path, options?.pathParams), data }),
+  put: <T = unknown>(path: string, data?: unknown, options?: RequestOptions) =>
+    request<T>({ method: 'PUT', path: resolveApiPath(path, options?.pathParams), data }),
+  delete: <T = unknown>(path: string, data?: unknown, options?: RequestOptions) =>
+    request<T>({ method: 'DELETE', path: resolveApiPath(path, options?.pathParams), data }),
 }
 
 export { AppError }

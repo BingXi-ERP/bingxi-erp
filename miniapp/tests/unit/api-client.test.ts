@@ -61,6 +61,20 @@ describe('apiClient', () => {
     expect(first?.url).toBe('https://erp.example.test/api/v1/erp/products?page=1&page_size=10')
   })
 
+  it('resolves path parameters before sending the request', async () => {
+    request.mockResolvedValue({
+      statusCode: 200,
+      data: okEnvelope([]),
+      header: {},
+    })
+
+    await apiClient.get('/api/v1/erp/products/{id}/colors', undefined, {
+      pathParams: { id: 42 },
+    })
+
+    expect(sentOptions(0)?.url).toBe('https://erp.example.test/api/v1/erp/products/42/colors')
+  })
+
   it('replays once with the recovered CSRF token', async () => {
     request
       .mockResolvedValueOnce({

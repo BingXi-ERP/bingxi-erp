@@ -14,15 +14,15 @@ import {
 } from '../../src/shared/api/contracts'
 
 const snapshotPath = resolve(import.meta.dirname, '../../../frontend/scripts/route-snapshot.txt')
-const registeredPaths = new Set(
-  readFileSync(snapshotPath, 'utf8')
-    .split(/\r?\n/)
-    .flatMap((line) => {
-      const apiPath = line.split('\t')[1]
-      if (!apiPath) return []
-      return [apiPath.replace(/\{[^}]+\}/g, '*').replace(/\$\{[^}]+\}/g, '*')]
-    }),
-)
+const registeredMethods = new Map<string, Set<string>>()
+for (const line of readFileSync(snapshotPath, 'utf8').split(/\r?\n/)) {
+  const [method, rawPath] = line.split('\t')
+  if (!method || !rawPath) continue
+  const apiPath = rawPath.replace(/\{[^}]+\}/g, '*').replace(/\$\{[^}]+\}/g, '*')
+  const methods = registeredMethods.get(apiPath) ?? new Set<string>()
+  methods.add(method)
+  registeredMethods.set(apiPath, methods)
+}
 
 const endpoints = [
   ['DASHBOARD_OVERVIEW_PATH', DASHBOARD_OVERVIEW_PATH, '/api/v1/erp/dashboard/overview'],
@@ -37,8 +37,9 @@ const endpoints = [
 ] as const
 
 describe('Phase 2 endpoint contracts', () => {
-  it.each(endpoints)('%s uses its full registered ERP path', (_name, actual, expected) => {
+  it.each(endpoints)('%s uses its full registered GET path', (_name, actual, expected) => {
+    const normalized = actual.replace(/\{[^}]+\}/g, '*')
     expect(actual).toBe(expected)
-    expect(registeredPaths.has(actual.replace(/\{[^}]+\}/g, '*'))).toBe(true)
+    expect(registeredMethods.get(normalized)?.has('GET')).toBe(true)
   })
 })

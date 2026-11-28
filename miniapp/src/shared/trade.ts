@@ -18,9 +18,25 @@ const SALES_ORDER_STATUSES = [
 ] as const
 
 const SALES_RETURN_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'COMPLETED'] as const
+const PAYMENT_STATUSES = ['pending', 'confirmed', 'cancelled'] as const
+const CUSTOMER_STATUSES = ['active', 'inactive', 'merged', 'blacklist'] as const
+const PRODUCT_STATUSES = ['active', 'inactive'] as const
+const COLOR_CARD_STATUSES = [
+  'draft',
+  'issued',
+  'received',
+  'used',
+  'expired',
+  'archived',
+  'lost',
+] as const
 
 export type SalesOrderStatus = (typeof SALES_ORDER_STATUSES)[number]
 export type SalesReturnStatus = (typeof SALES_RETURN_STATUSES)[number]
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number]
+export type CustomerStatus = (typeof CUSTOMER_STATUSES)[number]
+export type ProductStatus = (typeof PRODUCT_STATUSES)[number]
+export type ColorCardStatus = (typeof COLOR_CARD_STATUSES)[number]
 
 function parseDecimal(value: string): DecimalParts {
   const normalized = value.trim()
@@ -118,4 +134,32 @@ export function normalizeSalesReturnStatus(value: string): SalesReturnStatus {
     throw new Error(`Unknown sales return status: ${value}`)
   }
   return value as SalesReturnStatus
+}
+
+export function normalizePaymentStatus(value: string): PaymentStatus {
+  if (!(PAYMENT_STATUSES as readonly string[]).includes(value)) {
+    throw new Error(`Unknown payment status: ${value}`)
+  }
+  return value as PaymentStatus
+}
+
+export function normalizeCustomerStatus(value: string): CustomerStatus {
+  if (!(CUSTOMER_STATUSES as readonly string[]).includes(value)) {
+    throw new Error(`Unknown customer status: ${value}`)
+  }
+  return value as CustomerStatus
+}
+
+export function normalizeProductStatus(value: string): ProductStatus {
+  if (!(PRODUCT_STATUSES as readonly string[]).includes(value)) {
+    throw new Error(`Unknown product status: ${value}`)
+  }
+  return value as ProductStatus
+}
+
+export function normalizeColorCardStatus(value: string): ColorCardStatus {
+  if (!(COLOR_CARD_STATUSES as readonly string[]).includes(value)) {
+    throw new Error(`Unknown color card status: ${value}`)
+  }
+  return value as ColorCardStatus
 }

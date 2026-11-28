@@ -60,14 +60,67 @@ describe('StatusTag', () => {
     )
   })
 
-  it.each(['payment', 'customer', 'product', 'color-card'] as const)(
-    'fails explicitly for unsupported domain %s',
-    (domain) => {
-      expect(() => mountStatusTag({ domain, value: 'approved' })).toThrow(
-        'Unsupported status domain',
-      )
-    },
-  )
+  it.each([
+    ['pending', '待确认', 'warning'],
+    ['confirmed', '已确认', 'success'],
+    ['cancelled', '已取消', 'default'],
+  ] as const)('renders payment status %s', (value, label, type) => {
+    const wrapper = mountStatusTag({ domain: 'payment', value })
+    expect(wrapper.text()).toBe(label)
+    expect(wrapper.findComponent(TagStub).props('type')).toBe(type)
+  })
+
+  it.each([
+    ['active', '活跃', 'success'],
+    ['inactive', '停用', 'default'],
+    ['merged', '已合并', 'primary'],
+    ['blacklist', '黑名单', 'danger'],
+  ] as const)('renders customer status %s', (value, label, type) => {
+    const wrapper = mountStatusTag({ domain: 'customer', value })
+    expect(wrapper.text()).toBe(label)
+    expect(wrapper.findComponent(TagStub).props('type')).toBe(type)
+  })
+
+  it.each([
+    ['active', '启用', 'success'],
+    ['inactive', '停用', 'default'],
+  ] as const)('renders product status %s', (value, label, type) => {
+    const wrapper = mountStatusTag({ domain: 'product', value })
+    expect(wrapper.text()).toBe(label)
+    expect(wrapper.findComponent(TagStub).props('type')).toBe(type)
+  })
+
+  it.each([
+    ['draft', '草稿', 'default'],
+    ['issued', '已发放', 'primary'],
+    ['received', '已收回', 'primary'],
+    ['used', '已使用', 'success'],
+    ['expired', '已过期', 'warning'],
+    ['archived', '已归档', 'default'],
+    ['lost', '已丢失', 'danger'],
+  ] as const)('renders color card status %s', (value, label, type) => {
+    const wrapper = mountStatusTag({ domain: 'color-card', value })
+    expect(wrapper.text()).toBe(label)
+    expect(wrapper.findComponent(TagStub).props('type')).toBe(type)
+  })
+
+  it.each([
+    ['payment', 'PENDING', 'Unknown payment status'],
+    ['customer', 'ACTIVE', 'Unknown customer status'],
+    ['product', 'INACTIVE', 'Unknown product status'],
+    ['color-card', 'DRAFT', 'Unknown color card status'],
+  ] as const)('rejects wrong-case %s status tokens', (domain, value, message) => {
+    expect(() => mountStatusTag({ domain, value })).toThrow(message)
+  })
+
+  it.each([
+    ['payment', 'Unknown payment status'],
+    ['customer', 'Unknown customer status'],
+    ['product', 'Unknown product status'],
+    ['color-card', 'Unknown color card status'],
+  ] as const)('rejects unknown %s status tokens', (domain, message) => {
+    expect(() => mountStatusTag({ domain, value: 'unknown' })).toThrow(message)
+  })
 
   it('recomputes the label and tone when props change', async () => {
     const wrapper = mountStatusTag({ domain: 'sales-order', value: 'draft' })
@@ -88,6 +141,17 @@ describe('MoneyText', () => {
   ])('formats Decimal string %s without floating-point conversion', (value, expected) => {
     const wrapper = mount(MoneyText, { props: { value } })
     expect(wrapper.text()).toBe(expected)
+  })
+
+  it('formats ordinary negative Decimal strings', () => {
+    const wrapper = mount(MoneyText, { props: { value: '-12.50' } })
+    expect(wrapper.text()).toBe('-12.5')
+  })
+
+  it('recomputes the formatted value when props change', async () => {
+    const wrapper = mount(MoneyText, { props: { value: '10.00' } })
+    await wrapper.setProps({ value: '20.50' })
+    expect(wrapper.text()).toBe('20.5')
   })
 
   it('shows the localized currency prefix only when requested', async () => {
