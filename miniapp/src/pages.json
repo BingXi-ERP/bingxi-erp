@@ -59,6 +59,24 @@
       "style": {
         "navigationBarTitleText": "色卡详情"
       }
+    },
+    {
+      "path": "features/orders/pages/list/index",
+      "style": {
+        "navigationBarTitleText": "销售订单"
+      }
+    },
+    {
+      "path": "features/orders/pages/detail/index",
+      "style": {
+        "navigationBarTitleText": "订单详情"
+      }
+    },
+    {
+      "path": "features/orders/pages/create/index",
+      "style": {
+        "navigationBarTitleText": "新建订单"
+      }
     }
   ],
   "tabBar": {
@@ -67,6 +85,10 @@
       {
         "pagePath": "features/workspace/pages/index/index",
         "text": "工作台"
+      },
+      {
+        "pagePath": "features/orders/pages/list/index",
+        "text": "订单"
       }
     ]
   },

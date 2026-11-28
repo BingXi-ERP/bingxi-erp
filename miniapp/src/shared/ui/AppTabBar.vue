@@ -25,6 +25,7 @@ interface TabItem {
 
 const items: TabItem[] = [
   { path: '/features/workspace/pages/index/index', labelKey: 'tabBar.workspace' },
+  { path: '/features/orders/pages/list/index', labelKey: 'tabBar.orders' },
 ]
 
 function navigate(path: string) {
