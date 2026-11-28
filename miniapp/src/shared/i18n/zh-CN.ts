@@ -72,6 +72,14 @@ export const zhCN = {
     save: '保存',
     loadFailed: '客户数据加载失败，请重试',
   },
+  orders: {
+    title: '销售订单',
+    create: '新建订单',
+    orderNo: '订单号',
+    customer: '客户',
+    amount: '订单金额',
+    submitFailed: '订单提交失败，请重试',
+  },
   catalog: {
     productSearch: '搜索商品名称或编码',
     colorCardSearch: '搜索色卡名称或卡号',

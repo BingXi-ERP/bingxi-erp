@@ -6,7 +6,7 @@ interface DecimalParts {
 
 const DECIMAL_PATTERN = /^-?\d+(?:\.\d+)?$/
 
-const SALES_ORDER_STATUSES = [
+export const SALES_ORDER_STATUSES = [
   'draft',
   'pending',
   'approved',
@@ -84,6 +84,16 @@ export function calculateLineTotal(quantity: string, unitPrice: string): string 
   const right = parseDecimal(unitPrice)
   const units = left.units * right.units
   return formatDecimal(units, left.scale + right.scale, left.negative !== right.negative)
+}
+
+export function sumDecimals(values: readonly string[]): string {
+  const parsed = values.map(parseDecimal)
+  const scale = parsed.reduce((max, value) => Math.max(max, value.scale), 0)
+  const total = parsed.reduce((sum, value) => {
+    const units = value.units * 10n ** BigInt(scale - value.scale)
+    return sum + (value.negative ? -units : units)
+  }, 0n)
+  return formatDecimal(total < 0n ? -total : total, scale, total < 0n)
 }
 
 export function compareDecimals(leftValue: string, rightValue: string): -1 | 0 | 1 {

@@ -7,6 +7,7 @@ import {
   normalizePageQuery,
   normalizeSalesOrderStatus,
   normalizeSalesReturnStatus,
+  sumDecimals,
 } from '../../src/shared/trade'
 
 describe('trade decimal helpers', () => {
@@ -23,6 +24,11 @@ describe('trade decimal helpers', () => {
   it('calculates line totals exactly', () => {
     expect(calculateLineTotal('12.345', '7.890')).toBe('97.40205')
     expect(calculateLineTotal('0', '7.890')).toBe('0')
+  })
+
+  it('sums decimals exactly across different scales', () => {
+    expect(sumDecimals(['97.40205', '20.00', '-0.00205'])).toBe('117.4')
+    expect(sumDecimals([])).toBe('0')
   })
 
   it('compares decimals exactly across different scales', () => {

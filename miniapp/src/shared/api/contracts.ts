@@ -50,6 +50,20 @@ export const COLOR_CARD_ITEMS_PATH = `${COLOR_CARD_DETAIL_PATH}/items`
 
 export const ORDERS_PATH = `${API_BASE_PATH}/sales/orders`
 
+export const ORDER_DETAIL_PATH = `${ORDERS_PATH}/{id}`
+
+export const ORDER_SUBMIT_PATH = `${ORDER_DETAIL_PATH}/submit`
+
+export const ORDER_APPROVE_PATH = `${ORDER_DETAIL_PATH}/approve`
+
+export const ORDER_REJECT_PATH = `${ORDER_DETAIL_PATH}/reject`
+
+export const ORDER_CANCEL_PATH = `${ORDER_DETAIL_PATH}/cancel`
+
+export const ORDER_SHIP_PATH = `${ORDER_DETAIL_PATH}/ship`
+
+export const ORDER_COMPLETE_PATH = `${ORDER_DETAIL_PATH}/complete`
+
 export const PAYMENTS_PATH = `${API_BASE_PATH}/ar/payments`
 
 export const PRINT_TASKS_PATH = `${API_BASE_PATH}/print-tasks`
