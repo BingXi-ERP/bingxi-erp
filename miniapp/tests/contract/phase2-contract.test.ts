@@ -12,6 +12,7 @@ import {
   ORDERS_PATH,
   PAYMENT_DETAIL_PATH,
   PAYMENTS_PATH,
+  PRINT_TASK_DETAIL_PATH,
   PRINT_TASKS_PATH,
   COLOR_CARD_DETAIL_PATH,
   COLOR_CARD_ITEMS_PATH,
@@ -57,6 +58,7 @@ const endpoints = [
   ['PAYMENTS_PATH', PAYMENTS_PATH, '/api/v1/erp/ar/payments'],
   ['PAYMENT_DETAIL_PATH', PAYMENT_DETAIL_PATH, '/api/v1/erp/ar/payments/{id}'],
   ['PRINT_TASKS_PATH', PRINT_TASKS_PATH, '/api/v1/erp/print-tasks'],
+  ['PRINT_TASK_DETAIL_PATH', PRINT_TASK_DETAIL_PATH, '/api/v1/erp/print-tasks/{id}'],
   ['SALES_RETURNS_PATH', SALES_RETURNS_PATH, '/api/v1/erp/sales/sales-returns'],
   ['SALES_RETURN_DETAIL_PATH', SALES_RETURN_DETAIL_PATH, '/api/v1/erp/sales/sales-returns/{id}'],
   [

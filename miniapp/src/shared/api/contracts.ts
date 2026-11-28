@@ -74,6 +74,8 @@ export const PAYMENT_CANCEL_PATH = `${PAYMENT_DETAIL_PATH}/cancel`
 
 export const PRINT_TASKS_PATH = `${API_BASE_PATH}/print-tasks`
 
+export const PRINT_TASK_DETAIL_PATH = `${PRINT_TASKS_PATH}/{id}`
+
 export const SALES_RETURNS_PATH = `${API_BASE_PATH}/sales/sales-returns`
 
 export const SALES_RETURN_DETAIL_PATH = `${SALES_RETURNS_PATH}/{id}`
