@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { API_BASE_URL, apiUrl, apiWsUrl } from '@/api/base-url';
+import { exportColorCardUrl } from '@/api/color-card';
 
 const srcRoot = resolve(process.cwd(), 'src');
 
@@ -26,6 +27,10 @@ describe('SPA API 前缀单源', () => {
     expect(apiWsUrl('/ws/notifications', 'http://api.example.com/api/v1/erp')).toBe(
       'ws://api.example.com/api/v1/erp/ws/notifications'
     );
+  });
+
+  it('色卡导出下载地址复用 API 前缀', () => {
+    expect(exportColorCardUrl(42)).toBe(`${API_BASE_URL}/color-cards/export/42`);
   });
 
   it('request 与 raw fetch 不得再传完整 ERP 前缀', () => {
