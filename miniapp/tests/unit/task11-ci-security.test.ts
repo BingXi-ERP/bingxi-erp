@@ -59,9 +59,15 @@ describe('Task 11 CI security regressions', () => {
       .slice(workflow.indexOf('- uses: actions/upload-artifact@'))
       .split(/\r?\n {6}- /, 1)[0]
 
+    const configStep = workflow.match(
+      /- name: 校验运行时 E2E 配置\r?\n([\s\S]*?)(?=\r?\n {6}- )/,
+    )?.[1]
+    expect(configStep).toContain('id: config')
     expect(scanStep).toContain('id: scan_artifacts')
     expect(scanStep).toContain('if: always()')
-    expect(uploadStep).toContain("if: always() && steps.scan_artifacts.outcome == 'success'")
+    expect(uploadStep).toContain(
+      "if: always() && steps.config.outcome == 'success' && steps.scan_artifacts.outcome == 'success'",
+    )
     expect(uploadStep).not.toMatch(/\r?\n {8}if: always\(\)\r?\n/)
     expect(workflow).not.toContain('path: miniapp/test-results/')
     expect(workflow).toContain('miniapp/test-results/e2e.json')

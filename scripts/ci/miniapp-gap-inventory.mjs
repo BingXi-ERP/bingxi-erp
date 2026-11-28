@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // 旧小程序后端能力静态盘点：只读取声明页与 require 图，不执行旧工程代码。
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";

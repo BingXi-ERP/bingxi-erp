@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // miniapp 契约门禁：用 TypeScript Compiler API 解析源码，不执行被测工程代码。
 // 业务红包含旧端点/旧分页键、未注册路径、不可解析调用与契约常量。
 // 判定器异常（TOOL_BUG/DETECTOR_BLIND）退出 2，不得被当成绿。

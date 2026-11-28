@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // pages.json 声明页与磁盘源码对账：缺页是业务红，配置或扫描异常是判定器故障。
 
 import { existsSync, readFileSync, statSync } from "node:fs";

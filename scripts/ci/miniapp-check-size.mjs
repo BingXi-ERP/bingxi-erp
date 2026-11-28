@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // 微信构建产物体积门：递归统计所有文件字节，扫描空目录按判定器故障处理。
 
 import { existsSync, readdirSync, statSync } from "node:fs";

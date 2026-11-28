@@ -64,6 +64,7 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: 校验运行时 E2E 配置
+        id: config
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -188,6 +189,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Continue'
           $backendPidFile = 'miniapp/test-results/backend.pid'
           if (Test-Path -LiteralPath $backendPidFile) {
             $backendPid = [int](Get-Content -LiteralPath $backendPidFile -Raw).Trim()
@@ -198,7 +200,14 @@ jobs:
             $automatorPid = [int](Get-Content -LiteralPath $automatorPidFile -Raw).Trim()
             Stop-Process -Id $automatorPid -Force -ErrorAction SilentlyContinue
           }
-          docker rm -f miniapp-postgres 2>$null | Out-Null
+          if (Get-Command docker -ErrorAction SilentlyContinue) {
+            docker rm -f miniapp-postgres 2>$null | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+              Write-Warning 'PostgreSQL 容器清理失败；runner 为一次性环境，不影响主失败判定。'
+            }
+          } else {
+            Write-Warning 'docker 不可用，跳过 PostgreSQL 容器清理。'
+          }
 
       - name: 脱敏并强制扫描 E2E 制品
         id: scan_artifacts
@@ -208,7 +217,7 @@ jobs:
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         id: upload_artifacts
-        if: always() && steps.scan_artifacts.outcome == 'success'
+        if: always() && steps.config.outcome == 'success' && steps.scan_artifacts.outcome == 'success'
         with:
           name: miniapp-e2e-results
           path: |

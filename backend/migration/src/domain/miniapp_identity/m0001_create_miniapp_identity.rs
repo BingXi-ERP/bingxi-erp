@@ -11,46 +11,48 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager.create_table(
-            Table::create()
-                .table(MiniappIdentity::Table)
-                .col(
-                    ColumnDef::new(MiniappIdentity::Id)
-                        .big_integer()
-                        .auto_increment()
-                        .primary_key(),
-                )
-                .col(ColumnDef::new(MiniappIdentity::Appid).string().not_null())
-                .col(ColumnDef::new(MiniappIdentity::Openid).string().not_null())
-                .col(ColumnDef::new(MiniappIdentity::UserId).integer().not_null())
-                .col(
-                    ColumnDef::new(MiniappIdentity::CreatedAt)
-                        .date_time()
-                        .default(SimpleExpr::current_timestamp())
-                        .not_null(),
-                )
-                .col(
-                    ColumnDef::new(MiniappIdentity::UpdatedAt)
-                        .date_time()
-                        .default(SimpleExpr::current_timestamp())
-                        .not_null(),
-                )
-                .foreign_key(
-                    ForeignKey::create()
-                        .name("fk_miniapp_identity_user")
-                        .from(MiniappIdentity::UserId)
-                        .to(Users::Table, Users::Id)
-                        .on_delete(ForeignKeyAction::Cascade),
-                )
-                .index(
-                    Index::create()
-                        .name("uq_miniapp_identity_appid_openid")
-                        .unique()
-                        .col(MiniappIdentity::Appid)
-                        .col(MiniappIdentity::Openid),
-                )
-                .to_owned(),
-        )
+        manager
+            .create_table(
+                Table::create()
+                    .table(MiniappIdentity::Table)
+                    .col(
+                        ColumnDef::new(MiniappIdentity::Id)
+                            .big_integer()
+                            .auto_increment()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(MiniappIdentity::Appid).string().not_null())
+                    .col(ColumnDef::new(MiniappIdentity::Openid).string().not_null())
+                    .col(ColumnDef::new(MiniappIdentity::UserId).integer().not_null())
+                    .col(
+                        ColumnDef::new(MiniappIdentity::CreatedAt)
+                            .date_time()
+                            .default(SimpleExpr::current_timestamp())
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(MiniappIdentity::UpdatedAt)
+                            .date_time()
+                            .default(SimpleExpr::current_timestamp())
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_miniapp_identity_user")
+                            .from(MiniappIdentity::Table, MiniappIdentity::UserId)
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .index(
+                        Index::create()
+                            .name("uq_miniapp_identity_appid_openid")
+                            .unique()
+                            .col(MiniappIdentity::Appid)
+                            .col(MiniappIdentity::Openid),
+                    )
+                    .to_owned(),
+            )
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
