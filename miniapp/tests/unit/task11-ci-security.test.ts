@@ -33,6 +33,8 @@ describe('Task 11 CI security regressions', () => {
     expect(initToken.toLowerCase()).not.toMatch(
       /change-me|changeme|please-change-me|init-token|default|secret/,
     )
+    expect(workflow).toContain("Join-Path $_.FullName 'Default'")
+    expect(workflow).toContain('New-Item -ItemType Directory -Force')
   })
 
   it('strips URLs from every WeChat reqwest error', () => {

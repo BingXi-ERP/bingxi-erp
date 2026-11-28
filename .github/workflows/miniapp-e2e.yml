@@ -163,6 +163,12 @@ jobs:
           $project = Join-Path $env:GITHUB_WORKSPACE 'miniapp/dist/build/mp-weixin'
           $stdout = Join-Path $env:GITHUB_WORKSPACE 'miniapp/test-results/automator.stdout.log'
           $stderr = Join-Path $env:GITHUB_WORKSPACE 'miniapp/test-results/automator.stderr.log'
+          $userData = Join-Path $env:LOCALAPPDATA '微信开发者工具\User Data'
+          if (Test-Path -LiteralPath $userData) {
+            Get-ChildItem -LiteralPath $userData -Directory | ForEach-Object {
+              New-Item -ItemType Directory -Force -Path (Join-Path $_.FullName 'Default') | Out-Null
+            }
+          }
           $process = Start-Process -FilePath $cli `
             -ArgumentList @('auto', '--project', $project, '--auto-port', '9420') `
             -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
