@@ -99,28 +99,79 @@ function sensitiveLiteral(name, value) {
   );
 }
 
-function codeLiterals(file, contents) {
-  const templateLiterals = [];
-  if (file.endsWith(".vue")) {
-    const template =
-      contents.match(/<template\b[^>]*>([\s\S]*?)<\/template>/)?.[1] ?? "";
-    const cleaned = template.replace(/<!--[\s\S]*?-->/g, "");
-    for (const match of cleaned.matchAll(/>([^<>]+)</g)) {
-      const value = match[1].replace(/\{\{[\s\S]*?\}\}/g, "").trim();
-      if (value) templateLiterals.push({ value, name: "", line: 1 });
-    }
-    for (const match of cleaned.matchAll(
-      /([A-Za-z_:][\w:.-]*)\s*=\s*(["'])(.*?)\2/gs,
-    )) {
-      if (!match[1].startsWith(":")) {
-        templateLiterals.push({ value: match[3], name: match[1], line: 1 });
-      }
+function vueTemplateLiterals(contents) {
+  const template =
+    contents.match(/<template\b[^>]*>([\s\S]*?)<\/template>/)?.[1] ?? "";
+  const cleaned = template.replace(new RegExp("<!--[\\s\\S]*?-->", "g"), "");
+  const literals = [];
+  for (const match of cleaned.matchAll(/>([^<>]+)</g)) {
+    const value = match[1].replace(/\{\{[\s\S]*?\}\}/g, "").trim();
+    if (value) literals.push({ value, name: "", line: 1 });
+  }
+  for (const match of cleaned.matchAll(
+    /([A-Za-z_:][\w:.-]*)\s*=\s*(["'])(.*?)\2/gs,
+  )) {
+    if (!match[1].startsWith(":")) {
+      literals.push({ value: match[3], name: match[1], line: 1 });
     }
   }
-  const start = file.endsWith(".vue")
-    ? contents.match(/<script\b[^>]*>([\s\S]*?)<\/script>/)?.[1]
-    : contents;
-  if (start === undefined) return [];
+  return literals;
+}
+
+function scriptSource(file, contents) {
+  if (!file.endsWith(".vue")) return contents;
+  return contents.match(/<script\b[^>]*>([\s\S]*?)<\/script>/)?.[1];
+}
+
+function addLiteral(literals, source, node, value, name = "") {
+  const line =
+    source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+  literals.push({ value, name, line });
+}
+
+function visitLiteralNodes(node, source, literals) {
+  if (
+    ts.isStringLiteralLike(node) ||
+    ts.isNoSubstitutionTemplateLiteral(node)
+  ) {
+    addLiteral(literals, source, node, node.text);
+  } else if (ts.isTemplateExpression(node)) {
+    addLiteral(literals, source, node.head, node.head.text);
+    for (const span of node.templateSpans)
+      addLiteral(literals, source, span.literal, span.literal.text);
+  }
+  if (
+    (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name)) ||
+    (ts.isPropertyAssignment(node) && ts.isStringLiteralLike(node.name))
+  ) {
+    const initializer = node.initializer;
+    if (ts.isStringLiteralLike(initializer))
+      addLiteral(
+        literals,
+        source,
+        initializer,
+        initializer.text,
+        node.name.text,
+      );
+  }
+  if (
+    ts.isVariableDeclaration(node) &&
+    ts.isIdentifier(node.name) &&
+    node.initializer &&
+    ts.isStringLiteralLike(node.initializer)
+  ) {
+    addLiteral(
+      literals,
+      source,
+      node.initializer,
+      node.initializer.text,
+      node.name.text,
+    );
+  }
+  ts.forEachChild(node, (child) => visitLiteralNodes(child, source, literals));
+}
+
+function scriptLiterals(file, start) {
   const source = ts.createSourceFile(
     file,
     start,
@@ -129,42 +180,17 @@ function codeLiterals(file, contents) {
     file.endsWith(".vue") ? ts.ScriptKind.TS : ts.ScriptKind.TSX,
   );
   const literals = [];
-  function add(node, value, name = "") {
-    const line =
-      source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
-    literals.push({ value, name, line });
-  }
-  function visit(node) {
-    if (
-      ts.isStringLiteralLike(node) ||
-      ts.isNoSubstitutionTemplateLiteral(node)
-    ) {
-      add(node, node.text);
-    } else if (ts.isTemplateExpression(node)) {
-      add(node.head, node.head.text);
-      for (const span of node.templateSpans)
-        add(span.literal, span.literal.text);
-    }
-    if (
-      (ts.isPropertyAssignment(node) && ts.isIdentifier(node.name)) ||
-      (ts.isPropertyAssignment(node) && ts.isStringLiteralLike(node.name))
-    ) {
-      const initializer = node.initializer;
-      if (ts.isStringLiteralLike(initializer))
-        add(initializer, initializer.text, node.name.text);
-    }
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.initializer &&
-      ts.isStringLiteralLike(node.initializer)
-    ) {
-      add(node.initializer, node.initializer.text, node.name.text);
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(source);
-  return [...templateLiterals, ...literals];
+  visitLiteralNodes(source, source, literals);
+  return literals;
+}
+
+function codeLiterals(file, contents) {
+  const templateLiterals = file.endsWith(".vue")
+    ? vueTemplateLiterals(contents)
+    : [];
+  const start = scriptSource(file, contents);
+  if (start === undefined) return [];
+  return [...templateLiterals, ...scriptLiterals(file, start)];
 }
 
 function envLiterals(contents) {
