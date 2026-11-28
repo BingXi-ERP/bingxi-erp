@@ -107,6 +107,31 @@ fn test_scddztcl_dxfgyzx() {
     }
 }
 
+/// 流转卡只有一套数据库写入词表；禁止再引入无人引用的大写镜像别名。
+#[test]
+fn flow_card_status_vocabulary_has_no_uppercase_mirror() {
+    let source = include_str!("../src/models/status/production.rs");
+    let start = source
+        .find("pub mod flow_card {")
+        .expect("flow_card 状态模块缺失，需同步状态契约");
+    let end = source[start..]
+        .find("/// 工序流转记录状态")
+        .expect("flow_card 状态模块边界缺失，需人工核对");
+    let body = &source[start..start + end];
+    for alias in [
+        "PENDING_UPPER",
+        "SCHEDULED_UPPER",
+        "COMPLETED_UPPER",
+        "SHIPPED_UPPER",
+        "TERMINATED_UPPER",
+    ] {
+        assert!(
+            !body.contains(alias),
+            "流转卡 DB 状态保持小写，禁止恢复大写镜像别名 {alias}"
+        );
+    }
+}
+
 // ===== Service 实例化与 DB 异常路径 =====
 
 /// 验证 new(db) 仅存储 Arc<DatabaseConnection>，不执行任何 DB 查询。
