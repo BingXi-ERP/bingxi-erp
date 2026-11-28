@@ -56,6 +56,29 @@ fn test_init_test_database_public_with_handler_guards() {
     assert!(!is_public_path("/api/v1/erp/init/test-database/sub"));
 }
 
+#[test]
+fn self_service_paths_skip_rbac_but_keep_csrf_protection() {
+    for path in [
+        "/api/v1/erp/users/me",
+        "/api/v1/erp/user/profile",
+        "/api/v1/erp/user/avatar",
+    ] {
+        assert!(
+            is_self_service_path(path),
+            "自服务路径应免业务权限码: {path}"
+        );
+        assert!(
+            !is_auth_only_path(path),
+            "自服务写路径不得进入 CSRF 豁免清单: {path}"
+        );
+        assert!(!is_public_path(path), "自服务路径仍必须认证: {path}");
+    }
+
+    assert!(!is_self_service_path("/api/v1/erp/users/123"));
+    assert!(!is_self_service_path("/api/v1/erp/user/profile/extra"));
+    assert!(!is_self_service_path("/api/v1/erp/user/avatar-bypass"));
+}
+
 /// P1-03-2 修复：严格精确匹配，子路径不再放行
 #[test]
 fn test_public_paths_strict_exact() {

@@ -1,7 +1,7 @@
 use crate::container::AppState;
 use crate::middleware::auth_context::AuthContext;
 use crate::middleware::public_routes::{
-    is_auth_only_path, is_customer_portal_read_path, is_public_path,
+    is_auth_only_path, is_customer_portal_read_path, is_public_path, is_self_service_path,
 };
 use crate::models::audit_log::{OperationType, Severity};
 use crate::models::role_permission;
@@ -104,13 +104,15 @@ pub async fn permission_middleware(
 
     // 认证豁免 RBAC 路径（自服务端点）：仅需 JWT 认证，不查业务权限码，
     // 也不要求 role_id。
-    // 本判定必须在 extract_role_id **之前**：白名单里三个端点（/auth/me、/ws/ticket、
-    // /users/change-password）都只按调用者自身身份工作、不需要任何业务权限码；
-    // 若先取 role_id，未分配角色的账号连"读自己的身份/改自己的密码"都会被
-    // extract_role_id 的固定 403「没有关联角色」拦死（与 /auth/me 曾有的
+    // 本判定必须在 extract_role_id **之前**：这些端点都只按调用者自身身份工作、
+    // 不需要任何业务权限码；若先取 role_id，未分配角色的账号连"读自己的身份/改自己的密码"
+    // 都会被 extract_role_id 的固定 403「没有关联角色」拦死（与 /auth/me 曾有的
     // 「刷新即 403 跳登录」同型故障，只是命中的是改密自助面）。
     // 越权面不因此放宽：跳过 RBAC 后各 handler 自身的"只操作 auth.user_id"约束不变。
-    if is_auth_only_path(path) || is_customer_portal_read_path(path, method.as_str()) {
+    if is_auth_only_path(path)
+        || is_self_service_path(path)
+        || is_customer_portal_read_path(path, method.as_str())
+    {
         tracing::debug!(
             "认证豁免 RBAC 路径放行: path={}, user_id={}",
             path,

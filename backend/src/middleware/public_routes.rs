@@ -3,9 +3,10 @@
 //! 安全原则：最小化公开端点，仅保留认证必需和基础设施健康检查。
 //! 所有业务端点必须经过 JWT 验证。
 //!
-//! 两类清单语义不同，均集中在此模块维护，避免各中间件各存一份副本而产生豁免漂移：
+//! 三类清单语义不同，均集中在此模块维护，避免各中间件各存一份副本而产生豁免漂移：
 //! - [`PUBLIC_PATHS`]：完全匿名，跳过 JWT 认证
 //! - [`AUTH_ONLY_PATHS`]：仍需 JWT 认证，但跳过 CSRF 一次性 token 消费与 RBAC 权限码校验
+//! - [`SELF_SERVICE_PATHS`]：仍需 JWT 认证与 CSRF 校验，仅跳过 RBAC 权限码校验
 
 pub const PUBLIC_PATHS: &[&str] = &[
     // 基础设施健康检查（负载均衡器 / 监控探针，无需认证）
@@ -118,6 +119,23 @@ pub const AUTH_ONLY_PATHS: &[&str] = &[
     "/api/v1/erp/users/change-password",
     "/api/v1/erp/company-profile",
 ];
+
+/// 自服务路径：仅跳过 RBAC，不跳过 CSRF。
+///
+/// 这些端点都只按 `auth.user_id` 读写调用者本人数据，但 `/user/profile` 与 `/user/avatar`
+/// 是写操作，必须继续消费 CSRF 令牌；不能放进 `AUTH_ONLY_PATHS`。普通员工也不应被迫持有
+/// `users:create/update` 等管理员权限才能维护自己的资料。
+pub const SELF_SERVICE_PATHS: &[&str] = &[
+    "/api/v1/erp/users/me",
+    "/api/v1/erp/user/profile",
+    "/api/v1/erp/user/avatar",
+];
+
+/// 路径是否仅需认证的自服务端点（精确匹配，不做前缀放行）。
+pub fn is_self_service_path(path: &str) -> bool {
+    let clean_path = path.split(['?', '#']).next().unwrap_or(path);
+    SELF_SERVICE_PATHS.contains(&clean_path)
+}
 
 /// 客户门户只读路径（独立于 [`AUTH_ONLY_PATHS`] 的精确清单）。
 ///
